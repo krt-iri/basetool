@@ -17,14 +17,15 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Spezialkommando (SK) flow (UC-11): an admin manages an SK as a first-class OrgUnit, and the
- * documented limitation holds — an SK cannot (yet) own a staffel aggregate, because the legacy
- * {@code owning_squadron_id} column is still {@code NOT NULL}, so the picker resolver rejects SK
- * ownership with HTTP 400 until the destructive cleanup release.
+ * documented limitation holds — a not-yet-profit-eligible SK cannot be the responsible (processing)
+ * unit of a job order. Only profit-eligible org units process orders (V128), and a freshly created
+ * SK is not profit-eligible by default, so naming it as the responsible unit returns HTTP 400.
  *
  * <ul>
  *   <li>Lifecycle (UI): the admin creates an SK via {@code /admin/special-commands} and it appears
  *       in the list.
- *   <li>Limitation (API): naming an SK as a job order's creating OrgUnit returns 400.
+ *   <li>Limitation (API): naming a non-profit-eligible SK as a job order's responsible OrgUnit
+ *       returns 400.
  * </ul>
  */
 @Tag("e2e")
@@ -102,9 +103,9 @@ class SpecialCommandE2eTest {
   }
 
   /**
-   * Naming a Spezialkommando as a job order's creating OrgUnit returns HTTP 400 (the resolver
-   * rejects SK ownership while the legacy {@code owning_squadron_id} column stays {@code NOT
-   * NULL}).
+   * Naming a not-yet-profit-eligible Spezialkommando as a job order's responsible (processing)
+   * OrgUnit returns HTTP 400 — only profit-eligible org units may process orders, and a freshly
+   * created SK is not eligible by default.
    */
   @Test
   void specialCommandCannotOwnAJobOrder() {
@@ -120,6 +121,9 @@ class SpecialCommandE2eTest {
                 700,
                 50);
     assertEquals(
-        400, status, "an SK named as a job order's creating OrgUnit must be rejected with 400");
+        400,
+        status,
+        "a non-profit-eligible SK named as a job order's responsible OrgUnit must be rejected with"
+            + " 400");
   }
 }

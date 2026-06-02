@@ -77,7 +77,8 @@ class CrossStaffelJobOrderE2eTest {
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E CrossStaffel Mat");
       String bLocationId =
           seeder.createLocation(ADMIN_USER, ADMIN_PASSWORD, "E2E CrossStaffel Loc");
-      // Staffel A's order (creatingSquadronId = A, since the admin token has no active pin).
+      // Staffel A's order: A (IRIDIUM) is named the responsible (processing) unit, so the order is
+      // private to A + admins — which the Officer-of-A view in the test below relies on.
       jobOrderId =
           seeder.createJobOrder(
               ADMIN_USER,

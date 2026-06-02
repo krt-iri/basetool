@@ -53,6 +53,19 @@ public final class E2eStackExtension implements BeforeAllCallback {
   /** Local image tag the compose build override tags the freshly built images with. */
   private static final String IMAGE_TAG = "e2e-local";
 
+  /** Canonical IRIDIUM Squadron id, opted into Job-Order processing during bootstrap. */
+  private static final String IRIDIUM_SQUADRON_ID = "00000000-0000-0000-0000-000000000001";
+
+  /**
+   * Throwaway admin username from {@code realm-export.e2e.json}, used once during bootstrap to opt
+   * the IRIDIUM Squadron into Job-Order processing. Never reuse; never substitute production
+   * values.
+   */
+  private static final String E2E_ADMIN_USER = "test-admin";
+
+  /** Throwaway admin password matching {@link #E2E_ADMIN_USER} in {@code realm-export.e2e.json}. */
+  private static final String E2E_ADMIN_PASSWORD = "test-admin-pw";
+
   /** Max time to wait for one {@code docker compose up --build --wait} attempt to finish. */
   private static final Duration UP_TIMEOUT = Duration.ofMinutes(12);
 
@@ -166,7 +179,15 @@ public final class E2eStackExtension implements BeforeAllCallback {
       // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
       // method) the admin REST API cannot create on a fresh DB — unblocks the Refinery/Hangar
       // flows.
-      new BackendSeeder().seedCatalog();
+      BackendSeeder seeder = new BackendSeeder();
+      seeder.seedCatalog();
+      // Opt the canonical IRIDIUM Squadron into Job-Order processing exactly once, before any test
+      // page warms the frontend's 10-minute squadrons-catalog cache. Only profit-eligible org units
+      // may be a job order's responsible (processing) unit (V128); without this the create form's
+      // responsible picker stays empty and every order-create / handover flow 400s. Seeding it here
+      // (not per test class) guarantees the cache never pins a stale not-eligible snapshot.
+      seeder.setSquadronProfitEligible(
+          E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID, true);
       started = true;
       context
           .getRoot()

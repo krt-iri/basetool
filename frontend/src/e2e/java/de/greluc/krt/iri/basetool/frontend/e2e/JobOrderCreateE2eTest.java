@@ -6,6 +6,7 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
@@ -17,12 +18,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 /**
  * Functional flow: create a Job Order through the UI and verify it appears in the order list.
  *
- * <p>Job Orders are cross-staffel (no OrgUnit-scope filter), but the create form's {@code
- * requestingOrgUnitId} dropdown is populated from the caller's memberships and its material
- * dropdown only lists {@code isJobOrder=true} materials — so {@link BackendSeeder} seeds the
- * IRIDIUM membership and one job-order material in {@link #setUp()}. Uses the {@code
- * order-material-*} / {@code order-submit} hooks on the create form and {@code order-row} on the
- * index, with the reused authenticated session from {@link E2eSupport#authenticatedStorageState}.
+ * <p>Job Orders are cross-staffel (no OrgUnit-scope filter). The create form carries two org-unit
+ * pickers: the responsible (processing) unit — restricted to profit-eligible org units — and the
+ * requesting (customer) unit. IRIDIUM is opted into profit-eligibility once at stack bootstrap
+ * ({@link E2eStackExtension}) so it offers in the responsible picker; {@link BackendSeeder} seeds
+ * the IRIDIUM membership and one {@code isJobOrder=true} material in {@link #setUp()}. Uses the
+ * {@code order-material-*} / {@code order-submit} hooks on the create form and {@code order-row} on
+ * the index, with the reused authenticated session from {@link
+ * E2eSupport#authenticatedStorageState}.
  */
 @Tag("e2e")
 class JobOrderCreateE2eTest {
@@ -67,8 +70,8 @@ class JobOrderCreateE2eTest {
   }
 
   /**
-   * Fills and submits the job-order create form (requesting org-unit, contact handle, one material
-   * row) and asserts an order then appears in the order list.
+   * Fills and submits the job-order create form (responsible org-unit, requesting org-unit, contact
+   * handle, one material row) and asserts an order then appears in the order list.
    */
   @Test
   void createsAJobOrderThroughTheUi() {
@@ -82,6 +85,9 @@ class JobOrderCreateE2eTest {
       Page page = context.newPage();
       try {
         page.navigate(baseUrl + "/orders/create");
+        // Responsible (processing) unit — restricted to profit-eligible org units; IRIDIUM is opted
+        // in at stack bootstrap. Required, so it must be selected for the create to pass.
+        page.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#handle").fill("E2E Contact");
         // Select whatever material the (frontend-cached) dropdown offers — see setUp().
@@ -92,7 +98,9 @@ class JobOrderCreateE2eTest {
 
         // The created order must appear in the list (fresh ephemeral DB => exactly one).
         page.navigate(baseUrl + "/orders");
-        assertThat(page.getByTestId("order-row").first()).isVisible();
+        // 20 s, not the 5 s default: the post-submit list render is slow on WebKit under CI load.
+        assertThat(page.getByTestId("order-row").first())
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-create");
         throw failure;
