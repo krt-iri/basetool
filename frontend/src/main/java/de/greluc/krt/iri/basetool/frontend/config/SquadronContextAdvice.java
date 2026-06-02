@@ -396,6 +396,46 @@ public class SquadronContextAdvice {
   }
 
   /**
+   * Whether the org-unit blueprint availability overview (#364) menu entry should be shown. The
+   * overview is restricted to admins, officers (their Staffel) and Spezialkommando leads (their SK)
+   * — but the frontend session flattens SK-lead into {@code ROLE_LOGISTICIAN}, so the lead bit is
+   * invisible here. We therefore reuse the backend's authoritative gate via {@code GET
+   * /api/v1/me/capabilities}, short-circuiting admins (always allowed) to spare the round-trip.
+   *
+   * <p>Fails <em>closed</em>: any backend hiccup hides the menu rather than exposing an oversight
+   * tool the caller may not be entitled to. The backend overview endpoints enforce the same gate,
+   * so a hidden menu and a forbidden API stay in lockstep.
+   *
+   * @return {@code true} iff the caller may open the blueprint availability overview.
+   */
+  @ModelAttribute("canSeeBlueprintOverview")
+  public boolean canSeeBlueprintOverview() {
+    if (!authHelper.isAuthenticated()) {
+      return false;
+    }
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    try {
+      CapabilitiesResponse resp =
+          backendApiClient.get("/api/v1/me/capabilities", CapabilitiesResponse.class);
+      return resp != null && resp.canSeeBlueprintOverview();
+    } catch (Exception ex) {
+      log.debug("Failed to resolve blueprint-overview capability", ex);
+      return false;
+    }
+  }
+
+  /**
+   * Wire-shape mirror of the backend's {@code MeController.CapabilitiesResponse}. Kept local to
+   * avoid a frontend dependency on the backend module for one JSON envelope.
+   *
+   * @param canSeeBlueprintOverview {@code true} iff the caller may open the blueprint availability
+   *     overview.
+   */
+  public record CapabilitiesResponse(boolean canSeeBlueprintOverview) {}
+
+  /**
    * The request URI the sidebar switcher form posts back as {@code _referer} so the redirect after
    * the squadron change lands the user on the same page they were on. We resolve it via a model
    * attribute rather than the Thymeleaf {@code #httpServletRequest} utility because the latter is
