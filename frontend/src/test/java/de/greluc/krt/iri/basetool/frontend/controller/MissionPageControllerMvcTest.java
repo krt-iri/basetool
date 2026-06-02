@@ -1280,7 +1280,8 @@ class MissionPageControllerMvcTest {
                                     .subject(memberUserId.toString())
                                     .claim("preferred_username", "member1"))))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("class=\"btn edit-participant-btn\"")));
+        .andExpect(
+            content().string(containsString("class=\"btn btn-ghost edit-participant-btn\"")));
   }
 
   @Test
@@ -1394,7 +1395,8 @@ class MissionPageControllerMvcTest {
                                     .subject(loggedInUserId.toString())
                                     .claim("preferred_username", "member2"))))
         .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("class=\"btn edit-participant-btn\""))));
+        .andExpect(
+            content().string(not(containsString("class=\"btn btn-ghost edit-participant-btn\""))));
   }
 
   // --- Unassigned participants AJAX endpoint ------------------------------
