@@ -465,7 +465,8 @@ class InventoryItemServiceBookOutTest {
     void transferIntoExistingIdenticalStack_mergesInsteadOfDuplicating() {
       // REGRESSION: a transfer onto a (user, location) slot that already holds an identical stack
       // must add to that stack, not insert a second row. Previously the TRANSFER branch always did
-      // `new InventoryItem()`, which produced the visible duplicates reported in the inventory view.
+      // `new InventoryItem()`, which produced the visible duplicates reported in the inventory
+      // view.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);

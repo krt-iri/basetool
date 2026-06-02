@@ -32,10 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Both transitions re-stamp AND dedupe: {@code owning_org_unit} is the eighth merge-key
  * dimension of an inventory stack, so changing it can make a row collide with an already-existing
  * identical stack of the same owner. After re-stamping, every now-identical stack is therefore
- * collapsed into
- * one row (amounts summed) — otherwise the inventory-duplicate bug this change set fixes would
- * reappear through the back door. Private inventory ({@code personal = true}) is never touched: it
- * is owner-only regardless of org unit.
+ * collapsed into one row (amounts summed) — otherwise the inventory-duplicate bug this change set
+ * fixes would reappear through the back door. Private inventory ({@code personal = true}) is never
+ * touched: it is owner-only regardless of org unit.
  *
  * <p>Every method requires an already-open transaction ({@link Propagation#MANDATORY}) because it
  * runs as part of the membership-mutation transaction in {@link OrgUnitMembershipService}, so the
@@ -59,9 +58,9 @@ public class InventoryOrgUnitReconciler {
   /**
    * Reacts to a user gaining their <em>first</em> org-unit membership by promoting their
    * ownerless-personal shared inventory ({@code owning_org_unit IS NULL}) to {@code firstOrgUnit},
-   * so it appears in that org unit's Lager-View. A membershipless owner can only ever hold
-   * {@code NULL}-org shared rows, so no pre-existing stack of {@code firstOrgUnit} can collide; the
-   * dedupe pass is a safety net.
+   * so it appears in that org unit's Lager-View. A membershipless owner can only ever hold {@code
+   * NULL}-org shared rows, so no pre-existing stack of {@code firstOrgUnit} can collide; the dedupe
+   * pass is a safety net.
    *
    * @param userId the owner whose shared inventory to promote; never {@code null}.
    * @param firstOrgUnit the single org unit the user just joined; never {@code null}.

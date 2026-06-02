@@ -76,8 +76,7 @@ class InventoryOrgUnitReconcilerTest {
     InventoryItem b = sharedRow(orgB, 6.0, matA, 900);
     // A distinct stack (different material) that just gets nulled, never merged.
     InventoryItem c = sharedRow(orgA, 2.0, matB, 900);
-    when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId))
-        .thenReturn(List.of(a, b, c));
+    when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(a, b, c));
 
     reconciler.onUserLostLastOrgUnit(userId);
 
