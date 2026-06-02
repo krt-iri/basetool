@@ -57,6 +57,7 @@
                         <a th:href="@{/personal-inventory/blueprints}" th:text="#{nav.personal_inventory.blueprints}">Blueprints</a>
                     </div>
                 </details>
+                <a th:href="@{/blueprint-overview}" th:if="${canSeeBlueprintOverview}" data-testid="nav-blueprint-overview" th:text="#{nav.blueprint_overview}">Blueprint Availability</a>
                 <details class="sidebar-group" th:if="${promotionFeatureEnabled}">
                     <summary th:text="#{nav.promotion}">Bef\u00f6rderung</summary>
                     <div class="sidebar-sublinks">

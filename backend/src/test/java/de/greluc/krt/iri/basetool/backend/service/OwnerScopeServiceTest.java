@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -1084,6 +1085,202 @@ class OwnerScopeServiceTest {
           new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
               "user", "n/a", auths);
       when(authHelper.currentAuthentication()).thenReturn(Optional.of(authentication));
+    }
+  }
+
+  @Nested
+  class CanAccessBlueprintOverviewTests {
+
+    @Test
+    void admin_canAccess() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canAccessBlueprintOverview());
+    }
+
+    @Test
+    void officer_canAccess() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
+
+      assertTrue(service.canAccessBlueprintOverview());
+    }
+
+    @Test
+    void skLead_canAccess() {
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
+      lead.setLead(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+
+      assertTrue(service.canAccessBlueprintOverview());
+    }
+
+    @Test
+    void logisticianFlagWithoutOfficerOrLead_isDenied() {
+      // is_logistician alone does NOT grant the overview — only officer / admin / SK-lead do.
+      OrgUnitMembership logisticianStaffel = staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID);
+      logisticianStaffel.setLogistician(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(logisticianStaffel));
+
+      assertFalse(service.canAccessBlueprintOverview());
+    }
+
+    @Test
+    void anonymous_isDenied() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.empty());
+
+      assertFalse(service.canAccessBlueprintOverview());
+    }
+  }
+
+  @Nested
+  class CurrentBlueprintOversightScopeTests {
+
+    @Test
+    void adminWithoutPin_allScope() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentBlueprintOversightScope();
+
+      assertTrue(scope.adminAllScope());
+      assertNull(scope.activeOrgUnitId());
+      assertTrue(scope.memberOrgUnitIds().isEmpty());
+    }
+
+    @Test
+    void adminWithPin_scopesToPinnedOrgUnit() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      ScopePredicate scope = service.currentBlueprintOversightScope();
+
+      assertFalse(scope.adminAllScope());
+      assertEquals(SQUADRON_B_ID, scope.activeOrgUnitId());
+      assertTrue(scope.memberOrgUnitIds().isEmpty());
+    }
+
+    @Test
+    void officer_scopesToOwnStaffel() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentBlueprintOversightScope();
+
+      assertFalse(scope.adminAllScope());
+      assertNull(scope.activeOrgUnitId());
+      assertEquals(Set.of(SQUADRON_A_ID), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void skLeadOnly_scopesToLedSkNotOwnStaffel() {
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
+      lead.setLead(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentBlueprintOversightScope();
+
+      // Their Staffel is NOT in scope (they are not an officer there); only the led SK is.
+      assertEquals(Set.of(skId), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void officerWhoAlsoLeadsSk_scopesToBoth() {
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
+      lead.setLead(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentBlueprintOversightScope();
+
+      assertEquals(Set.of(SQUADRON_A_ID, skId), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void pinWithinOversight_isHonoured() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      ScopePredicate scope = service.currentBlueprintOversightScope();
+
+      assertEquals(SQUADRON_A_ID, scope.activeOrgUnitId());
+      assertTrue(scope.memberOrgUnitIds().isEmpty());
+    }
+
+    @Test
+    void pinOutsideOversight_isIgnored() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      ScopePredicate scope = service.currentBlueprintOversightScope();
+
+      assertNull(scope.activeOrgUnitId());
+      assertEquals(Set.of(SQUADRON_A_ID), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void plainMember_emptyOversight() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentBlueprintOversightScope();
+
+      assertFalse(scope.adminAllScope());
+      assertNull(scope.activeOrgUnitId());
+      assertTrue(scope.memberOrgUnitIds().isEmpty());
     }
   }
 

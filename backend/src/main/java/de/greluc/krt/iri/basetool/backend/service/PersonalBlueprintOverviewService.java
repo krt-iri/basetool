@@ -1,0 +1,223 @@
+package de.greluc.krt.iri.basetool.backend.service;
+
+import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintOverviewEntryDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintOverviewOwnerDto;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.PersonalBlueprintRepository;
+import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Aggregates, for the leadership oversight view (#364), which crafting blueprints are available
+ * among the members of the caller's oversight org units, and which members own a given blueprint.
+ *
+ * <p>{@link PersonalBlueprint} carries no org-unit column — it is a pure per-user aggregate keyed
+ * by the Keycloak {@code sub}. This service bridges to org units in two steps, entirely in Java (no
+ * cross-type SQL join between the {@code String owner_sub} and the {@code UUID} membership key): it
+ * resolves the in-scope member user ids from {@link OrgUnitMembershipRepository} using the
+ * oversight {@link ScopePredicate} from {@link OwnerScopeService#currentBlueprintOversightScope()},
+ * then loads and groups those members' owned-blueprint rows by product.
+ *
+ * <p>Owner identity never leaves the service except as a display name in the drill-down — the list
+ * view exposes only product + owner count, and the drill-down exposes only {@link
+ * de.greluc.krt.iri.basetool.backend.model.User#getEffectiveName()} (never the {@code sub} or
+ * e-mail), preserving the project's data-isolation rule.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class PersonalBlueprintOverviewService {
+
+  /** Whitelisted sort fields for the availability list — only the product display name. */
+  public static final Set<String> SORTABLE_FIELDS = Set.of("productName");
+
+  /** Default sort field applied when the request supplies none. */
+  public static final String DEFAULT_SORT_FIELD = "productName";
+
+  private final OwnerScopeService ownerScopeService;
+  private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+  private final PersonalBlueprintRepository personalBlueprintRepository;
+  private final UserRepository userRepository;
+
+  /**
+   * Lists the distinct blueprints available among the members of the caller's oversight org units,
+   * one row per product with the count of distinct in-scope members that own it. Returns an empty
+   * page when the caller oversees no org unit (the {@link
+   * OwnerScopeService#canAccessBlueprintOverview()} gate already keeps non-leadership callers out).
+   *
+   * @param pageable page request whose sort is restricted to {@link #SORTABLE_FIELDS}
+   * @return a page of {@link BlueprintOverviewEntryDto}, sorted by product name then product key
+   */
+  @NotNull
+  public Page<BlueprintOverviewEntryDto> listAvailableBlueprints(@NotNull Pageable pageable) {
+    Set<String> ownerSubs = inScopeOwnerSubs();
+    if (ownerSubs.isEmpty()) {
+      return new PageImpl<>(List.of(), pageable, 0);
+    }
+    Map<String, ProductAggregate> byKey = new LinkedHashMap<>();
+    for (PersonalBlueprint bp : personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs)) {
+      byKey
+          .computeIfAbsent(bp.getProductKey(), key -> new ProductAggregate(bp.getProductName()))
+          .owners
+          .add(bp.getOwnerSub());
+    }
+    List<BlueprintOverviewEntryDto> all =
+        byKey.entrySet().stream()
+            .map(
+                entry ->
+                    new BlueprintOverviewEntryDto(
+                        entry.getKey(),
+                        entry.getValue().productName,
+                        entry.getValue().owners.size()))
+            .sorted(entryComparator(pageable))
+            .toList();
+    return paginate(all, pageable);
+  }
+
+  /**
+   * Lists the in-scope members that own the given product, by display name. Re-resolves the
+   * oversight scope server-side so a client cannot widen it through the query parameter. Returns an
+   * empty list when the caller oversees no org unit or nobody in scope owns the product.
+   *
+   * @param productKey the normalized product key whose owners to resolve
+   * @return the owning in-scope members' display names, sorted case-insensitively; never {@code
+   *     null}
+   */
+  @NotNull
+  public List<BlueprintOverviewOwnerDto> listOwnersForProduct(String productKey) {
+    Set<String> ownerSubs = inScopeOwnerSubs();
+    if (ownerSubs.isEmpty()) {
+      return List.of();
+    }
+    Set<UUID> ownerIds =
+        personalBlueprintRepository.findAllByProductKeyAndOwnerSubIn(productKey, ownerSubs).stream()
+            .map(PersonalBlueprint::getOwnerSub)
+            .map(PersonalBlueprintOverviewService::parseUuid)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    if (ownerIds.isEmpty()) {
+      return List.of();
+    }
+    return userRepository.findAllById(ownerIds).stream()
+        .map(user -> new BlueprintOverviewOwnerDto(user.getEffectiveName()))
+        .sorted(
+            Comparator.comparing(
+                BlueprintOverviewOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))
+        .toList();
+  }
+
+  /**
+   * Resolves the Keycloak {@code sub}s of every user in the caller's oversight scope, translating
+   * the {@link ScopePredicate} into a set of member user ids and then into their {@code sub} string
+   * form (the {@code owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}).
+   *
+   * @return the in-scope owner {@code sub}s; empty when the caller oversees no org unit
+   */
+  @NotNull
+  private Set<String> inScopeOwnerSubs() {
+    ScopePredicate scope = ownerScopeService.currentBlueprintOversightScope();
+    Set<UUID> userIds;
+    if (scope.adminAllScope()) {
+      userIds = orgUnitMembershipRepository.findDistinctMemberUserIds();
+    } else if (scope.activeOrgUnitId() != null) {
+      userIds =
+          orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(
+              Set.of(scope.activeOrgUnitId()));
+    } else if (!scope.memberOrgUnitIds().isEmpty()) {
+      userIds =
+          orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(scope.memberOrgUnitIds());
+    } else {
+      return Set.of();
+    }
+    return userIds.stream()
+        .map(UUID::toString)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  /**
+   * Builds the in-memory comparator for the availability list: product name (honouring the request
+   * direction, case-insensitive), then product key as a stable tiebreaker.
+   *
+   * @param pageable the page request carrying the (whitelisted) sort
+   * @return the comparator to order the aggregated entries by
+   */
+  @NotNull
+  private static Comparator<BlueprintOverviewEntryDto> entryComparator(@NotNull Pageable pageable) {
+    Sort.Order order = pageable.getSort().getOrderFor("productName");
+    Comparator<BlueprintOverviewEntryDto> byName =
+        Comparator.comparing(BlueprintOverviewEntryDto::productName, String.CASE_INSENSITIVE_ORDER);
+    if (order != null && order.isDescending()) {
+      byName = byName.reversed();
+    }
+    return byName.thenComparing(BlueprintOverviewEntryDto::productKey);
+  }
+
+  /**
+   * Cuts the requested page out of the fully-sorted entry list and wraps it as a {@link Page} so
+   * the controller can echo the standard {@code PageResponse} envelope.
+   *
+   * @param all the complete, sorted entry list
+   * @param pageable the page request
+   * @return the requested slice as a {@link Page}
+   */
+  @NotNull
+  private static Page<BlueprintOverviewEntryDto> paginate(
+      @NotNull List<BlueprintOverviewEntryDto> all, @NotNull Pageable pageable) {
+    int total = all.size();
+    int from = (int) Math.min((long) pageable.getPageNumber() * pageable.getPageSize(), total);
+    int to = (int) Math.min((long) from + pageable.getPageSize(), total);
+    return new PageImpl<>(List.copyOf(all.subList(from, to)), pageable, total);
+  }
+
+  /**
+   * Parses a stored {@code owner_sub} back into a {@link UUID}, returning {@code null} for the
+   * (theoretical) malformed value so it is filtered out instead of aborting the drill-down.
+   *
+   * @param raw the {@code owner_sub} string
+   * @return the parsed id, or {@code null} when {@code raw} is not a UUID
+   */
+  @Nullable
+  private static UUID parseUuid(String raw) {
+    try {
+      return UUID.fromString(raw);
+    } catch (IllegalArgumentException ex) {
+      return null;
+    }
+  }
+
+  /**
+   * Mutable per-product accumulator used while grouping owned-blueprint rows: holds the display
+   * name and the set of distinct owner {@code sub}s seen for one product key.
+   */
+  private static final class ProductAggregate {
+    private final String productName;
+    private final Set<String> owners = new LinkedHashSet<>();
+
+    /**
+     * Starts an accumulator for one product.
+     *
+     * @param productName the product's display spelling
+     */
+    ProductAggregate(String productName) {
+      this.productName = productName;
+    }
+  }
+}

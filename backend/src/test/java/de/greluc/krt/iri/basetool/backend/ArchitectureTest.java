@@ -686,7 +686,10 @@ class ArchitectureTest {
             // Phase 4 (#344): material claims gate on the claiming squadron's scope
             // (AuthHelperService.canEditOrgUnit) + the responsible-SK authority
             // (OwnerScopeService.hasRoleInOrgUnit), so the service must wire both.
-            "MaterialClaimService");
+            "MaterialClaimService",
+            // #364: the blueprint availability overview filters the aggregate to the caller's
+            // oversight org units via OwnerScopeService.currentBlueprintOversightScope().
+            "PersonalBlueprintOverviewService");
 
     String authHelper = "de.greluc.krt.iri.basetool.backend.service.AuthHelperService";
     String ownerScope = "de.greluc.krt.iri.basetool.backend.service.OwnerScopeService";

@@ -1,6 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
+import io.swagger.v3.oas.annotations.Operation;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -20,15 +21,15 @@ import org.springframework.web.bind.annotation.RestController;
  * in the backend's {@code HttpSession}, but that was effectively a no-op: REST calls from the
  * frontend do not relay session cookies (only the OAuth2 bearer token), so each call created a
  * fresh backend session and the attribute was lost between requests. The mutators are gone; the
- * only remaining surface are the two {@code GET}s which reflect what the header for the current
- * request says.
+ * only remaining surface are the {@code GET}s which reflect what the header for the current request
+ * says, plus the per-principal {@code GET /capabilities} UI flags.
  *
- * <p>Two paths exist for the read endpoint during the SPEZIALKOMMANDO_PLAN.md §7.2 rename soak
- * window: the new canonical {@code GET /active-org-unit} and the legacy alias {@code GET
- * /active-squadron}. Both return the same payload shape and are forwarded through the same scope
- * resolver — the alias exists so a frontend release that lags the backend rename keeps working. The
- * legacy path is dropped together with the {@code X-Active-Squadron-Id} header alias in the
- * destructive cleanup release.
+ * <p>Two paths exist for the active-context read endpoint during the SPEZIALKOMMANDO_PLAN.md §7.2
+ * rename soak window: the new canonical {@code GET /active-org-unit} and the legacy alias {@code
+ * GET /active-squadron}. Both return the same payload shape and are forwarded through the same
+ * scope resolver — the alias exists so a frontend release that lags the backend rename keeps
+ * working. The legacy path is dropped together with the {@code X-Active-Squadron-Id} header alias
+ * in the destructive cleanup release.
  */
 @RestController
 @RequestMapping("/api/v1/me")
@@ -69,6 +70,21 @@ public class MeController {
   }
 
   /**
+   * Per-principal UI capability flags the frontend uses to decide which optional menu entries to
+   * show. Currently a single flag: whether the caller may open the org-unit blueprint availability
+   * overview (#364) — {@code true} for admins, officers, and Spezialkommando leads. Reuses the
+   * exact gate the {@code /api/v1/personal-blueprints/overview} endpoints are class-gated by, so a
+   * hidden menu and a forbidden API can never diverge.
+   *
+   * @return the caller's UI capability flags; never {@code null}.
+   */
+  @GetMapping("/capabilities")
+  @Operation(summary = "Per-principal UI capability flags (e.g. blueprint-overview access).")
+  public CapabilitiesResponse getCapabilities() {
+    return new CapabilitiesResponse(ownerScopeService.canAccessBlueprintOverview());
+  }
+
+  /**
    * Response for {@code GET /api/v1/me/active-org-unit}: the resolved effective org-unit context
    * for the current request. {@code null} means the admin is viewing all OrgUnits (or the user has
    * no assigned home Staffel and no pinned context).
@@ -86,4 +102,12 @@ public class MeController {
    * @param squadronId effective OrgUnit UUID, or {@code null}.
    */
   public record ActiveSquadronResponse(@Nullable UUID squadronId) {}
+
+  /**
+   * Response for {@code GET /api/v1/me/capabilities}: per-principal UI capability flags.
+   *
+   * @param canSeeBlueprintOverview {@code true} iff the caller may open the org-unit blueprint
+   *     availability overview (admin, officer, or Spezialkommando lead).
+   */
+  public record CapabilitiesResponse(boolean canSeeBlueprintOverview) {}
 }

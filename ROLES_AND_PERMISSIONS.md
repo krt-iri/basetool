@@ -1,6 +1,6 @@
 # Rollen- und Rechte-Matrix (Profit Basetool)
 
-> **Stand 2026-06-02 (nach Auftrags-Umbau #340, Operations/Auszahlungen, Material-Claims, Personal-Blueprints).**
+> **Stand 2026-06-02 (nach Auftrags-Umbau #340, Operations/Auszahlungen, Material-Claims, Personal-Blueprints, Blueprint-Verfügbarkeit #364).**
 > Diese Matrix wurde gegen die tatsächliche Implementierung verifiziert:
 > die `@PreAuthorize`-Annotationen aller ~50 Backend-Controller, die
 > URL-Matrix in
@@ -209,6 +209,9 @@ Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
 | `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Persönliches Inventar / Persönliche Blueprints (eigene) (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Persönl. Inventar/Blueprints **anderer** verwalten (`/admin/...`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Blueprint-Verfügbarkeit der Orgeinheit lesen (`/blueprint-overview`, `canAccessBlueprintOverview`) | ❌ | ❌ | ❌¹ | ❌ | ✅ | ✅ |
+
+¹ SK-Leads sehen die Übersicht zusätzlich **für ihre SK** (über das `is_lead`-Flag, nicht über das reine Logistician-Flag). Officer sehen nur ihre Staffel; Admins ohne Pin alle Orgeinheiten, mit Pin nur die angepinnte.
 
 ### 3.3 Lager (Inventory) & Aufträge (Job Orders)
 
@@ -362,6 +365,13 @@ restriktive Sicht wie ein Member.
   (gemeinsame Warteschlange, an die sich Staffeln per Material-Claim melden);
   verantwortlich = **Staffel** → privat für diese Staffel + Admins. SK-Auftrags-*Edits*
   laufen über das Rollen-Gate (Logistician+), nicht über das Staffel-Scope.
+- **Oversight-Übersicht** (kein eigenes Aggregat): Die Blueprint-Verfügbarkeit
+  (`/blueprint-overview`) aggregiert die per-Nutzer-`personal_blueprint`-Zeilen über
+  die Mitglieder der Orgeinheiten, die der Aufrufer **beaufsichtigt** — Officer ihre
+  Staffel, SK-Leads ihre SK(s), Admins alle bzw. die angepinnte
+  (`OwnerScopeService.currentBlueprintOversightScope()`, enger als die
+  Mitgliedschafts-Vereinigung der normalen Listen). Besitzer werden nur als
+  Anzeigename ausgeliefert, nie als Sub/E-Mail.
 
 ---
 

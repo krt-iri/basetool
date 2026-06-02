@@ -242,6 +242,83 @@ public class OwnerScopeService {
   }
 
   /**
+   * #364 blueprint-availability gate: {@code true} iff the current principal may open the org-unit
+   * blueprint availability overview at all. The overview is an oversight feature restricted to
+   * leadership:
+   *
+   * <ul>
+   *   <li>admins — always (they see every org unit, or the one they pinned);
+   *   <li>officers — for their own Staffel;
+   *   <li>Spezialkommando leads — for the SK(s) they lead.
+   * </ul>
+   *
+   * <p>A plain member, or a contextual logistician who is neither an officer nor an SK lead, is
+   * rejected (no menu entry, empty / forbidden API). The lead branch scans the caller's memberships
+   * for any {@code is_lead} row; the V95 CHECK constraint pins {@code is_lead} to Spezialkommando
+   * memberships, so a hit means the caller leads at least one SK.
+   *
+   * @return {@code true} iff the caller is an admin, an officer, or the lead of at least one SK.
+   */
+  public boolean canAccessBlueprintOverview() {
+    if (authHelper.isAdmin() || authHelper.hasReachableRole("ROLE_OFFICER")) {
+      return true;
+    }
+    return authHelper
+        .currentUserId()
+        .map(
+            userId ->
+                orgUnitMembershipRepository.findAllByIdUserId(userId).stream()
+                    .anyMatch(OrgUnitMembership::isLead))
+        .orElse(false);
+  }
+
+  /**
+   * #364 effective scope for the blueprint-availability overview, encoded as a {@link
+   * ScopePredicate} so the aggregation reuses the same three-field shape as the staffel-scoped list
+   * queries. Unlike {@link #currentScopePredicate()} — which returns the union of <em>all</em> of a
+   * non-admin's memberships — this restricts a non-admin to the org units they have oversight over,
+   * mirroring {@link #canAccessBlueprintOverview()}:
+   *
+   * <ul>
+   *   <li>admin → delegates to {@link #currentScopePredicate()} (all org units, or the pinned one);
+   *   <li>officer → their own Staffel (via {@link #readPersistentSquadronFromUser()});
+   *   <li>SK lead → every SK they lead;
+   *   <li>an active pin is honoured only when it points at one of those oversight org units,
+   *       otherwise it is ignored and the full oversight union applies.
+   * </ul>
+   *
+   * <p>A caller with an empty oversight set (e.g. a plain member who reached the service despite
+   * the gate) yields {@code memberOrgUnitIds = {}}, which the aggregation treats as "no rows".
+   *
+   * @return a never-null scope vector of the org units whose blueprints the caller may oversee.
+   */
+  @NotNull
+  public ScopePredicate currentBlueprintOversightScope() {
+    if (authHelper.isAdmin()) {
+      return currentScopePredicate();
+    }
+    Set<UUID> oversightOrgUnitIds = new LinkedHashSet<>();
+    if (authHelper.hasReachableRole("ROLE_OFFICER")) {
+      readPersistentSquadronFromUser().ifPresent(oversightOrgUnitIds::add);
+    }
+    authHelper
+        .currentUserId()
+        .ifPresent(
+            userId -> {
+              for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userId)) {
+                if (m.isLead()) {
+                  oversightOrgUnitIds.add(m.getId().getOrgUnitId());
+                }
+              }
+            });
+    Optional<UUID> pinned = readActiveSquadronFromHeader();
+    if (pinned.isPresent() && oversightOrgUnitIds.contains(pinned.get())) {
+      return new ScopePredicate(false, pinned.get(), Set.of());
+    }
+    return new ScopePredicate(false, null, oversightOrgUnitIds);
+  }
+
+  /**
    * Convenience entry point for the aggregate-service create paths: returns the {@link Squadron}
    * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller has
    * no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services use

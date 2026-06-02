@@ -1,7 +1,9 @@
 package de.greluc.krt.iri.basetool.backend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,7 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * SPEZIALKOMMANDO_PLAN.md §7.2 rename soak: the new canonical {@code GET /active-org-unit} and the
  * deprecated alias {@code GET /active-squadron}. Both pull from the same {@code
  * OwnerScopeService.currentOrgUnitId()} resolver — the test pins the routing + the field-name
- * difference in the two response records.
+ * difference in the two response records. The {@code GET /capabilities} endpoint reflects the
+ * blueprint-overview gate (#364).
  */
 @ExtendWith(MockitoExtension.class)
 class MeControllerTest {
@@ -62,5 +65,20 @@ class MeControllerTest {
     when(ownerScopeService.currentOrgUnitId()).thenReturn(Optional.empty());
 
     assertNull(controller.getActiveSquadron().squadronId());
+  }
+
+  @Test
+  void getCapabilities_reflectsBlueprintOverviewAccess_true() {
+    when(ownerScopeService.canAccessBlueprintOverview()).thenReturn(true);
+
+    assertTrue(controller.getCapabilities().canSeeBlueprintOverview());
+    verify(ownerScopeService).canAccessBlueprintOverview();
+  }
+
+  @Test
+  void getCapabilities_reflectsBlueprintOverviewAccess_false() {
+    when(ownerScopeService.canAccessBlueprintOverview()).thenReturn(false);
+
+    assertFalse(controller.getCapabilities().canSeeBlueprintOverview());
   }
 }
