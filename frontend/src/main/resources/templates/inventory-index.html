@@ -78,7 +78,7 @@
                         th:data-href="@{/inventory/all(materialIds=${item.material.id})}"
                         data-trigger="navigate-href"
                         style="cursor: pointer;" class="clickable-row">
-                        <td th:text="${item.material.name}" style="color: var(--color-primary);">Material</td>
+                        <td th:text="${item.material.name}" style="color: var(--color-white);">Material</td>
                         <td th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
                         <td th:switch="${item.material.quantityType}">
                             <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>

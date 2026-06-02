@@ -38,7 +38,7 @@
                        autocomplete="off"
                        style="width: 100%; box-sizing: border-box;">
             </div>
-            <button type="submit" class="btn" th:text="#{general.search}">Suche</button>
+            <button type="submit" class="btn btn-ghost" th:text="#{general.search}">Suche</button>
         </form>
         <div class="table-responsive">
         <table th:if="${users}">
@@ -98,9 +98,9 @@
                     </td>
                     <td>
                         <div class="flex-gap-xs">
-                            <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn" th:text="#{members.edit}">Bearbeiten</a>
+                            <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn btn-ghost" th:text="#{members.edit}">Bearbeiten</a>
                             <button th:if="${!user.inKeycloak}" sec:authorize="hasRole('ADMIN')"
-                                    class="btn btn-danger"
+                                    class="btn btn-quiet-danger"
                                     th:data-user-id="${user.id}"
                                     data-trigger="members-delete-user"
                                     th:text="#{members.delete}">Löschen</button>

@@ -44,7 +44,7 @@
              </div>
              <form th:if="${unreadAnnouncement}" th:action="@{/announcement/read}" method="post" class="m-0" data-trigger="stop-propagation">
                  <input type="hidden" name="id" th:value="${announcement.id}" />
-                 <button type="submit" class="btn" th:text="#{info.mark_read}">Als gelesen markieren</button>
+                 <button type="submit" class="btn btn-ghost" th:text="#{info.mark_read}">Als gelesen markieren</button>
              </form>
         </div>
         

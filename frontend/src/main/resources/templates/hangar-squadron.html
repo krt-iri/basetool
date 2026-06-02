@@ -23,7 +23,7 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{hangar.squadron.title}">Staffelübersicht</h1>
-        <a th:href="@{/hangar}" class="btn btn-secondary" th:text="#{hangar.back}">Zurück zum Hangar</a>
+        <a th:href="@{/hangar}" class="btn btn-ghost" th:text="#{hangar.back}">Zurück zum Hangar</a>
     </div>
 
     <div class="hud-box mt-2">
@@ -51,7 +51,7 @@
             }
             .sub-table th {
                 background-color: rgba(231, 126, 35, 0.05) !important;
-                color: var(--color-primary) !important;
+                color: var(--color-gray-1) !important;
                 font-family: var(--font-headline) !important;
                 font-size: 0.7rem !important;
                 letter-spacing: 0.05em;
@@ -99,7 +99,7 @@
                 <td th:text="${item.count} + ' (' + ${item.fittedCount} + ' ' + #{hangar.squadron.fitted} + ')'" style="vertical-align: top; padding-top: 1rem;">0 (0 gefittet)</td>
                 <td style="vertical-align: top; padding-top: 0.5rem;">
                     <details sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" th:if="${item.details != null and !item.details.isEmpty()}">
-                        <summary class="btn" style="cursor: pointer; display: inline-flex; align-items: center; min-height: unset; padding: 0.25rem 0.75rem; font-size: 0.8rem; width: auto;" th:text="#{general.details}">Details</summary>
+                        <summary class="btn btn-ghost" style="cursor: pointer; display: inline-flex; align-items: center; min-height: unset; padding: 0.25rem 0.75rem; font-size: 0.8rem; width: auto;" th:text="#{general.details}">Details</summary>
                     </details>
                 </td>
             </tr>
