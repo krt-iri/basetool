@@ -217,7 +217,7 @@
 
         <div th:if="${currentUserRank != null}" style="color:var(--color-gray-2);font-size:0.85rem;margin-bottom:0.75rem;">
             <span th:text="#{promotion.overview.your.rank}">Dein Rang</span>:
-            <strong th:text="${currentUserRank}" style="color:var(--color-primary);">20</strong>
+            <strong th:text="${currentUserRank}" style="color:var(--data-fg);">20</strong>
         </div>
 
         <div th:if="${#lists.isEmpty(eligibilities)}">

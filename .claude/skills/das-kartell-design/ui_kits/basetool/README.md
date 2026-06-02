@@ -24,7 +24,11 @@ Login → dashboard → navigate via the hamburger **sidebar drawer**:
 3. **Missions** — searchable table with department tags + status pills; "show past" filter.
 4. **Hangar** — ship table with LTI badges, toggleable *fitted* dots, edit/delete row actions + toasts.
 5. **Price Overview** — the commodity × terminal **price matrix** with collapsible categories.
-6. **Admin** (Members / UEX / Settings) — header turns to the `accent-dark` admin tint;
+6. **Mission detail** (Missions → click a row) — demonstrates the **action hierarchy**:
+   one filled orange CTA per panel (Anmelden / Speichern / Hinzufügen), `.btn-outline`
+   for Crew zuweisen, ghost Edit, quiet Delete, neutral labels, `.data-value` readouts,
+   calm `.panel-header`s.
+7. **Admin** (Members / UEX / Settings) — header turns to the `accent-dark` admin tint;
    Members is a real table, UEX/Settings are honest stubs (admin-only data not recreated).
 
 ## Files
@@ -37,6 +41,7 @@ Login → dashboard → navigate via the hamburger **sidebar drawer**:
 | `data.jsx` | Fictional, on-theme sample data. |
 | `components.jsx` | Chrome: `Header`, `Sidebar`, `Footer`, `HudBox`, `Btn`, `Badge`, `StatusPill`, toasts. |
 | `screens.jsx` | `LoginScreen`, `Dashboard`, `MissionsScreen`, `HangarScreen`, `MaterialsScreen`, `MembersScreen`. |
+| `screen-mission-detail.jsx` | `MissionDetailScreen` — applied action hierarchy (CTA / outline / ghost / quiet). |
 
 ## Notes & fidelity
 

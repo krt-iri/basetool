@@ -11,8 +11,7 @@
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
-            color: var(--color-primary);
-            font-family: var(--font-headline);
+            font-family: var(--font-body);
             font-size: 0.8rem;
         }
         .form-group input, .form-group select, .form-group textarea {
@@ -42,7 +41,7 @@
             font-family: var(--font-headline);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: var(--color-bg-dark);
+            color: var(--color-bg-black);
             background-color: var(--color-primary);
             border-radius: var(--radius-none);
             vertical-align: middle;
@@ -115,7 +114,7 @@
             <h2 th:text="#{admin.materials.categories.title}">Kategorien verwalten</h2>
             <form method="post" th:action="@{/admin/materials/categories}" class="inline-form mb-1">
                 <input type="text" name="name" required th:placeholder="#{general.name}">
-                <button type="submit" class="btn" th:text="#{general.add}">Hinzufügen</button>
+                <button type="submit" class="btn btn--cta" th:text="#{general.add}">Hinzufügen</button>
             </form>
             <div class="table-responsive">
                 <table>
@@ -131,7 +130,7 @@
                             <td>
                                 <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" style="display:inline;"
                                       data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}">
-                                    <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Löschen</button>
+                                    <button type="submit" class="btn btn-quiet-danger" th:text="#{general.delete}">Löschen</button>
                                 </form>
                             </td>
                         </tr>
@@ -149,7 +148,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
                 <h2 th:text="#{admin.materials.subtitle}">Materialien</h2>
                 <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                    <button type="button" class="btn" data-trigger="materials-open-create-modal" th:text="#{admin.materials.create.button}">Material anlegen</button>
+                    <button type="button" class="btn btn--cta" data-trigger="materials-open-create-modal" th:text="#{admin.materials.create.button}">Material anlegen</button>
                     <div class="form-group" style="margin-bottom: 0; width: 300px; max-width: 100%; position: relative;">
                         <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="materialsTable" autocomplete="off">
                         <!--/*
@@ -308,8 +307,8 @@
         </div>
 
         <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" data-trigger="materials-close-create-modal" th:text="#{general.cancel}">Abbrechen</button>
-            <button type="button" class="btn" data-trigger="materials-submit-create" th:text="#{admin.materials.create.submit}">Anlegen</button>
+            <button type="button" class="btn btn-ghost" data-trigger="materials-close-create-modal" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" data-trigger="materials-submit-create" th:text="#{admin.materials.create.submit}">Anlegen</button>
         </div>
     </div>
 </div>

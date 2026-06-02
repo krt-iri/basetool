@@ -7,7 +7,6 @@
             .form-group label {
                 display: block;
                 margin-bottom: 0.5rem;
-                color: var(--color-primary);
                 font-family: var(--font-body);
                 font-weight: bold;
                 font-size: 0.9rem;
@@ -213,7 +212,7 @@
                                 <input type="date" class="date-part" th:readonly="${!canEdit}">
                                 <input type="time" class="time-part" th:readonly="${!canEdit}">
                             </div>
-                            <button th:if="${canEdit}" type="button" class="btn btn-secondary" data-trigger="rod-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
+                            <button th:if="${canEdit}" type="button" class="btn btn-ghost" data-trigger="rod-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
                         </div>
                     </div>
                     
@@ -290,14 +289,14 @@
                 </div>
 
                 <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: var(--color-primary); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
+                    <h3 style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
                 </div>
 
                 <div id="materials-container">
                     <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-bg-dark-gray); margin-bottom: 1rem;">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
-                            <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-secondary remove-btn" data-trigger="rod-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
+                            <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn" data-trigger="rod-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
                         </div>
 
                         <div class="material-row">
@@ -356,15 +355,15 @@
 
             <div style="margin-top: 2rem; display: flex; gap: 1rem; align-items: center;">
                 <th:block th:if="${canEdit}">
-                    <button type="submit" form="refineryOrderMainForm" class="btn" th:text="#{orders.create.save}">Speichern</button>
+                    <button type="submit" form="refineryOrderMainForm" class="btn btn--cta" th:text="#{orders.create.save}">Speichern</button>
                 </th:block>
                 <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
-                    <button type="button" class="btn" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
+                    <button type="button" class="btn btn-outline" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
                     <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" class="m-0">
                         <th:block th:replace="~{fragments/components :: button(label=#{refineryorder.action.cancel}, variant='danger', type='submit', extraClass=null)}"></th:block>
                     </form>
                 </th:block>
-                <a th:href="@{/refinery-orders}" class="btn btn-secondary" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{profile.back}">Zurück</a>
+                <a th:href="@{/refinery-orders}" class="btn btn-ghost" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{profile.back}">Zurück</a>
             </div>
         </div>
     </div>
@@ -380,8 +379,8 @@
                 <div id="storeItemsContainer">
                     <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-surface-input); margin-bottom: 1rem;">
                         <div class="flex-between-mb">
-                            <h4 style="margin: 0; color: var(--color-primary); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
-                            <button type="button" class="btn" style="padding: 0.2rem 0.5rem;" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
+                            <h4 style="margin: 0; color: var(--color-gray-1); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
+                            <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem;" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
                         </div>
                         
                         <input type="hidden" th:field="*{items[__${stat.index}__].materialId}" />
@@ -433,8 +432,8 @@
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-                    <button type="submit" class="btn" th:text="#{orders.create.save}">Speichern</button>
-                    <button type="button" class="btn btn-secondary" data-trigger="rod-close-store" th:text="#{orders.create.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" th:text="#{orders.create.save}">Speichern</button>
+                    <button type="button" class="btn btn-ghost" data-trigger="rod-close-store" th:text="#{orders.create.cancel}">Abbrechen</button>
                 </div>
             </form>
         </div>

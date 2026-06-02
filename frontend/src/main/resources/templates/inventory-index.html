@@ -50,8 +50,8 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
             <h3 style="font-family: 'Lato', sans-serif; font-weight: 700; margin: 0;" th:text="#{inventory.overview.aggregated}">Aggregiertes Staffellager</h3>
             <div class="actions-bar" style="margin-bottom: 0;">
-                <a th:href="@{/inventory/my}" class="btn" th:text="#{inventory.overview.my}">Mein Lager</a>
-                <a th:href="@{/inventory/all}" class="btn" th:text="#{inventory.overview.global}">Globales Lager</a>
+                <a th:href="@{/inventory/my}" class="btn btn-outline" th:text="#{inventory.overview.my}">Mein Lager</a>
+                <a th:href="@{/inventory/all}" class="btn btn-outline" th:text="#{inventory.overview.global}">Globales Lager</a>
             </div>
         </div>
         <!-- The aggregated view buckets quantities per material across the entire active
@@ -78,7 +78,7 @@
                         th:data-href="@{/inventory/all(materialIds=${item.material.id})}"
                         data-trigger="navigate-href"
                         style="cursor: pointer;" class="clickable-row">
-                        <td th:text="${item.material.name}" style="color: var(--color-primary);">Material</td>
+                        <td th:text="${item.material.name}" style="color: var(--color-white);">Material</td>
                         <td th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
                         <td th:switch="${item.material.quantityType}">
                             <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>

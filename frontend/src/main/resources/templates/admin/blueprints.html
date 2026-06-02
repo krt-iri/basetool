@@ -33,7 +33,7 @@
             .bp-slider-out { display: flex; align-items: baseline; gap: 0.35rem; font-size: 0.85rem; }
             .bp-q { color: var(--color-gray-2); font-variant-numeric: tabular-nums; }
             .bp-slider-arrow, .bp-dep-arrow { color: var(--color-gray-2); }
-            .bp-out, .bp-dep-val { color: var(--color-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
+            .bp-out, .bp-dep-val { color: var(--data-fg); font-weight: 700; font-variant-numeric: tabular-nums; }
             .bp-empty-hint { color: var(--color-gray-2); font-style: italic; }
             .pager { display: flex; gap: 1rem; align-items: center; justify-content: center; margin-top: 1rem; }
         </style>
@@ -71,9 +71,9 @@
             <form method="get" th:action="@{/admin/blueprints}" class="bp-filter">
                 <input type="text" name="search" th:value="${search}"
                        th:placeholder="#{admin.blueprints.search.placeholder}" autocomplete="off">
-                <button type="submit" class="btn" th:text="#{admin.blueprints.search.button}">Suchen</button>
+                <button type="submit" class="btn btn--cta" th:text="#{admin.blueprints.search.button}">Suchen</button>
                 <a th:if="${search != null and !search.isEmpty()}" th:href="@{/admin/blueprints}"
-                   class="btn btn-secondary" th:text="#{admin.blueprints.reset}">Zur&uuml;cksetzen</a>
+                   class="btn btn-ghost" th:text="#{admin.blueprints.reset}">Zur&uuml;cksetzen</a>
             </form>
             <span class="bp-count" th:text="#{admin.blueprints.total} + ': ' + ${totalElements}">Gesamt: 0</span>
         </div>

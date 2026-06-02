@@ -178,6 +178,18 @@
     --color-info:    #355DDC;  /* blue — same value as Forschung */
     --color-secondary: #FFD23F;                       /* cross-squadron / foreign-link highlight */
 
+    /* ------------------------------------------------------------------ */
+    /* ACTION HIERARCHY — how the orange accent is allocated.              */
+    /* Rule: the filled orange CTA marks the ONE primary action per        */
+    /* context. Orange is for ACTION + IDENTITY (logo, badges, headings),  */
+    /* never for plain data values. See krt-components.css .btn--cta /     */
+    /* .btn-outline / .btn-ghost / .btn-quiet-danger / .data-value.        */
+    /* ------------------------------------------------------------------ */
+    --action-primary: var(--color-primary);           /* filled CTA */
+    --action-emphasis: var(--color-primary);          /* outline secondary */
+    --action-neutral: var(--color-gray-3);            /* ghost border */
+    --data-fg: var(--color-white);                    /* bright neutral readouts */
+
     /* Status hover tints (from the .btn variants) */
     --color-danger-hover:  #D41A25;
     --color-success-hover: #2EBC3D;
@@ -278,6 +290,18 @@ a:hover { color: var(--color-accent-light); }
 
 strong, b { font-weight: var(--fw-bold); }
 code, kbd, samp { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+
+/* Form labels are neutral, not orange. The accent is reserved for ACTIONS and
+   identity — labels that shout in orange add noise and bury the input values.
+   (Changed 2026-06 alongside the action-hierarchy work.) */
+label {
+    display: block;
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-sm);
+    margin-bottom: 0.5rem;
+}
 
 ::selection { background: var(--color-primary); color: var(--color-bg-black); }
 

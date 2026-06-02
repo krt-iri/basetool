@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="_card.css">
+<link rel="stylesheet" href="../krt-components.css">
+<style>
+  .ladder { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+  .rung { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .rung .btn { width: 100%; }
+  .rung .k { font-family: var(--font-body); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.6rem; color: var(--color-gray-2); }
+</style>
+</head>
+<body>
+  <p class="pv-label">Action hierarchy — reserve filled orange for ONE primary per context</p>
+  <div class="ladder">
+    <div class="rung"><button class="btn btn--cta">Anmelden</button><span class="k">Primary · CTA</span></div>
+    <div class="rung"><button class="btn btn-success">Check-In</button><span class="k">Status · green</span></div>
+    <div class="rung"><button class="btn btn-outline">Crew zuweisen</button><span class="k">Emphasis · outline</span></div>
+    <div class="rung"><button class="btn btn-ghost">Edit</button><span class="k">Secondary · ghost</span></div>
+    <div class="rung"><button class="btn btn-quiet-danger">Delete</button><span class="k">Destructive · quiet</span></div>
+  </div>
+  <p class="pv-mono" style="margin-top:14px;">Filled CTA carries a restrained orange bloom. Hover ghost/outline/quiet to see them commit to color. Labels &amp; data values stay neutral so the accent reads as "action".</p>
+</body>
+</html>

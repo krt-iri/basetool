@@ -23,12 +23,12 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.orders}">Aufträge</h1>
-        <a th:href="@{/orders/create(source='index')}" class="btn">Neuer Auftrag</a>
+        <a th:href="@{/orders/create(source='index')}" class="btn btn--cta">Neuer Auftrag</a>
     </div>
 
     <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
-            <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary);">Status:</span>
+            <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1);">Status:</span>
             <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{status.OPEN}">Offen</span>
@@ -50,7 +50,7 @@
                  union. Collapses silently to "all" for users with no active squadron context
                  (admins in "all squadrons" mode) — the backend filter is a display preference,
                  not an access-control gate. -->
-            <span th:text="#{orders.index.filter.scope}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-primary); margin-left: 1rem;">Staffel:</span>
+            <span th:text="#{orders.index.filter.scope}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1); margin-left: 1rem;">Staffel:</span>
             <label class="flex-gap-2xs">
                 <input type="radio" name="scope" value="mine" th:checked="${selectedScope == null or selectedScope == 'mine'}">
                 <span th:text="#{orders.index.filter.scope.mine}">Eigene Staffel</span>
@@ -59,7 +59,7 @@
                 <input type="radio" name="scope" value="all" th:checked="${selectedScope == 'all'}">
                 <span th:text="#{orders.index.filter.scope.all}">Alle Staffeln</span>
             </label>
-            <button type="submit" class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
+            <button type="submit" class="btn btn-ghost" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>
 
         <div th:if="${error}" class="hud-box hud-box-error">
@@ -184,7 +184,7 @@
                 </td>
                 <td class="nowrap">
                     <div class="flex-gap-xs">
-                        <a th:href="@{/orders/{id}(id=${order.id})}" class="btn">Details</a>
+                        <a th:href="@{/orders/{id}(id=${order.id})}" class="btn btn-ghost">Details</a>
                     </div>
                 </td>
             </tr>

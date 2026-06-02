@@ -17,7 +17,6 @@
         }
         .profile-label {
             font-family: var(--font-body);
-            color: var(--color-primary);
             width: 200px;
             font-size: 0.9rem;
             text-transform: uppercase;
@@ -95,15 +94,15 @@
                         <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-danger); font-size: 0.8rem; margin-top: 0.5rem;"></div>
                     </div>
                     <div class="mt-1">
-                        <button type="submit" class="btn" th:text="#{profile.save_custom_data}">Save</button>
+                        <button type="submit" class="btn btn--cta" th:text="#{profile.save_custom_data}">Save</button>
                     </div>
                 </form>
             </div>
         </div>
         
         <div class="mt-2-flex-gap">
-            <a th:href="${keycloakAccountUrl}" class="btn" target="_blank" th:text="#{profile.edit_link}">Edit in Keycloak</a>
-            <a th:href="@{/}" class="btn btn-secondary" th:text="#{profile.back}">Back</a>
+            <a th:href="${keycloakAccountUrl}" class="btn btn-outline" target="_blank" th:text="#{profile.edit_link}">Edit in Keycloak</a>
+            <a th:href="@{/}" class="btn btn-ghost" th:text="#{profile.back}">Back</a>
         </div>
     </div>
 </main>

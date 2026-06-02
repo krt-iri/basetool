@@ -4,7 +4,7 @@
     <title th:text="#{operation.details} + ' - ' + ${appTitle}">Operation Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <style th:attr="nonce=${cspNonce}">
-            label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; color: var(--color-primary); }
+            label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; }
             input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
             input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
             .form-actions { margin-top: 2rem; display: flex; gap: 1rem; }
@@ -93,11 +93,12 @@
                 min-height: 44px;
                 background-color: var(--color-surface-input);
                 padding: 0.8rem 1rem;
-                border: 1px solid var(--color-primary);
+                border: 1px solid var(--color-gray-3);
+                border-left: 4px solid var(--color-primary);
                 cursor: pointer;
                 margin-bottom: 1rem;
                 font-family: var(--font-headline);
-                color: var(--color-primary);
+                color: var(--color-gray-1);
                 text-transform: uppercase;
                 letter-spacing: 1px;
             }
@@ -112,7 +113,7 @@
             .mission-column .col-header h2 {
                 margin: 0;
                 font-size: 1.1rem;
-                color: var(--color-primary);
+                color: var(--color-white);
                 font-family: var(--font-headline);
                 text-transform: uppercase;
                 letter-spacing: 1px;
@@ -385,7 +386,7 @@
         <main style="padding-bottom: 0;">
             <div class="greeting hud-box flex-between">
                 <h1 class="m-0" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
-                <a th:href="@{/operations}" class="btn btn-secondary" th:text="#{general.back}">Zurück</a>
+                <a th:href="@{/operations}" class="btn btn-ghost" th:text="#{general.back}">Zurück</a>
             </div>
         </main>
     </div>
@@ -429,11 +430,11 @@
                 </div>
                 <!-- Buttons box at the bottom of the Details column, same pattern as mission-detail. -->
                 <div class="hud-box" style="display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
-                    <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-danger" style="margin-right: auto;" th:text="#{general.delete}"
+                    <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger" style="margin-right: auto;" th:text="#{general.delete}"
                             th:data-id="${operation.id}"
                             data-trigger="operation-open-delete">Delete</button>
-                    <button th:if="${canEdit}" type="submit" form="operation-form" class="btn" th:text="#{general.save}">Save</button>
-                    <a th:href="@{/operations}" class="btn btn-secondary" th:text="#{general.back}">Back</a>
+                    <button th:if="${canEdit}" type="submit" form="operation-form" class="btn btn--cta" th:text="#{general.save}">Save</button>
+                    <a th:href="@{/operations}" class="btn btn-ghost" th:text="#{general.back}">Back</a>
                 </div>
             </div>
         </div>
@@ -465,7 +466,7 @@
                                               th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</span>
                                     </td>
                                     <td>
-                                        <a class="btn" th:href="@{/missions/{id}(id=${msn.id})}" th:text="#{general.details}">Details</a>
+                                        <a class="btn btn-ghost" th:href="@{/missions/{id}(id=${msn.id})}" th:text="#{general.details}">Details</a>
                                     </td>
                                 </tr>
                             </tbody>
@@ -579,7 +580,7 @@
                                  class="operation-mission-fin-header"
                                  th:data-mission-id="${msnFin.missionId}"
                                  data-trigger="operation-toggle-mission-finances">
-                                <strong style="color: var(--color-primary);" th:text="${msnFin.missionName}">Mission Name</strong>
+                                <strong style="color: var(--color-gray-1);" th:text="${msnFin.missionName}">Mission Name</strong>
                                 <span>
                                     <span th:text="${#numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
                                     <span class="toggle-icon-msn">&#9660;</span>
@@ -638,7 +639,7 @@
         <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
             <div class="mt-2-flex-gap">
                 <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
-                <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="delete-operation-modal" th:text="#{general.cancel}">Cancel</button>
+                <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="delete-operation-modal" th:text="#{general.cancel}">Cancel</button>
             </div>
         </form>
     </div>

@@ -48,7 +48,7 @@
         <p th:text="#{admin.syncReports.subtitle}">Ergebnisse der UEX- und SC-Wiki-Synchronisation.</p>
     </div>
 
-    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-combat);">
+    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
@@ -119,7 +119,7 @@
                 <label for="purge-days" th:text="#{admin.syncReports.delete.label}">Berichte älter als (Tage)</label>
                 <input type="number" id="purge-days" name="days" min="1" step="1" value="30" required>
             </div>
-            <button type="button" id="purge-trigger" class="btn btn-danger"
+            <button type="button" id="purge-trigger" class="btn btn-outline-danger"
                     th:text="#{admin.syncReports.delete.button}">Alte löschen</button>
         </form>
     </div>
@@ -131,7 +131,7 @@
             <p id="purge-confirm-message" class="mb-2"
                th:data-template="#{admin.syncReports.delete.confirm.message}">Wirklich löschen?</p>
             <div class="flex-center-gap">
-                <button type="button" class="btn btn-secondary" id="purge-cancel"
+                <button type="button" class="btn btn-ghost" id="purge-cancel"
                         th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-danger" id="purge-confirm"
                         th:text="#{admin.syncReports.delete.button}">Alte löschen</button>

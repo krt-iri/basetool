@@ -29,12 +29,12 @@
                 margin-left: 0.25rem;
             }
             .role-badge.lead {
-                background-color: var(--color-accent);
-                color: var(--color-bg);
+                background-color: var(--color-accent-light);
+                color: var(--color-bg-black);
             }
             .role-badge.role-logistician {
                 background-color: var(--color-dept-search-rescue);
-                color: var(--color-bg);
+                color: var(--color-bg-black);
             }
             .role-badge.role-mission-manager {
                 background-color: var(--color-dept-forschung);
@@ -81,7 +81,7 @@
     <div class="hud-box mt-2" id="members-box">
         <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h2 th:text="#{admin.specialcommands.members.title}" class="m-0">Mitglieder</h2>
-            <button id="add-member-btn" class="btn" type="button" th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</button>
+            <button id="add-member-btn" class="btn btn--cta" type="button" th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</button>
         </div>
 
         <div th:if="${members == null or #lists.isEmpty(members)}" style="color: var(--color-gray-2); padding: 1rem 0;" th:text="#{admin.specialcommands.members.empty}">
@@ -121,7 +121,7 @@
                                     <input type="checkbox" class="role-checkbox" name="isMissionManager" value="true" th:checked="${m.isMissionManager()}">
                                     <span th:text="#{admin.specialcommands.members.role.mission_manager}">Einsatzleiter</span>
                                 </label>
-                                <button type="submit" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" th:text="#{members.save}">Speichern</button>
+                                <button type="submit" class="btn btn-ghost" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" th:text="#{members.save}">Speichern</button>
                             </form>
                         </td>
                         <td>
@@ -129,7 +129,7 @@
                                   method="post" class="lead-toggle-form">
                                 <input type="hidden" name="version" th:value="${m.version()}">
                                 <input type="hidden" name="isLead" th:value="${!m.isLead()}">
-                                <button type="submit" class="btn btn-secondary"
+                                <button type="submit" class="btn btn-ghost"
                                         th:text="${m.isLead() ? #messages.msg('admin.specialcommands.members.lead.demote') : #messages.msg('admin.specialcommands.members.lead.promote')}">
                                     Toggle Lead
                                 </button>
@@ -138,7 +138,7 @@
                         <td>
                             <form th:action="@{/admin/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
                                   method="post" style="margin: 0; display: inline;">
-                                <button type="submit" class="btn btn-secondary delete-btn"
+                                <button type="submit" class="btn btn-quiet-danger delete-btn"
                                         th:data-action="@{/admin/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
                                         th:text="#{admin.specialcommands.members.remove}">Entfernen</button>
                             </form>
@@ -163,7 +163,7 @@
                     <option th:each="u : ${allUsers}" th:value="${u.id()}" th:text="${u.effectiveName() ?: u.username()}">User</option>
                 </select>
             </div>
-            <button type="submit" class="btn" th:text="#{admin.specialcommands.members.add.submit}">Hinzufügen</button>
+            <button type="submit" class="btn btn--cta" th:text="#{admin.specialcommands.members.add.submit}">Hinzufügen</button>
         </form>
     </div>
 </div>

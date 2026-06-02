@@ -27,6 +27,65 @@
 }
 .btn:hover { background-color: var(--color-accent-light); color: var(--color-bg-black); }
 
+/* ----------------------------------------------------------------------------
+   ACTION HIERARCHY (added 2026-06 — fixes "everything is orange" on dense
+   pages like /missions/{id}). Reserve the filled orange accent for the ONE
+   primary action per context; demote routine + destructive actions.
+
+   Ladder, strongest → quietest:
+     .btn.btn--cta      primary, filled orange + bloom   (max 1 per panel)
+     .btn-success       status / state change (green)    (Check-In)
+     .btn-outline       emphasized secondary (orange outline, not filled)
+     .btn-ghost         routine secondary (neutral hairline → orange on hover)
+     .btn-quiet-danger  destructive (transparent → red on hover)
+   ---------------------------------------------------------------------------- */
+
+/* Primary call-to-action: the existing .btn plus a restrained orange bloom
+   (the brand's own elevation idiom) so the single hero action is unmistakable. */
+.btn--cta {
+    box-shadow: var(--glow-primary);
+    font-weight: var(--fw-bold);
+}
+.btn--cta:hover { box-shadow: var(--glow-primary-lg); }
+
+/* Emphasized secondary — orange outline, no fill. For the 2nd-most-important
+   action in a context (e.g. "Crew zuweisen" inside a unit box). */
+.btn-outline {
+    background-color: transparent;
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+}
+.btn-outline:hover {
+    background-color: rgba(231, 126, 35, 0.12);
+    color: var(--color-accent-light);
+    border-color: var(--color-accent-light);
+}
+
+/* Routine secondary — neutral hairline, lights up orange on hover. Use for
+   repeated row actions (Edit, Check-Out) so tables stay calm. */
+.btn-ghost {
+    background-color: transparent;
+    color: var(--color-gray-1);
+    border: 1px solid var(--color-gray-3);
+}
+.btn-ghost:hover {
+    background-color: rgba(231, 126, 35, 0.07);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* Destructive, quiet — only commits to red on hover. */
+.btn-quiet-danger {
+    background-color: transparent;
+    color: var(--color-gray-2);
+    border: 1px solid var(--color-gray-3);
+}
+.btn-quiet-danger:hover {
+    background-color: rgba(163, 0, 10, 0.12);
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+}
+
 .btn-secondary { background-color: var(--color-gray-3); color: var(--color-gray-1); }
 .btn-secondary:hover { background-color: var(--color-gray-2); color: var(--color-gray-1); }
 
@@ -44,6 +103,56 @@
 .btn-outline-danger:hover { background-color: rgba(163, 0, 10, 0.2); }
 
 .btn:disabled, .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+/* --------------------------------------------------------- PANEL HEADER -- */
+/* Calmer alternative to a full-orange bordered header. Surface fill + a single
+   orange left-accent bar + a light heading; orange is kept for the chevron and
+   the active/hover state only. Use for collapsible section headers so the
+   accent isn't spent on every panel frame. */
+.panel-header {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: var(--touch-target);
+    padding: 0.8rem 1rem;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    border-left: 4px solid var(--color-primary);
+    cursor: pointer;
+    font-family: var(--font-headline);
+    color: var(--color-gray-1);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: background-color 0.2s ease;
+}
+.panel-header:hover { background-color: var(--color-gray-3); }
+.panel-header:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.panel-header h2, .panel-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--color-white);
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.panel-header .panel-count { color: var(--color-primary); font-family: var(--font-body); font-weight: var(--fw-bold); margin-left: 0.5rem; }
+.panel-header .toggle-icon { color: var(--color-primary); flex: 0 0 auto; }
+
+/* Data value — mission-critical readouts (names, frequencies, IDs) should read
+   as bright neutral DATA, not as an action. Orange is reserved for action +
+   identity, never for plain values. */
+.data-value {
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    padding: 0.2rem 0.55rem;
+}
+.data-value--mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* --------------------------------------------------------------- HUD BOX -- */
 /* The signature container: thin border + two diagonal corner brackets.       */
@@ -98,7 +207,7 @@ table, .krt-table {
 th, td { padding: 1rem; text-align: left; border-bottom: var(--border-hairline); }
 th {
     background-color: var(--color-surface-input);
-    color: var(--color-primary);
+    color: var(--color-gray-1);
     font-family: var(--font-body);
     font-size: var(--fs-sm);
     text-transform: uppercase;
@@ -147,7 +256,7 @@ input::placeholder, textarea::placeholder { color: var(--color-gray-2); font-sty
 .form-group { margin-bottom: 1.25rem; }
 .form-label, .form-label-sm {
     display: block;
-    color: var(--color-primary);
+    color: var(--color-gray-1);
     font-family: var(--font-body);
     font-weight: var(--fw-bold);
     margin-bottom: 0.5rem;

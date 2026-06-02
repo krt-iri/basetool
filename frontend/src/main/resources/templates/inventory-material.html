@@ -44,10 +44,10 @@
 
     <div class="hud-box mt-2">
         <div class="actions-bar">
-            <a th:href="@{/inventory}" class="btn btn-secondary">&laquo; Zurück zur Übersicht</a>
+            <a th:href="@{/inventory}" class="btn btn-ghost">&laquo; Zurück zur Übersicht</a>
             
             <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
-                <label for="materialSelect" style="color: var(--color-primary); font-family: var(--font-headline); font-size: 0.8rem;">Anderes Material:</label>
+                <label for="materialSelect" style="font-family: var(--font-body); font-size: 0.8rem;">Anderes Material:</label>
                 <select id="materialSelect" class="material-select" data-trigger="navigate-select" data-url-template="/inventory/material/{value}">
                     <option th:each="mat : ${materials}" th:value="${mat.id}" th:text="${mat.name}" th:selected="${mat.id == selectedMaterialId}"></option>
                 </select>

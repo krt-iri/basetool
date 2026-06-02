@@ -99,6 +99,46 @@ success `#239E33`, warning `#FFD23F`, info `#355DDC`.
 
 ---
 
+## Action hierarchy
+
+How the orange accent is *allocated* — added 2026-06 after the `/missions/{id}`
+page was reported as "too orange, the Anmelden button is hard to find". The root
+cause was the accent doing double duty (identity **and** action) on a dense page,
+so primary buttons stopped standing out.
+
+**Rule: the filled orange accent marks the ONE primary action per context.**
+Orange is for **action + identity** (logo, badges, headings) — never for plain
+data values or every label.
+
+The button ladder (`krt-components.css`), strongest → quietest:
+
+| Class | Look | Use |
+| :-- | :-- | :-- |
+| `.btn.btn--cta` | filled orange + restrained bloom | the single primary action per panel — Anmelden, Speichern |
+| `.btn-success` | filled green | status / state change — Check-In |
+| `.btn-outline` | orange outline, not filled | emphasized secondary — Crew zuweisen |
+| `.btn-ghost` | neutral hairline → orange on hover | routine repeated actions — Edit, Check-Out |
+| `.btn-quiet-danger` | transparent → red on hover | destructive — Delete |
+
+Supporting changes, all system-wide:
+
+- **Form labels are neutral** (`--color-gray-1`), not orange — the input *values*
+  should be the brightest thing in a form. Base `label` + `.form-label` updated.
+- **Panel headers** use the calmer `.panel-header` component: surface fill + a
+  single orange left-accent bar + light heading; orange kept for the chevron and
+  active state only (instead of a full-orange bordered header).
+- **Data values** (names, frequencies, IDs) use `.data-value` — bright white on a
+  surface chip, because data is not an action.
+- Named tokens: `--action-primary`, `--action-emphasis`, `--action-neutral`,
+  `--data-fg`.
+
+See the live before/after at
+[`proposals/mission-detail-button-hierarchy.html`](proposals/mission-detail-button-hierarchy.html),
+the specimen card `preview/components-button-hierarchy.html`, and the applied
+pattern in `ui_kits/basetool/` (Missions → click a row → mission detail).
+
+---
+
 ## Files
 
 See the [**index**](#index) at the bottom for the full manifest.
@@ -187,9 +227,10 @@ Everything that makes a screen read as "Profit Basetool".
 - **Transparency & blur.** Overlays are `rgba(0,0,0,0.8)` + `backdrop-filter:
   blur(4px)` (sidebar overlay, modals). The squadron context chip uses a light
   `blur(2px)`. Used for focus/scrim, never decoration.
-- **Tables.** Dense; `#141414` body, uppercase orange-on-`#1C1C1C` headers with a
-  2px orange under-rule, ultra-subtle zebra (`rgba(255,255,255,0.02)`), full-row
-  hover to `#282828`.
+- **Tables.** Dense; `#141414` body, uppercase **light-gray** (`#D2D2D2`) headers on
+  `#1C1C1C` with a **2px orange under-rule** (the orange is kept as the rule, not the
+  text — consistent with the action-hierarchy work), ultra-subtle zebra
+  (`rgba(255,255,255,0.02)`), full-row hover to `#282828`.
 - **Layout rules.** Sticky top **header** (`#141414`, 2px orange bottom border,
   becomes `accent-dark` in admin mode). Off-canvas **sidebar drawer** (380px) is
   the primary nav. **Fixed footer** pinned bottom with legal links + version.
@@ -267,6 +308,7 @@ Root manifest:
 | `fonts/` | Ethnocentric (Regular/Italic) + Lato (Thin→Black, each + italic) — self-hosted WOFF2 with OTF/TTF fallback. |
 | `assets/` | `krt.webp` (mark), `krt-favicon.webp`, `Kartelllogo.jpg` (lockup), `honeycomb.svg` + `honeycomb-bg.svg` (Wabenmuster). |
 | `preview/` | 22 Design System specimen cards (type, color, spacing, components, brand — incl. the rank ladder, honeycomb pattern and background/texture treatments). |
+| `proposals/` | Design proposals + handoff: action-hierarchy before/after mocks (`mission-detail-…`, `list-page-…`, `inventory-…`, `refinery-order-…`), the full `template-audit.md`, and `claude-code-auftrag.md` (project-wide unification order for the real repo). |
 | `slides/` | HUD slide template (deck-stage) — title, section, content, stats, comparison, quote, closing. |
 | `ui_kits/basetool/` | Interactive recreation of the Profit Basetool app — see its own README. |
 

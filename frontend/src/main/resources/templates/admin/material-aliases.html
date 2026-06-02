@@ -10,8 +10,7 @@
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
-            color: var(--color-primary);
-            font-family: var(--font-headline);
+            font-family: var(--font-body);
             font-size: 0.8rem;
         }
         .form-group input, .form-group select, .form-group textarea {
@@ -54,7 +53,7 @@
         <p th:text="#{admin.materialAlias.subtitle}">Externe Commodity-Namen lokalen Materialien zuordnen.</p>
     </div>
 
-    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-combat);">
+    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
@@ -97,7 +96,7 @@
                     <textarea id="newNote" name="note" rows="2"></textarea>
                 </div>
                 <div class="form-group grid-col-full">
-                    <button type="submit" class="btn" th:text="#{admin.materialAlias.action.create}">Anlegen</button>
+                    <button type="submit" class="btn btn--cta" th:text="#{admin.materialAlias.action.create}">Anlegen</button>
                 </div>
             </form>
         </div>
@@ -131,7 +130,7 @@
                         <td>
                             <div class="flex-gap-xs">
                                 <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0">
-                                    <button type="submit" class="btn btn-secondary" th:text="#{admin.materialAlias.action.delete}">Löschen</button>
+                                    <button type="submit" class="btn btn-quiet-danger" th:text="#{admin.materialAlias.action.delete}">Löschen</button>
                                 </form>
                             </div>
                         </td>
@@ -182,7 +181,7 @@
                     <textarea id="editNote" name="note" rows="2" th:text="${aliasToEdit.note}"></textarea>
                 </div>
                 <div class="form-group grid-col-full">
-                    <button type="submit" class="btn" th:text="#{admin.materialAlias.action.update}">Speichern</button>
+                    <button type="submit" class="btn btn--cta" th:text="#{admin.materialAlias.action.update}">Speichern</button>
                 </div>
             </form>
         </div>

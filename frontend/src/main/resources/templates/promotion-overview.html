@@ -224,15 +224,15 @@
                 <span th:if="${currentUserRank != null}"
                       style="color:var(--color-gray-2);font-size:0.85rem;">
                     <span th:text="#{promotion.overview.your.rank}">Dein Rang</span>:
-                    <strong th:text="${currentUserRank}" style="color:var(--color-primary);">20</strong>
+                    <strong th:text="${currentUserRank}" style="color:var(--data-fg);">20</strong>
                 </span>
                 <div class="ov-spacer"></div>
                 <button type="button"
-                        class="btn btn-secondary btn-tiny"
+                        class="btn btn-ghost btn-tiny"
                         data-trigger="po-expand-all"
                         th:text="#{promotion.overview.expand.all}">Alle ausklappen</button>
                 <button type="button"
-                        class="btn btn-secondary btn-tiny"
+                        class="btn btn-ghost btn-tiny"
                         data-trigger="po-collapse-all"
                         th:text="#{promotion.overview.collapse.all}">Alle einklappen</button>
             </div>

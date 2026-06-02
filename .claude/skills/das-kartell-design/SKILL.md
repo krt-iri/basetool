@@ -33,6 +33,10 @@ artifacts _or_ production code, depending on the need.
 Key brand rules (see `README.md` for the full content + visual foundations):
 - Color is functional and sparing — one hero orange; department/semantic hues only as
   small tags, row tints and status.
+- **Action hierarchy:** the filled orange CTA marks the ONE primary action per context
+  (`.btn--cta`); demote routine actions to `.btn-ghost`/`.btn-outline` and destructive
+  ones to `.btn-quiet-danger`. Orange is for action + identity, never for plain data
+  values or every form label (labels are neutral gray; data uses `.data-value`).
 - Corners are sharp everywhere; the ONLY rounded things are pill badges and the radio.
 - Depth = hairlines + corner brackets + an orange bloom glow. No soft drop shadows.
 - Headings & UI labels are UPPERCASE; system/error copy leans into the sci-fi fiction
