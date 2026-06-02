@@ -45,7 +45,7 @@
                 <input type="checkbox" name="status" value="CANCELED" th:checked="${selectedStatuses != null and selectedStatuses.contains('CANCELED')}">
                 <span th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem; padding-left: 1rem; border-left: 1px solid var(--color-primary-dark);">
+            <label style="display: flex; align-items: center; gap: 0.25rem; padding-left: 1rem; border-left: 1px solid var(--color-gray-3);">
                 <input type="checkbox" name="onlyMine" value="true" th:checked="${onlyMine}">
                 <span th:text="#{refineryorder.index.filter.onlyMine}">Meine Aufträge</span>
             </label>

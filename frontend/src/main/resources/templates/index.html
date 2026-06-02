@@ -69,7 +69,7 @@
         </div>
         <p th:if="${nextMission == null && error == null}" th:text="#{mission.empty_next}">Keine anstehenden Missionen.</p>
         <div th:if="${nextMission}" sec:authorize="isAuthenticated()" class="mt-1" style="margin-top: 1rem;">
-            <a th:href="@{/missions/{id}(id=${nextMission.get('id')})}" class="btn btn-primary" th:text="#{mission.open_mission}">Einsatz öffnen</a>
+            <a th:href="@{/missions/{id}(id=${nextMission.get('id')})}" class="btn btn--cta" th:text="#{mission.open_mission}">Einsatz öffnen</a>
         </div>
     </div>
     </div>
