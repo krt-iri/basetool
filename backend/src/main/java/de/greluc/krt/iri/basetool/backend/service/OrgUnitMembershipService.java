@@ -56,6 +56,7 @@ public class OrgUnitMembershipService {
   private final UserRepository userRepository;
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
+  private final InventoryOrgUnitReconciler inventoryReconciler;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
@@ -185,6 +186,8 @@ public class OrgUnitMembershipService {
       throw new DuplicateEntityException("User is already a member of this Spezialkommando");
     }
 
+    final boolean wasMembershipless = membershipRepository.countByIdUserId(userId) == 0;
+
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(userId, sc.getId()));
     membership.setUser(user);
@@ -193,7 +196,15 @@ public class OrgUnitMembershipService {
     // the immediate DTO mapping reads the right discriminator without re-fetching the row.
     membership.setKind(OrgUnitKind.SPECIAL_COMMAND);
     membership.setJoinedAt(Instant.now());
-    return membershipRepository.save(membership);
+    OrgUnitMembership saved = membershipRepository.save(membership);
+
+    // First org-unit membership for this user → their ownerless-personal inventory adopts this SK
+    // (the auto-promote lifecycle policy). No-op when the user already had memberships or owns no
+    // ownerless inventory.
+    if (wasMembershipless) {
+      inventoryReconciler.onUserGainedFirstOrgUnit(userId, sc);
+    }
+    return saved;
   }
 
   /**
@@ -213,6 +224,13 @@ public class OrgUnitMembershipService {
       throw new NotFoundException("Membership not found");
     }
     membershipRepository.deleteById(id);
+
+    // Last org-unit membership removed → the user's org-stamped inventory falls back to
+    // ownerless-personal (the auto-demote lifecycle policy). The count query auto-flushes the
+    // delete first, so it reflects the just-removed row.
+    if (membershipRepository.countByIdUserId(userId) == 0) {
+      inventoryReconciler.onUserLostLastOrgUnit(userId);
+    }
   }
 
   /**
@@ -356,12 +374,18 @@ public class OrgUnitMembershipService {
   @Transactional
   public void syncStaffelMembership(
       @NotNull User user, @org.jetbrains.annotations.Nullable Squadron newSquadron) {
+    final long membershipsBefore = membershipRepository.countByIdUserId(user.getId());
     List<OrgUnitMembership> existing =
         membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
 
     if (newSquadron == null) {
       if (!existing.isEmpty()) {
         membershipRepository.deleteAll(existing);
+        // Removing the Staffel may have been the user's last org-unit membership (no SK left) →
+        // demote their org-stamped inventory to ownerless-personal.
+        if (membershipRepository.countByIdUserId(user.getId()) == 0) {
+          inventoryReconciler.onUserLostLastOrgUnit(user.getId());
+        }
       }
       return;
     }
@@ -392,6 +416,13 @@ public class OrgUnitMembershipService {
       // app_user.is_logistician / app_user.is_mission_manager columns are gone. Admins re-grant
       // the flags via the membership-PATCH endpoint after the Staffel switch.
       membershipRepository.save(fresh);
+
+      // If this Staffel was the user's first-ever org-unit membership, their ownerless-personal
+      // inventory adopts it (the auto-promote lifecycle policy). A Staffel switch or a second
+      // membership (membershipsBefore > 0) does not move existing stock.
+      if (membershipsBefore == 0) {
+        inventoryReconciler.onUserGainedFirstOrgUnit(user.getId(), newSquadron);
+      }
     }
   }
 

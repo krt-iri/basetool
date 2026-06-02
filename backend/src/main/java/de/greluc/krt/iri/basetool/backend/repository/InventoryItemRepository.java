@@ -43,6 +43,21 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   Page<InventoryItem> findByUser(User user, Pageable pageable);
 
+  /**
+   * Loads every non-personal (shared) inventory row owned by the given user as managed entities.
+   * Used by {@link de.greluc.krt.iri.basetool.backend.service.InventoryOrgUnitReconciler} to
+   * re-stamp and dedupe a user's shared stock when they gain their first or lose their last
+   * org-unit membership. Private inventory ({@code personal = true}) is intentionally excluded: it
+   * is owner-only regardless of org unit. The associations are loaded eagerly so the reconciler can
+   * read their ids (the eighth-dimension natural key) without an N+1 per row.
+   *
+   * @param userId the owner whose shared inventory to load; never {@code null}.
+   * @return the user's non-personal inventory rows; never {@code null}, possibly empty.
+   */
+  @EntityGraph(attributePaths = {"material", "location", "jobOrder", "mission", "owningOrgUnit"})
+  @Query("SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.personal = false")
+  List<InventoryItem> findByUserIdAndPersonalFalse(@Param("userId") UUID userId);
+
   /** Derived Spring-Data query - returns entities matching {@code MaterialAndPersonalFalse}. */
   Page<InventoryItem> findByMaterialAndPersonalFalse(Material material, Pageable pageable);
 
@@ -245,7 +260,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   /**
    * Pessimistic-write variant of {@link #findMatchingInventoryItem} for the inventory merge
    * race-condition guard. Same seven-dimension match, but acquires a row-level {@code SELECT … FOR
-   * UPDATE} on every matched row for the duration of the surrounding transaction.
+   * UPDATE} on every matched row for the duration of the surrounding transaction. The eighth
+   * identity dimension — {@code owning_org_unit} — is deliberately NOT part of this query: callers
+   * apply it as an in-memory filter on the returned candidates (so the row lock covers the
+   * seven-dimension superset and concurrent transfers across org units still serialise), which is
+   * why stock of two different org-unit pools never merges into one row.
    *
    * <p>Why: the merge path on inventory create/update and on refinery-order store reads the
    * existing row, adds the incoming amount to its {@code amount}, and writes the sum back. Two

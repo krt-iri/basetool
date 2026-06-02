@@ -42,6 +42,18 @@ public interface OrgUnitMembershipRepository
   List<OrgUnitMembership> findAllByIdUserId(UUID userId);
 
   /**
+   * Counts the org-unit memberships of the given user. Used by {@code OrgUnitMembershipService} to
+   * detect the two inventory-relevant boundary transitions — gaining the first membership
+   * (membershipless → member) and losing the last (member → membershipless) — so {@link
+   * de.greluc.krt.iri.basetool.backend.service.InventoryOrgUnitReconciler} can re-stamp the user's
+   * inventory accordingly.
+   *
+   * @param userId the user whose memberships to count; never {@code null}.
+   * @return the number of org-unit membership rows of this user (0 when membershipless).
+   */
+  long countByIdUserId(UUID userId);
+
+  /**
    * Returns every membership row of the given user filtered by kind. Handy for "what Staffel does
    * this user belong to" (returns at most one row because of the V95 partial unique index) and for
    * "what Spezialkommandos has this user joined" — without forcing the caller to filter the full

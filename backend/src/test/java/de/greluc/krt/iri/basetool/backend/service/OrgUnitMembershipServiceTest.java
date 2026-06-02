@@ -51,6 +51,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private SpecialCommandRepository specialCommandRepository;
+  @Mock private InventoryOrgUnitReconciler inventoryReconciler;
 
   @InjectMocks private OrgUnitMembershipService membershipService;
 
@@ -149,6 +150,34 @@ class OrgUnitMembershipServiceTest {
     verify(membershipRepository, never()).save(any());
   }
 
+  @Test
+  void addMember_firstMembership_promotesOwnerlessInventory() {
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
+    when(membershipRepository.save(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    membershipService.addMember(scId, userId);
+
+    verify(inventoryReconciler).onUserGainedFirstOrgUnit(userId, sc);
+  }
+
+  @Test
+  void addMember_userAlreadyHadMemberships_doesNotPromoteInventory() {
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(2L);
+    when(membershipRepository.save(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    membershipService.addMember(scId, userId);
+
+    verify(inventoryReconciler, never()).onUserGainedFirstOrgUnit(any(), any());
+  }
+
   // --- removeMember ---------------------------------------------------------
 
   @Test
@@ -168,6 +197,28 @@ class OrgUnitMembershipServiceTest {
 
     assertThrows(NotFoundException.class, () -> membershipService.removeMember(scId, userId));
     verify(membershipRepository, never()).deleteById(any(OrgUnitMembershipId.class));
+  }
+
+  @Test
+  void removeMember_lastMembership_demotesInventoryToPersonal() {
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.existsById(id)).thenReturn(true);
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
+
+    membershipService.removeMember(scId, userId);
+
+    verify(inventoryReconciler).onUserLostLastOrgUnit(userId);
+  }
+
+  @Test
+  void removeMember_userStillHasMemberships_doesNotDemoteInventory() {
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.existsById(id)).thenReturn(true);
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
+
+    membershipService.removeMember(scId, userId);
+
+    verify(inventoryReconciler, never()).onUserLostLastOrgUnit(any());
   }
 
   // --- patchFlags -----------------------------------------------------------

@@ -13,6 +13,7 @@ import de.greluc.krt.iri.basetool.backend.model.Material;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BulkCheckoutRequest;
@@ -424,15 +425,24 @@ public class InventoryItemService {
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
 
-    // Pessimistic write lock on the merge target so two concurrent createInventoryItem calls
-    // with the same seven-dimension natural key serialise on the row instead of both reading the
-    // same `amount`, both adding their delta, and the last writer clobbering the other's
-    // increment — see InventoryItemRepository.findMatchingInventoryItemForUpdate Javadoc.
-    java.util.List<InventoryItem> existingItems =
-        inventoryItemRepository.findMatchingInventoryItemForUpdate(
-            user, material, location, dto.quality(), mission, jobOrder, isPersonal);
+    // The owning org unit is the eighth natural-key dimension of an inventory stack. Resolve it up
+    // front (validating the picker output) so a new row only merges into a candidate that also
+    // matches on it — stock of two different org-unit pools must never collapse into one row.
+    final OrgUnit owningOrgUnit =
+        ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId());
 
-    java.util.Optional<InventoryItem> existingItemOpt = existingItems.stream().findFirst();
+    // Pessimistic write lock on the merge target so two concurrent createInventoryItem calls with
+    // the same natural key serialise on the row instead of both reading the same `amount`, both
+    // adding their delta, and the last writer clobbering the other's increment. The owning-org-unit
+    // dimension is applied as an in-memory filter on the locked candidates — see sameOwningOrgUnit
+    // and the findMatchingInventoryItemForUpdate Javadoc.
+    java.util.Optional<InventoryItem> existingItemOpt =
+        inventoryItemRepository
+            .findMatchingInventoryItemForUpdate(
+                user, material, location, dto.quality(), mission, jobOrder, isPersonal)
+            .stream()
+            .filter(candidate -> sameOwningOrgUnit(candidate.getOwningOrgUnit(), owningOrgUnit))
+            .findFirst();
 
     if (existingItemOpt.isPresent()) {
       InventoryItem existingItem = existingItemOpt.orElseThrow();
@@ -442,8 +452,7 @@ public class InventoryItemService {
 
     InventoryItem item = new InventoryItem();
     item.setUser(user);
-    item.setOwningOrgUnit(
-        ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId()));
+    item.setOwningOrgUnit(owningOrgUnit);
     item.setMaterial(material);
     item.setLocation(location);
     item.setQuality(dto.quality());
@@ -541,7 +550,10 @@ public class InventoryItemService {
             item.getPersonal());
 
     java.util.Optional<InventoryItem> existingItemOpt =
-        existingItems.stream().filter(i -> !i.getId().equals(item.getId())).findFirst();
+        existingItems.stream()
+            .filter(i -> !i.getId().equals(item.getId()))
+            .filter(i -> sameOwningOrgUnit(i.getOwningOrgUnit(), item.getOwningOrgUnit()))
+            .findFirst();
 
     if (existingItemOpt.isPresent()) {
       InventoryItem existingItem = existingItemOpt.orElseThrow();
@@ -607,7 +619,8 @@ public class InventoryItemService {
    * Consumes or transfers an inventory item.
    *
    * <p>The {@code type} discriminator selects: CONSUME (just decrement), TRANSFER (decrement here,
-   * create a new row at the target location/owner), SELL (decrement here, create a finance entry
+   * then merge the moved quantity into the matching stack at the target location/owner — or create
+   * a new row when no identical stack exists there), SELL (decrement here, create a finance entry
    * for the participant). When the post-decrement quantity is below {@link #QUANTITY_EPSILON} the
    * row is removed entirely. Fulfills attached job-order materials when the amount delivered
    * reaches the required quantity.
@@ -689,19 +702,54 @@ public class InventoryItemService {
         throw new BadRequestException("Transfer must change either the user or the location");
       }
 
-      InventoryItem newItem = new InventoryItem();
-      newItem.setUser(targetUser);
-      newItem.setOwningOrgUnit(
+      // Resolve the target stack's owning org unit up front — the eighth natural-key dimension — so
+      // the merge only folds into a target row of the SAME org-unit pool and a freshly created row
+      // is stamped with that pool.
+      final OrgUnit targetOwningOrgUnit =
           ownerScopeService.resolveOrgUnitForPickerOutputNullable(
-              targetUser, dto.targetOwningOrgUnitId()));
-      newItem.setMaterial(item.getMaterial());
-      newItem.setLocation(targetLocation);
-      newItem.setQuality(item.getQuality());
-      newItem.setAmount(roundAmount(dto.amount()));
-      newItem.setPersonal(item.getPersonal());
-      newItem.setJobOrder(item.getJobOrder());
-      newItem.setMission(item.getMission());
-      InventoryItem savedNew = inventoryItemRepository.save(newItem);
+              targetUser, dto.targetOwningOrgUnitId());
+
+      // Merge the moved quantity into an existing identical stack at the target instead of
+      // inserting a duplicate — the same natural-key merge the create path (createInventoryItem)
+      // and the refinery-store path already use. Without this, transferring stock onto a (user,
+      // location) slot that already holds an identical row (same material, quality, mission, job
+      // order, personal flag, owning org unit) silently produced a second row that the inventory
+      // view shows as a duplicate. The transfer guard above guarantees the target differs from the
+      // source in user or location, so the source row can never be its own merge target; the id
+      // filter is a defensive guard. The matched row is locked FOR UPDATE so two concurrent
+      // transfers into the same stack serialise instead of clobbering each other's increment.
+      java.util.Optional<InventoryItem> targetMatch =
+          inventoryItemRepository
+              .findMatchingInventoryItemForUpdate(
+                  targetUser,
+                  item.getMaterial(),
+                  targetLocation,
+                  item.getQuality(),
+                  item.getMission(),
+                  item.getJobOrder(),
+                  item.getPersonal())
+              .stream()
+              .filter(c -> !c.getId().equals(item.getId()))
+              .filter(c -> sameOwningOrgUnit(c.getOwningOrgUnit(), targetOwningOrgUnit))
+              .findFirst();
+      InventoryItem savedNew;
+      if (targetMatch.isPresent()) {
+        InventoryItem existingTarget = targetMatch.orElseThrow();
+        existingTarget.setAmount(roundAmount(existingTarget.getAmount() + dto.amount()));
+        savedNew = inventoryItemRepository.save(existingTarget);
+      } else {
+        InventoryItem newItem = new InventoryItem();
+        newItem.setUser(targetUser);
+        newItem.setOwningOrgUnit(targetOwningOrgUnit);
+        newItem.setMaterial(item.getMaterial());
+        newItem.setLocation(targetLocation);
+        newItem.setQuality(item.getQuality());
+        newItem.setAmount(roundAmount(dto.amount()));
+        newItem.setPersonal(item.getPersonal());
+        newItem.setJobOrder(item.getJobOrder());
+        newItem.setMission(item.getMission());
+        savedNew = inventoryItemRepository.save(newItem);
+      }
       if (remainingAmount <= QUANTITY_EPSILON) {
         inventoryItemRepository.delete(item);
       } else {
@@ -894,5 +942,22 @@ public class InventoryItemService {
     return java.math.BigDecimal.valueOf(amount)
         .setScale(3, java.math.RoundingMode.HALF_UP)
         .doubleValue();
+  }
+
+  /**
+   * Null-safe identity check of two owning-org-unit references by id — the eighth merge-key
+   * dimension layered on top of {@link
+   * InventoryItemRepository#findMatchingInventoryItemForUpdate}'s seven-dimension candidate set.
+   * Two {@code null} references (ownerless-personal rows) count as the same pool; a {@code null}
+   * and a present reference never match, so stock owned by different org units never merges.
+   *
+   * @param a first owning-org-unit reference, may be {@code null}
+   * @param b second owning-org-unit reference, may be {@code null}
+   * @return {@code true} iff both are {@code null} or both reference the same org-unit id
+   */
+  private static boolean sameOwningOrgUnit(OrgUnit a, OrgUnit b) {
+    UUID idA = a == null ? null : a.getId();
+    UUID idB = b == null ? null : b.getId();
+    return java.util.Objects.equals(idA, idB);
   }
 }
