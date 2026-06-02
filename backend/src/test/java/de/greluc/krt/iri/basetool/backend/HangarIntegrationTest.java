@@ -12,6 +12,7 @@ import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
+import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
@@ -21,6 +22,7 @@ import de.greluc.krt.iri.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.time.Instant;
@@ -64,6 +66,8 @@ class HangarIntegrationTest {
   @Autowired private MissionUnitRepository missionUnitRepository;
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
+  @Autowired private SpecialCommandRepository specialCommandRepository;
 
   private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -397,6 +401,81 @@ class HangarIntegrationTest {
     assertTrue(response.contains("\"count\":1"));
     assertTrue(response.contains("\"fittedCount\":1"));
     assertTrue(response.contains("\"details\":[{\"ownerName\":\"user1\""));
+  }
+
+  /**
+   * Regression for the hangar squadron-overview scope leak: an admin pinned to a squadron must NOT
+   * see the owner-detail rows of a ship owned by a different OrgUnit (here a Spezialkommando the
+   * admin's pinned squadron has nothing to do with), even when that foreign ship shares its ship
+   * type with the pinned squadron. Before the fix the aggregated counts were squadron-scoped but
+   * the per-owner breakdown was loaded by ship type alone, so a member who belonged only to an SK
+   * leaked into the pinned squadron's overview.
+   */
+  @Test
+  void testSquadronOverviewAsPinnedAdmin_doesNotLeakForeignSkShipsOfSharedType() throws Exception {
+    // Iridium-owned ship of the shared "Fighter" type.
+    Ship iridiumShip = new Ship();
+    iridiumShip.setOwningOrgUnit(iridium);
+    iridiumShip.setName("Iridium Fighter");
+    iridiumShip.setShipType(fighter);
+    iridiumShip.setOwner(user1);
+    iridiumShip.setInsurance("LTI");
+    iridiumShip.setFitted(true);
+    shipRepository.save(iridiumShip);
+
+    // A Spezialkommando plus a member who belongs ONLY to it (no squadron membership at all).
+    SpecialCommand sk = new SpecialCommand();
+    sk.setName("Leak Test SK");
+    sk.setShorthand("LTSK");
+    sk = specialCommandRepository.save(sk);
+
+    User skUser = new User();
+    skUser.setId(UUID.randomUUID());
+    skUser.setUsername("skuser");
+    userRepository.save(skUser);
+    OrgUnitMembership skMembership = new OrgUnitMembership();
+    skMembership.setId(new OrgUnitMembershipId(skUser.getId(), sk.getId()));
+    skMembership.setUser(skUser);
+    skMembership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(skMembership);
+
+    // SK-owned ship of the SAME ship type as the Iridium ship — the shared type is what made the
+    // pre-fix unscoped owner lookup leak it into Iridium's overview.
+    Ship skShip = new Ship();
+    skShip.setOwningOrgUnit(sk);
+    skShip.setName("SK Fighter");
+    skShip.setShipType(fighter);
+    skShip.setOwner(skUser);
+    skShip.setInsurance("LTI");
+    skShip.setFitted(false);
+    shipRepository.save(skShip);
+
+    // Admin pinned to Iridium via the active-org-unit relay header.
+    String response =
+        mockMvc
+            .perform(
+                get("/api/v1/hangar/squadron-overview")
+                    .header("X-Active-Org-Unit-Id", Squadron.IRIDIUM_ID.toString())
+                    .with(
+                        jwt()
+                            .jwt(builder -> builder.subject(adminUser.getId().toString()))
+                            .authorities(
+                                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                                new SimpleGrantedAuthority("HANGAR_READ"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Only the pinned squadron's single ship is counted, and its owner is the only detail row.
+    assertTrue(response.contains("\"count\":1"), "pinned admin must count only Iridium's ship");
+    assertTrue(
+        response.contains("\"ownerName\":\"user1\""),
+        "the pinned squadron's own ship must still appear in the breakdown");
+    // The SK-only member's ship must never leak into the pinned squadron's overview.
+    assertFalse(
+        response.contains("skuser"),
+        "an SK-only member's ship must not leak into the pinned squadron's hangar overview");
   }
 
   @Test

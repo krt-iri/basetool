@@ -148,11 +148,40 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       Pageable pageable);
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code ShipTypeIn}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
+   * OrgUnit-scoped owner-detail lookup for the squadron-overview drill-down: returns the ships of
+   * the given types that ALSO fall within the caller's scope, using the same R6.c scope-predicate
+   * triple as {@link #countShipsByType} so the per-owner detail rows exactly match the aggregated
+   * counts shown next to them. Without the scope clause the owner breakdown leaked rows of ships
+   * owned by a foreign OrgUnit that merely shared a ship type with the scoped set — e.g. an admin
+   * pinned to a squadron seeing an SK-only member's ship in the overview. The {@code shipType IN}
+   * filter narrows the result to the current overview page's types (derived from {@link
+   * #countShipsByType}); the scope clause then drops any of those ships that belong to a different
+   * OrgUnit. Eagerly fetches {@code owner}, {@code location} and {@code owningOrgUnit} via
+   * {@code @EntityGraph}.
+   *
+   * @param shipTypes the ship types to include (the current overview page's already-scoped types);
+   *     an empty collection yields an empty list.
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection —
+   *     returns every ship of the given types.
+   * @param activeOrgUnitId the pinned OrgUnit id, or {@code null} when no pin is active.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to, consulted only on the
+   *     non-admin, no-pin path.
+   * @return the scoped ships of those types.
    */
   @EntityGraph(attributePaths = {"owner", "location", "owningOrgUnit"})
-  List<Ship> findByShipTypeIn(List<de.greluc.krt.iri.basetool.backend.model.ShipType> shipTypes);
+  @Query(
+      "SELECT s FROM Ship s WHERE s.shipType IN :shipTypes AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
+  List<Ship> findByShipTypeInScoped(
+      @org.springframework.data.repository.query.Param("shipTypes")
+          List<de.greluc.krt.iri.basetool.backend.model.ShipType> shipTypes,
+      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
+      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
+          java.util.Collection<UUID> memberOrgUnitIds);
 
   /**
    * Bulk-reassigns every ship owned by {@code oldUser} to {@code newUser}; used by the user-merge
