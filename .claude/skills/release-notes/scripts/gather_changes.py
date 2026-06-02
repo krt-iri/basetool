@@ -5,10 +5,11 @@ This script does the mechanical part of the release-notes workflow so the model
 can focus on the editorial part (filtering + translating into friendly German).
 It prints two things:
 
-  1. The ``## [Unreleased]`` block of CHANGELOG.md verbatim -- the richest,
-     already-curated description of recent changes. Per-entry dates are NOT in
-     the changelog, so this block may contain items from before the window; the
-     git log below defines the real time boundary.
+  1. The relevant slice of CHANGELOG.md -- the richest, already-curated
+     descriptions. On a reconciled changelog this is the ``## [Unreleased]``
+     block plus every dated ``## [vX.Y.Z] - DATE`` section whose tag/date falls
+     in the window; on a legacy all-in-``[Unreleased]`` changelog it is just that
+     one (huge) block. Either way the git log below defines the real boundary.
   2. The git history in range, bucketed by Conventional-Commit type, so it is
      obvious at a glance which commits are user-facing (feat / fix / perf) and
      which are almost certainly internal (chore / refactor / test / docs / ...).
@@ -88,26 +89,82 @@ def run_git(repo: str, args: list[str]) -> str:
     return result.stdout
 
 
-def extract_unreleased(changelog_path: str) -> str:
-    """Return the ``## [Unreleased]`` section verbatim, or a not-found notice."""
+# A reconciled version heading: "## [v0.3.41](url) - 2026-06-02". Anchor on the
+# trailing " - DATE" (the URL may itself contain dashes, e.g. ".../krt-iri/...",
+# so matching up to the first dash would break); the date's own dashes carry no
+# surrounding spaces, so " - " before an end-anchored date is unambiguous.
+VERSION_HEADER_RE = re.compile(
+    r"^## \[v(\d+)\.(\d+)\.(\d+)\].* - (\d{4}-\d{2}-\d{2})\s*$")
+UNRELEASED_HEADER_RE = re.compile(r"^## .*unreleased", re.IGNORECASE)
+# A bare-or-prefixed semantic version, for turning a --since/--until tag into a key.
+VERSION_REF_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+
+
+def iter_level2_blocks(lines: list[str]):
+    """Yield ``(header_line, body_lines)`` for every ``## `` section, in file order."""
+    header: str | None = None
+    body: list[str] = []
+    for line in lines:
+        if line.startswith("## "):
+            if header is not None:
+                yield header, body
+            header, body = line, []
+        elif header is not None:
+            body.append(line)
+    if header is not None:
+        yield header, body
+
+
+def version_ref_key(value: str) -> tuple[int, int, int] | None:
+    """Parse ``v0.3.41`` / ``0.3.41`` into a comparable tuple, or ``None``."""
+    match = VERSION_REF_RE.match(value)
+    return tuple(int(part) for part in match.groups()) if match else None  # type: ignore[return-value]
+
+
+def select_changelog(changelog_path: str, since: str, until: str) -> str:
+    """Return ``[Unreleased]`` plus every version section inside the window.
+
+    The window mirrors the git-log boundary: when ``since`` is a tag, keep
+    sections strictly newer than it (and ``<= until`` if ``until`` is also a tag);
+    when ``since`` is a date, keep sections dated on/after it (and ``<= until`` if
+    ``until`` is a date). A commit-SHA ``since`` cannot be mapped to versions, so
+    only ``[Unreleased]`` is returned and the git log carries the boundary. On a
+    legacy un-reconciled changelog there are no version headings, so the whole
+    ``[Unreleased]`` block (the entire history) is returned -- old behaviour.
+    """
     if not os.path.isfile(changelog_path):
         return f"(no CHANGELOG.md found at {changelog_path})"
     with open(changelog_path, encoding="utf-8") as handle:
         lines = handle.read().splitlines()
 
+    since_ver = version_ref_key(since)
+    until_ver = version_ref_key(until) if until and until != "HEAD" else None
+    since_date = since.replace("T", " ")[:10] if (
+        DATE_ONLY_RE.match(since) or DATE_TIME_RE.match(since)) else None
+    until_date = until.replace("T", " ")[:10] if until and (
+        DATE_ONLY_RE.match(until) or DATE_TIME_RE.match(until)) else None
+
     out: list[str] = []
-    capturing = False
-    for line in lines:
-        if line.startswith("## "):
-            if capturing:  # reached the next version section -> stop
-                break
-            if "unreleased" in line.lower():
-                capturing = True
-                out.append(line)
-                continue
-        elif capturing:
-            out.append(line)
-    return "\n".join(out).strip() or "(no [Unreleased] section found)"
+    for header, body in iter_level2_blocks(lines):
+        if UNRELEASED_HEADER_RE.match(header):
+            out.append(header)
+            out.extend(body)
+            continue
+        match = VERSION_HEADER_RE.match(header)
+        if not match:  # bogus placeholder / non-version section -> skip
+            continue
+        ver = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        date = match.group(4)
+        if since_ver is not None:
+            keep = ver > since_ver and (until_ver is None or ver <= until_ver)
+        elif since_date is not None:
+            keep = date >= since_date and (until_date is None or date <= until_date)
+        else:  # since is a commit SHA -> rely on the git log for the boundary
+            keep = False
+        if keep:
+            out.append(header)
+            out.extend(body)
+    return "\n".join(out).strip() or "(no [Unreleased] or in-window version sections)"
 
 
 def as_git_date(value: str, *, end: bool = False) -> str | None:
@@ -221,10 +278,12 @@ def main() -> None:
     print(f"SUGGESTED TITLE (use verbatim as the H1): {suggested_title(log, args.since)}")
     print("=" * 78)
 
-    print("\n### SOURCE 1 -- CHANGELOG.md [Unreleased] (verbatim, richest descriptions)")
-    print("# Note: entries are NOT dated; some may predate the window. Use the git")
-    print("#       log below to decide what actually falls in range.\n")
-    print(extract_unreleased(os.path.join(repo, "CHANGELOG.md")))
+    print("\n### SOURCE 1 -- CHANGELOG.md: [Unreleased] + version sections in range")
+    print("# Reconciled changelogs carry dated '## [vX.Y.Z] - DATE' sections; the")
+    print("#   in-window ones are printed below (richest descriptions). [Unreleased]")
+    print("#   then holds only not-yet-released entries. A legacy all-in-[Unreleased]")
+    print("#   changelog prints whole. Cross-check the git log for the exact boundary.\n")
+    print(select_changelog(os.path.join(repo, "CHANGELOG.md"), args.since, args.until))
 
     print("\n\n### SOURCE 2 -- git log in range, bucketed by Conventional-Commit type")
     print("# feat/fix/perf are the user-facing candidates; the internal bucket is")
