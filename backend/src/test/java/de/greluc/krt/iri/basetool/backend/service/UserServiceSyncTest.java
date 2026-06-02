@@ -128,8 +128,6 @@ class UserServiceSyncTest {
               USER_ID.toString(),
               Map.of(
                   "preferred_username", "alice",
-                  "given_name", "Alice",
-                  "family_name", "Liddell",
                   "email", "alice@example.com"));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
@@ -142,8 +140,6 @@ class UserServiceSyncTest {
 
       assertEquals(USER_ID, result.getId());
       assertEquals("alice", result.getUsername());
-      assertEquals("Alice", result.getFirstName());
-      assertEquals("Liddell", result.getLastName());
       assertEquals("alice@example.com", result.getEmail());
       assertEquals(1, result.getRoles().size());
       assertEquals("Guest", result.getRoles().iterator().next().getName());
@@ -179,13 +175,9 @@ class UserServiceSyncTest {
               USER_ID.toString(),
               Map.of(
                   "preferred_username", "alice",
-                  "given_name", "Alice",
-                  "family_name", "Liddell",
                   "email", "alice@example.com"));
 
       User existing = newUser(USER_ID, "alice");
-      existing.setFirstName("Alice");
-      existing.setLastName("Liddell");
       existing.setEmail("alice@example.com");
       existing.setVersion(2L);
       Role guest = role(99L, "Guest");
@@ -204,16 +196,6 @@ class UserServiceSyncTest {
     void detectsChange_whenUsernameDiffers() {
       assertSavedOnFieldChange(
           "preferred_username", "new-username", User::setUsername, "old-username");
-    }
-
-    @Test
-    void detectsChange_whenFirstNameDiffers() {
-      assertSavedOnFieldChange("given_name", "Alice-New", User::setFirstName, "Alice-Old");
-    }
-
-    @Test
-    void detectsChange_whenLastNameDiffers() {
-      assertSavedOnFieldChange("family_name", "Liddell-New", User::setLastName, "Liddell-Old");
     }
 
     @Test
@@ -281,15 +263,11 @@ class UserServiceSyncTest {
           new java.util.HashMap<>(
               Map.of(
                   "preferred_username", "alice",
-                  "given_name", "Alice",
-                  "family_name", "Liddell",
                   "email", "alice@example.com"));
       claims.put(jwtClaim, newValue);
       Jwt jwt = newJwt(USER_ID.toString(), claims);
 
       User existing = newUser(USER_ID, "alice");
-      existing.setFirstName("Alice");
-      existing.setLastName("Liddell");
       existing.setEmail("alice@example.com");
       existing.setVersion(1L);
       oldFieldSetter.accept(existing, oldValue);
@@ -315,8 +293,7 @@ class UserServiceSyncTest {
 
     @Test
     void returnsEarly_whenDtoIdIsNull() {
-      KeycloakUserDto dto =
-          new KeycloakUserDto(null, "alice", "Alice", "L", "alice@example.com", true, Set.of());
+      KeycloakUserDto dto = new KeycloakUserDto(null, "alice", "alice@example.com", true, Set.of());
 
       userService.syncUser(dto);
 
@@ -333,7 +310,7 @@ class UserServiceSyncTest {
       when(roleRepository.findByNameIgnoreCase("Guest"))
           .thenReturn(Optional.of(role(99L, "Guest")));
 
-      userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, null, null, true, Set.of()));
+      userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, Set.of()));
 
       assertTrue(existing.isInKeycloak(), "must flip back to true once seen again");
       verify(userRepository, times(1)).save(existing);
@@ -346,7 +323,7 @@ class UserServiceSyncTest {
           .thenReturn(Optional.of(role(99L, "Guest")));
 
       userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "Alice", "L", "alice@example.com", true, Set.of()));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of()));
 
       verify(userRepository, times(1)).save(any(User.class));
     }
@@ -354,8 +331,6 @@ class UserServiceSyncTest {
     @Test
     void noFieldChanged_andUserNotNew_skipsSave() {
       User existing = newUser(USER_ID, "alice");
-      existing.setFirstName("Alice");
-      existing.setLastName("L");
       existing.setEmail("alice@example.com");
       existing.setInKeycloak(true);
       existing.setVersion(3L);
@@ -366,7 +341,7 @@ class UserServiceSyncTest {
       when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
 
       userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "Alice", "L", "alice@example.com", true, Set.of()));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of()));
 
       verify(userRepository, never()).save(any());
     }
@@ -441,7 +416,7 @@ class UserServiceSyncTest {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
     when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(role(99L, "Guest")));
 
-    userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, null, null, true, null));
+    userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, null));
 
     verify(roleRepository, times(1)).findByNameIgnoreCase("Guest");
   }

@@ -7,10 +7,4 @@ import java.util.UUID;
 /** Data transfer record carrying Keycloak User payload. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record KeycloakUserDto(
-    UUID id,
-    String username,
-    String firstName,
-    String lastName,
-    String email,
-    Boolean enabled,
-    Set<String> roles) {}
+    UUID id, String username, String email, Boolean enabled, Set<String> roles) {}

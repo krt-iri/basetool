@@ -58,8 +58,6 @@ public class ProfileController {
     }
 
     model.addAttribute("username", principal.getPreferredUsername());
-    model.addAttribute("firstName", principal.getGivenName());
-    model.addAttribute("lastName", principal.getFamilyName());
     model.addAttribute("email", principal.getEmail());
 
     // Default from Token

@@ -45,8 +45,6 @@ public class MissionDataLeakTest {
     testUser.setId(UUID.randomUUID());
     testUser.setUsername("leaked_user");
     testUser.setEmail("secret@leaked.org");
-    testUser.setFirstName("Secret");
-    testUser.setLastName("User");
     userRepository.save(testUser);
 
     publicMission = new Mission();
@@ -68,9 +66,7 @@ public class MissionDataLeakTest {
         .perform(get("/api/v1/missions/" + publicMission.getId()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.participants[0].user.username").value("leaked_user"))
-        .andExpect(jsonPath("$.participants[0].user.email").value(nullValue()))
-        .andExpect(jsonPath("$.participants[0].user.firstName").value(nullValue()))
-        .andExpect(jsonPath("$.participants[0].user.lastName").value(nullValue()));
+        .andExpect(jsonPath("$.participants[0].user.email").value(nullValue()));
   }
 
   @Test

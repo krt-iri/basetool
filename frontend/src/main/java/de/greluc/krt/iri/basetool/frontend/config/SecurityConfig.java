@@ -395,10 +395,11 @@ public class SecurityConfig {
           authority -> {
             mappedAuthorities.add(authority);
             if (authority instanceof OidcUserAuthority oidcUserAuthority) {
-              // Audit finding H-11: only log the attribute keys, never the values. The full
-              // attribute map carries `email`, `preferred_username`, `given_name`, `family_name`
-              // — all of which the PiiMasker only partially scrubs and which this package's
-              // TRACE-by-default Logback config would emit on every login in production.
+              // Audit finding H-11: only log the attribute keys, never the values. The attribute
+              // map still carries `email` / `preferred_username` (and, on a Keycloak that has not
+              // yet had its name mappers removed, possibly `given_name` / `family_name`) — all of
+              // which the PiiMasker only partially scrubs and which this package's TRACE-by-default
+              // Logback config would emit on every login in production.
               log.debug(
                   "OidcUserAuthority attribute keys: {}",
                   oidcUserAuthority.getAttributes().keySet());

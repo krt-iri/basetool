@@ -88,14 +88,7 @@ public class KeycloakService {
           .map(
               u -> {
                 Set<String> roles = fetchUserRoles(u.id(), token);
-                return new KeycloakUserDto(
-                    u.id(),
-                    u.username(),
-                    u.firstName(),
-                    u.lastName(),
-                    u.email(),
-                    u.enabled(),
-                    roles);
+                return new KeycloakUserDto(u.id(), u.username(), u.email(), u.enabled(), roles);
               })
           .toList();
 

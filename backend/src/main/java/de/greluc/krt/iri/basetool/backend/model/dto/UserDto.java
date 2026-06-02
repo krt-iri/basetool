@@ -11,8 +11,6 @@ public record UserDto(
     String username,
     String displayName,
     String effectiveName,
-    String firstName,
-    String lastName,
     String email,
     Integer rank,
     String description,

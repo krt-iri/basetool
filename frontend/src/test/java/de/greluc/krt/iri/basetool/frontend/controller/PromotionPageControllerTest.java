@@ -100,8 +100,6 @@ class PromotionPageControllerTest {
         null,
         username,
         null,
-        null,
-        null,
         rank,
         null,
         java.util.Set.of(),

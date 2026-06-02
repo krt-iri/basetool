@@ -75,8 +75,6 @@ class MissionFinanceEntryControllerSecurityTest {
             "bob.callsign",
             "Bob",
             "Bob Builder",
-            "Bob",
-            "Builder",
             "bob@example.invalid",
             null,
             null,
@@ -137,12 +135,6 @@ class MissionFinanceEntryControllerSecurityTest {
         body.contains("bob.callsign"), "anonymous slim ack must not carry the participant at all");
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"), "anonymous ack must not leak participant email");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("\"firstName\":\"Bob\""),
-        "anonymous ack must not leak participant first name");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("\"lastName\":\"Builder\""),
-        "anonymous ack must not leak participant last name");
   }
 
   @Test
@@ -193,12 +185,6 @@ class MissionFinanceEntryControllerSecurityTest {
 
     org.junit.jupiter.api.Assertions.assertTrue(
         body.contains("bob@example.invalid"), "authenticated officer must see participant email");
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("\"firstName\":\"Bob\""),
-        "authenticated officer must see participant first name");
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("\"lastName\":\"Builder\""),
-        "authenticated officer must see participant last name");
   }
 
   @Test

@@ -455,8 +455,6 @@ class MemberManagementControllerTest {
         name,
         name + " display",
         name + " display",
-        "First",
-        "Last",
         name + "@example.com",
         5,
         "desc",

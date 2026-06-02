@@ -69,8 +69,6 @@ class ProfileControllerTest {
   @Test
   void profile_authenticated_populatesModelFromTokenAndBackendOverride() {
     when(principal.getPreferredUsername()).thenReturn("jdoe");
-    when(principal.getGivenName()).thenReturn("John");
-    when(principal.getFamilyName()).thenReturn("Doe");
     when(principal.getEmail()).thenReturn("jdoe@example.com");
     when(principal.getAttribute("rank")).thenReturn(3);
     when(principal.getAttribute("description")).thenReturn("From-Token");
@@ -92,8 +90,6 @@ class ProfileControllerTest {
 
     assertEquals("profile", view);
     assertEquals("jdoe", model.getAttribute("username"));
-    assertEquals("John", model.getAttribute("firstName"));
-    assertEquals("Doe", model.getAttribute("lastName"));
     assertEquals("jdoe@example.com", model.getAttribute("email"));
     // Backend values must shadow the token values
     assertEquals(7, model.getAttribute("rank"));

@@ -345,18 +345,12 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
         instanceof org.springframework.security.authentication.AbstractAuthenticationToken token) {
       Object p = token.getPrincipal();
       if (p instanceof OidcUser oidc) {
+        // Privacy / data minimisation: the presence label is derived from the public callsign
+        // (preferred_username) only. given_name / family_name / the composite name claim are no
+        // longer read here — those claims are removed from the Keycloak tokens.
         String preferred = oidc.getPreferredUsername();
         if (preferred != null && !preferred.isBlank()) {
           return preferred;
-        }
-        String given = oidc.getGivenName();
-        String family = oidc.getFamilyName();
-        if (given != null && !given.isBlank()) {
-          return family != null && !family.isBlank() ? given + " " + family : given;
-        }
-        String fullName = oidc.getFullName();
-        if (fullName != null && !fullName.isBlank()) {
-          return fullName;
         }
       }
     }

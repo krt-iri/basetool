@@ -375,9 +375,9 @@ public class MissionController {
   }
 
   /**
-   * Redacts a user DTO for guests: drops first/last name, email, description, roles, permissions,
-   * announcement watermark and join date. Username + displayName + rank remain visible because
-   * those are the public callsign tuple.
+   * Redacts a user DTO for guests: drops email, description, roles, permissions, announcement
+   * watermark and join date. Username + displayName + rank remain visible because those are the
+   * public callsign tuple.
    *
    * @param dto the user DTO
    * @return a redacted copy safe for unauthenticated callers
@@ -388,8 +388,6 @@ public class MissionController {
         dto.username(),
         dto.displayName(),
         dto.effectiveName(),
-        null, // firstName
-        null, // lastName
         null, // email
         dto.rank(),
         null, // description

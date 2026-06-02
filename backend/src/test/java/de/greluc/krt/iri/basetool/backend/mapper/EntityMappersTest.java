@@ -34,8 +34,6 @@ class EntityMappersTest {
     user.setId(userId);
     user.setUsername("jdoe");
     user.setDisplayName("J. Doe");
-    user.setFirstName("John");
-    user.setLastName("Doe");
     user.setEmail("jdoe@example.com");
     user.setRank(5);
     user.setDescription("Pilot");
@@ -53,8 +51,6 @@ class EntityMappersTest {
     assertEquals("jdoe", dto.username());
     assertEquals("J. Doe", dto.displayName());
     assertEquals("J. Doe", dto.effectiveName());
-    assertEquals("John", dto.firstName());
-    assertEquals("Doe", dto.lastName());
     assertEquals("jdoe@example.com", dto.email());
     assertEquals(5, dto.rank());
     assertEquals("Pilot", dto.description());
