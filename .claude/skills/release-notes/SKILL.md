@@ -1,6 +1,6 @@
 ---
 name: release-notes
-description: Use this skill to write user-facing release notes / "Was ist neu" / Änderungsübersicht / Patch Notes / Update-Ankündigung for the Profit Basetool app, starting from a given point in time (a date, a git tag like v0.3.40, a release, or a commit). It turns the technical German CHANGELOG.md and git history into friendly, non-technical release notes for the squadron's normal members, grouped into Neu / Verbesserungen / Fehlerbehebungen. Trigger this whenever the user wants to communicate recent changes to end users — e.g. "schreib Release Notes seit v0.3.40", "was ist neu seit dem 15.05 für die Nutzer", "fasse die letzten Änderungen für die Mitglieder zusammen", "Update-Ankündigung für die letzten zwei Wochen" — even when they don't say the words "release notes".
+description: Use this skill to write user-facing release notes / "Was ist neu" / Änderungsübersicht / Patch Notes / Update-Ankündigung for the Profit Basetool app, starting from a given point in time (a date, a git tag like v0.3.40, a release, or a commit). It turns the technical German CHANGELOG.md and git history into friendly, non-technical release notes for the squadron's normal members, grouped into Neu / Verbesserungen / Fehlerbehebungen. As part of the same run it also tidies CHANGELOG.md itself: entries still sitting under `[Unreleased]` that have already shipped under a git tag (`vX.Y.Z`) are moved into that tag's own dated section. Trigger this whenever the user wants to communicate recent changes to end users — e.g. "schreib Release Notes seit v0.3.40", "was ist neu seit dem 15.05 für die Nutzer", "fasse die letzten Änderungen für die Mitglieder zusammen", "Update-Ankündigung für die letzten zwei Wochen" — even when they don't say the words "release notes".
 user-invocable: true
 ---
 
@@ -46,9 +46,10 @@ welcher Version?") und schlage das letzte Tag als Default vor — rate nicht.
 ## Schritt 1 — Rohmaterial sammeln
 
 Führe das Hilfsskript vom Repo-Wurzelverzeichnis aus. Es legt beide Quellen
-nebeneinander: den `[Unreleased]`-Block der CHANGELOG.md (die reichhaltigsten
-Beschreibungen) und das nach Commit-Typ sortierte Git-Log (das das Zeitfenster
-sauber abgrenzt).
+nebeneinander: den relevanten Changelog-Ausschnitt (den `[Unreleased]`-Block
+**plus** die zum Fenster gehörenden, datierten `## [vX.Y.Z]`-Abschnitte — die
+reichhaltigsten Beschreibungen) und das nach Commit-Typ sortierte Git-Log (das
+das Zeitfenster sauber abgrenzt).
 
 ```bash
 python .claude/skills/release-notes/scripts/gather_changes.py --since <DATUM-ODER-TAG>
@@ -65,16 +66,18 @@ python .claude/skills/release-notes/scripts/gather_changes.py --since "2026-05-1
 > bzw. `git log --no-merges <tag>..HEAD ...`.
 
 **Warum zwei Quellen — und warum das Git-Log den Ton angibt?** Die CHANGELOG.md
-beschreibt jede Änderung ausführlich und benutzernah, trägt aber **kein Datum pro
-Eintrag**. In diesem Projekt liegt zudem praktisch die **gesamte Historie** unter
-`## [Unreleased]` (die Versions-Tags wurden nie als eigene Changelog-Abschnitte
-geschnitten) — der Block ist also riesig, nach Rubrik gruppiert, mit den
-**neuesten Einträgen jeweils oben**. Verlass dich für den **Umfang** deshalb strikt
-auf das **Git-Log** (es grenzt das Fenster exakt ab und signalisiert über die
-Commit-Typen `feat`/`fix`/`perf` vs. `chore`/`refactor`/`test`/`docs`, was
-überhaupt nutzerrelevant ist) und greife im Changelog nur die **oberen** Einträge
-jeder Rubrik ab, die zu den Commits deines Fensters passen. **Kopiere nie den
-ganzen `[Unreleased]`-Block** — das meiste davon liegt weit vor deinem Startpunkt.
+beschreibt jede Änderung ausführlich und benutzernah. Ist der Changelog
+**nachgeführt** (siehe Schritt 6), liegen veröffentlichte Einträge bereits unter
+ihrem datierten `## [vX.Y.Z]`-Abschnitt, und `## [Unreleased]` enthält nur noch
+das wirklich noch nicht Veröffentlichte — das Skript schneidet dir genau die zum
+Fenster passenden Abschnitte heraus. **War der Changelog länger nicht nachgeführt**
+(historisch lag hier praktisch die gesamte Historie unter `## [Unreleased]`), kann
+der `[Unreleased]`-Block noch riesig sein und Einträge weit vor deinem Startpunkt
+enthalten. In **beiden** Fällen gibt das **Git-Log den Umfang vor**: es grenzt das
+Fenster exakt ab und signalisiert über die Commit-Typen `feat`/`fix`/`perf` vs.
+`chore`/`refactor`/`test`/`docs`, was überhaupt nutzerrelevant ist. Nimm aus dem
+Changelog nur die Einträge, die zu den Commits deines Fensters passen — **kopiere
+nie blind einen ganzen Block**.
 
 **Achtung Release-Kadenz:** Hier werden mehrmals am Tag Tags geschnitten
 (`v0.3.40`, `v0.3.41`, `v0.3.42` am selben Tag). „Seit dem letzten Release" kann
@@ -238,6 +241,56 @@ Zeig das Dokument direkt in der Antwort. Biete an, es zu speichern (z. B. unter
 `docs/` oder ins Wiki) oder als GitHub-Release-Text aufzubereiten — aber lege nur
 Dateien an oder poste nichts nach außen, wenn der Nutzer das ausdrücklich will.
 
+## Schritt 6 — CHANGELOG nachführen (released-Abschnitte schneiden)
+
+Zum Erstellen der Release Notes gehört, die **CHANGELOG.md selbst aufzuräumen**:
+Einträge, die noch unter `## [Unreleased]` stehen, aber inzwischen unter einem
+Git-Tag (`vX.Y.Z`) veröffentlicht wurden, gehören in den Abschnitt **dieses
+Tags** — nicht weiter ins „Unreleased". So spiegelt der Changelog die echten
+Releases wider, und `[Unreleased]` enthält nur noch wirklich Unveröffentlichtes.
+
+Das macht ein zweites Hilfsskript mechanisch. **Immer erst der Probelauf**, den
+Bericht prüfen, dann schreiben:
+
+```bash
+python .claude/skills/release-notes/scripts/reconcile_changelog.py            # Probelauf (schreibt nichts)
+python .claude/skills/release-notes/scripts/reconcile_changelog.py --write    # CHANGELOG.md umschreiben
+# optional: --repo <pfad>   --rev <ref, Default HEAD>   --repo-url <github-basis>
+```
+
+**Wie es zuordnet:** Jeder Eintrag (ein `- `-Punkt samt eingerückter
+Unterpunkte/Folgezeilen) wird per `git blame` auf den Commit zurückgeführt, der
+ihn geschrieben hat; dieser Commit wird auf das **früheste** ihn enthaltende,
+wohlgeformte `vN.N.N`-Tag abgebildet — also das Release, in dem er erstmals
+ausgeliefert wurde. Mehrzeilige Einträge nehmen das **kleinste** Tag über alle
+ihre Zeilen (eine spätere Korrektur an einer Zeile schiebt den Eintrag nicht in
+ein neueres Release). Einträge, deren Commit in **keinem** Tag liegt, bleiben in
+`[Unreleased]`. Die `### `-Rubriken werden auf ihr Grundwort normalisiert
+(`### Changed (Paket 3A …)` → `### Changed`) und je Release in der Reihenfolge
+Added → Changed → Deprecated → Removed → Fixed → Security (Sonstige danach)
+gebündelt.
+
+**Eigenschaften, auf die Verlass ist:**
+- **Verlustfrei am Text:** Der Wortlaut jedes Punktes bleibt 1:1 erhalten; nur
+  Gruppierung und Rubriken-Köpfe ändern sich. Der Probelauf meldet, falls eine
+  Nicht-Leerzeile keinem Eintrag zugeordnet werden konnte, und **verweigert dann
+  das Schreiben** — nichts geht still verloren.
+- **Idempotent:** Erneutes Ausführen auf einem bereits nachgeführten Changelog
+  ändert nichts (leeres `[Unreleased]` → keine Verschiebung).
+- **Nur saubere Tags:** Tippfehler-Tags wie `v-0.2.23` oder `v.0.1.1` werden
+  ignoriert; gewertet wird ausschließlich `^v\d+\.\d+\.\d+$`.
+- **Datei-Hygiene:** kein BOM, LF-Zeilenenden und bereits vorhandene
+  Versions-Abschnitte am Dateiende bleiben unangetastet. Die Versions-Überschrift
+  ist `## [vX.Y.Z](<repo>/releases/tag/vX.Y.Z) - JJJJ-MM-TT` (Datum = Commit-Datum
+  des Tags). Umlaute bleiben echtes UTF-8 (Markdown-Regel, **kein** `\uXXXX`).
+
+**Grenzen / was es NICHT tut:** Es ist ein rein **struktureller** Umbau. Es
+repariert **keine** kaputt kodierten Umlaute (Mojibake wie `fÃ¼r`/`â€"` in alten
+Einträgen) und ändert keine inhaltliche Rubriken-Fehleinordnung aus der
+Vergangenheit — beides bleibt bewusst dem Menschen überlassen. Schreibe die Datei
+nur mit `--write`, prüfe danach das `git diff`, und **committe/pushe nichts**, wenn
+der Nutzer das nicht ausdrücklich verlangt.
+
 ## Best Practices für Release Notes (Leitlinien mit Begründung)
 
 Diese Prinzipien stehen hinter den Schritten oben — verinnerliche das *Warum*, dann
@@ -281,3 +334,5 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 - [ ] **Kein einziges Emoji** — Überschriften und Punkte rein als Text.
 - [ ] Echte Umlaute (ä/ö/ü/ß, kein ue/oe/ae/ss), keine Mojibake aus den Quelldaten.
 - [ ] Etwaiger Handlungsbedarf der Nutzer genannt.
+- [ ] CHANGELOG nachgeführt (Schritt 6): Probelauf geprüft, dann `--write`; veröffentlichte
+      `[Unreleased]`-Einträge stehen unter ihrem `## [vX.Y.Z]`-Abschnitt, `git diff` gesichtet.
