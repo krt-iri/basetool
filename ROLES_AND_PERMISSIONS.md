@@ -1,99 +1,394 @@
 # Rollen- und Rechte-Matrix (Profit Basetool)
 
-> **Stand 2026-05-23 (Spezialkommando-Erweiterung R6.e abgeschlossen):**
-> Die untenstehende Matrix wurde gegen alle `@PreAuthorize`-Annotationen
-> in den Backend-Controllern verifiziert. Mit dem Phase-4-Lockdown des
-> Multi-Squadron-Umbaus (siehe [`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md))
-> wurde der Admin-Bereich auf `hasRole('ADMIN')` verengt; mit der
-> Spezialkommando-Erweiterung (siehe `SPEZIALKOMMANDO_PLAN.md`) sind die
-> Authority-Quellen fuer `LOGISTICIAN` und `MISSION_MANAGER` von der
-> globalen `app_user`-Spalte auf die per-OrgUnit-Membership-Spalte
-> umgezogen — der JWT-Konverter befoerdert die flache Rolle, wenn die
-> Flag auf *irgendeiner* Staffel-/SK-Mitgliedschaft `true` ist; das
-> per-OrgUnit-Scoping erfolgt separat ueber `@PreAuthorize`-Gates an den
-> `OwnerScopeService`. SK-spezifisch kommt die `Lead`-Rolle hinzu — ein
-> User mit `is_lead = true` auf einer SK-Mitgliedschaft darf in *diesem
-> einen* SK Mitglieder hinzufuegen / entfernen / Flags toggeln (ueber den
-> `SpecialCommandSecurityService.canManageMembers`-Gate), nichts mehr.
-> Officer behalten ihre squadron-internen Funktionen — Mission-Management,
-> Hangar-Schreibrechte (inklusive `resetAllFittedStatus`),
-> Refinery-Management und den (bedingt staffel-gescopten) Job-Order-Workflow.
-> Die `USER_MANAGE`-Authority bleibt aus historischen Gruenden Teil des
-> Officer-Rollensatzes in
-> [`DataInitializer`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DataInitializer.java),
-> wird aber von keinem Endpunkt mehr gepruft (effektiv inert). Falls die
-> Matrix von der Implementierung abweicht, zaehlen weiterhin die
-> `@PreAuthorize`-Annotationen im Backend.
+> **Stand 2026-06-02 (nach Auftrags-Umbau #340, Operations/Auszahlungen, Material-Claims, Personal-Blueprints).**
+> Diese Matrix wurde gegen die tatsächliche Implementierung verifiziert:
+> die `@PreAuthorize`-Annotationen aller ~50 Backend-Controller, die
+> URL-Matrix in
+> [`backend/.../config/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/SecurityConfig.java)
+> und
+> [`frontend/.../config/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/config/SecurityConfig.java),
+> die Rollen-Seeds in
+> [`DataInitializer`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DataInitializer.java)
+> und der Authority-Konverter
+> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java).
+> **Bei Abweichungen zwischen diesem Dokument und dem Code zählt immer der
+> Code** (`@PreAuthorize` + `SecurityConfig`).
 
-Dieses Dokument fasst die aktuelle Rollen- und Rechtekonfiguration des Profit Basetools zusammen, basierend auf der Implementierung in Backend-Controllern und der Datenbank-Initialisierung.
-
-Das System nutzt eine Kombination aus **Rollen** (abgeleitet vom Keycloak JWT und in der Datenbank synchronisiert) und zugehörigen **Berechtigungen (Permissions / Authorities)**.
-
-## 1. Definierte Rollen & ihre grundlegenden Berechtigungen
-
-Die Initialisierung der Rollen erfolgt über den `DataInitializer` und weist den Rollen folgende Basis-Berechtigungen (Authorities) zu. Zusätzlich gibt es eine **Rollen-Hierarchie** für die Lagerverwaltung.
-
-### Rollen-Hierarchie
-`ROLE_ADMIN > ROLE_LOGISTICIAN`
-`ROLE_OFFICER > ROLE_LOGISTICIAN`
-`ROLE_ADMIN > ROLE_MISSION_MANAGER`
-`ROLE_OFFICER > ROLE_MISSION_MANAGER`
-
-Das bedeutet, dass Administratoren und Offiziere automatisch alle Rechte der Rollen `LOGISTICIAN` und `MISSION_MANAGER` besitzen.
-
-| Rolle | Zugewiesene Berechtigungen (Authorities) |
-| :--- | :--- |
-| **Admin** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE`, `ROLE_LOGISTICIAN` (via Hierarchie) |
-| **Officer** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_LOGISTICIAN` (via Hierarchie) |
-| **Logistician** | *(Lager- und Auftragsverwaltung — pro OrgUnit-Mitgliedschaft via `org_unit_membership.is_logistician`; JWT-Konverter befoerdert die flache Rolle bei `true` auf irgendeiner Mitgliedschaft)* |
-| **Mission Manager** | *(Globale Missionsverwaltung — pro OrgUnit-Mitgliedschaft via `org_unit_membership.is_mission_manager`; gleiche JWT-Befoerderungslogik wie Logistician)* |
-| **SK Lead** | *(Per-SK-Mitgliederverwaltung — `org_unit_membership.is_lead = true` auf einer Spezialkommando-Zeile; gilt nur in diesem einen SK, kein cross-SK-Carry-over)* |
-| **Squadron Member** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ` |
-| **Guest** | *(Keine spezifischen Berechtigungen)* |
+Dieses Dokument fasst zusammen, **wer was darf** — von völlig anonymen,
+nicht angemeldeten Besuchern bis zum Administrator.
 
 ---
 
-## 2. Matrix: Endpunkte & Funktionsbereiche (Zugriffskontrolle)
+## 0. Zwei Durchsetzungsebenen (wichtig zum Lesen der Matrix)
 
-Anhand der `@PreAuthorize`-Annotationen in den Controllern ergibt sich folgende Matrix für die verschiedenen Module des Basetools:
+Jeder Request durchläuft **zwei** voneinander unabhängige Gates. Ein Zugriff
+ist nur erlaubt, wenn er **beide** passiert:
 
-| Funktionsbereich / Endpunkt | Guest | Squadron Member | Logistician | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Allgemeiner Login (Authenticated)** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Hangar: Lesen** (`HANGAR_READ`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Hangar: Schreiben / Admin-Aktionen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **User Management** (Roll-Flags, Rank, Attribute) | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **User List / Details (Read)** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Refinery Orders (Manage All)** (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Refinery Orders (Edit / Delete / Store)** (`hasRole('LOGISTICIAN')` or Owner) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Refinery Orders (Read All)** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Lagerverwaltung: Ansehen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Lagerverwaltung: Bearbeiten** (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Warenaufträge (Job Orders): Lesen / Erstellen** (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Warenaufträge (Job Orders): Bearbeiten** (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Warenaufträge (Job Orders): Löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Job Orders: Verantwortliche Einheit umschreiben** (`hasRole('LOGISTICIAN')`; Admin frei, Staffel-Logistiker nur Eskalation Staffel→SK) | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Material-Eintragungen auf SK-Aufträgen: Eintragen / Ändern / Zurückziehen** (`hasRole('LOGISTICIAN')` + eigene Staffel via `canEditOrgUnit` / Logistiker **oder** Lead/Offizier des bearbeitenden SK / Admin) | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Missionen: Erstellen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Missionen: Verwalten (Alle)** (`hasRole('MISSION_MANAGER')`) | ❌ | ❌ | ❌ | ✅ | ✅ |
-| **Missionen: Verwalten (Eigene/Delegiert)** (`canManageMission`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Announcements (Ankündigungen) – Schreiben** | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Announcements (Ankündigungen) – Lesen** | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Schiffsdaten (Ship Types, Manufacturers)** | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Basisdatenbank** (Locations, Materials, StarSystems, Terminals, etc.) | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Promotion-System (Verwaltung von Kategorien/Themen/Voraussetzungen)** | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Member Evaluations: Eigene Bewertungen ansehen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Member Evaluations: Pflegen (Alle / Upsert / Delete)** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Admin-Dashboard & Settings** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Aktive Staffel umschalten (Switcher)** | ❌ | ❌ | ❌ | ❌ | ✅ |
+1. **URL-Matrix (`SecurityConfig.authorizeHttpRequests`)** — das äußere Tor.
+   Legt pro Pfad fest: `permitAll()` (auch anonym), `authenticated()` oder
+   eine konkrete Rolle. Wird *zuerst* ausgewertet.
+2. **Method-Level `@PreAuthorize`** auf Controller/Service — das innere Tor.
+   Verfeinert über Spring-Security-SpEL, häufig mit den Beans
+   `@ownerScopeService`, `@missionSecurityService`,
+   `@specialCommandSecurityService`.
 
-*\*Hinweis: Bei Missionen gibt es spezifische Checks (z.B. `#userId.toString() == authentication.name`), die es erlauben, dass Benutzer ihre eigenen Zuweisungen verwalten, während Officers/Admins Vollzugriff auf alle Missionen haben.*
+Die beiden Ebenen können sich nur **verschärfen, nie aufweichen**:
 
-## 3. Besonderheiten der Implementierung
+- URL `authenticated()` schlägt Method `permitAll()` → der Endpunkt ist
+  *nicht* anonym erreichbar, auch wenn die Methode `permitAll()` trägt
+  (z. B. `/api/v1/system/ping`).
+- URL `permitAll()` + Method `isAuthenticated()` → effektiv **angemeldet
+  erforderlich** (z. B. *Mission anlegen*, `POST /api/v1/missions`).
 
-1. **Fallback bei Keycloak-Synchronisation:** Wenn JWT-Claims (wie `realm_access.roles`) nicht vollständig in die lokale Datenbank synchronisiert werden können, fällt das System auf die reinen Rollen-Namen aus dem JWT-Token zurück (`ROLE_ADMIN`, `ROLE_OFFICER`, etc.), fügt diesen das Präfix `ROLE_` hinzu und übersetzt sie in Großbuchstaben.
-2. **Ränge (Ranks):** Die `UserService`-Logik gibt vor, dass `OFFICER` nur die Ränge 1–12 und `SQUADRON_MEMBER` die Ränge 13–20 erhalten dürfen.
-3. **Default Role:** Wird bei der Anmeldung keine bekannte Rolle aus Keycloak übermittelt oder dem User noch keine spezifische Rolle zugewiesen, erhält der Benutzer standardmäßig die Rolle **Guest**.
-4. **Logistiker-Flag:** Die Rolle `LOGISTICIAN` kann über das `is_logistician`-Flag in der `users`-Tabelle manuell vergeben werden, unabhängig von Keycloak-Rollen. Seit dem Phase-4-Lockdown des Multi-Squadron-Umbaus ausschließlich durch **Admins** (Officer haben keinen Zugriff mehr auf die Flag-Endpunkte; siehe `@PreAuthorize("hasRole('ADMIN')")` auf `UserController#patchLogistician`).
-5. **Missions-Manager-Flag:** Die Rolle `MISSION_MANAGER` kann über das `is_mission_manager`-Flag in der `users`-Tabelle manuell durch **Admins** vergeben werden, analog zur Logistiker-Rolle. Officer haben seit Phase 4 keinen Zugriff mehr (`UserController#patchMissionManager` ist `hasRole('ADMIN')`).
-6. **Multi-Squadron-Sichtbarkeit:** Lesepfade werden ueber [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java) gefiltert. Nicht-Admins sehen ausschliesslich Daten ihrer eigenen Staffel; oeffentliche Missionen (`is_internal = false`) sind zusaetzlich cross-staffel sichtbar. Admins koennen ueber den Sidebar-Switcher (`PUT /api/v1/me/active-squadron`) den aktiven Kontext umschalten oder die "Alle Staffeln"-Sicht anwaehlen. Job-Orders sind seit dem Auftrags-Umbau (#340) **bedingt staffel-gescopt**: Ein von einem Spezialkommando bearbeiteter Auftrag (`responsible_org_unit_id` = SK) ist fuer alle Staffeln sichtbar (gemeinsame Warteschlange, auf die sich Staffeln per Material-Eintragung melden koennen), ein von einer Staffel bearbeiteter Auftrag nur fuer diese Staffel und Admins. Der Auftraggeber (`requesting_org_unit_id`) gewaehrt keine Sichtbarkeit. Die alte `creating_squadron_id`-Spalte entfaellt.
+Wer eine Berechtigung beurteilt, muss daher **beide** Ebenen lesen.
+
+---
+
+## 1. Anonyme (nicht angemeldete) Nutzer
+
+Das Basetool hat eine bewusst öffentliche Fläche, damit Auftraggeber und
+Gäste **ohne Login** mit der Organisation interagieren können. Im Frontend
+sind dafür die Routen `/`, `/missions/**`, `/operations/**`, `/orders/**`,
+die Rechtsseiten (`/impressum`, `/privacy`, `/terms`) und statische Assets
+auf `permitAll()` gesetzt; im Backend eine explizit aufgezählte Liste von
+`permitAll()`-Endpunkten. Alles andere erfordert eine Anmeldung.
+
+### 1.1 Was anonyme Nutzer dürfen
+
+| Fähigkeit | Endpunkt(e) | Gate |
+| :--- | :--- | :--- |
+| **Stammdaten lesen** (Materialien, Locations, Schiffstypen, Hersteller, Refining-Methoden, Sternensysteme, Job-Typen, Frequenztypen, System-Settings, Staffel-Liste) | `GET /api/v1/{materials,locations,ship-types,manufacturers,refining-methods,star-systems,job-types,frequency-types,settings,squadrons}/**` | URL `permitAll`, kein Method-Gate |
+| **Einsätze (Missionen) durchblättern** — nur **nicht-interne** Missionen, Detailansicht inklusive | `GET /api/v1/missions`, `/search`, `/next`, `/{id}` | `@ownerScopeService.canSeeMission` (intern = unsichtbar) |
+| **Warenauftrag anlegen** (Material-Auftrag) | `POST /api/v1/orders` | `permitAll()` |
+| **Item-Auftrag anlegen** (Fertigteil-Bestellung mit auto-abgeleiteten Materialien) | `POST /api/v1/orders/items` | `permitAll()` |
+| **Bestellbaren Item-Katalog durchsuchen** | `GET /api/v1/orders/item-catalog/**` | `permitAll()` |
+| **Sich bei einem (nicht-internen) Einsatz als Gast anmelden** — mit frei wählbarem `guestName` | `POST /api/v1/missions/{id}/participants/add`, `/participants/slim` | `@ownerScopeService.canSeeMission` |
+| **Ein-/Auschecken** beim Einsatz | `POST /api/v1/missions/{id}/participants/{pid}/check-in[/slim]`, `…/check-out[/slim]` | `@missionSecurityService.canAccessParticipant` |
+| **Eigenen Gast-Teilnehmer bearbeiten** (Job-Typ, Schiff, Kommentar, Zeiten) | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]` | `canAccessParticipant` |
+| **Auszahlungsart ändern** (Auszahlungspräferenz, z. B. `DONATE`) | `PUT /api/v1/missions/{id}/participants/{pid}/payout-preference[/slim]` | `canAccessParticipant` |
+| **Eigenen Gast-Teilnehmer entfernen** | `DELETE /api/v1/missions/{id}/participants/{pid}[/slim]` | `canAccessParticipant` |
+| **Finanz-Eintrag zu einem sichtbaren Einsatz erfassen** | `POST /api/v1/finance-entries` | `@ownerScopeService.canSeeMission(#dto.missionId)` |
+
+**Warum die Teilnehmer-Endpunkte anonym funktionieren:** Ein **Gast-Teilnehmer
+ist nicht mit einem Benutzerkonto verknüpft** (`participant.user == null`).
+[`MissionSecurityService.canAccessParticipant`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/MissionSecurityService.java)
+gibt für solche unverknüpften Teilnehmer **`true` für jeden** zurück — das ist
+die bewusste Konstruktionsnaht, die den Anmelde-Flow ohne Login nutzbar macht.
+Sobald ein Teilnehmer mit einem echten User verknüpft ist, dürfen nur noch
+dieser User selbst oder eine erhöhte Rolle (Mission-Manager/Officer/Admin) ihn
+bearbeiten.
+
+**Wohin anonyme Aufträge laufen:** Beim Anlegen ohne Login wird der Auftrag
+zwingend auf das konfigurierte **Intake-Spezialkommando** gestempelt
+(System-Setting `job_order.intake_special_command_id`, eingeführt mit V128).
+So landet jeder Gast-Auftrag in einer definierten SK-Warteschlange statt im Nichts.
+
+### 1.2 Was anonyme Nutzer **nicht** dürfen
+
+- **Einsätze/Operations anlegen oder verwalten** — `POST /api/v1/missions`
+  ist zwar URL-`permitAll`, aber method-`isAuthenticated()` → Login nötig.
+  Operations (`/api/v1/operations/**`) sind komplett angemeldet.
+- **Die Auftrags-Liste oder Auftrags-Details sehen** — `GET /api/v1/orders`
+  und `/orders/{id}` fallen unter `isAuthenticated()` + `canSeeJobOrder`. Ein
+  Gast kann also einen Auftrag *absenden*, ihn danach aber nicht
+  weiterverfolgen.
+- **Material-Claims, Refinery, Hangar, Lager, Persönliches Inventar/Blueprints,
+  Benutzerverzeichnis, Promotion-System, Admin-Bereich** — alles angemeldet
+  bzw. rollen-gegated.
+
+### 1.3 Datenschutz für Gäste (`cleanupForGuest`)
+
+Alle öffentlichen Mission-Antworten werden für nicht-angemeldete Aufrufer
+serverseitig bereinigt (`cleanupMissionForGuest` / `cleanupParticipantForGuest`
+in [`MissionController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MissionController.java)):
+interne Missionen verschwinden komplett, Manager-Listen, Finanzdaten,
+Refinery-Bezüge und Owner-Felder werden geleert, und bei Teilnehmern werden
+E-Mail, Realname und Rollen entfernt — sichtbar bleiben nur `guestName` /
+Callsign. **Namen, E-Mails und Tokens landen nie in einer Gast-Antwort.**
+
+> **Anonym ≠ Rolle „Guest".** „Anonym" = gar nicht eingeloggt (kein JWT),
+> erreicht nur die `permitAll`-Liste oben. Die **Rolle `GUEST`** dagegen ist
+> ein *angemeldeter* Keycloak-User ganz ohne Authorities (siehe §2): er
+> passiert `isAuthenticated()`-Gates (sieht also z. B. sein eigenes — leeres —
+> Inventar, die Auftrags-Liste, Operations), scheitert aber an jedem
+> `hasRole(...)`/`hasAuthority(...)`-Check.
+
+---
+
+## 2. Rollen & Basis-Berechtigungen
+
+Rollen werden aus den Keycloak-Realm-Rollen abgeleitet (`ROLE_<GROSS_SNAKE>`)
+und im
+[`DataInitializer`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DataInitializer.java)
+mit Authorities geseedet. Zusätzlich gilt eine **Rollen-Hierarchie**.
+
+### Rollen-Hierarchie (backend + frontend identisch)
+```
+ROLE_ADMIN   > ROLE_LOGISTICIAN
+ROLE_OFFICER > ROLE_LOGISTICIAN
+ROLE_ADMIN   > ROLE_MISSION_MANAGER
+ROLE_OFFICER > ROLE_MISSION_MANAGER
+```
+Admins und Officer erfüllen damit automatisch jeden `LOGISTICIAN`- und
+`MISSION_MANAGER`-Check.
+
+### Geseedete Authorities
+
+| Rolle | Authorities (DataInitializer) |
+| :--- | :--- |
+| **Admin** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie) |
+| **Officer** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie) |
+| **Squadron Member** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ` |
+| **Guest** | *(keine — leeres Set)* |
+
+`USER_MANAGE` bleibt aus historischen Gründen im Officer-Set, wird aber von
+keinem Endpunkt mehr geprüft (effektiv inert — alle Member-Management-Endpunkte
+sind seit dem Phase-4-Lockdown `hasRole('ADMIN')`).
+
+### Kontextuelle Rollen aus OrgUnit-Mitgliedschaften
+
+`LOGISTICIAN` und `MISSION_MANAGER` sind **keine** Keycloak-Rollen, sondern
+**Flags pro OrgUnit-Mitgliedschaft** (`org_unit_membership.is_logistician` /
+`is_mission_manager`). Der
+[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java)
+befördert daraus zwei Authority-Flächen:
+
+- **Flach** `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER`, sobald **irgendeine**
+  Mitgliedschaft (Staffel oder SK) das Flag trägt — damit funktionieren alle
+  bestehenden `hasRole('LOGISTICIAN')`-Gates.
+- **Kontextuell** `ROLE_LOGISTICIAN@<orgUnitId>` pro (Mitgliedschaft, Flag)-Paar
+  — damit das per-OrgUnit-Scoping am `@PreAuthorize`-Aufrufort
+  (`@ownerScopeService.canEdit…`) ohne Service-Roundtrip aufgelöst werden kann.
+
+> Die **alten** `app_user.is_logistician` / `app_user.is_mission_manager`-Spalten
+> wurden mit **V101** entfernt — Quelle der Wahrheit ist ausschließlich
+> `org_unit_membership`. Mitgliedschaftslose Accounts (Admins, Gäste) tragen
+> kein Logistician-/Mission-Manager-Flag.
+
+### SK-Lead (Sonderfall)
+
+Eine Mitgliedschaft mit `is_lead = true` (gibt es per DB-CHECK nur auf
+**Spezialkommando**-Zeilen) macht den User innerhalb *dieses einen SK*
+automatisch **sowohl `LOGISTICIAN` als auch `MISSION_MANAGER`** (flach +
+kontextuell) — der Lead steht über beiden Rollen seines SK, analog dazu, dass
+ein Officer Logistician + Mission-Manager seiner eigenen Staffel ist. Zusätzlich
+darf ein Lead die **Mitglieder seines SK verwalten** (hinzufügen/entfernen/Flags
+`is_logistician`/`is_mission_manager` togglen) über
+`@specialCommandSecurityService.canManageMembers`. Das **Lead-Flag selbst** zu
+setzen bleibt **Admin-only** (Lead kann sich nicht selbst eskalieren). Kein
+Carry-over auf andere SKs.
+
+---
+
+## 3. Zugriffsmatrix nach Funktionsbereich
+
+Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
+**Log.** = Member + Logistician-Flag · **MM** = Member + Mission-Manager-Flag ·
+**Officer** · **Admin**.
+
+> Logistician/Mission-Manager sind **Zusatz-Flags** auf einem Member: sie erben
+> alle Member-Rechte und addieren ihre flag-spezifische Fähigkeit, **gescopt auf
+> ihre OrgUnit(s)** (`@ownerScopeService.canEdit…`). Officer ⊇ Log.+MM der
+> **eigenen Staffel**; Admin ⊇ alles, staffelübergreifend.
+
+### 3.1 Auth / Kontext
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Angemeldet sein (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Eigenes Profil / `GET /me`, aktiver OrgUnit-Kontext (`/me/active-org-unit`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Benutzerverzeichnis lesen (`/users`, `/search`, `/lookup`, `/{id}`, `/{id}/memberships`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+### 3.2 Hangar & Persönliche Daten
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Hangar lesen (`HANGAR_READ`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Eigene Schiffe pflegen / Import (CCU, HangarXPLOR, StarJump) (`isAuthenticated()` + Owner) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Schiffe anderer Member verwalten (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Persönliches Inventar / Persönliche Blueprints (eigene) (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Persönl. Inventar/Blueprints **anderer** verwalten (`/admin/...`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+### 3.3 Lager (Inventory) & Aufträge (Job Orders)
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Lager-View ansehen (`/inventory`, Member+) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Lager bearbeiten / aus-/einbuchen (`isAuthenticated()` + `canEditInventoryItem`, Owner-Scope) | ❌ | ✅¹ | ✅ | ✅¹ | ✅ | ✅ |
+| Auftrag **anlegen** (Material- & Item-Auftrag) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canSeeJobOrder`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`) | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Verantwortliche Einheit umsetzen (`PATCH /{id}/responsible-org-unit`) | ❌ | ❌ | ✅² | ❌ | ✅² | ✅ |
+| Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Auftrag **löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+¹ Nur über das eigene Lager / die Owner-Scope-Prüfung — nicht generell.
+² Admin frei; Staffel-Logistiker/-Officer nur **Eskalation** des eigenen
+Staffel-Auftrags an ein SK.
+
+### 3.4 Refinery
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Eigene Refinery-Orders lesen/anlegen (`isAuthenticated()` [+ `canSeeRefineryOrder`]) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Refinery-Order bearbeiten/löschen/lagern (`isAuthenticated()` + `canEditRefineryOrder`: Owner **oder** Logistician) | ❌ | ✅¹ | ✅ | ✅¹ | ✅ | ✅ |
+| Refinery-Orders **für andere** anlegen/verwalten (`/users/{id}`, `hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+
+¹ Nur als Owner der jeweiligen Order.
+
+### 3.5 Einsätze (Missionen)
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Nicht-interne Missionen lesen (`canSeeMission`, gast-bereinigt) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Mission **anlegen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Als (Gast-)Teilnehmer anmelden / ein-/auschecken / Auszahlungsart ändern / abmelden (`canAccessParticipant`) | ✅¹ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Mission **verwalten** (bearbeiten, Teilnehmer/Units/Crew/Frequenzen, Party-Lead) (`canManageMission`) | ❌ | ✅² | ✅² | ✅³ | ✅³ | ✅ |
+| Manager / Owner setzen (`canManageManagers` / `canChangeOwner`) | ❌ | ✅² | ✅² | ✅² | ✅³ | ✅ |
+| Mission **löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+¹ Anonym nur auf **unverknüpften Gast-Teilnehmern**; eingeloggte User nur auf
+ihrem eigenen verknüpften Teilnehmer. ² Nur als **Owner/Co-Manager** der Mission.
+³ Mission-Manager/Officer zusätzlich nur im eigenen Staffel-Scope
+(`canEditMission`).
+
+### 3.6 Operations (Einsatz-Klammer, Finanzen & Auszahlungen)
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Operations lesen (Liste/Detail/Finanzen/Auszahlungen) (`isAuthenticated()` [+ `canSeeOperation`]) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Operation anlegen/bearbeiten (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`]) | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Auszahlung als **paid-out markieren** (`hasRole('MISSION_MANAGER')` + `canEditOperation`) | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| paid-out **zurücknehmen** (zusätzlich `hasAnyRole('ADMIN','OFFICER')`) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Operation **löschen** (`hasRole('ADMIN')` + `canEditOperation`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+> Asymmetrie der Auszahlung: jeder Mission-Manager darf `paidOut=true` setzen,
+> aber nur Officer/Admin dürfen ein bestätigtes paid-out wieder auf `false`
+> zurücksetzen.
+
+### 3.7 Mission-Finanzen & Profit
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Finanz-Einträge einer Mission lesen (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Finanz-Eintrag **anlegen** (`canSeeMission`, gast-bereinigt) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Finanz-Eintrag bearbeiten/löschen (`canEditFinanceEntry`: Owner **oder** Officer/Admin) | ❌ | ✅¹ | ✅¹ | ✅¹ | ✅ | ✅ |
+| Profit-Kalkulation lesen (`hasAnyRole('SQUADRON_MEMBER','MEMBER','OFFICER','ADMIN')`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Material-Übersicht / Material-Collection eines Auftrags (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+¹ Nur eigener Eintrag und nur solange weiterhin Teilnehmer der Mission.
+
+### 3.8 Promotion-System (Beförderung)
+
+Alle Promotion-Controller sind class-level `isAuthenticated()`; das
+**ADMIN-oder-Officer-der-eigenen-Staffel**-Gate sitzt in der Service-Schicht
+(`canEditSquadron(topic.owningSquadron.id)`).
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Themenbereiche/Kategorien/Level-Inhalte/Rangvoraussetzungen lesen (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| …**pflegen** (Service: Admin **oder** Officer der besitzenden Staffel) | ❌ | ❌ | ❌ | ❌ | ✅¹ | ✅ |
+| Eigene Bewertungen / Eligibility ansehen (`/my`, JWT-Sub) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Bewertungen/Eligibility **anderer** ansehen, Member-Liste (`hasAnyRole('ADMIN','OFFICER')`, Officer staffel-gescopt) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Promotion-Subsystem je Staffel an-/abschalten (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+¹ Nur für die eigene Staffel. **SKs sind vom Promotion-System per
+DB-CHECK/Trigger + ArchUnit-Regel dauerhaft ausgeschlossen.**
+
+### 3.9 Organisation (Staffeln & Spezialkommandos)
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Staffel-Liste lesen | ✅¹ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| SK-Liste lesen (`isAuthenticated()`; inaktive nur Admin) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Aktiven OrgUnit-Kontext umschalten (Sidebar-Switcher) | ❌ | ✅² | ✅² | ✅² | ✅² | ✅ |
+| Staffel-Lifecycle (anlegen/umbenennen/löschen/aktivieren, `promotion-enabled`, `profit-eligible`) (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Staffel-Mitglieds-Flags setzen (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| SK-Lifecycle (anlegen/umbenennen/löschen/aktivieren, `profit-eligible`) (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| SK-**Mitglieder** verwalten (add/remove/Flags) (`@specialCommandSecurityService.canManageMembers`) | ❌ | ❌ | ❌ | ❌ | ❌³ | ✅ |
+| SK-**Lead-Flag** setzen (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+¹ Stammdaten-Read, anonym erlaubt. ² Nicht-Admins schalten zwischen ihren
+Mitgliedschaften; Admins zusätzlich „Alle Staffeln". ³ SK-Mitgliederverwaltung
+ist **Admin oder SK-Lead dieses SK** — nicht an die globale Officer-Rolle
+gebunden.
+
+### 3.10 Stammdaten, Ankündigungen, System
+
+| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Öffentlich** lesbare Stammdaten (Materialien, Locations, Schiffstypen, Hersteller, Sternensysteme, Refining-Methoden, Frequenz-/Job-Typen, Staffeln, System-Settings) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Angemeldet** lesbare Stammdaten (Terminals, Material-Kategorien) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Admin-only** Stammdaten – auch zum Lesen (Städte, Raumstationen, Outposts, POIs, Material-Aliase, Blueprints) (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Stammdaten **schreiben** (anlegen/ändern/löschen/Sichtbarkeit/Overrides) (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| UEX-Location-Typeahead / Blueprint-Produkt-Suche (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Ankündigung **lesen** (`GET /announcement`, `isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Ankündigung **schreiben/löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Sync-Reports lesen/aufräumen (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| System-Setting schreiben (`PUT /settings/{key}`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Rollen-/Rechteverwaltung, Member-Attribute/Rang, Flag-Vergabe (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+Welche Stammdaten anonym lesbar sind, legt allein die `permitAll`-Liste in
+`SecurityConfig` fest (siehe §1.1) — alles andere ist mindestens angemeldet,
+einige Tabellen (Städte, Stationen, Outposts, POIs, Aliase, Blueprints) sind
+schon zum **Lesen** Admin-only. **Schreiben ist bei allen Stammdaten
+Admin-only.**
+
+---
+
+## 4. Mehr-OrgUnit-Sichtbarkeit (Scoping)
+
+Lese- und Schreibpfade werden über
+[`OwnerScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java)
+gefiltert (früher `SquadronScopeService`; deckt heute Staffeln **und**
+Spezialkommandos ab). Grundregel: Nicht-Admins sehen die Vereinigung ihrer
+Mitgliedschaften; Admins ohne aktiven Pin sehen alles, mit Pin dieselbe
+restriktive Sicht wie ein Member.
+
+- **Strikt staffel-gescopt** (kein Cross-Staffel): `Ship`, `InventoryItem`
+  (Lager-View), `RefineryOrder`, `Operation` — Listen filtern auf
+  `owning_org_unit_id`, Detail-/Schreib-Endpunkte gaten auf
+  `canSee*`/`canEdit*`.
+- **Cross-Staffel mit Public-Escape**: `Mission` — für andere OrgUnits sichtbar
+  genau dann, wenn `is_internal = false`; editierbar nur durch die besitzende
+  OrgUnit + Admins.
+- **Bedingt staffel-gescopt**: `JobOrder` (+ `JobOrderMaterial` /
+  `JobOrderHandover` / `MaterialClaim`). Ein Auftrag trägt
+  `responsible_org_unit_id` (die **bearbeitende** Einheit — steuert die
+  Sichtbarkeit, nur über `PATCH /{id}/responsible-org-unit` änderbar) und
+  `requesting_org_unit_id` (der **Auftraggeber** — gewährt **keine**
+  Sichtbarkeit). Verantwortlich = **SK** → öffentlich für alle Staffeln
+  (gemeinsame Warteschlange, an die sich Staffeln per Material-Claim melden);
+  verantwortlich = **Staffel** → privat für diese Staffel + Admins. SK-Auftrags-*Edits*
+  laufen über das Rollen-Gate (Logistician+), nicht über das Staffel-Scope.
+
+---
+
+## 5. Besonderheiten der Implementierung
+
+1. **Keycloak-Sync / Fallback:** Lassen sich JWT-Claims (`realm_access.roles`)
+   nicht vollständig synchronisieren, fällt das System auf die reinen
+   Rollen-Namen aus dem Token zurück (Präfix `ROLE_`, Großbuchstaben,
+   Leerzeichen → `_`).
+2. **Default-Rolle:** Wird keine bekannte Rolle übermittelt, erhält der
+   Benutzer **Guest** (keine Authorities).
+3. **Ränge:** Die `UserService`-Logik gibt vor, dass `OFFICER` nur Ränge 1–12,
+   `SQUADRON_MEMBER` Ränge 13–20 erhalten dürfen.
+4. **Logistician-/Mission-Manager-Flags** werden ausschließlich von **Admins**
+   über die Mitgliedschaftsverwaltung (`org_unit_membership`) vergeben
+   (`UserController#patchLogistician` / `#patchMissionManager` und die
+   SquadronMembership-/SpecialCommandMembership-Endpunkte sind `hasRole('ADMIN')`
+   bzw. für SK zusätzlich der SK-Lead über `canManageMembers`). Die alten
+   `app_user`-Flag-Spalten existieren seit V101 nicht mehr.
+5. **Phase-4-Lockdown:** Der gesamte Admin-Bereich (Stammdaten,
+   Member-Management, Ankündigungen, UEX, System-Settings,
+   SK-/Staffel-Lifecycle) ist `hasRole('ADMIN')`. Officer behalten ihre
+   staffel-internen Funktionen (Mission-Management, Hangar-Write inkl.
+   `resetAllFittedStatus`, Refinery, Logistician via Hierarchie, der
+   Auftrags-Workflow und — als einzige Officer-Carve-outs — Promotion-Pflege der
+   eigenen Staffel sowie SK-Mitgliederverwaltung **nur** als SK-Lead).
+6. **Architektur-Guards (ArchUnit):** Jeder `@RestController` trägt mindestens
+   ein `@PreAuthorize`; staffel-gescopte Services müssen `OwnerScopeService` /
+   `AuthHelperService` injizieren; Controller geben nie JPA-Entities zurück. Ein
+   neuer Verstoß bricht den Build (`./gradlew test`).

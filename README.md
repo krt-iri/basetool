@@ -12,7 +12,9 @@ single-sign-on via Keycloak and a clear role and permission model.
 
 ### What the application provides
 
-- **Mission planning** — plan, brief and review squadron missions with role-aware access (`MISSION_MANAGER`, `OFFICER`, `ADMIN`).
+- **Mission planning** — plan, brief and review squadron missions with role-aware access (`MISSION_MANAGER`, `OFFICER`, `ADMIN`). Non-internal missions are browsable (and joinable) without an account.
+- **Operations & payouts** — group missions under an *Operation*, track per-participant finances and payouts, and confirm pay-outs with an asymmetric mark/clear gate (`MISSION_MANAGER` sets, `OFFICER`/`ADMIN` clears).
+- **Public request surface** — unauthenticated visitors can submit material/item job orders (auto-routed to the intake Spezialkommando) and sign up for non-internal missions as a named guest — including changing their payout preference — without logging in. See [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) §1.
 - **Hangar & inventory** — track ships and personal inventories per member, including UEX City and Space Station locations.
 - **Refinery & materials** — manage refinery job orders, material handovers and the materials matrix (`/materials/overview`) with planet-aware grouping.
 - **Terminals** — administer trade terminals, including UEX raw state (loading dock, auto-load) and the last UEX sync timestamp (`/admin/terminals`).
@@ -63,7 +65,7 @@ documents cover everything else:
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards (Contributor Covenant 3.0). |
 | [.github/SECURITY.md](.github/SECURITY.md) | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM). |
 | [LICENSE.md](LICENSE.md) | GNU General Public License v3.0. |
-| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role). |
+| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface. |
 | [MULTI_SQUADRON_PLAN.md](MULTI_SQUADRON_PLAN.md) | The original multi-Staffel refactor plan (Phases 1–7, V80–V93). |
 | [SPEZIALKOMMANDO_PLAN.md](SPEZIALKOMMANDO_PLAN.md) | The Spezialkommando-as-second-tenant-kind extension on top of the multi-Squadron baseline (V95+). |
 | [Styleguide.md](Styleguide.md) | "DAS KARTELL" Corporate Design Manual — brand colors, typography (`Ethnocentric`, `Lato`), department palette, visual rules. |
@@ -214,24 +216,28 @@ What changed at the data layer:
 
 What changed at the authorization layer:
 
-* New [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java)
-  centralises `currentSquadron()` / `canSee…` / `canEdit…` for every
-  staffel-scoped aggregate. Read paths consult it in service / repository
-  filters, write paths stamp the owning squadron at create time, and
-  controllers use it via `@PreAuthorize("@squadronScopeService.canEdit…")`
+* [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java)
+  (originally `SquadronScopeService`, later renamed and broadened to cover
+  Staffeln **and** Spezialkommandos) centralises `currentOrgUnitId()` /
+  `canSee…` / `canEdit…` for every staffel-scoped aggregate. Read paths
+  consult it in service / repository filters (via a three-parameter
+  `ScopePredicate` tuple), write paths stamp the owning OrgUnit at create
+  time, and controllers use it via `@PreAuthorize("@ownerScopeService.canEdit…")`
   on detail-view endpoints.
-* New [`MeController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MeController.java)
-  exposes `GET /api/v1/me/active-squadron` for every authenticated
-  caller plus `PUT` / `DELETE` (admin-only) to switch the session
-  context. The frontend
+* [`MeController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MeController.java)
+  exposes `GET /api/v1/me/active-org-unit` (legacy alias
+  `GET /active-squadron`) for every authenticated caller to **read** the
+  resolved context. **Switching** is a frontend concern:
   [`MeFrontendController`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/MeFrontendController.java)
-  proxies the browser-side POST through to the backend.
-* MDC field `squadronId` (sentinels `all` / `none` / `anonymous`) is
-  attached by [`CorrelationIdFilter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/logging/CorrelationIdFilter.java)
-  so log lines and access-log JSON show which squadron context a
-  request ran under.
+  `POST /active-org-unit` updates the Redis-backed session pin and relays it
+  to the backend on every outbound call via the `X-Active-Org-Unit-Id`
+  header (legacy `X-Active-Squadron-Id` mirrored for one release).
+* MDC field `orgUnitId` (sentinels `all` / `none` / `anonymous`) is attached
+  by [`CorrelationIdFilter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/logging/CorrelationIdFilter.java)
+  so log lines and access-log JSON show which OrgUnit context a request ran
+  under; the legacy `squadronId` field is emitted in parallel for one release.
 * ArchUnit rule
-  `staffelScopedServicesMustWireSquadronOrAuthHelper` in
+  `staffelScopedServicesMustWireOwnerScopeOrAuthHelper` in
   [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)
   fails the build if a staffel-scoped service stops injecting one of
   the auth services.
@@ -253,20 +259,21 @@ non-internal missions stay visible across squadrons (think public
 operations boards), but everything else respects the strict squadron
 filter.
 
-What is **deferred** to a follow-up release: the tightening migrations
-`V88`/`V89`/`V90` (Phase 7 chain — `V88` stop-write of the legacy
-`job_order.squadron` VARCHAR, `V89` `SET NOT NULL` on the new
-columns, `V90` final `DROP COLUMN` per the two-phase rule). They
-intentionally do not ship in the same release as `V80`–`V86`, so a
-rollback to single-tenant remains possible during the grace window.
-The chain was originally numbered `V87`/`V88`/`V89`; the solo-deploy
-of `V88` (Phase 7 Part 1) before its `V87` companion pushed the
-NOT NULL tightening into the `V89` slot and the DROP COLUMN into
-`V90` (Flyway `out-of-order=false` rejects any later-discovered
-migration with `version <= latest_applied`). The full frontend UI for the squadron switcher /
-context badge / squadron-column rendering is tracked as the next slice
-of work; see `MULTI_SQUADRON_FOLLOWUP_PROMPT.md` at the repo root for
-the open punch list.
+**Status today.** The multi-squadron rollout is long complete and was
+**extended into a multi-OrgUnit model** by the Spezialkommando work (see
+[`SPEZIALKOMMANDO_PLAN.md`](SPEZIALKOMMANDO_PLAN.md)): a shared `org_unit`
+table with a `kind` discriminator (`SQUADRON` / `SPECIAL_COMMAND`) now backs
+every owner reference, and the squadron switcher / context badge shipped in
+the frontend. The schema has advanced well past the original Phase-7 chain
+(currently `V132`). Several legacy columns have already been dropped — the
+`app_user.is_logistician` / `is_mission_manager` flags (`V101`, now sourced
+from `org_unit_membership`), `job_order.creating_*` (`V129`), and the legacy
+material / ship-type columns (`V125`). The one remaining dual-write is
+`owning_squadron_id` (kept in lockstep with `owning_org_unit_id` by JPA
+lifecycle hooks); it is dropped in the destructive cleanup release, after
+which a rollback to single-tenant is no longer supported. See
+[`CLAUDE.md`](CLAUDE.md) (“Multi-org-unit tenancy”) for the current
+per-aggregate scope model.
 
 ---
 
@@ -643,10 +650,11 @@ redirect (`prompt=none`).
 ### 5.5 Request correlation and structured logging
 
 Both modules emit one access-log line per request (HTTP method, path,
-status, duration) and enrich **every** log line with two MDC fields:
+status, duration) and enrich **every** log line with these MDC fields:
 
 - `correlationId` — taken from the inbound `X-Correlation-Id` request header (configurable via `APP_LOGGING_CORRELATION_ID_HEADER`) or generated as a UUID if absent. The effective id is echoed back in the response header of the same name so clients, proxies and load balancers can trace requests end-to-end. The frontend's `WebClientLoggingFilter` also propagates the same id to every outbound backend call, so backend and frontend log lines of the same user interaction share one id.
 - `userId` — the JWT / OIDC `sub` claim of the authenticated user, or `anonymous` for unauthenticated traffic. Names, emails and tokens are never logged.
+- `orgUnitId` — (backend) the effective OrgUnit context the request ran under (sentinels `all` / `none` / `anonymous`); the legacy `squadronId` field is emitted in parallel for one release.
 
 In addition to access logs, the frontend module logs Resilience4j events
 (circuit-breaker state transitions, retry attempts, bulkhead rejections,
