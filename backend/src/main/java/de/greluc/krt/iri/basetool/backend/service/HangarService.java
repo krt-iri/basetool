@@ -123,6 +123,13 @@ public class HangarService {
    * HangarController} so this method stays pure business logic and the service layer keeps its
    * hands off {@link org.springframework.security.core.context.SecurityContextHolder} — see the
    * architecture rule enforced by {@code ArchitectureTest}.
+   *
+   * <p>Both the aggregated counts ({@code countShipsByType}) and the owner-detail rows ({@code
+   * findByShipTypeInScoped}) are filtered through the <em>same</em> {@link ScopePredicate}, so the
+   * breakdown can never surface a ship from an OrgUnit the caller is not scoped to. An admin pinned
+   * to a squadron therefore sees only that squadron's ships in the breakdown — not, say, an SK-only
+   * member's ship that merely shares a ship type with the pinned squadron (Hangar = strict eigene
+   * Staffel, MULTI_SQUADRON_PLAN.md section 1).
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails) {
@@ -140,7 +147,8 @@ public class HangarService {
 
     List<Ship> ships =
         includeOwnerDetails && !types.isEmpty()
-            ? shipRepository.findByShipTypeIn(types)
+            ? shipRepository.findByShipTypeInScoped(
+                types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
             : java.util.Collections.emptyList();
 
     return p.map(
