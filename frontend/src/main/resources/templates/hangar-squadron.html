@@ -71,6 +71,25 @@
             .sub-table tr:hover {
                 background-color: rgba(231, 126, 35, 0.05) !important;
             }
+            /* ---- Ship-type live filter ---- */
+            .hangar-filter {
+                position: relative;
+                max-width: 360px;
+                margin-bottom: 1.25rem;
+            }
+            .hangar-filter .hangar-filter-icon {
+                position: absolute;
+                left: 0.85rem;
+                top: 50%;
+                transform: translateY(-50%);
+                display: inline-flex;
+                color: var(--color-gray-2);
+                pointer-events: none;
+            }
+            .hangar-filter input[type="search"] {
+                width: 100%;
+                padding-left: 2.6rem;
+            }
         </style>
 
         <!-- Squadron overview aggregates ship counts per ship-type across the current
@@ -81,6 +100,14 @@
              style="display: block; padding: 0.6rem 0.9rem; margin-bottom: 1rem; border-radius: var(--radius-none); white-space: normal; text-align: left;"
              th:text="#{hangar.squadron.all_squadrons_notice}">
             Aggregation across all squadrons. Select a single squadron to filter.
+        </div>
+
+        <div class="hangar-filter" th:if="${!#lists.isEmpty(overview)}">
+            <span class="hangar-filter-icon" aria-hidden="true">
+                <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
+            </span>
+            <input type="search" id="squadron-ship-filter" autocomplete="off"
+                   th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
         </div>
 
         <div class="table-responsive">
@@ -94,7 +121,7 @@
             </thead>
             <tbody>
             <th:block th:each="item : ${overview}">
-            <tr>
+            <tr class="sq-row" th:attr="data-ship-filter=${#strings.toLowerCase((item.shipType.manufacturer != null ? item.shipType.manufacturer.name + ' ' : '') + item.shipType.name)}">
                 <td th:text="${item.shipType.name}" style="vertical-align: top; padding-top: 1rem;">Typ</td>
                 <td th:text="${item.count} + ' (' + ${item.fittedCount} + ' ' + #{hangar.squadron.fitted} + ')'" style="vertical-align: top; padding-top: 1rem;">0 (0 gefittet)</td>
                 <td style="vertical-align: top; padding-top: 0.5rem;">
@@ -130,11 +157,48 @@
             <tr th:if="${#lists.isEmpty(overview)}">
                 <td colspan="3" class="text-center" th:text="#{hangar.squadron.empty}">Keine Schiffe in der Staffel vorhanden.</td>
             </tr>
+            <tr id="squadron-filter-empty" style="display: none;">
+                <td colspan="3" class="text-center" th:text="#{hangar.filter.no_results}">Keine Treffer für diese Suche.</td>
+            </tr>
             </tbody>
         </table>
         </div>
     </div>
 </main>
+
+<script th:attr="nonce=${cspNonce}">
+    // ---- Live filter: hide ship-type rows (and their detail rows) that do not match the query ----
+    document.addEventListener("DOMContentLoaded", function() {
+        const filterInput = document.getElementById("squadron-ship-filter");
+        if (!filterInput) {
+            return;
+        }
+        const typeRows = document.querySelectorAll("tr.sq-row");
+        const noResultsRow = document.getElementById("squadron-filter-empty");
+
+        filterInput.addEventListener("input", function() {
+            const query = this.value.trim().toLowerCase();
+            let anyVisible = false;
+            typeRows.forEach(function(row) {
+                const haystack = row.getAttribute("data-ship-filter") || "";
+                const match = query === "" || haystack.indexOf(query) !== -1;
+                row.style.display = match ? "" : "none";
+                // The optional admin/officer detail row sits directly after the type row;
+                // hide it in lockstep, but leave its open/closed state to the CSS when visible.
+                const details = row.nextElementSibling;
+                if (details && details.classList.contains("details-row")) {
+                    details.style.display = match ? "" : "none";
+                }
+                if (match) {
+                    anyVisible = true;
+                }
+            });
+            if (noResultsRow) {
+                noResultsRow.style.display = (!anyVisible && query !== "") ? "" : "none";
+            }
+        });
+    });
+</script>
 
 </body>
 </html>
