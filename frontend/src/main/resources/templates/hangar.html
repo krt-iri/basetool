@@ -122,6 +122,25 @@
                 width: 100%;
             }
         }
+    /* ---- Ship-type live filter ---- */
+        .hangar-filter {
+            position: relative;
+            max-width: 360px;
+            margin-bottom: 1.25rem;
+        }
+        .hangar-filter .hangar-filter-icon {
+            position: absolute;
+            left: 0.85rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: inline-flex;
+            color: var(--color-gray-2);
+            pointer-events: none;
+        }
+        .hangar-filter input[type="search"] {
+            width: 100%;
+            padding-left: 2.6rem;
+        }
     </style>
     </th:block>
 </head>
@@ -156,6 +175,14 @@
                 <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
             </div>
 
+            <div class="hangar-filter" th:if="${!#lists.isEmpty(myShips)}">
+                <span class="hangar-filter-icon" aria-hidden="true">
+                    <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
+                </span>
+                <input type="search" id="hangar-ship-filter" autocomplete="off"
+                       th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
+            </div>
+
             <div class="table-responsive">
             <table>
                 <thead>
@@ -171,7 +198,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row">
+                    <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row"
+                        th:attr="data-ship-filter=${#strings.toLowerCase((ship.shipType != null && ship.shipType.manufacturer != null ? ship.shipType.manufacturer.name : '') + ' ' + (ship.shipType != null ? ship.shipType.name : ''))}">
                         <td th:text="${ship.shipType != null && ship.shipType.manufacturer != null ? ship.shipType.manufacturer.name : ''}">Hersteller</td>
                         <td th:text="${ship.shipType != null ? ship.shipType.name : ''}">Typ</td>
                         <td>
@@ -209,6 +237,9 @@
                     </tr>
                     <tr th:if="${#lists.isEmpty(myShips)}">
                         <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" class="text-center" th:text="#{hangar.empty}">Keine Schiffe im Hangar.</td>
+                    </tr>
+                    <tr id="hangar-filter-empty" style="display: none;">
+                        <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" class="text-center" th:text="#{hangar.filter.no_results}">Keine Treffer für diese Suche.</td>
                     </tr>
                 </tbody>
             </table>
@@ -652,6 +683,32 @@
                 }
             });
         });
+
+        // ---- Live filter: hide ship rows whose ship type does not match the query ----
+        (function() {
+            const filterInput = document.getElementById("hangar-ship-filter");
+            if (!filterInput) {
+                return;
+            }
+            const shipRows = document.querySelectorAll("tr[data-ship-filter]");
+            const noResultsRow = document.getElementById("hangar-filter-empty");
+
+            filterInput.addEventListener("input", function() {
+                const query = this.value.trim().toLowerCase();
+                let anyVisible = false;
+                shipRows.forEach(function(row) {
+                    const haystack = row.getAttribute("data-ship-filter") || "";
+                    const match = query === "" || haystack.indexOf(query) !== -1;
+                    row.style.display = match ? "" : "none";
+                    if (match) {
+                        anyVisible = true;
+                    }
+                });
+                if (noResultsRow) {
+                    noResultsRow.style.display = (!anyVisible && query !== "") ? "" : "none";
+                }
+            });
+        })();
     });
 </script>
 </body>

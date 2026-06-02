@@ -1,17 +1,21 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.ManufacturerDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
@@ -71,5 +75,60 @@ class HangarPageControllerMvcTest {
 
     // When & Then
     mockMvc.perform(get("/hangar")).andExpect(status().isOk()).andExpect(view().name("hangar"));
+  }
+
+  @Test
+  @WithMockUser
+  void viewHangar_ShouldRenderShipTypeFilterWhenHangarHasShips() throws Exception {
+    // Given
+    ManufacturerDto manufacturer =
+        new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
+    ShipTypeDto shipType =
+        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
+    ShipDto ship =
+        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
+    PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 1000, 1, 1, List.of());
+
+    when(backendApiClient.get(
+            eq("/api/v1/hangar/my-ships?size=1000"), any(ParameterizedTypeReference.class)))
+        .thenReturn(ships);
+
+    // When & Then
+    mockMvc
+        .perform(get("/hangar"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("hangar"))
+        .andExpect(content().string(containsString("id=\"hangar-ship-filter\"")))
+        .andExpect(
+            content().string(containsString("data-ship-filter=\"aegis dynamics avenger titan\"")));
+  }
+
+  @Test
+  @WithMockUser
+  void viewSquadron_ShouldRenderShipTypeFilterWhenOverviewHasEntries() throws Exception {
+    // Given
+    ManufacturerDto manufacturer =
+        new ManufacturerDto(
+            UUID.randomUUID(), "Drake Interplanetary", "DRAK", null, null, null, false);
+    ShipTypeDto shipType =
+        new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", manufacturer, null, 0, false);
+    SquadronShipOverviewDto overview = new SquadronShipOverviewDto(shipType, 3L, 1L, List.of());
+    PageResponse<SquadronShipOverviewDto> page =
+        new PageResponse<>(List.of(overview), 0, 1000, 1, 1, List.of());
+
+    when(backendApiClient.get(
+            eq("/api/v1/hangar/squadron-overview?size=1000"),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(page);
+
+    // When & Then
+    mockMvc
+        .perform(get("/hangar/squadron"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("hangar-squadron"))
+        .andExpect(content().string(containsString("id=\"squadron-ship-filter\"")))
+        .andExpect(
+            content()
+                .string(containsString("data-ship-filter=\"drake interplanetary cutlass black\"")));
   }
 }
