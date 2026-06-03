@@ -3,7 +3,7 @@
 A design system for the **Profit Basetool**, the squadron-management web app of the
 **„DAS KARTELL" / IRIDIUM** organization in *Star Citizen*. It captures the brand's
 dark, sci-fi "technical HUD" aesthetic — house orange on black, the angular
-*Ethnocentric* display face, *Lato* body text, square-cornered containers framed
+*Audiowide* display face, *Lato* body text, square-cornered containers framed
 with corner brackets, and a department color system — so designers and agents can
 produce on-brand interfaces, mockups and assets.
 
@@ -150,7 +150,7 @@ See the [**index**](#index) at the bottom for the full manifest.
 - [`ui_kits/basetool/`](ui_kits/basetool/) — interactive recreation of the app.
 - [`assets/`](assets/) — logos & favicon, plus the honeycomb `Wabenmuster`
   (`honeycomb.svg` bold + `honeycomb-bg.svg` faint ambient).
-- [`fonts/`](fonts/) — Ethnocentric + Lato (self-hosted).
+- [`fonts/`](fonts/) — Audiowide + Lato (self-hosted).
 
 ---
 
@@ -168,7 +168,7 @@ How the product writes. Pulled from the real i18n strings.
 - **Person.** Addresses the user as **you** ("This entry is only visible to you").
   Confirmations are matter-of-fact: *"Ship successfully added."*, *"Successfully saved."*
 - **Casing.** Labels, table headers, nav, buttons and headings are **UPPERCASE**
-  (headings via Ethnocentric; UI labels via CSS `text-transform`). Sentence case for
+  (headings via Audiowide; UI labels via CSS `text-transform`). Sentence case for
   body/help text. Status enums shout: `PLANNED`, `ACTIVE`, `COMPLETED`, `CANCELLED`.
 - **Buttons.** Imperative verbs: *Add, Edit, Save, Delete, Cancel, Check out,
   Log Handover, Create New Order.* Destructive actions always confirm
@@ -194,9 +194,8 @@ Everything that makes a screen read as "Profit Basetool".
   `#D2D2D2`. One hero accent — house orange `#E77E23` — carries borders, headings,
   links, focus and primary actions. Color is used *sparingly and functionally*;
   department/semantic hues appear only as small tags, row tints and status.
-- **Type.** Display = **Ethnocentric**, uppercase only, letter-spacing `0.05em`
-  (the face has weak built-in kerning — the manual recommends optical kerning and a
-  manual `+25` nudge on "E"). Body/UI = **Lato**, default weight **Light 300**, with
+- **Type.** Display = **Audiowide**, uppercase only, letter-spacing `0.05em`
+  (a wide, rounded techno face). Body/UI = **Lato**, default weight **Light 300**, with
   **Bold 700** for emphasis/labels. Headings are orange; body is gray-1.
 - **Backgrounds.** Flat black/dark-gray. No photographic hero imagery in-app. A
   subtle technical **pattern/texture** (`images/pattern.svg`) exists in the brand
@@ -290,8 +289,9 @@ From the project's own engineering guide (`CLAUDE.md` → *Frontend / UI rules*)
   `assets/Kartelllogo.jpg` (full lockup). Logo may appear **only** in orange,
   white or black. *(The repo's `design/logos/*.svg` exports embed raster data that
   did not survive import; the `.webp`/`.jpg` rasters here are the usable copies.)*
-- **Substitutions.** None — both brand fonts (Ethnocentric, Lato) and the icon set
-  are the originals, self-hosted. No Google Fonts or CDN fallbacks are required.
+- **Substitutions.** The display face was switched from the manual's *Ethnocentric*
+  to **Audiowide** (self-hosted WOFF2). *Lato* and the icon set are originals. No
+  Google Fonts or CDN fallbacks are required at runtime.
 
 ---
 
@@ -305,7 +305,7 @@ Root manifest:
 | `SKILL.md` | Agent-Skills entry point (for use in Claude Code). |
 | `colors_and_type.css` | `@font-face` declarations + all color/type/shape tokens. |
 | `krt-components.css` | Component CSS layer built on the tokens. |
-| `fonts/` | Ethnocentric (Regular/Italic) + Lato (Thin→Black, each + italic) — self-hosted WOFF2 with OTF/TTF fallback. |
+| `fonts/` | Audiowide (display) + Lato (Thin→Black, each + italic) — self-hosted WOFF2 with TTF fallback. |
 | `assets/` | `krt.webp` (mark), `krt-favicon.webp`, `Kartelllogo.jpg` (lockup), `honeycomb.svg` + `honeycomb-bg.svg` (Wabenmuster). |
 | `preview/` | 22 Design System specimen cards (type, color, spacing, components, brand — incl. the rank ladder, honeycomb pattern and background/texture treatments). |
 | `proposals/` | Design proposals + handoff: action-hierarchy before/after mocks (`mission-detail-…`, `list-page-…`, `inventory-…`, `refinery-order-…`), the full `template-audit.md`, and `claude-code-auftrag.md` (project-wide unification order for the real repo). |

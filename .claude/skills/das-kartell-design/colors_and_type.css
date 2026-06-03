@@ -13,24 +13,26 @@
 /* ----------------------------------------------------------------------------
    FONTS
    Two faces only:
-   - Ethnocentric — the wide, angular display face. Headlines ONLY, always
+   - Audiowide — the wide, techy display face. Headlines ONLY, always
      UPPERCASE, letter-spacing 0.05em. Never set body copy in it.
+     (Replaced Ethnocentric, 2026-06. Single weight, no italic — both the
+      old normal + italic slots map to the one Audiowide cut.)
    - Lato — everything else. Default body weight is 300 (Light).
-   The original app ships WOFF2; here we reference the OTF/TTF originals.
    ---------------------------------------------------------------------------- */
-/* Ethnocentric — display. Versalien (uppercase) only. */
+/* Audiowide — display. Single weight; use UPPERCASE for headlines. */
 @font-face {
-    font-family: 'Ethnocentric';
-    src: url('fonts/Ethnocentric_Rg.woff2') format('woff2'),
-         url('fonts/Ethnocentric_Rg.otf') format('opentype');
+    font-family: 'Audiowide';
+    src: url('fonts/Audiowide-Regular.woff2') format('woff2'),
+         url('fonts/Audiowide-Regular.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
 }
+/* Audiowide has no italic — fall back to the regular cut for the italic slot. */
 @font-face {
-    font-family: 'Ethnocentric';
-    src: url('fonts/Ethnocentric_Rg_It.woff2') format('woff2'),
-         url('fonts/Ethnocentric_Rg_It.otf') format('opentype');
+    font-family: 'Audiowide';
+    src: url('fonts/Audiowide-Regular.woff2') format('woff2'),
+         url('fonts/Audiowide-Regular.ttf') format('truetype');
     font-weight: normal;
     font-style: italic;
     font-display: swap;
@@ -197,7 +199,7 @@
     /* ------------------------------------------------------------------ */
     /* TYPOGRAPHY tokens                                                   */
     /* ------------------------------------------------------------------ */
-    --font-headline: 'Ethnocentric', sans-serif;
+    --font-headline: 'Audiowide', sans-serif;
     --font-body: 'Lato', sans-serif;
     /* The brand ships no monospace face, so "mono" contexts (version strings,
        IDs, hex codes, code) use the house font Lato with tabular figures for
@@ -218,7 +220,7 @@
     --fw-bold: 700;      /* labels, nav, btn, strong */
     --fw-black: 900;
 
-    --tracking-display: 0.05em;  /* Ethnocentric optical kerning fix */
+    --tracking-display: 0.05em;  /* Audiowide display tracking */
     --tracking-overline: 0.15em; /* admin chip, overlines */
     --lh-body: 1.5;
 
