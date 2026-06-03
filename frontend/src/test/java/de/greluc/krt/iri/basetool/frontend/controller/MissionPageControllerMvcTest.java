@@ -335,6 +335,91 @@ class MissionPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
+  void missionDetail_LinkedRefineryOrder_RendersEndTimeForClientSideLocalZoneConversion()
+      throws Exception {
+    // Regression guard: a refinery order linked to a mission used to render its end time with a raw
+    // #temporals.format() that fell back to the server's default zone (UTC in the container), so
+    // the
+    // user saw UTC instead of their local time. The fix renders the end timestamp into a data-utc
+    // epoch-millis attribute plus an explicitly UTC-labelled fallback, and a small page script
+    // (formatRefineryEndLocalTimes) rewrites it to the browser's local zone on load.
+    UUID missionId = UUID.randomUUID();
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderDto order =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderDto(
+            UUID.randomUUID(),
+            null,
+            null,
+            null,
+            java.time.Instant.parse("2026-02-10T09:00:00Z"),
+            120L,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Collections.emptyList(),
+            null,
+            null,
+            1L,
+            null);
+    long expectedEndsAtMillis = order.getEndsAt().toEpochMilli();
+
+    MissionDto mission =
+        new MissionDto(
+            missionId,
+            "Refinery TZ Mission",
+            null,
+            null,
+            "RUNNING",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptySet(),
+            Collections.emptyList(),
+            List.of(order),
+            null,
+            null,
+            Collections.emptySet(),
+            true,
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            0,
+            0,
+            null,
+            null,
+            null,
+            0L);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(mission);
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId))
+        .andExpect(status().isOk())
+        // End timestamp carried as epoch millis for the client-side local-zone converter.
+        .andExpect(content().string(containsString("data-utc=\"" + expectedEndsAtMillis + "\"")))
+        .andExpect(content().string(containsString("class=\"refinery-endsat-local\"")))
+        // Pre-JS fallback is explicitly UTC-labelled (never an unlabelled, misleading local-looking
+        // string).
+        .andExpect(content().string(containsString("10.02.2026 11:00 UTC")))
+        // The conversion script must be present so the value becomes browser-local on load.
+        .andExpect(content().string(containsString("formatRefineryEndLocalTimes")));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
   void missionDetail_ShouldRenderParticipantsCounter_AsXSlashY() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID p1Id = UUID.randomUUID();

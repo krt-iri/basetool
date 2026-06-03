@@ -594,7 +594,11 @@ public class RefineryOrderService {
 
       if (existingItemOpt.isPresent()) {
         InventoryItem existingItem = existingItemOpt.orElseThrow();
-        existingItem.setAmount(existingItem.getAmount() + itemDto.amount());
+        // Round the summed quantity at the source (defence in depth): InventoryItem's
+        // @PrePersist/@PreUpdate hook is the guarantee, but rounding the double sum here keeps the
+        // in-memory amount clean so no caller observes a >3-decimal artefact before flush.
+        existingItem.setAmount(
+            InventoryItem.roundToScuScale(existingItem.getAmount() + itemDto.amount()));
         if (incomingNote != null) {
           String existingNote = existingItem.getNote();
           if (existingNote == null || existingNote.isBlank()) {
@@ -618,7 +622,7 @@ public class RefineryOrderService {
         item.setMaterial(mat);
         item.setLocation(loc);
         item.setQuality(itemDto.quality());
-        item.setAmount(itemDto.amount());
+        item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
         item.setMission(order.getMission());
         item.setNote(incomingNote);
 
