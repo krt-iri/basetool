@@ -709,7 +709,7 @@
                     <div th:id="'unit-summary-' + ${unit.id}" class="unit-summary" style="display: none; flex-wrap: wrap; gap: 1rem; padding-top: 0.5rem; font-size: 0.9rem; color: var(--color-gray-1);">
                         <span th:if="${unit.jobSummary == null or unit.jobSummary.isEmpty()}" style="color: var(--color-gray-2); font-style: italic;" th:text="#{mission.unit.no_crew}">No crew assigned.</span>
                         <div th:each="entry : ${unit.jobSummary}" style="display: flex; align-items: center; gap: 0.3rem;">
-                            <span style="color: var(--color-primary); font-weight: bold;" th:text="${entry.value} + 'x'">1x</span>
+                            <span style="color: var(--color-white); font-weight: bold;" th:text="${entry.value} + 'x'">1x</span>
                             <span th:text="${entry.key}">Pilot</span>
                         </div>
                     </div>

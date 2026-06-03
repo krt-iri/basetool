@@ -6,9 +6,16 @@
  * without changing the rendered output on any supported browser. `font-display: swap` keeps
  * the system fallback visible until the brand font arrives, eliminating the FOIT blank period.
  */
+/*
+ * Audiowide — the wide, techy display face. Headlines ONLY, always UPPERCASE.
+ * Replaced Ethnocentric (2026-06) as part of the design-system unification:
+ * Ethnocentric's irregular kerning was hard to read at small sizes, Audiowide
+ * is the current KRT display face. Single weight, no italic. WOFF2-only (see
+ * the note above — every supported browser ships WOFF2).
+ */
 @font-face {
-    font-family: Ethnocentric;
-    src: url('../fonts/Ethnocentric Rg.woff2') format('woff2');
+    font-family: Audiowide;
+    src: url('../fonts/Audiowide-Regular.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -99,7 +106,7 @@
     --data-fg: var(--color-white);            /* bright neutral readouts */
 
     /* Typography */
-    --font-headline: 'Ethnocentric', sans-serif;
+    --font-headline: 'Audiowide', sans-serif;
     --font-body: 'Lato', sans-serif;
     /* The brand ships no monospace face, so "mono" contexts (version strings,
        IDs, hex codes, code) use the house font Lato with tabular figures for
@@ -120,7 +127,7 @@
     --fw-bold: 700;       /* labels, nav, btn, strong */
     --fw-black: 900;
 
-    --tracking-display: 0.05em;   /* Ethnocentric optical kerning fix */
+    --tracking-display: 0.05em;   /* Audiowide display tracking */
     --tracking-overline: 0.15em;  /* admin chip, overlines */
     --lh-body: 1.5;
 
@@ -2413,7 +2420,7 @@ textarea:focus-visible,
 /* ==========================================================================
    KRT Loading Indicator (used by live-filter overlays, e.g. mission list).
    Respects corporate design: dark background, orange accent, uppercase
-   Ethnocentric label and no native browser UI.
+   Audiowide label and no native browser UI.
    ========================================================================== */
 .krt-loading-indicator {
     display: flex;
