@@ -20,6 +20,10 @@
 
 - **Der Einsatz-Filter der Lageransichten („Mein Lager" / „Alle Lager") zeigt jetzt zusätzlich abgeschlossene und abgebrochene Einsätze der letzten drei Monate an, nicht mehr nur geplante und aktive.** Gerade beendete Operationen bleiben so im Filter — und im Einsatz-Zuordnungs-Dropdown — auswählbar; ältere abgeschlossene/abgebrochene Einsätze fallen weiterhin heraus, damit die Liste nicht zuwächst.
 
+- **Der Einsatz-Filter der Lageransichten (und das Einsatz-Zuordnungs-Dropdown) sortiert die Einsätze jetzt nach geplantem Start absteigend, sodass die neuesten oben stehen.** Bisher standen die ältesten oben; Einsätze ohne geplanten Start folgen weiterhin zuletzt.
+
+- **Der Auftrags-Filter der Lageransichten und die Auftrags-Auswahlfelder in den Lagereinträgen sortieren die Aufträge jetzt nach Priorität (wichtigste zuerst) — wie in der Auftragsverwaltung.** Aufträge ohne Priorität stehen zuletzt; bei gleicher Priorität entscheidet die höchste Auftragsnummer.
+
 - **Auftrags-Workflow jetzt profit-gegated: nur Mitglieder einer profit-berechtigten Staffel/SK (und Admins) dürfen Aufträge sehen, bearbeiten (Status/Priorität/Materialien/Handover/Reassign) und Material-Claims setzen; reine Nicht-Profit-Mitglieder können Aufträge nur noch anlegen, sonst nichts.** Im Menü ersetzt „Auftrag anlegen" den „Aufträge"-Link, und ein Direktaufruf von `/orders` bzw. `/orders/{id}` leitet für sie auf das Anlege-Formular um. Das Backend setzt dasselbe Gate auf Lese-, Schreib- und Claim-Endpunkten durch (leere Liste bzw. `403`) — auch die sonst staffelübergreifend öffentliche SK-Warteschlange bleibt für Nicht-Profit-Mitglieder verborgen.
 
 - **Beförderungssystem: ein Admin ohne aktive Staffel (Alle-Staffeln-Modus) sieht jetzt einen Hinweis „Bitte wähle eine Staffel" statt der zusammengeführten Daten aller Staffeln; erst nach Auswahl einer Staffel erscheint deren System.** Ein Beförderungskatalog ist inhärent pro Staffel, daher ergibt die vermischte Allansicht keinen Sinn. Nutzer ganz ohne Staffelzugehörigkeit haben kein eigenes Beförderungssystem mehr und sehen den Menüpunkt nicht (direkter Seitenaufruf wird mit 403 blockiert).

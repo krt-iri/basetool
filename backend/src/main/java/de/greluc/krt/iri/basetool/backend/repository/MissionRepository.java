@@ -19,9 +19,10 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
 
   /**
    * Returns slim {@link de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto}s for the
-   * mission-picker dropdowns of the warehouse (Lager) views, sorted by planned start, without
-   * pulling the full {@link Mission} aggregate. The result contains every {@code PLANNED} / {@code
-   * ACTIVE} mission visible to the caller (the live operational set, regardless of date) plus every
+   * mission-picker dropdowns of the warehouse (Lager) views, sorted newest-first by planned start
+   * (missions without a planned start sort last, then alphabetically by name), without pulling the
+   * full {@link Mission} aggregate. The result contains every {@code PLANNED} / {@code ACTIVE}
+   * mission visible to the caller (the live operational set, regardless of date) plus every
    * recently-closed {@code COMPLETED} / {@code CANCELLED} mission whose {@code plannedStartTime} is
    * on or after {@code cutoff} — so an inventory item can still be filtered by, or re-bound to, a
    * mission that has just wrapped up. Terminal missions older than the cut-off (and terminal
@@ -43,7 +44,7 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * @param cutoff inclusive lower bound on {@code plannedStartTime} for {@code COMPLETED} / {@code
    *     CANCELLED} missions; {@code PLANNED} / {@code ACTIVE} missions are returned regardless of
    *     it.
-   * @return slim reference DTOs visible to the caller.
+   * @return slim reference DTOs visible to the caller, ordered newest planned-start first.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name,"
@@ -55,7 +56,7 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
           + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
           + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
           + "  OR m.isInternal = false"
-          + " ) ORDER BY m.plannedStartTime ASC")
+          + " ) ORDER BY m.plannedStartTime DESC NULLS LAST, m.name ASC")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
