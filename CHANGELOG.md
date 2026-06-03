@@ -16,6 +16,8 @@
 
 ### Changed
 
+- **Die Oberfläche wird app-weit auf das aktuelle KRT-Design-System vereinheitlicht.** Die Headline-Schrift wechselt von Ethnocentric zu Audiowide (gleichmäßigere Kerning, besser lesbar), und die Aktions-Hierarchie wird angeglichen: pro Ansicht genau eine gefüllte orange Hauptaktion, wiederholte Zeilen- und Routineaktionen dezent (Ghost/Outline), destruktive Aktionen zurückhaltend, Formular-Labels und reine Datenwerte nicht mehr orange.
+
 - **Der automatische Deploy (`deploy.sh` / `iri-deploy.timer`) wiederholt ein Image, dessen Health-Check fehlschlägt, jetzt mit exponentiellem Backoff statt bei jedem 5-Minuten-Tick.** Bisher fuhr ein kaputtes `:stable` (oder ein vorübergehender Fehler) die Anwendung alle paar Minuten in die Wartungsseite, weil derselbe defekte Digest endlos neu ausgerollt und zurückgerollt wurde. Der Backoff ist an das Digest-Paar gekoppelt — ein neu promotetes (repariertes) Image wird sofort ausgerollt, nur Wiederholungen desselben fehlerhaften Images werden gedrosselt (`--force` erzwingt einen Sofort-Retry, `IRI_BACKOFF_BASE` / `IRI_BACKOFF_MAX` steuern die Zeiten).
 
 - **Der Einsatz-Filter der Lageransichten („Mein Lager" / „Alle Lager") zeigt jetzt zusätzlich abgeschlossene und abgebrochene Einsätze der letzten drei Monate an, nicht mehr nur geplante und aktive.** Gerade beendete Operationen bleiben so im Filter — und im Einsatz-Zuordnungs-Dropdown — auswählbar; ältere abgeschlossene/abgebrochene Einsätze fallen weiterhin heraus, damit die Liste nicht zuwächst.

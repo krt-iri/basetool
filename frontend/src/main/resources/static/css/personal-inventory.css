@@ -1,7 +1,7 @@
 /*
  * KRT "DAS KARTELL" Corporate Design styling for the Personal Inventory feature.
  * Color tokens: --color-primary (#E77E23), --color-bg-dark-gray (#141414).
- * Typography: Ethnocentric for headlines (ALL CAPS), Lato for body.
+ * Typography: Audiowide for headlines (ALL CAPS), Lato for body.
  * Touch targets >= 44px; responsive across 4 device classes.
  */
 
@@ -12,7 +12,7 @@
 }
 
 .krt-personal-inventory-header h1 {
-    font-family: Ethnocentric, Lato, sans-serif;
+    font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--color-primary, #E77E23);
@@ -37,7 +37,7 @@
     background: linear-gradient(90deg, rgb(231 126 35 / 25%) 0%, rgb(231 126 35 / 5%) 100%);
     border: 1px solid var(--color-primary, #E77E23);
     color: var(--color-primary, #E77E23);
-    font-family: Ethnocentric, Lato, sans-serif;
+    font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.18em;
     padding: 0.6rem 1rem;
@@ -357,7 +357,7 @@
     display: inline-flex;
     align-items: center;
     padding: 0.5rem 1.4rem;
-    font-family: Ethnocentric, Lato, sans-serif;
+    font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-size: var(--fs-xs);
@@ -386,7 +386,7 @@
 }
 
 .krt-bp-section-title {
-    font-family: Ethnocentric, Lato, sans-serif;
+    font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--color-primary, #E77E23);
@@ -595,7 +595,7 @@
 .krt-bp-imp-group { margin-bottom: 1.25rem; }
 
 .krt-bp-imp-group-title {
-    font-family: Ethnocentric, Lato, sans-serif;
+    font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--color-primary, #E77E23);
@@ -746,7 +746,7 @@
     text-align: left;
     padding: 0.25rem 0.6rem;
     border-bottom: 1px solid var(--color-gray-3, #282828);
-    font-family: Ethnocentric, Lato, sans-serif;
+    font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-size: var(--fs-xs);
@@ -870,7 +870,7 @@
         content: attr(data-label);
         display: block;
         margin-bottom: 0.3rem;
-        font-family: Ethnocentric, Lato, sans-serif;
+        font-family: var(--font-headline);
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-size: var(--fs-xs);

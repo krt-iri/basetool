@@ -10,7 +10,7 @@
       Preload the critical body font weight so the browser starts the request before stylesheet
       parsing. Without this hint, @font-face requests sit behind styles.css and a `font-display:
       swap` swap-in becomes visible. Lato-Regular is the dominant body weight; Light and Bold
-      load lazily on demand. The Ethnocentric headline font is also lazy because it only renders
+      load lazily on demand. The Audiowide headline font is also lazy because it only renders
       above-the-fold on a small set of pages.
     -->
     <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>

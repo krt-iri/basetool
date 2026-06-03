@@ -477,7 +477,7 @@
 <div sec:authorize="hasRole('LOGISTICIAN')" id="edit-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="edit-modal">&times;</button>
-        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
+        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
         
         <form th:action="@{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
             <input type="hidden" th:field="*{version}">
@@ -566,7 +566,7 @@
 
 <div id="status-warning-modal" class="modal" style="display: none; z-index: 1060;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 480px; position: relative; text-align: center;">
-        <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif; text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.status.warning.title}">STATUSWECHSEL BESTÄTIGEN</h3>
+        <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline); text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.status.warning.title}">STATUSWECHSEL BESTÄTIGEN</h3>
         <p style="margin-bottom: 2rem; font-family: 'Lato', sans-serif; font-weight: 300; line-height: 1.6;" th:text="#{orders.status.warning.body}">Wenn Sie den Status auf Abgeschlossen oder Abgelehnt setzen, werden alle verknüpften Lagereinträge vom Auftrag getrennt. Diese Aktion kann nicht rückgängig gemacht werden.</p>
         <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
             <button type="button" class="btn btn-ghost" style="min-height: 44px; min-width: 120px;" data-trigger="od-cancel-status" th:text="#{orders.status.warning.cancel}">Abbrechen</button>
@@ -577,7 +577,7 @@
 
 <div id="material-delete-confirm-modal" class="modal" style="display: none; z-index: 1050;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 400px; position: relative; text-align: center;">
-        <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.material.removeConfirmTitle}">Material entfernen</h3>
+        <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.material.removeConfirmTitle}">Material entfernen</h3>
         <p class="mb-2" th:text="#{orders.detail.material.removeConfirmText}">Möchten Sie dieses Material wirklich aus dem Auftrag entfernen?</p>
         <div style="display: flex; gap: 1rem; justify-content: center;">
             <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="material-delete-confirm-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
@@ -591,7 +591,7 @@
 <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" id="claim-modal" class="modal" style="display: none; z-index: 1060;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 480px; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="claim-modal">&times;</button>
-        <h3 id="claim-modal-title" style="color: var(--color-primary); margin-bottom: 0.5rem; font-family: 'Ethnocentric', sans-serif; text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.claim.modal.title.add}">Eintragung</h3>
+        <h3 id="claim-modal-title" style="color: var(--color-primary); margin-bottom: 0.5rem; font-family: var(--font-headline); text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.claim.modal.title.add}">Eintragung</h3>
         <p id="claim-modal-bucket" class="text-muted" style="margin-bottom: 1.5rem;"></p>
         <input type="hidden" id="claim-order-id" th:value="${order.id}">
         <input type="hidden" id="claim-material-id">
@@ -622,7 +622,7 @@
 <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" id="handover-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="handover-modal">&times;</button>
-        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
+        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
 
         <form data-testid="order-handover-form" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
@@ -672,7 +672,7 @@
 <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="item-handover-modal">&times;</button>
-        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: 'Ethnocentric', sans-serif;" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
+        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
 
         <form data-testid="item-handover-form" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
