@@ -3,198 +3,183 @@
    A classic org chart drawn in the KRT HUD style: square boxes, hairline
    connectors, the orange bloom as the only "elevation", no invented colours.
 
-   Two connector primitives build the hierarchy:
-     - .oc-branch : horizontal branching with elbow connectors (a parent node
-       fans out to a row of child boxes) — used Bereichsleiter→Gruppen and
-       Staffelleiter→Kommandos.
-     - .oc-stack  : a vertical report column hanging under a manager, the
-       siblings centred on one descending line — used for the people under a
-       group / Kommando and the SK-Leiter.
-   Only design tokens from styles.css are used; --oc-line / --oc-gap are local
-   connector knobs. The whole chart scrolls horizontally on narrow screens.
+   Connectors are built from two primitives so every line stays unbroken and
+   centred (the previous <ul>-elbow approach left gaps at single-child seams):
+     - .oc-v   : a vertical link element that *is* one --oc-gap of height, with
+                 a centred hairline filling it. Used between a node and its sole
+                 child (Bereichsleiter→Stab, Staffel→Staffelleiter, Kommando→…).
+                 Gap-free by construction — the element is the gap.
+     - .oc-fan : a node fanning out to a row of children: a centred drop into a
+                 horizontal bus, then a centred drop into every child. Used for
+                 the units row and a Staffelleiter→Kommandos row.
+   Shared knobs: --oc-gap (vertical step), --oc-col-gap (horizontal step),
+   --oc-box-w (every box's width, so each type lines up). The whole chart
+   scrolls horizontally on narrow screens with a KRT-styled scrollbar.
    ============================================================================ */
 
 .oc-chart {
     --oc-line: var(--color-gray-2);
-    --oc-gap: 1.5rem;
+    --oc-line-w: 2px;
+    --oc-gap: 1.25rem;
+    --oc-col-gap: 1.5rem;
+    --oc-unit-gap: 3.5rem;
+    --oc-box-w: 200px;
 
     overflow-x: auto;
-    padding-bottom: 1.5rem;
+    padding-bottom: 1rem;
     margin-top: 1.5rem;
+
+    /* KRT-styled scrollbar (Firefox) */
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-gray-2) var(--color-bg-dark-gray);
+}
+
+/* KRT-styled scrollbar (WebKit / Blink): thin, dark track, gray thumb that
+   warms to the brand orange on hover — matches the HUD aesthetic. */
+.oc-chart::-webkit-scrollbar {
+    height: 10px;
+}
+
+.oc-chart::-webkit-scrollbar-track {
+    background: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-gray-3);
+}
+
+.oc-chart::-webkit-scrollbar-thumb {
+    background: var(--color-gray-2);
+    border: 2px solid var(--color-bg-dark-gray);
+}
+
+.oc-chart::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary);
 }
 
 .oc-caption {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
 }
 
 .oc-caption-title {
     font-family: var(--font-headline);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--color-gray-1);
-    font-size: 0.9rem;
+    color: var(--color-white);
+    font-size: 1rem;
 }
 
-.oc-dept-tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.15rem 0.6rem;
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-success);
-    border: 1px solid var(--color-success);
-}
-
-/* --- horizontal branch tree (elbow connectors) ------------------------------ */
+/* --- connector primitives --------------------------------------------------- */
 .oc-tree {
-    display: inline-block;
-    min-width: 100%;
-    text-align: center;
-}
-
-.oc-branch {
-    position: relative;
     display: flex;
     justify-content: center;
-    padding-top: var(--oc-gap);
-    margin: 0;
-    list-style: none;
+    min-width: 100%;
 }
 
-.oc-branch li {
-    position: relative;
-    list-style: none;
-    padding: var(--oc-gap) 0.5rem 0;
+/* a centred column: spine, unit column, command column */
+.oc-col {
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
-.oc-branch li::before,
-.oc-branch li::after {
+/* vertical link: occupies exactly one --oc-gap, hairline centred down its
+   middle. Sits flush between the two boxes it joins, so there is never a gap. */
+.oc-v {
+    flex: 0 0 auto;
+    width: 100%;
+    height: var(--oc-gap);
+    position: relative;
+}
+
+.oc-v::before {
     content: '';
     position: absolute;
     top: 0;
-    width: 50%;
-    height: var(--oc-gap);
-    border-top: 1px solid var(--oc-line);
+    bottom: 0;
+    left: 50%;
+    margin-left: calc(var(--oc-line-w) / -2);
+    border-left: var(--oc-line-w) solid var(--oc-line);
 }
 
-.oc-branch li::before {
+/* fan-out: a centred drop into a horizontal bus (top half of the gap), then a
+   centred drop from the bus into each child (bottom half). The end children
+   trim the outer bus half but keep their own drop, so the bus spans exactly
+   from the first to the last child and every child stays connected. */
+.oc-fan {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    position: relative;
+    padding-top: var(--oc-gap);
+}
+
+.oc-fan::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: calc(var(--oc-gap) / 2);
+    margin-left: calc(var(--oc-line-w) / -2);
+    border-left: var(--oc-line-w) solid var(--oc-line);
+}
+
+.oc-fan > li {
+    list-style: none;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 calc(var(--oc-col-gap) / 2);
+}
+
+.oc-fan > li::before,
+.oc-fan > li::after {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--oc-gap) / 2);
+    height: calc(var(--oc-gap) / 2);
+    width: 50%;
+    border-top: var(--oc-line-w) solid var(--oc-line);
+}
+
+.oc-fan > li::before {
     right: 50%;
 }
 
-.oc-branch li::after {
+.oc-fan > li::after {
     left: 50%;
-    border-left: 1px solid var(--oc-line);
+    margin-left: calc(var(--oc-line-w) / -2);
+    border-left: var(--oc-line-w) solid var(--oc-line);
 }
 
-.oc-branch li:only-child::before,
-.oc-branch li:only-child::after {
-    display: none;
+.oc-fan > li:first-child::before {
+    border-top: 0;
 }
 
-.oc-branch li:first-child::before {
-    border: 0;
+.oc-fan > li:last-child::after {
+    border-top: 0;
 }
 
-.oc-branch li:last-child::after {
-    border: 0;
-}
-
-.oc-branch li:last-child::before {
-    border-right: 1px solid var(--oc-line);
-}
-
-/* vertical line from a parent node down into its nested child bus */
-.oc-branch .oc-branch::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    height: var(--oc-gap);
-    border-left: 1px solid var(--oc-line);
-}
-
-/* leadership root: the Bereichsleiter is the top node, no incoming line/elbow */
-.oc-leadership > .oc-branch {
-    padding-top: 0;
-}
-
-.oc-leadership > .oc-branch > li {
-    padding-top: 0;
-}
-
-.oc-leadership > .oc-branch > li::before,
-.oc-leadership > .oc-branch > li::after {
-    display: none;
-}
-
-/* the Bereichsleiter box reads as the hero (orange frame + bloom) */
-.oc-leadership > .oc-branch > li > .oc-node:not(.oc-node--vacant) {
-    border-color: var(--color-primary);
-    box-shadow: var(--glow-primary);
-}
-
-/* spine joining the leadership block to the units bus */
-.oc-spine {
-    width: 0;
-    height: var(--oc-gap);
-    border-left: 1px solid var(--oc-line);
-    margin: 0 auto;
-}
-
-.oc-units-tree > .oc-branch::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    height: var(--oc-gap);
-    border-left: 1px solid var(--oc-line);
-}
-
-/* --- vertical report stack (siblings under a manager) ----------------------- */
-.oc-stack {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.55rem;
-    margin-top: var(--oc-gap);
-}
-
-.oc-stack::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: calc(-1 * var(--oc-gap));
-    bottom: 0;
-    border-left: 1px solid var(--oc-line);
-    z-index: 0;
-}
-
-.oc-stack-item {
-    position: relative;
-    z-index: 1;
+/* wider horizontal gap between OrgUnits (Staffeln / SKs) than between tiles inside one */
+.oc-fan--units > li {
+    padding-left: calc(var(--oc-unit-gap) / 2);
+    padding-right: calc(var(--oc-unit-gap) / 2);
 }
 
 /* --- boxes ------------------------------------------------------------------ */
 .oc-node {
     position: relative;
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
     gap: 0.2rem;
     padding: 0.55rem 0.75rem;
     background: var(--color-bg-dark-gray);
     border: 1px solid var(--color-gray-3);
-    min-width: 170px;
+    width: var(--oc-box-w);
     text-align: left;
 }
 
@@ -214,8 +199,15 @@
     overflow-wrap: break-word;
 }
 
-/* Vacant slot: a subtle filled box + readable label so the seat reads clearly (not the old
-   near-invisible grey-on-transparent); the dashed frame still signals "empty". */
+/* the Bereichsleiter reads as the hero: orange frame + bloom */
+.oc-node--hero {
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-primary);
+}
+
+/* Vacant slot: a subtle filled box + readable italic label so the seat reads
+   clearly (not the old near-invisible grey-on-transparent); the dashed frame
+   still signals "empty". */
 .oc-node--vacant {
     border-style: dashed;
     border-color: var(--color-gray-2);
@@ -229,7 +221,7 @@
 }
 
 .oc-unit-box {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.15rem;
@@ -237,7 +229,7 @@
     background: var(--color-surface-input);
     border: 1px solid var(--color-gray-3);
     border-top: 3px solid var(--color-primary);
-    min-width: 160px;
+    width: var(--oc-box-w);
 }
 
 .oc-unit-box .sh {
@@ -253,6 +245,7 @@
     color: var(--color-white);
     font-size: 0.95rem;
     letter-spacing: 0.04em;
+    text-align: center;
 }
 
 .oc-unit-box--sk {
@@ -263,20 +256,7 @@
     color: var(--color-gray-1);
 }
 
-.oc-group-box {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.4rem 0.8rem;
-    background: transparent;
-    border: 1px dashed var(--color-gray-2);
-    color: var(--color-gray-1);
-    font-weight: 700;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-/* --- Kommando(gruppe) header: names the command, sits above its Kommandoleiter ----------- */
+/* Kommando(gruppe) header: names the command, sits above its Kommandoleiter. */
 .oc-command-head {
     gap: 0.15rem;
     border-top: 2px solid var(--color-primary);
@@ -336,12 +316,17 @@
     background: rgb(163 0 10 / 12%);
 }
 
+/* add-affordances are hidden until edit mode; they share --oc-box-w so they sit
+   in the column like a node. They are actions, not org nodes, so no connector
+   line is drawn to them. */
 .oc-add {
     display: none;
     align-items: center;
+    justify-content: center;
     gap: 0.35rem;
-    margin-top: 0.5rem;
+    margin-top: var(--oc-gap);
     padding: 0.35rem 0.7rem;
+    width: var(--oc-box-w);
     background: transparent;
     border: 1px dashed var(--color-gray-2);
     color: var(--color-gray-1);
@@ -386,13 +371,11 @@
     color: var(--color-primary);
 }
 
-/* --- responsive: keep the tree, let it pan; relax fixed widths -------------- */
+/* --- responsive: keep the tree, let it pan; narrow the shared box width ------ */
 @media (width <= 768px) {
-    .oc-node {
-        min-width: 150px;
-    }
-
-    .oc-unit-box {
-        min-width: 140px;
+    .oc-chart {
+        --oc-box-w: 160px;
+        --oc-col-gap: 1rem;
+        --oc-unit-gap: 2rem;
     }
 }

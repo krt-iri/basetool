@@ -8,6 +8,7 @@
   inline reassign / remove controls that the page JS wires up via data-trigger.
 -->
 <div th:fragment="ocNode(node)" class="oc-node" th:if="${node != null}"
+     th:classappend="${node.positionType() == 'AREA_LEAD' ? 'oc-node--hero' : ''}"
      th:with="rk=${'orgChart.rank.' + node.positionType()}">
     <span class="oc-node-rank" th:text="#{${rk}}">Rank</span>
     <span class="oc-node-name" th:text="${node.userName()}">Name</span>
