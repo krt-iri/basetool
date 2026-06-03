@@ -1,5 +1,7 @@
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -23,13 +25,18 @@ public record RefineryOrderDto(
     MissionReferenceDto mission,
     Instant startedAt,
     @PositiveOrZero Long durationMinutes,
-    Double expenses,
-    @PositiveOrZero Double otherExpenses,
-    @PositiveOrZero Double oreSales,
+    // Upper cap mirrors the mission-finance amount cap (1e9, audit C-2); audit L-10 closes the
+    // missing upper bound so a runaway refinery money value cannot inflate the operation roll-up.
+    @PositiveOrZero @DecimalMax("1000000000.0") Double expenses,
+    @PositiveOrZero @DecimalMax("1000000000.0") Double otherExpenses,
+    @PositiveOrZero @DecimalMax("1000000000.0") Double oreSales,
     Double profit,
     RefiningMethodDto refiningMethod,
     String status,
-    @NotEmpty List<RefineryGoodDto> goods,
+    // @Valid cascades the @NotNull/@Min(1) constraints on each RefineryGoodDto into the list
+    // elements (audit M-4 sweep): without it a good with inputQuantity <= 0 or a null material
+    // would bypass bean validation and reach the service.
+    @NotEmpty @Valid List<RefineryGoodDto> goods,
     SquadronReferenceDto owningSquadron,
     Long version,
     UUID owningOrgUnitId) {}

@@ -84,8 +84,12 @@ public class RefiningMethodController {
   @PreAuthorize("hasRole('ADMIN')")
   public RefiningMethodDto createRefiningMethod(
       @RequestBody @NotNull RefiningMethodDto refiningMethod) {
-    return refiningMethodMapper.toDto(
-        refiningMethodService.createRefiningMethod(refiningMethodMapper.toEntity(refiningMethod)));
+    var toCreate = refiningMethodMapper.toEntity(refiningMethod);
+    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
+    // row.
+    toCreate.setId(null);
+    toCreate.setVersion(null);
+    return refiningMethodMapper.toDto(refiningMethodService.createRefiningMethod(toCreate));
   }
 
   /**

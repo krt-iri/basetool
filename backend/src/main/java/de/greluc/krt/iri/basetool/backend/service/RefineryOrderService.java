@@ -199,6 +199,17 @@ public class RefineryOrderService {
   @Transactional
   public RefineryOrder createRefineryOrder(
       @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
+    // Mass-assignment guard (audit H-2): the create path must never honour a client-supplied id or
+    // version. RefineryOrderDto is shared with the update path and carries both fields, and
+    // RefineryOrderMapper.toEntity copies them onto the transient entity (it ignores only owner).
+    // Because AbstractEntity.isNew() is id == null, a non-null id would route
+    // JpaRepository.save() through EntityManager.merge() (UPSERT) and let a caller overwrite and
+    // re-own an existing order, bypassing the per-resource canEditRefineryOrder gate. Resetting
+    // both forces a clean INSERT — the LocationMapper.stripServerManaged contract applied at the
+    // single create choke point so every create endpoint (my-orders + users/{userId}) is covered.
+    order.setId(null);
+    order.setVersion(null);
+
     User user =
         userRepository
             .findById(userId)

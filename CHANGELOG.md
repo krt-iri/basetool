@@ -32,6 +32,24 @@
 
 - **Operations- und Einsatz-Detailseite: der fest eingeblendete Footer verdeckt nicht mehr den unteren Seiteninhalt.** Diese beiden Seiten betten ihren Inhalt neben dem `<main>`-Element ein, wodurch die globale Footer-Freiraum-Reservierung verloren ging und die letzte Panel-Zeile beim Scrollen unter den Footer rutschte; der Seiten-Wrapper reserviert den Platz jetzt selbst.
 
+### Security
+
+- **E-Mail-Adressen werden nur noch im eigenen Profil ausgeliefert.** Die zentrale User-Projektion (`UserMapper.toDto`) blendet die E-Mail jetzt grundsätzlich aus; allein der eigene Profilabruf (`/api/v1/users/me*`) fügt sie wieder hinzu. Dadurch enthält keine Nutzerliste/-suche, kein Nutzer-Detail, keine Missions-Teilnehmerliste, kein Finanz-Ledger und keine Hangar-/Auftrags-Antwort mehr eine fremde E-Mail — auch nicht für Logistiker, Offiziere oder Admins (Admins nutzen für E-Mails die Keycloak-Konsole). An andere Nutzer gehen nur noch Callsign und Anzeigename.
+
+- **Missions-Finanzdaten sind nicht mehr staffelübergreifend lesbar.** `GET /api/v1/missions/{id}/finance-entries` und `/finance-entries/sum` sind jetzt an die Missions-Sichtbarkeit gebunden (`canSeeMission`); die Teilnehmer-PII (Rollen, Rechte) wird zusätzlich für jeden Abrufenden geschwärzt. Bisher konnte jeder angemeldete Nutzer mit einer Missions-UUID das komplette Finanz-Ledger einer fremden — auch internen — Mission lesen.
+
+- **Das Anlegen einer Raffinerie-Order ignoriert jetzt eine vom Client mitgeschickte `id`/`version`.** Bisher konnte ein angemeldeter Nutzer durch Mitsenden einer fremden Order-`id` aus dem `save()` ein `merge()`-UPSERT erzwingen und so eine fremde Raffinerie-Order überschreiben und auf sich selbst übereignen (Umgehung des Bearbeiten-Gates); der Server erzwingt jetzt einen sauberen INSERT.
+
+- **Negative Ausgaben (`expenses`) bei Raffinerie-Orders werden jetzt abgelehnt** (`@PositiveOrZero`, wie bereits bei `otherExpenses`/`oreSales`). Ein negativer Wert erhöhte über `Profit = Erlös - Ausgaben - sonstige Ausgaben` den Einsatz- bzw. Missions-Profit und damit die Auszahlungsanteile aller Teilnehmer — eine Finanzmanipulation, die jedes Mitglied mit einer eigenen Order auslösen konnte.
+
+- **Weitere Auftrags-Endpunkte sind jetzt staffel-scoped.** Die Job-Order-Material-Collection (`/orders/{id}/material-collection`) und der Auftrags-Lookup (`/orders/lookup`) tragen jetzt das `canSeeJobOrder`- bzw. Profit-/Scope-Gate der Geschwister-Endpunkte. Bisher konnte jeder angemeldete Nutzer darüber fremde Beitrags-, Kontakt- und Materialdaten enumerieren. (Die missions-bezogene Raffinerie-Liste wurde separat gescoped — siehe „Fixed" oben.)
+
+- **Negative Übergabe- und Raffinerie-Mengen werden jetzt abgelehnt.** Die Handover-Items tragen jetzt `@Valid` (das `@Positive` greift dadurch wirklich) plus einen Service-Guard, und die Raffinerie-Güter (`@Valid`) sowie die Geld-Felder (Obergrenze 1e9) sind validiert — bisher konnte eine negative Menge den Lagerbestand und die offene Anforderung erhöhen.
+
+- **Der Frontend-Prod-JSON-Log maskiert jetzt PII.** Der bisher ungemaskte `LogstashEncoder` (`logs/frontend.json`) ist durch einen maskierenden Encoder ersetzt, sodass E-Mails / JWTs / Bearer-Tokens auch im JSON-Sink geschwärzt werden — wie in den Konsolen-/Datei-Logs.
+
+- **Härtung (defense-in-depth):** Admin-Stammdaten-Create (Sternsysteme, Frequenztypen, Raffineriemethoden, Materialkategorien, Staffeln, SK, Job-Typen) ignoriert jetzt eine client-`id`/`version`; Logout läuft nur noch per CSRF-geschütztem POST; das Frontend hat ein Multipart-Upload-Limit (2 MB); der Backend-Health-Check pinnt in Prod das Backend-Zertifikat statt blind zu vertrauen; der Resource-Server kann optional die JWT-`aud` prüfen (`app.security.jwt.expected-audiences`); und die Docker-Base-Images sind auf ihren Multi-Arch-Digest gepinnt (reproduzierbare Builds, intakte SLSA-Provenance).
+
 ## [v0.3.44](https://github.com/krt-iri/basetool/releases/tag/v0.3.44) - 2026-06-02
 
 ### Changed

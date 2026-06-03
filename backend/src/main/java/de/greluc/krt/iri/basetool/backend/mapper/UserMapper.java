@@ -48,13 +48,25 @@ public abstract class UserMapper {
   @Autowired protected SquadronRepository squadronRepository;
 
   /**
-   * Projects a {@link User} entity to its full outbound DTO. The {@code squadron}, {@code
+   * Projects a {@link User} entity to its outbound DTO. The {@code squadron}, {@code
    * isLogistician}, {@code isMissionManager} fields are sourced from the user's Staffel membership
    * row (post-R9 D3) — see the class-level Javadoc for the unassigned-user fallback.
    *
+   * <p><strong>{@code email} is deliberately NOT mapped</strong> ({@code ignore = true}) so it is
+   * {@code null} on every DTO this method produces. Email is a profile-only field: it may be shown
+   * only to the user themselves in their own profile, never to any other user. Because every nested
+   * mapper ({@code MissionMapper}, {@code ShipMapper}, {@code JobOrderMapper}) and every list /
+   * detail / admin endpoint funnels its {@code User → UserDto} conversion through this single
+   * method, omitting email here closes all peer-exposure paths at once and keeps new endpoints safe
+   * by default. The only caller that needs the email — the user's own {@code /api/v1/users/me*}
+   * view — re-adds it explicitly (see {@code UserController}); do NOT add a second {@code User →
+   * UserDto} mapping method here, as that would make the nested-mapper delegation ambiguous.
+   *
    * @param user the user entity to project; {@code null} maps to {@code null}.
-   * @return the populated DTO, or {@code null} when {@code user} is {@code null}.
+   * @return the populated DTO with {@code email == null}, or {@code null} when {@code user} is
+   *     {@code null}.
    */
+  @Mapping(target = "email", ignore = true)
   @Mapping(target = "roles", expression = "java(roleNames(user.getRoles()))")
   @Mapping(target = "permissions", expression = "java(permissions(user.getRoles()))")
   @Mapping(target = "isLogistician", expression = "java(resolveLogistician(user))")

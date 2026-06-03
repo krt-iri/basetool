@@ -44,6 +44,14 @@ server:
         same-site: strict
 
 spring:
+  servlet:
+    multipart:
+      # L-4: mirror the backend's explicit multipart caps (2MB). The frontend's only multipart
+      # endpoints are the import proxies (HangarImportProxyController /
+      # PersonalBlueprintImportProxyController), which buffer the whole upload via file.getBytes();
+      # an explicit cap stops a large upload from materialising unbounded in the heap.
+      max-file-size: 2MB
+      max-request-size: 2MB
   threads:
     virtual:
       enabled: true

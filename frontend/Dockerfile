@@ -1,4 +1,6 @@
-FROM eclipse-temurin:25-jdk-alpine AS build
+# L-8: pin the base image to its multi-arch index digest (not just the floating tag) so builds are
+# bit-reproducible and the SLSA provenance stays sound. Dependabot bumps the tag + digest together.
+FROM eclipse-temurin:25-jdk-alpine@sha256:30d9f87d702c2c1c601ed0d31e0c88ea1ea474ee7676cda7b7a59e759181c4dd AS build
 WORKDIR /app
 
 # Application version string forwarded to Gradle's `bootBuildInfo` via
@@ -90,7 +92,8 @@ WORKDIR /app/extracted
 # WebClient (Reactor Netty), Spring Session + Lettuce (Redis client) are all
 # pure-Java. If we ever add a native library that depends on glibc, revisit
 # and switch back to `25-jre-jammy`.
-FROM eclipse-temurin:25-jre-alpine
+# L-8: digest-pinned (see the build stage above).
+FROM eclipse-temurin:25-jre-alpine@sha256:c707c0d18cb9e8556380719f80d96a7529d0746fbb42143893949b98ed2f8943
 WORKDIR /app
 
 # Non-root runtime user. Fixed UID/GID so host bind mounts (e.g. the log

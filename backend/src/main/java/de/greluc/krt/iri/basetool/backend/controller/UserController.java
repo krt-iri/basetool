@@ -209,7 +209,9 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public UserDto getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
-    return userMapper.toDto(userService.findById(userService.getUserIdFromJwt(jwt)));
+    de.greluc.krt.iri.basetool.backend.model.User me =
+        userService.findById(userService.getUserIdFromJwt(jwt));
+    return withSelfEmail(userMapper.toDto(me), me);
   }
 
   /**
@@ -224,12 +226,13 @@ public class UserController {
   public UserDto updateMyDescription(
       @AuthenticationPrincipal Jwt jwt,
       @RequestBody @jakarta.validation.Valid UserDescriptionRequest request) {
-    return userMapper.toDto(
+    de.greluc.krt.iri.basetool.backend.model.User me =
         userService.updateUserDescription(
             userService.getUserIdFromJwt(jwt),
             request.getDescription(),
             request.getDisplayName(),
-            request.getVersion()));
+            request.getVersion());
+    return withSelfEmail(userMapper.toDto(me), me);
   }
 
   /**
@@ -242,8 +245,9 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   public UserDto updateReadAnnouncement(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID announcementId) {
-    return userMapper.toDto(
-        userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), announcementId));
+    de.greluc.krt.iri.basetool.backend.model.User me =
+        userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), announcementId);
+    return withSelfEmail(userMapper.toDto(me), me);
   }
 
   /**
@@ -373,16 +377,20 @@ public class UserController {
   }
 
   /**
-   * Strips the PII that a peer (non-Officer, non-Admin) does not need to see. Returns the input
-   * unchanged for officers/admins and the caller's own row (admins/officers may legitimately need
-   * the email field for moderation / payouts). Audit finding H-4: previously any SQUADRON_MEMBER
-   * could paginate {@code /api/v1/users/search} and harvest every member's email.
+   * Strips the non-email PII that a peer (non-Officer, non-Admin) does not need to see. Officers
+   * and admins get the DTO unchanged; plain members get the slim peer shape. {@code email} is no
+   * longer governed here at all — {@link UserMapper#toDto(User)} omits it for every projection (it
+   * is re-added only on the {@code /me*} self path via {@link #withSelfEmail}), so even an
+   * officer/admin never receives a peer's email through this controller. This helper now only hides
+   * the remaining peer-irrelevant fields from plain members. Audit finding H-4: previously any
+   * SQUADRON_MEMBER could paginate {@code /api/v1/users/search} and harvest every member's email.
    *
    * <p>The peer view keeps {@code id}, {@code username}, {@code displayName}, {@code
    * effectiveName}, {@code rank}, {@code inKeycloak}, {@code squadron}, {@code version} — enough
    * for the participant pickers in the mission editor to identify peers visually; drops {@code
-   * email}, {@code description}, {@code roles}, {@code permissions}, {@code
-   * lastReadAnnouncementId}, {@code isLogistician}, {@code isMissionManager}, {@code joinDate}.
+   * description}, {@code roles}, {@code permissions}, {@code lastReadAnnouncementId}, {@code
+   * isLogistician}, {@code isMissionManager}, {@code joinDate} (and {@code email}, already {@code
+   * null} from the mapper).
    *
    * @param dto the persisted user DTO
    * @return the redacted DTO for non-elevated callers, or the original for officer/admin
@@ -423,5 +431,37 @@ public class UserController {
         dto.version(),
         null // joinDate
         );
+  }
+
+  /**
+   * Re-attaches the caller's own {@code email} to a DTO produced by {@link UserMapper#toDto(User)},
+   * which deliberately omits it. Used only by the {@code /me*} self endpoints: a user may always
+   * see their own email in their own profile, while {@code toDto} keeps it {@code null} for every
+   * other (peer / list / admin) projection so a user's email never reaches anyone else. All
+   * non-email fields are copied straight from {@code dto}.
+   *
+   * @param dto the email-free DTO from the mapper; never {@code null}
+   * @param user the caller's own entity, the source of the email; never {@code null}
+   * @return a copy of {@code dto} with {@code email} populated from {@code user}
+   */
+  private UserDto withSelfEmail(
+      @NotNull UserDto dto, @NotNull de.greluc.krt.iri.basetool.backend.model.User user) {
+    return new UserDto(
+        dto.id(),
+        dto.username(),
+        dto.displayName(),
+        dto.effectiveName(),
+        user.getEmail(),
+        dto.rank(),
+        dto.description(),
+        dto.roles(),
+        dto.permissions(),
+        dto.lastReadAnnouncementId(),
+        dto.isLogistician(),
+        dto.isMissionManager(),
+        dto.inKeycloak(),
+        dto.squadron(),
+        dto.version(),
+        dto.joinDate());
   }
 }

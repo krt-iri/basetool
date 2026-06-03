@@ -65,9 +65,10 @@ class MissionsLiveFilterPageTest {
     mockMvc
         .perform(get("/missions"))
         .andExpect(status().isOk())
-        // Legacy filter submit button must be gone.
+        // Legacy filter submit button must be gone. The generic "<button type=submit>" backstop was
+        // removed because the global sidebar logout is now a CSRF-protected POST form/button (audit
+        // L-3), so a submit button legitimately renders on every page.
         .andExpect(content().string(not(containsString("id=\"missions-filter-submit\""))))
-        .andExpect(content().string(not(containsString("<button type=\"submit\""))))
         // AJAX results container must be present.
         .andExpect(content().string(containsString("id=\"missions-results\"")))
         // Live-filter JS must be wired in.

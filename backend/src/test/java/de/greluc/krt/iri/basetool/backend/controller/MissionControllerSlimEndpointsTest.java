@@ -677,7 +677,7 @@ class MissionControllerSlimEndpointsTest {
   }
 
   @Test
-  void addParticipantSlim_authenticatedOfficer_keepsParticipantPii() throws Exception {
+  void addParticipantSlim_authenticatedOfficer_stripsParticipantEmail() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID callerId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
@@ -700,9 +700,13 @@ class MissionControllerSlimEndpointsTest {
             .getResponse()
             .getContentAsString();
 
-    // Authenticated officer DOES see the full PII — required for the existing mission-roster UI.
+    // H-1 (refined): email is a profile-only field — even an authenticated Officer must not receive
+    // a peer's email through the roster; only the public callsign stays visible.
     org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob@example.invalid"), "authenticated officer must see participant email");
+        body.contains("bob.callsign"), "participant callsign stays visible on the roster");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"),
+        "authenticated officer must NOT receive the participant's email");
   }
 
   @Test
@@ -733,7 +737,7 @@ class MissionControllerSlimEndpointsTest {
   }
 
   @Test
-  void addParticipantPublic_authenticatedOfficer_keepsParticipantPii() throws Exception {
+  void addParticipantPublic_authenticatedOfficer_stripsParticipantEmail() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID callerId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
@@ -756,7 +760,12 @@ class MissionControllerSlimEndpointsTest {
             .getResponse()
             .getContentAsString();
 
+    // H-1 (refined): email is profile-only — an authenticated Officer must not receive a peer's
+    // email through the public-add roster response either; only the callsign stays visible.
     org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob@example.invalid"), "authenticated officer must see participant email");
+        body.contains("bob.callsign"), "participant callsign stays visible on the roster");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"),
+        "authenticated officer must NOT receive the participant's email");
   }
 }

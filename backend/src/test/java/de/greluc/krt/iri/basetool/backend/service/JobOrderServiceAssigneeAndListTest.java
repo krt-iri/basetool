@@ -221,7 +221,29 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void emptyRepositoryResult_returnsEmptyList() {
+      when(ownerScopeService.canViewJobOrders()).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of());
+
+      assertTrue(service.findAllActiveReference().isEmpty());
+    }
+
+    @Test
+    void nonProfitMember_getsEmptyListWithoutQueryingRepository() {
+      // M-2: the viewer-side profit gate short-circuits before the repository is even touched.
+      when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+
+      assertTrue(service.findAllActiveReference().isEmpty());
+      verify(jobOrderRepository, never()).findAllActiveWithMaterials();
+    }
+
+    @Test
+    void ordersOutOfScope_areFilteredOut() {
+      // M-2: a squadron-private order the caller may not see is dropped from the typeahead so it
+      // cannot enumerate a foreign squadron's order handle + materials.
+      JobOrder o = newJobOrder(JobOrderStatus.OPEN);
+      when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+      when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(false);
+      when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
 
       assertTrue(service.findAllActiveReference().isEmpty());
     }
@@ -230,6 +252,8 @@ class JobOrderServiceAssigneeAndListTest {
     void orderWithNullMaterials_emitsEmptyMaterialsList() {
       JobOrder o = newJobOrder(JobOrderStatus.OPEN);
       o.setMaterials(null);
+      when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+      when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
 
       List<JobOrderReferenceDto> result = service.findAllActiveReference();
@@ -247,6 +271,8 @@ class JobOrderServiceAssigneeAndListTest {
       mat.setId(UUID.randomUUID());
       mat.setMaterial(new de.greluc.krt.iri.basetool.backend.model.Material());
       o.setMaterials(new HashSet<>(Set.of(mat)));
+      when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+      when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
       when(jobOrderMapper.toDto(mat))
           .thenReturn(

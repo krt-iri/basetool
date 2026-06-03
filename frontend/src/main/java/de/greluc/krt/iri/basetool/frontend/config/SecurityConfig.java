@@ -284,8 +284,15 @@ public class SecurityConfig {
             logout ->
                 logout
                     .logoutRequestMatcher(
+                        // L-3: POST-only logout. A GET-triggerable /logout is CSRF-able (a
+                        // cross-site link could force-logout the victim); requiring POST means the
+                        // sidebar's Thymeleaf form must carry the _csrf token. SameSite=Strict
+                        // already mitigates this, so it is defense in depth.
                         request ->
-                            request.getRequestURI().equals(request.getContextPath() + "/logout"))
+                            "POST".equals(request.getMethod())
+                                && request
+                                    .getRequestURI()
+                                    .equals(request.getContextPath() + "/logout"))
                     .logoutSuccessHandler(oidcLogoutSuccessHandler))
         .exceptionHandling(ex -> ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint))
         // M-14: explicit session-management policy.

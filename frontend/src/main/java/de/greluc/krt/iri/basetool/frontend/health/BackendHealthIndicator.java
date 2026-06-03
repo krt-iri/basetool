@@ -4,14 +4,23 @@ import de.greluc.krt.iri.basetool.frontend.config.AppBackendProperties;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.net.http.HttpClient;
 import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.TrustManagerFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEnabledHealthIndicator;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
+import org.springframework.boot.ssl.NoSuchSslBundleException;
+import org.springframework.boot.ssl.SslBundle;
+import org.springframework.boot.ssl.SslBundles;
+import org.springframework.core.env.Environment;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -71,18 +80,26 @@ public class BackendHealthIndicator implements HealthIndicator {
   /**
    * Production constructor used by Spring; resolves the backend base URL from {@link
    * AppBackendProperties} and builds a {@link RestClient} with indicator-specific timeouts and the
-   * same trust-all SSL context the application's {@code WebClient} uses against the backend's
-   * self-signed certificate. {@link Autowired} is required because the class declares a second
-   * (package-private, test-only) constructor; without it Spring 4+'s constructor-selection logic
-   * falls back to a non-existent default constructor and fails at startup with {@code
-   * NoSuchMethodException: <init>()}.
+   * backend trust policy resolved by {@link #backendTls(SslBundles, Environment)} — pinned to the
+   * {@code backend-trust} bundle in prod, trust-all only in dev/test (audit L-5). {@link Autowired}
+   * is required because the class declares a second (package-private, test-only) constructor;
+   * without it Spring 4+'s constructor-selection logic falls back to a non-existent default
+   * constructor and fails at startup with {@code NoSuchMethodException: <init>()}.
    *
    * @param backendProperties type-safe binding of the {@code app.backend-url} property; the
    *     readiness probe path is appended verbatim to {@link AppBackendProperties#getBackendUrl()}
+   * @param sslBundles the application's configured SSL bundles, source of the {@code backend-trust}
+   *     truststore used to pin the probe's TLS trust in prod
+   * @param environment the active environment, used to pick the trust policy per profile
    */
   @Autowired
-  public BackendHealthIndicator(AppBackendProperties backendProperties) {
-    this(backendProperties.getBackendUrl(), CONNECT_TIMEOUT, READ_TIMEOUT);
+  public BackendHealthIndicator(
+      AppBackendProperties backendProperties, SslBundles sslBundles, Environment environment) {
+    this(
+        backendProperties.getBackendUrl(),
+        CONNECT_TIMEOUT,
+        READ_TIMEOUT,
+        backendTls(sslBundles, environment));
   }
 
   /**
@@ -97,15 +114,34 @@ public class BackendHealthIndicator implements HealthIndicator {
    *     probe is treated as {@code DOWN}
    */
   BackendHealthIndicator(String backendUrl, Duration connectTimeout, Duration readTimeout) {
+    this(backendUrl, connectTimeout, readTimeout, new BackendTls(trustAllSslContext(), true));
+  }
+
+  /**
+   * Shared constructor that wires the {@link RestClient} from a resolved {@link BackendTls} trust
+   * policy. Endpoint identification (hostname verification) is disabled only when {@link
+   * BackendTls#disableHostnameVerification()} is set — i.e. on the pinned-cert / trust-all paths,
+   * mirroring {@code WebClientConfig}; the default-JVM-trust fallback keeps it on.
+   *
+   * @param backendUrl backend base URL (trailing slash trimmed)
+   * @param connectTimeout TCP connect timeout for the probe
+   * @param readTimeout response read timeout for the probe
+   * @param tls resolved trust policy (SSL context + whether to skip hostname verification)
+   */
+  private BackendHealthIndicator(
+      String backendUrl, Duration connectTimeout, Duration readTimeout, BackendTls tls) {
     String trimmedBaseUrl =
         backendUrl.endsWith("/") ? backendUrl.substring(0, backendUrl.length() - 1) : backendUrl;
     this.readinessUrl = trimmedBaseUrl + READINESS_PATH;
-    HttpClient httpClient =
-        HttpClient.newBuilder()
-            .connectTimeout(connectTimeout)
-            .sslContext(trustAllSslContext())
-            .build();
-    JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+    HttpClient.Builder httpClientBuilder =
+        HttpClient.newBuilder().connectTimeout(connectTimeout).sslContext(tls.context());
+    if (tls.disableHostnameVerification()) {
+      SSLParameters params = tls.context().getDefaultSSLParameters();
+      params.setEndpointIdentificationAlgorithm(null);
+      httpClientBuilder = httpClientBuilder.sslParameters(params);
+    }
+    JdkClientHttpRequestFactory factory =
+        new JdkClientHttpRequestFactory(httpClientBuilder.build());
     factory.setReadTimeout(readTimeout);
     this.client = RestClient.builder().requestFactory(factory).build();
   }
@@ -168,4 +204,60 @@ public class BackendHealthIndicator implements HealthIndicator {
       throw new IllegalStateException("Failed to initialise trust-all SSL context", ex);
     }
   }
+
+  /**
+   * Resolves the backend TLS trust policy, mirroring {@code WebClientConfig} (audit L-5). The probe
+   * previously trusted any certificate unconditionally in every profile; the policy now branches by
+   * profile:
+   *
+   * <ul>
+   *   <li>{@code dev} / {@code test}: trust-all (self-signed bootstrap / ephemeral test cert).
+   *   <li>otherwise WITH a {@code backend-trust} SSL bundle (prod): pin trust to the bundle's
+   *       truststore — the same self-signed backend cert the WebClient pins, no longer an
+   *       indiscriminate trust-all.
+   *   <li>otherwise WITHOUT the bundle (operator fronts the backend with a publicly-trusted cert):
+   *       fall back to the default JVM trust store, keeping hostname verification on.
+   * </ul>
+   *
+   * @param sslBundles the application's configured SSL bundles
+   * @param environment the active environment, for profile detection
+   * @return the resolved {@link BackendTls} (context + whether to skip hostname verification)
+   */
+  private static BackendTls backendTls(SslBundles sslBundles, Environment environment) {
+    List<String> profiles = Arrays.asList(environment.getActiveProfiles());
+    if (profiles.contains("dev") || profiles.contains("test")) {
+      return new BackendTls(trustAllSslContext(), true);
+    }
+    try {
+      SslBundle bundle = sslBundles.getBundle("backend-trust");
+      KeyStore truststore = bundle.getStores().getTrustStore();
+      TrustManagerFactory tmf =
+          TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      tmf.init(truststore);
+      SSLContext context = SSLContext.getInstance("TLS");
+      context.init(null, tmf.getTrustManagers(), null);
+      // Pinned to the backend's self-signed cert, whose SAN need not match the Docker service name
+      // — disable hostname verification, exactly as WebClientConfig does on its pinned path.
+      return new BackendTls(context, true);
+    } catch (NoSuchSslBundleException ignored) {
+      try {
+        return new BackendTls(SSLContext.getDefault(), false);
+      } catch (GeneralSecurityException ex) {
+        throw new IllegalStateException("Failed to obtain default SSL context", ex);
+      }
+    } catch (GeneralSecurityException ex) {
+      throw new IllegalStateException("Failed to initialise backend-trust SSL context", ex);
+    }
+  }
+
+  /**
+   * Resolved backend TLS trust policy: the {@link SSLContext} to install on the probe's HTTP client
+   * plus whether endpoint identification (hostname verification) should be skipped for it (true on
+   * the pinned-cert / trust-all paths, false on the default-JVM-trust fallback).
+   *
+   * @param context the SSL context whose trust managers gate the probe's TLS handshake
+   * @param disableHostnameVerification {@code true} to skip hostname verification
+   *     (pinned/trust-all)
+   */
+  private record BackendTls(SSLContext context, boolean disableHostnameVerification) {}
 }

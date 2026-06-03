@@ -6,6 +6,7 @@ import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
@@ -866,6 +867,19 @@ public class OwnerScopeService {
   }
 
   /**
+   * Entity overload of {@link #canSeeJobOrder(UUID)} for callers that already hold a managed {@link
+   * JobOrder} (e.g. the active-order lookup projection, which loads the rows in one query) — avoids
+   * a per-row {@code findById} re-fetch. Same visibility contract as the id overload (viewer-side
+   * profit gate, SK-public escape, squadron-private otherwise).
+   *
+   * @param order the job order to inspect; never {@code null}.
+   * @return {@code true} iff the caller may read the order.
+   */
+  public boolean canSeeJobOrder(@NotNull JobOrder order) {
+    return canSeeJobOrderRow(order);
+  }
+
+  /**
    * Per-row read check shared by {@link #canSeeJobOrder(UUID)}. First applies the viewer-side
    * profit gate ({@link #canViewJobOrders()}): a caller who is not a member of any profit-eligible
    * org unit (and is not an admin) may see no order at all — not even the otherwise-public SK
@@ -1019,14 +1033,23 @@ public class OwnerScopeService {
    * @return {@code true} iff the caller may read the order.
    */
   public boolean canSeeRefineryOrder(@NotNull UUID orderId) {
-    return refineryOrderRepository
-        .findById(orderId)
-        .map(
-            o ->
-                o.getOwningOrgUnit() == null
-                    ? canAccessOwnerlessPersonalRow(o.getOwner())
-                    : canSeeSquadron(o.getOwningOrgUnit().getId()))
-        .orElse(false);
+    return refineryOrderRepository.findById(orderId).map(this::canSeeRefineryOrder).orElse(false);
+  }
+
+  /**
+   * Entity overload of {@link #canSeeRefineryOrder(UUID)} for callers that already hold a managed
+   * {@link RefineryOrder} (e.g. the mission-scoped refinery list) — avoids a per-row {@code
+   * findById} re-fetch. Strict owning-squadron check (refinery is a strict-staffel aggregate with
+   * no public escape); an ownerless personal order ({@code owningOrgUnit == null}) defers to {@link
+   * #canAccessOwnerlessPersonalRow(User)}.
+   *
+   * @param order the refinery order to inspect; never {@code null}.
+   * @return {@code true} iff the caller may read the order.
+   */
+  public boolean canSeeRefineryOrder(@NotNull RefineryOrder order) {
+    return order.getOwningOrgUnit() == null
+        ? canAccessOwnerlessPersonalRow(order.getOwner())
+        : canSeeSquadron(order.getOwningOrgUnit().getId());
   }
 
   /**
