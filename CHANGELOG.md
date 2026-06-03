@@ -22,9 +22,13 @@
 
 - **Lagerbestände mit Mengentyp SCU werden jetzt zuverlässig auf drei Nachkommastellen gerundet (kaufmännisch).** Beim Einlagern von Raffinerie-Ausbeuten summierte das Backend die Mengen als Gleitkommazahl ohne Rundung, sodass im Lager und im Ausbuchen-Dialog Werte wie 37,160000000000004 SCU auftauchten. Ein Persistenz-Guard am Lagereintrag rundet jetzt jeden Schreibpfad auf drei Stellen, und eine Migration bereinigt die bereits betroffenen Einträge (V137).
 
+- **Verlinkte Raffinerieaufträge auf der Missions-Detailseite zeigen die Endzeit jetzt in der lokalen Zeitzone des Nutzers statt in UTC.** Die Spalte „Ende" wurde serverseitig ohne Zeitzonenumrechnung formatiert; sie wird jetzt — wie in der Raffinerieauftrags-Liste — im Browser DST-korrekt in die Lokalzeit umgerechnet.
+
 - **Sicherheit: Die Raffinerie-Aufträge einer Mission (`GET /api/v1/refinery-orders/mission/{id}`) sind jetzt auf die Orgeinheit(en) des Aufrufers beschränkt.** Ein Logistiker konnte zuvor die Raffinerie-Finanzdaten (Ausgaben, Erlöse, Gewinn, Besitzer) einer fremden Staffel auslesen, indem er eine öffentliche Mission dieser Staffel aufrief; die Logistiker-Ansicht liefert jetzt nur noch Aufträge der eigenen Orgeinheit(en). Admins ohne aktive Staffel sehen weiterhin alles, eine angepinnte Staffel nur diese; die eigentümergefilterte Ansicht normaler Nutzer war nie betroffen.
 
 - **Das Beförderungssystem ist jetzt durchgängig staffel-scoped: jede Staffel sieht nur ihre eigenen Themenbereiche, Bewertungen, Rangvoraussetzungen und Eignungsprüfungen.** Bisher filterten nur die Themenbereiche nach Staffel — Kategorien, Lerninhalte, Rangvoraussetzungen, „Meine Bewertungen", die Bewertungsverwaltung und die Eignungsberechnung werteten staffelübergreifend aus; ein Offizier oder Mitglied einer Staffel konnte so die Beförderungsdaten anderer Staffeln sehen. Admins sehen weiterhin alles bzw. die angepinnte Staffel. Rangvoraussetzungen (inklusive staffelweiter „globaler" ohne Themenbereich/Kategorie) gehören jetzt einer eigenen Staffel und werden beim Anlegen aus dem aktiven Staffelkontext gestempelt (Migration V135).
+
+- **Operations- und Einsatz-Detailseite: der fest eingeblendete Footer verdeckt nicht mehr den unteren Seiteninhalt.** Diese beiden Seiten betten ihren Inhalt neben dem `<main>`-Element ein, wodurch die globale Footer-Freiraum-Reservierung verloren ging und die letzte Panel-Zeile beim Scrollen unter den Footer rutschte; der Seiten-Wrapper reserviert den Platz jetzt selbst.
 
 ## [v0.3.44](https://github.com/krt-iri/basetool/releases/tag/v0.3.44) - 2026-06-02
 
