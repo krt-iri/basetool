@@ -86,7 +86,11 @@ main.oc-page .oc-toolbar {
 /* --- connector primitives --------------------------------------------------- */
 .oc-tree {
     display: flex;
-    justify-content: center;
+    /* `safe` keeps the tree centred when it fits, but falls back to start-aligned
+       once it is wider than the viewport. Plain `center` pushes the overflowing
+       left half into negative scroll space that the scrollbar can never reach,
+       so the leftmost Staffel/Kommando columns become unscrollable. */
+    justify-content: safe center;
     min-width: 100%;
 }
 
