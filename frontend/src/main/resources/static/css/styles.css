@@ -506,6 +506,39 @@ tr:hover {
     font-size: 0.75rem;
 }
 
+/*
+ * Star Citizen Fan Kit compliance band. `flex-basis: 100%` makes it claim its
+ * own line at the top of the wrapping footer flex, so the existing links/meta
+ * row keeps its `space-between` layout on the line below. Holds the
+ * "Made By The Community" logo next to the required CIG trademark notice.
+ */
+.krt-footer-fankit {
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+/*
+ * White-artwork logo variant, rendered unmodified on the dark footer. Fixed
+ * square size keeps it crisp and recognisable; `flex-shrink: 0` stops the long
+ * trademark sentence from squashing it when the row is tight.
+ */
+.krt-footer-fankit-logo {
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+}
+/*
+ * Required trademark notice. Raised to --fs-sm (~10.8pt) on the brighter
+ * gray-1 ink so it clears the Fan Kit's "legible font size and color, no less
+ * than 10 point font" rule — the footer's default --fs-xs is only ~9.6pt.
+ */
+.krt-footer-trademark {
+    font-size: var(--fs-sm);
+    color: var(--color-gray-1);
+    line-height: 1.4;
+}
+
 @media (width <= 768px) {
     .krt-footer {
         flex-direction: column;
