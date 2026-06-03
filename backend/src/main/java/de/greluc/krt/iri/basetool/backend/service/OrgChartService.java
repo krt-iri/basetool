@@ -21,11 +21,9 @@ import de.greluc.krt.iri.basetool.backend.model.dto.SquadronChartDto;
 import de.greluc.krt.iri.basetool.backend.repository.OrgChartPositionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -43,13 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
  * staffelScopedServicesMustWireOwnerScopeOrAuthHelper} ArchUnit whitelist. Read access is open to
  * every authenticated user; write access is gated to ADMIN at the controller.
  *
- * <p>The unit tier is the active, profit-eligible Staffeln + SKs (loaded via {@link
- * OrgUnitRepository#findActiveProfitEligible()}) plus the configured Job-Order intake
- * Spezialkommando (system setting {@code job_order.intake_special_command_id}). The intake SK is
- * part of the profit pipeline by configuration — it accepts guest profit orders even though it is
- * exempt from the profit-eligible flag — so it is rendered and made assignable here even when its
- * {@code is_profit_eligible} column is {@code false}. Every such unit is rendered even when empty
- * so an admin can fill it in.
+ * <p>The unit tier is exactly the active, profit-eligible Staffeln + SKs (loaded via {@link
+ * OrgUnitRepository#findActiveProfitEligible()}); every such unit is rendered even when empty so an
+ * admin can fill it in.
  *
  * <p>All structural invariants the database cannot express in plain SQL — the per-Staffel limits
  * (≤{@value #MAX_COMMAND_LEADS} Kommandos, ≤{@value #MAX_ENSIGNS} Ensign), the per-SK limit
@@ -83,14 +77,6 @@ public class OrgChartService {
   /** Maximum number of SK-Leiter (SK_COMMANDER) positions per Spezialkommando. */
   static final int MAX_SK_COMMANDERS = 2;
 
-  /**
-   * System-setting key holding the UUID of the Job-Order intake Spezialkommando. The chart surfaces
-   * this SK (and allows assigning its SK-Leiter) even when it is not flagged profit-eligible, since
-   * it processes guest profit orders by configuration. Mirrors {@code
-   * JobOrderService.INTAKE_SK_SETTING_KEY}.
-   */
-  private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
-
   private static final String ERR_SCOPE_MISMATCH = "problem.org_chart.scope_mismatch";
   private static final String ERR_UNIT_NOT_PROFIT = "problem.org_chart.unit_not_profit_eligible";
   private static final String ERR_INVALID_PARENT = "problem.org_chart.invalid_parent";
@@ -107,18 +93,16 @@ public class OrgChartService {
   private final OrgUnitRepository orgUnitRepository;
   private final UserRepository userRepository;
   private final OrgChartPositionMapper mapper;
-  private final SystemSettingService systemSettingService;
 
   /**
    * Assembles the entire chart as one nested read model: the Bereichsleitung plus a column for each
-   * active, profit-eligible Staffel and Spezialkommando (and the configured intake SK), ordered by
-   * name. Open to every authenticated user.
+   * active, profit-eligible Staffel and Spezialkommando, ordered by name. Open to every
+   * authenticated user.
    *
    * @return the assembled chart; never {@code null}. Empty scopes render as empty groups.
    */
   public OrgChartDto getOrgChart() {
-    List<OrgUnit> units = new ArrayList<>(orgUnitRepository.findActiveProfitEligible());
-    includeIntakeSpecialCommand(units);
+    List<OrgUnit> units = orgUnitRepository.findActiveProfitEligible();
     List<OrgUnit> squadrons =
         units.stream()
             .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
@@ -357,22 +341,6 @@ public class OrgChartService {
     return child.getParent() != null && parent.getId().equals(child.getParent().getId());
   }
 
-  /**
-   * Adds the configured Job-Order intake Spezialkommando to the unit list if it is set, active, of
-   * SK kind, and not already present (it may already be in the list when it also carries the
-   * profit-eligible flag). The intake SK belongs to the profit pipeline by configuration, so it
-   * appears in the chart even without the flag.
-   *
-   * @param units the mutable unit list to augment in place.
-   */
-  private void includeIntakeSpecialCommand(List<OrgUnit> units) {
-    intakeSpecialCommandId()
-        .filter(id -> units.stream().noneMatch(u -> id.equals(u.getId())))
-        .flatMap(orgUnitRepository::findById)
-        .filter(u -> u.isActive() && u.getKind() == OrgUnitKind.SPECIAL_COMMAND)
-        .ifPresent(units::add);
-  }
-
   // ----------------------------------------------------------------- write guards --
 
   private User resolveHolderForCreate(OrgChartPositionType type, UUID userId) {
@@ -414,7 +382,7 @@ public class OrgChartService {
     if (unit.getKind() != expectedKind) {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
-    if (!unit.isActive() || (!unit.isProfitEligible() && !isIntakeSpecialCommand(unit))) {
+    if (!unit.isActive() || !unit.isProfitEligible()) {
       throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
     }
     return unit;
@@ -508,28 +476,6 @@ public class OrgChartService {
             : positionRepository.existsByOrgUnitIdAndUserId(orgUnit.getId(), userId);
     if (alreadyAssigned) {
       throw new BadRequestException(ERR_USER_ASSIGNED);
-    }
-  }
-
-  private boolean isIntakeSpecialCommand(OrgUnit unit) {
-    return unit != null
-        && unit.getKind() == OrgUnitKind.SPECIAL_COMMAND
-        && intakeSpecialCommandId().filter(id -> id.equals(unit.getId())).isPresent();
-  }
-
-  private Optional<UUID> intakeSpecialCommandId() {
-    return systemSettingService
-        .getSettingValue(INTAKE_SK_SETTING_KEY)
-        .map(String::trim)
-        .filter(value -> !value.isEmpty())
-        .flatMap(OrgChartService::parseUuid);
-  }
-
-  private static Optional<UUID> parseUuid(String raw) {
-    try {
-      return Optional.of(UUID.fromString(raw));
-    } catch (IllegalArgumentException ex) {
-      return Optional.empty();
     }
   }
 
