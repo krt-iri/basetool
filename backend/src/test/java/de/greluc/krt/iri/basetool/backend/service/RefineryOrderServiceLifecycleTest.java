@@ -62,7 +62,9 @@ import org.springframework.security.access.AccessDeniedException;
  *       filter).
  *   <li>{@link RefineryOrderService#getAllRefineryOrders} (both overloads and with/without status
  *       filter).
- *   <li>{@link RefineryOrderService#getMissionRefineryOrders} (both overloads).
+ *   <li>{@link RefineryOrderService#getMissionRefineryOrdersScoped} (org-unit-scoped logistician
+ *       path) and {@link RefineryOrderService#getMissionRefineryOrders(UUID, UUID)} (owner-filtered
+ *       path).
  *   <li>{@link RefineryOrderService#createRefineryOrder} — every validation branch (User / Location
  *       / Mission / RefiningMethod lookups, location-must-have-refinery, goods validation including
  *       RAW-input-only, output-must-match-refined-of-input, output fallback chain), plus the {@code
@@ -240,11 +242,31 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
-    void getMissionRefineryOrders_unfiltered_delegatesToFindByMissionId() {
-      RefineryOrder o = new RefineryOrder();
-      when(refineryOrderRepository.findByMissionId(MISSION_ID)).thenReturn(List.of(o));
+    void getMissionRefineryOrdersScoped_passesCallerScope_soForeignSquadronOrdersAreUnreachable() {
+      // SECURITY (BAC-004): a squadron-A logistician must only ever query within squadron A's
+      // scope. Squadron B never enters the predicate, so the scoped query (which filters on
+      // owning_org_unit) can never return squadron B's financials - not even for a public B
+      // mission the caller can otherwise see. Mirrors OwnerScopeServiceTest's squadron-A-vs-B
+      // refinery coverage (memberRejectsForeignSquadronRefineryOrder) at the mission-list layer.
+      UUID squadronA = UUID.randomUUID();
+      UUID squadronB = UUID.randomUUID();
+      ScopePredicate squadronAscope = new ScopePredicate(false, null, Set.of(squadronA));
+      when(ownerScopeService.currentScopePredicate()).thenReturn(squadronAscope);
+      RefineryOrder squadronAorder = new RefineryOrder();
+      when(refineryOrderRepository.findByMissionIdScoped(
+              MISSION_ID, false, null, Set.of(squadronA)))
+          .thenReturn(List.of(squadronAorder));
 
-      assertEquals(List.of(o), service.getMissionRefineryOrders(MISSION_ID));
+      List<RefineryOrder> result = service.getMissionRefineryOrdersScoped(MISSION_ID);
+
+      assertEquals(List.of(squadronAorder), result);
+      // The repository was asked with squadron A's scope only - not all-scope, not squadron B, and
+      // not via the unscoped findByMissionId that the finance roll-up still uses internally.
+      verify(refineryOrderRepository)
+          .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronA));
+      verify(refineryOrderRepository, never())
+          .findByMissionIdScoped(MISSION_ID, false, null, Set.of(squadronB));
+      verify(refineryOrderRepository, never()).findByMissionId(any(UUID.class));
     }
 
     @Test

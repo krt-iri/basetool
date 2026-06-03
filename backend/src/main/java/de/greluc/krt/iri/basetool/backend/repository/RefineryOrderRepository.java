@@ -36,6 +36,32 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   List<RefineryOrder> findByMissionIdAndOwnerId(UUID missionId, UUID ownerId);
 
   /**
+   * Org-unit-scoped variant of {@link #findByMissionId(UUID)}: returns only the refinery orders
+   * linked to {@code missionId} that fall within the caller's effective scope, encoded as the
+   * standard {@code isAdminAllScope} / {@code activeOrgUnitId} / {@code memberOrgUnitIds} triple
+   * (see {@link de.greluc.krt.iri.basetool.backend.service.ScopePredicate}). Refinery is a
+   * strict-staffel aggregate with no cross-squadron escape clause, so an order owned by a foreign
+   * org unit is never returned - even when the linked mission is itself publicly visible.
+   *
+   * <p>This closes the BAC-004 cross-org-unit leak on the mission-scoped refinery endpoint {@code
+   * GET /api/v1/refinery-orders/mission/{missionId}}, where a logistician of one squadron could
+   * otherwise read another squadron's refinery financials by enumerating that squadron's public
+   * missions. Eagerly fetches the configured relations via {@code @EntityGraph}.
+   */
+  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @Query(
+      "SELECT r FROM RefineryOrder r WHERE r.mission.id = :missionId AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
+  List<RefineryOrder> findByMissionIdScoped(
+      @Param("missionId") UUID missionId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+
+  /**
    * Derived Spring-Data query - returns entities matching {@code MissionIdIn}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */

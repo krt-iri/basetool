@@ -88,13 +88,25 @@ public class RefineryOrderService {
   }
 
   /**
-   * Lists all refinery orders linked to a mission (used by the mission finance roll-up).
+   * Lists the refinery orders linked to a mission that fall within the caller's org-unit scope.
+   * Used by the mission detail page's refinery roll-up for logistician+ viewers. Refinery is a
+   * strict-staffel aggregate, so the result is filtered through the caller's {@link ScopePredicate}
+   * (admin all-scope sees every order; an admin pinned to a squadron and a non-admin logistician
+   * see only their own org units' orders) by {@link RefineryOrderRepository#findByMissionIdScoped}.
+   *
+   * <p>Without this scope filter (finding BAC-004) a logistician of one squadron could read another
+   * squadron's refinery financials by enumerating that squadron's public missions: Mission's
+   * cross-staffel visibility escape ({@code is_internal = false}) exposes the mission id, but it
+   * does NOT extend to the refinery orders attached to it - those stay private to their owning
+   * squadron.
    *
    * @param missionId mission id
-   * @return all linked orders
+   * @return the in-scope orders linked to the mission
    */
-  public List<RefineryOrder> getMissionRefineryOrders(@NotNull UUID missionId) {
-    return refineryOrderRepository.findByMissionId(missionId);
+  public List<RefineryOrder> getMissionRefineryOrdersScoped(@NotNull UUID missionId) {
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return refineryOrderRepository.findByMissionIdScoped(
+        missionId, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
   }
 
   /**
