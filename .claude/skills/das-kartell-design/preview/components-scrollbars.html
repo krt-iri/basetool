@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="_card.css">
+<link rel="stylesheet" href="../krt-components.css">
+<style>
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; align-items: start; }
+  .demo { height: 96px; padding: 10px 12px; color: var(--color-gray-1); font-size: 0.78rem; line-height: 1.7; }
+  .demo p { margin: 0; max-width: none; }
+  .wide { white-space: nowrap; }
+  .cap { font-family: var(--font-mono); font-size: 0.6rem; color: var(--color-gray-2); margin: 6px 0 0; }
+</style>
+</head>
+<body>
+  <p class="pv-label">Scrollbars — square, hairline track, orange on hover (both axes)</p>
+  <div class="grid">
+    <div>
+      <div class="hud-scroll scroll-y demo">
+        <p>Vertical · default 12px<br>Operation Tiefschlag<br>Aaron Halo Sweep<br>Pyro Recon<br>Daymar Salvage<br>Refinery Convoy<br>Checkmate Drill<br>Ghost Hollow<br>ARC-L1 Run<br>Seraphim Patrol</p>
+      </div>
+      <p class="cap">.hud-scroll .scroll-y</p>
+    </div>
+    <div>
+      <div class="hud-scroll scroll-x demo">
+        <p class="wide">Horizontal · TDD Area18 — Baijini Point — CRU-L1 — Lorville TDD — Everus Harbor — Seraphim — GrimHEX — Port Olisar</p>
+      </div>
+      <p class="cap">.hud-scroll .scroll-x</p>
+    </div>
+    <div>
+      <div class="hud-scroll scroll-y scroll-accent demo">
+        <p>Accent · orange thumb<br>19:00 server join<br>19:05 quantum align<br>19:12 contact<br>19:20 engaged<br>19:34 refinery drop<br>19:50 payout split<br>20:01 RTB</p>
+      </div>
+      <p class="cap">.scroll-accent (log/console)</p>
+    </div>
+  </div>
+  <p class="pv-mono" style="margin-top:13px;">12px default · <code>.scroll-thin</code> 8px · idle gray-2 → hover accent-light → active orange · corner + buttons suppressed · Firefox via <code>scrollbar-color</code>.</p>
+</body>
+</html>

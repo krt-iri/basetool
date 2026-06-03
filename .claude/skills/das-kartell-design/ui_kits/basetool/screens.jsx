@@ -169,8 +169,8 @@ function MaterialsScreen() {
         <p style={{ color: "var(--color-gray-2)", fontSize: "0.85rem", marginTop: 0 }}>
           Sell prices in <span className="price-sell">green (+)</span>, buy prices in <span className="price-buy">red (−)</span>, per terminal. Click a category to collapse.
         </p>
-        <div style={{ overflowX: "auto" }}>
-          <table className="matrix-table" style={{ marginTop: "0.5rem" }}>
+        <div className="hud-scroll scroll-x" style={{ marginTop: "0.5rem" }}>
+          <table className="matrix-table" style={{ marginTop: 0 }}>
             <thead>
               <tr><th>Commodity</th>{TERMINALS.map((t) => <th key={t.name} className="num-cell" title={t.planet}>{t.name}</th>)}</tr>
             </thead>

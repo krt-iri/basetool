@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrollbalken — Mockups im Produktkontext</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="../krt-components.css">
+<style>
+  body { margin: 0; padding: 40px 32px 70px; background: var(--color-bg-black); background-image: url('../assets/honeycomb-bg.svg'); background-size: 46px 26.56px; color: var(--color-gray-1); }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  .head { margin-bottom: 30px; }
+  .head .eyebrow { font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; font-size: 12px; color: var(--color-gray-2); display: flex; align-items: center; gap: 10px; font-family: var(--font-body); }
+  .head .eyebrow::before { content: ''; width: 30px; height: 2px; background: var(--color-primary); }
+  .head h1 { font-family: var(--font-headline); color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.04em; font-size: 26px; margin: 13px 0 8px; }
+  .head p { font-weight: 300; max-width: 80ch; margin: 0; }
+
+  .grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
+  @media (min-width: 1000px) { .grid { grid-template-columns: 1.4fr 1fr; } }
+  h3.sec { font-family: var(--font-headline); color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.04em; font-size: 14px; border-bottom: 1px solid var(--color-gray-3); padding-bottom: 7px; margin: 0 0 12px; }
+  .sub { color: var(--color-gray-2); font-size: 12px; font-family: var(--font-mono); margin: 8px 0 0; }
+
+  /* horizontal price matrix */
+  .matrix-scroll { max-width: 100%; }
+  table.matrix { width: max-content; min-width: 100%; border-collapse: collapse; margin: 0; }
+  table.matrix th, table.matrix td { padding: 0.55rem 0.85rem; font-size: 0.82rem; white-space: nowrap; border-bottom: 1px solid var(--color-gray-3); }
+  table.matrix th { background: var(--color-surface-input); color: var(--color-gray-1); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.72rem; border-bottom: 2px solid var(--color-primary); position: sticky; top: 0; }
+  table.matrix td:first-child, table.matrix th:first-child { position: sticky; left: 0; background: var(--color-surface-input); z-index: 1; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .sell { color: var(--color-success); }
+
+  /* console log */
+  .console { height: 280px; padding: 12px 14px; font-family: var(--font-mono); font-size: 12px; line-height: 1.85; color: var(--color-gray-1); }
+  .console .ln { white-space: nowrap; }
+  .console .t { color: var(--color-gray-2); }
+  .console .ok { color: var(--color-success); }
+  .console .warn { color: var(--color-warning); }
+  .console .err { color: var(--color-danger); }
+
+  /* both-axis map region */
+  .map-region { height: 220px; }
+  .map-canvas { width: 1100px; height: 520px; position: relative; background:
+      radial-gradient(circle at 30% 40%, rgba(231,126,35,0.10), transparent 22%),
+      radial-gradient(circle at 70% 65%, rgba(53,93,220,0.12), transparent 20%),
+      linear-gradient(rgba(231,126,35,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(231,126,35,0.06) 1px, transparent 1px);
+    background-size: auto, auto, 40px 40px, 40px 40px; }
+  .node { position: absolute; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-gray-1); }
+  .node::before { content: ''; width: 9px; height: 9px; background: var(--color-primary); }
+  .foot { margin-top: 30px; color: var(--color-gray-2); font-family: var(--font-mono); font-size: 12px; }
+  .full { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="eyebrow">Design-System · Scrollbalken</div>
+    <h1>Scrollbalken im Produktkontext</h1>
+    <p>Eckig, Hairline-Spur, Daumen grau → orange bei Hover/Aktiv, Ecken-Stück gefüllt. Drei typische Fälle: horizontale Preis-Matrix, vertikale Log-Konsole (Accent) und eine Both-Axis-Karte.</p>
+  </div>
+
+  <div class="grid">
+    <!-- horizontal -->
+    <div>
+      <h3 class="sec">Preis-Matrix · horizontal scrollen</h3>
+      <div class="hud-scroll scroll-x matrix-scroll">
+        <table class="matrix">
+          <thead><tr><th>Commodity</th><th class="num">Area18</th><th class="num">Baijini</th><th class="num">CRU-L1</th><th class="num">Lorville</th><th class="num">Everus</th><th class="num">Seraphim</th><th class="num">GrimHEX</th><th class="num">Olisar</th></tr></thead>
+          <tbody>
+            <tr><td>Quantanium</td><td class="num sell">+29.400</td><td class="num sell">+29.100</td><td class="num sell">+28.800</td><td class="num sell">+27.200</td><td class="num sell">+28.050</td><td class="num sell">+29.600</td><td class="num sell">+30.100</td><td class="num sell">+28.700</td></tr>
+            <tr><td>Laranite</td><td class="num sell">+3.090</td><td class="num sell">+2.980</td><td class="num sell">+3.010</td><td class="num sell">+2.760</td><td class="num sell">+2.900</td><td class="num sell">+3.120</td><td class="num sell">+3.050</td><td class="num sell">+2.840</td></tr>
+            <tr><td>Agricium</td><td class="num sell">+2.810</td><td class="num sell">+2.700</td><td class="num sell">+2.560</td><td class="num sell">+2.640</td><td class="num sell">+2.720</td><td class="num sell">+2.880</td><td class="num sell">+2.790</td><td class="num sell">+2.610</td></tr>
+            <tr><td>Bexalite</td><td class="num sell">+42.100</td><td class="num sell">+41.800</td><td class="num sell">+40.900</td><td class="num sell">+41.200</td><td class="num sell">+42.400</td><td class="num sell">+43.000</td><td class="num sell">+41.500</td><td class="num sell">+40.700</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sub">.hud-scroll .scroll-x · sticky erste Spalte + Kopf</p>
+    </div>
+
+    <!-- vertical accent console -->
+    <div>
+      <h3 class="sec">Einsatz-Log · vertikal (Accent)</h3>
+      <div class="hud-scroll scroll-y scroll-accent console">
+        <div class="ln"><span class="t">19:00:04</span> <span class="ok">JOIN</span> cmdr.valk → server PYRO-3</div>
+        <div class="ln"><span class="t">19:00:51</span> <span class="ok">JOIN</span> mara.k, hex_07, dane</div>
+        <div class="ln"><span class="t">19:05:12</span> quantum align → Aaron Halo</div>
+        <div class="ln"><span class="t">19:11:48</span> <span class="warn">CONTACT</span> 2 unknown @ 14km</div>
+        <div class="ln"><span class="t">19:12:30</span> <span class="err">ENGAGED</span> escort breaks formation</div>
+        <div class="ln"><span class="t">19:20:09</span> <span class="ok">CLEAR</span> hostiles down</div>
+        <div class="ln"><span class="t">19:34:22</span> refinery drop ARC-L1 · 128 SCU</div>
+        <div class="ln"><span class="t">19:41:05</span> yield +14.300 aUEC</div>
+        <div class="ln"><span class="t">19:50:33</span> payout split · 4 shares</div>
+        <div class="ln"><span class="t">20:01:17</span> <span class="ok">RTB</span> mission complete</div>
+        <div class="ln"><span class="t">20:02:00</span> log written → mission #1042</div>
+      </div>
+      <p class="sub">.hud-scroll .scroll-y .scroll-accent</p>
+    </div>
+
+    <!-- both axis -->
+    <div class="full">
+      <h3 class="sec">Sektor-Karte · beide Achsen</h3>
+      <div class="hud-scroll scroll-both map-region">
+        <div class="map-canvas">
+          <div class="node" style="left:120px; top:90px;">ARC-L1 Refinery</div>
+          <div class="node" style="left:420px; top:200px;">Aaron Halo Belt</div>
+          <div class="node" style="left:780px; top:120px;">Seraphim Station</div>
+          <div class="node" style="left:600px; top:380px;">GrimHEX</div>
+          <div class="node" style="left:960px; top:300px;">Pyro Gateway</div>
+          <div class="node" style="left:240px; top:440px;">Daymar Wreck</div>
+        </div>
+      </div>
+      <p class="sub">.hud-scroll .scroll-both · Ecken-Stück füllt den Kreuzungspunkt</p>
+    </div>
+  </div>
+
+  <p class="foot">Alle Regionen nutzen <code>.hud-scroll</code> + eine Achsenklasse. Scrollbalken sind nativ — am besten live im Browser scrollen.</p>
+</div>
+</body>
+</html>
