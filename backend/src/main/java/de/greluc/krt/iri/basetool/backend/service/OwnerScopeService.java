@@ -876,6 +876,10 @@ public class OwnerScopeService {
    *       like {@link #canEditSquadron(UUID)}.
    * </ul>
    *
+   * <p>Both branches are additionally gated by the viewer-side profit check ({@link
+   * #canViewJobOrders()}): a caller who belongs to no profit-eligible org unit (and is not an
+   * admin) may edit no order, mirroring the read path.
+   *
    * <p>Non-existent ids return {@code false}.
    *
    * @param jobOrderId job order to inspect; never {@code null}.
@@ -886,13 +890,19 @@ public class OwnerScopeService {
   }
 
   /**
-   * Per-row write check shared by {@link #canEditJobOrder(UUID)}. SK-responsible orders are open to
-   * the role gate; squadron-responsible orders defer to {@link #canEditSquadron(UUID)}.
+   * Per-row write check shared by {@link #canEditJobOrder(UUID)}. First applies the same
+   * viewer-side profit gate as the read path ({@link #canViewJobOrders()}): a caller who is not a
+   * member of any profit-eligible org unit (and is not an admin) may edit no order at all — not
+   * even the shared SK queue. For a permitted caller, SK-responsible orders are open to the role
+   * gate and squadron-responsible orders defer to {@link #canEditSquadron(UUID)}.
    *
    * @param o the job order whose responsible org unit gates write access.
    * @return {@code true} iff the caller may edit the row.
    */
   private boolean canEditJobOrderRow(JobOrder o) {
+    if (!canViewJobOrders()) {
+      return false;
+    }
     OrgUnit responsible = o.getResponsibleOrgUnit();
     if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
       return true;

@@ -440,13 +440,38 @@ class OwnerScopeServiceTest {
   class CanEditJobOrderTests {
 
     @Test
-    void skResponsibleOrder_isOpenToTheRoleGate() {
+    void skResponsibleOrder_isOpenToTheRoleGate_forProfitEligibleCaller() {
       // SK-order edits are governed by the endpoint's LOGISTICIAN+ role gate, not by squadron
-      // scope;
-      // this method therefore returns true for the SK case so any profit squadron can contribute.
+      // scope,
+      // so this returns true for the SK case for any profit-eligible caller (the member-in-A
+      // default
+      // is profit-eligible) — letting any profit squadron contribute to the shared queue.
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
+      stubMemberInSquadronA();
+
+      assertTrue(service.canEditJobOrder(orderId));
+    }
+
+    @Test
+    void skResponsibleOrder_notEditableByNonProfitMember() {
+      // The viewer-side profit gate also blocks edits: a non-profit member cannot act on the SK
+      // queue even though the order is otherwise only role-gated.
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
+      stubNonProfitMember();
+
+      assertFalse(service.canEditJobOrder(orderId));
+    }
+
+    @Test
+    void skResponsibleOrder_editableByAdmin() {
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
+      when(authHelper.isAdmin()).thenReturn(true);
 
       assertTrue(service.canEditJobOrder(orderId));
     }
