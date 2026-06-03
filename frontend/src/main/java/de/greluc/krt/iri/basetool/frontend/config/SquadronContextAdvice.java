@@ -25,7 +25,8 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * sidebar switcher / context badge / squadron-aware columns can be rendered from the layout
  * fragments without each page controller having to load the data separately.
  *
- * <p>Populates four model attributes:
+ * <p>Populates the cross-cutting model attributes the layout fragments read. The core org-unit
+ * context ones:
  *
  * <ul>
  *   <li>{@code activeSquadronId} — UUID of the squadron the backend currently scopes queries to, or
@@ -40,6 +41,12 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  *       cross-staffel union (no active selection). Members and guests never enter this mode and
  *       always see {@code false}.
  * </ul>
+ *
+ * <p>Beyond those it also exposes the merged OrgUnit switcher catalogue ({@code availableOrgUnits},
+ * {@code activeOrgUnit}, {@code isActiveOrgUnitSpecialCommand}), the per-principal capability flags
+ * resolved once via {@code meCapabilities} ({@code canSeeBlueprintOverview} / {@code
+ * canViewJobOrders}), the dynamic {@code appTitle}, {@code promotionFeatureEnabled}, and {@code
+ * currentRequestUri} — each documented on its own {@code @ModelAttribute} method below.
  *
  * <p>Failures from the backend round-trip degrade gracefully: a non-resolvable active-squadron call
  * leaves the badge empty; a non-resolvable squadron list leaves the dropdown empty. We never let an

@@ -112,6 +112,16 @@ public class OwnerScopeService {
   private static final String CACHE_KEY_CURRENT_SQUADRON =
       OwnerScopeService.class.getName() + ".currentSquadron";
 
+  /**
+   * Request-attribute key under which {@link #currentMemberOrgUnitIds()} caches the caller's
+   * membership org-unit ids for the duration of the current HTTP request. Stored as the resolved
+   * {@code Set<UUID>} (possibly empty) directly — a present attribute of type {@link java.util.Set}
+   * means "already resolved this request", so the membership read happens at most once even though
+   * several gates consult it.
+   */
+  private static final String CACHE_KEY_MEMBER_ORG_UNIT_IDS =
+      OwnerScopeService.class.getName() + ".memberOrgUnitIds";
+
   private final AuthHelperService authHelper;
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
@@ -220,9 +230,12 @@ public class OwnerScopeService {
    * the empty set for anonymous callers and (technically) for admins, although the latter never
    * reaches this method through {@link #currentScopePredicate()}.
    *
-   * <p>The result is computed fresh every call — there is no per-request memoisation yet because
-   * the resolver is invoked exactly once per request (via {@link #currentScopePredicate()}) and the
-   * additional cache key would only pay off if the resolver was called multiple times.
+   * <p>The result is memoised on the {@link HttpServletRequest} for the duration of the request.
+   * Since the Job-Order profit gate ({@link #canViewJobOrders()}) landed, the resolver is consulted
+   * more than once per request — the list path reads it via both {@code canViewJobOrders()} and
+   * {@link #currentScopePredicate()}, and the detail/edit paths read it via {@code
+   * canViewJobOrders()} — so the single cached {@code Set<UUID>} collapses what would otherwise be
+   * two or three identical {@code findAllByIdUserId} queries into one.
    *
    * <p>Post-D3: every membership row (Staffel + SK) flows through {@code
    * OrgUnitMembershipRepository.findAllByIdUserId} — the legacy {@code User.squadron} column was
@@ -232,14 +245,23 @@ public class OwnerScopeService {
    */
   @NotNull
   public java.util.Set<UUID> currentMemberOrgUnitIds() {
+    Object cached = request.getAttribute(CACHE_KEY_MEMBER_ORG_UNIT_IDS);
+    if (cached instanceof java.util.Set<?> set) {
+      @SuppressWarnings("unchecked")
+      java.util.Set<UUID> typed = (java.util.Set<UUID>) set;
+      return typed;
+    }
     Optional<UUID> userIdOpt = authHelper.currentUserId();
+    java.util.Set<UUID> ids;
     if (userIdOpt.isEmpty()) {
-      return java.util.Set.of();
+      ids = java.util.Set.of();
+    } else {
+      ids = new java.util.LinkedHashSet<>();
+      for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userIdOpt.get())) {
+        ids.add(m.getId().getOrgUnitId());
+      }
     }
-    java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
-    for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userIdOpt.get())) {
-      ids.add(m.getId().getOrgUnitId());
-    }
+    request.setAttribute(CACHE_KEY_MEMBER_ORG_UNIT_IDS, ids);
     return ids;
   }
 
