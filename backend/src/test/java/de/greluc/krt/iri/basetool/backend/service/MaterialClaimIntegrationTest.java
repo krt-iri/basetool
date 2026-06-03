@@ -61,19 +61,19 @@ class MaterialClaimIntegrationTest {
           String tag = UUID.randomUUID().toString().substring(0, 8);
           SpecialCommand sk = new SpecialCommand();
           sk.setName("Claim-SK-" + tag);
-          sk.setShorthand("S" + tag.substring(0, 3));
+          sk.setShorthand("S" + tag);
           sk.setProfitEligible(true);
           sk = specialCommandRepository.save(sk);
 
           Squadron sqA = new Squadron();
           sqA.setName("Claim-A-" + tag);
-          sqA.setShorthand("A" + tag.substring(0, 3));
+          sqA.setShorthand("A" + tag);
           sqA.setProfitEligible(true);
           sqA = squadronRepository.save(sqA);
 
           Squadron sqB = new Squadron();
           sqB.setName("Claim-B-" + tag);
-          sqB.setShorthand("B" + tag.substring(0, 3));
+          sqB.setShorthand("B" + tag);
           sqB = squadronRepository.save(sqB);
 
           Material mat = new Material();
@@ -186,16 +186,16 @@ class MaterialClaimIntegrationTest {
               String tag = UUID.randomUUID().toString().substring(0, 8);
               SpecialCommand sk = new SpecialCommand();
               sk.setName("Orph-SK-" + tag);
-              sk.setShorthand("O" + tag.substring(0, 3));
+              sk.setShorthand("O" + tag);
               sk.setProfitEligible(true);
               sk = specialCommandRepository.save(sk);
               Squadron sqA = new Squadron();
               sqA.setName("Orph-A-" + tag);
-              sqA.setShorthand("A" + tag.substring(0, 3));
+              sqA.setShorthand("A" + tag);
               sqA = squadronRepository.save(sqA);
               Squadron sqB = new Squadron();
               sqB.setName("Orph-B-" + tag);
-              sqB.setShorthand("B" + tag.substring(0, 3));
+              sqB.setShorthand("B" + tag);
               sqB = squadronRepository.save(sqB);
               Material matA = new Material();
               matA.setName("OrphMatA-" + tag);
