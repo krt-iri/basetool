@@ -144,6 +144,12 @@ public class JobOrderHandoverService {
         throw new IllegalStateException("Inventory item does not belong to this JobOrder");
       }
 
+      if (itemDto.amount() == null || itemDto.amount() <= 0) {
+        // Defence in depth behind the DTO's @Positive (now actually cascaded via @Valid, audit
+        // M-4): a non-positive amount would pass the "more than available" check, then *increase*
+        // both the inventory stock (remaining = stock - amount) and the open requirement.
+        throw new BadRequestException("Handover amount must be positive");
+      }
       if (itemDto.amount() > inventoryItem.getAmount() + QUANTITY_EPSILON) {
         throw new BadRequestException("Cannot hand over more than the available amount");
       }

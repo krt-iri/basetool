@@ -199,9 +199,10 @@ class BackendHealthIndicatorTest {
 
     Constructor<?>[] all = BackendHealthIndicator.class.getDeclaredConstructors();
     assertEquals(
-        2,
+        3,
         all.length,
-        "this regression test assumes exactly two constructors -- if a third is added, revisit "
-            + "the @Autowired contract");
+        "this regression test assumes three constructors: the @Autowired production one, the "
+            + "visible-for-testing one, and the private shared one that wires the resolved trust "
+            + "policy (audit L-5) -- if the count changes, revisit the @Autowired contract");
   }
 }

@@ -64,7 +64,9 @@ class UserMapperTest {
     assertNotNull(dto);
     assertEquals(user.getId(), dto.id());
     assertEquals("jdoe", dto.username());
-    assertEquals("jdoe@example.com", dto.email());
+    // PII: toDto deliberately omits email (it is re-added only on the /me self path via
+    // UserController.withSelfEmail). It must be null on every projection this mapper produces.
+    assertNull(dto.email());
     assertEquals(5, dto.rank());
     assertEquals("desc", dto.description());
     assertEquals(Set.of("ADMIN", "OFFICER"), dto.roles());

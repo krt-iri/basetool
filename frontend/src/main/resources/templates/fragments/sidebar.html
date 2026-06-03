@@ -90,7 +90,13 @@
                         <a th:href="@{/admin/personal-blueprints}" th:text="#{admin.personalInventory.blueprints.menu}" sec:authorize="hasRole('ADMIN')">Pers. Blueprints (Admin)</a>
                     </div>
                 </details>
-                <a th:href="@{/logout}" th:text="#{nav.logout}">Logout</a>
+                <!-- L-3: logout is a POST form (CSRF-protected) instead of a GET link so it cannot
+                     be force-triggered cross-site. The button is styled to blend in with the
+                     surrounding nav anchors. Thymeleaf injects the _csrf hidden field. -->
+                <form th:action="@{/logout}" method="post" style="margin: 0;">
+                    <button type="submit" th:text="#{nav.logout}"
+                            style="background: none; border: none; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; width: 100%;">Logout</button>
+                </form>
             </span>
                 <span sec:authorize="isAnonymous()">
                 <a th:href="@{/orders/create}" th:text="#{orders.create.link}">Auftrag anlegen</a>

@@ -261,13 +261,23 @@ public class JobOrderService {
 
   /**
    * Lightweight reference projection used by typeaheads and refinery-order pickers (only id +
-   * display-id + summary). Filtered to active (non-completed/-rejected) orders.
+   * display-id + summary). Filtered to active (non-completed/-rejected) orders and, like the main
+   * list endpoint, to the caller's visibility: a non-profit member (no {@code canViewJobOrders()})
+   * gets an empty list, and squadron-private orders of other squadrons are filtered out so the
+   * typeahead cannot enumerate a foreign squadron's order handle + materials (audit M-2).
    *
-   * @return active job orders as reference DTOs
+   * @return active job orders the caller may see, as reference DTOs
    */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.JobOrderReferenceDto>
       findAllActiveReference() {
+    // M-2: mirror the list endpoint's controls. Viewer-side profit gate first (a non-profit member
+    // sees nothing, not even the SK-public union), then per-row visibility scope on the loaded
+    // rows.
+    if (!ownerScopeService.canViewJobOrders()) {
+      return List.of();
+    }
     return jobOrderRepository.findAllActiveWithMaterials().stream()
+        .filter(ownerScopeService::canSeeJobOrder)
         .map(
             o ->
                 new de.greluc.krt.iri.basetool.backend.model.dto.JobOrderReferenceDto(

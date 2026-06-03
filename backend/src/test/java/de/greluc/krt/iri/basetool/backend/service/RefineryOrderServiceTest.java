@@ -1034,5 +1034,41 @@ class RefineryOrderServiceTest {
           saved.getOwningOrgUnit(),
           "the picker output must be honoured verbatim, not user.getSquadron()");
     }
+
+    @Test
+    void createRefineryOrder_stripsClientSuppliedIdAndVersion() {
+      UUID userId = UUID.randomUUID();
+      User user = new User();
+      user.setId(userId);
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+      Location loc = new Location();
+      loc.setId(UUID.randomUUID());
+      SpaceStation station = new SpaceStation();
+      station.setHasRefinery(true);
+      loc.setSpaceStation(station);
+      when(locationRepository.findById(loc.getId())).thenReturn(Optional.of(loc));
+      when(refineryOrderRepository.save(any(RefineryOrder.class)))
+          .thenAnswer(i -> i.getArgument(0));
+
+      // Audit H-2: a malicious client echoes an existing order's id + version in the create body to
+      // turn save() into an EntityManager.merge() UPSERT (AbstractEntity.isNew() == id == null),
+      // overwriting and re-owning a foreign order. createRefineryOrder must reset both so the
+      // persistence provider performs a clean INSERT instead.
+      RefineryOrder transientOrder = new RefineryOrder();
+      transientOrder.setLocation(loc);
+      transientOrder.setId(UUID.randomUUID());
+      transientOrder.setVersion(7L);
+
+      refineryOrderService.createRefineryOrder(userId, transientOrder, null);
+
+      ArgumentCaptor<RefineryOrder> captor = ArgumentCaptor.forClass(RefineryOrder.class);
+      verify(refineryOrderRepository).save(captor.capture());
+      assertNull(
+          captor.getValue().getId(),
+          "client-supplied id must be nulled so save() does an INSERT, not a merge UPSERT");
+      assertNull(
+          captor.getValue().getVersion(), "client-supplied version must be nulled on create");
+    }
   }
 }

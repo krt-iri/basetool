@@ -282,6 +282,8 @@ class UserControllerTest {
     // never from a request parameter. A regression here lets any caller
     // request another user's profile.
     User entity = new User();
+    // The self endpoint re-adds the caller's OWN email on top of the (email-free) mapper output.
+    entity.setEmail("me@example.invalid");
     UserDto dto = mockDto(CALLER_ID);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
     when(userService.findById(CALLER_ID)).thenReturn(entity);
@@ -289,7 +291,10 @@ class UserControllerTest {
 
     UserDto result = controller.getCurrentUser(jwt);
 
-    assertSame(dto, result);
+    assertNotNull(result);
+    assertEquals(CALLER_ID, result.id());
+    // A user always sees their own email in their own profile (re-added by withSelfEmail).
+    assertEquals("me@example.invalid", result.email());
     verify(userService).getUserIdFromJwt(jwt);
     verify(userService).findById(CALLER_ID);
   }
@@ -306,6 +311,7 @@ class UserControllerTest {
     req.setVersion(2L);
 
     User updated = new User();
+    updated.setEmail("me@example.invalid");
     UserDto dto = mockDto(CALLER_ID);
     when(userService.updateUserDescription(CALLER_ID, "Pilot extraordinaire", "Ace", 2L))
         .thenReturn(updated);
@@ -313,7 +319,9 @@ class UserControllerTest {
 
     UserDto result = controller.updateMyDescription(jwt, req);
 
-    assertSame(dto, result);
+    assertNotNull(result);
+    assertEquals(CALLER_ID, result.id());
+    assertEquals("me@example.invalid", result.email());
     verify(userService).updateUserDescription(CALLER_ID, "Pilot extraordinaire", "Ace", 2L);
   }
 
@@ -324,13 +332,16 @@ class UserControllerTest {
     UUID announcementId = UUID.randomUUID();
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
     User updated = new User();
+    updated.setEmail("me@example.invalid");
     when(userService.updateReadAnnouncement(CALLER_ID, announcementId)).thenReturn(updated);
     UserDto dto = mockDto(CALLER_ID);
     when(userMapper.toDto(updated)).thenReturn(dto);
 
     UserDto result = controller.updateReadAnnouncement(jwt, announcementId);
 
-    assertSame(dto, result);
+    assertNotNull(result);
+    assertEquals(CALLER_ID, result.id());
+    assertEquals("me@example.invalid", result.email());
     verify(userService).updateReadAnnouncement(CALLER_ID, announcementId);
   }
 

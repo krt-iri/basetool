@@ -34507,15 +34507,18 @@
           },
           "expenses" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "maximum" : 1.0E9
           },
           "otherExpenses" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "maximum" : 1.0E9
           },
           "oreSales" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "maximum" : 1.0E9
           },
           "profit" : {
             "type" : "number",

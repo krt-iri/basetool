@@ -85,7 +85,12 @@ public class SquadronController {
   @PostMapping
   @PreAuthorize("hasRole('ADMIN')")
   public SquadronDto createSquadron(@RequestBody @Valid SquadronDto squadron) {
-    return squadronMapper.toDto(squadronService.createSquadron(squadronMapper.toEntity(squadron)));
+    var toCreate = squadronMapper.toEntity(squadron);
+    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
+    // row.
+    toCreate.setId(null);
+    toCreate.setVersion(null);
+    return squadronMapper.toDto(squadronService.createSquadron(toCreate));
   }
 
   /**

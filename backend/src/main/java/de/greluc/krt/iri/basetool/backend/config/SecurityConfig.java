@@ -3,6 +3,7 @@ package de.greluc.krt.iri.basetool.backend.config;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -13,6 +14,14 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -58,6 +67,56 @@ public class SecurityConfig {
    */
   @Value("${app.cors.allowed-origin-patterns:}")
   private List<String> allowedOriginPatterns;
+
+  /**
+   * Expected JWT {@code aud} (audience) values for the opt-in audience check (audit L-1). Empty by
+   * default → no audience enforcement: the resource server already validates signature, issuer and
+   * expiry, and the effective authority comes from realm roles, so requiring {@code aud} is a
+   * defense-in-depth knob an operator enables once they know the value their realm issues (a wrong
+   * value would reject every token). Set {@code app.security.jwt.expected-audiences} (comma-list)
+   * to the backend client / resource id to turn it on.
+   */
+  @Value("${app.security.jwt.expected-audiences:}")
+  private List<String> expectedAudiences;
+
+  /**
+   * Opt-in audience-validating {@link JwtDecoder}. Created ONLY when {@code
+   * app.security.jwt.expected-audiences} is set (audit L-1); otherwise Spring Boot's
+   * auto-configured decoder is used unchanged, so the default behavior — including the {@code test}
+   * profile's unreachable placeholder issuer, which the auto-config fetches lazily — is untouched.
+   * When active it layers an {@code aud} check on top of the default signature / issuer / timestamp
+   * validators.
+   *
+   * @param issuerUri the configured Keycloak issuer location.
+   * @return a Nimbus decoder whose validator chain additionally requires a matching {@code aud}.
+   */
+  @Bean
+  @ConditionalOnProperty(prefix = "app.security.jwt", name = "expected-audiences")
+  JwtDecoder audienceValidatingJwtDecoder(
+      @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri) {
+    NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+    decoder.setJwtValidator(
+        new DelegatingOAuth2TokenValidator<>(
+            JwtValidators.createDefaultWithIssuer(issuerUri),
+            audienceValidator(expectedAudiences)));
+    return decoder;
+  }
+
+  /**
+   * Builds the {@code aud}-claim validator (audit L-1): a token passes only when its {@code aud}
+   * list intersects {@code expectedAudiences}. Package-private + static so it is unit-testable
+   * without a Spring context.
+   *
+   * @param expectedAudiences the accepted audience values; never {@code null} (an empty set matches
+   *     no token).
+   * @return an {@link OAuth2TokenValidator} that errors unless the JWT's {@code aud} intersects the
+   *     expected set.
+   */
+  static OAuth2TokenValidator<Jwt> audienceValidator(List<String> expectedAudiences) {
+    return new JwtClaimValidator<List<String>>(
+        JwtClaimNames.AUD,
+        aud -> aud != null && !java.util.Collections.disjoint(aud, expectedAudiences));
+  }
 
   /**
    * Declares the role hierarchy that {@code @PreAuthorize("hasRole('LOGISTICIAN')")} and friends

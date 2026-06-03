@@ -3,7 +3,9 @@ package de.greluc.krt.iri.basetool.backend.controller;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryUpdateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.service.MissionFinanceEntryService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
@@ -68,7 +70,7 @@ public class MissionFinanceEntryController {
    * @return paged finance-entry DTOs
    */
   @GetMapping("/missions/{missionId}/finance-entries")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#missionId)")
   public PageResponse<MissionFinanceEntryDto> getFinanceEntries(
       @PathVariable UUID missionId,
       @RequestParam(required = false, defaultValue = "0") int page,
@@ -76,7 +78,15 @@ public class MissionFinanceEntryController {
       @RequestParam(required = false, defaultValue = "createdAt,desc") String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "createdAt");
-    return toPageResponse(financeEntryService.getEntriesByMission(missionId, pageable));
+    Page<MissionFinanceEntryDto> entries =
+        financeEntryService.getEntriesByMission(missionId, pageable);
+    // Audit H-1: canSeeMission (above) blocks cross-squadron reads of internal missions; on top of
+    // that the nested participant PII is stripped for EVERY caller — including Logistician/Officer.
+    // A participant's email may only ever be shown to that user themselves in their own profile, so
+    // it must never travel to a peer through the finance ledger (there is no business need for a
+    // peer's contact data here). redactUserPii keeps only the public name tuple.
+    entries = entries.map(this::redactParticipantPii);
+    return toPageResponse(entries);
   }
 
   /**
@@ -86,7 +96,7 @@ public class MissionFinanceEntryController {
    * @return the signed bottom-line of the mission (entries + refinery profit)
    */
   @GetMapping("/missions/{missionId}/finance-entries/sum")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#missionId)")
   public BigDecimal getFinanceEntriesSum(@PathVariable UUID missionId) {
     return financeEntryService.calculateTotalSum(missionId);
   }
@@ -94,13 +104,15 @@ public class MissionFinanceEntryController {
   /**
    * Creates a finance entry. Open to anonymous callers (guests recording their own payout line),
    * but gated by {@code @ownerScopeService.canSeeMission(dto.missionId)} so internal missions are
-   * not writable without authentication, and the response is redacted via {@link
-   * #cleanupParticipantForGuest} when the caller is anonymous to avoid leaking the linked
-   * participant's email / real name / roles (audit finding C-2).
+   * not writable without authentication. The response never carries a peer's PII: an anonymous
+   * caller gets the slim acknowledgement via {@link #cleanupFinanceEntryForGuest} (participant
+   * dropped entirely, audit C-2 / M-5), an authenticated caller gets the entry with the nested
+   * participant PII stripped via {@link #redactParticipantPii} (email is a profile-only field,
+   * H-1).
    *
    * @param dto create payload
    * @param jwt the caller's JWT, or {@code null} for anonymous callers
-   * @return the persisted entry, with nested participant PII stripped for anonymous callers
+   * @return the persisted entry, with nested participant PII stripped for every caller
    */
   @PostMapping("/finance-entries")
   @ResponseStatus(HttpStatus.CREATED)
@@ -109,23 +121,30 @@ public class MissionFinanceEntryController {
       @RequestBody @Valid MissionFinanceEntryCreateDto dto, @AuthenticationPrincipal Jwt jwt) {
     MissionFinanceEntryDto created = financeEntryService.createEntry(dto);
     if (jwt == null) {
-      created = cleanupFinanceEntryForGuest(created);
+      // Anonymous caller: drop the nested participant entirely (audit C-2 / M-5).
+      return cleanupFinanceEntryForGuest(created);
     }
-    return created;
+    // Authenticated caller: strip the nested participant PII so the create response cannot echo a
+    // peer's email back to the creator (H-1). Defence in depth on top of the email-free UserMapper
+    // projection — the controller boundary enforces it regardless of how the DTO was built.
+    return redactParticipantPii(created);
   }
 
   /**
-   * Updates an entry. Service-layer {@code @PreAuthorize} checks owner-vs-admin.
+   * Updates an entry. Service-layer {@code @PreAuthorize} checks owner-vs-admin; the response has
+   * its nested participant PII stripped via {@link #redactParticipantPii} (email is a profile-only
+   * field; H-1) so an edit cannot echo a peer's email back to the editor.
    *
    * @param entryId entry id
    * @param dto update payload (carries the expected version)
-   * @return the persisted entry
+   * @return the persisted entry, with nested participant PII stripped
    */
   @PutMapping("/finance-entries/{entryId}")
   @PreAuthorize("isAuthenticated()")
   public MissionFinanceEntryDto updateFinanceEntry(
       @PathVariable UUID entryId, @RequestBody @Valid MissionFinanceEntryUpdateDto dto) {
-    return financeEntryService.updateEntry(entryId, dto);
+    // Strip nested participant PII (email is profile-only; H-1) — mirrors the read / create paths.
+    return redactParticipantPii(financeEntryService.updateEntry(entryId, dto));
   }
 
   /**
@@ -171,6 +190,76 @@ public class MissionFinanceEntryController {
   // The ArchUnit rule {@code anonymousReadableMissionEndpointsMustRedactGuestPii} accepts the
   // new {@code cleanupFinanceEntryForGuest} call site via the {@code cleanup…ForGuest} name
   // pattern.
+
+  /**
+   * Redacts the nested participant's PII from a finance-entry DTO for every finance-ledger caller
+   * (audit H-1) — the redaction is unconditional, a Logistician/Officer is treated no differently
+   * from a squadron member here. A {@code null} participant or user passes through unchanged;
+   * otherwise the nested user is stripped via {@link #redactUserPii} while the participant's
+   * non-sensitive fields (org units, job types, comment, times, payout preference) are kept.
+   * Mirrors {@code MissionController#cleanupParticipantForGuest}.
+   *
+   * @param dto the finance-entry DTO straight from the service
+   * @return a copy with the nested participant PII stripped, or {@code dto} when there is no
+   *     participant/user to redact
+   */
+  private MissionFinanceEntryDto redactParticipantPii(MissionFinanceEntryDto dto) {
+    MissionParticipantDto participant = dto.participant();
+    if (participant == null || participant.user() == null) {
+      return dto;
+    }
+    MissionParticipantDto redacted =
+        new MissionParticipantDto(
+            participant.id(),
+            redactUserPii(participant.user()),
+            participant.guestName(),
+            participant.orgUnits(),
+            participant.desiredMissionJobType(),
+            participant.plannedMissionJobType(),
+            participant.comment(),
+            participant.startTime(),
+            participant.endTime(),
+            participant.payoutPreference(),
+            participant.version());
+    return new MissionFinanceEntryDto(
+        dto.id(), dto.missionId(), redacted, dto.note(), dto.type(), dto.amount(), dto.version());
+  }
+
+  /**
+   * Strips PII from a participant's {@link UserDto} for every finance-ledger caller: nulls email,
+   * description, roles, permissions, last-read watermark, squadron and join date and forces the
+   * logistician/mission-manager flags to {@code false}; keeps the id, the public name tuple
+   * (username/displayName/effectiveName), {@code rank}, {@code inKeycloak} and {@code version}.
+   * Email is dropped for everyone because it may only ever be shown to the user themselves in their
+   * own profile, never to a peer. {@code effectiveName} is retained — not a real name but, by
+   * construction in {@link de.greluc.krt.iri.basetool.backend.model.User#getEffectiveName()}, just
+   * the display name with a username fallback — because the ledger UI renders the participant
+   * column from it. The same contract as {@code MissionController#cleanupUserForGuest} so the
+   * redacted shape is consistent across the mission and finance views.
+   *
+   * @param dto the participant's user DTO
+   * @return a redacted copy carrying only the public name tuple and non-sensitive scalars
+   */
+  private UserDto redactUserPii(UserDto dto) {
+    return new UserDto(
+        dto.id(),
+        dto.username(),
+        dto.displayName(),
+        dto.effectiveName(),
+        null, // email
+        dto.rank(),
+        null, // description
+        null, // roles
+        null, // permissions
+        null, // lastReadAnnouncementId
+        false, // isLogistician
+        false, // isMissionManager
+        dto.inKeycloak(),
+        null, // squadron
+        dto.version(),
+        null // joinDate
+        );
+  }
 
   private <T> PageResponse<T> toPageResponse(Page<T> page) {
     return new PageResponse<>(

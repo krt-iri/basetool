@@ -39,11 +39,13 @@ public class MaterialCollectionController {
               + " location, material name, quality (desc), quantity (desc).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Material collection returned successfully"),
-    @ApiResponse(responseCode = "403", description = "Access denied – authentication required"),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Access denied – not allowed to see this job order"),
     @ApiResponse(responseCode = "404", description = "Job order not found")
   })
   @GetMapping("/{jobOrderId}/material-collection")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
   public List<MaterialCollectionEntryDto> getMaterialCollection(
       @PathVariable @NotNull UUID jobOrderId) {
     return inventoryItemService.getMaterialCollection(jobOrderId);

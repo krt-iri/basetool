@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,11 +18,13 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.service.MissionFinanceEntryService;
 import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -40,7 +43,7 @@ import org.springframework.web.context.WebApplicationContext;
  *   <li>anonymous on non-internal mission → 201 with the nested user's email / real name / roles
  *       scrubbed,
  *   <li>anonymous on internal mission → 403, no service call,
- *   <li>authenticated officer → 201 with full PII (existing UI flow unchanged),
+ *   <li>authenticated officer → 201 with the nested participant's email stripped (H-1),
  *   <li>oversized {@code note} or out-of-range {@code amount} → 400 before the service is hit.
  * </ul>
  */
@@ -64,6 +67,10 @@ class MissionFinanceEntryControllerSecurityTest {
     return new SimpleGrantedAuthority("ROLE_OFFICER");
   }
 
+  private static SimpleGrantedAuthority member() {
+    return new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER");
+  }
+
   /**
    * Builds a finance-entry DTO whose nested participant carries a registered user with PII
    * populated — the response shape the controller assembles after a successful service call.
@@ -74,7 +81,9 @@ class MissionFinanceEntryControllerSecurityTest {
             UUID.randomUUID(),
             "bob.callsign",
             "Bob",
-            "Bob Builder",
+            // effectiveName == displayName by construction (User.getEffectiveName), never a
+            // realname
+            "Bob",
             "bob@example.invalid",
             null,
             null,
@@ -161,7 +170,7 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   @Test
-  void createFinanceEntry_authenticatedOfficer_keepsFullPii() throws Exception {
+  void createFinanceEntry_authenticatedOfficer_stripsParticipantEmail() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
     when(financeEntryService.createEntry(any())).thenReturn(persistedEntryWithUserPii(missionId));
@@ -179,12 +188,16 @@ class MissionFinanceEntryControllerSecurityTest {
                             + "\",\"type\":\"INCOME\",\"amount\":500.00}")
                     .with(jwt().authorities(officer())))
             .andExpect(status().isCreated())
+            // the participant callsign still confirms which line was created…
+            .andExpect(jsonPath("$.participant.user.username").value("bob.callsign"))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob@example.invalid"), "authenticated officer must see participant email");
+    // …but H-1 (refined): even an authenticated Officer must not get a peer's email back on create.
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"),
+        "authenticated create response must not echo the participant's email");
   }
 
   @Test
@@ -228,5 +241,93 @@ class MissionFinanceEntryControllerSecurityTest {
         .andExpect(status().isBadRequest());
 
     verify(financeEntryService, never()).createEntry(any());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Audit finding H-1: the mission-finance READ endpoints used to be gated only by
+  // isAuthenticated(), so any authenticated user could read any mission's ledger (and the nested
+  // participant email) by UUID — a cross-squadron IDOR. They now carry
+  // @ownerScopeService.canSeeMission AND redact participant PII for every caller (email is a
+  // profile-only field — never echoed to a peer, not even to a Logistician/Officer).
+  // ---------------------------------------------------------------------------
+
+  @Test
+  void getFinanceEntries_authenticatedNonMember_isForbidden() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    // canSeeMission == false models a foreign squadron's internal mission: the @PreAuthorize gate
+    // denies before the service is ever invoked.
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
+
+    mockMvc
+        .perform(
+            get("/api/v1/missions/{id}/finance-entries", missionId)
+                .with(jwt().authorities(member())))
+        .andExpect(status().isForbidden());
+
+    verify(financeEntryService, never()).getEntriesByMission(any(), any());
+  }
+
+  @Test
+  void getFinanceEntriesSum_authenticatedNonMember_isForbidden() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
+
+    mockMvc
+        .perform(
+            get("/api/v1/missions/{id}/finance-entries/sum", missionId)
+                .with(jwt().authorities(member())))
+        .andExpect(status().isForbidden());
+
+    verify(financeEntryService, never()).calculateTotalSum(any());
+  }
+
+  @Test
+  void getFinanceEntries_inScopeMember_redactsParticipantPii() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(financeEntryService.getEntriesByMission(any(), any()))
+        .thenReturn(new PageImpl<>(List.of(persistedEntryWithUserPii(missionId))));
+
+    String body =
+        mockMvc
+            .perform(
+                get("/api/v1/missions/{id}/finance-entries", missionId)
+                    .with(jwt().authorities(member())))
+            .andExpect(status().isOk())
+            // public callsign stays visible
+            .andExpect(jsonPath("$.content[0].participant.user.username").value("bob.callsign"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"),
+        "an in-scope member must not receive participant email through the finance ledger");
+  }
+
+  @Test
+  void getFinanceEntries_officer_alsoRedactsParticipantEmail() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(financeEntryService.getEntriesByMission(any(), any()))
+        .thenReturn(new PageImpl<>(List.of(persistedEntryWithUserPii(missionId))));
+
+    String body =
+        mockMvc
+            .perform(
+                get("/api/v1/missions/{id}/finance-entries", missionId)
+                    .with(jwt().authorities(officer())))
+            .andExpect(status().isOk())
+            // the public callsign still comes through — only the PII is stripped
+            .andExpect(jsonPath("$.content[0].participant.user.username").value("bob.callsign"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // H-1 (refined): redaction is unconditional — even an Officer must not receive a peer's email
+    // through the ledger; email is shown only to the user themselves in their own profile.
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"),
+        "an Officer must not receive participant email through the finance ledger either");
   }
 }

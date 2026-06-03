@@ -89,7 +89,12 @@
                 <maxHistory>30</maxHistory>
                 <totalSizeCap>2GB</totalSizeCap>
             </rollingPolicy>
-            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!--
+              Audit M-5: use the PII-masking encoder (extends LogstashEncoder) instead of the stock
+              one, so the JSON sink scrubs e-mails / JWTs / bearer tokens like the console/file
+              sinks already do via PiiMaskingPatternLayout. Was the only unmasked log output.
+            -->
+            <encoder class="de.greluc.krt.iri.basetool.frontend.logging.PiiMaskingLogstashEncoder">
                 <includeMdcKeyName>correlationId</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
                 <customFields>{"app":"basetool-frontend"}</customFields>

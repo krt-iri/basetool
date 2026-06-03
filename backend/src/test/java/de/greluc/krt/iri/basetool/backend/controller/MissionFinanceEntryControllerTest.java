@@ -11,10 +11,13 @@ import de.greluc.krt.iri.basetool.backend.model.FinanceType;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryUpdateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.backend.service.MissionFinanceEntryService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +50,45 @@ class MissionFinanceEntryControllerTest {
     return new MissionFinanceEntryDto(UUID.randomUUID(), missionId, null, "note", type, amount, 1L);
   }
 
+  /**
+   * Builds a finance-entry DTO whose nested participant carries a registered user with full PII
+   * populated — the shape the service returns before the controller applies the audit-H-1
+   * redaction.
+   */
+  private static MissionFinanceEntryDto entryWithParticipantPii(UUID missionId) {
+    UserDto user =
+        new UserDto(
+            UUID.randomUUID(),
+            "bob.callsign",
+            "Bob",
+            // effectiveName is displayName-or-username by construction, so it mirrors displayName
+            // here ("Bob") — never an independent real-name field.
+            "Bob",
+            "bob@example.invalid",
+            5,
+            "desc",
+            Set.of("ROLE_SQUADRON_MEMBER"),
+            Set.of("HANGAR_READ"),
+            null,
+            true,
+            true,
+            true,
+            null,
+            1L,
+            null);
+    MissionParticipantDto participant =
+        new MissionParticipantDto(
+            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L);
+    return new MissionFinanceEntryDto(
+        UUID.randomUUID(),
+        missionId,
+        participant,
+        "note",
+        FinanceType.INCOME,
+        new BigDecimal("500.00"),
+        1L);
+  }
+
   @Test
   void getFinanceEntries_wrapsServicePageIntoPageResponse() {
     UUID missionId = UUID.randomUUID();
@@ -56,6 +98,8 @@ class MissionFinanceEntryControllerTest {
         new PageImpl<>(
             List.of(a, b), PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "createdAt")), 2);
     when(service.getEntriesByMission(eq(missionId), any(Pageable.class))).thenReturn(page);
+    // These entries carry no participant, so the unconditional audit-H-1 redaction is a no-op and
+    // the page passes through verbatim.
 
     // Audit finding M-1 (2026-05-20): the controller now builds the {@link Pageable} from
     // explicit page / size / sort params with a whitelist (mirrors UserController / JobOrder).
@@ -69,6 +113,31 @@ class MissionFinanceEntryControllerTest {
     // PaginationUtil contract used by every other listing endpoint or the next-page link breaks.
     assertThat(result.sort()).containsExactly("createdAt,ASC");
     verify(service).getEntriesByMission(eq(missionId), any(Pageable.class));
+  }
+
+  @Test
+  void getFinanceEntries_redactsParticipantPiiForEveryCaller() {
+    UUID missionId = UUID.randomUUID();
+    MissionFinanceEntryDto withPii = entryWithParticipantPii(missionId);
+    Page<MissionFinanceEntryDto> page =
+        new PageImpl<>(
+            List.of(withPii), PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")), 1);
+    when(service.getEntriesByMission(eq(missionId), any(Pageable.class))).thenReturn(page);
+
+    PageResponse<MissionFinanceEntryDto> result =
+        controller.getFinanceEntries(missionId, 0, 20, "createdAt,desc");
+
+    UserDto user = result.content().get(0).participant().user();
+    // Audit H-1: the ledger must never carry a peer's email regardless of the caller's role — email
+    // is a profile-only field. Roles / permissions / contextual flags are stripped alongside it.
+    assertThat(user.email()).isNull();
+    assertThat(user.roles()).isNull();
+    assertThat(user.permissions()).isNull();
+    assertThat(user.isLogistician()).isFalse();
+    // Only the public name tuple survives (consistent with MissionController guest redaction).
+    assertThat(user.username()).isEqualTo("bob.callsign");
+    assertThat(user.displayName()).isEqualTo("Bob");
+    assertThat(user.effectiveName()).isEqualTo("Bob");
   }
 
   @Test

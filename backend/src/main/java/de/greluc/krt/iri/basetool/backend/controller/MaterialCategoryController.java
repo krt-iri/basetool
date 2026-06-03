@@ -61,6 +61,10 @@ public class MaterialCategoryController {
   @PreAuthorize("hasRole('ADMIN')")
   public MaterialCategoryDto create(@RequestBody MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
+    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
+    // row.
+    category.setId(null);
+    category.setVersion(null);
     MaterialCategory saved = service.create(category);
     return mapper.toDto(saved);
   }
