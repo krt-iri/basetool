@@ -368,8 +368,60 @@ input[type="radio"]:checked::after {
 .notification-toast.error-toast h4 { color: var(--color-danger); }
 
 /* --------------------------------------------------------------- SCROLLBAR */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background-color: var(--color-bg-dark-gray); border-left: 1px solid var(--color-gray-3); }
-::-webkit-scrollbar-thumb { background-color: var(--color-gray-2); }
-::-webkit-scrollbar-thumb:hover { background-color: var(--color-primary); }
+/* HUD scrollbars — square, hairline-tracked, orange on hover. Works for BOTH
+   axes: the track gets a leading hairline (left for vertical, top for
+   horizontal) and the thumb is a flat block with a 2px transparent inset so it
+   reads as a "bar inside a channel". The corner where the two bars meet is
+   filled with the surface color (otherwise it renders as a bright OS default).
+
+   Tokens used: --color-bg-dark-gray (track), --color-gray-2 (thumb idle),
+   --color-gray-3 (hairline), --color-primary (active/hover). */
+
+/* --- WebKit / Chromium / Edge / Safari --------------------------------- */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track {
+    background-color: var(--color-bg-dark-gray);
+}
+::-webkit-scrollbar-track:vertical   { border-left: 1px solid var(--color-gray-3); }
+::-webkit-scrollbar-track:horizontal { border-top:  1px solid var(--color-gray-3); }
+::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-2);
+    border: 2px solid var(--color-bg-dark-gray); /* inset → thumb sits in a channel */
+    background-clip: padding-box;
+    min-height: 32px;
+    min-width: 32px;
+}
+::-webkit-scrollbar-thumb:hover  { background-color: var(--color-accent-light); }
+::-webkit-scrollbar-thumb:active { background-color: var(--color-primary); }
+/* the box where vertical + horizontal bars cross */
+::-webkit-scrollbar-corner { background-color: var(--color-bg-dark-gray); }
+/* suppress the default up/down + left/right buttons for a cleaner HUD look */
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* --- Firefox ------------------------------------------------------------ */
 * { scrollbar-width: thin; scrollbar-color: var(--color-gray-2) var(--color-bg-dark-gray); }
+
+/* ----------------------------------------------------------- SCROLL AREAS */
+/* Utility wrappers for explicitly scrollable regions. Pair an axis class with
+   .hud-scroll to get a bordered scroll viewport. */
+.scroll-y { overflow-y: auto; overflow-x: hidden; }
+.scroll-x { overflow-x: auto; overflow-y: hidden; }
+.scroll-both { overflow: auto; }
+
+/* Bordered scroll viewport (use on tables/code/log panes that scroll). */
+.hud-scroll {
+    border: var(--border-hairline);
+    background-color: var(--color-bg-dark-gray);
+    position: relative;
+}
+
+/* Thin variant — 8px bars for compact panes (sidebars, dropdowns, code). */
+.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { border-width: 2px; }
+.scroll-thin { scrollbar-width: thin; }
+
+/* Orange-accented variant — thumb is brand orange at rest (for emphasis panes
+   like an active log/console). Hover lightens it. */
+.scroll-accent::-webkit-scrollbar-thumb { background-color: var(--color-primary); }
+.scroll-accent::-webkit-scrollbar-thumb:hover { background-color: var(--color-accent-light); }
+.scroll-accent { scrollbar-color: var(--color-primary) var(--color-bg-dark-gray); }

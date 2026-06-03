@@ -230,6 +230,13 @@ Everything that makes a screen read as "Profit Basetool".
   `#1C1C1C` with a **2px orange under-rule** (the orange is kept as the rule, not the
   text — consistent with the action-hierarchy work), ultra-subtle zebra
   (`rgba(255,255,255,0.02)`), full-row hover to `#282828`.
+- **Scrollbars.** Square, 12px (`.scroll-thin` = 8px), on a `#141414` track with a
+  leading hairline (`#282828`). Thumb is a flat `#646464` block in a 2px channel,
+  lightening to `#EEB64B` on hover and `#E77E23` while dragging; the up/down
+  buttons and the corner box are suppressed/filled so nothing renders as a bright
+  OS default. Both axes. Wrap a scroll region in `.hud-scroll` + an axis class
+  (`.scroll-y` / `.scroll-x` / `.scroll-both`); `.scroll-accent` makes the thumb
+  orange at rest for emphasis panes (logs/consoles). Firefox via `scrollbar-color`.
 - **Layout rules.** Sticky top **header** (`#141414`, 2px orange bottom border,
   becomes `accent-dark` in admin mode). Off-canvas **sidebar drawer** (380px) is
   the primary nav. **Fixed footer** pinned bottom with legal links + version.
@@ -307,8 +314,8 @@ Root manifest:
 | `krt-components.css` | Component CSS layer built on the tokens. |
 | `fonts/` | Audiowide (display) + Lato (Thin→Black, each + italic) — self-hosted WOFF2 with TTF fallback. |
 | `assets/` | `krt.webp` (mark), `krt-favicon.webp`, `Kartelllogo.jpg` (lockup), `honeycomb.svg` + `honeycomb-bg.svg` (Wabenmuster). |
-| `preview/` | 22 Design System specimen cards (type, color, spacing, components, brand — incl. the rank ladder, honeycomb pattern and background/texture treatments). |
-| `proposals/` | Design proposals + handoff: action-hierarchy before/after mocks (`mission-detail-…`, `list-page-…`, `inventory-…`, `refinery-order-…`), the full `template-audit.md`, and `claude-code-auftrag.md` (project-wide unification order for the real repo). |
+| `preview/` | 23 Design System specimen cards (type, color, spacing, components, brand — incl. the rank ladder, honeycomb pattern, scrollbars and background/texture treatments). |
+| `proposals/` | Design proposals + handoff: action-hierarchy before/after mocks (`mission-detail-…`, `list-page-…`, `inventory-…`, `refinery-order-…`), `scrollbar-mockups.html`, the bp-extractor audit, the full `template-audit.md`, and `claude-code-auftrag.md` (project-wide unification order for the real repo). |de-code-auftrag.md` (project-wide unification order for the real repo). |
 | `slides/` | HUD slide template (deck-stage) — title, section, content, stats, comparison, quote, closing. |
 | `ui_kits/basetool/` | Interactive recreation of the Profit Basetool app — see its own README. |
 
