@@ -33,6 +33,8 @@ import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -115,21 +117,26 @@ public class MissionService {
   }
 
   /**
-   * Returns lightweight reference projection of active missions (id + display name + status +
-   * planned start) used by typeaheads. Squadron-scoped via {@link
-   * OwnerScopeService#currentSquadronId()}: a non-admin caller sees their own squadron's missions
-   * PLUS any non-internal mission of any squadron, mirroring {@link #searchMissions(String,
-   * Instant, Instant, List, Boolean, UUID, Pageable)}; admins in "all squadrons" mode get the
-   * unfiltered cross-staffel list. Audit finding H-4: the previous implementation leaked the names
-   * of foreign squadrons' internal missions through this dropdown.
+   * Returns the lightweight reference projection (id + display name + status + planned start) that
+   * drives the mission-picker dropdowns in the warehouse (Lager) views — the per-item association
+   * select and the list filter. Includes every {@code PLANNED} / {@code ACTIVE} mission visible to
+   * the caller plus the {@code COMPLETED} / {@code CANCELLED} missions whose planned start falls
+   * within the last three months, so a just-closed operation stays filterable while ancient ones
+   * drop off the list. Squadron-scoped via {@link OwnerScopeService#currentScopePredicate()}: a
+   * non-admin caller sees their own OrgUnits' missions PLUS any non-internal mission of any
+   * OrgUnit, mirroring {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID,
+   * Pageable)}; admins in "all squadrons" mode get the unfiltered cross-staffel list. Audit finding
+   * H-4: the previous implementation leaked the names of foreign squadrons' internal missions
+   * through this dropdown.
    *
-   * @return lightweight reference projection of active missions visible to the caller
+   * @return lightweight reference projection of the picker-visible missions for the caller
    */
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto>
       findAllActiveReference() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    Instant terminalCutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
     return missionRepository.findAllActiveReference(
-        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), terminalCutoff);
   }
 
   /**

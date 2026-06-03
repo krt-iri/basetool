@@ -158,14 +158,20 @@ public class MissionController {
   }
 
   /**
-   * Lightweight projection (id + label) of active missions for typeaheads.
+   * Lightweight projection (id + label) of the missions offered by the warehouse mission picker:
+   * every active mission plus the {@code COMPLETED} / {@code CANCELLED} ones from the last three
+   * months. See {@link
+   * de.greluc.krt.iri.basetool.backend.service.MissionService#findAllActiveReference()}.
    *
-   * @return active missions as reference DTOs
+   * @return picker-visible missions as reference DTOs
    */
   @GetMapping("/lookup")
   @Operation(
-      summary = "Lookup active missions",
-      description = "Returns a reference list of active missions.")
+      summary = "Lookup missions for the warehouse picker",
+      description =
+          "Returns a reference list of missions for the inventory mission picker: all PLANNED /"
+              + " ACTIVE missions plus COMPLETED / CANCELLED missions whose planned start is within"
+              + " the last three months.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> lookupMissions() {

@@ -29476,8 +29476,8 @@
     "/api/v1/missions/lookup" : {
       "get" : {
         "tags" : [ "Missions" ],
-        "summary" : "Lookup active missions",
-        "description" : "Returns a reference list of active missions.",
+        "summary" : "Lookup missions for the warehouse picker",
+        "description" : "Returns a reference list of missions for the inventory mission picker: all PLANNED / ACTIVE missions plus COMPLETED / CANCELLED missions whose planned start is within the last three months.",
         "operationId" : "lookupMissions",
         "responses" : {
           "200" : {

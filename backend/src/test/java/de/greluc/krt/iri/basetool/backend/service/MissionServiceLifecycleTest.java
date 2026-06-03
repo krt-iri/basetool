@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -442,11 +445,23 @@ class MissionServiceLifecycleTest {
   void findAllActiveReference_delegatesToRepository() {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-    when(missionRepository.findAllActiveReference(true, null, java.util.Set.of()))
+    when(missionRepository.findAllActiveReference(
+            eq(true), isNull(), eq(java.util.Set.of()), any(java.time.Instant.class)))
         .thenReturn(java.util.List.of());
 
     assertNotNull(service.findAllActiveReference());
-    verify(missionRepository).findAllActiveReference(true, null, java.util.Set.of());
+
+    ArgumentCaptor<java.time.Instant> cutoffCaptor =
+        ArgumentCaptor.forClass(java.time.Instant.class);
+    verify(missionRepository)
+        .findAllActiveReference(eq(true), isNull(), eq(java.util.Set.of()), cutoffCaptor.capture());
+    // The COMPLETED / CANCELLED visibility window is the last three months; allow a small skew for
+    // the clock tick between the service computing the cut-off and this assertion.
+    java.time.Instant expected =
+        java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMonths(3).toInstant();
+    long skewMinutes =
+        Math.abs(java.time.Duration.between(cutoffCaptor.getValue(), expected).toMinutes());
+    assertTrue(skewMinutes <= 5, "lookup cut-off must be roughly three months in the past");
   }
 
   @Test
@@ -454,12 +469,15 @@ class MissionServiceLifecycleTest {
     java.util.UUID squadronId = java.util.UUID.randomUUID();
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, squadronId, java.util.Set.of()));
-    when(missionRepository.findAllActiveReference(false, squadronId, java.util.Set.of()))
+    when(missionRepository.findAllActiveReference(
+            eq(false), eq(squadronId), eq(java.util.Set.of()), any(java.time.Instant.class)))
         .thenReturn(java.util.List.of());
 
     service.findAllActiveReference();
 
-    verify(missionRepository).findAllActiveReference(false, squadronId, java.util.Set.of());
+    verify(missionRepository)
+        .findAllActiveReference(
+            eq(false), eq(squadronId), eq(java.util.Set.of()), any(java.time.Instant.class));
   }
 
   // ---------------------------------------------------------------
