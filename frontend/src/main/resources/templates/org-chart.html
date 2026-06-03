@@ -51,8 +51,9 @@
         <div class="oc-tree oc-leadership">
             <ul class="oc-branch">
                 <li>
-                    <th:block th:if="${area.lead() != null}"
-                              th:replace="~{fragments/org-chart-node :: ocNode(${area.lead()})}"></th:block>
+                    <th:block th:if="${area.lead() != null}">
+                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${area.lead()})}"></th:block>
+                    </th:block>
                     <div th:if="${area.lead() == null}" class="oc-node oc-node--vacant">
                         <span class="oc-node-rank" th:text="#{orgChart.rank.AREA_LEAD}">Bereichsleiter</span>
                         <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
@@ -119,8 +120,9 @@
                     </div>
                     <ul class="oc-branch">
                         <li>
-                            <th:block th:if="${sq.lead() != null}"
-                                      th:replace="~{fragments/org-chart-node :: ocNode(${sq.lead()})}"></th:block>
+                            <th:block th:if="${sq.lead() != null}">
+                                <th:block th:replace="~{fragments/org-chart-node :: ocNode(${sq.lead()})}"></th:block>
+                            </th:block>
                             <div th:if="${sq.lead() == null}" class="oc-node oc-node--vacant">
                                 <span class="oc-node-rank" th:text="#{orgChart.rank.SQUADRON_LEAD}">Staffelleiter</span>
                                 <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
