@@ -25,7 +25,8 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * sidebar switcher / context badge / squadron-aware columns can be rendered from the layout
  * fragments without each page controller having to load the data separately.
  *
- * <p>Populates four model attributes:
+ * <p>Populates the cross-cutting model attributes the layout fragments read. The core org-unit
+ * context ones:
  *
  * <ul>
  *   <li>{@code activeSquadronId} — UUID of the squadron the backend currently scopes queries to, or
@@ -40,6 +41,12 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  *       cross-staffel union (no active selection). Members and guests never enter this mode and
  *       always see {@code false}.
  * </ul>
+ *
+ * <p>Beyond those it also exposes the merged OrgUnit switcher catalogue ({@code availableOrgUnits},
+ * {@code activeOrgUnit}, {@code isActiveOrgUnitSpecialCommand}), the per-principal capability flags
+ * resolved once via {@code meCapabilities} ({@code canSeeBlueprintOverview} / {@code
+ * canViewJobOrders}), the dynamic {@code appTitle}, {@code promotionFeatureEnabled}, and {@code
+ * currentRequestUri} — each documented on its own {@code @ModelAttribute} method below.
  *
  * <p>Failures from the backend round-trip degrade gracefully: a non-resolvable active-squadron call
  * leaves the badge empty; a non-resolvable squadron list leaves the dropdown empty. We never let an
@@ -406,34 +413,67 @@ public class SquadronContextAdvice {
   }
 
   /**
-   * Whether the org-unit blueprint availability overview (#364) menu entry should be shown. The
-   * overview is restricted to admins, officers (their Staffel) and Spezialkommando leads (their SK)
-   * — but the frontend session flattens SK-lead into {@code ROLE_LOGISTICIAN}, so the lead bit is
-   * invisible here. We therefore reuse the backend's authoritative gate via {@code GET
-   * /api/v1/me/capabilities}, short-circuiting admins (always allowed) to spare the round-trip.
+   * Loads the per-principal UI capability flags once per request from {@code GET
+   * /api/v1/me/capabilities} so the derived {@code canSeeBlueprintOverview} and {@code
+   * canViewJobOrders} attributes share a single backend round-trip instead of one each. Admins
+   * receive every flag without a call (system-wide access); anonymous callers receive every flag
+   * off without a call.
    *
-   * <p>Fails <em>closed</em>: any backend hiccup hides the menu rather than exposing an oversight
-   * tool the caller may not be entitled to. The backend overview endpoints enforce the same gate,
-   * so a hidden menu and a forbidden API stay in lockstep.
+   * <p>Fails <em>closed</em>: any backend hiccup yields all-off rather than exposing a gated menu
+   * or page the caller may not be entitled to. The backend enforces the same gates (a forbidden API
+   * / empty list), so a hidden control and the API stay in lockstep.
    *
-   * @return {@code true} iff the caller may open the blueprint availability overview.
+   * @return the caller's capability flags; never {@code null}.
    */
-  @ModelAttribute("canSeeBlueprintOverview")
-  public boolean canSeeBlueprintOverview() {
+  @ModelAttribute("meCapabilities")
+  public CapabilitiesResponse meCapabilities() {
     if (!authHelper.isAuthenticated()) {
-      return false;
+      return new CapabilitiesResponse(false, false);
     }
     if (authHelper.isAdmin()) {
-      return true;
+      return new CapabilitiesResponse(true, true);
     }
     try {
       CapabilitiesResponse resp =
           backendApiClient.get("/api/v1/me/capabilities", CapabilitiesResponse.class);
-      return resp != null && resp.canSeeBlueprintOverview();
+      return resp != null ? resp : new CapabilitiesResponse(false, false);
     } catch (Exception ex) {
-      log.debug("Failed to resolve blueprint-overview capability", ex);
-      return false;
+      log.debug("Failed to resolve me-capabilities", ex);
+      return new CapabilitiesResponse(false, false);
     }
+  }
+
+  /**
+   * Whether the org-unit blueprint availability overview (#364) menu entry should be shown. The
+   * overview is restricted to admins, officers (their Staffel) and Spezialkommando leads (their SK)
+   * — but the frontend session flattens SK-lead into {@code ROLE_LOGISTICIAN}, so the lead bit is
+   * invisible here. We therefore reuse the backend's authoritative gate, resolved once per request
+   * by {@link #meCapabilities()}.
+   *
+   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
+   * @return {@code true} iff the caller may open the blueprint availability overview.
+   */
+  @ModelAttribute("canSeeBlueprintOverview")
+  public boolean canSeeBlueprintOverview(
+      @ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canSeeBlueprintOverview();
+  }
+
+  /**
+   * Whether the authenticated caller may enter the Job-Order area (the order list + order details).
+   * Drives the sidebar's "Aufträge" vs "Auftrag anlegen" link split and the {@code
+   * JobOrderPageController} redirect for non-viewers: only admins and members of a profit-eligible
+   * Staffel/SK may see orders, while a non-profit member keeps the create entry only — mirroring
+   * the anonymous "submit but don't track" flow. The backend gate ({@code
+   * OwnerScopeService.canViewJobOrders}) is authoritative; this attribute only steers the UI and
+   * fails closed via {@link #meCapabilities()}.
+   *
+   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
+   * @return {@code true} iff the caller may view job orders.
+   */
+  @ModelAttribute("canViewJobOrders")
+  public boolean canViewJobOrders(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canViewJobOrders();
   }
 
   /**
@@ -442,8 +482,9 @@ public class SquadronContextAdvice {
    *
    * @param canSeeBlueprintOverview {@code true} iff the caller may open the blueprint availability
    *     overview.
+   * @param canViewJobOrders {@code true} iff the caller may enter the Job-Order area.
    */
-  public record CapabilitiesResponse(boolean canSeeBlueprintOverview) {}
+  public record CapabilitiesResponse(boolean canSeeBlueprintOverview, boolean canViewJobOrders) {}
 
   /**
    * The request URI the sidebar switcher form posts back as {@code _referer} so the redirect after

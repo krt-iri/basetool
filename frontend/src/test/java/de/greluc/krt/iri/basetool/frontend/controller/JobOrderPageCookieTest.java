@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.iri.basetool.frontend.config.SquadronContextAdvice;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import jakarta.servlet.http.Cookie;
@@ -41,6 +42,12 @@ class JobOrderPageCookieTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    // The default @WithMockUser is a non-admin, so the orders view's profit gate would otherwise
+    // redirect to /orders/create. Stub the capability as a profit-eligible viewer so these cookie
+    // tests exercise the list path.
+    when(backendApiClient.get(
+            "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
   }
 
   @Test

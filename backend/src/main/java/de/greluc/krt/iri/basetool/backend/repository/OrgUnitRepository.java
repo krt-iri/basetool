@@ -1,8 +1,11 @@
 package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
+import java.util.Collection;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -18,4 +21,20 @@ import org.springframework.stereotype.Repository;
  * on kind and dispatching to the two kind-specific repositories.
  */
 @Repository
-public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {}
+public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
+
+  /**
+   * Counts how many of the given org-unit ids are flagged {@code is_profit_eligible} — works across
+   * both kinds (Squadron + SpecialCommand) via single-table inheritance. Drives {@code
+   * OwnerScopeService.canViewJobOrders()}: a caller may enter the Job-Order area iff at least one
+   * of their membership org units is profit-eligible, so the service only needs the {@code > 0}
+   * answer. Callers must pass a non-empty collection — an empty {@code IN ()} renders
+   * inconsistently across dialects, so {@code OwnerScopeService} short-circuits the empty case
+   * before calling this.
+   *
+   * @param ids the org-unit ids to inspect (the caller's membership ids); must be non-empty.
+   * @return the number of those ids whose org unit is profit-eligible; {@code 0} when none.
+   */
+  @Query("SELECT COUNT(o) FROM OrgUnit o WHERE o.id IN :ids AND o.isProfitEligible = true")
+  long countProfitEligibleByIdIn(@Param("ids") Collection<UUID> ids);
+}

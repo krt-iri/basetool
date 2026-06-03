@@ -218,6 +218,11 @@ public class JobOrderService {
    * never page past their visibility — admins without a pin see everything, an admin pinned to a
    * squadron (or any non-admin member) sees that scope's private orders plus all SK orders.
    *
+   * <p>Layered on top is the viewer-side profit gate ({@link
+   * OwnerScopeService#canViewJobOrders()}): a caller who belongs to no profit-eligible org unit
+   * (and is not an admin) is not part of the order workflow and receives an empty page — the
+   * SK-public union is suppressed for them too.
+   *
    * <p>The {@code squadronId} parameter is a pure UI display preference layered on top of the scope
    * (the orders-index "involving my squadron" toggle, matching responsible OR requesting side); it
    * can only narrow the already-scoped result, never widen it.
@@ -230,6 +235,13 @@ public class JobOrderService {
    */
   public Page<JobOrderDto> getAllJobOrders(
       List<JobOrderStatus> statuses, UUID squadronId, Pageable pageable) {
+    // Viewer-side profit gate: only members of a profit-eligible org unit (or admins) may see the
+    // order queue at all. A non-profit caller gets an empty page instead of the SK-public union, so
+    // the list stays invisible to them — the create flow stays open elsewhere. Mirrors the detail
+    // gate folded into OwnerScopeService.canSeeJobOrder.
+    if (!ownerScopeService.canViewJobOrders()) {
+      return Page.empty(pageable);
+    }
     // Pass the full enum set when no status filter is requested so the repository's IN clause is
     // never bound with an empty collection (mirrors searchMissions); the boolean-flag alternative
     // would still have to bind an empty list, which JPQL renders inconsistently across dialects.

@@ -8,6 +8,7 @@ import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import de.greluc.krt.iri.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SquadronRepository;
 import java.util.List;
@@ -44,6 +45,7 @@ class JobOrderScopeQueryIntegrationTest {
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
+  @Autowired private OrgUnitRepository orgUnitRepository;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private DataSource dataSource;
 
@@ -126,6 +128,35 @@ class JobOrderScopeQueryIntegrationTest {
                 + " column_name = 'responsible_org_unit_id'",
             String.class);
     assertThat(nullable).isEqualTo("NO");
+  }
+
+  @Test
+  void countProfitEligibleByIdIn_countsProfitEligibleAcrossBothKinds() {
+    // Backs OwnerScopeService.canViewJobOrders(): a profit-eligible Squadron and a profit-eligible
+    // SK both count, a default (non-profit) Squadron does not. Validates the JPQL attribute name
+    // and
+    // the single-table cross-kind reach end-to-end against the real schema.
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    Squadron profit = new Squadron();
+    profit.setName("Profit-" + tag);
+    profit.setShorthand("P" + tag.substring(0, 3));
+    profit.setProfitEligible(true);
+    Squadron nonProfit = new Squadron();
+    nonProfit.setName("NonProfit-" + tag);
+    nonProfit.setShorthand("N" + tag.substring(0, 3));
+    SpecialCommand profitSk = new SpecialCommand();
+    profitSk.setName("ProfitSK-" + tag);
+    profitSk.setShorthand("X" + tag.substring(0, 3));
+    profitSk.setProfitEligible(true);
+    UUID profitId = squadronRepository.save(profit).getId();
+    UUID nonProfitId = squadronRepository.save(nonProfit).getId();
+    UUID profitSkId = specialCommandRepository.save(profitSk).getId();
+
+    assertThat(
+            orgUnitRepository.countProfitEligibleByIdIn(Set.of(profitId, nonProfitId, profitSkId)))
+        .isEqualTo(2L);
+    assertThat(orgUnitRepository.countProfitEligibleByIdIn(Set.of(nonProfitId))).isZero();
+    assertThat(orgUnitRepository.countProfitEligibleByIdIn(Set.of(profitSkId))).isEqualTo(1L);
   }
 
   private Set<UUID> visibleIds(ScopePredicate scope) {

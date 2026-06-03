@@ -29210,7 +29210,7 @@
     "/api/v1/me/capabilities" : {
       "get" : {
         "tags" : [ "me-controller" ],
-        "summary" : "Per-principal UI capability flags (e.g. blueprint-overview access).",
+        "summary" : "Per-principal UI capability flags (blueprint-overview + job-order access).",
         "operationId" : "getCapabilities",
         "responses" : {
           "200" : {
@@ -39045,6 +39045,9 @@
         "type" : "object",
         "properties" : {
           "canSeeBlueprintOverview" : {
+            "type" : "boolean"
+          },
+          "canViewJobOrders" : {
             "type" : "boolean"
           }
         }
