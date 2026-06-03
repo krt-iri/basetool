@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Der Footer zeigt jetzt das „Made By The Community"-Logo und den erforderlichen Markenhinweis von Cloud Imperium Rights LLC.** Damit erfüllt die App die Vorgaben des offiziellen Star-Citizen-Fankits für Fan-Projekte; der Hinweis ist über den fest eingeblendeten Footer auf jeder Seite sichtbar.
+
 ### Changed
 
 - **Auftrags-Workflow jetzt profit-gegated: nur Mitglieder einer profit-berechtigten Staffel/SK (und Admins) dürfen Aufträge sehen, bearbeiten (Status/Priorität/Materialien/Handover/Reassign) und Material-Claims setzen; reine Nicht-Profit-Mitglieder können Aufträge nur noch anlegen, sonst nichts.** Im Menü ersetzt „Auftrag anlegen" den „Aufträge"-Link, und ein Direktaufruf von `/orders` bzw. `/orders/{id}` leitet für sie auf das Anlege-Formular um. Das Backend setzt dasselbe Gate auf Lese-, Schreib- und Claim-Endpunkten durch (leere Liste bzw. `403`) — auch die sonst staffelübergreifend öffentliche SK-Warteschlange bleibt für Nicht-Profit-Mitglieder verborgen.
