@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<!--
+  Reusable person-node for the org chart. Kept in its own fragment file (rather than inline in
+  org-chart.html) so the reused markup is not also rendered in place. Resolves the rank label from
+  the position type via the orgChart.rank.<TYPE> message key, and — for admins only — emits the
+  inline reassign / remove controls that the page JS wires up via data-trigger.
+-->
+<div th:fragment="ocNode(node)" class="oc-node"
+     th:with="rk=${'orgChart.rank.' + node.positionType()}">
+    <span class="oc-node-rank" th:text="#{${rk}}">Rank</span>
+    <span class="oc-node-name" th:text="${node.userName()}">Name</span>
+    <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+        <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
+                th:data-position-id="${node.positionId()}"
+                th:data-version="${node.version()}"
+                th:data-user-id="${node.userId()}"
+                th:data-rank-label="#{${rk}}"
+                th:title="#{orgChart.reassign}" th:aria-label="#{orgChart.reassign}">
+            <svg class="krt-icon" aria-hidden="true">
+                <use href="#krt-icon-edit"></use>
+            </svg>
+        </button>
+        <button type="button" class="oc-icon-btn oc-icon-btn--danger" data-trigger="oc-remove"
+                th:data-position-id="${node.positionId()}"
+                th:data-position-type="${node.positionType()}"
+                th:title="#{orgChart.remove}" th:aria-label="#{orgChart.remove}">
+            <svg class="krt-icon" aria-hidden="true">
+                <use href="#krt-icon-trash"></use>
+            </svg>
+        </button>
+    </div>
+</div>
+</body>
+</html>

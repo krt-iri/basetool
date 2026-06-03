@@ -4049,6 +4049,185 @@
         } ]
       }
     },
+    "/api/v1/org-chart/positions/{id}" : {
+      "put" : {
+        "tags" : [ "org-chart-controller" ],
+        "summary" : "Reassign or reorder an org-chart position",
+        "description" : "Changes the holder and/or the display order of an existing position. The functional rank and scope cannot change (move = remove + re-add). ADMIN-only.",
+        "operationId" : "updatePosition",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OrgChartPositionUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Position updated.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgChartPositionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "org-chart-controller" ],
+        "summary" : "Remove an org-chart position",
+        "description" : "Deletes the position. Removing a Kommandoleiter also removes its Stv. Kommandoleiter and the Ensigns reporting into that command. ADMIN-only.",
+        "operationId" : "deletePosition",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Position removed."
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{id}" : {
       "get" : {
         "tags" : [ "Orders" ],
@@ -13595,6 +13774,96 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ]
+      }
+    },
+    "/api/v1/org-chart/positions" : {
+      "post" : {
+        "tags" : [ "org-chart-controller" ],
+        "summary" : "Assign a user to an org-chart position",
+        "description" : "Creates a position binding a user to a functional rank within a scope (area leadership, Staffel or SK). Enforces the per-Staffel limits (≤4 Kommandoleiter, ≤4 Ensign), the ≤2 SK-Leiter limit, the scope/parent consistency rules and one-user-per-scope. ADMIN-only.",
+        "operationId" : "createPosition",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OrgChartPositionCreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Position created.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgChartPositionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/orders" : {
@@ -27001,6 +27270,103 @@
         }
       }
     },
+    "/api/v1/org-chart" : {
+      "get" : {
+        "tags" : [ "org-chart-controller" ],
+        "summary" : "Get the Profit-Bereich org chart",
+        "description" : "Returns the full org chart: the Bereichsleitung on top and a column for every active, profit-eligible Staffel and Spezialkommando below. Read-only and open to every authenticated user; editing is ADMIN-only via the position endpoints.",
+        "operationId" : "getOrgChart",
+        "responses" : {
+          "200" : {
+            "description" : "The assembled org chart.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgChartDto"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{jobOrderId}/material-collection" : {
       "get" : {
         "tags" : [ "material-collection-controller" ],
@@ -34670,6 +35036,60 @@
           }
         }
       },
+      "OrgChartPositionUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "sortIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
+      },
+      "OrgChartPositionDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "positionType" : {
+            "type" : "string",
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "userName" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "sortIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "CreateJobOrderDto" : {
         "type" : "object",
         "properties" : {
@@ -36697,6 +37117,32 @@
           }
         }
       },
+      "OrgChartPositionCreateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "positionType" : {
+            "type" : "string",
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "parentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "sortIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "positionType", "userId" ]
+      },
       "HandoverReportItemDto" : {
         "type" : "object",
         "properties" : {
@@ -38605,6 +39051,157 @@
             "items" : {
               "type" : "string"
             }
+          }
+        }
+      },
+      "AreaLeadershipDto" : {
+        "type" : "object",
+        "properties" : {
+          "lead" : {
+            "$ref" : "#/components/schemas/OrgChartNodeDto"
+          },
+          "commanders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          },
+          "coordinators" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          },
+          "operators" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          }
+        }
+      },
+      "CommandChartDto" : {
+        "type" : "object",
+        "properties" : {
+          "commandLead" : {
+            "$ref" : "#/components/schemas/OrgChartNodeDto"
+          },
+          "deputy" : {
+            "$ref" : "#/components/schemas/OrgChartNodeDto"
+          },
+          "ensigns" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          }
+        }
+      },
+      "OrgChartDto" : {
+        "type" : "object",
+        "properties" : {
+          "areaLeadership" : {
+            "$ref" : "#/components/schemas/AreaLeadershipDto"
+          },
+          "squadrons" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SquadronChartDto"
+            }
+          },
+          "specialCommands" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SpecialCommandChartDto"
+            }
+          }
+        }
+      },
+      "OrgChartNodeDto" : {
+        "type" : "object",
+        "properties" : {
+          "positionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "positionType" : {
+            "type" : "string",
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+          },
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "userName" : {
+            "type" : "string"
+          },
+          "sortIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "SpecialCommandChartDto" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "commanders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          },
+          "canAddCommander" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "SquadronChartDto" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "lead" : {
+            "$ref" : "#/components/schemas/OrgChartNodeDto"
+          },
+          "commands" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CommandChartDto"
+            }
+          },
+          "directEnsigns" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          },
+          "canAddCommand" : {
+            "type" : "boolean"
+          },
+          "canAddEnsign" : {
+            "type" : "boolean"
           }
         }
       },

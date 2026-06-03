@@ -1,0 +1,148 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgChartDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgChartPositionCreateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgChartPositionDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.service.OrgChartService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * REST surface for the Profit-Bereich org chart. The chart is purely descriptive (it grants no
+ * permissions), so read access is open to every authenticated user while every write is
+ * ADMIN-gated. The whole chart is read in one call; the inline editor mutates it one position at a
+ * time.
+ *
+ * <p>The user picker the editor needs is served by the existing {@code GET /api/v1/users/lookup} —
+ * this controller intentionally adds no user-listing endpoint of its own.
+ */
+@RestController
+@RequestMapping("/api/v1/org-chart")
+@RequiredArgsConstructor
+public class OrgChartController {
+
+  private final OrgChartService orgChartService;
+
+  /**
+   * Returns the entire org chart (Bereichsleitung plus every active, profit-eligible Staffel and
+   * SK) as one nested read model. Open to any authenticated caller.
+   *
+   * @return the assembled chart.
+   */
+  @GetMapping
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      summary = "Get the Profit-Bereich org chart",
+      description =
+          "Returns the full org chart: the Bereichsleitung on top and a column for every active,"
+              + " profit-eligible Staffel and Spezialkommando below. Read-only and open to every"
+              + " authenticated user; editing is ADMIN-only via the position endpoints.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "The assembled org chart."),
+    @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
+  })
+  public OrgChartDto getOrgChart() {
+    return orgChartService.getOrgChart();
+  }
+
+  /**
+   * Assigns a user to a new functional-rank position. ADMIN-only. Scope/parent/cardinality/
+   * uniqueness violations surface as 400 problem responses.
+   *
+   * @param request the assignment payload; validated by Jakarta annotations.
+   * @return the persisted position as a flat DTO.
+   */
+  @PostMapping("/positions")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Assign a user to an org-chart position",
+      description =
+          "Creates a position binding a user to a functional rank within a scope (area leadership,"
+              + " Staffel or SK). Enforces the per-Staffel limits (≤4 Kommandoleiter, ≤4 Ensign),"
+              + " the ≤2 SK-Leiter limit, the scope/parent consistency rules and"
+              + " one-user-per-scope. ADMIN-only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Position created."),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Validation error or a scope/parent/cardinality/uniqueness rule violation."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Referenced user, OrgUnit or parent not found."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "A concurrent create raced a singleton uniqueness constraint.")
+  })
+  public OrgChartPositionDto createPosition(
+      @RequestBody @Valid OrgChartPositionCreateRequest request) {
+    return orgChartService.createPosition(request);
+  }
+
+  /**
+   * Reassigns the holder and/or reorders an existing position. The rank and scope are immutable;
+   * only the holder and the display order may change. Carries the optimistic-lock version in the
+   * body. ADMIN-only.
+   *
+   * @param id the position id.
+   * @param request the edit payload; validated by Jakarta annotations.
+   * @return the updated position with the bumped version.
+   */
+  @PutMapping("/positions/{id}")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Reassign or reorder an org-chart position",
+      description =
+          "Changes the holder and/or the display order of an existing position. The functional"
+              + " rank and scope cannot change (move = remove + re-add). ADMIN-only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Position updated."),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Validation error or the new holder already occupies the scope."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(responseCode = "404", description = "Position or new holder not found."),
+    @ApiResponse(responseCode = "409", description = "Optimistic-lock conflict (stale version).")
+  })
+  public OrgChartPositionDto updatePosition(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid OrgChartPositionUpdateRequest request) {
+    return orgChartService.updatePosition(id, request);
+  }
+
+  /**
+   * Removes a position. Removing a Kommandoleiter cascades to its Stv. and the Ensigns under that
+   * command. ADMIN-only.
+   *
+   * @param id the position id.
+   */
+  @DeleteMapping("/positions/{id}")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Remove an org-chart position",
+      description =
+          "Deletes the position. Removing a Kommandoleiter also removes its Stv. Kommandoleiter and"
+              + " the Ensigns reporting into that command. ADMIN-only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Position removed."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(responseCode = "404", description = "No position matches the given id.")
+  })
+  public void deletePosition(@PathVariable @NotNull UUID id) {
+    orgChartService.deletePosition(id);
+  }
+}

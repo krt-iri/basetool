@@ -1,0 +1,377 @@
+/* ============================================================================
+   Profit-Bereich Organigramm — top-down org-chart layout.
+   A classic org chart drawn in the KRT HUD style: square boxes, hairline
+   connectors, the orange bloom as the only "elevation", no invented colours.
+
+   Two connector primitives build the hierarchy:
+     - .oc-branch : horizontal branching with elbow connectors (a parent node
+       fans out to a row of child boxes) — used Bereichsleiter→Gruppen and
+       Staffelleiter→Kommandos.
+     - .oc-stack  : a vertical report column hanging under a manager, the
+       siblings centred on one descending line — used for the people under a
+       group / Kommando and the SK-Leiter.
+   Only design tokens from styles.css are used; --oc-line / --oc-gap are local
+   connector knobs. The whole chart scrolls horizontally on narrow screens.
+   ============================================================================ */
+
+.oc-chart {
+    --oc-line: var(--color-gray-2);
+    --oc-gap: 1.5rem;
+
+    overflow-x: auto;
+    padding-bottom: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.oc-caption {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.oc-caption-title {
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-gray-1);
+    font-size: 0.9rem;
+}
+
+.oc-dept-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.6rem;
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+}
+
+/* --- horizontal branch tree (elbow connectors) ------------------------------ */
+.oc-tree {
+    display: inline-block;
+    min-width: 100%;
+    text-align: center;
+}
+
+.oc-branch {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    padding-top: var(--oc-gap);
+    margin: 0;
+    list-style: none;
+}
+
+.oc-branch li {
+    position: relative;
+    list-style: none;
+    padding: var(--oc-gap) 0.5rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.oc-branch li::before,
+.oc-branch li::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: var(--oc-gap);
+    border-top: 1px solid var(--oc-line);
+}
+
+.oc-branch li::before {
+    right: 50%;
+}
+
+.oc-branch li::after {
+    left: 50%;
+    border-left: 1px solid var(--oc-line);
+}
+
+.oc-branch li:only-child::before,
+.oc-branch li:only-child::after {
+    display: none;
+}
+
+.oc-branch li:first-child::before {
+    border: 0;
+}
+
+.oc-branch li:last-child::after {
+    border: 0;
+}
+
+.oc-branch li:last-child::before {
+    border-right: 1px solid var(--oc-line);
+}
+
+/* vertical line from a parent node down into its nested child bus */
+.oc-branch .oc-branch::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: var(--oc-gap);
+    border-left: 1px solid var(--oc-line);
+}
+
+/* leadership root: the Bereichsleiter is the top node, no incoming line/elbow */
+.oc-leadership > .oc-branch {
+    padding-top: 0;
+}
+
+.oc-leadership > .oc-branch > li {
+    padding-top: 0;
+}
+
+.oc-leadership > .oc-branch > li::before,
+.oc-leadership > .oc-branch > li::after {
+    display: none;
+}
+
+/* the Bereichsleiter box reads as the hero (orange frame + bloom) */
+.oc-leadership > .oc-branch > li > .oc-node:not(.oc-node--vacant) {
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-primary);
+}
+
+/* spine joining the leadership block to the units bus */
+.oc-spine {
+    width: 0;
+    height: var(--oc-gap);
+    border-left: 1px solid var(--oc-line);
+    margin: 0 auto;
+}
+
+.oc-units-tree > .oc-branch::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: var(--oc-gap);
+    border-left: 1px solid var(--oc-line);
+}
+
+/* --- vertical report stack (siblings under a manager) ----------------------- */
+.oc-stack {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+    margin-top: var(--oc-gap);
+}
+
+.oc-stack::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: calc(-1 * var(--oc-gap));
+    bottom: 0;
+    border-left: 1px solid var(--oc-line);
+    z-index: 0;
+}
+
+.oc-stack-item {
+    position: relative;
+    z-index: 1;
+}
+
+/* --- boxes ------------------------------------------------------------------ */
+.oc-node {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.55rem 0.75rem;
+    background: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-gray-3);
+    min-width: 170px;
+    text-align: left;
+}
+
+.oc-node-rank {
+    font-family: var(--font-body);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-size: 0.62rem;
+    color: var(--color-primary);
+}
+
+.oc-node-name {
+    color: var(--color-white);
+    font-weight: 700;
+    font-size: 0.92rem;
+    overflow-wrap: break-word;
+}
+
+.oc-node--vacant {
+    border-style: dashed;
+    border-color: var(--color-gray-2);
+    background: transparent;
+}
+
+.oc-node--vacant .oc-node-name {
+    color: var(--color-gray-2);
+    font-weight: 400;
+    font-style: italic;
+}
+
+.oc-unit-box {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.5rem 0.9rem;
+    background: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    border-top: 3px solid var(--color-primary);
+    min-width: 160px;
+}
+
+.oc-unit-box .sh {
+    font-weight: 700;
+    color: var(--color-primary);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+}
+
+.oc-unit-box .nm {
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    color: var(--color-white);
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+}
+
+.oc-unit-box--sk {
+    border-top-color: var(--color-gray-2);
+}
+
+.oc-unit-box--sk .sh {
+    color: var(--color-gray-1);
+}
+
+.oc-group-box {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.8rem;
+    background: transparent;
+    border: 1px dashed var(--color-gray-2);
+    color: var(--color-gray-1);
+    font-weight: 700;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* --- inline editor controls (admin, only while .editing) -------------------- */
+.oc-actions {
+    display: none;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.oc-chart.editing .oc-actions {
+    display: flex;
+}
+
+.oc-chart.editing .oc-add {
+    display: inline-flex;
+}
+
+.oc-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.oc-icon-btn:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: rgb(231 126 35 / 7%);
+}
+
+.oc-icon-btn.oc-icon-btn--danger:hover {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+    background: rgb(163 0 10 / 12%);
+}
+
+.oc-add {
+    display: none;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    padding: 0.35rem 0.7rem;
+    background: transparent;
+    border: 1px dashed var(--color-gray-2);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    min-height: var(--touch-target);
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.oc-add:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.oc-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.oc-modal-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--color-gray-2);
+    font-size: 1.75rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.oc-modal-close:hover {
+    color: var(--color-primary);
+}
+
+/* --- responsive: keep the tree, let it pan; relax fixed widths -------------- */
+@media (width <= 768px) {
+    .oc-node {
+        min-width: 150px;
+    }
+
+    .oc-unit-box {
+        min-width: 140px;
+    }
+}

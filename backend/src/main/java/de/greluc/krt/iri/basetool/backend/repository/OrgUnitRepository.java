@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -37,4 +38,16 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    */
   @Query("SELECT COUNT(o) FROM OrgUnit o WHERE o.id IN :ids AND o.isProfitEligible = true")
   long countProfitEligibleByIdIn(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Loads every active, profit-eligible org unit across both kinds (Squadron + SpecialCommand) via
+   * single-table inheritance. Backs the Profit-Bereich org chart, whose unit tier is exactly the
+   * profit-eligible Staffeln + SKs; the caller splits the result by {@link OrgUnit#getKind()} into
+   * the squadron and SK columns.
+   *
+   * @return the active profit-eligible org units in arbitrary order; never {@code null}, possibly
+   *     empty.
+   */
+  @Query("SELECT o FROM OrgUnit o WHERE o.active = true AND o.isProfitEligible = true")
+  List<OrgUnit> findActiveProfitEligible();
 }
