@@ -904,7 +904,12 @@
                                     <tr th:each="order : ${mission.refineryOrders}">
                                         <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
                                         <td th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
-                                        <td th:text="${order.startedAt != null and order.durationMinutes != null ? #temporals.format(order.startedAt.plusSeconds(order.durationMinutes * 60), 'dd.MM.yyyy HH:mm') : '-'}">Ende</td>
+                                        <td>
+                                            <!-- Server-Rendering explizit in UTC; Browser-JS konvertiert es DST-korrekt in die lokale Zeitzone des Nutzers. -->
+                                            <span class="refinery-endsat-local"
+                                                  th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}"
+                                                  th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '-'}">Ende</span>
+                                        </td>
                                         <td th:text="${order.status != null ? #messages.msgOrNull('refinery.status.' + order.status) ?: order.status : '-'}">Status</td>
                                         <td style="padding: 0.5rem;">
                                             <table th:if="${order.goods != null and !#lists.isEmpty(order.goods)}" style="margin: 0; background: transparent;">
@@ -2714,6 +2719,30 @@
         presence.start();
         window.missionPresence = presence;
     });
+</script>
+<!-- Refinery-order end timestamps are rendered server-side in UTC; convert them to the
+     browser's local time zone (DST-correct) on load, mirroring the refinery-orders list. -->
+<script th:attr="nonce=${cspNonce}">
+    function formatRefineryEndLocalTimes() {
+        document.querySelectorAll('.refinery-endsat-local').forEach(el => {
+            const utcMsStr = el.getAttribute('data-utc');
+            if (utcMsStr && utcMsStr !== 'null') {
+                const date = new Date(parseInt(utcMsStr, 10));
+                if (!isNaN(date)) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    el.innerText = `${day}.${month}.${year} ${hours}:${minutes}`;
+                }
+            } else {
+                el.innerText = '-';
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', formatRefineryEndLocalTimes);
 </script>
 </body>
 </html>
