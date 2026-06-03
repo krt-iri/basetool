@@ -81,4 +81,19 @@ class MeControllerTest {
 
     assertFalse(controller.getCapabilities().canSeeBlueprintOverview());
   }
+
+  @Test
+  void getCapabilities_reflectsJobOrderViewAccess_true() {
+    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+
+    assertTrue(controller.getCapabilities().canViewJobOrders());
+    verify(ownerScopeService).canViewJobOrders();
+  }
+
+  @Test
+  void getCapabilities_reflectsJobOrderViewAccess_false() {
+    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+
+    assertFalse(controller.getCapabilities().canViewJobOrders());
+  }
 }

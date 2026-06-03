@@ -138,8 +138,16 @@ public class JobOrderPageController {
       @CookieValue(name = "orders_filter_status", required = false) String cookieStatus,
       @CookieValue(name = "orders_filter_scope", required = false) String cookieScope,
       @ModelAttribute("activeSquadronId") UUID activeSquadronId,
+      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       HttpServletResponse response,
       Model model) {
+    if (!canViewJobOrders) {
+      // Non-profit members (anyone without a profit-eligible org unit, and not an admin) are not
+      // part of the order workflow: they may place orders but not browse the queue. Route them to
+      // the create form — the only order surface open to them — mirroring the anonymous "submit but
+      // don't track" flow. The backend list returns empty for them regardless; this is the UX.
+      return "redirect:/orders/create";
+    }
     if (status == null || status.isEmpty()) {
       if (cookieStatus != null && !cookieStatus.isBlank()) {
         List<String> parsed = Arrays.asList(cookieStatus.split("-"));
@@ -252,7 +260,15 @@ public class JobOrderPageController {
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String viewOrderDetail(
-      @PathVariable UUID id, Model model, @AuthenticationPrincipal OidcUser principal) {
+      @PathVariable UUID id,
+      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    if (!canViewJobOrders) {
+      // Non-profit members may not open order details — the backend returns 403 for them anyway.
+      // Route to the create form (their only order surface) so a stray bookmark/link is graceful.
+      return "redirect:/orders/create";
+    }
     try {
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
       model.addAttribute("order", order);
@@ -387,6 +403,7 @@ public class JobOrderPageController {
   @PostMapping("/items")
   public String createItemOrder(
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
+      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       RedirectAttributes redirectAttributes,
       @AuthenticationPrincipal OidcUser principal) {
     try {
@@ -433,7 +450,9 @@ public class JobOrderPageController {
       backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      if (principal == null) {
+      // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
+      // form (with the success toast) instead of bouncing them to a list they may not see.
+      if (principal == null || !canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }
@@ -684,6 +703,7 @@ public class JobOrderPageController {
   @PostMapping("/create")
   public String createOrder(
       @ModelAttribute("jobOrderForm") JobOrderForm form,
+      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       RedirectAttributes redirectAttributes,
       @AuthenticationPrincipal OidcUser principal) {
     try {
@@ -714,7 +734,9 @@ public class JobOrderPageController {
       backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      if (principal == null) {
+      // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
+      // form (with the success toast) instead of bouncing them to a list they may not see.
+      if (principal == null || !canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }

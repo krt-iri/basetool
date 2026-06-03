@@ -13,6 +13,7 @@ import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.iri.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository;
@@ -121,6 +122,7 @@ public class OwnerScopeService {
   private final OperationRepository operationRepository;
   private final ShipRepository shipRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+  private final OrgUnitRepository orgUnitRepository;
   private final HttpServletRequest request;
 
   /**
@@ -239,6 +241,40 @@ public class OwnerScopeService {
       ids.add(m.getId().getOrgUnitId());
     }
     return ids;
+  }
+
+  /**
+   * {@code true} iff the current principal may enter the Job-Order area at all — i.e. see the order
+   * list and order details. Only members of a <em>profit-eligible</em> org unit (Squadron or
+   * Spezialkommando) participate in the order workflow: Kartell departments are split into Profit
+   * and non-Profit, and only the Profit side processes orders. A non-Profit unit may still
+   * <em>place</em> orders (as the requesting/Auftraggeber side) but its members must not see the
+   * order queue — mirroring how anonymous guests can submit an order yet cannot track it.
+   *
+   * <ul>
+   *   <li>Admin → always {@code true} (system-wide oversight, like every other {@code can*}
+   *       short-circuit here).
+   *   <li>Non-admin → {@code true} iff at least one of the caller's membership org units (any kind)
+   *       is flagged {@code is_profit_eligible}.
+   *   <li>Anonymous / member of only non-profit units → {@code false}.
+   * </ul>
+   *
+   * <p>This is the viewer-side gate folded into {@link #canSeeJobOrder(UUID)} (so order details +
+   * material claims respect it) and short-circuited by {@code JobOrderService.getAllJobOrders} (so
+   * the list returns empty). It is independent of which specific order is responsible to whom — a
+   * non-profit member sees nothing, including the otherwise-public SK queue.
+   *
+   * @return {@code true} iff the caller may view job orders.
+   */
+  public boolean canViewJobOrders() {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    Set<UUID> memberOrgUnitIds = currentMemberOrgUnitIds();
+    if (memberOrgUnitIds.isEmpty()) {
+      return false;
+    }
+    return orgUnitRepository.countProfitEligibleByIdIn(memberOrgUnitIds) > 0;
   }
 
   /**
@@ -784,12 +820,17 @@ public class OwnerScopeService {
    * Job Orders are a <em>conditionally</em> staffel-scoped aggregate:
    *
    * <ul>
-   *   <li>responsible = Spezialkommando → <b>public</b>: visible to every (authenticated) caller,
-   *       so the central SK queue stays a shared workspace across all profit squadrons.
+   *   <li>responsible = Spezialkommando → <b>public</b>: visible to every <em>profit-eligible</em>
+   *       caller (see {@link #canViewJobOrders()}), so the central SK queue stays a shared
+   *       workspace across all profit squadrons. A non-profit member sees it no more than the rest
+   *       of the order area.
    *   <li>responsible = Squadron → <b>private</b>: visible only to a member of that squadron and to
    *       admins. The requester does NOT grant visibility (a squadron-private order is invisible to
    *       the customer squadron unless it happens to also be the responsible one).
    * </ul>
+   *
+   * <p>Both branches are additionally gated by the viewer-side profit check: a caller who belongs
+   * to no profit-eligible org unit (and is not an admin) may read no order at all.
    *
    * <p>A {@code null} responsible org unit (legacy rows before the V130 backfill) is treated as
    * visible — defensive only; the backfill + NOT NULL constraint means no such row survives in
@@ -803,13 +844,19 @@ public class OwnerScopeService {
   }
 
   /**
-   * Per-row read check shared by {@link #canSeeJobOrder(UUID)}. SK-responsible orders are public;
-   * squadron-responsible orders defer to {@link #canSeeSquadron(UUID)}.
+   * Per-row read check shared by {@link #canSeeJobOrder(UUID)}. First applies the viewer-side
+   * profit gate ({@link #canViewJobOrders()}): a caller who is not a member of any profit-eligible
+   * org unit (and is not an admin) may see no order at all — not even the otherwise-public SK
+   * queue. For a permitted viewer, SK-responsible orders are public and squadron-responsible orders
+   * defer to {@link #canSeeSquadron(UUID)}.
    *
    * @param o the job order whose responsible org unit gates visibility.
    * @return {@code true} iff the caller may read the row.
    */
   private boolean canSeeJobOrderRow(JobOrder o) {
+    if (!canViewJobOrders()) {
+      return false;
+    }
     OrgUnit responsible = o.getResponsibleOrgUnit();
     if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
       return true;

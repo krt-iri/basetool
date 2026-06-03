@@ -74,6 +74,7 @@ class OwnerScopeServiceTest {
   @Mock private OperationRepository operationRepository;
   @Mock private ShipRepository shipRepository;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
+  @Mock private de.greluc.krt.iri.basetool.backend.repository.OrgUnitRepository orgUnitRepository;
 
   @Mock
   private de.greluc.krt.iri.basetool.backend.repository.SpecialCommandRepository
@@ -348,12 +349,37 @@ class OwnerScopeServiceTest {
   class CanSeeJobOrderTests {
 
     @Test
-    void skResponsibleOrder_isPublicToEveryone() {
-      // An SK-responsible order is the shared central queue: visible to any caller without a
-      // squadron-scope check. No auth stubbing required — the SK short-circuit fires first.
+    void skResponsibleOrder_isPublicToProfitEligibleViewer() {
+      // An SK-responsible order is the shared central queue: visible to any profit-eligible caller
+      // without a squadron-scope check. The member-in-A default is profit-eligible, so the SK
+      // short-circuit fires once the viewer gate passes.
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
+      stubMemberInSquadronA();
+
+      assertTrue(service.canSeeJobOrder(orderId));
+    }
+
+    @Test
+    void skResponsibleOrder_invisibleToNonProfitMember() {
+      // The viewer-side profit gate suppresses even the otherwise-public SK queue for a caller who
+      // belongs to no profit-eligible org unit.
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
+      stubNonProfitMember();
+
+      assertFalse(service.canSeeJobOrder(orderId));
+    }
+
+    @Test
+    void skResponsibleOrder_visibleToAdmin() {
+      // Admins keep system-wide visibility — the profit gate short-circuits to true for them.
+      UUID orderId = UUID.randomUUID();
+      when(jobOrderRepository.findById(orderId))
+          .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
+      when(authHelper.isAdmin()).thenReturn(true);
 
       assertTrue(service.canSeeJobOrder(orderId));
     }
@@ -451,6 +477,48 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
       assertFalse(service.canEditJobOrder(orderId));
+    }
+  }
+
+  @Nested
+  class CanViewJobOrdersTests {
+
+    @Test
+    void admin_canAlwaysView() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canViewJobOrders());
+    }
+
+    @Test
+    void memberOfProfitEligibleOrgUnit_canView() {
+      stubMemberInSquadronA(); // member-in-A default is profit-eligible (count > 0)
+
+      assertTrue(service.canViewJobOrders());
+    }
+
+    @Test
+    void memberOfOnlyNonProfitOrgUnit_cannotView() {
+      stubNonProfitMember();
+
+      assertFalse(service.canViewJobOrders());
+    }
+
+    @Test
+    void callerWithNoMembership_cannotView() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of());
+
+      assertFalse(service.canViewJobOrders());
+    }
+
+    @Test
+    void anonymousCaller_cannotView() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.empty());
+
+      assertFalse(service.canViewJobOrders());
     }
   }
 
@@ -1320,5 +1388,25 @@ class OwnerScopeServiceTest {
             orgUnitMembershipRepository.findAllByIdUserIdAndKind(
                 MEMBER_USER_ID, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+    // canViewJobOrders() reads the all-kinds membership union and the profit-eligibility count.
+    // The default member-in-A is treated as profit-eligible so the existing canSeeJobOrder member
+    // scenarios still pass the viewer gate; the non-profit case is stubbed explicitly per test.
+    lenient()
+        .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+        .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+    lenient().when(orgUnitRepository.countProfitEligibleByIdIn(any())).thenReturn(1L);
+  }
+
+  /**
+   * Stubs a non-admin caller whose single membership is a non-profit-eligible org unit — the viewer
+   * gate {@link OwnerScopeService#canViewJobOrders()} must return {@code false} for such a caller.
+   */
+  private void stubNonProfitMember() {
+    lenient().when(authHelper.isAdmin()).thenReturn(false);
+    lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+    lenient()
+        .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+        .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+    lenient().when(orgUnitRepository.countProfitEligibleByIdIn(any())).thenReturn(0L);
   }
 }

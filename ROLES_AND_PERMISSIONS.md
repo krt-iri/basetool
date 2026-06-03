@@ -220,7 +220,7 @@ Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
 | Lager-View ansehen (`/inventory`, Member+) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Lager bearbeiten / aus-/einbuchen (`isAuthenticated()` + `canEditInventoryItem`, Owner-Scope) | ❌ | ✅¹ | ✅ | ✅¹ | ✅ | ✅ |
 | Auftrag **anlegen** (Material- & Item-Auftrag) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canSeeJobOrder`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`) | ❌ | ✅³ | ✅³ | ✅³ | ✅³ | ✅ |
 | Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`) | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
 | Verantwortliche Einheit umsetzen (`PATCH /{id}/responsible-org-unit`) | ❌ | ❌ | ✅² | ❌ | ✅² | ✅ |
 | Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
@@ -229,6 +229,14 @@ Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
 ¹ Nur über das eigene Lager / die Owner-Scope-Prüfung — nicht generell.
 ² Admin frei; Staffel-Logistiker/-Officer nur **Eskalation** des eigenen
 Staffel-Auftrags an ein SK.
+³ **Nur Mitglieder einer profit-berechtigten Orgeinheit** (`is_profit_eligible`
+auf Staffel oder SK) dürfen Aufträge sehen. Wer ausschließlich in
+nicht-profit-berechtigten Einheiten ist, kann Aufträge **anlegen, aber nicht
+sehen** (Liste/Detail) — analog zu anonymen Gästen. Admins sehen immer alles
+(`canViewJobOrders` ist für sie immer wahr). Im Frontend wird der „Aufträge"-Link
+durch „Auftrag anlegen" ersetzt und ein Direktaufruf von `/orders` bzw.
+`/orders/{id}` auf das Anlege-Formular umgeleitet; das Backend liefert für sie
+eine leere Liste bzw. `403`.
 
 ### 3.4 Refinery
 

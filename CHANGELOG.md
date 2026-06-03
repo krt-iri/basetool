@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Auftragsansicht jetzt profit-gegated: nur Mitglieder einer profit-berechtigten Staffel/SK (und Admins) sehen die Auftragsliste und -details; reine Nicht-Profit-Mitglieder können Aufträge weiterhin anlegen, aber nicht mehr sehen.** Im Menü ersetzt „Auftrag anlegen" den „Aufträge"-Link, und ein Direktaufruf von `/orders` bzw. `/orders/{id}` leitet für sie auf das Anlege-Formular um. Das Backend setzt dasselbe Gate durch (leere Liste bzw. `403`) — auch die sonst staffelübergreifend öffentliche SK-Warteschlange bleibt für Nicht-Profit-Mitglieder verborgen.
+
 - **Beförderungssystem: ein Admin ohne aktive Staffel (Alle-Staffeln-Modus) sieht jetzt einen Hinweis „Bitte wähle eine Staffel" statt der zusammengeführten Daten aller Staffeln; erst nach Auswahl einer Staffel erscheint deren System.** Ein Beförderungskatalog ist inhärent pro Staffel, daher ergibt die vermischte Allansicht keinen Sinn. Nutzer ganz ohne Staffelzugehörigkeit haben kein eigenes Beförderungssystem mehr und sehen den Menüpunkt nicht (direkter Seitenaufruf wird mit 403 blockiert).
 
 ### Fixed
