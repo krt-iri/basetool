@@ -204,7 +204,7 @@ Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
 | Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Hangar lesen (`HANGAR_READ`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Eigene Schiffe pflegen / Import (CCU, HangarXPLOR, StarJump) (`isAuthenticated()` + Owner) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Eigene Schiffe pflegen / Import (CCU, HangarXPLOR, Fleetyards, StarJump) (`isAuthenticated()` + Owner) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Schiffe anderer Member verwalten (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Persönliches Inventar / Persönliche Blueprints (eigene) (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |

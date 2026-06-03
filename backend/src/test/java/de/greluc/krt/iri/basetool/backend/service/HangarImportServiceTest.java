@@ -1635,6 +1635,234 @@ class HangarImportServiceTest {
   }
 
   // -------------------------------------------------------------------------
+  // Fleetyards format (https://fleetyards.net): a flat array keyed by the
+  // camelCase shipCode/manufacturerCode pair. Same matcher pipeline as the other
+  // formats; only the parse layer differs. The probe field that triggers
+  // Fleetyards parsing is `shipCode` (camelCase) on the first element — it must
+  // never collide with HangarXPLOR's snake_case `ship_code`.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_fleetyardsFormat_isAutoDetectedAndImported() {
+    // Given: a full real-world Fleetyards entry (all flags + groups/modules/upgrades arrays).
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType spirit = shipTypeWithName("A1 Spirit");
+
+    String fleetyardsJson =
+        """
+        [{
+          "name":             "A1 Spirit",
+          "slug":             "crus-a1-spirit",
+          "shipCode":         "crus_spirit_a1",
+          "manufacturerName": "Crusader Industries",
+          "manufacturerCode": "CRUS",
+          "shipName":         "Koto",
+          "wanted":           false,
+          "flagship":         false,
+          "public":           true,
+          "nameVisible":      true,
+          "saleNotify":       false,
+          "groups":           [],
+          "modules":          [],
+          "upgrades":         []
+        }]
+        """;
+    MockMultipartFile file = multipartFile(fleetyardsJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(spirit));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, spirit.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    verify(shipRepository).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
+  // Fleetyards `shipName` that is genuinely different from `name` becomes the
+  // individual ship name; the absence of insurance data falls back to the
+  // neutral default. This entry also exercises the `manufacturerCode` half of
+  // the probe (no `shipCode` key present).
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_fleetyardsCustomShipName_isSetAsIndividualName() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType galaxy = shipTypeWithName("Galaxy");
+
+    String fleetyardsJson =
+        """
+        [{
+          "name":             "Galaxy",
+          "slug":             "rsi-galaxy",
+          "manufacturerCode": "RSI",
+          "shipName":         "Valenza",
+          "nameVisible":      true
+        }]
+        """;
+    MockMultipartFile file = multipartFile(fleetyardsJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    hangarImportService.importShips(userId, file);
+
+    // Then
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getName()).isEqualTo("Valenza");
+    assertThat(captor.getValue().getInsurance()).isEqualTo(HangarImportService.DEFAULT_INSURANCE);
+  }
+
+  // -------------------------------------------------------------------------
+  // Fleetyards `shipName` that merely echoes `name` is NOT used as a custom
+  // name — the shared echo heuristic discards it just like the Shiplist mapper.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_fleetyardsShipNameEchoesModelName_individualNameStaysNull() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType galaxy = shipTypeWithName("Galaxy");
+
+    String fleetyardsJson =
+        """
+        [{
+          "name":             "Galaxy",
+          "slug":             "rsi-galaxy",
+          "shipCode":         "rsi_galaxy",
+          "manufacturerCode": "RSI",
+          "shipName":         "Galaxy"
+        }]
+        """;
+    MockMultipartFile file = multipartFile(fleetyardsJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    hangarImportService.importShips(userId, file);
+
+    // Then: normalised "galaxy" is a substring of normalised "galaxy" → echo → individual null.
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getName()).isNull();
+    assertThat(captor.getValue().getShipType()).isSameAs(galaxy);
+  }
+
+  // -------------------------------------------------------------------------
+  // Fleetyards slug fallback: when the display name resolves against no ShipType
+  // name, the manufacturer-prefixed kebab-case slug (whose shape mirrors the SC
+  // Wiki slug) is matched against ShipType.scwikiSlug.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_fleetyardsSlugFallback_resolvesViaScwikiSlugWhenNameMisses() {
+    // Given: the name matches nothing, but the Fleetyards slug equals the ship's SC Wiki slug.
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType galaxy = shipTypeWithSlugs("Canonical Name", null, "rsi-galaxy");
+
+    String fleetyardsJson =
+        """
+        [{
+          "name":             "Unmatched Label",
+          "slug":             "rsi-galaxy",
+          "shipCode":         "rsi_galaxy",
+          "manufacturerCode": "RSI"
+        }]
+        """;
+    MockMultipartFile file = multipartFile(fleetyardsJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(galaxy);
+  }
+
+  // -------------------------------------------------------------------------
+  // Fleetyards mixed resolution mirroring the real export files: an exact name
+  // hit (Galaxy), a Stage-3 suffix-drift hit (M2 Hercules -> "M2 Hercules
+  // Starlifter"), a slug fallback (display name misses, scwikiSlug carries the
+  // match) and a truly unmatched entry, all in one payload.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_fleetyardsMixedResolution() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType galaxy = shipTypeWithName("Galaxy"); // Stage 1 exact
+    ShipType hercules = shipTypeWithName("M2 Hercules Starlifter"); // Stage 3 fv subset of uex
+    ShipType perseus = shipTypeWithSlugs("Canonical Perseus", null, "rsi-perseus"); // slug fallback
+
+    String fleetyardsJson =
+        """
+        [
+          { "name":"Galaxy", "slug":"rsi-galaxy", "shipCode":"rsi_galaxy",
+            "manufacturerCode":"RSI" },
+          { "name":"M2 Hercules", "slug":"crus-m2-hercules", "shipCode":"crus_starlifter_m2",
+            "manufacturerCode":"CRUS" },
+          { "name":"Some Label The Matcher Cannot Resolve", "slug":"rsi-perseus",
+            "shipCode":"rsi_perseus", "manufacturerCode":"RSI" },
+          { "name":"Alien Xyz", "slug":"alien-xyz", "shipCode":"alien_xyz",
+            "manufacturerCode":"ALN" }
+        ]
+        """;
+    MockMultipartFile file = multipartFile(fleetyardsJson);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy, hercules, perseus));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, hercules.getId())).thenReturn(0L);
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, perseus.getId())).thenReturn(0L);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: Galaxy + M2 Hercules + (Perseus via slug) import; only "Alien Xyz" is unmatched.
+    assertThat(result.importedCount()).isEqualTo(3);
+    assertThat(result.skippedCount()).isEqualTo(1);
+    assertThat(result.skippedShips()).containsExactly("Alien Xyz");
+    verify(shipRepository, times(3)).save(any(Ship.class));
+  }
+
+  // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
 
