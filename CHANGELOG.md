@@ -16,6 +16,8 @@
 
 ### Changed
 
+- **Der automatische Deploy (`deploy.sh` / `iri-deploy.timer`) wiederholt ein Image, dessen Health-Check fehlschlägt, jetzt mit exponentiellem Backoff statt bei jedem 5-Minuten-Tick.** Bisher fuhr ein kaputtes `:stable` (oder ein vorübergehender Fehler) die Anwendung alle paar Minuten in die Wartungsseite, weil derselbe defekte Digest endlos neu ausgerollt und zurückgerollt wurde. Der Backoff ist an das Digest-Paar gekoppelt — ein neu promotetes (repariertes) Image wird sofort ausgerollt, nur Wiederholungen desselben fehlerhaften Images werden gedrosselt (`--force` erzwingt einen Sofort-Retry, `IRI_BACKOFF_BASE` / `IRI_BACKOFF_MAX` steuern die Zeiten).
+
 - **Der Einsatz-Filter der Lageransichten („Mein Lager" / „Alle Lager") zeigt jetzt zusätzlich abgeschlossene und abgebrochene Einsätze der letzten drei Monate an, nicht mehr nur geplante und aktive.** Gerade beendete Operationen bleiben so im Filter — und im Einsatz-Zuordnungs-Dropdown — auswählbar; ältere abgeschlossene/abgebrochene Einsätze fallen weiterhin heraus, damit die Liste nicht zuwächst.
 
 - **Auftrags-Workflow jetzt profit-gegated: nur Mitglieder einer profit-berechtigten Staffel/SK (und Admins) dürfen Aufträge sehen, bearbeiten (Status/Priorität/Materialien/Handover/Reassign) und Material-Claims setzen; reine Nicht-Profit-Mitglieder können Aufträge nur noch anlegen, sonst nichts.** Im Menü ersetzt „Auftrag anlegen" den „Aufträge"-Link, und ein Direktaufruf von `/orders` bzw. `/orders/{id}` leitet für sie auf das Anlege-Formular um. Das Backend setzt dasselbe Gate auf Lese-, Schreib- und Claim-Endpunkten durch (leere Liste bzw. `403`) — auch die sonst staffelübergreifend öffentliche SK-Warteschlange bleibt für Nicht-Profit-Mitglieder verborgen.
@@ -23,6 +25,8 @@
 - **Beförderungssystem: ein Admin ohne aktive Staffel (Alle-Staffeln-Modus) sieht jetzt einen Hinweis „Bitte wähle eine Staffel" statt der zusammengeführten Daten aller Staffeln; erst nach Auswahl einer Staffel erscheint deren System.** Ein Beförderungskatalog ist inhärent pro Staffel, daher ergibt die vermischte Allansicht keinen Sinn. Nutzer ganz ohne Staffelzugehörigkeit haben kein eigenes Beförderungssystem mehr und sehen den Menüpunkt nicht (direkter Seitenaufruf wird mit 403 blockiert).
 
 ### Fixed
+
+- **Die Frontend-Readiness-Prüfung schlägt in Produktion nicht mehr am selbstsignierten Backend-Zertifikat fehl, sodass Deployments nicht mehr alle paar Minuten in die Wartungsseite kippen.** Die seit dem Sicherheits-Audit (L-5) gepinnte Health-Probe lief über den JDK-HTTP-Client, der — anders als der WebClient — die Hostnamen-Prüfung nicht abschalten kann; da das Backend-Zertifikat nur `localhost` (nicht den Docker-Alias `backend`) im SAN führt, meldete sie dauerhaft `DOWN`. Die Probe validiert die Zertifikatskette weiterhin gegen den gepinnten Truststore, überspringt jetzt aber die Hostnamen-Prüfung; fehlt das `backend-trust`-Bundle, fällt sie auf trust-all (wie der WebClient) statt auf den JVM-Standard-Truststore zurück.
 
 - **Lagerbestände mit Mengentyp SCU werden jetzt zuverlässig auf drei Nachkommastellen gerundet (kaufmännisch).** Beim Einlagern von Raffinerie-Ausbeuten summierte das Backend die Mengen als Gleitkommazahl ohne Rundung, sodass im Lager und im Ausbuchen-Dialog Werte wie 37,160000000000004 SCU auftauchten. Ein Persistenz-Guard am Lagereintrag rundet jetzt jeden Schreibpfad auf drei Stellen, und eine Migration bereinigt die bereits betroffenen Einträge (V137).
 
