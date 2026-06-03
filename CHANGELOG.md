@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Neue Seite „Organigramm" (`/org-chart`): visualisiert die Funktionsränge des Profit-Bereichs — die Bereichsleitung an der Spitze, darunter die profit-berechtigten Staffeln (Staffelleiter, bis zu vier Kommandogruppen mit je Kommandoleiter und Stv. und bis zu vier Ensign) und Spezialkommandos (1–2 Commander als SK-Leiter).** Jeder angemeldete Nutzer kann das Organigramm ansehen; nur Admins bearbeiten es über einen Inline-Modus direkt an den Knoten (zuweisen, neu zuweisen, entfernen). Rein informativ — eine Eintragung vergibt keine Berechtigungen (Migration V136).
+
 - **Der Footer zeigt jetzt das „Made By The Community"-Logo und den erforderlichen Markenhinweis von Cloud Imperium Rights LLC.** Damit erfüllt die App die Vorgaben des offiziellen Star-Citizen-Fankits für Fan-Projekte; der Hinweis ist über den fest eingeblendeten Footer auf jeder Seite sichtbar.
 
 - **Der Blueprint-Import im persönlichen Inventar akzeptiert jetzt zusätzlich das JSON des [Basetool Blueprint Extractor](https://github.com/krt-iri/basetool-bp-extractor), nicht mehr nur den SCMDB-Log-Watcher-Export.** Beide Formate liefern dieselben Bauplan-Namen; der Erhalt-Zeitstempel wird aus `ts` (SCMDB) oder `receivedAt` (Extractor) gelesen, und gelernte Namens-Aliase gelten für beide Tools.

@@ -70,6 +70,7 @@
                     </div>
                 </details>
                 <a th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>
+                <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
                 <details class="sidebar-group" sec:authorize="hasRole('ADMIN')">
                     <summary th:text="#{nav.administration}">Administration</summary>
                     <div class="sidebar-sublinks">

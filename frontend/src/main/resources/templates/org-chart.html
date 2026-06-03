@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{orgChart.title} + ' - ' + ${appTitle}">Organigramm - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <meta name="_csrf" th:content="${_csrf.token}"/>
+        <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+        <link rel="stylesheet" th:href="@{/css/org-chart.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}"/>
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{orgChart.title}">Organigramm des Profit-Bereichs</h1>
+        <p style="color: var(--color-gray-2); margin-top: 0.5rem;" th:text="#{orgChart.subtitle}">
+            Übersicht der Funktionsränge in Bereichsleitung, Staffeln und Spezialkommandos.
+        </p>
+    </div>
+
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
+
+    <div class="oc-toolbar" sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}">
+        <button type="button" class="btn btn-outline" data-trigger="oc-toggle-edit"
+                th:text="#{orgChart.edit}">Bearbeiten</button>
+    </div>
+
+    <div id="oc-chart" class="oc-chart" th:if="${orgChart != null}" th:with="area=${orgChart.areaLeadership()}">
+
+        <div class="oc-caption">
+            <span class="oc-dept-tag" th:text="#{orgChart.area.tag}">Profit-Bereich</span>
+            <span class="oc-caption-title" th:text="#{orgChart.area.title}">Bereichsleitung</span>
+        </div>
+
+        <!-- Tier 1: Bereichsleitung (Bereichsleiter at the top, area staff in columns below) -->
+        <div class="oc-tree oc-leadership">
+            <ul class="oc-branch">
+                <li>
+                    <th:block th:if="${area.lead() != null}"
+                              th:replace="~{fragments/org-chart-node :: ocNode(${area.lead()})}"></th:block>
+                    <div th:if="${area.lead() == null}" class="oc-node oc-node--vacant">
+                        <span class="oc-node-rank" th:text="#{orgChart.rank.AREA_LEAD}">Bereichsleiter</span>
+                        <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
+                    </div>
+                    <button th:if="${area.lead() == null}" type="button" class="oc-add"
+                            sec:authorize="hasRole('ADMIN')" data-trigger="oc-add" data-position-type="AREA_LEAD"
+                            th:data-rank-label="#{orgChart.rank.AREA_LEAD}"
+                            th:text="#{orgChart.add.areaLead}">Bereichsleiter zuweisen</button>
+
+                    <ul class="oc-branch">
+                        <li>
+                            <div class="oc-group-box" th:text="#{orgChart.area.commanders}">Commander</div>
+                            <div class="oc-stack" th:if="${!#lists.isEmpty(area.commanders())}">
+                                <div class="oc-stack-item" th:each="n : ${area.commanders()}">
+                                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n})}"></th:block>
+                                </div>
+                            </div>
+                            <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                                    data-trigger="oc-add" data-position-type="AREA_COMMANDER"
+                                    th:data-rank-label="#{orgChart.rank.AREA_COMMANDER}"
+                                    th:text="#{orgChart.add.commander}">Commander hinzufügen</button>
+                        </li>
+                        <li>
+                            <div class="oc-group-box" th:text="#{orgChart.area.coordinators}">Bereichskoordinatoren</div>
+                            <div class="oc-stack" th:if="${!#lists.isEmpty(area.coordinators())}">
+                                <div class="oc-stack-item" th:each="n : ${area.coordinators()}">
+                                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n})}"></th:block>
+                                </div>
+                            </div>
+                            <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                                    data-trigger="oc-add" data-position-type="AREA_COORDINATOR"
+                                    th:data-rank-label="#{orgChart.rank.AREA_COORDINATOR}"
+                                    th:text="#{orgChart.add.coordinator}">Koordinator hinzufügen</button>
+                        </li>
+                        <li>
+                            <div class="oc-group-box" th:text="#{orgChart.area.operators}">Bereichsoperatoren</div>
+                            <div class="oc-stack" th:if="${!#lists.isEmpty(area.operators())}">
+                                <div class="oc-stack-item" th:each="n : ${area.operators()}">
+                                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n})}"></th:block>
+                                </div>
+                            </div>
+                            <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                                    data-trigger="oc-add" data-position-type="AREA_OPERATOR"
+                                    th:data-rank-label="#{orgChart.rank.AREA_OPERATOR}"
+                                    th:text="#{orgChart.add.operator}">Operator hinzufügen</button>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <div class="oc-spine"
+             th:if="${!#lists.isEmpty(orgChart.squadrons()) or !#lists.isEmpty(orgChart.specialCommands())}"></div>
+
+        <!-- Tier 2: Staffeln + Spezialkommandos -->
+        <div class="oc-tree oc-units-tree"
+             th:if="${!#lists.isEmpty(orgChart.squadrons()) or !#lists.isEmpty(orgChart.specialCommands())}">
+            <ul class="oc-branch">
+                <!-- Staffeln -->
+                <li th:each="sq : ${orgChart.squadrons()}">
+                    <div class="oc-unit-box">
+                        <span class="sh" th:text="${sq.shorthand()}">IRI</span>
+                        <span class="nm" th:text="${sq.name()}">IRIDIUM</span>
+                    </div>
+                    <ul class="oc-branch">
+                        <li>
+                            <th:block th:if="${sq.lead() != null}"
+                                      th:replace="~{fragments/org-chart-node :: ocNode(${sq.lead()})}"></th:block>
+                            <div th:if="${sq.lead() == null}" class="oc-node oc-node--vacant">
+                                <span class="oc-node-rank" th:text="#{orgChart.rank.SQUADRON_LEAD}">Staffelleiter</span>
+                                <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
+                            </div>
+                            <button th:if="${sq.lead() == null}" type="button" class="oc-add"
+                                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                                    data-position-type="SQUADRON_LEAD" th:data-org-unit-id="${sq.orgUnitId()}"
+                                    th:data-rank-label="#{orgChart.rank.SQUADRON_LEAD}"
+                                    th:text="#{orgChart.add.squadronLead}">Staffelleiter zuweisen</button>
+
+                            <ul class="oc-branch"
+                                th:if="${!#lists.isEmpty(sq.commands()) or !#lists.isEmpty(sq.directEnsigns())}">
+                                <!-- Kommandos: Kommandoleiter with its Stv. + Ensigns below -->
+                                <li th:each="cmd : ${sq.commands()}">
+                                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${cmd.commandLead()})}"></th:block>
+                                    <div class="oc-stack"
+                                         th:if="${cmd.deputy() != null or !#lists.isEmpty(cmd.ensigns())}">
+                                        <div class="oc-stack-item" th:if="${cmd.deputy() != null}">
+                                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${cmd.deputy()})}"></th:block>
+                                        </div>
+                                        <div class="oc-stack-item" th:each="e : ${cmd.ensigns()}">
+                                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e})}"></th:block>
+                                        </div>
+                                    </div>
+                                    <button th:if="${cmd.deputy() == null}" type="button" class="oc-add"
+                                            sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                                            data-position-type="DEPUTY_COMMAND_LEAD"
+                                            th:data-org-unit-id="${sq.orgUnitId()}"
+                                            th:data-parent-id="${cmd.commandLead().positionId()}"
+                                            th:data-rank-label="#{orgChart.rank.DEPUTY_COMMAND_LEAD}"
+                                            th:text="#{orgChart.add.deputy}">Stv. zuweisen</button>
+                                    <button th:if="${sq.canAddEnsign()}" type="button" class="oc-add"
+                                            sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                                            data-position-type="ENSIGN" th:data-org-unit-id="${sq.orgUnitId()}"
+                                            th:data-parent-id="${cmd.commandLead().positionId()}"
+                                            th:data-rank-label="#{orgChart.rank.ENSIGN}"
+                                            th:text="#{orgChart.add.ensign}">Ensign hinzufügen</button>
+                                </li>
+                                <!-- Direkt unterstellt: Ensigns reporting straight to the Staffelleiter -->
+                                <li th:if="${!#lists.isEmpty(sq.directEnsigns())}">
+                                    <div class="oc-group-box" th:text="#{orgChart.directReports}">Direkt unterstellt</div>
+                                    <div class="oc-stack">
+                                        <div class="oc-stack-item" th:each="e : ${sq.directEnsigns()}">
+                                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e})}"></th:block>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+
+                            <button th:if="${sq.canAddCommand()}" type="button" class="oc-add"
+                                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                                    data-position-type="COMMAND_LEAD" th:data-org-unit-id="${sq.orgUnitId()}"
+                                    th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
+                                    th:text="#{orgChart.add.command}">Kommandogruppe hinzufügen</button>
+                            <button th:if="${sq.canAddEnsign()}" type="button" class="oc-add"
+                                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                                    data-position-type="ENSIGN" th:data-org-unit-id="${sq.orgUnitId()}"
+                                    th:data-rank-label="#{orgChart.rank.ENSIGN}"
+                                    th:text="#{orgChart.add.ensignDirect}">Ensign (direkt) hinzufügen</button>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Spezialkommandos: 1-2 Commander (SK-Leiter) -->
+                <li th:each="sk : ${orgChart.specialCommands()}">
+                    <div class="oc-unit-box oc-unit-box--sk">
+                        <span class="sh" th:text="${sk.shorthand()}">BRV</span>
+                        <span class="nm" th:text="${sk.name()}">Bravo</span>
+                    </div>
+                    <div class="oc-stack" th:if="${!#lists.isEmpty(sk.commanders())}">
+                        <div class="oc-stack-item" th:each="c : ${sk.commanders()}">
+                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${c})}"></th:block>
+                        </div>
+                    </div>
+                    <button th:if="${sk.canAddCommander()}" type="button" class="oc-add"
+                            sec:authorize="hasRole('ADMIN')" data-trigger="oc-add" data-position-type="SK_COMMANDER"
+                            th:data-org-unit-id="${sk.orgUnitId()}"
+                            th:data-rank-label="#{orgChart.rank.SK_COMMANDER}"
+                            th:text="#{orgChart.add.skCommander}">SK-Leiter hinzufügen</button>
+                </li>
+            </ul>
+        </div>
+
+        <div class="hud-box mt-2"
+             th:if="${#lists.isEmpty(orgChart.squadrons()) and #lists.isEmpty(orgChart.specialCommands())}"
+             style="color: var(--color-gray-2);"
+             th:text="#{orgChart.empty}">
+            Es sind noch keine profit-berechtigten Staffeln oder Spezialkommandos vorhanden.
+        </div>
+    </div>
+</main>
+
+<!-- Assign / reassign modal (admins only) -->
+<div id="oc-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
+     style="display:none;" sec:authorize="hasRole('ADMIN')">
+    <div class="modal-content hud-box">
+        <button type="button" class="oc-modal-close" data-trigger="oc-modal-cancel"
+                th:aria-label="#{general.cancel}">&times;</button>
+        <h2 id="oc-modal-title" th:text="#{orgChart.modal.title}">Position besetzen</h2>
+        <input type="hidden" id="oc-mode">
+        <input type="hidden" id="oc-position-type">
+        <input type="hidden" id="oc-org-unit-id">
+        <input type="hidden" id="oc-parent-id">
+        <input type="hidden" id="oc-position-id">
+        <input type="hidden" id="oc-version">
+        <div class="form-group">
+            <label for="oc-user" th:text="#{orgChart.modal.user}">Nutzer</label>
+            <select id="oc-user">
+                <option value="" th:text="#{orgChart.modal.userPlaceholder}">-- Bitte wählen --</option>
+                <option th:each="u : ${allUsers}" th:value="${u.id()}"
+                        th:text="${u.effectiveName() != null ? u.effectiveName() : u.username()}">User</option>
+            </select>
+        </div>
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem;">
+            <button type="button" class="btn btn-ghost" data-trigger="oc-modal-cancel"
+                    th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" data-trigger="oc-modal-submit"
+                    th:text="#{orgChart.modal.submit}">Zuweisen</button>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    (function () {
+        'use strict';
+        const chart = document.getElementById('oc-chart');
+        const modal = document.getElementById('oc-modal');
+
+        function csrfHeaders() {
+            const headers = {'Content-Type': 'application/json', 'Accept': 'application/json'};
+            const token = document.querySelector('meta[name="_csrf"]');
+            const header = document.querySelector('meta[name="_csrf_header"]');
+            if (token && header && header.content) {
+                headers[header.content] = token.content;
+            }
+            return headers;
+        }
+
+        function field(id) {
+            const el = document.getElementById(id);
+            return el ? el.value : '';
+        }
+
+        function setField(id, value) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.value = (value === null || value === undefined) ? '' : value;
+            }
+        }
+
+        function closeModal() {
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function openModal(mode, ctx) {
+            if (!modal) {
+                return;
+            }
+            setField('oc-mode', mode);
+            setField('oc-position-type', ctx.positionType);
+            setField('oc-org-unit-id', ctx.orgUnitId);
+            setField('oc-parent-id', ctx.parentId);
+            setField('oc-position-id', ctx.positionId);
+            setField('oc-version', ctx.version);
+            const userSel = document.getElementById('oc-user');
+            if (userSel) {
+                userSel.value = (mode === 'reassign' && ctx.userId) ? ctx.userId : '';
+            }
+            const titleEl = document.getElementById('oc-modal-title');
+            if (titleEl) {
+                const base = (mode === 'reassign')
+                    ? /*[[#{orgChart.modal.reassignTitle}]]*/ 'Reassign'
+                    : /*[[#{orgChart.modal.title}]]*/ 'Fill position';
+                titleEl.textContent = ctx.rankLabel ? (base + ' — ' + ctx.rankLabel) : base;
+            }
+            modal.style.display = 'flex';
+            if (userSel) {
+                userSel.focus();
+            }
+        }
+
+        function send(method, url, body) {
+            const opts = {method: method, headers: csrfHeaders()};
+            if (body !== null) {
+                opts.body = JSON.stringify(body);
+            }
+            fetch(url, opts).then(function (resp) {
+                if (resp.ok) {
+                    window.showFrontendSuccessToast(/*[[#{orgChart.toast.saved}]]*/ 'Saved');
+                    closeModal();
+                    setTimeout(function () {
+                        window.location.reload();
+                    }, 400);
+                    return null;
+                }
+                return resp.json().catch(function () {
+                    return {};
+                }).then(function (data) {
+                    let message;
+                    if (data && data.code === 'OPTIMISTIC_LOCK') {
+                        message = /*[[#{error.concurrency.conflict}]]*/ 'Conflict, please reload.';
+                    } else if (data && data.detail) {
+                        message = data.detail;
+                    } else {
+                        message = /*[[#{orgChart.error.generic}]]*/ 'Action failed.';
+                    }
+                    window.showFrontendErrorToast(message);
+                });
+            }).catch(function () {
+                window.showFrontendErrorToast(/*[[#{orgChart.error.generic}]]*/ 'Action failed.');
+            });
+        }
+
+        function submitModal() {
+            const userId = field('oc-user');
+            if (!userId) {
+                window.showFrontendErrorToast(/*[[#{orgChart.modal.userPlaceholder}]]*/ 'Please select a user.');
+                return;
+            }
+            if (field('oc-mode') === 'reassign') {
+                const id = encodeURIComponent(field('oc-position-id'));
+                send('PUT', '/org-chart/positions/' + id + '/ajax',
+                    {userId: userId, version: parseInt(field('oc-version'), 10)});
+                return;
+            }
+            const body = {positionType: field('oc-position-type'), userId: userId};
+            const orgUnitId = field('oc-org-unit-id');
+            if (orgUnitId) {
+                body.orgUnitId = orgUnitId;
+            }
+            const parentId = field('oc-parent-id');
+            if (parentId) {
+                body.parentId = parentId;
+            }
+            send('POST', '/org-chart/positions/ajax', body);
+        }
+
+        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+            window.krtEvents.on('click', 'oc-toggle-edit', function (btn) {
+                if (!chart) {
+                    return;
+                }
+                const editing = chart.classList.toggle('editing');
+                btn.textContent = editing
+                    ? /*[[#{orgChart.editDone}]]*/ 'Done editing'
+                    : /*[[#{orgChart.edit}]]*/ 'Edit';
+            });
+
+            window.krtEvents.on('click', 'oc-add', function (btn) {
+                openModal('create', {
+                    positionType: btn.getAttribute('data-position-type'),
+                    orgUnitId: btn.getAttribute('data-org-unit-id'),
+                    parentId: btn.getAttribute('data-parent-id'),
+                    rankLabel: btn.getAttribute('data-rank-label')
+                });
+            });
+
+            window.krtEvents.on('click', 'oc-reassign', function (btn) {
+                openModal('reassign', {
+                    positionId: btn.getAttribute('data-position-id'),
+                    version: btn.getAttribute('data-version'),
+                    userId: btn.getAttribute('data-user-id'),
+                    rankLabel: btn.getAttribute('data-rank-label')
+                });
+            });
+
+            window.krtEvents.on('click', 'oc-remove', function (btn) {
+                const isCommand = btn.getAttribute('data-position-type') === 'COMMAND_LEAD';
+                const message = isCommand
+                    ? /*[[#{orgChart.remove.confirmCommand}]]*/ 'Remove this command lead and its reports?'
+                    : /*[[#{orgChart.remove.confirm}]]*/ 'Really remove this position?';
+                const title = /*[[#{orgChart.remove.confirmTitle}]]*/ 'Remove position';
+                window.showKrtConfirm(title, message).then(function (ok) {
+                    if (ok) {
+                        const id = encodeURIComponent(btn.getAttribute('data-position-id'));
+                        send('DELETE', '/org-chart/positions/' + id + '/ajax', null);
+                    }
+                });
+            });
+
+            window.krtEvents.on('click', 'oc-modal-cancel', closeModal);
+            window.krtEvents.on('click', 'oc-modal-submit', submitModal);
+        }
+
+        if (modal) {
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+        }
+    })();
+</script>
+</body>
+</html>
