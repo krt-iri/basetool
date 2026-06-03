@@ -377,6 +377,28 @@ class RefineryOrderServiceTest {
       assertEquals(50.0, existing.getAmount(), "existing amount must accumulate, not replace");
       verify(inventoryItemRepository, times(1)).save(existing);
     }
+
+    @Test
+    void roundsSummedAmountToThreeDecimals_whenMatchFound() {
+      // Defence in depth: summing two valid (<=3-decimal) SCU amounts as doubles yields a
+      // >3-decimal artefact (1.1 + 2.2 == 3.3000000000000003). The producer rounds at the source
+      // so the in-memory amount is already clean — independent of the @PrePersist/@PreUpdate hook,
+      // which a mocked repository never fires.
+      InventoryItem existing = new InventoryItem();
+      existing.setAmount(1.1);
+      existing.setNote(null);
+
+      stubLookupsForSingleItem();
+      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
+              any(), any(), any(), any(), any(), any(), any()))
+          .thenReturn(List.of(existing));
+
+      refineryOrderService.storeRefineryOrder(
+          OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(itemWithAmount(2.2, null))), false);
+
+      assertEquals(3.3, existing.getAmount(), "summed amount must be rounded to three decimals");
+      verify(inventoryItemRepository, times(1)).save(existing);
+    }
   }
 
   // ------------------------------------------------------------------

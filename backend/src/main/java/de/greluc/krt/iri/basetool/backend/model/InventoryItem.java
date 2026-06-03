@@ -8,8 +8,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -92,4 +96,50 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @JoinColumn(name = "owning_org_unit_id", nullable = true)
   @ToString.Exclude
   private OrgUnit owningOrgUnit;
+
+  /**
+   * Rounds {@link #amount} to SCU storage precision (three decimals) before every {@code INSERT}
+   * and {@code UPDATE}.
+   *
+   * <p>{@code amount} is a {@code double}, so server-side arithmetic that sums or subtracts
+   * fractional quantities (the refinery store-into-inventory merge in {@code RefineryOrderService},
+   * transfers, handovers) can land on a neighbouring binary value whose shortest decimal form
+   * carries more than three fractional digits — e.g. summing refinery yields produced the stored
+   * value {@code 37.160000000000004}. The inbound DTO validator {@code
+   * ValidQuantityAmountValidator} rejects such precision on user input, but it never sees these
+   * internally computed amounts. This callback is the single persistence chokepoint every write
+   * path flushes through, so rounding here guarantees no row is ever stored with more than three
+   * decimals, no matter which service produced the value.
+   *
+   * <p>Rounding is unconditional rather than gated on {@link QuantityType#SCU}: {@code PIECE}
+   * amounts are whole numbers, so three-decimal rounding is a no-op for them, and reading {@link
+   * #material} inside a lifecycle callback would force a lazy-load of the proxy on every flush.
+   */
+  @PrePersist
+  @PreUpdate
+  void roundAmountToScuScale() {
+    amount = roundToScuScale(amount);
+  }
+
+  /**
+   * Rounds an SCU amount to three decimals using {@link RoundingMode#HALF_UP} (commercial
+   * rounding), leaving {@code null} untouched.
+   *
+   * <p>This is the canonical SCU-precision rounding that {@link #roundAmountToScuScale()} applies
+   * at the persistence boundary. It is also reused by write paths that compute an amount through
+   * {@code double} arithmetic <em>before</em> it reaches that hook — e.g. the refinery
+   * store-into-inventory merge in {@code RefineryOrderService} — so the in-memory value is already
+   * clean. That is defence in depth: the lifecycle callback remains the guarantee, but the producer
+   * no longer hands a dirty value around in the meantime.
+   *
+   * @param value the raw amount, possibly carrying floating-point noise beyond three decimals
+   * @return {@code value} rounded to three decimals, or {@code null} when {@code value} is {@code
+   *     null}
+   */
+  public static Double roundToScuScale(Double value) {
+    if (value == null) {
+      return null;
+    }
+    return BigDecimal.valueOf(value).setScale(3, RoundingMode.HALF_UP).doubleValue();
+  }
 }

@@ -20,6 +20,8 @@
 
 ### Fixed
 
+- **Lagerbestände mit Mengentyp SCU werden jetzt zuverlässig auf drei Nachkommastellen gerundet (kaufmännisch).** Beim Einlagern von Raffinerie-Ausbeuten summierte das Backend die Mengen als Gleitkommazahl ohne Rundung, sodass im Lager und im Ausbuchen-Dialog Werte wie 37,160000000000004 SCU auftauchten. Ein Persistenz-Guard am Lagereintrag rundet jetzt jeden Schreibpfad auf drei Stellen, und eine Migration bereinigt die bereits betroffenen Einträge (V137).
+
 - **Verlinkte Raffinerieaufträge auf der Missions-Detailseite zeigen die Endzeit jetzt in der lokalen Zeitzone des Nutzers statt in UTC.** Die Spalte „Ende" wurde serverseitig ohne Zeitzonenumrechnung formatiert; sie wird jetzt — wie in der Raffinerieauftrags-Liste — im Browser DST-korrekt in die Lokalzeit umgerechnet.
 
 - **Sicherheit: Die Raffinerie-Aufträge einer Mission (`GET /api/v1/refinery-orders/mission/{id}`) sind jetzt auf die Orgeinheit(en) des Aufrufers beschränkt.** Ein Logistiker konnte zuvor die Raffinerie-Finanzdaten (Ausgaben, Erlöse, Gewinn, Besitzer) einer fremden Staffel auslesen, indem er eine öffentliche Mission dieser Staffel aufrief; die Logistiker-Ansicht liefert jetzt nur noch Aufträge der eigenen Orgeinheit(en). Admins ohne aktive Staffel sehen weiterhin alles, eine angepinnte Staffel nur diese; die eigentümergefilterte Ansicht normaler Nutzer war nie betroffen.
