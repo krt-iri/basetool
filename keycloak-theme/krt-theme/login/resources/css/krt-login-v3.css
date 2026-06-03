@@ -5,7 +5,7 @@
  * typography stack, spacing) are defined in `frontend/src/main/resources/
  * static/css/styles.css :root`. This file mirrors the same values so the
  * Keycloak login renders identically to the in-app screens (same orange,
- * same dark background, same Ethnocentric headlines, same Lato body).
+ * same dark background, same Audiowide headlines, same Lato body).
  *
  * MAINTENANCE RULE: any styleguide change to a token must be reflected in
  * both files in the same commit. The `.btn` / `.btn-secondary` aliases at
@@ -22,9 +22,9 @@
  * period that the default `auto` causes. Matches frontend/static/css/styles.css.
  */
 @font-face {
-    font-family: 'Ethnocentric';
-    src: url('../fonts/Ethnocentric Rg.woff2') format('woff2'),
-         url('../fonts/Ethnocentric Rg.otf') format('opentype');
+    font-family: 'Audiowide';
+    src: url('../fonts/Audiowide-Regular.woff2') format('woff2'),
+         url('../fonts/Audiowide-Regular.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -69,9 +69,22 @@
     --color-gray-2: #646464;
     --color-gray-3: #282828;
     --color-gray-4: #141414;
-    
-    --font-headline: 'Ethnocentric', sans-serif;
+    --color-surface-input: #1C1C1C;
+
+    /* Semantic tokens — REQUIRED so validation errors render red, not the
+       brand orange. Mirror of frontend styles.css. Keep these values identical
+       with account/krt-account-v3.css :root (token-sync rule). */
+    --color-danger: #A3000A;
+    --color-success: #239E33;
+    --color-warning: #FFD23F;
+    --color-info: #355DDC;
+
+    --font-headline: 'Audiowide', sans-serif;
     --font-body: 'Lato', sans-serif;
+
+    /* Glows — orange bloom for the primary CTA, red bloom for error fields. */
+    --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
+    --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
 }
 
 /* Force override PatternFly variables globally */
@@ -101,8 +114,10 @@
     --pf-v6-global--primary-color--100: var(--color-primary) !important;
 }
 
-/* Hard reset for all backgrounds to remove the orange grid completely */
-body, html, .login-pf-page, .login-pf-body, [class*="login-pf"], [class*="pf-c-background"], [class*="pf-v5-c-background"], [class*="pf-v6-c-background"] {
+/* Hard reset for all backgrounds to remove the orange grid completely.
+   NOTE: `body` is intentionally NOT in this list — it carries the honeycomb
+   wash below. Every other PF surface stays hard-reset to flat black. */
+html, .login-pf-page, .login-pf-body, [class*="login-pf"], [class*="pf-c-background"], [class*="pf-v5-c-background"], [class*="pf-v6-c-background"] {
     background-image: none !important;
     background-color: var(--color-bg-black) !important;
 }
@@ -122,6 +137,16 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    /* Flat black + faint honeycomb wash + a soft top bloom, matching the app
+       login so the SSO redirect has no visual seam. The PF background grid
+       stays hard-reset everywhere else; only <body> carries this pattern. */
+    background-color: var(--color-bg-black);
+    background-image:
+        radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%),
+        url('../img/honeycomb-bg.svg');
+    background-repeat: no-repeat, repeat;
+    background-size: auto, 46px 26.56px;
+    background-attachment: fixed;
 }
 
 .login-container {
@@ -271,11 +296,13 @@ button.pf-v5-c-button.pf-m-primary {
     border: none !important;
     cursor: pointer;
     letter-spacing: 1px;
-    transition: background-color 0.3s, transform 0.1s;
+    transition: background-color 0.3s, box-shadow 0.3s, transform 0.1s;
     font-weight: normal !important;
     appearance: none !important;
     -webkit-appearance: none !important;
     border-radius: 0 !important;
+    /* The single filled-orange CTA per screen carries the brand bloom (action hierarchy). */
+    box-shadow: var(--glow-primary) !important;
 }
 
 .krt-button:hover,
@@ -291,7 +318,7 @@ input[type="button"]:hover,
 button[type="submit"]:hover,
 button.pf-c-button.pf-m-primary:hover,
 button.pf-v5-c-button.pf-m-primary:hover {
-    background-color: var(--color-accent-dark) !important; /* Accent Dark */
+    background-color: var(--color-accent-light) !important; /* lighten — system-standard primary hover */
 }
 
 .krt-button:active,
@@ -503,10 +530,50 @@ input[type="checkbox"]:checked::after,
 }
 
 .krt-error-message {
-    color: var(--color-primary) !important;
+    color: var(--color-danger) !important;
     font-size: 0.85em !important;
     display: block;
     margin-top: 5px;
+}
+.krt-error-message::before {
+    content: '\26A0  '; /* ⚠ — errors read as danger, not as the brand accent */
+}
+
+/* Keycloak validation errors — semantic red across PF v5 / v6 / legacy. The
+   brand orange is reserved for actions + identity; an error shown in orange
+   reads as a call-to-action instead of a problem. */
+#input-error,
+.kc-error-message,
+.kc-feedback-text,
+.input-error,
+.pf-c-form__helper-text.pf-m-error,
+.pf-v5-c-form__helper-text.pf-m-error,
+.pf-v6-c-form__helper-text.pf-m-error,
+.pf-c-form__helper-text--error,
+.pf-v5-c-form__helper-text--error,
+.pf-v6-c-form__helper-text--error,
+.alert-error,
+.pf-c-alert.pf-m-danger,
+.pf-v5-c-alert.pf-m-danger,
+.pf-v6-c-alert.pf-m-danger,
+.pf-c-alert.pf-m-danger .pf-c-alert__title,
+.pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__title,
+.pf-v6-c-alert.pf-m-danger .pf-v6-c-alert__title {
+    color: var(--color-danger) !important;
+}
+
+/* Invalid fields get a red bottom border + red glow (overriding the orange focus). */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"],
+.pf-c-form-control.pf-m-error,
+.pf-v5-c-form-control.pf-m-error,
+.pf-v6-c-form-control.pf-m-error,
+.pf-m-error input,
+.pf-m-error > input {
+    border-color: var(--color-danger) !important;
+    border-bottom: 2px solid var(--color-danger) !important;
+    box-shadow: var(--glow-danger) !important;
 }
 
 .krt-info-text {
@@ -556,7 +623,7 @@ input[type="checkbox"]:checked::after,
 }
 
 .krt-monospace-text {
-    color: var(--color-primary) !important;
+    color: var(--color-gray-1) !important;
     font-family: monospace !important;
     font-size: 1.1em !important;
 }
@@ -892,9 +959,38 @@ input[type="checkbox"]:checked::after,
     background-color: var(--color-gray-2);
 }
 .btn-danger {
-    background-color: var(--color-dept-combat, #A3000A);
+    background-color: var(--color-danger);
     color: #FFFFFF;
 }
 .btn-danger:hover {
     background-color: #D41A25;
+}
+
+/* ---- Keyboard focus (A11y) -------------------------------------------------
+   Inputs already show an orange focus glow; give buttons, links, checkboxes and
+   the locale toggle a visible focus ring too so keyboard users always see where
+   they are. PF's own blue focus ring is suppressed elsewhere — this is the KRT
+   replacement, not an addition on top of it. */
+.krt-button:focus-visible,
+.krt-button-secondary:focus-visible,
+.btn:focus-visible,
+.btn-secondary:focus-visible,
+.btn-danger:focus-visible,
+.pf-c-button:focus-visible,
+.pf-v5-c-button:focus-visible,
+.pf-v6-c-button:focus-visible,
+input[type="submit"]:focus-visible,
+input[type="button"]:focus-visible,
+button[type="submit"]:focus-visible,
+a:focus-visible,
+input[type="checkbox"]:focus-visible,
+.pf-c-check__input:focus-visible,
+.pf-v5-c-check__input:focus-visible,
+.pf-v6-c-check__input:focus-visible,
+#kc-locale button:focus-visible,
+#kc-current-locale-link:focus-visible,
+.pf-v5-c-menu-toggle:focus-visible,
+.pf-v6-c-menu-toggle:focus-visible {
+    outline: 2px solid var(--color-primary) !important;
+    outline-offset: 2px !important;
 }

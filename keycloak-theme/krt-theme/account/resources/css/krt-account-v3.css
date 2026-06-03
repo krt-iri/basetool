@@ -1,13 +1,26 @@
+/*
+ * KRT Keycloak ACCOUNT-console theme.
+ *
+ * DESIGN-TOKEN SOURCE OF TRUTH: frontend/src/main/resources/static/css/styles.css :root.
+ * This file mirrors those tokens; the shared design-token VALUES (colors,
+ * semantic colors, fonts, glows) and the body pattern are kept identical with
+ * login/krt-login-v3.css so the login screen and account console share one
+ * identity across the SSO redirect.
+ *
+ * MAINTENANCE RULE: any token change in colors_and_type.css / styles.css must be
+ * reflected in BOTH Keycloak CSS files in the SAME commit.
+ */
+
 /* Fonts */
 /*
- * WOFF2 first (~40% the size of TTF/OTF), TTF/OTF as a fallback for legacy
+ * WOFF2 first (~40% the size of TTF/OTF), TTF as a fallback for legacy
  * browsers. `font-display: swap` shows the system fallback immediately and
  * swaps in the brand font once it has arrived. Matches frontend/static/css/styles.css.
  */
 @font-face {
-    font-family: 'Ethnocentric';
-    src: url('../fonts/Ethnocentric Rg.woff2') format('woff2'),
-         url('../fonts/Ethnocentric Rg.otf') format('opentype');
+    font-family: 'Audiowide';
+    src: url('../fonts/Audiowide-Regular.woff2') format('woff2'),
+         url('../fonts/Audiowide-Regular.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -53,9 +66,21 @@
     --color-gray-2: #646464;
     --color-gray-3: #282828;
     --color-gray-4: #141414;
-    
-    --font-headline: 'Ethnocentric', sans-serif;
+    --color-surface-input: #1C1C1C;
+
+    /* Semantic tokens — REQUIRED so validation errors render red, not the brand
+       orange. Keep these values identical with login/krt-login-v3.css :root. */
+    --color-danger: #A3000A;
+    --color-success: #239E33;
+    --color-warning: #FFD23F;
+    --color-info: #355DDC;
+
+    --font-headline: 'Audiowide', sans-serif;
     --font-body: 'Lato', sans-serif;
+
+    /* Glows — orange bloom for the primary CTA, red bloom for error fields. */
+    --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
+    --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
 
     /* PatternFly Overrides to enforce simple CSS design */
     --pf-v5-global--FontFamily--sans-serif: var(--font-body);
@@ -69,8 +94,22 @@
     --pf-v5-global--Color--200: var(--color-gray-2);
 }
 
-/* Hard reset for all backgrounds to remove the orange grid completely */
-body, html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section, 
+/* Flat black + faint honeycomb wash + a soft top bloom, matching the app login
+   and the login theme so the account console shares one identity. The PF grid
+   stays hard-reset below; only <body> carries the pattern. */
+body {
+    background-color: var(--color-bg-black);
+    background-image:
+        radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%),
+        url('../img/honeycomb-bg.svg');
+    background-repeat: no-repeat, repeat;
+    background-size: auto, 46px 26.56px;
+    background-attachment: fixed;
+}
+
+/* Hard reset for all backgrounds to remove the orange grid completely.
+   NOTE: `body` is intentionally NOT in this list — it carries the honeycomb. */
+html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section,
 .pf-v5-c-page, .pf-v5-c-page__main, .pf-v5-c-page__main-section, 
 .pf-v6-c-page, .pf-v6-c-page__main, .pf-v6-c-page__main-section,
 .keycloak-account-page, [class*="pf-c-background"], [class*="pf-v5-c-background"], [class*="pf-v6-c-background"] {
@@ -235,10 +274,12 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     border: none !important;
     letter-spacing: 1px !important;
     padding: 12px 25px !important;
+    /* The single filled-orange CTA per screen carries the brand bloom. */
+    box-shadow: var(--glow-primary) !important;
 }
 
 .pf-v5-c-button.pf-m-primary:hover, .pf-v6-c-button.pf-m-primary:hover {
-    background-color: var(--color-accent-dark) !important;
+    background-color: var(--color-accent-light) !important; /* lighten — system-standard primary hover */
 }
 
 .pf-v5-c-button.pf-m-secondary, .pf-v6-c-button.pf-m-secondary {
@@ -266,4 +307,57 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .pf-v5-c-page__header, .pf-v6-c-page__header {
     background-color: var(--color-bg-dark-gray) !important;
     border-bottom: 2px solid var(--color-primary) !important;
+}
+
+/* Validation errors — semantic red across PF v5 / v6 / legacy (mirror of the
+   login theme). Orange is reserved for actions + identity; an error in orange
+   reads as a call-to-action instead of a problem. */
+#input-error,
+.kc-error-message,
+.kc-feedback-text,
+.input-error,
+.pf-c-form__helper-text.pf-m-error,
+.pf-v5-c-form__helper-text.pf-m-error,
+.pf-v6-c-form__helper-text.pf-m-error,
+.pf-c-form__helper-text--error,
+.pf-v5-c-form__helper-text--error,
+.pf-v6-c-form__helper-text--error,
+.alert-error,
+.pf-c-alert.pf-m-danger,
+.pf-v5-c-alert.pf-m-danger,
+.pf-v6-c-alert.pf-m-danger,
+.pf-c-alert.pf-m-danger .pf-c-alert__title,
+.pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__title,
+.pf-v6-c-alert.pf-m-danger .pf-v6-c-alert__title {
+    color: var(--color-danger) !important;
+}
+
+/* Invalid fields get a red bottom border + red glow (overriding the orange focus). */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"],
+.pf-c-form-control.pf-m-error,
+.pf-v5-c-form-control.pf-m-error,
+.pf-v6-c-form-control.pf-m-error,
+.pf-m-error input,
+.pf-m-error > input {
+    border-color: var(--color-danger) !important;
+    border-bottom: 2px solid var(--color-danger) !important;
+    box-shadow: var(--glow-danger) !important;
+}
+
+/* ---- Keyboard focus (A11y) -------------------------------------------------
+   Inputs already glow orange on focus; give buttons, links, checkboxes and the
+   nav a visible focus ring too. PF's blue focus is suppressed elsewhere — this
+   is the KRT replacement. */
+.pf-v5-c-button:focus-visible,
+.pf-v6-c-button:focus-visible,
+a:focus-visible,
+input[type="checkbox"]:focus-visible,
+.pf-v5-c-check__input:focus-visible,
+.pf-v6-c-check__input:focus-visible,
+.pf-v5-c-nav__link:focus-visible,
+.pf-v6-c-nav__link:focus-visible {
+    outline: 2px solid var(--color-primary) !important;
+    outline-offset: 2px !important;
 }
