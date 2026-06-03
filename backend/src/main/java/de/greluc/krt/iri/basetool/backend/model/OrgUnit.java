@@ -32,21 +32,18 @@ import lombok.ToString;
  * Subclasses that need their own columns can move to joined-strategy later via a dedicated
  * migration; nothing in the current shape needs subclass-specific columns.
  *
- * <p><b>Squadron is intentionally NOT in this hierarchy yet.</b> The legacy {@link Squadron} entity
- * still maps to the standalone {@code squadron} table during the R2.a soak window so the R1 schema
- * rollback path (drop the new tables, keep the legacy schema authoritative) stays viable. R2.b will
- * migrate {@code Squadron} to extend {@code OrgUnit}, switching its mapping to the {@code org_unit}
- * table and a {@code @DiscriminatorValue("SQUADRON")} marker. Until then, the {@code
- * kind='SQUADRON'} rows that V94 copied into {@code org_unit} are read-only ballast — readers of
- * {@code OrgUnit} (and any of its subclasses other than {@link SpecialCommand}) must avoid trying
- * to materialise them: {@link SpecialCommand}'s repository filters on the discriminator
- * automatically, and {@code OrgUnitMembership} stores {@code org_unit_id} as a plain UUID instead
- * of a JPA relation to {@code OrgUnit} so Hibernate cannot raise a {@code WrongClassException} on a
- * {@code SQUADRON}-discriminated row that has no Java subclass.
+ * <p><b>Squadron joined this hierarchy in R2.b.</b> The {@link Squadron} entity now maps to the
+ * {@code org_unit} table via {@code @DiscriminatorValue("SQUADRON")}, alongside {@link
+ * SpecialCommand}, so a polymorphic {@code OrgUnit} query materialises {@code kind='SQUADRON'} rows
+ * as {@link Squadron} and {@code kind='SPECIAL_COMMAND'} rows as {@link SpecialCommand}. The legacy
+ * {@code squadron} table is kept in lockstep with {@code org_unit} by the V97 trigger {@code
+ * sync_org_unit_to_squadron} so the existing {@code squadron_id} foreign keys still resolve, and
+ * {@code OrgUnitMembership} stores {@code org_unit_id} as a plain UUID rather than a JPA relation
+ * to {@code OrgUnit}, decoupling membership rows from the entity hierarchy.
  *
  * <p>Promotion-feature invariant: {@link #isPromotionEnabled} stays on this superclass so the
  * existing {@code SquadronScopeService.isPromotionFeatureEnabledForCurrentScope} contract carries
- * over unchanged once {@code Squadron} moves into the hierarchy in R2.b. The database CHECK
+ * over unchanged now that {@code Squadron} is in the hierarchy (R2.b). The database CHECK
  * constraint {@code chk_org_unit_promotion_only_squadron} (V94) enforces that {@code
  * is_promotion_enabled} is false for every {@code SPECIAL_COMMAND} row, so a careless setter call
  * on a {@link SpecialCommand} instance surfaces as a constraint violation at flush time rather than
