@@ -1,5 +1,6 @@
 /*
- * Personal Inventory — Blueprints SCMDB import flow (#327, Phase 6).
+ * Personal Inventory — Blueprints import flow (#327, Phase 6).
+ * Accepts both the SCMDB log-watcher export and the Basetool Blueprint Extractor JSON.
  *
  * Responsibilities:
  *  - "Import JSON" -> file pick -> POST the upload to the frontend preview proxy.
@@ -283,6 +284,7 @@
                 if (!result) { applyError(); return; }
                 const msg = (i18n().applied || 'Import complete.') + ' '
                         + (i18n().addedLabel || 'added') + ': ' + (result.added || 0) + ', '
+                        + (i18n().updatedLabel || 'updated') + ': ' + (result.acquiredAtUpdated || 0) + ', '
                         + (i18n().aliasesLabel || 'aliases') + ': ' + (result.aliasesLearned || 0) + ', '
                         + (i18n().skippedLabel || 'skipped') + ': ' + (result.skipped || 0);
                 if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg);

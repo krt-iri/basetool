@@ -120,7 +120,7 @@ class AdminPersonalBlueprintControllerTest {
         new BlueprintImportResolutionDto("Arclight Pistol", "arclight pistol", null, null);
     BlueprintImportApplyRequest req = new BlueprintImportApplyRequest(List.of(res));
     when(importService.applyImport(TARGET, List.of(res)))
-        .thenReturn(new BlueprintImportResultDto(1, 0, 0, 0));
+        .thenReturn(new BlueprintImportResultDto(1, 0, 0, 0, 0));
 
     BlueprintImportResultDto result = controller.applyImportForUser(TARGET, req);
 

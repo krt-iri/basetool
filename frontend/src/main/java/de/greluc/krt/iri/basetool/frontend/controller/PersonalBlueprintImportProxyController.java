@@ -26,15 +26,16 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Frontend proxy for the SCMDB blueprint import flow (#327, Phase 6). Two AJAX endpoints used by
- * the Blueprints-page import modal:
+ * Frontend proxy for the blueprint import flow (#327, Phase 6). Two AJAX endpoints used by the
+ * Blueprints-page import modal:
  *
  * <ul>
- *   <li>{@code POST /personal-inventory/blueprints/import/preview} — forwards the uploaded SCMDB
- *       JSON multipart to the backend {@code POST /api/v1/personal-blueprints/import/preview} via
- *       the authenticated {@link WebClient} (which attaches the OAuth2 token) and returns the typed
- *       preview unchanged. A backend parse failure (400) is surfaced as-is so the user sees a
- *       meaningful error.
+ *   <li>{@code POST /personal-inventory/blueprints/import/preview} — forwards the uploaded
+ *       blueprint export JSON multipart (SCMDB log-watcher or Basetool Blueprint Extractor) to the
+ *       backend {@code POST /api/v1/personal-blueprints/import/preview} via the authenticated
+ *       {@link WebClient} (which attaches the OAuth2 token) and returns the typed preview
+ *       unchanged. A backend parse failure (400) is surfaced as-is so the user sees a meaningful
+ *       error.
  *   <li>{@code POST /personal-inventory/blueprints/import/apply} — wraps the resolution list in the
  *       backend apply request and relays it via {@link BackendApiClient}.
  * </ul>
@@ -54,10 +55,10 @@ public class PersonalBlueprintImportProxyController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Proxies an SCMDB JSON upload to the backend import-preview endpoint and returns the resolution
-   * preview. The backend persists nothing at this step.
+   * Proxies a blueprint export JSON upload to the backend import-preview endpoint and returns the
+   * resolution preview. The backend persists nothing at this step.
    *
-   * @param file the uploaded SCMDB log-watcher JSON
+   * @param file the uploaded blueprint export JSON (SCMDB log-watcher or Basetool BP Extractor)
    * @return the import preview (per-name rows + status counts)
    * @throws ResponseStatusException with the backend's status if the upload is rejected (e.g. 400
    *     for an empty / malformed file), or 500 on an unexpected error
@@ -67,7 +68,7 @@ public class PersonalBlueprintImportProxyController {
     try {
       byte[] bytes = file.getBytes();
       String filename =
-          file.getOriginalFilename() != null ? file.getOriginalFilename() : "scmdb.json";
+          file.getOriginalFilename() != null ? file.getOriginalFilename() : "blueprints.json";
       MultipartBodyBuilder builder = new MultipartBodyBuilder();
       builder
           .part(
@@ -118,7 +119,7 @@ public class PersonalBlueprintImportProxyController {
               "/api/v1/personal-blueprints/import/apply",
               new BlueprintImportApplyRequest(list),
               BlueprintImportResultDto.class);
-      return result == null ? new BlueprintImportResultDto(0, 0, 0, 0) : result;
+      return result == null ? new BlueprintImportResultDto(0, 0, 0, 0, 0) : result;
     } catch (Exception e) {
       log.error("Blueprint import apply proxy failed for {} resolution(s)", list.size(), e);
       throw new ResponseStatusException(

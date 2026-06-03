@@ -4,6 +4,8 @@ import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.model.BlueprintExternalAlias;
 import de.greluc.krt.iri.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintExportEntryDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintExportFileDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportApplyRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportEntryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportPreviewDto;
@@ -11,15 +13,15 @@ import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportResolutionDto
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportStatus;
 import de.greluc.krt.iri.basetool.backend.model.dto.BlueprintImportSuggestionDto;
-import de.greluc.krt.iri.basetool.backend.model.dto.ScmdbBlueprintEntryDto;
-import de.greluc.krt.iri.basetool.backend.model.dto.ScmdbImportFileDto;
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintExternalAliasRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,15 +44,20 @@ import tools.jackson.databind.ObjectMapper;
  * SCMDB blueprint import engine (#327, Phase 4). Two steps:
  *
  * <ol>
- *   <li>{@link #previewImport(String, MultipartFile)} parses an uploaded SCMDB log-watcher JSON,
- *       de-duplicates by product name, and resolves each name against the master product list
- *       through a fixed chain — normalized exact match, then a curated {@code
- *       blueprint_external_alias} (SCMDB) lookup, then dependency-free fuzzy suggestions — flagging
- *       names the caller already owns. Nothing is persisted.
+ *   <li>{@link #previewImport(String, MultipartFile)} parses an uploaded blueprint export — the
+ *       SCMDB log-watcher or the <a
+ *       href="https://github.com/krt-iri/basetool-bp-extractor">Basetool Blueprint Extractor</a>,
+ *       both of which carry a {@code blueprints} array of identically-named entries — de-duplicates
+ *       by product name, and resolves each name against the master product list through a fixed
+ *       chain — normalized exact match, then a curated {@code blueprint_external_alias} lookup,
+ *       then dependency-free fuzzy suggestions — flagging names the caller already owns. Nothing is
+ *       persisted.
  *   <li>{@link #applyImport(String, List)} takes the user's per-name resolutions, creates the
  *       missing {@code personal_blueprint} rows, and — for every manual pick (where the name did
  *       not already match by normalization) — learns a {@code blueprint_external_alias} so the next
- *       import auto-resolves it.
+ *       import auto-resolves it. Re-importing an already-owned blueprint never inserts a duplicate
+ *       (also guarded by the {@code (owner_sub, product_key)} unique constraint); it only pulls the
+ *       stored acquisition time earlier when the import carries an earlier timestamp.
  * </ol>
  *
  * <p>The engine is {@code ownerSub}-parameterised and never reads the security context, so the
@@ -78,11 +85,12 @@ public class BlueprintImportService {
   private final GameItemRepository gameItemRepository;
 
   /**
-   * Parses an uploaded SCMDB export and previews how each unique blueprint name resolves against
-   * the master product list for {@code ownerSub}. No rows are persisted.
+   * Parses an uploaded blueprint export (SCMDB log-watcher or Basetool Blueprint Extractor) and
+   * previews how each unique blueprint name resolves against the master product list for {@code
+   * ownerSub}. No rows are persisted.
    *
    * @param ownerSub Keycloak {@code sub} the import is being previewed for (owned-flag computation)
-   * @param file the uploaded SCMDB log-watcher JSON
+   * @param file the uploaded blueprint export JSON
    * @return the preview with per-name rows and per-status counts
    * @throws BadRequestException if the file is empty, not valid JSON, or carries no blueprint array
    */
@@ -161,6 +169,12 @@ public class BlueprintImportService {
    * Repeated names / products within one request are de-duplicated, so re-submitting a preview is
    * idempotent.
    *
+   * <p>An already-owned blueprint is never duplicated (also guarded by the {@code (owner_sub,
+   * product_key)} unique constraint); re-importing it only pulls the stored acquisition time
+   * earlier when the current import carries an earlier timestamp (a missing or later timestamp
+   * leaves it untouched). That earlier value is written by mutating the managed entity and relying
+   * on dirty-checking — no {@code save()} / {@code flush()} — per the CLAUDE.md concurrency rules.
+   *
    * @param ownerSub Keycloak {@code sub} the rows are created for
    * @param resolutions the per-name decisions (see {@link BlueprintImportApplyRequest})
    * @return a summary of added / learned / skipped / already-owned counts
@@ -175,7 +189,8 @@ public class BlueprintImportService {
     int aliasesLearned = 0;
     int skipped = 0;
     int alreadyOwned = 0;
-    Set<String> ownedKeys = new HashSet<>(ownedKeys(ownerSub, productByKey.keySet()));
+    int acquiredAtUpdated = 0;
+    Map<String, PersonalBlueprint> ownedByKey = ownedByKey(ownerSub, productByKey.keySet());
     Set<String> aliasNamesSeen = new HashSet<>();
 
     for (BlueprintImportResolutionDto resolution : resolutions) {
@@ -197,25 +212,37 @@ public class BlueprintImportService {
         aliasesLearned++;
       }
 
-      if (ownedKeys.contains(product.productKey())) {
+      PersonalBlueprint existing = ownedByKey.get(product.productKey());
+      if (existing != null) {
+        // Re-import of an already-owned blueprint: never insert a duplicate (also guarded by the
+        // (owner_sub, product_key) unique constraint); only pull the acquisition time earlier when
+        // this import carries an earlier timestamp. Mutating the managed entity relies on
+        // dirty-checking — no save()/flush() — per the CLAUDE.md concurrency rules.
+        if (isEarlierAcquiredAt(resolution.acquiredAt(), existing.getAcquiredAt())) {
+          existing.setAcquiredAt(resolution.acquiredAt());
+          acquiredAtUpdated++;
+        }
         alreadyOwned++;
         continue;
       }
-      personalBlueprintRepository.save(
-          newOwned(ownerSub, product, resolution.acquiredAt(), resolution.note()));
-      ownedKeys.add(product.productKey());
+      ownedByKey.put(
+          product.productKey(),
+          personalBlueprintRepository.save(
+              newOwned(ownerSub, product, resolution.acquiredAt(), resolution.note())));
       added++;
     }
 
     log.info(
         "Blueprint import apply for ownerSub={}: added={} aliasesLearned={} skipped={}"
-            + " alreadyOwned={}",
+            + " alreadyOwned={} acquiredAtUpdated={}",
         ownerSub,
         added,
         aliasesLearned,
         skipped,
-        alreadyOwned);
-    return new BlueprintImportResultDto(added, aliasesLearned, skipped, alreadyOwned);
+        alreadyOwned,
+        acquiredAtUpdated);
+    return new BlueprintImportResultDto(
+        added, aliasesLearned, skipped, alreadyOwned, acquiredAtUpdated);
   }
 
   /**
@@ -340,11 +367,12 @@ public class BlueprintImportService {
 
   /**
    * Reads the multipart body and converts it into the de-duplicated parsed entries. Accepts either
-   * the documented {@code {"blueprints": [...]}} object or a bare array of blueprint records.
-   * Duplicate product names collapse to one entry that keeps the earliest {@code ts} as the
-   * acquisition suggestion; blank names are dropped.
+   * the documented {@code {"blueprints": [...]}} object (both the SCMDB log-watcher and the
+   * Basetool Blueprint Extractor wrap their records this way) or a bare array of blueprint records.
+   * Duplicate product names collapse to one entry that keeps the earliest acquisition time as the
+   * suggestion; blank names are dropped.
    *
-   * @param file the uploaded SCMDB JSON
+   * @param file the uploaded blueprint export JSON
    * @return parsed entries in first-seen order (possibly empty)
    * @throws BadRequestException if the file is empty, not valid JSON, or carries no blueprint array
    */
@@ -358,45 +386,84 @@ public class BlueprintImportService {
       root = objectMapper.readTree(file.getInputStream());
     } catch (IOException | JacksonException e) {
       log.warn("Blueprint import: failed to parse JSON — {}", e.getMessage());
-      throw new BadRequestException("The uploaded file could not be parsed as valid SCMDB JSON.");
+      throw new BadRequestException(
+          "The uploaded file could not be parsed as valid blueprint export JSON.");
     }
 
-    List<ScmdbBlueprintEntryDto> raw;
+    List<BlueprintExportEntryDto> raw;
     if (root != null && root.isArray()) {
-      raw = objectMapper.convertValue(root, new TypeReference<List<ScmdbBlueprintEntryDto>>() {});
+      raw = objectMapper.convertValue(root, new TypeReference<List<BlueprintExportEntryDto>>() {});
     } else if (root != null && root.isObject()) {
-      raw = objectMapper.convertValue(root, ScmdbImportFileDto.class).blueprints();
+      raw = objectMapper.convertValue(root, BlueprintExportFileDto.class).blueprints();
     } else {
       raw = null;
     }
     if (raw == null) {
       throw new BadRequestException(
-          "The uploaded file must contain a 'blueprints' array of SCMDB entries.");
+          "The uploaded file must contain a 'blueprints' array (SCMDB log-watcher or Basetool"
+              + " Blueprint Extractor export).");
     }
 
-    // Collapse duplicates by exact (trimmed) name, keeping the earliest timestamp.
-    LinkedHashMap<String, Double> minTsByName = new LinkedHashMap<>();
-    for (ScmdbBlueprintEntryDto entry : raw) {
+    // Collapse duplicates by exact (trimmed) name, keeping the earliest acquisition time.
+    LinkedHashMap<String, Instant> earliestByName = new LinkedHashMap<>();
+    for (BlueprintExportEntryDto entry : raw) {
       if (entry == null || entry.productName() == null || entry.productName().isBlank()) {
         continue;
       }
       String name = entry.productName().trim();
-      Double ts = entry.ts();
-      if (!minTsByName.containsKey(name)) {
-        minTsByName.put(name, ts);
+      Instant acquiredAt = acquiredAtOf(entry);
+      if (!earliestByName.containsKey(name)) {
+        earliestByName.put(name, acquiredAt);
       } else {
-        Double current = minTsByName.get(name);
-        if (ts != null && (current == null || ts < current)) {
-          minTsByName.put(name, ts);
+        Instant current = earliestByName.get(name);
+        if (acquiredAt != null && (current == null || acquiredAt.isBefore(current))) {
+          earliestByName.put(name, acquiredAt);
         }
       }
     }
 
-    List<ParsedEntry> entries = new ArrayList<>(minTsByName.size());
-    for (Map.Entry<String, Double> e : minTsByName.entrySet()) {
-      entries.add(new ParsedEntry(e.getKey(), toInstant(e.getValue())));
+    List<ParsedEntry> entries = new ArrayList<>(earliestByName.size());
+    for (Map.Entry<String, Instant> e : earliestByName.entrySet()) {
+      entries.add(new ParsedEntry(e.getKey(), e.getValue()));
     }
     return entries;
+  }
+
+  /**
+   * Resolves a parsed entry's acquisition instant from whichever timestamp its source exporter
+   * stamped: SCMDB's {@code ts} (fractional Unix epoch seconds) takes precedence, then the Basetool
+   * Blueprint Extractor's {@code receivedAt} (ISO-8601 instant). A malformed {@code receivedAt} is
+   * treated as absent rather than failing the whole import.
+   *
+   * @param entry the parsed export entry
+   * @return the acquisition instant, or {@code null} if neither field is present and parseable
+   */
+  @Nullable
+  private Instant acquiredAtOf(@NotNull BlueprintExportEntryDto entry) {
+    if (entry.ts() != null) {
+      return toInstant(entry.ts());
+    }
+    return parseInstant(entry.receivedAt());
+  }
+
+  /**
+   * Parses an ISO-8601 instant string (e.g. {@code 2026-03-26T16:49:31.050Z}) leniently. A blank or
+   * unparseable value yields {@code null} so one malformed record never aborts the import.
+   *
+   * @param iso the ISO-8601 instant string, or {@code null}
+   * @return the parsed instant, or {@code null}
+   */
+  @Nullable
+  private Instant parseInstant(@Nullable String iso) {
+    if (iso == null || iso.isBlank()) {
+      return null;
+    }
+    try {
+      return Instant.parse(iso.trim());
+    } catch (DateTimeParseException e) {
+      log.debug("Blueprint import: ignoring unparseable receivedAt '{}'", iso);
+      return null;
+    }
   }
 
   /**
@@ -434,16 +501,49 @@ public class BlueprintImportService {
    */
   @NotNull
   private Set<String> ownedKeys(@NotNull String ownerSub, @NotNull Set<String> keys) {
+    return new HashSet<>(ownedByKey(ownerSub, keys).keySet());
+  }
+
+  /**
+   * Loads the owner's existing blueprint rows for the given product keys, indexed by product key,
+   * via a single bulk lookup. Backs {@link #applyImport}'s duplicate skip and earliest-acquisition
+   * refresh; the returned entities are managed, so mutating one (e.g. its {@code acquiredAt}) is
+   * flushed by dirty-checking without an explicit {@code save()}.
+   *
+   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param keys the product keys to load
+   * @return owned rows indexed by product key (empty if {@code keys} is empty)
+   */
+  @NotNull
+  private Map<String, PersonalBlueprint> ownedByKey(
+      @NotNull String ownerSub, @NotNull Set<String> keys) {
     if (keys.isEmpty()) {
-      return Set.of();
+      return new HashMap<>();
     }
-    Set<String> owned = new HashSet<>();
+    Map<String, PersonalBlueprint> owned = new HashMap<>();
     for (PersonalBlueprint pb :
         personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(
             ownerSub, new ArrayList<>(keys))) {
-      owned.add(pb.getProductKey());
+      owned.putIfAbsent(pb.getProductKey(), pb);
     }
     return owned;
+  }
+
+  /**
+   * Decides whether an owned row's acquisition time should be pulled to an incoming import value:
+   * only when the incoming value is present and is either earlier than the stored one or fills a
+   * stored {@code null}. A {@code null} incoming never overwrites a stored value, so re-importing
+   * an export that lacks a timestamp can never erase a known acquisition time.
+   *
+   * @param incoming the acquisition instant from the current import, or {@code null}
+   * @param existing the instant currently stored on the owned row, or {@code null}
+   * @return {@code true} if {@code existing} should be replaced with {@code incoming}
+   */
+  private boolean isEarlierAcquiredAt(@Nullable Instant incoming, @Nullable Instant existing) {
+    if (incoming == null) {
+      return false;
+    }
+    return existing == null || incoming.isBefore(existing);
   }
 
   /**
@@ -475,11 +575,12 @@ public class BlueprintImportService {
   }
 
   /**
-   * A single de-duplicated SCMDB entry after parsing: the external product name plus the earliest
-   * acquisition timestamp seen for it.
+   * A single de-duplicated export entry after parsing: the external product name plus the earliest
+   * acquisition instant seen for it.
    *
-   * @param externalName the SCMDB {@code productName} (trimmed)
-   * @param suggestedAcquiredAt the earliest {@code ts} as an instant, or {@code null}
+   * @param externalName the export {@code productName} (trimmed)
+   * @param suggestedAcquiredAt the earliest acquisition instant (from {@code ts} or {@code
+   *     receivedAt}), or {@code null}
    */
   private record ParsedEntry(@NotNull String externalName, @Nullable Instant suggestedAcquiredAt) {}
 
