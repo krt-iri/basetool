@@ -4053,7 +4053,7 @@
       "put" : {
         "tags" : [ "org-chart-controller" ],
         "summary" : "Reassign or reorder an org-chart position",
-        "description" : "Changes the holder and/or the display order of an existing position. The functional rank and scope cannot change (move = remove + re-add). ADMIN-only.",
+        "description" : "Changes the holder, the Kommando name (COMMAND_LEAD only) and/or the display order of an existing position. The functional rank and scope cannot change (move = remove + re-add). Assigning a holder to a still-leaderless Kommando is a reassign through this endpoint. ADMIN-only.",
         "operationId" : "updatePosition",
         "parameters" : [ {
           "name" : "id",
@@ -4150,7 +4150,7 @@
       "delete" : {
         "tags" : [ "org-chart-controller" ],
         "summary" : "Remove an org-chart position",
-        "description" : "Deletes the position. Removing a Kommandoleiter also removes its Stv. Kommandoleiter and the Ensigns reporting into that command. ADMIN-only.",
+        "description" : "Deletes the position. Removing a Kommando (COMMAND_LEAD) also removes its Stv. Kommandoleiter and the Ensigns reporting into it. ADMIN-only.",
         "operationId" : "deletePosition",
         "parameters" : [ {
           "name" : "id",
@@ -13780,7 +13780,7 @@
       "post" : {
         "tags" : [ "org-chart-controller" ],
         "summary" : "Assign a user to an org-chart position",
-        "description" : "Creates a position binding a user to a functional rank within a scope (area leadership, Staffel or SK). Enforces the per-Staffel limits (≤4 Kommandoleiter, ≤4 Ensign), the ≤2 SK-Leiter limit, the scope/parent consistency rules and one-user-per-scope. ADMIN-only.",
+        "description" : "Creates a position binding a user to a functional rank within a scope (area leadership, Staffel or SK). A Kommando (COMMAND_LEAD) may instead be created without a holder and with a name, so its Stv. Kommandoleiter and Ensigns can be filled before its Kommandoleiter is assigned; every other rank requires a holder and rejects a name. Enforces the per-Staffel limits (≤4 Kommandos, ≤4 Ensign), the ≤2 SK-Leiter limit, the scope/parent consistency rules and one-user-per-scope. ADMIN-only.",
         "operationId" : "createPosition",
         "requestBody" : {
           "content" : {
@@ -27274,7 +27274,7 @@
       "get" : {
         "tags" : [ "org-chart-controller" ],
         "summary" : "Get the Profit-Bereich org chart",
-        "description" : "Returns the full org chart: the Bereichsleitung on top and a column for every active, profit-eligible Staffel and Spezialkommando below. Read-only and open to every authenticated user; editing is ADMIN-only via the position endpoints.",
+        "description" : "Returns the full org chart: the Bereichsleitung on top and a column for every active, profit-eligible Staffel and Spezialkommando (plus the configured Job-Order intake Spezialkommando) below. Read-only and open to every authenticated user; editing is ADMIN-only via the position endpoints.",
         "operationId" : "getOrgChart",
         "responses" : {
           "200" : {
@@ -35046,6 +35046,11 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
+          },
           "sortIndex" : {
             "type" : "integer",
             "format" : "int32"
@@ -35077,6 +35082,9 @@
             "format" : "uuid"
           },
           "userName" : {
+            "type" : "string"
+          },
+          "name" : {
             "type" : "string"
           },
           "parentId" : {
@@ -37139,12 +37147,17 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
+          },
           "sortIndex" : {
             "type" : "integer",
             "format" : "int32"
           }
         },
-        "required" : [ "positionType", "userId" ]
+        "required" : [ "positionType" ]
       },
       "HandoverReportItemDto" : {
         "type" : "object",
@@ -39086,8 +39099,27 @@
       "CommandChartDto" : {
         "type" : "object",
         "properties" : {
-          "commandLead" : {
-            "$ref" : "#/components/schemas/OrgChartNodeDto"
+          "positionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "sortIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "leaderUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "leaderUserName" : {
+            "type" : "string"
           },
           "deputy" : {
             "$ref" : "#/components/schemas/OrgChartNodeDto"

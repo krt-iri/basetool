@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Neue Seite „Organigramm" (`/org-chart`): visualisiert die Funktionsränge des Profit-Bereichs — die Bereichsleitung an der Spitze, darunter die profit-berechtigten Staffeln (Staffelleiter, bis zu vier Kommandogruppen mit je Kommandoleiter und Stv. und bis zu vier Ensign) und Spezialkommandos (1–2 Commander als SK-Leiter).** Jeder angemeldete Nutzer kann das Organigramm ansehen; nur Admins bearbeiten es über einen Inline-Modus direkt an den Knoten (zuweisen, neu zuweisen, entfernen). Rein informativ — eine Eintragung vergibt keine Berechtigungen (Migration V136).
+- **Neue Seite „Organigramm" (`/org-chart`): visualisiert die Funktionsränge des Profit-Bereichs — die Bereichsleitung an der Spitze, darunter die profit-berechtigten Staffeln (Staffelleiter, bis zu vier benennbare Kommandogruppen mit je Kommandoleiter, Stv. und bis zu vier Ensign) und Spezialkommandos (1–2 SK-Leiter); auch das als Auftrags-Eingang konfigurierte Spezialkommando wird angezeigt.** Eine Kommandogruppe lässt sich benennen und schon vor ihrem Kommandoleiter mit Stv. und Ensign besetzen — untergeordnete Posten sind also unabhängig vom übergeordneten besetzbar. Jeder angemeldete Nutzer kann das Organigramm ansehen; nur Admins bearbeiten es inline an den Knoten (zuweisen, neu zuweisen, umbenennen, entfernen). Rein informativ — eine Eintragung vergibt keine Berechtigungen (Migrationen V136/V138).
 
 - **Der Footer zeigt jetzt das „Made By The Community"-Logo und den erforderlichen Markenhinweis von Cloud Imperium Rights LLC.** Damit erfüllt die App die Vorgaben des offiziellen Star-Citizen-Fankits für Fan-Projekte; der Hinweis ist über den fest eingeblendeten Footer auf jeder Seite sichtbar.
 

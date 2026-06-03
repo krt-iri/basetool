@@ -21,9 +21,11 @@ import de.greluc.krt.iri.basetool.backend.model.dto.SquadronChartDto;
 import de.greluc.krt.iri.basetool.backend.repository.OrgChartPositionRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -41,24 +43,36 @@ import org.springframework.transaction.annotation.Transactional;
  * staffelScopedServicesMustWireOwnerScopeOrAuthHelper} ArchUnit whitelist. Read access is open to
  * every authenticated user; write access is gated to ADMIN at the controller.
  *
- * <p>The unit tier is exactly the active, profit-eligible Staffeln + SKs (loaded via {@link
- * OrgUnitRepository#findActiveProfitEligible()}); every such unit is rendered even when empty so an
- * admin can fill it in. All structural invariants the database cannot express in plain SQL — the
- * per-Staffel limits (≤{@value #MAX_COMMAND_LEADS} Kommandoleiter, ≤{@value #MAX_ENSIGNS} Ensign),
- * the per-SK limit (≤{@value #MAX_SK_COMMANDERS} SK-Leiter), the parent/scope consistency rules,
- * and "a user appears at most once per scope" — are enforced here and surface as 400 problem
- * responses. The singleton rules (one Bereichsleiter, one Staffelleiter per Staffel, one Stv. per
- * Kommando, one position per user and scope) are additionally backstopped by partial unique indexes
- * in migration {@code V136}, so a concurrent double-create there fails cleanly as a 409. The count
- * caps (≤4/≤2) are service-layer only: two interleaved creates could momentarily exceed a cap by
- * one — harmless for a descriptive, ADMIN-only chart where an admin simply removes the surplus.
+ * <p>The unit tier is the active, profit-eligible Staffeln + SKs (loaded via {@link
+ * OrgUnitRepository#findActiveProfitEligible()}) plus the configured Job-Order intake
+ * Spezialkommando (system setting {@code job_order.intake_special_command_id}). The intake SK is
+ * part of the profit pipeline by configuration — it accepts guest profit orders even though it is
+ * exempt from the profit-eligible flag — so it is rendered and made assignable here even when its
+ * {@code is_profit_eligible} column is {@code false}. Every such unit is rendered even when empty
+ * so an admin can fill it in.
+ *
+ * <p>All structural invariants the database cannot express in plain SQL — the per-Staffel limits
+ * (≤{@value #MAX_COMMAND_LEADS} Kommandos, ≤{@value #MAX_ENSIGNS} Ensign), the per-SK limit
+ * (≤{@value #MAX_SK_COMMANDERS} SK-Leiter), the parent/scope consistency rules, the "name /
+ * nullable holder only on a Kommando" rule, and "a user appears at most once per scope" — are
+ * enforced here and surface as 400 problem responses. The singleton rules (one Bereichsleiter, one
+ * Staffelleiter per Staffel, one Stv. per Kommando, one position per user and scope) are
+ * additionally backstopped by partial unique indexes in migrations {@code V136}/{@code V138}, so a
+ * concurrent double-create there fails cleanly as a 409. The count caps (≤4/≤2) are service-layer
+ * only: two interleaved creates could momentarily exceed a cap by one — harmless for a descriptive,
+ * ADMIN-only chart where an admin simply removes the surplus.
+ *
+ * <p>A {@link OrgChartPositionType#COMMAND_LEAD} row models the Kommando(gruppe) itself, carrying
+ * an optional {@code name} and an optional holder (the Kommandoleiter). This lets an admin create
+ * and name a Kommando, hang a Stv. Kommandoleiter and Ensigns off it, and only later assign its
+ * Kommandoleiter — so a subordinate seat is fillable while its superior is still vacant.
  */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OrgChartService {
 
-  /** Maximum number of Kommandoleiter (COMMAND_LEAD) positions per Staffel. */
+  /** Maximum number of Kommandos (COMMAND_LEAD rows) per Staffel. */
   static final int MAX_COMMAND_LEADS = 4;
 
   /**
@@ -69,6 +83,14 @@ public class OrgChartService {
   /** Maximum number of SK-Leiter (SK_COMMANDER) positions per Spezialkommando. */
   static final int MAX_SK_COMMANDERS = 2;
 
+  /**
+   * System-setting key holding the UUID of the Job-Order intake Spezialkommando. The chart surfaces
+   * this SK (and allows assigning its SK-Leiter) even when it is not flagged profit-eligible, since
+   * it processes guest profit orders by configuration. Mirrors {@code
+   * JobOrderService.INTAKE_SK_SETTING_KEY}.
+   */
+  private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
+
   private static final String ERR_SCOPE_MISMATCH = "problem.org_chart.scope_mismatch";
   private static final String ERR_UNIT_NOT_PROFIT = "problem.org_chart.unit_not_profit_eligible";
   private static final String ERR_INVALID_PARENT = "problem.org_chart.invalid_parent";
@@ -78,21 +100,25 @@ public class OrgChartService {
   private static final String ERR_DUPLICATE_LEAD = "problem.org_chart.duplicate_lead";
   private static final String ERR_DUPLICATE_DEPUTY = "problem.org_chart.duplicate_deputy";
   private static final String ERR_USER_ASSIGNED = "problem.org_chart.user_already_assigned";
+  private static final String ERR_USER_REQUIRED = "problem.org_chart.user_required";
+  private static final String ERR_NAME_NOT_ALLOWED = "problem.org_chart.name_not_allowed";
 
   private final OrgChartPositionRepository positionRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final UserRepository userRepository;
   private final OrgChartPositionMapper mapper;
+  private final SystemSettingService systemSettingService;
 
   /**
    * Assembles the entire chart as one nested read model: the Bereichsleitung plus a column for each
-   * active, profit-eligible Staffel and Spezialkommando (ordered by name). Open to every
-   * authenticated user.
+   * active, profit-eligible Staffel and Spezialkommando (and the configured intake SK), ordered by
+   * name. Open to every authenticated user.
    *
    * @return the assembled chart; never {@code null}. Empty scopes render as empty groups.
    */
   public OrgChartDto getOrgChart() {
-    List<OrgUnit> units = orgUnitRepository.findActiveProfitEligible();
+    List<OrgUnit> units = new ArrayList<>(orgUnitRepository.findActiveProfitEligible());
+    includeIntakeSpecialCommand(units);
     List<OrgUnit> squadrons =
         units.stream()
             .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
@@ -126,48 +152,54 @@ public class OrgChartService {
   }
 
   /**
-   * Creates a new position, validating scope/type consistency, parent rules, cardinality limits and
-   * the one-user-per-scope rule before persisting. ADMIN-only at the controller.
+   * Creates a new position, validating scope/type consistency, parent rules, cardinality limits,
+   * the name/holder rules and the one-user-per-scope rule before persisting. ADMIN-only at the
+   * controller. A {@code COMMAND_LEAD} create may omit the holder to make a still-leaderless
+   * Kommando and may carry a {@code name}; every other rank requires a holder and rejects a name.
    *
    * @param request the assignment payload; never {@code null}.
    * @return the persisted position as a flat DTO with id + version populated.
    * @throws NotFoundException if the user, the OrgUnit, or the referenced parent does not exist.
-   * @throws BadRequestException if any scope/parent/cardinality/uniqueness rule is violated.
+   * @throws BadRequestException if any scope/parent/cardinality/name/uniqueness rule is violated.
    */
   @Transactional
   public OrgChartPositionDto createPosition(@NotNull OrgChartPositionCreateRequest request) {
     OrgChartPositionType type = request.positionType();
     OrgChartScope scope = type.scope();
-    final User user =
-        userRepository
-            .findById(request.userId())
-            .orElseThrow(() -> new NotFoundException("User not found: " + request.userId()));
+    final User user = resolveHolderForCreate(type, request.userId());
 
     OrgUnit orgUnit = resolveScopeOrgUnit(scope, request.orgUnitId());
     final OrgChartPosition parent = resolveAndValidateParent(type, orgUnit, request.parentId());
     validateCardinality(type, orgUnit);
-    validateUserUnique(scope, orgUnit, request.userId());
+    final String name = validateAndNormalizeName(type, request.name());
+    if (user != null) {
+      validateUserUnique(scope, orgUnit, request.userId());
+    }
 
     OrgChartPosition position = new OrgChartPosition();
     position.setPositionType(type);
     position.setOrgUnit(orgUnit);
     position.setUser(user);
+    position.setName(name);
     position.setParent(parent);
     position.setSortIndex(request.sortIndex() != null ? request.sortIndex() : 0);
     return mapper.toDto(positionRepository.save(position));
   }
 
   /**
-   * Reassigns the holder and/or reorders an existing position. The functional rank, scope and
-   * parent are immutable after creation (move = remove + re-add), so only {@code userId} and {@code
-   * sortIndex} are honoured; a {@code null} field leaves the current value unchanged.
+   * Reassigns the holder, renames a Kommando and/or reorders an existing position. The functional
+   * rank, scope and parent are immutable after creation (move = remove + re-add), so only {@code
+   * userId}, {@code name} (Kommando only) and {@code sortIndex} are honoured; a {@code null} field
+   * leaves the current value unchanged, while a blank {@code name} clears it. Assigning a holder to
+   * a still-leaderless Kommando is just a reassign through {@code userId}.
    *
    * @param id the position id; never {@code null}.
    * @param request the edit payload carrying the current optimistic-lock version; never {@code
    *     null}.
    * @return the updated position as a flat DTO with the bumped version.
    * @throws NotFoundException if the position or the new user does not exist.
-   * @throws BadRequestException if the new holder already occupies a position in the same scope.
+   * @throws BadRequestException if the new holder already occupies a position in the same scope, or
+   *     a name is supplied for a non-Kommando rank.
    * @throws ObjectOptimisticLockingFailureException if the supplied version is stale.
    */
   @Transactional
@@ -180,14 +212,23 @@ public class OrgChartService {
     if (position.getVersion() != null && !position.getVersion().equals(request.version())) {
       throw new ObjectOptimisticLockingFailureException(OrgChartPosition.class, id);
     }
-    if (request.userId() != null && !request.userId().equals(position.getUser().getId())) {
-      User newUser =
-          userRepository
-              .findById(request.userId())
-              .orElseThrow(() -> new NotFoundException("User not found: " + request.userId()));
-      validateUserUnique(
-          position.getPositionType().scope(), position.getOrgUnit(), request.userId());
-      position.setUser(newUser);
+    if (request.name() != null) {
+      if (position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
+        throw new BadRequestException(ERR_NAME_NOT_ALLOWED);
+      }
+      position.setName(trimToNull(request.name()));
+    }
+    if (request.userId() != null) {
+      User current = position.getUser();
+      if (current == null || !request.userId().equals(current.getId())) {
+        User newUser =
+            userRepository
+                .findById(request.userId())
+                .orElseThrow(() -> new NotFoundException("User not found: " + request.userId()));
+        validateUserUnique(
+            position.getPositionType().scope(), position.getOrgUnit(), request.userId());
+        position.setUser(newUser);
+      }
     }
     if (request.sortIndex() != null) {
       position.setSortIndex(request.sortIndex());
@@ -196,10 +237,10 @@ public class OrgChartService {
   }
 
   /**
-   * Removes a position. Removing a Kommandoleiter cascades to its Stv. Kommandoleiter and the
-   * Ensigns reporting into that command (the {@code parent_id} FK is {@code ON DELETE CASCADE});
-   * the inline editor warns the admin of the affected children before calling this. ADMIN-only at
-   * the controller.
+   * Removes a position. Removing a Kommando (COMMAND_LEAD) cascades to its Stv. Kommandoleiter and
+   * the Ensigns reporting into it (the {@code parent_id} FK is {@code ON DELETE CASCADE}); the
+   * inline editor warns the admin of the affected children before calling this. ADMIN-only at the
+   * controller.
    *
    * @param id the position id; never {@code null}.
    * @throws NotFoundException if no position matches the id.
@@ -236,30 +277,12 @@ public class OrgChartService {
             .findFirst()
             .map(mapper::toNode)
             .orElse(null);
-    List<OrgChartPosition> commandLeads =
+    List<OrgChartPosition> commands =
         positions.stream()
             .filter(p -> p.getPositionType() == OrgChartPositionType.COMMAND_LEAD)
             .toList();
-    List<CommandChartDto> commands =
-        commandLeads.stream()
-            .map(
-                cl ->
-                    new CommandChartDto(
-                        mapper.toNode(cl),
-                        positions.stream()
-                            .filter(
-                                p ->
-                                    p.getPositionType() == OrgChartPositionType.DEPUTY_COMMAND_LEAD)
-                            .filter(p -> isChildOf(p, cl))
-                            .findFirst()
-                            .map(mapper::toNode)
-                            .orElse(null),
-                        positions.stream()
-                            .filter(p -> p.getPositionType() == OrgChartPositionType.ENSIGN)
-                            .filter(p -> isChildOf(p, cl))
-                            .map(mapper::toNode)
-                            .toList()))
-            .toList();
+    List<CommandChartDto> commandDtos =
+        commands.stream().map(cmd -> buildCommand(cmd, positions)).toList();
     List<OrgChartNodeDto> directEnsigns =
         positions.stream()
             .filter(p -> p.getPositionType() == OrgChartPositionType.ENSIGN)
@@ -273,10 +296,45 @@ public class OrgChartService {
         unit.getName(),
         unit.getShorthand(),
         lead,
-        commands,
+        commandDtos,
         directEnsigns,
-        commandLeads.size() < MAX_COMMAND_LEADS,
+        commands.size() < MAX_COMMAND_LEADS,
         ensignCount < MAX_ENSIGNS);
+  }
+
+  /**
+   * Projects one Kommando row plus its children into a {@link CommandChartDto}. The Kommandoleiter
+   * lives on the Kommando row itself, so it is carried inline ({@code null} while vacant); the Stv.
+   * and Ensigns are the rows whose {@code parent_id} points back at this Kommando.
+   *
+   * @param command the Kommando ({@code COMMAND_LEAD}) row, with its user fetched.
+   * @param siblings every position of the owning Staffel, used to find this Kommando's children.
+   * @return the assembled Kommando DTO; never {@code null}.
+   */
+  private CommandChartDto buildCommand(OrgChartPosition command, List<OrgChartPosition> siblings) {
+    User leader = command.getUser();
+    OrgChartNodeDto deputy =
+        siblings.stream()
+            .filter(p -> p.getPositionType() == OrgChartPositionType.DEPUTY_COMMAND_LEAD)
+            .filter(p -> isChildOf(p, command))
+            .findFirst()
+            .map(mapper::toNode)
+            .orElse(null);
+    List<OrgChartNodeDto> ensigns =
+        siblings.stream()
+            .filter(p -> p.getPositionType() == OrgChartPositionType.ENSIGN)
+            .filter(p -> isChildOf(p, command))
+            .map(mapper::toNode)
+            .toList();
+    return new CommandChartDto(
+        command.getId(),
+        command.getName(),
+        command.getVersion(),
+        command.getSortIndex(),
+        leader != null ? leader.getId() : null,
+        leader != null ? leader.getEffectiveName() : null,
+        deputy,
+        ensigns);
   }
 
   private SpecialCommandChartDto buildSpecialCommand(
@@ -299,7 +357,43 @@ public class OrgChartService {
     return child.getParent() != null && parent.getId().equals(child.getParent().getId());
   }
 
+  /**
+   * Adds the configured Job-Order intake Spezialkommando to the unit list if it is set, active, of
+   * SK kind, and not already present (it may already be in the list when it also carries the
+   * profit-eligible flag). The intake SK belongs to the profit pipeline by configuration, so it
+   * appears in the chart even without the flag.
+   *
+   * @param units the mutable unit list to augment in place.
+   */
+  private void includeIntakeSpecialCommand(List<OrgUnit> units) {
+    intakeSpecialCommandId()
+        .filter(id -> units.stream().noneMatch(u -> id.equals(u.getId())))
+        .flatMap(orgUnitRepository::findById)
+        .filter(u -> u.isActive() && u.getKind() == OrgUnitKind.SPECIAL_COMMAND)
+        .ifPresent(units::add);
+  }
+
   // ----------------------------------------------------------------- write guards --
+
+  private User resolveHolderForCreate(OrgChartPositionType type, UUID userId) {
+    if (userId == null) {
+      if (type == OrgChartPositionType.COMMAND_LEAD) {
+        return null; // a Kommando may be created before its Kommandoleiter is assigned
+      }
+      throw new BadRequestException(ERR_USER_REQUIRED);
+    }
+    return userRepository
+        .findById(userId)
+        .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+  }
+
+  private String validateAndNormalizeName(OrgChartPositionType type, String rawName) {
+    String normalized = trimToNull(rawName);
+    if (normalized != null && type != OrgChartPositionType.COMMAND_LEAD) {
+      throw new BadRequestException(ERR_NAME_NOT_ALLOWED);
+    }
+    return normalized;
+  }
 
   private OrgUnit resolveScopeOrgUnit(OrgChartScope scope, UUID orgUnitId) {
     if (scope == OrgChartScope.AREA) {
@@ -320,7 +414,7 @@ public class OrgChartService {
     if (unit.getKind() != expectedKind) {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
-    if (!unit.isActive() || !unit.isProfitEligible()) {
+    if (!unit.isActive() || (!unit.isProfitEligible() && !isIntakeSpecialCommand(unit))) {
       throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
     }
     return unit;
@@ -346,7 +440,7 @@ public class OrgChartService {
       return parent;
     }
     // ENSIGN: a null parent means "reports directly to the Staffelleiter"; a non-null parent must
-    // be a Kommandoleiter in the same Staffel.
+    // be a Kommando in the same Staffel.
     return parentId == null ? null : loadCommandLeadParent(parentId, orgUnit);
   }
 
@@ -399,7 +493,7 @@ public class OrgChartService {
           throw new BadRequestException(ERR_COMMANDER_LIMIT);
         }
       }
-      // DEPUTY_COMMAND_LEAD's "at most one per command" is enforced during parent resolution;
+      // DEPUTY_COMMAND_LEAD's "at most one per Kommando" is enforced during parent resolution;
       // AREA_COORDINATOR / AREA_OPERATOR / AREA_COMMANDER are unbounded.
       default -> {
         // no cardinality limit
@@ -415,5 +509,35 @@ public class OrgChartService {
     if (alreadyAssigned) {
       throw new BadRequestException(ERR_USER_ASSIGNED);
     }
+  }
+
+  private boolean isIntakeSpecialCommand(OrgUnit unit) {
+    return unit != null
+        && unit.getKind() == OrgUnitKind.SPECIAL_COMMAND
+        && intakeSpecialCommandId().filter(id -> id.equals(unit.getId())).isPresent();
+  }
+
+  private Optional<UUID> intakeSpecialCommandId() {
+    return systemSettingService
+        .getSettingValue(INTAKE_SK_SETTING_KEY)
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .flatMap(OrgChartService::parseUuid);
+  }
+
+  private static Optional<UUID> parseUuid(String raw) {
+    try {
+      return Optional.of(UUID.fromString(raw));
+    } catch (IllegalArgumentException ex) {
+      return Optional.empty();
+    }
+  }
+
+  private static String trimToNull(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }

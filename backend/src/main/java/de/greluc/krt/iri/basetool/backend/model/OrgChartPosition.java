@@ -35,6 +35,15 @@ import lombok.ToString;
  * Stv. and the Ensigns reporting into it in one statement; the inline editor warns the admin about
  * those children before the delete.
  *
+ * <p><b>Kommando(gruppe).</b> A {@link OrgChartPositionType#COMMAND_LEAD} row models the Kommando
+ * itself, not merely the person leading it: it carries an optional group {@link #name} and an
+ * optional holder ({@link #user} may be {@code null} while the Kommandoleiter seat is still
+ * vacant). This is the one rank allowed to have a null user — it lets an admin create and name a
+ * Kommando, attach a Stv. Kommandoleiter and Ensigns to it, and only later assign the
+ * Kommandoleiter. The {@code chk_org_chart_user} / {@code chk_org_chart_name} CHECK constraints
+ * (migration {@code V138}) confine both the nullable holder and the {@code name} to this rank;
+ * every other rank keeps its mandatory holder and a {@code null} name.
+ *
  * <p><b>Descriptive only.</b> Nothing here feeds authorization — the chart records who holds which
  * functional rank; permissions stay with the role model and the {@code org_unit_membership} flags.
  */
@@ -75,13 +84,24 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   private OrgUnit orgUnit;
 
   /**
-   * The user holding this position. Never {@code null}; {@code ON DELETE CASCADE} removes the
-   * position if the user row is hard-deleted.
+   * The user holding this position. {@code null} only for a still-leaderless {@link
+   * OrgChartPositionType#COMMAND_LEAD} Kommando (see the class-level "Kommando(gruppe)" note); the
+   * {@code chk_org_chart_user} CHECK keeps it {@code NOT NULL} for every other rank. {@code ON
+   * DELETE CASCADE} removes the position if the user row is hard-deleted.
    */
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "user_id", nullable = false)
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id")
   @ToString.Exclude
   private User user;
+
+  /**
+   * The Kommando's display name (Kommandogruppen-Name), e.g. {@code "Alpha"}. Only ever set on a
+   * {@link OrgChartPositionType#COMMAND_LEAD} row — the {@code chk_org_chart_name} CHECK forces it
+   * {@code null} for every other rank. {@code null} means the Kommando is unnamed; the UI then
+   * shows a generic fallback label. Capped at 120 characters by the column definition.
+   */
+  @Column(name = "name", length = 120)
+  private String name;
 
   /**
    * The position this one reports into within the same Staffel: a Kommandoleiter for a deputy, or
