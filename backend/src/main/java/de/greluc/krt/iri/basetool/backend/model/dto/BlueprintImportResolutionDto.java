@@ -10,7 +10,7 @@ import java.time.Instant;
  * chosen product does not already match the external name by normalization, the apply step learns a
  * {@code blueprint_external_alias} so future imports auto-resolve it.
  *
- * @param externalName the SCMDB {@code productName} this decision applies to (from the preview)
+ * @param externalName the export {@code productName} this decision applies to (from the preview)
  * @param productKey normalized key of the chosen product, or blank / {@code null} to skip
  * @param acquiredAt optional acquisition time to stamp (typically the preview's suggestion)
  * @param note optional free-form note (max 2000 chars)

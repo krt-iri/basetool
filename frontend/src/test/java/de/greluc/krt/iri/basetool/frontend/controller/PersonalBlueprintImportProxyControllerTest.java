@@ -124,7 +124,7 @@ class PersonalBlueprintImportProxyControllerTest {
             eq("/api/v1/personal-blueprints/import/apply"),
             any(BlueprintImportApplyRequest.class),
             eq(BlueprintImportResultDto.class)))
-        .thenReturn(new BlueprintImportResultDto(2, 1, 0, 0));
+        .thenReturn(new BlueprintImportResultDto(2, 1, 0, 0, 0));
 
     BlueprintImportResultDto result =
         controller.apply(

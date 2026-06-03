@@ -12,13 +12,13 @@ import java.util.UUID;
  * #suggestions} list carries the fuzzy candidates and the resolved fields are {@code null}; {@link
  * BlueprintImportStatus#UNMATCHED} carries neither.
  *
- * @param externalName the SCMDB {@code productName} exactly as it appeared in the upload
+ * @param externalName the export {@code productName} exactly as it appeared in the upload
  * @param status the resolution outcome for this name
  * @param productKey normalized key of the resolved product, or {@code null} when unresolved
  * @param productName display name of the resolved product, or {@code null} when unresolved
  * @param outputItemId resolved output {@code game_item} id, or {@code null} when none / unresolved
- * @param suggestedAcquiredAt acquisition time derived from the earliest SCMDB {@code ts}, or {@code
- *     null} if the export carried no timestamp
+ * @param suggestedAcquiredAt acquisition time derived from the earliest export timestamp ({@code
+ *     ts} or {@code receivedAt}), or {@code null} if the export carried no timestamp
  * @param suggestions fuzzy candidates (highest score first); empty unless {@code status} is {@link
  *     BlueprintImportStatus#SUGGESTED}
  */

@@ -6,6 +6,10 @@
 
 - **Der Footer zeigt jetzt das „Made By The Community"-Logo und den erforderlichen Markenhinweis von Cloud Imperium Rights LLC.** Damit erfüllt die App die Vorgaben des offiziellen Star-Citizen-Fankits für Fan-Projekte; der Hinweis ist über den fest eingeblendeten Footer auf jeder Seite sichtbar.
 
+- **Der Blueprint-Import im persönlichen Inventar akzeptiert jetzt zusätzlich das JSON des [Basetool Blueprint Extractor](https://github.com/krt-iri/basetool-bp-extractor), nicht mehr nur den SCMDB-Log-Watcher-Export.** Beide Formate liefern dieselben Bauplan-Namen; der Erhalt-Zeitstempel wird aus `ts` (SCMDB) oder `receivedAt` (Extractor) gelesen, und gelernte Namens-Aliase gelten für beide Tools.
+
+- **Mehrfaches Importieren ist unkritisch: bereits vorhandene Baupläne werden nicht doppelt angelegt, und ihr Erhalt-Zeitpunkt wird nur dann aktualisiert, wenn der erneute Import einen früheren Zeitpunkt liefert.**
+
 ### Changed
 
 - **Auftrags-Workflow jetzt profit-gegated: nur Mitglieder einer profit-berechtigten Staffel/SK (und Admins) dürfen Aufträge sehen, bearbeiten (Status/Priorität/Materialien/Handover/Reassign) und Material-Claims setzen; reine Nicht-Profit-Mitglieder können Aufträge nur noch anlegen, sonst nichts.** Im Menü ersetzt „Auftrag anlegen" den „Aufträge"-Link, und ein Direktaufruf von `/orders` bzw. `/orders/{id}` leitet für sie auf das Anlege-Formular um. Das Backend setzt dasselbe Gate auf Lese-, Schreib- und Claim-Endpunkten durch (leere Liste bzw. `403`) — auch die sonst staffelübergreifend öffentliche SK-Warteschlange bleibt für Nicht-Profit-Mitglieder verborgen.

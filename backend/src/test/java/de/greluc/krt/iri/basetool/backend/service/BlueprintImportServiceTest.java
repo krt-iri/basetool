@@ -186,6 +186,101 @@ class BlueprintImportServiceTest {
   }
 
   @Test
+  void preview_acceptsFullScmdbWatcherDocumentShape() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+
+    // Exact shape the original SCMDB log-watcher import mode (run_import) writes: a metadata
+    // envelope plus a blueprints[] of entries carrying productName + ts (fractional epoch SECONDS,
+    // value taken from a real Game.log line) and mission-correlation fields the import ignores.
+    String json =
+        "{\"exportSchemaVersion\":1,\"watcherVersion\":\"0.1.7\",\"channel\":\"LIVE\","
+            + "\"exportedAt\":\"2026-03-26T17:00:00+00:00\",\"sourceLogs\":[\"Game Build(1).log\"],"
+            + "\"missions\":[],"
+            + "\"blueprints\":[{\"productName\":\"Calico Legs Tactical\",\"ts\":1774534484.296,"
+            + "\"missionGuid\":\"g\",\"missionDebugName\":\"d\","
+            + "\"missionContractDefinitionId\":\"c\",\"missionTrigger\":\"complete\"}]}";
+    BlueprintImportPreviewDto preview = service.previewImport(SUB, upload(json));
+
+    assertEquals(1, preview.total());
+    assertEquals(1, preview.matched());
+    BlueprintImportEntryDto entry = preview.entries().get(0);
+    assertEquals("calico legs tactical", entry.productKey());
+    // ts is epoch SECONDS; 1774534484.296 -> 2026-03-26T14:14:44.296Z (verified against the
+    // watcher).
+    assertEquals(Instant.parse("2026-03-26T14:14:44.296Z"), entry.suggestedAcquiredAt());
+  }
+
+  @Test
+  void preview_acceptsBpExtractorReceivedAtFormat() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+
+    // Basetool Blueprint Extractor shape: full document with receivedAt (ISO-8601) instead of ts.
+    String json =
+        "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
+            + "\"players\":[{\"handle\":\"greluc\",\"blueprintCount\":1}],"
+            + "\"blueprints\":[{\"productName\":\"Arclight Pistol\",\"category\":\"Weapon\","
+            + "\"receivedAt\":\"2026-03-26T16:49:31.050Z\",\"player\":\"greluc\"}]}";
+    BlueprintImportPreviewDto preview = service.previewImport(SUB, upload(json));
+
+    assertEquals(1, preview.total());
+    assertEquals(1, preview.matched());
+    BlueprintImportEntryDto entry = preview.entries().get(0);
+    assertEquals(BlueprintImportStatus.MATCHED, entry.status());
+    assertEquals("arclight pistol", entry.productKey());
+    assertEquals(Instant.parse("2026-03-26T16:49:31.050Z"), entry.suggestedAcquiredAt());
+  }
+
+  @Test
+  void preview_prefersTsOverReceivedAtWhenBothPresent() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+
+    // ts (epoch seconds) wins over receivedAt when an export carries both.
+    String json =
+        "{\"blueprints\":[{\"productName\":\"Arclight Pistol\",\"ts\":1700000000.0,"
+            + "\"receivedAt\":\"2026-03-26T16:49:31.050Z\"}]}";
+    BlueprintImportPreviewDto preview = service.previewImport(SUB, upload(json));
+
+    assertEquals(
+        Instant.ofEpochMilli(1700000000000L), preview.entries().get(0).suggestedAcquiredAt());
+  }
+
+  @Test
+  void preview_dedupesBpExtractorEntriesKeepingEarliestReceivedAt() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+
+    // Two records of the same product; the later receivedAt appears first in the file.
+    String json =
+        "{\"blueprints\":["
+            + "{\"productName\":\"Arclight Pistol\",\"receivedAt\":\"2026-03-26T16:49:31.050Z\"},"
+            + "{\"productName\":\"Arclight Pistol\",\"receivedAt\":\"2025-01-01T00:00:00.000Z\"}]}";
+    BlueprintImportPreviewDto preview = service.previewImport(SUB, upload(json));
+
+    assertEquals(1, preview.total());
+    assertEquals(
+        Instant.parse("2025-01-01T00:00:00.000Z"), preview.entries().get(0).suggestedAcquiredAt());
+  }
+
+  @Test
+  void preview_ignoresUnparseableReceivedAt() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+
+    BlueprintImportPreviewDto preview =
+        service.previewImport(
+            SUB,
+            upload(
+                "{\"blueprints\":[{\"productName\":\"Arclight"
+                    + " Pistol\",\"receivedAt\":\"nope\"}]}"));
+
+    assertEquals(1, preview.matched());
+    assertNull(preview.entries().get(0).suggestedAcquiredAt());
+  }
+
+  @Test
   void preview_emptyFileThrowsBadRequest() {
     MultipartFile empty =
         new MockMultipartFile("file", "scmdb.json", "application/json", new byte[0]);
@@ -325,5 +420,109 @@ class BlueprintImportServiceTest {
     assertEquals(1, result.added());
     assertEquals(0, result.aliasesLearned());
     verify(aliasRepository, never()).save(any());
+  }
+
+  // ----------------------------------------------------- apply: re-import refresh --
+
+  @Test
+  void apply_refreshesAcquiredAtEarlierOnReimportWithoutDuplicating() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    Instant later = Instant.parse("2026-03-26T16:00:00Z");
+    Instant earlier = Instant.parse("2025-01-01T00:00:00Z");
+    PersonalBlueprint owned =
+        PersonalBlueprint.builder()
+            .ownerSub(SUB)
+            .productKey("arclight pistol")
+            .acquiredAt(later)
+            .build();
+    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+        .thenReturn(List.of(owned));
+
+    BlueprintImportResultDto result =
+        service.applyImport(
+            SUB,
+            List.of(
+                new BlueprintImportResolutionDto(
+                    "Arclight Pistol", "arclight pistol", earlier, null)));
+
+    assertEquals(0, result.added());
+    assertEquals(1, result.alreadyOwned());
+    assertEquals(1, result.acquiredAtUpdated());
+    assertEquals(earlier, owned.getAcquiredAt());
+    // No duplicate row: the already-owned entity is only mutated, never re-saved.
+    verify(personalBlueprintRepository, never()).save(any());
+  }
+
+  @Test
+  void apply_keepsAcquiredAtWhenReimportIsLater() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    Instant earlier = Instant.parse("2025-01-01T00:00:00Z");
+    Instant later = Instant.parse("2026-03-26T16:00:00Z");
+    PersonalBlueprint owned =
+        PersonalBlueprint.builder()
+            .ownerSub(SUB)
+            .productKey("arclight pistol")
+            .acquiredAt(earlier)
+            .build();
+    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+        .thenReturn(List.of(owned));
+
+    BlueprintImportResultDto result =
+        service.applyImport(
+            SUB,
+            List.of(
+                new BlueprintImportResolutionDto(
+                    "Arclight Pistol", "arclight pistol", later, null)));
+
+    assertEquals(earlier, owned.getAcquiredAt());
+    assertEquals(0, result.acquiredAtUpdated());
+  }
+
+  @Test
+  void apply_keepsAcquiredAtWhenReimportHasNoTimestamp() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    Instant existing = Instant.parse("2025-01-01T00:00:00Z");
+    PersonalBlueprint owned =
+        PersonalBlueprint.builder()
+            .ownerSub(SUB)
+            .productKey("arclight pistol")
+            .acquiredAt(existing)
+            .build();
+    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+        .thenReturn(List.of(owned));
+
+    BlueprintImportResultDto result =
+        service.applyImport(
+            SUB,
+            List.of(
+                new BlueprintImportResolutionDto(
+                    "Arclight Pistol", "arclight pistol", null, null)));
+
+    assertEquals(existing, owned.getAcquiredAt());
+    assertEquals(0, result.acquiredAtUpdated());
+  }
+
+  @Test
+  void apply_fillsAcquiredAtWhenOwnedRowHasNone() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    Instant incoming = Instant.parse("2025-01-01T00:00:00Z");
+    PersonalBlueprint owned =
+        PersonalBlueprint.builder().ownerSub(SUB).productKey("arclight pistol").build();
+    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+        .thenReturn(List.of(owned));
+
+    BlueprintImportResultDto result =
+        service.applyImport(
+            SUB,
+            List.of(
+                new BlueprintImportResolutionDto(
+                    "Arclight Pistol", "arclight pistol", incoming, null)));
+
+    assertEquals(incoming, owned.getAcquiredAt());
+    assertEquals(1, result.acquiredAtUpdated());
   }
 }

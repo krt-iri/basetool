@@ -132,7 +132,7 @@ class AdminPersonalBlueprintsControllerTest {
             contains("/api/v1/admin/personal-blueprints/" + TARGET + "/import/apply"),
             any(),
             eq(BlueprintImportResultDto.class)))
-        .thenReturn(new BlueprintImportResultDto(1, 1, 0, 0));
+        .thenReturn(new BlueprintImportResultDto(1, 1, 0, 0, 0));
 
     BlueprintImportResultDto result = controller.applyImport(TARGET, List.of());
 

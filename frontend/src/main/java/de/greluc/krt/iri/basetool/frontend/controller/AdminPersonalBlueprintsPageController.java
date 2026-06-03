@@ -48,7 +48,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Admin counterpart of {@link PersonalInventoryBlueprintsPageController} (#327, Phase 7): lets
  * administrators pick a target user and manage that user's acquired blueprints — owned list,
- * multi-select add, note edit / remove, and the SCMDB import — mirroring {@code
+ * multi-select add, note edit / remove, and the blueprint import — mirroring {@code
  * /admin/personal-inventory}. Everything proxies to the admin backend surface ({@code
  * /api/v1/admin/personal-blueprints/...}) with the target {@code sub} from the path; the product
  * type-ahead reuses the shared user search endpoint. {@code @PreAuthorize("hasRole('ADMIN')")}
@@ -187,11 +187,12 @@ public class AdminPersonalBlueprintsPageController {
   }
 
   /**
-   * Previews an SCMDB import on behalf of the target user (multipart upload forwarded via the
-   * authenticated WebClient). Backend parse failures (400) propagate.
+   * Previews a blueprint export import (SCMDB or Basetool BP Extractor) on behalf of the target
+   * user (multipart upload forwarded via the authenticated WebClient). Backend parse failures (400)
+   * propagate.
    *
    * @param userSub target user's Keycloak {@code sub}
-   * @param file the uploaded SCMDB JSON
+   * @param file the uploaded blueprint export JSON
    * @return the per-name resolution preview
    */
   @PostMapping(value = "/{userSub}/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -201,7 +202,7 @@ public class AdminPersonalBlueprintsPageController {
     try {
       byte[] bytes = file.getBytes();
       String filename =
-          file.getOriginalFilename() != null ? file.getOriginalFilename() : "scmdb.json";
+          file.getOriginalFilename() != null ? file.getOriginalFilename() : "blueprints.json";
       MultipartBodyBuilder builder = new MultipartBodyBuilder();
       builder
           .part(
@@ -235,7 +236,7 @@ public class AdminPersonalBlueprintsPageController {
   }
 
   /**
-   * Applies reviewed SCMDB import resolutions on behalf of the target user.
+   * Applies reviewed blueprint-import resolutions on behalf of the target user.
    *
    * @param userSub target user's Keycloak {@code sub}
    * @param resolutions the per-name resolutions
@@ -252,7 +253,7 @@ public class AdminPersonalBlueprintsPageController {
               "/api/v1/admin/personal-blueprints/" + enc(userSub) + "/import/apply",
               new BlueprintImportApplyRequest(list),
               BlueprintImportResultDto.class);
-      return result == null ? new BlueprintImportResultDto(0, 0, 0, 0) : result;
+      return result == null ? new BlueprintImportResultDto(0, 0, 0, 0, 0) : result;
     } catch (Exception e) {
       log.error("Admin import apply proxy failed for user {}", userSub, e);
       throw new ResponseStatusException(

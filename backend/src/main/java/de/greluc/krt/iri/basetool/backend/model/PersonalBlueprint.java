@@ -75,7 +75,7 @@ public class PersonalBlueprint extends AbstractEntity<UUID> {
   @JoinColumn(name = "output_item_id")
   private GameItem outputItem;
 
-  /** Optional in-game acquisition time; pre-filled from the SCMDB {@code ts} on import. */
+  /** Optional in-game acquisition time; pre-filled from the export timestamp on import. */
   @Column(name = "acquired_at")
   private Instant acquiredAt;
 

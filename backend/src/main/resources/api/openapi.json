@@ -13318,7 +13318,7 @@
     "/api/v1/personal-blueprints/import/preview" : {
       "post" : {
         "tags" : [ "Personal Blueprints" ],
-        "summary" : "Preview an SCMDB blueprint import (parse + match, no writes).",
+        "summary" : "Preview a blueprint import (SCMDB or BP Extractor JSON; no writes).",
         "operationId" : "previewImport",
         "requestBody" : {
           "content" : {
@@ -13416,7 +13416,7 @@
     "/api/v1/personal-blueprints/import/apply" : {
       "post" : {
         "tags" : [ "Personal Blueprints" ],
-        "summary" : "Apply reviewed SCMDB import resolutions; learns aliases for manual picks.",
+        "summary" : "Apply reviewed import resolutions; learns aliases for manual picks.",
         "operationId" : "applyImport",
         "requestBody" : {
           "content" : {
@@ -19984,7 +19984,7 @@
     "/api/v1/admin/personal-blueprints/{userSub}/import/preview" : {
       "post" : {
         "tags" : [ "Admin – Personal Blueprints" ],
-        "summary" : "Preview an SCMDB blueprint import for the given user (no writes).",
+        "summary" : "Preview a blueprint import for the given user (no writes).",
         "operationId" : "previewImportForUser",
         "parameters" : [ {
           "name" : "userSub",
@@ -20090,7 +20090,7 @@
     "/api/v1/admin/personal-blueprints/{userSub}/import/apply" : {
       "post" : {
         "tags" : [ "Admin – Personal Blueprints" ],
-        "summary" : "Apply reviewed SCMDB import resolutions for the given user.",
+        "summary" : "Apply reviewed import resolutions for the given user.",
         "operationId" : "applyImportForUser",
         "parameters" : [ {
           "name" : "userSub",
@@ -36657,6 +36657,10 @@
             "format" : "int32"
           },
           "alreadyOwned" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "acquiredAtUpdated" : {
             "type" : "integer",
             "format" : "int32"
           }

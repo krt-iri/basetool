@@ -203,16 +203,16 @@ public class PersonalBlueprintController {
   }
 
   /**
-   * Previews an SCMDB log-watcher JSON import: parses the uploaded file, matches each blueprint
-   * name against the master product list, and returns per-name resolution rows for the caller to
-   * review. Nothing is persisted.
+   * Previews a blueprint export import (SCMDB log-watcher or Basetool Blueprint Extractor JSON):
+   * parses the uploaded file, matches each blueprint name against the master product list, and
+   * returns per-name resolution rows for the caller to review. Nothing is persisted.
    *
-   * @param file the uploaded SCMDB JSON export
+   * @param file the uploaded blueprint export JSON
    * @param auth the caller's JWT authentication
    * @return the per-name preview with status counts
    */
   @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @Operation(summary = "Preview an SCMDB blueprint import (parse + match, no writes).")
+  @Operation(summary = "Preview a blueprint import (SCMDB or BP Extractor JSON; no writes).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Preview computed."),
     @ApiResponse(responseCode = "400", description = "File empty, malformed, or wrong format."),
@@ -232,7 +232,7 @@ public class PersonalBlueprintController {
    * @return a summary of added / learned / skipped / already-owned counts
    */
   @PostMapping("/import/apply")
-  @Operation(summary = "Apply reviewed SCMDB import resolutions; learns aliases for manual picks.")
+  @Operation(summary = "Apply reviewed import resolutions; learns aliases for manual picks.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Import applied; see the summary."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),

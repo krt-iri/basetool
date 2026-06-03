@@ -41,9 +41,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Admin-only counterpart of {@link PersonalBlueprintController} (#327, Phase 7): lets
- * administrators manage any user's acquired blueprints and run the SCMDB import on their behalf.
- * The target user is taken from the URL path ({@code /{userSub}}) instead of from the JWT; the
- * {@code ADMIN} role is enforced at this boundary while the delegated services stay {@code
+ * administrators manage any user's acquired blueprints and run the import on their behalf. The
+ * target user is taken from the URL path ({@code /{userSub}}) instead of from the JWT; the {@code
+ * ADMIN} role is enforced at this boundary while the delegated services stay {@code
  * sub}-parameterised.
  */
 @RestController
@@ -174,14 +174,15 @@ public class AdminPersonalBlueprintController {
   }
 
   /**
-   * Previews an SCMDB import on behalf of the target user. Nothing is persisted.
+   * Previews a blueprint export import (SCMDB or Basetool BP Extractor) on behalf of the target
+   * user. Nothing is persisted.
    *
    * @param userSub target user's Keycloak {@code sub}
-   * @param file the uploaded SCMDB JSON
+   * @param file the uploaded blueprint export JSON
    * @return the per-name resolution preview
    */
   @PostMapping(value = "/{userSub}/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @Operation(summary = "Preview an SCMDB blueprint import for the given user (no writes).")
+  @Operation(summary = "Preview a blueprint import for the given user (no writes).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Preview computed."),
     @ApiResponse(responseCode = "400", description = "File empty, malformed, or wrong format."),
@@ -193,14 +194,14 @@ public class AdminPersonalBlueprintController {
   }
 
   /**
-   * Applies reviewed SCMDB import resolutions on behalf of the target user.
+   * Applies reviewed blueprint-import resolutions on behalf of the target user.
    *
    * @param userSub target user's Keycloak {@code sub}
    * @param request the per-name resolutions
    * @return a summary of added / learned / skipped / already-owned counts
    */
   @PostMapping("/{userSub}/import/apply")
-  @Operation(summary = "Apply reviewed SCMDB import resolutions for the given user.")
+  @Operation(summary = "Apply reviewed import resolutions for the given user.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Import applied; see the summary."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
