@@ -21,7 +21,12 @@ import lombok.ToString;
 
 /**
  * Defines the requirements for a promotion from one rank to another. Both {@link #topic} and {@link
- * #category} are optional; at least one should be set to give the requirement a meaningful scope.
+ * #category} are optional: a topic- or category-scoped requirement narrows the rule to part of the
+ * catalog, while a requirement with neither set is "global within its Staffel" (any {@link
+ * #requiredCount} categories of the owning Staffel must reach {@link #minimumLevel}). Because a
+ * global requirement has no topic/category to derive its squadron from, every requirement carries
+ * its own {@link #owningSquadron} — unlike the rest of the promotion tree, which inherits the scope
+ * through its topic reference (Plan §3.2).
  */
 @Entity
 @Table(name = "rank_requirement")
@@ -46,6 +51,19 @@ public class RankRequirement extends AbstractEntity<UUID> {
 
   @Column(name = "to_rank", nullable = false)
   private int toRank;
+
+  /**
+   * Staffel that owns this rank requirement and the only scope that may see or edit it. Stamped at
+   * creation from the caller's active squadron context and immutable afterwards. Carried directly
+   * (rather than derived through {@link #topic}/{@link #category}) so that a global requirement —
+   * one with neither topic nor category — still belongs to exactly one Staffel. Kept typed {@link
+   * Squadron} (never {@link OrgUnit}) and DB-guarded by the V135 {@code kind='SQUADRON'} trigger so
+   * promotion data can never be owned by a Spezialkommando (Plan §3.3).
+   */
+  @ToString.Exclude
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "owning_squadron_id", nullable = false)
+  private Squadron owningSquadron;
 
   // Excluded from {@code @ToString} because the LAZY association would either trigger a
   // LazyInitializationException outside a Hibernate session or recurse back through

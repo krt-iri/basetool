@@ -54,7 +54,8 @@ public class PromotionCategoryService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
-    return repository.findAll(pageable).map(mapper::toResponse);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
   }
 
   /**
@@ -70,7 +71,8 @@ public class PromotionCategoryService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
-    return repository.findAllByTopicId(topicId, pageable).map(mapper::toResponse);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllByTopicIdScoped(topicId, scope, pageable).map(mapper::toResponse);
   }
 
   /**
@@ -84,7 +86,8 @@ public class PromotionCategoryService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
-    return repository.findAllByTopicIdOrderBySortOrderAsc(topicId).stream()
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllByTopicIdScopedOrdered(topicId, scope).stream()
         .map(mapper::toResponse)
         .toList();
   }
@@ -95,10 +98,14 @@ public class PromotionCategoryService {
    * @param id identifier of the category
    * @return the matching category in response form
    * @throws EntityNotFoundException if no category exists for that id
+   * @throws AccessDeniedException if the caller's squadron context does not match the category's
+   *     owning squadron
    */
   public PromotionCategoryResponse get(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
-    return mapper.toResponse(load(id));
+    PromotionCategory entity = load(id);
+    assertCallerMaySeeCategory(entity);
+    return mapper.toResponse(entity);
   }
 
   /**
@@ -196,6 +203,17 @@ public class PromotionCategoryService {
     if (!ownerScopeService.canEditSquadron(topic.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow editing this promotion topic's children");
+    }
+  }
+
+  private void assertCallerMaySeeCategory(@NotNull PromotionCategory category) {
+    PromotionTopic topic = category.getTopic();
+    if (topic == null || topic.getOwningSquadron() == null) {
+      return;
+    }
+    if (!ownerScopeService.canSeeSquadron(topic.getOwningSquadron().getId())) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not match this category's owning squadron");
     }
   }
 }

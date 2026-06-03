@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -27,6 +28,39 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
    * @return all matching requirements, possibly empty
    */
   List<RankRequirement> findAllByFromRankAndToRankOrderByIdAsc(int fromRank, int toRank);
+
+  /**
+   * Squadron-scoped paged read for the admin list endpoint. When {@code owningSquadronId} is {@code
+   * null} the result spans every squadron (admin "all squadrons" mode); a non-null id restricts the
+   * result to a single squadron's requirements via the requirement's own {@code owningSquadron}.
+   *
+   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param pageable Spring Data paging and sorting parameters
+   * @return a page of rank requirements visible to the caller
+   */
+  @Query(
+      "SELECT r FROM RankRequirement r WHERE :owningSquadronId IS NULL OR r.owningSquadron.id ="
+          + " :owningSquadronId")
+  Page<RankRequirement> findAllScoped(
+      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+
+  /**
+   * Squadron-scoped variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)}. Same
+   * {@code null}-means-all-squadrons contract as {@link #findAllScoped(UUID, Pageable)}.
+   *
+   * @param fromRank the rank the member currently holds
+   * @param toRank the rank the member would be promoted to
+   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @return matching requirements visible to the caller, ordered by id
+   */
+  @Query(
+      "SELECT r FROM RankRequirement r WHERE r.fromRank = :fromRank AND r.toRank = :toRank AND"
+          + " (:owningSquadronId IS NULL OR r.owningSquadron.id = :owningSquadronId) ORDER BY r.id"
+          + " ASC")
+  List<RankRequirement> findScopedByFromRankAndToRank(
+      @Param("fromRank") int fromRank,
+      @Param("toRank") int toRank,
+      @Param("owningSquadronId") UUID owningSquadronId);
 
   /**
    * Paginated variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)} for admin REST
@@ -53,6 +87,21 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
   List<Object[]> findDistinctRankTransitions();
 
   /**
+   * Squadron-scoped variant of {@link #findDistinctRankTransitions()} used by the eligibility
+   * service so a member is evaluated only against the transitions configured for their squadron.
+   * When {@code owningSquadronId} is {@code null} the result spans every squadron (admin "all
+   * squadrons" mode).
+   *
+   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @return one row per configured transition in the scope, carrying {@code [fromRank, toRank]}
+   */
+  @Query(
+      "SELECT DISTINCT r.fromRank, r.toRank FROM RankRequirement r WHERE :owningSquadronId IS NULL"
+          + " OR r.owningSquadron.id = :owningSquadronId ORDER BY r.fromRank DESC, r.toRank DESC")
+  List<Object[]> findDistinctRankTransitionsScoped(
+      @Param("owningSquadronId") UUID owningSquadronId);
+
+  /**
    * JOIN-FETCH variant of {@link #findAllByFromRankAndToRankOrderByIdAsc(int, int)} used by the
    * eligibility evaluator so {@code topic}, {@code category} and {@code category.topic} are
    * hydrated up front and the per-requirement loop does not trigger lazy loads.
@@ -72,4 +121,28 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
           + "WHERE r.fromRank = :fromRank AND r.toRank = :toRank "
           + "ORDER BY r.id ASC")
   List<RankRequirement> findAllForRankTransitionWithRelations(int fromRank, int toRank);
+
+  /**
+   * Squadron-scoped variant of {@link #findAllForRankTransitionWithRelations(int, int)} used by the
+   * eligibility evaluator so a member is matched only against their squadron's requirements. Same
+   * eager-fetch shape and the same {@code null}-means-all-squadrons contract as the other scoped
+   * finders.
+   *
+   * @param fromRank the rank the member currently holds
+   * @param toRank the rank the member would be promoted to
+   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @return matching requirements with topic+category eagerly fetched, scoped to the caller
+   */
+  @Query(
+      "SELECT r FROM RankRequirement r "
+          + "LEFT JOIN FETCH r.topic "
+          + "LEFT JOIN FETCH r.category c "
+          + "LEFT JOIN FETCH c.topic "
+          + "WHERE r.fromRank = :fromRank AND r.toRank = :toRank "
+          + "AND (:owningSquadronId IS NULL OR r.owningSquadron.id = :owningSquadronId) "
+          + "ORDER BY r.id ASC")
+  List<RankRequirement> findAllForRankTransitionWithRelationsScoped(
+      @Param("fromRank") int fromRank,
+      @Param("toRank") int toRank,
+      @Param("owningSquadronId") UUID owningSquadronId);
 }

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.iri.basetool.backend.mapper.PromotionCategoryMapper;
 import de.greluc.krt.iri.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.iri.basetool.backend.model.PromotionTopic;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionCategoryCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionCategoryResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionCategoryUpdateRequest;
@@ -22,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class PromotionCategoryServiceTest {
@@ -48,24 +50,27 @@ class PromotionCategoryServiceTest {
   }
 
   @Test
-  void listAllByTopic_shouldReturnMappedCategories() {
+  void listAllByTopic_shouldReturnCategoriesScopedToSquadron() {
     // Given
     UUID topicId = UUID.randomUUID();
+    UUID scopeId = UUID.randomUUID();
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionCategory category =
         PromotionCategory.builder().topic(topic).name("Flug Kenntnisse").sortOrder(0).build();
     PromotionCategoryResponse response =
         new PromotionCategoryResponse(
             UUID.randomUUID(), 0L, topicId, "Grundlagen", "Flug Kenntnisse", null, 0, null, null);
-    when(repository.findAllByTopicIdOrderBySortOrderAsc(topicId)).thenReturn(List.of(category));
+    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
+    when(repository.findAllByTopicIdScopedOrdered(topicId, scopeId)).thenReturn(List.of(category));
     when(mapper.toResponse(category)).thenReturn(response);
 
     // When
     List<PromotionCategoryResponse> result = service.listAllByTopic(topicId);
 
-    // Then
+    // Then: the active squadron is forwarded to the scoped finder.
     assertEquals(1, result.size());
     assertEquals("Flug Kenntnisse", result.get(0).name());
+    verify(repository).findAllByTopicIdScopedOrdered(topicId, scopeId);
   }
 
   @Test
@@ -76,6 +81,24 @@ class PromotionCategoryServiceTest {
 
     // When / Then
     assertThrows(EntityNotFoundException.class, () -> service.get(id));
+  }
+
+  @Test
+  void get_shouldRejectCrossSquadron() {
+    // Given: a category whose topic is owned by a squadron the caller may not see.
+    UUID id = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    Squadron owner = new Squadron();
+    owner.setId(squadronId);
+    PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
+    topic.setOwningSquadron(owner);
+    PromotionCategory entity =
+        PromotionCategory.builder().topic(topic).name("Flug Kenntnisse").sortOrder(0).build();
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(ownerScopeService.canSeeSquadron(squadronId)).thenReturn(false);
+
+    // When / Then
+    assertThrows(AccessDeniedException.class, () -> service.get(id));
   }
 
   @Test
