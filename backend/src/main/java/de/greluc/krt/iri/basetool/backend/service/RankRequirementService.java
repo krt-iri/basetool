@@ -5,6 +5,7 @@ import de.greluc.krt.iri.basetool.backend.mapper.RankRequirementMapper;
 import de.greluc.krt.iri.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.iri.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.iri.basetool.backend.model.RankRequirement;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.RankRequirementCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.RankRequirementResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.RankRequirementUpdateRequest;
@@ -56,7 +57,8 @@ public class RankRequirementService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
-    return repository.findAll(pageable).map(mapper::toResponse);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
   }
 
   /**
@@ -72,7 +74,8 @@ public class RankRequirementService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
-    return repository.findAllByFromRankAndToRankOrderByIdAsc(fromRank, toRank).stream()
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findScopedByFromRankAndToRank(fromRank, toRank, scope).stream()
         .map(mapper::toResponse)
         .toList();
   }
@@ -83,37 +86,61 @@ public class RankRequirementService {
    * @param id identifier of the rank requirement
    * @return the matching rank requirement in response form
    * @throws EntityNotFoundException if no rank requirement exists for that id
+   * @throws AccessDeniedException if the caller's squadron context does not match the requirement's
+   *     owning squadron
    */
   public RankRequirementResponse get(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
-    return mapper.toResponse(load(id));
+    RankRequirement entity = load(id);
+    assertCallerMaySee(entity);
+    return mapper.toResponse(entity);
   }
 
   /**
    * Persists a new {@link RankRequirement}, wiring optional topic and category associations from
    * the request. Restricted to ADMIN or OFFICER callers via {@link PreAuthorize}.
    *
+   * <p>Auto-stamps the owning squadron from the caller's active context ({@link
+   * OwnerScopeService#currentSquadron()}) so Officers always tag their own squadron and Admins must
+   * focus the sidebar switcher before creating (Admin in "all squadrons" mode is rejected with HTTP
+   * 400, mirroring the {@code PromotionTopic} create contract). When the request references a topic
+   * or category, that reference must belong to the same squadron — a cross-squadron reference is
+   * rejected with HTTP 400.
+   *
    * @param request validated payload describing the new rank requirement
    * @return the persisted rank requirement in response form
    * @throws EntityNotFoundException if a referenced topic or category does not exist
+   * @throws BadRequestException when the caller has no active squadron context, or a referenced
+   *     topic/category belongs to a different squadron
    */
   @Transactional
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public RankRequirementResponse create(@NotNull RankRequirementCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
+    Squadron squadron =
+        ownerScopeService
+            .currentSquadron()
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "No active squadron context — admins in 'all squadrons' mode must focus a"
+                            + " squadron via the sidebar switcher before creating a rank"
+                            + " requirement."));
     RankRequirement entity = mapper.toEntity(request);
     PromotionTopic resolvedTopic = resolveTopic(request.topicId());
     PromotionCategory resolvedCategory = resolveCategory(request.categoryId());
-    assertCallerMayEditScope(resolvedTopic, resolvedCategory);
+    assertReferencesBelongToSquadron(resolvedTopic, resolvedCategory, squadron);
+    entity.setOwningSquadron(squadron);
     entity.setTopic(resolvedTopic);
     entity.setCategory(resolvedCategory);
     RankRequirement saved = repository.save(entity);
     log.info(
-        "Created RankRequirement id={} {}->{}",
+        "Created RankRequirement id={} {}->{} squadron={}",
         saved.getId(),
         saved.getFromRank(),
-        saved.getToRank());
+        saved.getToRank(),
+        squadron.getShorthand());
     return mapper.toResponse(saved);
   }
 
@@ -139,14 +166,16 @@ public class RankRequirementService {
     ownerScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = load(id);
-    assertCallerMayEditScope(entity.getTopic(), entity.getCategory());
+    assertCallerMayEdit(entity);
     if (!entity.getVersion().equals(request.version())) {
       throw new ObjectOptimisticLockingFailureException(RankRequirement.class, id);
     }
     mapper.updateEntity(entity, request);
     PromotionTopic resolvedTopic = resolveTopic(request.topicId());
     PromotionCategory resolvedCategory = resolveCategory(request.categoryId());
-    assertCallerMayEditScope(resolvedTopic, resolvedCategory);
+    // The owning squadron is immutable post-create; any new topic/category reference must stay
+    // within it so a requirement cannot be re-pointed at a different squadron's catalog.
+    assertReferencesBelongToSquadron(resolvedTopic, resolvedCategory, entity.getOwningSquadron());
     entity.setTopic(resolvedTopic);
     entity.setCategory(resolvedCategory);
     RankRequirement saved = repository.save(entity);
@@ -166,21 +195,58 @@ public class RankRequirementService {
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     RankRequirement entity = load(id);
-    assertCallerMayEditScope(entity.getTopic(), entity.getCategory());
+    assertCallerMayEdit(entity);
     repository.delete(entity);
     log.info("Deleted RankRequirement id={}", id);
   }
 
-  private void assertCallerMayEditScope(
-      @Nullable PromotionTopic topic, @Nullable PromotionCategory category) {
-    PromotionTopic effectiveTopic =
-        topic != null ? topic : category != null ? category.getTopic() : null;
-    if (effectiveTopic == null || effectiveTopic.getOwningSquadron() == null) {
+  private void assertCallerMaySee(@NotNull RankRequirement entity) {
+    if (entity.getOwningSquadron() == null) {
       return;
     }
-    if (!ownerScopeService.canEditSquadron(effectiveTopic.getOwningSquadron().getId())) {
+    if (!ownerScopeService.canSeeSquadron(entity.getOwningSquadron().getId())) {
       throw new AccessDeniedException(
-          "Caller's squadron context does not allow editing rank requirements of this scope");
+          "Caller's squadron context does not match the rank requirement's owning squadron");
+    }
+  }
+
+  private void assertCallerMayEdit(@NotNull RankRequirement entity) {
+    if (entity.getOwningSquadron() == null) {
+      return;
+    }
+    if (!ownerScopeService.canEditSquadron(entity.getOwningSquadron().getId())) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not allow editing this rank requirement");
+    }
+  }
+
+  /**
+   * Asserts that an optional topic and category both belong to {@code squadron}. A {@code null}
+   * topic or category is allowed (a requirement may be topic-scoped, category-scoped, or global); a
+   * non-null reference owned by a different squadron is rejected so a requirement can never link to
+   * another squadron's catalog.
+   *
+   * @param topic the resolved topic reference, or {@code null}
+   * @param category the resolved category reference, or {@code null}
+   * @param squadron the squadron the requirement is (being) owned by; never {@code null}
+   * @throws BadRequestException if a non-null reference belongs to a different squadron
+   */
+  private static void assertReferencesBelongToSquadron(
+      @Nullable PromotionTopic topic,
+      @Nullable PromotionCategory category,
+      @NotNull Squadron squadron) {
+    if (topic != null
+        && topic.getOwningSquadron() != null
+        && !squadron.getId().equals(topic.getOwningSquadron().getId())) {
+      throw new BadRequestException(
+          "The referenced promotion topic belongs to a different squadron.");
+    }
+    PromotionTopic categoryTopic = category != null ? category.getTopic() : null;
+    if (categoryTopic != null
+        && categoryTopic.getOwningSquadron() != null
+        && !squadron.getId().equals(categoryTopic.getOwningSquadron().getId())) {
+      throw new BadRequestException(
+          "The referenced promotion category belongs to a different squadron.");
     }
   }
 

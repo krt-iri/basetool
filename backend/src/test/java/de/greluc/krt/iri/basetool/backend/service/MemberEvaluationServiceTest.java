@@ -2,6 +2,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.mapper.MemberEvaluationMapper;
@@ -48,10 +49,11 @@ class MemberEvaluationServiceTest {
   @InjectMocks private MemberEvaluationService service;
 
   @Test
-  void listForUser_shouldOnlyReturnOwnEvaluations() {
-    // Given – data isolation: only evaluations for "user-A" are returned
+  void listForUser_shouldOnlyReturnOwnEvaluationsScopedToSquadron() {
+    // Given – data isolation: only evaluations for "user-A" in the active squadron are returned
     String userA = "user-A";
     String userB = "user-B";
+    UUID scopeId = UUID.randomUUID();
     MemberEvaluation evalA =
         MemberEvaluation.builder().userId(userA).assignedLevel(PromotionLevel.LEVEL_A).build();
     MemberEvaluationResponse responseA =
@@ -66,16 +68,19 @@ class MemberEvaluationServiceTest {
             PromotionLevel.LEVEL_A,
             null,
             null);
-    when(repository.findAllByUserId(userA)).thenReturn(List.of(evalA));
+    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
+    when(repository.findAllByUserIdScoped(userA, scopeId)).thenReturn(List.of(evalA));
     when(mapper.toResponse(evalA)).thenReturn(responseA);
 
     // When
     List<MemberEvaluationResponse> result = service.listForUser(userA);
 
-    // Then – only user-A's evaluations are returned, user-B's are never fetched
+    // Then – only user-A's evaluations are returned, scoped to the active squadron; user-B's are
+    // never fetched.
     assertEquals(1, result.size());
     assertEquals(userA, result.get(0).userId());
-    verify(repository, never()).findAllByUserId(userB);
+    verify(repository).findAllByUserIdScoped(userA, scopeId);
+    verify(repository, never()).findAllByUserIdScoped(eq(userB), any());
   }
 
   @Test

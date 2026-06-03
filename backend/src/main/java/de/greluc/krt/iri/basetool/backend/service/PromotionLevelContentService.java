@@ -50,7 +50,8 @@ public class PromotionLevelContentService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
-    return repository.findAll(pageable).map(mapper::toResponse);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
   }
 
   /**
@@ -65,7 +66,8 @@ public class PromotionLevelContentService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
-    return repository.findAllByCategoryIdOrderByLevel(categoryId).stream()
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllByCategoryIdScopedOrdered(categoryId, scope).stream()
         .map(mapper::toResponse)
         .toList();
   }
@@ -76,10 +78,14 @@ public class PromotionLevelContentService {
    * @param id identifier of the level content
    * @return the matching level content in response form
    * @throws EntityNotFoundException if no level content exists for that id
+   * @throws AccessDeniedException if the caller's squadron context does not match the level
+   *     content's owning squadron
    */
   public PromotionLevelContentResponse get(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
-    return mapper.toResponse(load(id));
+    PromotionLevelContent entity = load(id);
+    assertCallerMaySeeLevelContent(entity);
+    return mapper.toResponse(entity);
   }
 
   /**
@@ -180,6 +186,19 @@ public class PromotionLevelContentService {
     if (!ownerScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow editing level contents of this scope");
+    }
+  }
+
+  private void assertCallerMaySeeLevelContent(@NotNull PromotionLevelContent levelContent) {
+    PromotionCategory category = levelContent.getCategory();
+    if (category == null
+        || category.getTopic() == null
+        || category.getTopic().getOwningSquadron() == null) {
+      return;
+    }
+    if (!ownerScopeService.canSeeSquadron(category.getTopic().getOwningSquadron().getId())) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not match this level content's owning squadron");
     }
   }
 }

@@ -46,30 +46,39 @@ public class MemberEvaluationService {
   private final MemberEvaluationMapper mapper;
   private final OwnerScopeService ownerScopeService;
 
-  /** Returns all evaluations for the given user (JWT-sub filtered – data isolation). */
+  /**
+   * Returns all evaluations for the given user (JWT-sub filtered – data isolation), additionally
+   * scoped to the caller's active squadron so a multi-squadron member's "my evaluations" only shows
+   * the active squadron's grades.
+   */
   public List<MemberEvaluationResponse> listForUser(@NotNull String userId) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
-    return repository.findAllByUserId(userId).stream().map(mapper::toResponse).toList();
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllByUserIdScoped(userId, scope).stream()
+        .map(mapper::toResponse)
+        .toList();
   }
 
-  /** Returns paginated evaluations for the given user. */
+  /** Returns paginated evaluations for the given user, scoped to the active squadron. */
   public Page<MemberEvaluationResponse> listForUserPaged(
       @NotNull String userId, @NotNull Pageable pageable) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
-    return repository.findAllByUserId(userId, pageable).map(mapper::toResponse);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllByUserIdScoped(userId, scope, pageable).map(mapper::toResponse);
   }
 
-  /** Returns all evaluations (admin view, all users). */
+  /** Returns all evaluations (admin view, all users) scoped to the active squadron. */
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return Page.empty(pageable);
     }
-    return repository.findAll(pageable).map(mapper::toResponse);
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return repository.findAllScoped(scope, pageable).map(mapper::toResponse);
   }
 
   /**

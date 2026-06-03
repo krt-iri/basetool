@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.model.MemberEvaluation;
@@ -18,6 +21,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.PromotionRequirementCheckRes
 import de.greluc.krt.iri.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RankRequirementRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +51,9 @@ class PromotionEligibilityServiceTest {
   @BeforeEach
   void enablePromotionFeatureFlag() {
     lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
+    // No active pin in these unit tests → null scope → the scoped finders behave like the old
+    // unscoped ones, which keeps every eligibility scenario below focused on the matching logic.
+    lenient().when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
   }
 
   @InjectMocks private PromotionEligibilityService service;
@@ -55,9 +62,10 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldReturnNotEligibleWithNoRules_whenNoRequirementsConfigured() {
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(anyInt(), anyInt()))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(
+            anyInt(), anyInt(), isNull()))
         .thenReturn(List.of());
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(List.of());
 
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
@@ -76,9 +84,9 @@ class PromotionEligibilityServiceTest {
     PromotionCategory anwesenheit = category(grundlagen, "Anwesenheit");
     RankRequirement req = categoryRule(anwesenheit, PromotionLevel.LEVEL_A, "Anwesenheit A");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(req));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(List.of(evaluation(USER, anwesenheit, PromotionLevel.LEVEL_A)));
 
     // When
@@ -102,9 +110,9 @@ class PromotionEligibilityServiceTest {
     // Demand LEVEL_B but member has LEVEL_A
     RankRequirement req = categoryRule(anwesenheit, PromotionLevel.LEVEL_B, "Anwesenheit B");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(19, 18))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(19, 18, null))
         .thenReturn(List.of(req));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(List.of(evaluation(USER, anwesenheit, PromotionLevel.LEVEL_A)));
 
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 19, 18);
@@ -123,9 +131,9 @@ class PromotionEligibilityServiceTest {
     PromotionCategory anwesenheit = category(grundlagen, "Anwesenheit");
     RankRequirement req = topicRule(grundlagen, PromotionLevel.LEVEL_A, 2, "2A in Grundlagen");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(req));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, flug, PromotionLevel.LEVEL_A),
@@ -152,9 +160,9 @@ class PromotionEligibilityServiceTest {
     // Want 3× LEVEL_B but only one category reaches it.
     RankRequirement req = topicRule(grundlagen, PromotionLevel.LEVEL_B, 3, "3B in Grundlagen");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(19, 18))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(19, 18, null))
         .thenReturn(List.of(req));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(List.of(evaluation(USER, flug, PromotionLevel.LEVEL_B)));
 
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 19, 18);
@@ -178,10 +186,10 @@ class PromotionEligibilityServiceTest {
     RankRequirement categoryRule =
         categoryRule(anwesenheit, PromotionLevel.LEVEL_A, "Anwesenheit A");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(topicRule, categoryRule));
     // Member has exactly 2 A-level entries: one for Flug, one for Anwesenheit
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, flug, PromotionLevel.LEVEL_A),
@@ -211,9 +219,9 @@ class PromotionEligibilityServiceTest {
     RankRequirement anwesenheitRule =
         categoryRule(anwesenheit, PromotionLevel.LEVEL_A, "Anwesenheit A");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(topicRule, anwesenheitRule));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, flug, PromotionLevel.LEVEL_A),
@@ -239,9 +247,9 @@ class PromotionEligibilityServiceTest {
     PromotionCategory flug = category(grundlagen, "Flug Kenntnisse");
     RankRequirement req = categoryRule(flug, PromotionLevel.LEVEL_A, "Flug A");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(req));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(List.of(evaluation(USER, flug, PromotionLevel.LEVEL_C)));
 
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
@@ -265,9 +273,9 @@ class PromotionEligibilityServiceTest {
         topicRule(grundlagen, PromotionLevel.LEVEL_B, 3, "3B in Grundlagen");
     RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(threeBRule, oneARule));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, katA, PromotionLevel.LEVEL_B),
@@ -299,9 +307,9 @@ class PromotionEligibilityServiceTest {
         topicRule(grundlagen, PromotionLevel.LEVEL_B, 3, "3B in Grundlagen");
     RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(threeBRule, oneARule));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, katA, PromotionLevel.LEVEL_B),
@@ -332,9 +340,9 @@ class PromotionEligibilityServiceTest {
     RankRequirement twoCRule = topicRule(grundlagen, PromotionLevel.LEVEL_C, 2, "2C in Grundlagen");
     RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(oneARule, twoCRule));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, katA, PromotionLevel.LEVEL_C),
@@ -359,9 +367,9 @@ class PromotionEligibilityServiceTest {
     RankRequirement twoCRule = topicRule(grundlagen, PromotionLevel.LEVEL_C, 2, "2C in Grundlagen");
     RankRequirement oneARule = topicRule(grundlagen, PromotionLevel.LEVEL_A, 1, "1A in Grundlagen");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(twoCRule, oneARule));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, katA, PromotionLevel.LEVEL_C),
@@ -396,11 +404,11 @@ class PromotionEligibilityServiceTest {
     RankRequirement anwesenheitRule =
         categoryRule(anwesenheit, PromotionLevel.LEVEL_B, "Anwesenheit B");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(threeBRule, oneARule, anwesenheitRule));
     // Four distinct categories: Anwesenheit (B) + two more B's + one A. The Anwesenheit cat
     // satisfies BOTH the category rule AND counts as one of the three B-cats for "3B".
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, anwesenheit, PromotionLevel.LEVEL_B),
@@ -431,9 +439,9 @@ class PromotionEligibilityServiceTest {
     RankRequirement spezRule =
         topicRule(spez, PromotionLevel.LEVEL_B, 1, "1B in Spezialisierungen");
 
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(20, 19))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(grundlagenRule, spezRule));
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
                 evaluation(USER, grundlagenKat, PromotionLevel.LEVEL_B),
@@ -448,12 +456,13 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateAllForUser_shouldReturnOneEntryPerConfiguredTransition() {
-    when(rankRequirementRepository.findDistinctRankTransitions())
+    when(rankRequirementRepository.findDistinctRankTransitionsScoped(null))
         .thenReturn(List.of(new Object[] {20, 19}, new Object[] {19, 18}));
     // Both transitions resolve to empty rules => not eligible / hasConfiguredRules=false
-    when(rankRequirementRepository.findAllForRankTransitionWithRelations(anyInt(), anyInt()))
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(
+            anyInt(), anyInt(), isNull()))
         .thenReturn(List.of());
-    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(USER))
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(List.of());
 
     List<PromotionEligibilityResponse> result = service.evaluateAllForUser(USER);
@@ -463,6 +472,26 @@ class PromotionEligibilityServiceTest {
     assertEquals(19, result.get(0).toRank());
     assertEquals(19, result.get(1).fromRank());
     assertEquals(18, result.get(1).toRank());
+  }
+
+  @Test
+  void evaluateForRanks_shouldScopeRequirementAndEvaluationLoadsToActiveSquadron() {
+    // Given: the caller is pinned to a specific squadron.
+    UUID scopeId = UUID.randomUUID();
+    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
+    when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, scopeId))
+        .thenReturn(List.of());
+    when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, scopeId))
+        .thenReturn(List.of());
+
+    // When
+    service.evaluateForRanks(USER, 20, 19);
+
+    // Then: both the requirement load and the member's grade load are filtered by that squadron,
+    // so neither another squadron's rules nor the member's grades there bleed into the result.
+    verify(rankRequirementRepository).findAllForRankTransitionWithRelationsScoped(20, 19, scopeId);
+    verify(memberEvaluationRepository, atLeastOnce())
+        .findAllByUserIdWithCategoryAndTopicScoped(USER, scopeId);
   }
 
   // ---------------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,10 +86,12 @@ public class PromotionEligibilityService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return new PromotionEligibilityResponse(userId, fromRank, toRank, false, false, List.of());
     }
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
     List<RankRequirement> requirements =
-        rankRequirementRepository.findAllForRankTransitionWithRelations(fromRank, toRank);
-    Map<UUID, PromotionLevel> levelByCategory = loadAssignedLevels(userId);
-    Map<UUID, UUID> topicByCategory = loadCategoryToTopicIndex(userId);
+        rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(
+            fromRank, toRank, scope);
+    Map<UUID, PromotionLevel> levelByCategory = loadAssignedLevels(userId, scope);
+    Map<UUID, UUID> topicByCategory = loadCategoryToTopicIndex(userId, scope);
 
     Map<UUID, PromotionRequirementCheckResponse> topicScopedResults =
         evaluateTopicScopedDisjoint(requirements, levelByCategory, topicByCategory);
@@ -124,7 +127,8 @@ public class PromotionEligibilityService {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
       return List.of();
     }
-    List<Object[]> transitions = rankRequirementRepository.findDistinctRankTransitions();
+    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    List<Object[]> transitions = rankRequirementRepository.findDistinctRankTransitionsScoped(scope);
     List<PromotionEligibilityResponse> result = new ArrayList<>(transitions.size());
     for (Object[] row : transitions) {
       int from = ((Number) row[0]).intValue();
@@ -147,10 +151,11 @@ public class PromotionEligibilityService {
     return evaluateAllForUser(userId);
   }
 
-  private Map<UUID, PromotionLevel> loadAssignedLevels(@NotNull String userId) {
+  private Map<UUID, PromotionLevel> loadAssignedLevels(
+      @NotNull String userId, @Nullable UUID scope) {
     Map<UUID, PromotionLevel> levels = new HashMap<>();
     for (MemberEvaluation evaluation :
-        memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(userId)) {
+        memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(userId, scope)) {
       if (evaluation.getAssignedLevel() != null && evaluation.getCategory() != null) {
         levels.put(evaluation.getCategory().getId(), evaluation.getAssignedLevel());
       }
@@ -158,10 +163,10 @@ public class PromotionEligibilityService {
     return levels;
   }
 
-  private Map<UUID, UUID> loadCategoryToTopicIndex(@NotNull String userId) {
+  private Map<UUID, UUID> loadCategoryToTopicIndex(@NotNull String userId, @Nullable UUID scope) {
     Map<UUID, UUID> map = new HashMap<>();
     for (MemberEvaluation evaluation :
-        memberEvaluationRepository.findAllByUserIdWithCategoryAndTopic(userId)) {
+        memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(userId, scope)) {
       PromotionCategory category = evaluation.getCategory();
       if (category != null && category.getTopic() != null) {
         map.put(category.getId(), category.getTopic().getId());

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Das Beförderungssystem ist jetzt durchgängig staffel-scoped: jede Staffel sieht nur ihre eigenen Themenbereiche, Bewertungen, Rangvoraussetzungen und Eignungsprüfungen.** Bisher filterten nur die Themenbereiche nach Staffel — Kategorien, Lerninhalte, Rangvoraussetzungen, „Meine Bewertungen", die Bewertungsverwaltung und die Eignungsberechnung werteten staffelübergreifend aus; ein Offizier oder Mitglied einer Staffel konnte so die Beförderungsdaten anderer Staffeln sehen. Admins sehen weiterhin alles bzw. die angepinnte Staffel. Rangvoraussetzungen (inklusive staffelweiter „globaler" ohne Themenbereich/Kategorie) gehören jetzt einer eigenen Staffel und werden beim Anlegen aus dem aktiven Staffelkontext gestempelt (Migration V135).
+
 ## [v0.3.44](https://github.com/krt-iri/basetool/releases/tag/v0.3.44) - 2026-06-02
 
 ### Changed

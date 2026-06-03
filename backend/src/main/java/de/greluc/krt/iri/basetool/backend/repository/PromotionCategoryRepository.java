@@ -6,11 +6,15 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
  * Spring Data JPA repository for {@link PromotionCategory} aggregates, providing topic-scoped
- * lookups used by the promotion UI and the eligibility engine.
+ * lookups used by the promotion UI and the eligibility engine. Categories inherit their squadron
+ * scope from {@code topic.owningSquadron}; the {@code *Scoped} finders below apply that filter so a
+ * caller never sees another squadron's catalog ({@code null} scope = admin "all squadrons" mode).
  */
 @Repository
 public interface PromotionCategoryRepository extends JpaRepository<PromotionCategory, UUID> {
@@ -34,4 +38,51 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
    * @return a page of categories scoped to the topic
    */
   Page<PromotionCategory> findAllByTopicId(UUID topicId, Pageable pageable);
+
+  /**
+   * Squadron-scoped paged read across all topics. When {@code owningSquadronId} is {@code null} the
+   * result spans every squadron (admin "all squadrons" mode); a non-null id restricts the result to
+   * categories whose topic is owned by that squadron.
+   *
+   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param pageable Spring Data paging and sorting parameters
+   * @return a page of categories visible to the caller
+   */
+  @Query(
+      "SELECT c FROM PromotionCategory c WHERE :owningSquadronId IS NULL OR"
+          + " c.topic.owningSquadron.id = :owningSquadronId")
+  Page<PromotionCategory> findAllScoped(
+      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+
+  /**
+   * Squadron-scoped paged read of the categories under one topic. A topic outside the caller's
+   * scope yields an empty page, so a forged {@code topicId} cannot leak a foreign squadron's
+   * categories.
+   *
+   * @param topicId identifier of the parent topic
+   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @param pageable Spring Data paging and sorting parameters
+   * @return a page of categories under the topic, scoped to the caller
+   */
+  @Query(
+      "SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:owningSquadronId IS NULL"
+          + " OR c.topic.owningSquadron.id = :owningSquadronId)")
+  Page<PromotionCategory> findAllByTopicIdScoped(
+      @Param("topicId") UUID topicId,
+      @Param("owningSquadronId") UUID owningSquadronId,
+      Pageable pageable);
+
+  /**
+   * Squadron-scoped unpaginated read of one topic's categories in display order. Same
+   * empty-on-foreign-topic contract as {@link #findAllByTopicIdScoped(UUID, UUID, Pageable)}.
+   *
+   * @param topicId identifier of the parent topic
+   * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
+   * @return the topic's categories in display order, scoped to the caller
+   */
+  @Query(
+      "SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:owningSquadronId IS NULL"
+          + " OR c.topic.owningSquadron.id = :owningSquadronId) ORDER BY c.sortOrder ASC")
+  List<PromotionCategory> findAllByTopicIdScopedOrdered(
+      @Param("topicId") UUID topicId, @Param("owningSquadronId") UUID owningSquadronId);
 }

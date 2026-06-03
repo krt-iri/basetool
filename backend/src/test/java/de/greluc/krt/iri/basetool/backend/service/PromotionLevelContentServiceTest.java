@@ -7,6 +7,8 @@ import de.greluc.krt.iri.basetool.backend.mapper.PromotionLevelContentMapper;
 import de.greluc.krt.iri.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.iri.basetool.backend.model.PromotionLevel;
 import de.greluc.krt.iri.basetool.backend.model.PromotionLevelContent;
+import de.greluc.krt.iri.basetool.backend.model.PromotionTopic;
+import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionLevelContentResponse;
 import de.greluc.krt.iri.basetool.backend.repository.PromotionCategoryRepository;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class PromotionLevelContentServiceTest {
@@ -46,9 +49,10 @@ class PromotionLevelContentServiceTest {
   @InjectMocks private PromotionLevelContentService service;
 
   @Test
-  void listByCategory_shouldReturnMappedContents() {
+  void listByCategory_shouldReturnContentsScopedToSquadron() {
     // Given
     UUID categoryId = UUID.randomUUID();
+    UUID scopeId = UUID.randomUUID();
     PromotionCategory category =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
     PromotionLevelContent content =
@@ -67,15 +71,42 @@ class PromotionLevelContentServiceTest {
             "Kann fliegen",
             null,
             null);
-    when(repository.findAllByCategoryIdOrderByLevel(categoryId)).thenReturn(List.of(content));
+    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
+    when(repository.findAllByCategoryIdScopedOrdered(categoryId, scopeId))
+        .thenReturn(List.of(content));
     when(mapper.toResponse(content)).thenReturn(response);
 
     // When
     List<PromotionLevelContentResponse> result = service.listByCategory(categoryId);
 
-    // Then
+    // Then: the active squadron is forwarded to the scoped finder.
     assertEquals(1, result.size());
     assertEquals(PromotionLevel.LEVEL_A, result.get(0).level());
+    verify(repository).findAllByCategoryIdScopedOrdered(categoryId, scopeId);
+  }
+
+  @Test
+  void get_shouldRejectCrossSquadron() {
+    // Given: a level content whose category's topic is owned by a foreign squadron.
+    UUID id = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    Squadron owner = new Squadron();
+    owner.setId(squadronId);
+    PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
+    topic.setOwningSquadron(owner);
+    PromotionCategory category =
+        PromotionCategory.builder().topic(topic).name("Flug Kenntnisse").sortOrder(0).build();
+    PromotionLevelContent entity =
+        PromotionLevelContent.builder()
+            .category(category)
+            .level(PromotionLevel.LEVEL_A)
+            .description("Kann fliegen")
+            .build();
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(ownerScopeService.canSeeSquadron(squadronId)).thenReturn(false);
+
+    // When / Then
+    assertThrows(AccessDeniedException.class, () -> service.get(id));
   }
 
   @Test
