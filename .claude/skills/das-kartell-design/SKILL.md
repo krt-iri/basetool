@@ -7,7 +7,7 @@ user-invocable: true
 Read the `README.md` file within this skill, and explore the other available files.
 
 This is a dark, sci-fi "technical HUD" brand for a Star Citizen org: house orange
-`#E77E23` on black, the angular **Ethnocentric** display face (UPPERCASE only),
+`#E77E23` on black, the wide **Audiowide** display face (UPPERCASE only),
 **Lato** body text (Light 300 / Bold 700), **square-cornered** containers framed with
 diagonal corner brackets (the `.hud-box`), and a fixed department color system.
 
@@ -19,7 +19,7 @@ Quick start:
 - **Real components & screens:** `ui_kits/basetool/` is an interactive React recreation
   of the app (header, sidebar drawer, dashboard, missions, hangar, price matrix, login).
   Copy patterns from `components.jsx` / `screens.jsx` / `app.css`.
-- **Assets:** `fonts/` (Ethnocentric + Lato, self-hosted) and `assets/` (logo mark,
+- **Assets:** `fonts/` (Audiowide + Lato, self-hosted) and `assets/` (logo mark,
   full lockup, favicon). The logo may appear ONLY in orange, white or black.
 
 If creating visual artifacts (slides, mocks, throwaway prototypes), copy assets out and
