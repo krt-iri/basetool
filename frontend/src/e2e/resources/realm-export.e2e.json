@@ -12,6 +12,17 @@
   "accessTokenLifespan": 3600,
   "ssoSessionIdleTimeout": 36000,
   "ssoSessionMaxLifespan": 36000,
+  "requiredActions": [
+    {
+      "alias": "VERIFY_PROFILE",
+      "name": "Verify Profile",
+      "providerId": "VERIFY_PROFILE",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 90,
+      "config": {}
+    }
+  ],
   "roles": {
     "realm": [
       { "name": "Admin", "description": "E2E test role" },
