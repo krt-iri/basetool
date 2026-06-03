@@ -18,14 +18,20 @@ import org.springframework.stereotype.Repository;
 public interface MissionRepository extends JpaRepository<Mission, UUID> {
 
   /**
-   * Returns slim {@link de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto}s for
-   * every {@code PLANNED} / {@code ACTIVE} mission visible to the caller, sorted by planned start.
-   * Drives mission-picker dropdowns without pulling the full {@link Mission} aggregate.
+   * Returns slim {@link de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto}s for the
+   * mission-picker dropdowns of the warehouse (Lager) views, sorted by planned start, without
+   * pulling the full {@link Mission} aggregate. The result contains every {@code PLANNED} / {@code
+   * ACTIVE} mission visible to the caller (the live operational set, regardless of date) plus every
+   * recently-closed {@code COMPLETED} / {@code CANCELLED} mission whose {@code plannedStartTime} is
+   * on or after {@code cutoff} — so an inventory item can still be filtered by, or re-bound to, a
+   * mission that has just wrapped up. Terminal missions older than the cut-off (and terminal
+   * missions with no planned start) are dropped to keep the dropdown from ballooning with
+   * historical operations.
    *
    * <p>Multi-tenant rule (MULTI_SQUADRON_PLAN.md §1, audit finding H-4 + R6.c §5.4): the lookup
-   * uses the standard org-unit scope-predicate triple — admin all-scope sees every active mission;
-   * a specific {@code activeOrgUnitId} narrows to that OrgUnit's missions; the non-admin path
-   * passes the union of memberships. Cross-staffel public missions ({@code isInternal=false})
+   * uses the standard org-unit scope-predicate triple — admin all-scope sees every matching
+   * mission; a specific {@code activeOrgUnitId} narrows to that OrgUnit's missions; the non-admin
+   * path passes the union of memberships. Cross-staffel public missions ({@code isInternal=false})
    * remain visible regardless of scope — so a member from one OrgUnit can still see other OrgUnits'
    * public missions in the typeahead.
    *
@@ -34,12 +40,17 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
    *     admins and anonymous callers.
+   * @param cutoff inclusive lower bound on {@code plannedStartTime} for {@code COMPLETED} / {@code
+   *     CANCELLED} missions; {@code PLANNED} / {@code ACTIVE} missions are returned regardless of
+   *     it.
    * @return slim reference DTOs visible to the caller.
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name,"
-          + " m.status, m.plannedStartTime) FROM Mission m WHERE m.status IN ('PLANNED', 'ACTIVE')"
-          + " AND ("
+          + " m.status, m.plannedStartTime) FROM Mission m WHERE ("
+          + "  m.status IN ('PLANNED', 'ACTIVE')"
+          + "  OR (m.status IN ('COMPLETED', 'CANCELLED') AND m.plannedStartTime >= :cutoff)"
+          + " ) AND ("
           + "  :isAdminAllScope = true"
           + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
           + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
@@ -48,7 +59,8 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
   List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("cutoff") Instant cutoff);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
