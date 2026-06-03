@@ -44,7 +44,7 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * REST surface for the personal hangar (own ships), the squadron-wide overview, the admin per-user
  * hangar, and the third-party ship-export JSON import (CCU Game Fleetview / HangarXPLOR Shiplist /
- * StarJump FleetViewer "Hangar Link").
+ * Fleetyards / StarJump FleetViewer "Hangar Link").
  *
  * <p>{@code /my-ships} reads the calling user's JWT to derive the owner id — never accepts it from
  * the URL — so a caller cannot view another user's hangar via this endpoint. The admin-only {@code
@@ -272,10 +272,10 @@ public class HangarController {
   }
 
   /**
-   * Imports a ship-export JSON file (CCU Game Fleetview, HangarXPLOR Shiplist or StarJump
-   * FleetViewer / "Hangar Link" — the format is auto-detected from the payload shape). Parses the
-   * file via {@code HangarImportService} and creates only the missing rows so existing hangar
-   * contents are never lost or duplicated. The caller's JWT is the owner of the new rows.
+   * Imports a ship-export JSON file (CCU Game Fleetview, HangarXPLOR Shiplist, Fleetyards or
+   * StarJump FleetViewer / "Hangar Link" — the format is auto-detected from the payload shape).
+   * Parses the file via {@code HangarImportService} and creates only the missing rows so existing
+   * hangar contents are never lost or duplicated. The caller's JWT is the owner of the new rows.
    *
    * @param jwt caller's JWT — its {@code sub} claim becomes the new rows' owner id
    * @param file uploaded JSON file
