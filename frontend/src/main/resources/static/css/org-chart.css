@@ -266,12 +266,15 @@ main.oc-page .oc-toolbar {
     text-align: center;
 }
 
+/* SK cards are marked in the Profit-Bereich green (Staffel cards use the brand
+   orange) so the two OrgUnit kinds stay visually distinct — top edge + shorthand,
+   mirroring the Staffel treatment. */
 .oc-unit-box--sk {
-    border-top-color: var(--color-gray-2);
+    border-top-color: var(--color-dept-profit);
 }
 
 .oc-unit-box--sk .sh {
-    color: var(--color-gray-1);
+    color: var(--color-dept-profit);
 }
 
 /* Kommando(gruppe) header: names the command, sits above its Kommandoleiter. */
