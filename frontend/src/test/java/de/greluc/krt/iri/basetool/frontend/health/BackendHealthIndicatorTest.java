@@ -3,11 +3,18 @@ package de.greluc.krt.iri.basetool.frontend.health;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.frontend.config.AppBackendProperties;
 import java.lang.reflect.Constructor;
+import java.net.Socket;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.X509TrustManager;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -17,6 +24,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
+import org.springframework.boot.ssl.NoSuchSslBundleException;
+import org.springframework.boot.ssl.SslBundles;
+import org.springframework.core.env.Environment;
 
 /**
  * Unit tests for the frontend's {@link BackendHealthIndicator}. The indicator is driven against an
@@ -44,10 +54,11 @@ import org.springframework.boot.health.contributor.Status;
  * constructor is also exercised so a {@code BACKEND_URL=https://backend:11261/} setup cannot
  * produce a double-slash URL.
  *
- * <p>TLS verification is NOT exercised here — the indicator installs a trust-all SSL context to
- * mirror the application's main {@code WebClient}, but {@link MockWebServer} defaults to plain
- * HTTP, which is sufficient for behavioural coverage. The trust-all path is a one-method
- * constructor side-effect with no branches.
+ * <p>End-to-end TLS is NOT exercised here — {@link MockWebServer} defaults to plain HTTP, which is
+ * sufficient for the behavioural coverage above. The per-profile trust resolution added by audit
+ * L-5 is covered separately below: the missing-bundle fallback (which must degrade to trust-all,
+ * never the default JVM trust store) and the pinned-path hostname-skip routing inside {@code
+ * HostnameAgnosticTrustManager}.
  */
 class BackendHealthIndicatorTest {
 
@@ -174,6 +185,86 @@ class BackendHealthIndicatorTest {
         "/actuator/health/readiness",
         req.getPath(),
         "trailing slash on BACKEND_URL must not propagate to the probe path");
+  }
+
+  // ─── TLS trust policy (audit L-5 follow-up) ─────────────────────────────
+
+  @Test
+  void prodWithoutBackendTrustBundle_fallsBackToWorkingTrustAllProbe() throws Exception {
+    // Regression for the L-5 follow-up: in prod a MISSING `backend-trust` bundle must fall back to
+    // trust-all (mirroring WebClientConfig), NOT the default JVM trust store -- the latter can
+    // never
+    // validate the backend's self-signed internal cert and silently forced the probe DOWN, flapping
+    // the deploy. MockWebServer is plain HTTP here, so this asserts the prod constructor path
+    // resolves a WORKING probe when getBundle(...) throws NoSuchSslBundleException: it must not
+    // throw
+    // at construction and the probe must function.
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"status\":\"UP\"}"));
+    AppBackendProperties props = new AppBackendProperties();
+    props.setBackendUrl(backendUrl);
+    SslBundles sslBundles = mock(SslBundles.class);
+    when(sslBundles.getBundle("backend-trust"))
+        .thenThrow(
+            new NoSuchSslBundleException("backend-trust", "not configured for this profile"));
+    Environment environment = mock(Environment.class);
+    when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});
+
+    BackendHealthIndicator indicator = new BackendHealthIndicator(props, sslBundles, environment);
+
+    assertEquals(Status.UP, indicator.health().getStatus());
+  }
+
+  @Test
+  void hostnameAgnosticTrustManager_routesEndpointChecksThroughChainValidation() {
+    // The fix's core: on the JDK HttpClient (which forces HTTPS endpoint identification and ignores
+    // SSLParameters), hostname verification can only be dropped inside the trust manager. This
+    // guard
+    // asserts the Socket/SSLEngine-aware checkServerTrusted overloads -- the ones that would
+    // perform
+    // the hostname check -- delegate to the host-agnostic two-arg variant, so chain validation is
+    // preserved while endpoint identity is not enforced.
+    RecordingTrustManager recorder = new RecordingTrustManager();
+    BackendHealthIndicator.HostnameAgnosticTrustManager tm =
+        new BackendHealthIndicator.HostnameAgnosticTrustManager(recorder);
+    X509Certificate[] chain = new X509Certificate[0];
+
+    assertNotNull(tm.getAcceptedIssuers(), "accepted issuers must come from the pinned delegate");
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> {
+          tm.checkServerTrusted(chain, "RSA");
+          tm.checkServerTrusted(chain, "RSA", (Socket) null);
+          tm.checkServerTrusted(chain, "RSA", (SSLEngine) null);
+        });
+
+    assertEquals(
+        3,
+        recorder.serverTwoArgCalls,
+        "every checkServerTrusted overload must delegate to the host-agnostic two-arg chain check");
+  }
+
+  /** Stub {@link X509TrustManager} that counts delegations to the two-arg server-trust check. */
+  private static final class RecordingTrustManager implements X509TrustManager {
+
+    private int serverTwoArgCalls;
+
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain, String authType) {
+      // no-op: the probe is always the TLS client, never the server
+    }
+
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain, String authType) {
+      serverTwoArgCalls++;
+    }
+
+    @Override
+    public X509Certificate[] getAcceptedIssuers() {
+      return new X509Certificate[0];
+    }
   }
 
   // ─── Spring constructor-selection guard ─────────────────────────────────
