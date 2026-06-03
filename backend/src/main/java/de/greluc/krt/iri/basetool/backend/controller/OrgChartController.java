@@ -50,9 +50,8 @@ public class OrgChartController {
       summary = "Get the Profit-Bereich org chart",
       description =
           "Returns the full org chart: the Bereichsleitung on top and a column for every active,"
-              + " profit-eligible Staffel and Spezialkommando (plus the configured Job-Order intake"
-              + " Spezialkommando) below. Read-only and open to every authenticated user; editing"
-              + " is ADMIN-only via the position endpoints.")
+              + " profit-eligible Staffel and Spezialkommando below. Read-only and open to every"
+              + " authenticated user; editing is ADMIN-only via the position endpoints.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "The assembled org chart."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")

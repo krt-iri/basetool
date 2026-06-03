@@ -41,28 +41,21 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 /**
  * Mockito unit tests for {@link OrgChartService}. The real generated {@link
  * OrgChartPositionMapperImpl} is wired in (not a mock) so the nested-tree assembly is asserted on
- * concrete node values; the repositories and {@link SystemSettingService} are mocked. Pins the read
- * assembly (grouping by scope / type / parent, the inline Kommando leader, the {@code canAdd*}
- * flags, the intake-SK inclusion) and every write guard (scope/type consistency, parent rules,
- * cardinality limits, the name / nullable-holder rules, one-user-per-scope, optimistic lock).
+ * concrete node values; the three repositories are mocked. Pins the read assembly (grouping by
+ * scope / type / parent, the inline Kommando leader, the {@code canAdd*} flags) and every write
+ * guard (scope/type consistency, parent rules, cardinality limits, the name / nullable-holder
+ * rules, one-user-per-scope, optimistic lock).
  */
 @ExtendWith(MockitoExtension.class)
 class OrgChartServiceTest {
 
-  private static final String INTAKE_KEY = "job_order.intake_special_command_id";
-
   @Mock private OrgChartPositionRepository positionRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private UserRepository userRepository;
-  @Mock private SystemSettingService systemSettingService;
 
   private OrgChartService service() {
     return new OrgChartService(
-        positionRepository,
-        orgUnitRepository,
-        userRepository,
-        new OrgChartPositionMapperImpl(),
-        systemSettingService);
+        positionRepository, orgUnitRepository, userRepository, new OrgChartPositionMapperImpl());
   }
 
   // ------------------------------------------------------------------ read assembly --
@@ -72,8 +65,6 @@ class OrgChartServiceTest {
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     SpecialCommand sk = specialCommand(UUID.randomUUID(), "Alpha SK", "ASK");
     when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron, sk));
-    when(systemSettingService.getSettingValue(INTAKE_KEY)).thenReturn(Optional.empty());
-
     OrgChartPosition areaLead = pos(OrgChartPositionType.AREA_LEAD, null, null);
     OrgChartPosition areaCoordinator = pos(OrgChartPositionType.AREA_COORDINATOR, null, null);
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -120,7 +111,6 @@ class OrgChartServiceTest {
   void getOrgChart_leaderlessNamedCommand_carriesNameAndNullLeader() {
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron));
-    when(systemSettingService.getSettingValue(INTAKE_KEY)).thenReturn(Optional.empty());
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
 
@@ -139,29 +129,8 @@ class OrgChartServiceTest {
   }
 
   @Test
-  void getOrgChart_includesConfiguredIntakeSpecialCommand_evenWhenNotProfitEligible() {
-    UUID intakeId = UUID.randomUUID();
-    SpecialCommand intake = specialCommand(intakeId, "Intake SK", "INT");
-    intake.setProfitEligible(false);
-    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of());
-    when(systemSettingService.getSettingValue(INTAKE_KEY))
-        .thenReturn(Optional.of(intakeId.toString()));
-    when(orgUnitRepository.findById(intakeId)).thenReturn(Optional.of(intake));
-    when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
-        .thenReturn(List.of());
-    when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
-        .thenReturn(List.of());
-
-    OrgChartDto chart = service().getOrgChart();
-
-    assertEquals(1, chart.specialCommands().size());
-    assertEquals("Intake SK", chart.specialCommands().getFirst().name());
-  }
-
-  @Test
   void getOrgChart_noProfitEligibleUnits_skipsUnitPositionQuery() {
     when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of());
-    when(systemSettingService.getSettingValue(INTAKE_KEY)).thenReturn(Optional.empty());
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
 
@@ -178,7 +147,6 @@ class OrgChartServiceTest {
   void getOrgChart_fullSquadron_clearsCanAddFlags() {
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron));
-    when(systemSettingService.getSettingValue(INTAKE_KEY)).thenReturn(Optional.empty());
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
     when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
@@ -429,32 +397,6 @@ class OrgChartServiceTest {
                             OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null, null)));
 
     assertTrue(ex.getMessage().contains("unit_not_profit_eligible"));
-  }
-
-  @Test
-  void createPosition_skCommanderOnIntakeSpecialCommand_isAllowedWithoutProfitFlag() {
-    UUID userId = UUID.randomUUID();
-    UUID unitId = UUID.randomUUID();
-    SpecialCommand intake = specialCommand(unitId, "Intake SK", "INT");
-    intake.setProfitEligible(false);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "skLead")));
-    when(orgUnitRepository.findById(unitId)).thenReturn(Optional.of(intake));
-    when(systemSettingService.getSettingValue(INTAKE_KEY))
-        .thenReturn(Optional.of(unitId.toString()));
-    when(positionRepository.countByOrgUnitIdAndPositionType(
-            unitId, OrgChartPositionType.SK_COMMANDER))
-        .thenReturn(0L);
-    when(positionRepository.existsByOrgUnitIdAndUserId(unitId, userId)).thenReturn(false);
-    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-    OrgChartPositionDto dto =
-        service()
-            .createPosition(
-                new OrgChartPositionCreateRequest(
-                    OrgChartPositionType.SK_COMMANDER, unitId, userId, null, null, null));
-
-    assertEquals(OrgChartPositionType.SK_COMMANDER, dto.positionType());
-    assertEquals(userId, dto.userId());
   }
 
   @Test
