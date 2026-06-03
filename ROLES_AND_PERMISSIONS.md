@@ -220,15 +220,27 @@ Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
 | Lager-View ansehen (`/inventory`, Member+) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Lager bearbeiten / aus-/einbuchen (`isAuthenticated()` + `canEditInventoryItem`, Owner-Scope) | ❌ | ✅¹ | ✅ | ✅¹ | ✅ | ✅ |
 | Auftrag **anlegen** (Material- & Item-Auftrag) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canSeeJobOrder`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`) | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`) | ❌ | ✅³ | ✅³ | ✅³ | ✅³ | ✅ |
+| Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`) | ❌ | ❌ | ✅³ | ❌ | ✅³ | ✅ |
 | Verantwortliche Einheit umsetzen (`PATCH /{id}/responsible-org-unit`) | ❌ | ❌ | ✅² | ❌ | ✅² | ✅ |
-| Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')` + `canViewJobOrders`) | ❌ | ❌ | ✅³ | ❌ | ✅³ | ✅ |
 | Auftrag **löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ¹ Nur über das eigene Lager / die Owner-Scope-Prüfung — nicht generell.
 ² Admin frei; Staffel-Logistiker/-Officer nur **Eskalation** des eigenen
 Staffel-Auftrags an ein SK.
+³ **Nur Mitglieder einer profit-berechtigten Orgeinheit** (`is_profit_eligible`
+auf Staffel oder SK) sind Teil des Auftrags-Workflows: nur sie dürfen Aufträge
+**sehen** (Liste/Detail), **bearbeiten** (Status/Priorität/Materialien/Handover,
+Reassign) und **Material-Claims** setzen/zurückziehen — der Profit-Gate
+(`canViewJobOrders`) ist in `canSeeJobOrder` und `canEditJobOrder` eingefaltet und
+gilt auch für die rollen-only Claim-Endpunkte. Wer ausschließlich in
+nicht-profit-berechtigten Einheiten ist, kann Aufträge **nur anlegen** — sonst
+nichts, analog zu anonymen Gästen. Admins haben immer Zugriff (`canViewJobOrders`
+ist für sie immer wahr). Im Frontend wird der „Aufträge"-Link durch „Auftrag
+anlegen" ersetzt und ein Direktaufruf von `/orders` bzw. `/orders/{id}` auf das
+Anlege-Formular umgeleitet; das Backend liefert für Nicht-Profit-Mitglieder eine
+leere Liste bzw. `403` (auch bei Schreib-/Claim-Endpunkten).
 
 ### 3.4 Refinery
 

@@ -118,6 +118,9 @@ class JobOrderServiceAssigneeAndListTest {
     @BeforeEach
     void stubScope() {
       lenient().when(ownerScopeService.currentScopePredicate()).thenReturn(adminAllScope);
+      // These routing tests model a permitted viewer; the profit gate is covered separately in
+      // OwnerScopeServiceTest / JobOrderServiceTest, so let the list reach the repository here.
+      lenient().when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     }
 
     @Test

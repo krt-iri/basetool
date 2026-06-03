@@ -1,0 +1,70 @@
+package de.greluc.krt.iri.basetool.frontend.controller;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.iri.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Verifies the viewer-side profit gate on the order pages: a non-admin caller who is not a member
+ * of any profit-eligible org unit ({@code canViewJobOrders=false}) is redirected from the order
+ * list and the order detail to the create form — the only order surface open to them — without the
+ * backend list/detail ever being queried. The profit-eligible / admin path (rendering the list and
+ * detail) is covered by the other order MVC tests, which stub the capability {@code true}.
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+class JobOrderViewProfitGateMvcTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    // Non-profit viewer: the backend capability says the caller may not enter the order area.
+    when(backendApiClient.get(
+            "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(false, false));
+  }
+
+  @Test
+  @WithMockUser
+  void orderList_nonProfitViewer_redirectsToCreate() throws Exception {
+    mockMvc
+        .perform(get("/orders"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/orders/create"));
+  }
+
+  @Test
+  @WithMockUser
+  void orderDetail_nonProfitViewer_redirectsToCreate() throws Exception {
+    mockMvc
+        .perform(get("/orders/" + UUID.randomUUID()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/orders/create"));
+  }
+}

@@ -1,0 +1,128 @@
+package de.greluc.krt.iri.basetool.backend.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.iri.basetool.backend.service.MaterialClaimService;
+import de.greluc.krt.iri.basetool.backend.service.OwnerScopeService;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Security-focused MockMvc tests pinning the {@code @ownerScopeService.canViewJobOrders()} clause
+ * on the material-claim write endpoints ({@code POST}/{@code DELETE} under {@code
+ * /api/v1/orders/{jobOrderId}/claims}). Unlike the read/edit gates — folded into {@code
+ * canSeeJobOrder}/{@code canEditJobOrder} and covered by {@code OwnerScopeServiceTest} — the claim
+ * writes carry the profit check only as a string literal in their {@code @PreAuthorize} SpEL, so
+ * this test locks the wiring in: a LOGISTICIAN who is not in a profit-eligible org unit must be
+ * forbidden, while a profit-eligible LOGISTICIAN reaches the service. The fine-grained per-squadron
+ * matrix is asserted separately at the service layer ({@code MaterialClaimServiceTest}).
+ */
+@SpringBootTest
+class MaterialClaimControllerSecurityTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private MaterialClaimService materialClaimService;
+  @MockitoBean private OwnerScopeService ownerScopeService;
+  @MockitoBean private JwtDecoder jwtDecoder;
+
+  private static final UUID ORDER_ID = UUID.randomUUID();
+  private static final UUID CLAIM_ID = UUID.randomUUID();
+
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  private static SimpleGrantedAuthority logistician() {
+    return new SimpleGrantedAuthority("ROLE_LOGISTICIAN");
+  }
+
+  /**
+   * A valid {@link de.greluc.krt.iri.basetool.backend.model.dto.CreateClaimDto} body so bean
+   * validation passes and the request reaches the {@code @PreAuthorize} gate rather than a 400.
+   */
+  private static String validClaimBody() {
+    return "{\"materialId\":\""
+        + UUID.randomUUID()
+        + "\",\"qualityRequirement\":\"GOOD\",\"claimingOrgUnitId\":\""
+        + UUID.randomUUID()
+        + "\",\"amount\":5.0}";
+  }
+
+  @Test
+  void upsertClaim_nonProfitLogistician_isForbidden() throws Exception {
+    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+
+    mockMvc
+        .perform(
+            post("/api/v1/orders/{id}/claims", ORDER_ID)
+                .with(jwt().authorities(logistician()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validClaimBody()))
+        .andExpect(status().isForbidden());
+
+    verify(materialClaimService, never()).upsertClaim(any(), any());
+  }
+
+  @Test
+  void upsertClaim_profitEligibleLogistician_reachesService() throws Exception {
+    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+
+    mockMvc
+        .perform(
+            post("/api/v1/orders/{id}/claims", ORDER_ID)
+                .with(jwt().authorities(logistician()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validClaimBody()))
+        .andExpect(status().isCreated());
+
+    verify(materialClaimService).upsertClaim(any(), any());
+  }
+
+  @Test
+  void withdrawClaim_nonProfitLogistician_isForbidden() throws Exception {
+    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+
+    mockMvc
+        .perform(
+            delete("/api/v1/orders/{id}/claims/{claimId}", ORDER_ID, CLAIM_ID)
+                .with(jwt().authorities(logistician())))
+        .andExpect(status().isForbidden());
+
+    verify(materialClaimService, never()).withdrawClaim(any(), any());
+  }
+
+  @Test
+  void withdrawClaim_profitEligibleLogistician_reachesService() throws Exception {
+    when(ownerScopeService.canViewJobOrders()).thenReturn(true);
+
+    mockMvc
+        .perform(
+            delete("/api/v1/orders/{id}/claims/{claimId}", ORDER_ID, CLAIM_ID)
+                .with(jwt().authorities(logistician())))
+        .andExpect(status().isNoContent());
+
+    verify(materialClaimService).withdrawClaim(ORDER_ID, CLAIM_ID);
+  }
+}

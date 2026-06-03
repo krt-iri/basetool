@@ -71,17 +71,26 @@ public class MeController {
 
   /**
    * Per-principal UI capability flags the frontend uses to decide which optional menu entries to
-   * show. Currently a single flag: whether the caller may open the org-unit blueprint availability
-   * overview (#364) — {@code true} for admins, officers, and Spezialkommando leads. Reuses the
-   * exact gate the {@code /api/v1/personal-blueprints/overview} endpoints are class-gated by, so a
-   * hidden menu and a forbidden API can never diverge.
+   * show and which pages to redirect away from. Two flags today:
+   *
+   * <ul>
+   *   <li>{@code canSeeBlueprintOverview} — whether the caller may open the org-unit blueprint
+   *       availability overview (#364): {@code true} for admins, officers, and Spezialkommando
+   *       leads. Reuses the exact gate the {@code /api/v1/personal-blueprints/overview} endpoints
+   *       are class-gated by.
+   *   <li>{@code canViewJobOrders} — whether the caller may enter the Job-Order area: {@code true}
+   *       for admins and members of any profit-eligible org unit. Mirrors the backend gate folded
+   *       into {@code OwnerScopeService.canSeeJobOrder} + the order-list short-circuit, so the
+   *       hidden menu / redirect and the empty-list / 403 API stay in lockstep.
+   * </ul>
    *
    * @return the caller's UI capability flags; never {@code null}.
    */
   @GetMapping("/capabilities")
-  @Operation(summary = "Per-principal UI capability flags (e.g. blueprint-overview access).")
+  @Operation(summary = "Per-principal UI capability flags (blueprint-overview + job-order access).")
   public CapabilitiesResponse getCapabilities() {
-    return new CapabilitiesResponse(ownerScopeService.canAccessBlueprintOverview());
+    return new CapabilitiesResponse(
+        ownerScopeService.canAccessBlueprintOverview(), ownerScopeService.canViewJobOrders());
   }
 
   /**
@@ -108,6 +117,8 @@ public class MeController {
    *
    * @param canSeeBlueprintOverview {@code true} iff the caller may open the org-unit blueprint
    *     availability overview (admin, officer, or Spezialkommando lead).
+   * @param canViewJobOrders {@code true} iff the caller may enter the Job-Order area (admin, or
+   *     member of at least one profit-eligible org unit).
    */
-  public record CapabilitiesResponse(boolean canSeeBlueprintOverview) {}
+  public record CapabilitiesResponse(boolean canSeeBlueprintOverview, boolean canViewJobOrders) {}
 }

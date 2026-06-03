@@ -52,6 +52,8 @@ class JobOrderServiceTest {
 
   @Mock private OrgUnitRepository orgUnitRepository;
 
+  @Mock private OwnerScopeService ownerScopeService;
+
   @Mock private SystemSettingService systemSettingService;
 
   @Mock private AuthHelperService authHelperService;
@@ -166,6 +168,23 @@ class JobOrderServiceTest {
             List.of(),
             Instant.now(),
             1L);
+  }
+
+  @Test
+  void getAllJobOrders_nonViewer_returnsEmptyPageWithoutQuerying() {
+    // A caller who may not view orders (non-admin, no profit-eligible membership) short-circuits to
+    // an empty page — the scope predicate and the repository query are never reached, so the
+    // SK-public union can never leak to them.
+    when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+
+    org.springframework.data.domain.Page<JobOrderDto> result =
+        jobOrderService.getAllJobOrders(
+            null, null, org.springframework.data.domain.PageRequest.of(0, 20));
+
+    assertTrue(result.isEmpty());
+    verify(jobOrderRepository, never())
+        .findScopedJobOrders(any(), any(), anyBoolean(), any(), any(), any());
+    verify(ownerScopeService, never()).currentScopePredicate();
   }
 
   @Test

@@ -29,11 +29,13 @@ import org.springframework.web.bind.annotation.RestController;
  * #340, Phase 4 / #344). Claims let profit squadrons sign up for partial quantities of a material
  * bucket on a public Spezialkommando order.
  *
- * <p>Reads are open to anyone who may see the order ({@code canSeeJobOrder}) — SK orders are
- * public, so the claim transparency ("all see all") falls out of the order's own visibility scope.
- * Writes require LOGISTICIAN or above at the role gate; the fine-grained permission matrix (own
- * squadron vs. responsible-SK authority vs. admin) plus the SK-only / no-overclaim /
- * terminal-freeze invariants are enforced in {@link MaterialClaimService}.
+ * <p>Reads are open to anyone who may see the order ({@code canSeeJobOrder}) — SK orders are public
+ * to profit-eligible viewers, so the claim transparency ("all see all") falls out of the order's
+ * own visibility scope. Writes require LOGISTICIAN or above at the role gate <em>and</em> that the
+ * caller belongs to a profit-eligible org unit ({@code canViewJobOrders}) — a non-profit member is
+ * outside the order workflow and may neither see nor act on the SK queue. The fine-grained
+ * permission matrix (own squadron vs. responsible-SK authority vs. admin) plus the SK-only /
+ * no-overclaim / terminal-freeze invariants are enforced in {@link MaterialClaimService}.
  */
 @RestController
 @RequestMapping("/api/v1/orders/{jobOrderId}/claims")
@@ -89,7 +91,7 @@ public class MaterialClaimController {
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order not found")
   })
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canViewJobOrders()")
   public ClaimDto upsertClaim(
       @PathVariable UUID jobOrderId, @RequestBody @Valid CreateClaimDto dto) {
     return materialClaimService.upsertClaim(jobOrderId, dto);
@@ -112,7 +114,7 @@ public class MaterialClaimController {
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order or claim not found")
   })
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canViewJobOrders()")
   public void withdrawClaim(@PathVariable UUID jobOrderId, @PathVariable UUID claimId) {
     materialClaimService.withdrawClaim(jobOrderId, claimId);
   }
