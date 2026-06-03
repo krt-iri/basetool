@@ -39,7 +39,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
 
   /**
    * Loads every job-order in {@code OPEN} or {@code IN_PROGRESS} status together with its materials
-   * and handover items in one query, ordered newest first by {@code displayId}. Eager-fetch path
+   * and handover items in one query, ordered by ascending {@code priority} (most-important first;
+   * orders without a priority sort last) and then by descending {@code displayId} as a stable
+   * tiebreaker — mirroring the Auftragsverwaltung's default {@code priority,asc} ranking so the
+   * warehouse (Lager) job-order filter and per-row pickers present the same order. Eager-fetch path
    * matches what the active-orders board renders, so there is no N+1.
    */
   @EntityGraph(
@@ -53,8 +56,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "requestingOrgUnit"
       })
   @Query(
-      "SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.displayId"
-          + " DESC")
+      "SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.priority ASC"
+          + " NULLS LAST, o.displayId DESC")
   List<JobOrder> findAllActiveWithMaterials();
 
   /**
