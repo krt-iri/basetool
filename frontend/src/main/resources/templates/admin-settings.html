@@ -159,12 +159,12 @@
             Per-squadron profit-eligibility toggle. Each row PATCHes the backend on click via
             /api/proxy/squadrons/{id}/profit-eligible — no full form submit. Marking a squadron
             eligible opts it into the Job-Order responsible (processing) picker; un-marking removes
-            it again. Spezialkommandos are always eligible and are not listed here.
+            it again. Spezialkommandos have their own per-SK toggle in the section below.
         -->
         <div class="data-section mt-2">
             <h2 th:text="#{admin.settings.squadron.profit}">Auftragsbearbeitung pro Staffel</h2>
             <p class="mb-1 text-muted"
-               th:text="#{admin.settings.squadron.profit.description}">Legt fest, welche Staffeln als verantwortliche (bearbeitende) Einheit eines Auftrags ausgewählt werden können. Spezialkommandos sind immer auswählbar.</p>
+               th:text="#{admin.settings.squadron.profit.description}">Legt fest, welche Staffeln als verantwortliche (bearbeitende) Einheit eines Auftrags ausgewählt werden können.</p>
 
             <div th:if="${#lists.isEmpty(squadrons)}" style="color: var(--color-gray-2); font-style: italic;"
                  th:text="#{admin.settings.squadron.profit.empty}">Keine Staffeln gefunden.</div>

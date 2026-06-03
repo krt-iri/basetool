@@ -41,13 +41,17 @@ class OrgChartDtoDeserializationTest {
                     "userId":"00000000-0000-0000-0000-0000000000b3","userName":"Lead","sortIndex":0,"version":1},
             "commands":[
               {
-                "commandLead":{"positionId":"00000000-0000-0000-0000-0000000000a4","positionType":"COMMAND_LEAD",
-                               "userId":"00000000-0000-0000-0000-0000000000b4","userName":"Cmd","sortIndex":0,"version":0},
+                "positionId":"00000000-0000-0000-0000-0000000000a4","name":"Alpha","version":2,"sortIndex":0,
+                "leaderUserId":"00000000-0000-0000-0000-0000000000b4","leaderUserName":"Cmd",
                 "deputy":null,
                 "ensigns":[
                   {"positionId":"00000000-0000-0000-0000-0000000000a5","positionType":"ENSIGN",
                    "userId":"00000000-0000-0000-0000-0000000000b5","userName":"Ensign","sortIndex":0,"version":0}
                 ]
+              },
+              {
+                "positionId":"00000000-0000-0000-0000-0000000000a7","name":null,"version":0,"sortIndex":1,
+                "leaderUserId":null,"leaderUserName":null,"deputy":null,"ensigns":[]
               }
             ],
             "directEnsigns":[],
@@ -84,13 +88,17 @@ class OrgChartDtoDeserializationTest {
     assertEquals("SQUADRON_LEAD", squadron.lead().positionType());
     assertTrue(squadron.canAddCommand());
     assertFalse(squadron.canAddEnsign());
-    assertEquals(1, squadron.commands().size());
 
+    assertEquals(2, squadron.commands().size());
     CommandChartDto command = squadron.commands().getFirst();
-    assertEquals("COMMAND_LEAD", command.commandLead().positionType());
+    assertEquals("Alpha", command.name());
+    assertEquals("Cmd", command.leaderUserName());
     assertNull(command.deputy());
     assertEquals(1, command.ensigns().size());
     assertEquals("ENSIGN", command.ensigns().getFirst().positionType());
+    CommandChartDto leaderless = squadron.commands().get(1);
+    assertNull(leaderless.name(), "an unnamed Kommando decodes a null name");
+    assertNull(leaderless.leaderUserId(), "a leaderless Kommando decodes a null holder");
 
     assertEquals(1, chart.specialCommands().size());
     assertEquals(

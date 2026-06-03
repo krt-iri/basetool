@@ -48,7 +48,7 @@ class OrgChartControllerTest {
   void createPosition_delegatesRequestToService() {
     OrgChartPositionCreateRequest request =
         new OrgChartPositionCreateRequest(
-            OrgChartPositionType.AREA_COORDINATOR, null, UUID.randomUUID(), null, null);
+            OrgChartPositionType.AREA_COORDINATOR, null, UUID.randomUUID(), null, null, null);
     OrgChartPositionDto response =
         new OrgChartPositionDto(
             UUID.randomUUID(),
@@ -56,6 +56,7 @@ class OrgChartControllerTest {
             null,
             request.userId(),
             "Coordinator",
+            null,
             null,
             0,
             0L);
@@ -69,7 +70,7 @@ class OrgChartControllerTest {
   void updatePosition_delegatesIdAndRequestToService() {
     UUID id = UUID.randomUUID();
     OrgChartPositionUpdateRequest request =
-        new OrgChartPositionUpdateRequest(UUID.randomUUID(), null, 0L);
+        new OrgChartPositionUpdateRequest(UUID.randomUUID(), null, null, 0L);
     OrgChartPositionDto response =
         new OrgChartPositionDto(
             id,
@@ -77,6 +78,7 @@ class OrgChartControllerTest {
             UUID.randomUUID(),
             request.userId(),
             "Lead",
+            null,
             null,
             0,
             1L);

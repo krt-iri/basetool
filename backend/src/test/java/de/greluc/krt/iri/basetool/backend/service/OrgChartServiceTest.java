@@ -32,7 +32,6 @@ import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -43,8 +42,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * Mockito unit tests for {@link OrgChartService}. The real generated {@link
  * OrgChartPositionMapperImpl} is wired in (not a mock) so the nested-tree assembly is asserted on
  * concrete node values; the three repositories are mocked. Pins the read assembly (grouping by
- * scope / type / parent, the {@code canAdd*} flags) and every write guard (scope/type consistency,
- * parent rules, cardinality limits, one-user-per-scope, optimistic lock).
+ * scope / type / parent, the inline Kommando leader, the {@code canAdd*} flags) and every write
+ * guard (scope/type consistency, parent rules, cardinality limits, the name / nullable-holder
+ * rules, one-user-per-scope, optimistic lock).
  */
 @ExtendWith(MockitoExtension.class)
 class OrgChartServiceTest {
@@ -53,16 +53,9 @@ class OrgChartServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private UserRepository userRepository;
 
-  private OrgChartService service;
-
-  @BeforeEach
-  void setUp() {
-    service =
-        new OrgChartService(
-            positionRepository,
-            orgUnitRepository,
-            userRepository,
-            new OrgChartPositionMapperImpl());
+  private OrgChartService service() {
+    return new OrgChartService(
+        positionRepository, orgUnitRepository, userRepository, new OrgChartPositionMapperImpl());
   }
 
   // ------------------------------------------------------------------ read assembly --
@@ -72,7 +65,6 @@ class OrgChartServiceTest {
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     SpecialCommand sk = specialCommand(UUID.randomUUID(), "Alpha SK", "ASK");
     when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron, sk));
-
     OrgChartPosition areaLead = pos(OrgChartPositionType.AREA_LEAD, null, null);
     OrgChartPosition areaCoordinator = pos(OrgChartPositionType.AREA_COORDINATOR, null, null);
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -88,7 +80,7 @@ class OrgChartServiceTest {
         .thenReturn(
             List.of(squadronLead, commandLead, deputy, commandEnsign, directEnsign, skCommander));
 
-    OrgChartDto chart = service.getOrgChart();
+    OrgChartDto chart = service().getOrgChart();
 
     assertNotNull(chart.areaLeadership().lead());
     assertEquals(OrgChartPositionType.AREA_LEAD, chart.areaLeadership().lead().positionType());
@@ -102,6 +94,8 @@ class OrgChartServiceTest {
     assertNotNull(squadronDto.lead());
     assertEquals(1, squadronDto.commands().size());
     CommandChartDto command = squadronDto.commands().getFirst();
+    assertEquals(commandLead.getId(), command.positionId());
+    assertNotNull(command.leaderUserId());
     assertNotNull(command.deputy());
     assertEquals(1, command.ensigns().size());
     assertEquals(1, squadronDto.directEnsigns().size());
@@ -114,12 +108,33 @@ class OrgChartServiceTest {
   }
 
   @Test
+  void getOrgChart_leaderlessNamedCommand_carriesNameAndNullLeader() {
+    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron));
+    when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
+        .thenReturn(List.of());
+
+    OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
+    command.setName("Alpha");
+    OrgChartPosition deputy = pos(OrgChartPositionType.DEPUTY_COMMAND_LEAD, squadron, command);
+    when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
+        .thenReturn(List.of(command, deputy));
+
+    CommandChartDto dto = service().getOrgChart().squadrons().getFirst().commands().getFirst();
+
+    assertEquals("Alpha", dto.name());
+    assertNull(dto.leaderUserId(), "a leaderless Kommando exposes no holder");
+    assertNull(dto.leaderUserName());
+    assertNotNull(dto.deputy(), "a Stv. may hang off a leaderless Kommando");
+  }
+
+  @Test
   void getOrgChart_noProfitEligibleUnits_skipsUnitPositionQuery() {
     when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of());
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
 
-    OrgChartDto chart = service.getOrgChart();
+    OrgChartDto chart = service().getOrgChart();
 
     assertNull(chart.areaLeadership().lead());
     assertTrue(chart.squadrons().isEmpty());
@@ -146,7 +161,7 @@ class OrgChartServiceTest {
                 pos(OrgChartPositionType.ENSIGN, squadron, null),
                 pos(OrgChartPositionType.ENSIGN, squadron, null)));
 
-    SquadronChartDto squadronDto = service.getOrgChart().squadrons().getFirst();
+    SquadronChartDto squadronDto = service().getOrgChart().squadrons().getFirst();
 
     assertEquals(4, squadronDto.commands().size());
     assertFalse(squadronDto.canAddCommand());
@@ -169,13 +184,118 @@ class OrgChartServiceTest {
             });
 
     OrgChartPositionDto dto =
-        service.createPosition(
-            new OrgChartPositionCreateRequest(
-                OrgChartPositionType.AREA_COORDINATOR, null, userId, null, null));
+        service()
+            .createPosition(
+                new OrgChartPositionCreateRequest(
+                    OrgChartPositionType.AREA_COORDINATOR, null, userId, null, null, null));
 
     assertEquals(OrgChartPositionType.AREA_COORDINATOR, dto.positionType());
     assertEquals(userId, dto.userId());
     assertNull(dto.orgUnitId());
+  }
+
+  @Test
+  void createPosition_commandLeadWithoutUser_createsLeaderlessNamedKommando() {
+    UUID unitId = UUID.randomUUID();
+    when(orgUnitRepository.findById(unitId))
+        .thenReturn(Optional.of(squadron(unitId, "IRIDIUM", "IRI")));
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            unitId, OrgChartPositionType.COMMAND_LEAD))
+        .thenReturn(0L);
+    when(positionRepository.save(any()))
+        .thenAnswer(
+            inv -> {
+              OrgChartPosition p = inv.getArgument(0);
+              p.setId(UUID.randomUUID());
+              return p;
+            });
+
+    OrgChartPositionDto dto =
+        service()
+            .createPosition(
+                new OrgChartPositionCreateRequest(
+                    OrgChartPositionType.COMMAND_LEAD, unitId, null, null, "  Alpha  ", null));
+
+    assertEquals(OrgChartPositionType.COMMAND_LEAD, dto.positionType());
+    assertNull(dto.userId(), "a Kommando may be created with no Kommandoleiter");
+    assertEquals("Alpha", dto.name(), "the name is trimmed");
+    verify(userRepository, never()).findById(any());
+  }
+
+  @Test
+  void createPosition_nonCommandRankWithoutUser_isRejected() {
+    UUID unitId = UUID.randomUUID();
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.SQUADRON_LEAD, unitId, null, null, null, null)));
+
+    assertTrue(ex.getMessage().contains("user_required"));
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void createPosition_nameOnNonCommandRank_isRejected() {
+    UUID userId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "lead")));
+    when(orgUnitRepository.findById(unitId))
+        .thenReturn(Optional.of(squadron(unitId, "IRIDIUM", "IRI")));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.SQUADRON_LEAD,
+                            unitId,
+                            userId,
+                            null,
+                            "Nope",
+                            null)));
+
+    assertTrue(ex.getMessage().contains("name_not_allowed"));
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void createPosition_deputyUnderLeaderlessKommando_persists() {
+    UUID userId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    UUID parentId = UUID.randomUUID();
+    Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
+    OrgChartPosition leaderlessKommando =
+        pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
+    leaderlessKommando.setId(parentId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "deputy")));
+    when(orgUnitRepository.findById(unitId)).thenReturn(Optional.of(squadron));
+    when(positionRepository.findById(parentId)).thenReturn(Optional.of(leaderlessKommando));
+    when(positionRepository.existsByParentIdAndPositionType(
+            parentId, OrgChartPositionType.DEPUTY_COMMAND_LEAD))
+        .thenReturn(false);
+    when(positionRepository.existsByOrgUnitIdAndUserId(unitId, userId)).thenReturn(false);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto =
+        service()
+            .createPosition(
+                new OrgChartPositionCreateRequest(
+                    OrgChartPositionType.DEPUTY_COMMAND_LEAD,
+                    unitId,
+                    userId,
+                    parentId,
+                    null,
+                    null));
+
+    assertEquals(OrgChartPositionType.DEPUTY_COMMAND_LEAD, dto.positionType());
+    assertEquals(userId, dto.userId());
   }
 
   @Test
@@ -189,9 +309,10 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.AREA_LEAD, null, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.AREA_LEAD, null, userId, null, null, null)));
 
     assertTrue(ex.getMessage().contains("duplicate_lead"));
     verify(positionRepository, never()).save(any());
@@ -206,9 +327,10 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.SQUADRON_LEAD, null, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.SQUADRON_LEAD, null, userId, null, null, null)));
 
     assertTrue(ex.getMessage().contains("scope_mismatch"));
   }
@@ -222,9 +344,15 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.AREA_LEAD, UUID.randomUUID(), userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.AREA_LEAD,
+                            UUID.randomUUID(),
+                            userId,
+                            null,
+                            null,
+                            null)));
 
     assertTrue(ex.getMessage().contains("scope_mismatch"));
   }
@@ -242,9 +370,10 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null, null)));
 
     assertTrue(ex.getMessage().contains("scope_mismatch"));
   }
@@ -262,9 +391,10 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null, null)));
 
     assertTrue(ex.getMessage().contains("unit_not_profit_eligible"));
   }
@@ -284,9 +414,10 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.COMMAND_LEAD, unitId, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.COMMAND_LEAD, unitId, userId, null, null, null)));
 
     assertTrue(ex.getMessage().contains("command_limit"));
   }
@@ -305,9 +436,10 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.ENSIGN, unitId, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.ENSIGN, unitId, userId, null, null, null)));
 
     assertTrue(ex.getMessage().contains("ensign_limit"));
   }
@@ -327,9 +459,10 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.SK_COMMANDER, unitId, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.SK_COMMANDER, unitId, userId, null, null, null)));
 
     assertTrue(ex.getMessage().contains("commander_limit"));
   }
@@ -346,9 +479,15 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.DEPUTY_COMMAND_LEAD, unitId, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.DEPUTY_COMMAND_LEAD,
+                            unitId,
+                            userId,
+                            null,
+                            null,
+                            null)));
 
     assertTrue(ex.getMessage().contains("invalid_parent"));
   }
@@ -369,9 +508,10 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.ENSIGN, unitId, userId, parentId, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.ENSIGN, unitId, userId, parentId, null, null)));
 
     assertTrue(ex.getMessage().contains("invalid_parent"));
   }
@@ -395,9 +535,15 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.DEPUTY_COMMAND_LEAD, unitId, userId, parentId, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.DEPUTY_COMMAND_LEAD,
+                            unitId,
+                            userId,
+                            parentId,
+                            null,
+                            null)));
 
     assertTrue(ex.getMessage().contains("duplicate_deputy"));
   }
@@ -412,9 +558,15 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.createPosition(
-                    new OrgChartPositionCreateRequest(
-                        OrgChartPositionType.AREA_COORDINATOR, null, userId, null, null)));
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.AREA_COORDINATOR,
+                            null,
+                            userId,
+                            null,
+                            null,
+                            null)));
 
     assertTrue(ex.getMessage().contains("user_already_assigned"));
     verify(positionRepository, never()).save(any());
@@ -428,9 +580,10 @@ class OrgChartServiceTest {
     assertThrows(
         NotFoundException.class,
         () ->
-            service.createPosition(
-                new OrgChartPositionCreateRequest(
-                    OrgChartPositionType.AREA_COORDINATOR, null, userId, null, null)));
+            service()
+                .createPosition(
+                    new OrgChartPositionCreateRequest(
+                        OrgChartPositionType.AREA_COORDINATOR, null, userId, null, null, null)));
   }
 
   @Test
@@ -443,9 +596,10 @@ class OrgChartServiceTest {
     assertThrows(
         NotFoundException.class,
         () ->
-            service.createPosition(
-                new OrgChartPositionCreateRequest(
-                    OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null)));
+            service()
+                .createPosition(
+                    new OrgChartPositionCreateRequest(
+                        OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null, null)));
   }
 
   // ----------------------------------------------------------------- update / delete --
@@ -460,7 +614,8 @@ class OrgChartServiceTest {
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> service.updatePosition(id, new OrgChartPositionUpdateRequest(null, null, 1L)));
+        () ->
+            service().updatePosition(id, new OrgChartPositionUpdateRequest(null, null, null, 1L)));
     verify(positionRepository, never()).save(any());
   }
 
@@ -480,7 +635,9 @@ class OrgChartServiceTest {
         assertThrows(
             BadRequestException.class,
             () ->
-                service.updatePosition(id, new OrgChartPositionUpdateRequest(newUserId, null, 0L)));
+                service()
+                    .updatePosition(
+                        id, new OrgChartPositionUpdateRequest(newUserId, null, null, 0L)));
 
     assertTrue(ex.getMessage().contains("user_already_assigned"));
     verify(positionRepository, never()).save(any());
@@ -500,9 +657,64 @@ class OrgChartServiceTest {
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     OrgChartPositionDto dto =
-        service.updatePosition(id, new OrgChartPositionUpdateRequest(newUserId, null, 0L));
+        service().updatePosition(id, new OrgChartPositionUpdateRequest(newUserId, null, null, 0L));
 
     assertEquals(newUserId, dto.userId());
+  }
+
+  @Test
+  void updatePosition_assignLeaderToLeaderlessKommando_persists() {
+    UUID id = UUID.randomUUID();
+    UUID newUserId = UUID.randomUUID();
+    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    OrgChartPosition kommando = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
+    kommando.setId(id);
+    kommando.setVersion(0L);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(kommando));
+    when(userRepository.findById(newUserId)).thenReturn(Optional.of(user(newUserId, "lead")));
+    when(positionRepository.existsByOrgUnitIdAndUserId(squadron.getId(), newUserId))
+        .thenReturn(false);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto =
+        service().updatePosition(id, new OrgChartPositionUpdateRequest(newUserId, null, null, 0L));
+
+    assertEquals(newUserId, dto.userId());
+  }
+
+  @Test
+  void updatePosition_renameCommand_persists() {
+    UUID id = UUID.randomUUID();
+    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    OrgChartPosition kommando = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null);
+    kommando.setId(id);
+    kommando.setVersion(0L);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(kommando));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto =
+        service().updatePosition(id, new OrgChartPositionUpdateRequest(null, "Bravo", null, 0L));
+
+    assertEquals("Bravo", dto.name());
+  }
+
+  @Test
+  void updatePosition_nameOnNonCommandRank_isRejected() {
+    UUID id = UUID.randomUUID();
+    OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null);
+    position.setId(id);
+    position.setVersion(0L);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(position));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .updatePosition(id, new OrgChartPositionUpdateRequest(null, "Nope", null, 0L)));
+
+    assertTrue(ex.getMessage().contains("name_not_allowed"));
+    verify(positionRepository, never()).save(any());
   }
 
   @Test
@@ -512,7 +724,8 @@ class OrgChartServiceTest {
 
     assertThrows(
         NotFoundException.class,
-        () -> service.updatePosition(id, new OrgChartPositionUpdateRequest(null, null, 0L)));
+        () ->
+            service().updatePosition(id, new OrgChartPositionUpdateRequest(null, null, null, 0L)));
   }
 
   @Test
@@ -522,7 +735,7 @@ class OrgChartServiceTest {
     position.setId(id);
     when(positionRepository.findById(id)).thenReturn(Optional.of(position));
 
-    service.deletePosition(id);
+    service().deletePosition(id);
 
     verify(positionRepository).delete(position);
   }
@@ -532,7 +745,7 @@ class OrgChartServiceTest {
     UUID id = UUID.randomUUID();
     when(positionRepository.findById(id)).thenReturn(Optional.empty());
 
-    assertThrows(NotFoundException.class, () -> service.deletePosition(id));
+    assertThrows(NotFoundException.class, () -> service().deletePosition(id));
     verify(positionRepository, never()).delete(any());
   }
 

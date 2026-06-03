@@ -214,14 +214,16 @@
     overflow-wrap: break-word;
 }
 
+/* Vacant slot: a subtle filled box + readable label so the seat reads clearly (not the old
+   near-invisible grey-on-transparent); the dashed frame still signals "empty". */
 .oc-node--vacant {
     border-style: dashed;
     border-color: var(--color-gray-2);
-    background: transparent;
+    background: var(--color-surface-input);
 }
 
 .oc-node--vacant .oc-node-name {
-    color: var(--color-gray-2);
+    color: var(--color-gray-1);
     font-weight: 400;
     font-style: italic;
 }
@@ -272,6 +274,25 @@
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
+}
+
+/* --- Kommando(gruppe) header: names the command, sits above its Kommandoleiter ----------- */
+.oc-command-head {
+    gap: 0.15rem;
+    border-top: 2px solid var(--color-primary);
+}
+
+.oc-command-name {
+    color: var(--color-white);
+    font-weight: 700;
+    font-size: 0.9rem;
+    overflow-wrap: break-word;
+}
+
+.oc-command-name--unnamed {
+    color: var(--color-gray-1);
+    font-weight: 400;
+    font-style: italic;
 }
 
 /* --- inline editor controls (admin, only while .editing) -------------------- */

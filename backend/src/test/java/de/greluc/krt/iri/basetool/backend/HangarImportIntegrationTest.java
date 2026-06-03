@@ -403,4 +403,59 @@ class HangarImportIntegrationTest {
     assertEquals(0, result.skippedCount());
     assertEquals(2, shipRepository.findByOwnerId(user1.getId()).size());
   }
+
+  // -------------------------------------------------------------------------
+  // Fleetyards (https://fleetyards.net): a flat array keyed by the camelCase
+  // shipCode/manufacturerCode pair, auto-detected on the canonical /import/ships
+  // endpoint. Exercises a name match (135c) with a custom shipName plus an
+  // unmatched entry, end-to-end against the real DB.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_fleetyards_nameMatchAndCustomName() throws Exception {
+    String json =
+        """
+        [
+          {
+            "name":"135c", "slug":"orig-135c", "shipCode":"orig_135c",
+            "manufacturerName":"Origin Jumpworks", "manufacturerCode":"ORIG",
+            "shipName":"My Little Ship", "wanted":false, "flagship":false,
+            "public":true, "nameVisible":true, "saleNotify":false,
+            "groups":[], "modules":[], "upgrades":[]
+          },
+          {
+            "name":"unknown xz99", "slug":"alien-xz99", "shipCode":"alien_xz99",
+            "manufacturerCode":"ALN", "groups":[], "modules":[], "upgrades":[]
+          }
+        ]
+        """;
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file",
+            "fleetyards-hangar.json",
+            "application/json",
+            json.getBytes(StandardCharsets.UTF_8));
+
+    // When
+    String response =
+        mockMvc
+            .perform(
+                multipart("/api/v1/hangar/import/ships")
+                    .file(file)
+                    .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: 135c matched and named; the alien entry reported as skipped.
+    FleetviewImportResponseDto result =
+        objectMapper.readValue(response, FleetviewImportResponseDto.class);
+    assertEquals(1, result.importedCount());
+    assertEquals(1, result.skippedCount());
+    assertTrue(result.skippedShips().contains("unknown xz99"));
+
+    Ship imported = shipRepository.findByOwnerId(user1.getId()).stream().findFirst().orElseThrow();
+    assertEquals("My Little Ship", imported.getName());
+  }
 }

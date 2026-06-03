@@ -135,9 +135,68 @@
 
                             <ul class="oc-branch"
                                 th:if="${!#lists.isEmpty(sq.commands()) or !#lists.isEmpty(sq.directEnsigns())}">
-                                <!-- Kommandos: Kommandoleiter with its Stv. + Ensigns below -->
+                                <!-- Kommando(gruppe): named header, then its Kommandoleiter (may be vacant),
+                                     then the Stv. + Ensigns reporting into it -->
                                 <li th:each="cmd : ${sq.commands()}">
-                                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${cmd.commandLead()})}"></th:block>
+                                    <div class="oc-node oc-command-head">
+                                        <span class="oc-node-rank" th:text="#{orgChart.command.tag}">Kommandogruppe</span>
+                                        <span class="oc-command-name" th:if="${cmd.name() != null}"
+                                              th:text="${cmd.name()}">Alpha</span>
+                                        <span class="oc-command-name oc-command-name--unnamed"
+                                              th:if="${cmd.name() == null}"
+                                              th:text="#{orgChart.command.unnamed}">Ohne Namen</span>
+                                        <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+                                            <button type="button" class="oc-icon-btn" data-trigger="oc-rename"
+                                                    th:data-position-id="${cmd.positionId()}"
+                                                    th:data-version="${cmd.version()}"
+                                                    th:data-name="${cmd.name()}"
+                                                    th:title="#{orgChart.command.rename}"
+                                                    th:aria-label="#{orgChart.command.rename}">
+                                                <svg class="krt-icon" aria-hidden="true">
+                                                    <use href="#krt-icon-edit"></use>
+                                                </svg>
+                                            </button>
+                                            <button type="button" class="oc-icon-btn oc-icon-btn--danger"
+                                                    data-trigger="oc-remove"
+                                                    th:data-position-id="${cmd.positionId()}"
+                                                    data-position-type="COMMAND_LEAD"
+                                                    th:title="#{orgChart.remove}" th:aria-label="#{orgChart.remove}">
+                                                <svg class="krt-icon" aria-hidden="true">
+                                                    <use href="#krt-icon-trash"></use>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <th:block th:if="${cmd.leaderUserId() != null}">
+                                        <div class="oc-node">
+                                            <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
+                                            <span class="oc-node-name" th:text="${cmd.leaderUserName()}">Name</span>
+                                            <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+                                                <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
+                                                        th:data-position-id="${cmd.positionId()}"
+                                                        th:data-version="${cmd.version()}"
+                                                        th:data-user-id="${cmd.leaderUserId()}"
+                                                        th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
+                                                        th:title="#{orgChart.reassign}" th:aria-label="#{orgChart.reassign}">
+                                                    <svg class="krt-icon" aria-hidden="true">
+                                                        <use href="#krt-icon-edit"></use>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </th:block>
+                                    <div th:if="${cmd.leaderUserId() == null}" class="oc-node oc-node--vacant">
+                                        <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
+                                        <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
+                                    </div>
+                                    <button th:if="${cmd.leaderUserId() == null}" type="button" class="oc-add"
+                                            sec:authorize="hasRole('ADMIN')" data-trigger="oc-reassign"
+                                            th:data-position-id="${cmd.positionId()}"
+                                            th:data-version="${cmd.version()}" data-user-id=""
+                                            th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
+                                            th:text="#{orgChart.add.assignLead}">Kommandoleiter zuweisen</button>
+
                                     <div class="oc-stack"
                                          th:if="${cmd.deputy() != null or !#lists.isEmpty(cmd.ensigns())}">
                                         <div class="oc-stack-item" th:if="${cmd.deputy() != null}">
@@ -151,13 +210,13 @@
                                             sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
                                             data-position-type="DEPUTY_COMMAND_LEAD"
                                             th:data-org-unit-id="${sq.orgUnitId()}"
-                                            th:data-parent-id="${cmd.commandLead().positionId()}"
+                                            th:data-parent-id="${cmd.positionId()}"
                                             th:data-rank-label="#{orgChart.rank.DEPUTY_COMMAND_LEAD}"
                                             th:text="#{orgChart.add.deputy}">Stv. zuweisen</button>
                                     <button th:if="${sq.canAddEnsign()}" type="button" class="oc-add"
                                             sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
                                             data-position-type="ENSIGN" th:data-org-unit-id="${sq.orgUnitId()}"
-                                            th:data-parent-id="${cmd.commandLead().positionId()}"
+                                            th:data-parent-id="${cmd.positionId()}"
                                             th:data-rank-label="#{orgChart.rank.ENSIGN}"
                                             th:text="#{orgChart.add.ensign}">Ensign hinzufügen</button>
                                 </li>
@@ -174,8 +233,9 @@
 
                             <button th:if="${sq.canAddCommand()}" type="button" class="oc-add"
                                     sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
-                                    data-position-type="COMMAND_LEAD" th:data-org-unit-id="${sq.orgUnitId()}"
-                                    th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
+                                    data-position-type="COMMAND_LEAD" data-needs-name="true"
+                                    data-user-optional="true" th:data-org-unit-id="${sq.orgUnitId()}"
+                                    th:data-rank-label="#{orgChart.command.tag}"
                                     th:text="#{orgChart.add.command}">Kommandogruppe hinzufügen</button>
                             <button th:if="${sq.canAddEnsign()}" type="button" class="oc-add"
                                     sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
@@ -228,8 +288,14 @@
         <input type="hidden" id="oc-parent-id">
         <input type="hidden" id="oc-position-id">
         <input type="hidden" id="oc-version">
-        <div class="form-group">
-            <label for="oc-user" th:text="#{orgChart.modal.user}">Nutzer</label>
+        <input type="hidden" id="oc-user-optional">
+        <div class="form-group" id="oc-name-group">
+            <label for="oc-name" th:text="#{orgChart.modal.commandName}">Name der Kommandogruppe</label>
+            <input type="text" id="oc-name" maxlength="120"
+                   th:placeholder="#{orgChart.modal.commandNamePlaceholder}">
+        </div>
+        <div class="form-group" id="oc-user-group">
+            <label for="oc-user" id="oc-user-label" th:text="#{orgChart.modal.user}">Nutzer</label>
             <select id="oc-user">
                 <option value="" th:text="#{orgChart.modal.userPlaceholder}">-- Bitte wählen --</option>
                 <option th:each="u : ${allUsers}" th:value="${u.id()}"
@@ -279,6 +345,13 @@
             }
         }
 
+        function setHidden(id, hidden) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = hidden ? 'none' : '';
+            }
+        }
+
         function openModal(mode, ctx) {
             if (!modal) {
                 return;
@@ -289,20 +362,50 @@
             setField('oc-parent-id', ctx.parentId);
             setField('oc-position-id', ctx.positionId);
             setField('oc-version', ctx.version);
+            setField('oc-user-optional', ctx.userOptional ? '1' : '');
+            setField('oc-name', ctx.name);
+
+            // A name field shows for renaming or for creating a Kommando; the user picker shows for
+            // everything except a pure rename. A Kommando create may leave the leader empty.
+            const needsName = mode === 'rename' || !!ctx.needsName;
+            const needsUser = mode !== 'rename';
+            setHidden('oc-name-group', !needsName);
+            setHidden('oc-user-group', !needsUser);
+
             const userSel = document.getElementById('oc-user');
             if (userSel) {
                 userSel.value = (mode === 'reassign' && ctx.userId) ? ctx.userId : '';
             }
+            const userLabel = document.getElementById('oc-user-label');
+            if (userLabel) {
+                userLabel.textContent = ctx.userOptional
+                    ? /*[[#{orgChart.modal.leaderOptional}]]*/ 'Kommandoleiter (optional)'
+                    : /*[[#{orgChart.modal.user}]]*/ 'User';
+            }
+
             const titleEl = document.getElementById('oc-modal-title');
             if (titleEl) {
-                const base = (mode === 'reassign')
-                    ? /*[[#{orgChart.modal.reassignTitle}]]*/ 'Reassign'
-                    : /*[[#{orgChart.modal.title}]]*/ 'Fill position';
+                let base;
+                if (mode === 'reassign') {
+                    base = /*[[#{orgChart.modal.reassignTitle}]]*/ 'Reassign';
+                } else if (mode === 'rename') {
+                    base = /*[[#{orgChart.modal.renameTitle}]]*/ 'Rename Kommando';
+                } else {
+                    base = /*[[#{orgChart.modal.title}]]*/ 'Fill position';
+                }
                 titleEl.textContent = ctx.rankLabel ? (base + ' — ' + ctx.rankLabel) : base;
             }
+            const submitBtn = modal.querySelector('[data-trigger="oc-modal-submit"]');
+            if (submitBtn) {
+                submitBtn.textContent = needsName
+                    ? /*[[#{orgChart.modal.save}]]*/ 'Save'
+                    : /*[[#{orgChart.modal.submit}]]*/ 'Assign';
+            }
+
             modal.style.display = 'flex';
-            if (userSel) {
-                userSel.focus();
+            const focusEl = needsName ? document.getElementById('oc-name') : userSel;
+            if (focusEl) {
+                focusEl.focus();
             }
         }
 
@@ -339,18 +442,41 @@
         }
 
         function submitModal() {
+            const mode = field('oc-mode');
+            const positionId = encodeURIComponent(field('oc-position-id'));
+            const version = parseInt(field('oc-version'), 10);
+
+            if (mode === 'rename') {
+                send('PUT', '/org-chart/positions/' + positionId + '/ajax',
+                    {name: field('oc-name'), version: version});
+                return;
+            }
+
             const userId = field('oc-user');
-            if (!userId) {
+            const userOptional = field('oc-user-optional') === '1';
+
+            if (mode === 'reassign') {
+                if (!userId) {
+                    window.showFrontendErrorToast(/*[[#{orgChart.modal.userPlaceholder}]]*/ 'Please select a user.');
+                    return;
+                }
+                send('PUT', '/org-chart/positions/' + positionId + '/ajax',
+                    {userId: userId, version: version});
+                return;
+            }
+
+            // create
+            if (!userId && !userOptional) {
                 window.showFrontendErrorToast(/*[[#{orgChart.modal.userPlaceholder}]]*/ 'Please select a user.');
                 return;
             }
-            if (field('oc-mode') === 'reassign') {
-                const id = encodeURIComponent(field('oc-position-id'));
-                send('PUT', '/org-chart/positions/' + id + '/ajax',
-                    {userId: userId, version: parseInt(field('oc-version'), 10)});
-                return;
+            const body = {positionType: field('oc-position-type')};
+            if (userId) {
+                body.userId = userId;
             }
-            const body = {positionType: field('oc-position-type'), userId: userId};
+            if (field('oc-position-type') === 'COMMAND_LEAD') {
+                body.name = field('oc-name');
+            }
             const orgUnitId = field('oc-org-unit-id');
             if (orgUnitId) {
                 body.orgUnitId = orgUnitId;
@@ -378,7 +504,9 @@
                     positionType: btn.getAttribute('data-position-type'),
                     orgUnitId: btn.getAttribute('data-org-unit-id'),
                     parentId: btn.getAttribute('data-parent-id'),
-                    rankLabel: btn.getAttribute('data-rank-label')
+                    rankLabel: btn.getAttribute('data-rank-label'),
+                    needsName: btn.getAttribute('data-needs-name') === 'true',
+                    userOptional: btn.getAttribute('data-user-optional') === 'true'
                 });
             });
 
@@ -388,6 +516,14 @@
                     version: btn.getAttribute('data-version'),
                     userId: btn.getAttribute('data-user-id'),
                     rankLabel: btn.getAttribute('data-rank-label')
+                });
+            });
+
+            window.krtEvents.on('click', 'oc-rename', function (btn) {
+                openModal('rename', {
+                    positionId: btn.getAttribute('data-position-id'),
+                    version: btn.getAttribute('data-version'),
+                    name: btn.getAttribute('data-name')
                 });
             });
 

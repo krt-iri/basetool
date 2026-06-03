@@ -20,9 +20,9 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Frontend proxy for the third-party ship-export import endpoint. Accepts both CCU Game Fleetview
- * and HangarXPLOR Shiplist JSON payloads; the backend auto-detects the format from the first array
- * element.
+ * Frontend proxy for the third-party ship-export import endpoint. Accepts CCU Game Fleetview,
+ * HangarXPLOR Shiplist, Fleetyards and StarJump FleetViewer JSON payloads; the backend auto-detects
+ * the format from the payload shape.
  *
  * <p>Receives the multipart file from the browser, forwards it to the backend {@code POST
  * /api/v1/hangar/import/ships} via the authenticated {@link WebClient} (which automatically
@@ -43,7 +43,8 @@ public class HangarImportProxyController {
   /**
    * Proxies a ship-export JSON file upload from the browser to the backend import endpoint.
    *
-   * @param file the uploaded JSON file (Fleetview or HangarXPLOR Shiplist)
+   * @param file the uploaded JSON file (Fleetview, HangarXPLOR Shiplist, Fleetyards or StarJump
+   *     FleetViewer)
    * @return the backend response (a {@code FleetviewImportResponseDto}) as a raw JSON map
    */
   @PostMapping(value = "/ships", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
