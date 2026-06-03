@@ -47,7 +47,8 @@ public class PromotionLevelContentService {
    * @return a page of level contents
    */
   public Page<PromotionLevelContentResponse> list(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -63,7 +64,8 @@ public class PromotionLevelContentService {
    * @return the category's level contents in display order
    */
   public List<PromotionLevelContentResponse> listByCategory(@NotNull UUID categoryId) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);

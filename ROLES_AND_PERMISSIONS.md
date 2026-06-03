@@ -284,20 +284,32 @@ ihrem eigenen verknüpften Teilnehmer. ² Nur als **Owner/Co-Manager** der Missi
 
 ### 3.8 Promotion-System (Beförderung)
 
-Alle Promotion-Controller sind class-level `isAuthenticated()`; das
-**ADMIN-oder-Officer-der-eigenen-Staffel**-Gate sitzt in der Service-Schicht
-(`canEditSquadron(topic.owningSquadron.id)`).
+Alle Promotion-Controller sind class-level `isAuthenticated()`. Das Beförderungssystem
+ist **durchgängig staffel-gescopt**: jede Staffel führt ihr eigenes System
+(Themenbereiche, Kategorien, Level-Inhalte, Rangvoraussetzungen, Bewertungen) und
+sieht ausschließlich die eigenen Daten. Lese- **und** Schreibzugriff werden in der
+Service-Schicht über den aktiven Staffel-Kontext gefiltert
+(`OwnerScopeService.currentSquadronId()` für Listen/Eligibility,
+`canSeeSquadron`/`canEditSquadron(topic.owningSquadron.id)` für Detail und Pflege).
+
+- **Member/Officer** sehen nur das System ihrer Heimat-Staffel.
+- **Admins** sehen das der aktiv angepinnten Staffel; ohne Pin (Alle-Staffeln-Modus)
+  zeigen die Seiten einen „Staffel wählen"-Hinweis statt einer Vermischung aller Staffeln.
+- Ein **Nutzer ohne Staffelzugehörigkeit, der kein Admin ist**, hat kein eigenes
+  Beförderungssystem: der Menüpunkt ist ausgeblendet, jeder Listen-/Eligibility-Read
+  liefert leer und ein direkter Seitenaufruf wird mit 403 blockiert (`hasPromotionReadAccess()`).
 
 | Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Themenbereiche/Kategorien/Level-Inhalte/Rangvoraussetzungen lesen (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| …**pflegen** (Service: Admin **oder** Officer der besitzenden Staffel) | ❌ | ❌ | ❌ | ❌ | ✅¹ | ✅ |
-| Eigene Bewertungen / Eligibility ansehen (`/my`, JWT-Sub) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Themenbereiche/Kategorien/Level-Inhalte/Rangvoraussetzungen lesen (`isAuthenticated()`, **nur eigene Staffel**) | ❌ | ✅¹ | ✅¹ | ✅¹ | ✅¹ | ✅² |
+| …**pflegen** (Service: Admin **oder** Officer der besitzenden Staffel) | ❌ | ❌ | ❌ | ❌ | ✅³ | ✅ |
+| Eigene Bewertungen / Eligibility ansehen (`/my`, JWT-Sub, **eigene Staffel**) | ❌ | ✅¹ | ✅¹ | ✅¹ | ✅¹ | ✅² |
 | Bewertungen/Eligibility **anderer** ansehen, Member-Liste (`hasAnyRole('ADMIN','OFFICER')`, Officer staffel-gescopt) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Promotion-Subsystem je Staffel an-/abschalten (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
-¹ Nur für die eigene Staffel. **SKs sind vom Promotion-System per
-DB-CHECK/Trigger + ArchUnit-Regel dauerhaft ausgeschlossen.**
+¹ Nur die **eigene Heimat-Staffel**; ein Nutzer ganz ohne Staffel (und ohne Admin-Rechte) sieht nichts — `hasPromotionReadAccess()` liefert leer, das Menü ist ausgeblendet, Direktaufruf 403.
+² Admin: die aktiv angepinnte Staffel; im Alle-Staffeln-Modus ein „Staffel wählen"-Hinweis statt einer Vermischung.
+³ Nur für die eigene Staffel. **SKs sind vom Promotion-System per DB-CHECK/Trigger + ArchUnit-Regel dauerhaft ausgeschlossen.**
 
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 

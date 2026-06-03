@@ -52,7 +52,8 @@ public class MemberEvaluationService {
    * the active squadron's grades.
    */
   public List<MemberEvaluationResponse> listForUser(@NotNull String userId) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -64,7 +65,8 @@ public class MemberEvaluationService {
   /** Returns paginated evaluations for the given user, scoped to the active squadron. */
   public Page<MemberEvaluationResponse> listForUserPaged(
       @NotNull String userId, @NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -74,7 +76,8 @@ public class MemberEvaluationService {
   /** Returns all evaluations (admin view, all users) scoped to the active squadron. */
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);

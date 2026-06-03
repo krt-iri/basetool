@@ -211,6 +211,11 @@
         <p th:text="#{promotion.my.subtitle}">Deine aktuellen Bewertungen</p>
     </div>
 
+    <div th:if="${isAllSquadronsMode}" class="hud-box mt-2">
+        <p th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</p>
+    </div>
+    <th:block th:unless="${isAllSquadronsMode}">
+
     <div class="hud-box mt-2">
         <h2 th:text="#{promotion.my.eligibility.title}">Beförderbarkeit</h2>
         <p th:text="#{promotion.my.eligibility.subtitle}" style="color:var(--color-gray-2);margin-bottom:1rem;font-size:0.9rem;">Zeigt, welche Beförderungen anhand deiner aktuellen Bewertungen möglich sind.</p>
@@ -394,10 +399,11 @@
             </div>
         </div>
     </div>
+    </th:block>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
 
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
     /*<![CDATA[*/
     /*
      * Progress-bar fill: client-side because the aggregate "achievedTotal /

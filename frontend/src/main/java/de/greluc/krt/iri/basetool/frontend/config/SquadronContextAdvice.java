@@ -363,16 +363,20 @@ public class SquadronContextAdvice {
    *
    * <ul>
    *   <li>Admin without an active pin — {@code activeSquadron} resolves to {@code null} (all-scopes
-   *       mode); this branch falls through to the {@code null}-default of {@code true} so the
-   *       toggle UI stays reachable for re-enabling locked-out staffeln.
+   *       mode); the menu stays visible ({@code isAdmin()} is {@code true}) but the promotion pages
+   *       render a "pick a squadron" prompt instead of a cross-staffel merge, because a promotion
+   *       catalog is inherently per-staffel. The admin selects a staffel via the switcher to view
+   *       or manage its system (creating topics/requirements already requires a pin server-side).
    *   <li>Admin pinned to a squadron — {@code activeSquadron} reflects the pin and its {@code
    *       isPromotionEnabled()} flag drives the menu visibility. An admin who pinned a squadron
    *       with promotion disabled now sees the same hidden-menu state as a member would — which
    *       matches the pinned-view UX promise. To re-enable, the admin clears the pin (back to
    *       all-scopes) or navigates directly to {@code /admin/settings} (not gated by this check).
-   *   <li>Non-admin — the home-squadron flag decides, unchanged from previous behaviour.
-   *   <li>Anonymous / squadron-less caller — {@code activeSquadron} is {@code null}, defaults to
-   *       {@code true} so an empty squadron-scope filter doesn't get a hidden menu on top.
+   *   <li>Non-admin with a home staffel — that staffel's flag decides, unchanged from previous
+   *       behaviour.
+   *   <li>Anonymous / squadron-less non-admin — {@code activeSquadron} is {@code null} and {@code
+   *       isAdmin()} is {@code false}, so the menu is hidden and {@code requirePromotionFeature}
+   *       blocks direct page access: such a caller has no promotion system of their own.
    * </ul>
    *
    * <p>The sidebar's {@code Beförderung} section reads this attribute via {@code
@@ -389,7 +393,13 @@ public class SquadronContextAdvice {
   @ModelAttribute("promotionFeatureEnabled")
   public boolean promotionFeatureEnabled(
       @ModelAttribute("activeSquadron") SquadronDto activeSquadron) {
-    if (activeSquadron == null || activeSquadron.isPromotionEnabled() == null) {
+    if (activeSquadron == null) {
+      // No single active staffel: an admin in all-scopes mode keeps the menu (the pages then
+      // prompt to pick a staffel), while a squadron-less non-admin / anonymous caller has no
+      // promotion system, so the menu is hidden and direct page access is blocked.
+      return authHelper.isAdmin();
+    }
+    if (activeSquadron.isPromotionEnabled() == null) {
       return true;
     }
     return activeSquadron.isPromotionEnabled();

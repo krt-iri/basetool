@@ -51,6 +51,7 @@ class PromotionEligibilityServiceTest {
   @BeforeEach
   void enablePromotionFeatureFlag() {
     lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
+    lenient().when(ownerScopeService.hasPromotionReadAccess()).thenReturn(true);
     // No active pin in these unit tests → null scope → the scoped finders behave like the old
     // unscoped ones, which keeps every eligibility scenario below focused on the matching logic.
     lenient().when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());

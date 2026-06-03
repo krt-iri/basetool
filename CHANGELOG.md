@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Beförderungssystem: ein Admin ohne aktive Staffel (Alle-Staffeln-Modus) sieht jetzt einen Hinweis „Bitte wähle eine Staffel" statt der zusammengeführten Daten aller Staffeln; erst nach Auswahl einer Staffel erscheint deren System.** Ein Beförderungskatalog ist inhärent pro Staffel, daher ergibt die vermischte Allansicht keinen Sinn. Nutzer ganz ohne Staffelzugehörigkeit haben kein eigenes Beförderungssystem mehr und sehen den Menüpunkt nicht (direkter Seitenaufruf wird mit 403 blockiert).
+
 ### Fixed
 
 - **Das Beförderungssystem ist jetzt durchgängig staffel-scoped: jede Staffel sieht nur ihre eigenen Themenbereiche, Bewertungen, Rangvoraussetzungen und Eignungsprüfungen.** Bisher filterten nur die Themenbereiche nach Staffel — Kategorien, Lerninhalte, Rangvoraussetzungen, „Meine Bewertungen", die Bewertungsverwaltung und die Eignungsberechnung werteten staffelübergreifend aus; ein Offizier oder Mitglied einer Staffel konnte so die Beförderungsdaten anderer Staffeln sehen. Admins sehen weiterhin alles bzw. die angepinnte Staffel. Rangvoraussetzungen (inklusive staffelweiter „globaler" ohne Themenbereich/Kategorie) gehören jetzt einer eigenen Staffel und werden beim Anlegen aus dem aktiven Staffelkontext gestempelt (Migration V135).

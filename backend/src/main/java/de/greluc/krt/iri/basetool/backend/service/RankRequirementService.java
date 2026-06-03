@@ -54,7 +54,8 @@ public class RankRequirementService {
    * @return a page of rank requirements
    */
   public Page<RankRequirementResponse> list(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -71,7 +72,8 @@ public class RankRequirementService {
    * @return the rank requirements applicable to that transition
    */
   public List<RankRequirementResponse> listByRanks(int fromRank, int toRank) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);

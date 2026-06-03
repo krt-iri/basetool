@@ -179,6 +179,11 @@
         <p th:text="#{promotion.overview.subtitle}">Übersicht</p>
     </div>
 
+    <div th:if="${isAllSquadronsMode}" class="hud-box mt-2">
+        <p th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</p>
+    </div>
+    <th:block th:unless="${isAllSquadronsMode}">
+
     <div class="hud-box mt-2">
         <!-- Bewertungskategorien -->
         <h2 th:text="#{promotion.overview.topics.title}">Bewertungskategorien</h2>
@@ -287,10 +292,11 @@
             </details>
         </div>
     </div>
+    </th:block>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
 
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
     /*<![CDATA[*/
     /*
      * Expand-all / collapse-all helpers for the rank-group <details> blocks.

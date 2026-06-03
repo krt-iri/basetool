@@ -83,7 +83,8 @@ public class PromotionEligibilityService {
    */
   public PromotionEligibilityResponse evaluateForRanks(
       @NotNull String userId, int fromRank, int toRank) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return new PromotionEligibilityResponse(userId, fromRank, toRank, false, false, List.of());
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -124,7 +125,8 @@ public class PromotionEligibilityService {
    * @return eligibility entries for every configured transition, possibly empty
    */
   public List<PromotionEligibilityResponse> evaluateAllForUser(@NotNull String userId) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
