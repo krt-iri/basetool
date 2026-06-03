@@ -101,6 +101,11 @@
         <p th:text="#{promotion.admin.topics.subtitle}">Themenbereiche und Kategorien</p>
     </div>
 
+    <div th:if="${isAllSquadronsMode}" class="hud-box mt-2">
+        <p th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</p>
+    </div>
+    <th:block th:unless="${isAllSquadronsMode}">
+
     <div class="hud-box mt-2">
         <!-- Save-all banner: only visible while ≥1 textarea is dirty. -->
         <div id="pa-save-all-banner" class="pa-save-all-banner" role="status">
@@ -285,6 +290,7 @@
             </div>
         </details>
     </div>
+    </th:block>
 </main>
 
 <!-- Create Topic Modal -->
@@ -388,7 +394,7 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
     /*<![CDATA[*/
     var MSG_SAVED         = /*[[#{promotion.admin.topics.saved}]]*/ 'Saved';
     var MSG_DELETED       = /*[[#{promotion.admin.topics.deleted}]]*/ 'Deleted';

@@ -58,7 +58,8 @@ public class PromotionTopicService {
    * @return a page of promotion topics
    */
   public Page<PromotionTopicResponse> list(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -73,7 +74,8 @@ public class PromotionTopicService {
    * @return visible topics in display order
    */
   public List<PromotionTopicResponse> listAll() {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()) {
+    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
+        || !ownerScopeService.hasPromotionReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);

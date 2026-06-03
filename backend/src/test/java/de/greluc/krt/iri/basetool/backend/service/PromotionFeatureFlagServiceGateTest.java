@@ -180,6 +180,33 @@ class PromotionFeatureFlagServiceGateTest {
   }
 
   @Test
+  @DisplayName("hasPromotionReadAccess: an admin always has access (all-scopes or pinned)")
+  void hasPromotionReadAccess_adminTrue() {
+    when(authHelper.isAdmin()).thenReturn(true);
+    assertTrue(ownerScopeService.hasPromotionReadAccess());
+  }
+
+  @Test
+  @DisplayName("hasPromotionReadAccess: a non-admin with a home squadron has access")
+  void hasPromotionReadAccess_nonAdminWithSquadronTrue() {
+    UUID userId = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    when(authHelper.currentUserId()).thenReturn(Optional.of(userId));
+    when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(staffelMembership(userId, squadronId)));
+    assertTrue(ownerScopeService.hasPromotionReadAccess());
+  }
+
+  @Test
+  @DisplayName(
+      "hasPromotionReadAccess: a squadron-less non-admin has NO access — every promotion read"
+          + " short-circuits to empty so they never see another squadron's system")
+  void hasPromotionReadAccess_squadronlessNonAdminFalse() {
+    when(authHelper.currentUserId()).thenReturn(Optional.empty());
+    assertFalse(ownerScopeService.hasPromotionReadAccess());
+  }
+
+  @Test
   @DisplayName("PromotionTopicService.list short-circuits to empty page when flag is OFF")
   void topicList_returnsEmptyWhenDisabled() {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);

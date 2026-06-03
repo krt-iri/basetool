@@ -497,6 +497,11 @@
         <p th:text="#{promotion.manage.subtitle}">Stufen verwalten</p>
     </div>
 
+    <div th:if="${isAllSquadronsMode}" class="hud-box mt-2">
+        <p th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</p>
+    </div>
+    <th:block th:unless="${isAllSquadronsMode}">
+
     <div class="hud-box mt-2">
         <div th:if="${#lists.isEmpty(members)}">
             <p th:text="#{promotion.manage.no.members}">Keine Mitglieder gefunden.</p>
@@ -715,11 +720,12 @@
             </div>
         </th:block>
     </div>
+    </th:block>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
     /*<![CDATA[*/
     // ----------------------------------------------------------------------
     // Translated strings: kept in one block at the top so a future locale-only

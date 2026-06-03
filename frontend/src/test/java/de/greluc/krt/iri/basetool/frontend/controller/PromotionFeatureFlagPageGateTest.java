@@ -128,4 +128,27 @@ class PromotionFeatureFlagPageGateTest {
         .perform(get("/promotion/overview").sessionAttr("iridium.activeOrgUnitId", pinnedId))
         .andExpect(status().is2xxSuccessful());
   }
+
+  @Test
+  @WithMockUser(roles = "SQUADRON_MEMBER")
+  void squadronlessNonAdmin_overviewIsForbidden() throws Exception {
+    // A non-admin whose home squadron does not resolve (active-squadron endpoint returns null) has
+    // no promotion system of their own: the menu is hidden and direct page access is blocked, so a
+    // squadron-less caller never sees the cross-staffel union.
+    when(backendApiClient.get(
+            eq("/api/v1/me/active-squadron"),
+            eq(SquadronContextAdvice.ActiveSquadronResponse.class)))
+        .thenReturn(new SquadronContextAdvice.ActiveSquadronResponse(null));
+    mockMvc.perform(get("/promotion/overview")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void adminAllSquadronsMode_overviewIsAccessible() throws Exception {
+    // An admin without an active pin (all-scopes mode) keeps access: the page renders and shows a
+    // "pick a squadron" prompt instead of a merged cross-staffel catalog. No session pin is set, so
+    // the admin branch resolves activeSquadronId to null → isAllSquadronsMode.
+    stubSquadronContext(UUID.randomUUID(), true);
+    mockMvc.perform(get("/promotion/overview")).andExpect(status().is2xxSuccessful());
+  }
 }

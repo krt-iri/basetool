@@ -120,8 +120,11 @@ class PromotionManagePageControllerMvcTest {
             any(ParameterizedTypeReference.class)))
         .thenReturn(List.of(elig));
 
+    // Pin a squadron: the management matrix only renders for a single active squadron context.
+    // Without a pin an admin is in all-squadrons mode and the page shows a "pick a squadron"
+    // prompt instead of the cross-staffel merge, so the column headers under test are hidden.
     mockMvc
-        .perform(get("/promotion/manage"))
+        .perform(get("/promotion/manage").sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
         // The category-name <th> for each column must carry both the category name as text and
         // the data-pm-category-name attribute the CSV exporter reads. Without the fix neither

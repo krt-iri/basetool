@@ -93,6 +93,11 @@
         <p th:text="#{promotion.admin.ranks.subtitle}">Anforderungen konfigurieren</p>
     </div>
 
+    <div th:if="${isAllSquadronsMode}" class="hud-box mt-2">
+        <p th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</p>
+    </div>
+    <th:block th:unless="${isAllSquadronsMode}">
+
     <div class="hud-box mt-2">
         <div class="pa-toolbar">
             <input type="search"
@@ -187,6 +192,7 @@
                  th:text="#{promotion.admin.ranks.filter.empty}">Keine Treffer.</div>
         </div>
     </div>
+    </th:block>
 </main>
 
 <!-- Create Modal -->
@@ -310,7 +316,7 @@
     </div>
 </div>
 
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
     /*<![CDATA[*/
     /*
      * Categories-by-topic map for the cascade. We build it client-side from

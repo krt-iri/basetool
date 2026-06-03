@@ -1065,6 +1065,23 @@ public class OwnerScopeService {
   }
 
   /**
+   * {@code true} iff the current caller may read <em>any</em> promotion data. Promotion is
+   * per-squadron, so a caller needs either the elevated all-squadrons view (admin) or an effective
+   * home squadron to see a system at all. A non-admin without any squadron membership has no
+   * promotion system of their own; every promotion list / eligibility read must short-circuit to
+   * empty for them rather than fall through to the {@code null}-scope cross-squadron union that
+   * admins rely on. Detail reads are already covered by {@link #canSeeSquadron(UUID)} (which
+   * returns {@code false} for a squadron-less non-admin), so this guard is only needed on the
+   * {@code null}-means-all list / eligibility paths.
+   *
+   * @return {@code true} for admins (all-scopes or pinned) and for non-admins with an effective
+   *     squadron; {@code false} for a squadron-less non-admin or anonymous caller.
+   */
+  public boolean hasPromotionReadAccess() {
+    return authHelper.isAdmin() || currentSquadronId().isPresent();
+  }
+
+  /**
    * Throws {@link AccessDeniedException} when the per-squadron promotion-system feature flag is off
    * for the caller's scope. Admins bypass the check (see {@link
    * #isPromotionFeatureEnabledForCurrentScope()} for the resolution rules). Used at the top of

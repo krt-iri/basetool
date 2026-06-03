@@ -44,6 +44,7 @@ class MemberEvaluationServiceTest {
   @BeforeEach
   void enablePromotionFeatureFlag() {
     lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
+    lenient().when(ownerScopeService.hasPromotionReadAccess()).thenReturn(true);
   }
 
   @InjectMocks private MemberEvaluationService service;
