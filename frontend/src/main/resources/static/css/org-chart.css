@@ -17,6 +17,20 @@
    scrolls horizontally on narrow screens with a KRT-styled scrollbar.
    ============================================================================ */
 
+/* The chart is far wider than the global 1200px reading column, so on this page
+   <main> drops the cap and uses the full viewport width — large screens then show
+   the whole tree without panning. The title block and toolbar stay capped and
+   centred so the header keeps a readable measure. */
+main.oc-page {
+    max-width: none;
+}
+
+main.oc-page .greeting,
+main.oc-page .oc-toolbar {
+    max-width: var(--content-max);
+    margin-inline: auto;
+}
+
 .oc-chart {
     --oc-line: var(--color-gray-2);
     --oc-line-w: 2px;
