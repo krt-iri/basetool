@@ -87,26 +87,17 @@ public class RefineryOrderController {
   }
 
   /**
-   * Fetches a single refinery order. Currently anyone authenticated may read; the
-   * isLogistician-vs-owner branch is a future-proofing seam in case the rule tightens.
+   * Fetches a single refinery order. Read access is gated entirely by the {@code @PreAuthorize}
+   * SpEL ({@code @ownerScopeService.canSeeRefineryOrder(#id)}); the body just maps the resolved
+   * order to its DTO, enriched with the per-material yield bonus for the order's location.
    *
    * @return the refinery-order DTO
    */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeRefineryOrder(#id)")
   @Transactional(readOnly = true)
-  public RefineryOrderDto getRefineryOrder(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
+  public RefineryOrderDto getRefineryOrder(@PathVariable @NotNull UUID id) {
     RefineryOrder order = refineryOrderService.getRefineryOrder(id);
-
-    if (authHelperService.isLogisticianOrAbove()
-        || (order.getOwner() != null
-            && order.getOwner().getId().equals(userService.getUserIdFromJwt(jwt)))) {
-      return mapper.toDto(
-          order, refineryOrderService.getYieldBonusByMaterialForLocation(order.getLocation()));
-    }
-
-    // For now, allow read access to everyone if they can see the list
     return mapper.toDto(
         order, refineryOrderService.getYieldBonusByMaterialForLocation(order.getLocation()));
   }
@@ -131,8 +122,16 @@ public class RefineryOrderController {
   }
 
   /**
-   * Lists refinery orders linked to a mission. Logisticians see all; regular users see only their
-   * own (the mission detail page is rendered for both roles).
+   * Lists refinery orders linked to a mission. Logisticians see every order within their own
+   * org-unit scope (an admin without an active pin sees all; an admin pinned to a squadron and a
+   * non-admin logistician see only their scope); regular users see only their own orders. The
+   * mission detail page is rendered for both roles.
+   *
+   * <p>Security (finding BAC-004): the logistician branch is org-unit-scoped via {@link
+   * RefineryOrderService#getMissionRefineryOrdersScoped}. Refinery is a strict-staffel aggregate
+   * with no cross-squadron escape, so although a non-internal mission is visible to other
+   * squadrons, the refinery financials attached to it are not - a logistician cannot read a foreign
+   * squadron's refinery orders by enumerating that squadron's public missions.
    *
    * @return list of refinery-order list DTOs
    */
@@ -143,7 +142,7 @@ public class RefineryOrderController {
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID missionId) {
     boolean isLogistician = authHelperService.isLogisticianOrAbove();
     if (isLogistician) {
-      return refineryOrderService.getMissionRefineryOrders(missionId).stream()
+      return refineryOrderService.getMissionRefineryOrdersScoped(missionId).stream()
           .map(mapper::toListDto)
           .toList();
     }

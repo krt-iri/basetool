@@ -282,13 +282,16 @@ class RefineryOrderControllerTest {
     private final UUID missionId = UUID.randomUUID();
 
     @Test
-    void logistician_seesAllOrdersOnMission() {
+    void logistician_routesToOrgUnitScopedQuery() {
+      // SECURITY (BAC-004): the logistician branch must go through the org-unit-scoped service
+      // method, never an unscoped "all orders on the mission" path. Otherwise a squadron-A
+      // logistician could read squadron-B refinery financials by enumerating a public B mission.
       when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-      when(service.getMissionRefineryOrders(missionId)).thenReturn(java.util.List.of());
+      when(service.getMissionRefineryOrdersScoped(missionId)).thenReturn(java.util.List.of());
 
       controller.getMissionRefineryOrders(jwt, missionId);
 
-      verify(service).getMissionRefineryOrders(missionId);
+      verify(service).getMissionRefineryOrdersScoped(missionId);
       verify(service, never()).getMissionRefineryOrders(any(UUID.class), any(UUID.class));
     }
 
@@ -303,7 +306,7 @@ class RefineryOrderControllerTest {
       controller.getMissionRefineryOrders(jwt, missionId);
 
       verify(service).getMissionRefineryOrders(missionId, CALLER_ID);
-      verify(service, never()).getMissionRefineryOrders(any(UUID.class));
+      verify(service, never()).getMissionRefineryOrdersScoped(any(UUID.class));
     }
   }
 
@@ -377,7 +380,7 @@ class RefineryOrderControllerTest {
       RefineryOrderDto out = dtoWithOwner(CALLER_ID);
       when(mapper.toDto(eq(order), any())).thenReturn(out);
 
-      RefineryOrderDto result = controller.getRefineryOrder(jwt, ORDER_ID);
+      RefineryOrderDto result = controller.getRefineryOrder(ORDER_ID);
 
       assertSame(out, result);
     }
