@@ -125,11 +125,18 @@ public class InventoryItem extends AbstractEntity<UUID> {
    * Rounds an SCU amount to three decimals using {@link RoundingMode#HALF_UP} (commercial
    * rounding), leaving {@code null} untouched.
    *
+   * <p>This is the canonical SCU-precision rounding that {@link #roundAmountToScuScale()} applies
+   * at the persistence boundary. It is also reused by write paths that compute an amount through
+   * {@code double} arithmetic <em>before</em> it reaches that hook — e.g. the refinery
+   * store-into-inventory merge in {@code RefineryOrderService} — so the in-memory value is already
+   * clean. That is defence in depth: the lifecycle callback remains the guarantee, but the producer
+   * no longer hands a dirty value around in the meantime.
+   *
    * @param value the raw amount, possibly carrying floating-point noise beyond three decimals
    * @return {@code value} rounded to three decimals, or {@code null} when {@code value} is {@code
    *     null}
    */
-  static Double roundToScuScale(Double value) {
+  public static Double roundToScuScale(Double value) {
     if (value == null) {
       return null;
     }
