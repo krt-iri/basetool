@@ -50,8 +50,9 @@ public class OrgChartController {
       summary = "Get the Profit-Bereich org chart",
       description =
           "Returns the full org chart: the Bereichsleitung on top and a column for every active,"
-              + " profit-eligible Staffel and Spezialkommando below. Read-only and open to every"
-              + " authenticated user; editing is ADMIN-only via the position endpoints.")
+              + " profit-eligible Staffel and Spezialkommando (plus the configured Job-Order intake"
+              + " Spezialkommando) below. Read-only and open to every authenticated user; editing"
+              + " is ADMIN-only via the position endpoints.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "The assembled org chart."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
@@ -73,9 +74,11 @@ public class OrgChartController {
       summary = "Assign a user to an org-chart position",
       description =
           "Creates a position binding a user to a functional rank within a scope (area leadership,"
-              + " Staffel or SK). Enforces the per-Staffel limits (≤4 Kommandoleiter, ≤4 Ensign),"
-              + " the ≤2 SK-Leiter limit, the scope/parent consistency rules and"
-              + " one-user-per-scope. ADMIN-only.")
+              + " Staffel or SK). A Kommando (COMMAND_LEAD) may instead be created without a holder"
+              + " and with a name, so its Stv. Kommandoleiter and Ensigns can be filled before its"
+              + " Kommandoleiter is assigned; every other rank requires a holder and rejects a"
+              + " name. Enforces the per-Staffel limits (≤4 Kommandos, ≤4 Ensign), the ≤2 SK-Leiter"
+              + " limit, the scope/parent consistency rules and one-user-per-scope. ADMIN-only.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Position created."),
     @ApiResponse(
@@ -108,8 +111,10 @@ public class OrgChartController {
   @Operation(
       summary = "Reassign or reorder an org-chart position",
       description =
-          "Changes the holder and/or the display order of an existing position. The functional"
-              + " rank and scope cannot change (move = remove + re-add). ADMIN-only.")
+          "Changes the holder, the Kommando name (COMMAND_LEAD only) and/or the display order of an"
+              + " existing position. The functional rank and scope cannot change (move = remove +"
+              + " re-add). Assigning a holder to a still-leaderless Kommando is a reassign through"
+              + " this endpoint. ADMIN-only.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Position updated."),
     @ApiResponse(
@@ -135,8 +140,8 @@ public class OrgChartController {
   @Operation(
       summary = "Remove an org-chart position",
       description =
-          "Deletes the position. Removing a Kommandoleiter also removes its Stv. Kommandoleiter and"
-              + " the Ensigns reporting into that command. ADMIN-only.")
+          "Deletes the position. Removing a Kommando (COMMAND_LEAD) also removes its Stv."
+              + " Kommandoleiter and the Ensigns reporting into it. ADMIN-only.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Position removed."),
     @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),

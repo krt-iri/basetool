@@ -9,7 +9,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.AreaLeadershipDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.CommandChartDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgChartDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgChartNodeDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronChartDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.util.List;
@@ -122,5 +124,53 @@ class OrgChartPageRenderTest {
     assertThat(html)
         .as("admin assign-Staffelleiter affordance")
         .contains("data-position-type=\"SQUADRON_LEAD\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void namedLeaderlessCommand_admin_rendersGroupHeaderVacantLeadAndChildren() throws Exception {
+    // Given: a named Kommando with a vacant Kommandoleiter but an already-attached Stv. + Ensign —
+    // the exact shape the decoupled command-group model introduces. Renders the group header
+    // (name), the vacant-leader placeholder + assign affordance, and the child person-nodes via
+    // ocNode. A broken expression in any of those new paths fails here instead of as a runtime 500.
+    OrgChartNodeDto deputy =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "DEPUTY_COMMAND_LEAD", UUID.randomUUID(), "Deputy", 0, 0L);
+    OrgChartNodeDto ensign =
+        new OrgChartNodeDto(UUID.randomUUID(), "ENSIGN", UUID.randomUUID(), "Ensign", 0, 0L);
+    CommandChartDto command =
+        new CommandChartDto(UUID.randomUUID(), "Alpha", 0L, 0, null, null, deputy, List.of(ensign));
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(
+                    new SquadronChartDto(
+                        UUID.randomUUID(),
+                        "IRIDIUM",
+                        "IRI",
+                        null,
+                        List.of(command),
+                        List.of(),
+                        true,
+                        true)),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("Kommando group header").contains("oc-command-head");
+    assertThat(html).as("Kommando name rendered").contains("Alpha");
+    assertThat(html).as("admin rename affordance").contains("data-trigger=\"oc-rename\"");
+    assertThat(html).as("vacant Kommandoleiter placeholder").contains("oc-node--vacant");
+    assertThat(html).as("child Stv. node rendered via ocNode").contains("Deputy");
+    assertThat(html).as("child Ensign node rendered via ocNode").contains("Ensign");
   }
 }
