@@ -40,6 +40,7 @@ class LocationMapperTest {
     entity.setName("Port Olisar");
     entity.setDescription("Crusader station");
     entity.setHidden(false);
+    entity.setHomeLocation(true);
     entity.setVersion(3L);
 
     // When
@@ -51,6 +52,7 @@ class LocationMapperTest {
     assertEquals("Port Olisar", dto.name());
     assertEquals("Crusader station", dto.description());
     assertFalse(dto.hidden());
+    assertTrue(dto.homeLocation());
     assertEquals(3L, dto.version());
   }
 
@@ -58,7 +60,7 @@ class LocationMapperTest {
   void toEntity_shouldMapExposedFields() {
     // Given
     UUID id = UUID.randomUUID();
-    LocationDto dto = new LocationDto(id, "Lorville", "Hurston city", true, 1L);
+    LocationDto dto = new LocationDto(id, "Lorville", "Hurston city", true, true, 1L);
 
     // When
     Location entity = mapper.toEntity(dto);
@@ -69,6 +71,7 @@ class LocationMapperTest {
     assertEquals("Lorville", entity.getName());
     assertEquals("Hurston city", entity.getDescription());
     assertTrue(entity.getHidden());
+    assertTrue(entity.getHomeLocation());
     assertEquals(1L, entity.getVersion());
     // Unmapped relations stay null (mapper ignores them)
     assertNull(entity.getCity());

@@ -67,6 +67,15 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
   Page<Location> findByHiddenFalse(Pageable pageable);
 
   /**
+   * Returns the curated, non-hidden home locations ordered by name descending (Z-&gt;A). Backs the
+   * hangar bulk "set home location" picker via {@code GET /api/v1/locations/home-locations}; the
+   * descending order is part of the contract (the picker preserves it).
+   *
+   * @return curated home locations, name descending
+   */
+  List<Location> findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
+
+  /**
    * Returns every location attached to a city or space-station that has a refinery; used as the
    * picker source when the user creates a refinery order.
    */

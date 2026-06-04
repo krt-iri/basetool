@@ -78,7 +78,7 @@ class HangarPageControllerMvcTest {
     PageResponse<ShipTypeDto> shipTypes =
         new PageResponse<>(List.of(shipType), 0, 10, 1, 1, List.of());
 
-    LocationDto location = new LocationDto(UUID.randomUUID(), "Area18", "City", false, null);
+    LocationDto location = new LocationDto(UUID.randomUUID(), "Area18", "City", false, false, null);
     PageResponse<LocationDto> locations =
         new PageResponse<>(List.of(location), 0, 10, 1, 1, List.of());
 
@@ -120,6 +120,38 @@ class HangarPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"hangar-ship-filter\"")))
         .andExpect(
             content().string(containsString("data-ship-filter=\"aegis dynamics avenger titan\"")));
+  }
+
+  @Test
+  @WithMockUser
+  void viewHangar_ShouldRenderHomeLocationButtonAndCuratedOptions() throws Exception {
+    // Given a hangar with at least one ship (button is hidden when empty) and one curated home
+    // location returned by the dedicated endpoint.
+    ManufacturerDto manufacturer =
+        new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
+    ShipTypeDto shipType =
+        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
+    ShipDto ship =
+        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
+    PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 1000, 1, 1, List.of());
+
+    LocationDto homeLoc = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L);
+
+    when(backendApiClient.get(
+            eq("/api/v1/hangar/my-ships?size=1000"), any(ParameterizedTypeReference.class)))
+        .thenReturn(ships);
+    when(backendApiClient.getCached(
+            eq("/api/v1/locations/home-locations"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(homeLoc));
+
+    // When & Then
+    mockMvc
+        .perform(get("/hangar"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("hangar"))
+        .andExpect(content().string(containsString("id=\"set-home-location-btn\"")))
+        .andExpect(content().string(containsString("id=\"home-location-modal\"")))
+        .andExpect(content().string(containsString("Orison")));
   }
 
   @Test

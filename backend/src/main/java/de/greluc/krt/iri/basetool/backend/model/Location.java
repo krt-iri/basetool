@@ -63,4 +63,13 @@ public class Location extends AbstractEntity<UUID> {
 
   @Column(nullable = false)
   private Boolean hidden = false;
+
+  /**
+   * Admin-curated marker flagging this location as an in-game "home location" (a player residence /
+   * primary spawn such as Lorville or Orison). Drives the hangar bulk "set home location" picker
+   * ({@code GET /api/v1/locations/home-locations}). Maintained locally and never written by the UEX
+   * universe sync, so it survives every sweep — the same guarantee {@link #hidden} relies on.
+   */
+  @Column(name = "is_home_location", nullable = false)
+  private Boolean homeLocation = false;
 }

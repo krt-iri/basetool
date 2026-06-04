@@ -23,6 +23,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ManufacturerDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SetHomeLocationRequestDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto;
@@ -50,6 +51,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -205,11 +207,28 @@ public class HangarPageController {
                   return new ArrayList<>();
                 });
 
+    CompletableFuture<List<LocationDto>> homeLocationsFuture =
+        parallelPageLoader
+            .<List<LocationDto>>loadAsync(
+                () -> {
+                  List<LocationDto> hl =
+                      backendApiClient.getCached(
+                          "/api/v1/locations/home-locations",
+                          new ParameterizedTypeReference<List<LocationDto>>() {});
+                  return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
+                })
+            .exceptionally(
+                e -> {
+                  log.error("Failed to fetch home locations", e);
+                  return new ArrayList<>();
+                });
+
     // join() blocks until every parallel fetch finishes; each call ran on its own virtual thread
     // with the full request-scoped context (SecurityContext / RequestAttributes / squadron /
     // correlation id) restored, so OAuth2 bearer relay and squadron-header propagation behave
     // identically to the previous sequential implementation.
-    CompletableFuture.allOf(shipsFuture, shipTypesFuture, locationsFuture, manufacturersFuture)
+    CompletableFuture.allOf(
+            shipsFuture, shipTypesFuture, locationsFuture, manufacturersFuture, homeLocationsFuture)
         .join();
 
     List<ShipDto> myShips = shipsFuture.join();
@@ -224,10 +243,15 @@ public class HangarPageController {
     List<ManufacturerDto> manufacturers = manufacturersFuture.join();
     manufacturers.sort(Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
 
+    // Curated home locations for the bulk "set home location" picker. The backend already returns
+    // them alphabetically descending (Z->A); preserve that order (do not re-sort).
+    List<LocationDto> homeLocations = homeLocationsFuture.join();
+
     model.addAttribute("myShips", myShips);
     model.addAttribute("shipTypes", shipTypes);
     model.addAttribute("locations", locations);
     model.addAttribute("manufacturers", manufacturers);
+    model.addAttribute("homeLocations", homeLocations);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions());
 
     return "hangar";
@@ -400,6 +424,33 @@ public class HangarPageController {
       log.error("Failed to delete ship", e);
       log.error("Error deleting ship", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.delete");
+    }
+    return "redirect:/hangar";
+  }
+
+  /**
+   * Bulk-sets the chosen curated home location on every ship the calling user owns, then redirects
+   * back to the hangar — a full reload that resyncs each row's displayed location and version. The
+   * location id comes from the home-location modal's select; the backend derives the owner from the
+   * JWT and validates that the id is a selectable home location.
+   *
+   * @param locationId the curated home location chosen in the modal
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /hangar}
+   */
+  @PostMapping("/home-location")
+  public String setHomeLocation(
+      @RequestParam("locationId") @NotNull UUID locationId, RedirectAttributes redirectAttributes) {
+    try {
+      backendApiClient.post(
+          "/api/v1/hangar/ships/home-location",
+          new SetHomeLocationRequestDto(locationId),
+          Void.class);
+      redirectAttributes.addFlashAttribute(
+          "successToast", "notification.success.home_location_set");
+    } catch (Exception e) {
+      log.error("Failed to set home location for ships", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.hangar.home_location.set");
     }
     return "redirect:/hangar";
   }

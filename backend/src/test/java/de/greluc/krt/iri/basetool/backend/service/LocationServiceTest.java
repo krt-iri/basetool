@@ -26,9 +26,12 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.iri.basetool.backend.exception.EntityInUseException;
 import de.greluc.krt.iri.basetool.backend.model.Location;
+import de.greluc.krt.iri.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipRepository;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -92,5 +95,38 @@ class LocationServiceTest {
     when(refineryOrderRepository.existsByLocationId(locId)).thenReturn(true);
 
     assertThrows(EntityInUseException.class, () -> locationService.deleteLocation(locId));
+  }
+
+  @Test
+  void getHomeLocations_delegatesToCuratedDescendingQuery() {
+    Location orison = new Location();
+    orison.setName("Orison");
+    Location lorville = new Location();
+    lorville.setName("Lorville");
+    when(locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc())
+        .thenReturn(List.of(orison, lorville));
+
+    assertEquals(List.of(orison, lorville), locationService.getHomeLocations());
+    verify(locationRepository, times(1)).findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
+  }
+
+  @Test
+  void updateLocation_copiesHomeLocationFlagFromDto() {
+    UUID id = UUID.randomUUID();
+    Location existing = new Location();
+    existing.setId(id);
+    existing.setName("Lorville");
+    existing.setVersion(1L);
+    existing.setHomeLocation(false);
+
+    when(locationRepository.existsByNameIgnoreCaseAndIdNot("Lorville", id)).thenReturn(false);
+    when(locationRepository.findById(id)).thenReturn(Optional.of(existing));
+    when(locationRepository.save(any(Location.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    LocationDto dto = new LocationDto(id, "Lorville", "Hurston", false, true, 1L);
+    Location result = locationService.updateLocation(id, dto);
+
+    assertTrue(result.getHomeLocation(), "updateLocation must copy the homeLocation flag from DTO");
   }
 }

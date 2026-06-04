@@ -25,6 +25,9 @@ import de.greluc.krt.iri.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.LocationService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
@@ -113,6 +116,27 @@ public class LocationController {
   @PreAuthorize("isAuthenticated()")
   public List<LocationDto> getRefineryLocations() {
     return locationService.getRefineryLocations().stream().map(locationMapper::toDto).toList();
+  }
+
+  /**
+   * Lists the admin-curated home locations (non-hidden), ordered by name descending — backs the
+   * hangar bulk "set home location" picker.
+   *
+   * @return curated home locations as DTOs, name descending
+   */
+  @Operation(
+      summary = "Kuratierte Home-Locations",
+      description =
+          "Listet die als Home-Location markierten, nicht ausgeblendeten Orte (alphabetisch"
+              + " absteigend) als Quelle für den Hangar-Bulk-Button.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Liste der Home-Locations"),
+    @ApiResponse(responseCode = "401", description = "Nicht authentifiziert")
+  })
+  @GetMapping("/home-locations")
+  @PreAuthorize("isAuthenticated()")
+  public List<LocationDto> getHomeLocations() {
+    return locationService.getHomeLocations().stream().map(locationMapper::toDto).toList();
   }
 
   /**

@@ -174,7 +174,12 @@
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{hangar.my_ships}">Meine Schiffe</h2>
-                <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
+                <div class="flex-gap-xs">
+                    <button id="set-home-location-btn" type="button" class="btn btn-outline"
+                            th:if="${!#lists.isEmpty(myShips)}"
+                            th:text="#{hangar.home_location.btn}">Home-Location setzen</button>
+                    <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
+                </div>
             </div>
 
             <div class="hangar-filter" th:if="${!#lists.isEmpty(myShips)}">
@@ -376,6 +381,37 @@
             <div class="flex-center-gap">
                 <button type="button" id="delete-all-cancel-btn" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" id="delete-all-confirm-btn" class="btn btn-danger" th:text="#{hangar.delete_all.modal.confirm}">Ja, alle löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Set Home Location Modal -->
+    <div id="home-location-modal" class="modal" style="display:none; z-index: 3300;">
+        <div class="modal-content hud-box" style="max-width: 520px;">
+            <span class="close-modal-home">&times;</span>
+            <h2 th:text="#{hangar.home_location.modal.title}" class="mt-0">Home-Location setzen</h2>
+
+            <p th:if="${#lists.isEmpty(homeLocations)}" class="mb-2"
+               th:text="#{hangar.home_location.empty}">Keine Home-Locations konfiguriert. Bitte an einen Admin wenden.</p>
+
+            <form th:unless="${#lists.isEmpty(homeLocations)}" id="home-location-form" method="post"
+                  th:action="@{/hangar/home-location}" class="m-0">
+                <div class="form-group">
+                    <label for="home-location-select" th:text="#{hangar.home_location.label}">Home-Location</label>
+                    <select id="home-location-select" name="locationId" required>
+                        <option value="" disabled selected th:text="#{hangar.ship.select_location}">Bitte wählen...</option>
+                        <option th:each="loc : ${homeLocations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                    </select>
+                </div>
+                <p class="mb-2" th:text="#{hangar.home_location.modal.body(${#lists.size(myShips)})}">Setzt den Ort aller Schiffe auf die gewählte Home-Location.</p>
+                <div style="display: flex; justify-content: space-between;">
+                    <button type="button" class="btn btn-ghost close-home-cancel" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" th:text="#{hangar.home_location.confirm}">Bestätigen</button>
+                </div>
+            </form>
+
+            <div th:if="${#lists.isEmpty(homeLocations)}" style="display:flex; justify-content:flex-end;">
+                <button type="button" class="btn btn-ghost close-home-cancel" th:text="#{general.cancel}">Abbrechen</button>
             </div>
         </div>
     </div>
@@ -653,6 +689,37 @@
                         deleteAllCancelBtn.disabled = false;
                     });
             });
+        })();
+
+        // ---- Set Home Location ----
+        (function() {
+            const openBtn = document.getElementById('set-home-location-btn');
+            const homeModal = document.getElementById('home-location-modal');
+            if (!openBtn || !homeModal) return;
+
+            const cancelEls = homeModal.querySelectorAll('.close-home-cancel, .close-modal-home');
+
+            openBtn.addEventListener('click', function() {
+                homeModal.style.display = 'flex';
+            });
+            cancelEls.forEach(function(el) {
+                el.addEventListener('click', function() {
+                    homeModal.style.display = 'none';
+                });
+            });
+            window.addEventListener('click', function(e) {
+                if (e.target === homeModal) {
+                    homeModal.style.display = 'none';
+                }
+            });
+
+            const homeForm = document.getElementById('home-location-form');
+            if (homeForm) {
+                homeForm.addEventListener('submit', function() {
+                    const submitBtn = homeForm.querySelector('button[type="submit"]');
+                    if (submitBtn) submitBtn.disabled = true;
+                });
+            }
         })();
 
         // Prevent double submit

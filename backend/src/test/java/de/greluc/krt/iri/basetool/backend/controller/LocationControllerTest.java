@@ -85,7 +85,7 @@ class LocationControllerTest {
   @Test
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
     Location entity = new Location();
-    LocationDto dto = new LocationDto(UUID.randomUUID(), "Lorville", null, false, 1L);
+    LocationDto dto = new LocationDto(UUID.randomUUID(), "Lorville", null, false, false, 1L);
     when(service.getAllLocations(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of(entity)));
     when(mapper.toDto(entity)).thenReturn(dto);
@@ -118,7 +118,7 @@ class LocationControllerTest {
   void getById_delegatesAndMaps() {
     UUID id = UUID.randomUUID();
     Location entity = new Location();
-    LocationDto dto = new LocationDto(id, "x", null, false, 1L);
+    LocationDto dto = new LocationDto(id, "x", null, false, false, 1L);
     when(service.getLocation(id)).thenReturn(entity);
     when(mapper.toDto(entity)).thenReturn(dto);
 
@@ -131,8 +131,8 @@ class LocationControllerTest {
   void getRefineryLocations_mapsEachEntityToDto() {
     Location loc1 = new Location();
     Location loc2 = new Location();
-    LocationDto dto1 = new LocationDto(UUID.randomUUID(), "ARC-L1", null, false, 1L);
-    LocationDto dto2 = new LocationDto(UUID.randomUUID(), "CRU-L4", null, false, 1L);
+    LocationDto dto1 = new LocationDto(UUID.randomUUID(), "ARC-L1", null, false, false, 1L);
+    LocationDto dto2 = new LocationDto(UUID.randomUUID(), "CRU-L4", null, false, false, 1L);
     when(service.getRefineryLocations()).thenReturn(List.of(loc1, loc2));
     when(mapper.toDto(loc1)).thenReturn(dto1);
     when(mapper.toDto(loc2)).thenReturn(dto2);
@@ -143,12 +143,27 @@ class LocationControllerTest {
   }
 
   @Test
+  void getHomeLocations_mapsEachEntityToDto() {
+    Location loc1 = new Location();
+    Location loc2 = new Location();
+    LocationDto dto1 = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L);
+    LocationDto dto2 = new LocationDto(UUID.randomUUID(), "Lorville", null, false, true, 1L);
+    when(service.getHomeLocations()).thenReturn(List.of(loc1, loc2));
+    when(mapper.toDto(loc1)).thenReturn(dto1);
+    when(mapper.toDto(loc2)).thenReturn(dto2);
+
+    List<LocationDto> result = controller.getHomeLocations();
+
+    assertEquals(List.of(dto1, dto2), result);
+  }
+
+  @Test
   void create_stripsServerManagedFields_andDelegatesToService() {
     // SECURITY: a client must not be able to set `id` or `version` via the
     // POST body and trigger an UPDATE instead of an INSERT. The controller
     // calls stripServerManaged() on the freshly mapped entity to guarantee
     // an INSERT path. This test pins that contract.
-    LocationDto request = new LocationDto(UUID.randomUUID(), "New Loc", "desc", false, 99L);
+    LocationDto request = new LocationDto(UUID.randomUUID(), "New Loc", "desc", false, false, 99L);
     Location mappedEntity = new Location();
     mappedEntity.setId(request.id());
     mappedEntity.setVersion(request.version());
@@ -158,7 +173,7 @@ class LocationControllerTest {
     Location persisted = new Location();
     persisted.setId(UUID.randomUUID());
     persisted.setVersion(1L);
-    LocationDto response = new LocationDto(persisted.getId(), "New Loc", "desc", false, 1L);
+    LocationDto response = new LocationDto(persisted.getId(), "New Loc", "desc", false, false, 1L);
 
     when(service.createLocation(any())).thenReturn(persisted);
     when(mapper.toDto(persisted)).thenReturn(response);
@@ -181,9 +196,9 @@ class LocationControllerTest {
     // Note: the update endpoint forwards the DTO directly (NOT the mapped
     // entity) so the service can apply only the user-mutable fields.
     UUID id = UUID.randomUUID();
-    LocationDto request = new LocationDto(id, "Renamed", "desc", false, 4L);
+    LocationDto request = new LocationDto(id, "Renamed", "desc", false, false, 4L);
     Location updated = new Location();
-    LocationDto response = new LocationDto(id, "Renamed", "desc", false, 5L);
+    LocationDto response = new LocationDto(id, "Renamed", "desc", false, false, 5L);
 
     when(service.updateLocation(id, request)).thenReturn(updated);
     when(mapper.toDto(updated)).thenReturn(response);

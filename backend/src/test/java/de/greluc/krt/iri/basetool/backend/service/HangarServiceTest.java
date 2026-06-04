@@ -25,7 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.User;
@@ -313,5 +315,71 @@ class HangarServiceTest {
     assertEquals(1L, page.getContent().get(0).count());
     assertEquals(1, page.getContent().get(0).details().size());
     assertEquals("pilot", page.getContent().get(0).details().get(0).ownerName());
+  }
+
+  // --- setHomeLocationForMyShips bulk action -------------------------------
+
+  @Test
+  void setHomeLocationForMyShips_validHomeLocation_setsAndReturnsCount() {
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    Location location = new Location();
+    location.setId(locationId);
+    location.setHomeLocation(true);
+    location.setHidden(false);
+
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(shipRepository.setLocationForOwner(userId, location)).thenReturn(3);
+
+    int updated = hangarService.setHomeLocationForMyShips(userId, locationId);
+
+    assertEquals(3, updated);
+    verify(shipRepository, times(1)).setLocationForOwner(userId, location);
+  }
+
+  @Test
+  void setHomeLocationForMyShips_nonHomeLocation_throwsBadRequestAndDoesNotUpdate() {
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    Location location = new Location();
+    location.setId(locationId);
+    location.setHomeLocation(false);
+    location.setHidden(false);
+
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> hangarService.setHomeLocationForMyShips(userId, locationId));
+    verify(shipRepository, never()).setLocationForOwner(any(), any());
+  }
+
+  @Test
+  void setHomeLocationForMyShips_hiddenHomeLocation_throwsBadRequest() {
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    Location location = new Location();
+    location.setId(locationId);
+    location.setHomeLocation(true);
+    location.setHidden(true);
+
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> hangarService.setHomeLocationForMyShips(userId, locationId));
+    verify(shipRepository, never()).setLocationForOwner(any(), any());
+  }
+
+  @Test
+  void setHomeLocationForMyShips_missingLocation_throwsBadRequest() {
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    when(locationRepository.findById(locationId)).thenReturn(Optional.empty());
+
+    assertThrows(
+        BadRequestException.class,
+        () -> hangarService.setHomeLocationForMyShips(userId, locationId));
+    verify(shipRepository, never()).setLocationForOwner(any(), any());
   }
 }

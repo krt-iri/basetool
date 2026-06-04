@@ -82,7 +82,7 @@ class AdminLocationsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void listData_ShouldRenderFilterTableFunction_AfterDatalist() throws Exception {
     LocationDto location =
-        new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp Lagrange 1", false, 0L);
+        new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp Lagrange 1", false, false, 0L);
     PageResponse<LocationDto> page =
         new PageResponse<>(List.of(location), 0, 1000, 1, 1, Collections.emptyList());
 
