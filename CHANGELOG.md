@@ -12,6 +12,12 @@
 
 - **Ein angemeldetes Staffelmitglied (ohne Offiziers- oder Adminrechte) kann seine eigene Auszahlungsart in einem Einsatz jetzt direkt in der Auszahlungs-Übersicht umstellen.** Bisher war ausgerechnet die eigene Zeile gesperrt, während sich die Auszahlungsart anonymer Teilnehmer ändern ließ — Ursache war ein Vergleich der Teilnehmer-ID mit dem Login-Benutzernamen statt mit der Keycloak-ID.
 
+- **Auf Smartphone und Tablet wurde der untere Seiteninhalt nicht mehr hinter dem fixierten Footer versteckt — sichtbar u. a. auf der Startseite.** Die responsiven Seitenabstände hatten die Platzreservierung für den Footer überschrieben; sie bleibt jetzt auf allen Bildschirmgrößen erhalten und wächst mit dem mobil höher gestapelten Footer mit.
+
+- **Die Mehrfachauswahl-Filter (Lager, Material-Übersicht, Profitberechnung) zeigen ihre aufgeklappte Optionsliste jetzt vollständig über dem Footer statt teilweise dahinter.**
+
+- **Auf der Bewertungsverwaltung (Beförderungssystem) rutschte die untere Kante der Bewertungsmatrix samt horizontaler Bildlaufleiste hinter den fixierten Footer — vor allem auf schmalen und mobilen Viewports, wo der Footer höher gestapelt ist.** Die Matrix-Höhe rechnet die tatsächliche Footer-Höhe jetzt ein, wie bereits auf der Material-Übersicht und der Profitberechnung.
+
 ### Security
 
 - **Ungenutztes Asciidoctor-Gradle-Plugin entfernt — das beseitigt 8 OWASP-Dependency-Check-Alerts an der Wurzel.** Das Plugin war totes Gerüst (keine `.adoc`-Quellen, kein Spring-REST-Docs; die API-Doku kommt von springdoc/OpenAPI) und zog allein die verwundbare `jruby-complete`-Kette (snakeyaml, jline, bcprov, jruby-base) auf den Build-Klassenpfad. Die dadurch obsolete SnakeYAML-Suppression in der OWASP-Suppressions-Datei wurde mitentfernt.
