@@ -42,32 +42,11 @@ main.oc-page .oc-toolbar {
     overflow-x: auto;
     padding-bottom: 1rem;
     margin-top: 1.5rem;
-
-    /* KRT-styled scrollbar (Firefox) */
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-gray-2) var(--color-bg-dark-gray);
 }
 
-/* KRT-styled scrollbar (WebKit / Blink): thin, dark track, gray thumb that
-   warms to the brand orange on hover — matches the HUD aesthetic. */
-.oc-chart::-webkit-scrollbar {
-    height: 10px;
-}
-
-.oc-chart::-webkit-scrollbar-track {
-    background: var(--color-bg-dark-gray);
-    border: 1px solid var(--color-gray-3);
-}
-
-.oc-chart::-webkit-scrollbar-thumb {
-    background: var(--color-gray-2);
-    border: 2px solid var(--color-bg-dark-gray);
-}
-
-.oc-chart::-webkit-scrollbar-thumb:hover {
-    background: var(--color-primary);
-}
-
+/* The horizontal scrollbar intentionally inherits the global HUD scrollbar from
+   styles.css — the previous local override pre-dated and diverged from the
+   design-system spec (size + hover colour). */
 .oc-caption {
     display: flex;
     align-items: center;

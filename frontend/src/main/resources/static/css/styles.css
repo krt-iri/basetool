@@ -2282,10 +2282,15 @@ main p {
     text-wrap: pretty;
 }
 
-/* Custom Scrollbars */
+/* Custom Scrollbars — HUD style per the design-system spec
+   (.claude/skills/das-kartell-design/krt-components.css): square, hairline
+   track, a thumb that sits in a 2px channel, accent-light on hover and brand
+   orange while dragging. The cross-axis corner is filled so two-axis scrollers
+   never fall back to the bright OS default, and the default arrow buttons are
+   removed for a cleaner HUD look. */
 ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
 }
 
 ::-webkit-scrollbar-track {
@@ -2296,10 +2301,28 @@ main p {
 
 ::-webkit-scrollbar-thumb {
     background-color: var(--color-gray-2);
+    border: 2px solid var(--color-bg-dark-gray); /* inset → thumb reads as a bar in a channel */
+    background-clip: padding-box;
+    min-height: 32px;
+    min-width: 32px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-accent-light);
+}
+
+::-webkit-scrollbar-thumb:active {
     background-color: var(--color-primary);
+}
+
+::-webkit-scrollbar-corner {
+    background-color: var(--color-bg-dark-gray);
+}
+
+::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 * {
