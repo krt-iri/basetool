@@ -24,6 +24,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationFinanceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutStatusUpdateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
@@ -234,12 +235,11 @@ public class OperationPageController {
               "/api/v1/operations/" + id + "/finances", OperationFinanceDto.class, false);
       model.addAttribute("operationFinance", operationFinance);
 
-      List<OperationPayoutDto> payouts =
+      OperationPayoutSummaryDto payoutSummary =
           backendApiClient.get(
-              "/api/v1/operations/" + id + "/payouts",
-              new ParameterizedTypeReference<List<OperationPayoutDto>>() {},
-              false);
-      model.addAttribute("operationPayouts", payouts);
+              "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class, false);
+      model.addAttribute("operationPayouts", payoutSummary.payouts());
+      model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
 
       // Resolved at the HTTP boundary so the template stays free of inline
       // role-expression checks. The backend's PUT /api/v1/operations/{id}

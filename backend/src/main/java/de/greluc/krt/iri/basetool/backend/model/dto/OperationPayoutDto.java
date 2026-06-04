@@ -30,13 +30,15 @@ import java.time.Instant;
  * finance entries where they are the participant + their refinery orders' {@code expenses +
  * otherExpenses}) are reimbursed off the top, and the remaining {@code totalSum} is split per
  * {@link #participationPercentage} across PAYOUT participants. DONATE participants keep their
- * {@link #personalExpenses} reimbursement (it is their own money) but contribute their {@link
- * #shareAmount} to the org. From the resulting gross payout ({@code personalExpenses +
- * shareAmount}) a flat 0.5% in-game transfer fee ({@link #transferFee}) is deducted to cover the
- * Star Citizen banking overhead charged on every aUEC transfer to the recipient. {@link
- * #payoutAmount} is always {@code round(personalExpenses + shareAmount - transferFee)} (HALF_UP to
- * scale 0 — whole aUEC, since mobiGlas transfers do not accept fractional credits) so the frontend
- * can render a single number without re-deriving it.
+ * {@link #personalExpenses} reimbursement (it is their own money) but contribute their share to the
+ * org: that contributed share is exposed as {@link #donatedAmount} (and aggregated into {@code
+ * OperationPayoutSummaryDto#totalDonations()}), while their {@link #shareAmount} stays {@link
+ * BigDecimal#ZERO} so it is never paid out to them. From the resulting gross payout ({@code
+ * personalExpenses + shareAmount}) a flat 0.5% in-game transfer fee ({@link #transferFee}) is
+ * deducted to cover the Star Citizen banking overhead charged on every aUEC transfer to the
+ * recipient. {@link #payoutAmount} is always {@code round(personalExpenses + shareAmount -
+ * transferFee)} (HALF_UP to scale 0 — whole aUEC, since mobiGlas transfers do not accept fractional
+ * credits) so the frontend can render a single number without re-deriving it.
  *
  * <p>The {@code paidOut*} block reflects the {@link
  * de.greluc.krt.iri.basetool.backend.model.OperationPayoutStatus} row that the mission-manager
@@ -49,7 +51,10 @@ import java.time.Instant;
  * @param participationPercentage clamped attendance-time share, 0–100, two decimals
  * @param payoutPreference {@code PAYOUT} or {@code DONATE} (sticky DONATE across the operation)
  * @param personalExpenses out-of-pocket expenses attributable to the participant (always &gt;= 0)
- * @param shareAmount totalSum × percentage / 100, or {@link BigDecimal#ZERO} for DONATE
+ * @param shareAmount totalSum × percentage / 100 for PAYOUT, or {@link BigDecimal#ZERO} for DONATE
+ * @param donatedAmount the share a DONATE participant contributes to the org (totalSum × percentage
+ *     / 100), or {@link BigDecimal#ZERO} for PAYOUT; aggregated into {@code
+ *     OperationPayoutSummaryDto#totalDonations()}
  * @param transferFee 0.5% of {@code personalExpenses + shareAmount}, deducted to cover the in-game
  *     aUEC transfer fee — always &gt;= 0 and zero when the gross payout is zero
  * @param payoutAmount {@code round(personalExpenses + shareAmount - transferFee)} (HALF_UP to scale
@@ -66,6 +71,7 @@ public record OperationPayoutDto(
     PayoutPreference payoutPreference,
     BigDecimal personalExpenses,
     BigDecimal shareAmount,
+    BigDecimal donatedAmount,
     BigDecimal transferFee,
     BigDecimal payoutAmount,
     boolean paidOut,

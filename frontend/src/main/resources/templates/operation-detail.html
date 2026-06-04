@@ -276,12 +276,22 @@
                 color: var(--color-gray-1);
             }
             .payout-table .payout-amount-reimbursement,
-            .payout-table .payout-amount-transferfee {
+            .payout-table .payout-amount-transferfee,
+            .payout-table .payout-amount-donation {
                 display: block;
                 font-size: 0.78em;
                 color: var(--color-gray-2);
                 font-style: italic;
                 margin-top: 0.2rem;
+            }
+            /* Operation-wide donation total below the payout table. Profit-green
+               reads as "money that stayed with the org" rather than a payout. */
+            .payout-donation-total {
+                margin: 1rem 0 0;
+                text-align: right;
+                font-family: 'Lato', sans-serif;
+                font-weight: 700;
+                color: var(--color-dept-profit, #239E33);
             }
             .payout-table th.payout-paid-col,
             .payout-table td.payout-paid-cell {
@@ -537,6 +547,9 @@
                                         <span class="payout-amount-transferfee"
                                               th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}"
                                               th:text="'(' + #{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.transferFee), 1, 'POINT')} + ' aUEC)'">(bereits abgezogene Überweisungsgebühr: 0 aUEC)</span>
+                                        <span class="payout-amount-donation"
+                                              th:if="${payout.donatedAmount != null and payout.donatedAmount.signum() > 0}"
+                                              th:text="'(' + #{operation.payout.amount.donation} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.donatedAmount), 1, 'POINT')} + ' aUEC)'">(gespendet: 0 aUEC)</span>
                                     </td>
                                     <td class="payout-paid-cell" sec:authorize="isAuthenticated()">
                                         <label class="payout-paid-label" th:if="${canEdit}">
@@ -561,6 +574,11 @@
                             </tbody>
                         </table>
                     </div>
+                    <p class="payout-donation-total"
+                       th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}">
+                        <span th:text="#{operation.payout.donation.total}">Spenden gesamt</span>:
+                        <span th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                    </p>
                     <p th:if="${operationPayouts == null or operationPayouts.isEmpty()}" th:text="#{mission.empty}">No participants.</p>
                 </div>
             </div>
@@ -581,6 +599,11 @@
                             <span th:text="#{operation.finances.total}">Gesamtergebnis</span>:
                             <span th:text="${operationFinance != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0'} + ' aUEC'">0 aUEC</span>
                         </h3>
+                        <p th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}"
+                           style="margin: 0.4rem 0 0; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-dept-profit, #239E33);">
+                            <span th:text="#{operation.finances.donations}">Davon gespendet</span>:
+                            <span th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                        </p>
                     </div>
 
                     <div th:if="${operationFinance != null and operationFinance.missions != null and !operationFinance.missions.isEmpty()}">
