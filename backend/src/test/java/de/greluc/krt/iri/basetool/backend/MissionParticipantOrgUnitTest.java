@@ -48,10 +48,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Verifies the org-unit stamping of mission participants. Replaces the former {@code
- * MissionParticipantSquadronTest}: a registered participant's affiliations are now derived from
- * their {@code org_unit_membership} rows (none / one Staffel / one SK / both), with no IRIDIUM
- * fallback, while a guest's affiliation honours the caller-submitted org units only after the H-3
- * authorization filter (anonymous callers are stripped).
+ * MissionParticipantSquadronTest}: a registered participant's affiliations are derived from their
+ * {@code org_unit_membership} rows (none / one Staffel / one SK / both), with no IRIDIUM fallback,
+ * while a guest's affiliation honours the caller-submitted org units verbatim — guest labeling is
+ * mission-scoped roster metadata open to any caller (including anonymous sign-ups), so no
+ * authorization filter strips it.
  */
 @SpringBootTest
 @Transactional
@@ -156,9 +157,11 @@ class MissionParticipantOrgUnitTest {
   }
 
   @Test
-  void guest_anonymousCaller_submittedOrgUnitsAreDropped() {
-    // This @SpringBootTest runs without an authenticated SecurityContext — the H-3 gate strips any
-    // caller-submitted org units so a forged "guest of org unit X" entry never lands.
+  void guest_anonymousCaller_submittedOrgUnitsAreHonored() {
+    // A guest's org-unit affiliation is mission-scoped roster metadata, not an authority grant, so
+    // anyone who may add the guest may label it with any Staffel or SK. This @SpringBootTest runs
+    // without an authenticated SecurityContext (an anonymous sign-up), and both submitted ids — a
+    // Staffel and an SK the caller has no relationship with — are kept verbatim.
     Mission updated =
         missionService.addParticipant(
             mission.getId(),
@@ -173,8 +176,9 @@ class MissionParticipantOrgUnitTest {
             .filter(p -> "Guest".equals(p.getGuestName()))
             .findFirst()
             .orElseThrow();
-    assertTrue(
-        participant.getOrgUnits().isEmpty(),
-        "anonymous guest must not be able to claim affiliation with any org unit (H-3)");
+    List<UUID> ids = participant.getOrgUnits().stream().map(OrgUnit::getId).toList();
+    assertTrue(ids.contains(testStaffel.getId()), "guest Staffel label must be honored");
+    assertTrue(ids.contains(testSk.getId()), "guest SK label must be honored");
+    assertEquals(2, ids.size());
   }
 }

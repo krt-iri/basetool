@@ -64,7 +64,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -1687,42 +1686,39 @@ public class MissionService {
 
   /**
    * Resolves a caller-submitted {@code orgUnitIds} list for a GUEST participant entry to the org
-   * units the service is allowed to persist. Generalises audit finding H-3 from a single squadron
-   * to a list of org units (Staffel + Spezialkommandos):
+   * units to persist. A guest's org-unit affiliation is mission-scoped roster metadata only: it is
+   * a label on a single mission's participant row, drives nothing but the roster badges (see {@code
+   * MissionMapper.orgUnitsToReferenceDtos}), grants no permissions and touches no user data. Anyone
+   * who may add the guest at all — the endpoint's {@code canSeeMission} gate already governs that,
+   * including anonymous sign-ups on public (non-internal) missions — may therefore label it with
+   * any Staffel or SK:
    *
    * <ul>
    *   <li>{@code null} / empty input → empty list (no affiliation).
-   *   <li>anonymous caller → empty list, the claim is silently dropped (the H-3 debug log fires).
-   *       Throwing 403 here would expose the auth gate to a probe.
-   *   <li>authenticated caller → each id is kept only when {@link OwnerScopeService#canEditOrgUnit}
-   *       (via {@link AuthHelperService}) permits the caller to label that org unit; an id the
-   *       caller may not edit raises 403 {@link AccessDeniedException}, since that is cross-org
-   *       forgery rather than an accidental extra option.
+   *   <li>otherwise → every id that resolves to a real {@link OrgUnit} is kept, in submission
+   *       order; a {@code null} or unknown id is silently skipped (a roster mislabel is not a
+   *       forgery worth a 403, and a non-resolving id simply yields no badge).
    * </ul>
    *
+   * <p>This deliberately drops the former audit-H-3 authorization filter (admin / own-membership
+   * required) for guests: that gate denied an SK lead — and every anonymous sign-up — from tagging
+   * a guest with the relevant org unit, even though the tag carries no authority. Registered-user
+   * participants are unaffected: their affiliations are auto-derived from their actual memberships
+   * in the caller paths, never from this submitted list.
+   *
    * @param submittedOrgUnitIds the caller-supplied org-unit ids from the request DTO.
-   * @return the managed org-unit entities the service may persist on the guest participant; never
-   *     {@code null}, possibly empty.
+   * @return the managed org-unit entities to persist on the guest participant; never {@code null},
+   *     possibly empty.
    */
   private java.util.List<OrgUnit> resolveGuestSubmittedOrgUnits(
       java.util.List<UUID> submittedOrgUnitIds) {
     if (submittedOrgUnitIds == null || submittedOrgUnitIds.isEmpty()) {
       return java.util.List.of();
     }
-    if (!authHelperService.isAuthenticated()) {
-      log.debug(
-          "Anonymous guest tried to claim {} org unit(s); silently dropping the claim (H-3)",
-          submittedOrgUnitIds.size());
-      return java.util.List.of();
-    }
     java.util.List<OrgUnit> resolved = new java.util.ArrayList<>();
     for (UUID orgUnitId : submittedOrgUnitIds) {
       if (orgUnitId == null) {
         continue;
-      }
-      if (!authHelperService.canEditOrgUnit(orgUnitId)) {
-        throw new AccessDeniedException(
-            "Cross-org-unit guest labeling requires admin or org-unit-officer rights.");
       }
       orgUnitRepository.findById(orgUnitId).ifPresent(resolved::add);
     }

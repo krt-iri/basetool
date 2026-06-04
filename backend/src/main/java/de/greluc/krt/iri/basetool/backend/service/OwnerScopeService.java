@@ -678,23 +678,34 @@ public class OwnerScopeService {
   }
 
   /**
-   * {@code true} iff the current principal may see data owned by {@code squadronId}.
+   * {@code true} iff the current principal may see data owned by {@code squadronId} — where the id
+   * may name either a Staffel or a Spezialkommando. Evaluates the very same effective-scope vector
+   * the staffel-scoped <em>list</em> queries use ({@link #currentScopePredicate()} → {@link
+   * ScopePredicate#permits(UUID)}), so a per-row detail/edit check can never diverge from what the
+   * lists show:
    *
    * <ul>
-   *   <li>Admin without an active squadron header: always {@code true}.
-   *   <li>Admin with an active squadron header: {@code true} only for the selected squadron — the
-   *       admin opted into the focused view and must switch back to "all" to break out.
-   *   <li>Non-admin: {@code true} only for the user's home squadron.
+   *   <li>Admin without an active pin: {@code true} for every org unit.
+   *   <li>Admin or non-admin pinned to one org unit: {@code true} only for that pinned id.
+   *   <li>Non-admin without a pin: {@code true} for any org unit they are a member of — the union
+   *       of their Staffel <em>and</em> every Spezialkommando they belong to.
+   *   <li>Anonymous: {@code false} for everything (only Mission's {@code isInternal = false} public
+   *       escape, applied by the callers, lets a guest through).
    * </ul>
    *
-   * @param squadronId the squadron whose data the caller wants to read; never {@code null}.
-   * @return {@code true} iff the caller may see the given squadron's data.
+   * <p>Before this delegated to {@link #currentScopePredicate()} it consulted only the home Staffel
+   * ({@code readPersistentSquadronFromUser()}), which denied SK members — and squadron-less SK
+   * leads entirely — detail/edit access to their own SK's strict aggregates and internal missions,
+   * even though the lists (which already used the predicate) showed those rows. Strict-staffel
+   * isolation is preserved: a non-admin still matches only org units in their own membership set,
+   * and a foreign pin collapses to that set rather than granting foreign access.
+   *
+   * @param squadronId the org-unit id (Staffel or Spezialkommando) whose data the caller wants to
+   *     read; never {@code null}.
+   * @return {@code true} iff the caller may see the given org unit's data.
    */
   public boolean canSeeSquadron(@NotNull UUID squadronId) {
-    if (authHelper.isAdmin()) {
-      return readActiveSquadronFromHeader().map(active -> active.equals(squadronId)).orElse(true);
-    }
-    return readPersistentSquadronFromUser().map(active -> active.equals(squadronId)).orElse(false);
+    return currentScopePredicate().permits(squadronId);
   }
 
   /**

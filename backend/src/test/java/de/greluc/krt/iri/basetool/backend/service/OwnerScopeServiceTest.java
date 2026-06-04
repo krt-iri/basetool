@@ -262,13 +262,83 @@ class OwnerScopeServiceTest {
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       lenient()
-          .when(
-              orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-                  MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
       assertFalse(service.canSeeSquadron(SQUADRON_B_ID));
+    }
+
+    @Test
+    void member_seesOwnStaffelAndEverySkTheyBelongTo() {
+      // Detail/edit visibility now mirrors the list scope: a member sees the union of their Staffel
+      // and every Spezialkommando membership, not just the home Staffel.
+      UUID skId = UUID.randomUUID();
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(
+              List.of(
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID),
+                  skMembership(MEMBER_USER_ID, skId)));
+
+      assertTrue(service.canSeeSquadron(SQUADRON_A_ID), "own Staffel");
+      assertTrue(service.canSeeSquadron(skId), "own SK — the regression this fixes");
+      assertFalse(service.canSeeSquadron(SQUADRON_B_ID), "foreign Staffel stays hidden");
+    }
+
+    @Test
+    void squadronlessSkMember_seesTheirSk() {
+      // The reported case: an SK lead with NO Staffel membership. The old home-Staffel-only gate
+      // denied them every org unit including their own SK; the membership union now grants the SK.
+      UUID skId = UUID.randomUUID();
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(skMembership(MEMBER_USER_ID, skId)));
+
+      assertTrue(service.canSeeSquadron(skId));
+      assertFalse(service.canSeeSquadron(SQUADRON_A_ID));
+    }
+
+    @Test
+    void nonAdminPinnedToOneMembership_seesOnlyThePin() {
+      // Mirrors the list scope: pinning one membership narrows detail/edit to that org unit,
+      // exactly as currentScopePredicate() narrows the IN-clause to the pinned id.
+      UUID skId = UUID.randomUUID();
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(
+              List.of(
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID),
+                  skMembership(MEMBER_USER_ID, skId)));
+      lenient()
+          .when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(skId.toString());
+
+      assertTrue(service.canSeeSquadron(skId), "pinned SK is visible");
+      assertFalse(service.canSeeSquadron(SQUADRON_A_ID), "the unpinned Staffel is filtered out");
+    }
+
+    @Test
+    void nonAdminForeignPin_collapsesToMembershipUnion() {
+      // A spoofed/stale pin to an org unit the caller is not a member of must NOT grant foreign
+      // access; it collapses to the membership union (same defence as currentScopePredicate()).
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      lenient()
+          .when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertTrue(service.canSeeSquadron(SQUADRON_A_ID), "own Staffel still visible");
+      assertFalse(service.canSeeSquadron(SQUADRON_B_ID), "foreign pin grants nothing");
     }
 
     @Test
@@ -837,19 +907,19 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void currentSquadronId_andCanSeeSquadron_shareMembershipLookup() {
+    void canSeeSquadron_calledTwice_hitsMembershipRepoOnce() {
+      // canSeeSquadron now evaluates the same scope vector as the list queries
+      // (currentScopePredicate). The membership lookup behind it is request-scoped, so repeated
+      // per-row detail/edit checks in one request collapse to a single org_unit_membership read.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      service.currentSquadronId();
       assertTrue(service.canSeeSquadron(SQUADRON_A_ID));
       assertFalse(service.canSeeSquadron(SQUADRON_B_ID));
 
-      verify(orgUnitMembershipRepository, times(1))
-          .findAllByIdUserIdAndKind(MEMBER_USER_ID, OrgUnitKind.SQUADRON);
+      verify(orgUnitMembershipRepository, times(1)).findAllByIdUserId(MEMBER_USER_ID);
     }
   }
 
