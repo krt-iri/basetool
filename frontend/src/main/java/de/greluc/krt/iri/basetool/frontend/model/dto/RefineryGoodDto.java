@@ -38,5 +38,4 @@ public record RefineryGoodDto(
     MaterialDto outputMaterial,
     @Min(1) Integer outputQuantity,
     @Min(0) @Max(1000) Integer quality,
-    Integer version,
     Integer yieldBonusPercent) {}

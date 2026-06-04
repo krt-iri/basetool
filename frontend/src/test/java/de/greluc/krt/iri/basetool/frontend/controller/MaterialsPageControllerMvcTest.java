@@ -142,7 +142,6 @@ class MaterialsPageControllerMvcTest {
     MaterialDto material =
         new MaterialDto(
             id,
-            1,
             "Aluminum",
             "RAW",
             "SCU",

@@ -90,7 +90,6 @@ class AdminMaterialsPageControllerMvcTest {
     MaterialDto material =
         new MaterialDto(
             UUID.randomUUID(),
-            1,
             "Aluminum",
             "RAW",
             "SCU",

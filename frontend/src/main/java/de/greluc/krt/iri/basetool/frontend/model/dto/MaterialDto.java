@@ -25,7 +25,6 @@ import java.util.UUID;
 /** Data transfer record carrying Material payload. */
 public record MaterialDto(
     UUID id,
-    Integer idCommodity,
     String name,
     String type,
     String quantityType,

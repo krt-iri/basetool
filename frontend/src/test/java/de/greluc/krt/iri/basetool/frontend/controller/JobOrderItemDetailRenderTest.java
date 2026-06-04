@@ -111,7 +111,6 @@ class JobOrderItemDetailRenderTest {
   private MaterialDto material(String name, String quantityType) {
     return new MaterialDto(
         UUID.randomUUID(),
-        null,
         name,
         null,
         quantityType,

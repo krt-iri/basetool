@@ -122,7 +122,6 @@ class MaterialsPageControllerTest {
     MaterialDto materialDto =
         new MaterialDto(
             id,
-            1,
             "Gold",
             "Metal",
             "SCU",

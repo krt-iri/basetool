@@ -65,7 +65,6 @@ class RefineryOrderStorageCalculationTest {
     MaterialDto pieceMaterial =
         new MaterialDto(
             UUID.randomUUID(),
-            1,
             "PieceMat",
             "TYPE",
             "PIECE",
@@ -81,8 +80,7 @@ class RefineryOrderStorageCalculationTest {
             true,
             0L);
     RefineryGoodDto good =
-        new RefineryGoodDto(
-            UUID.randomUUID(), pieceMaterial, 100, pieceMaterial, 15, 100, null, null);
+        new RefineryGoodDto(UUID.randomUUID(), pieceMaterial, 100, pieceMaterial, 15, 100, null);
     RefineryOrderDto orderDto =
         new RefineryOrderDto(
             orderId,
@@ -124,7 +122,6 @@ class RefineryOrderStorageCalculationTest {
     MaterialDto scuMaterial =
         new MaterialDto(
             UUID.randomUUID(),
-            2,
             "ScuMat",
             "TYPE",
             "SCU",
@@ -140,8 +137,7 @@ class RefineryOrderStorageCalculationTest {
             true,
             0L);
     RefineryGoodDto good =
-        new RefineryGoodDto(
-            UUID.randomUUID(), scuMaterial, 100, scuMaterial, 1234, 100, null, null);
+        new RefineryGoodDto(UUID.randomUUID(), scuMaterial, 100, scuMaterial, 1234, 100, null);
     RefineryOrderDto orderDto =
         new RefineryOrderDto(
             orderId,
@@ -195,7 +191,6 @@ class RefineryOrderStorageCalculationTest {
     MaterialDto nullQuantityTypeMaterial =
         new MaterialDto(
             UUID.randomUUID(),
-            3,
             "Ouratite",
             "REFINED",
             null, // ← reproduces the bug: UEX-imported material with NULL quantity_type
@@ -218,7 +213,6 @@ class RefineryOrderStorageCalculationTest {
             nullQuantityTypeMaterial,
             221,
             100,
-            null,
             null);
     RefineryOrderDto orderDto =
         new RefineryOrderDto(

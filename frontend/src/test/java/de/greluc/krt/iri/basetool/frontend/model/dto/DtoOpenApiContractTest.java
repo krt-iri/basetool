@@ -74,22 +74,15 @@ class DtoOpenApiContractTest {
 
   /**
    * Known PRE-EXISTING mirror drifts: a frontend record component the backend OpenAPI schema does
-   * not declare (so it always deserialises to {@code null}). These predate this contract test and
-   * are recorded here so the gate stays green and BLOCKING for any *new* drift. Each entry is
-   * tech-debt to resolve — remove the dead field from the mirror, or have the backend emit it — and
-   * this map must shrink, never grow. Snapshot taken when the test was introduced:
+   * not declare (so it always deserialises to {@code null}). Entries are allowlisted so the gate
+   * stays green and BLOCKING for any *new* drift; each is tech-debt to resolve — remove the dead
+   * field from the mirror, or have the backend emit it — and this map must shrink, never grow.
    *
-   * <ul>
-   *   <li>{@code MaterialDto.idCommodity} — backend MaterialDto carries no commodity id.
-   *   <li>{@code MissionCrewDto.version} — backend crew view is unversioned.
-   *   <li>{@code RefineryGoodDto.version} — backend refinery-good view is unversioned.
-   * </ul>
+   * <p>Now empty: the three drifts recorded when the test was introduced ({@code
+   * MaterialDto.idCommodity}, {@code MissionCrewDto.version}, {@code RefineryGoodDto.version}) have
+   * been resolved by dropping the dead fields from the frontend mirrors.
    */
-  private static final Map<String, Set<String>> KNOWN_PREEXISTING_DRIFT =
-      Map.of(
-          "MaterialDto", Set.of("idCommodity"),
-          "MissionCrewDto", Set.of("version"),
-          "RefineryGoodDto", Set.of("version"));
+  private static final Map<String, Set<String>> KNOWN_PREEXISTING_DRIFT = Map.of();
 
   /**
    * Builds one dynamic test per matched frontend record plus a final guard asserting enough records
