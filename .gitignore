@@ -57,3 +57,10 @@ Mining_Hub_V0.3.0.py
 
 ### Node / web-asset linting (gradle-node-plugin) ###
 node_modules/
+
+### Python bytecode caches from the .claude skill helper scripts ###
+__pycache__/
+*.pyc
+
+### Release-notes local progress tracker (never commit) ###
+/.release-notes-state.json

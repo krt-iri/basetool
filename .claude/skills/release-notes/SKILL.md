@@ -1,6 +1,6 @@
 ---
 name: release-notes
-description: Use this skill to write user-facing release notes / "Was ist neu" / Änderungsübersicht / Patch Notes / Update-Ankündigung for the Profit Basetool app, starting from a given point in time (a date, a git tag like v0.3.40, a release, or a commit). It turns the technical German CHANGELOG.md and git history into friendly, non-technical release notes for the squadron's normal members, grouped into Neu / Verbesserungen / Fehlerbehebungen. As part of the same run it also tidies CHANGELOG.md itself: entries still sitting under `[Unreleased]` that have already shipped under a git tag (`vX.Y.Z`) are moved into that tag's own dated section. Trigger this whenever the user wants to communicate recent changes to end users — e.g. "schreib Release Notes seit v0.3.40", "was ist neu seit dem 15.05 für die Nutzer", "fasse die letzten Änderungen für die Mitglieder zusammen", "Update-Ankündigung für die letzten zwei Wochen" — even when they don't say the words "release notes".
+description: Use this skill to write user-facing release notes / "Was ist neu" / Änderungsübersicht / Patch Notes / Update-Ankündigung for the Profit Basetool app, starting from a given point in time (a date, a git tag like v0.3.40, a release, or a commit). It turns the technical German CHANGELOG.md and git history into friendly, non-technical release notes for the squadron's normal members, grouped into Neu / Verbesserungen / Fehlerbehebungen. As part of the same run it also tidies CHANGELOG.md itself: entries still sitting under `[Unreleased]` that have already shipped under a git tag (`vX.Y.Z`) are moved into that tag's own dated section. Trigger this whenever the user wants to communicate recent changes to end users — e.g. "schreib Release Notes seit v0.3.40", "was ist neu seit dem 15.05 für die Nutzer", "fasse die letzten Änderungen für die Mitglieder zusammen", "Update-Ankündigung für die letzten zwei Wochen" — even when they don't say the words "release notes". When the user gives no start point at all, the skill automatically resumes from where the last release notes ended, using a local, git-ignored progress marker (.release-notes-state.json) so nobody has to remember the last covered point.
 user-invocable: true
 ---
 
@@ -40,8 +40,39 @@ wie der Startpunkt — Datum, Datum mit Uhrzeit oder Ref) und ein **Versions-Lab
 für die optionale Unterzeile (z. B. die geplante neue Versionsnummer). Der Titel
 selbst ist immer das Datums-Fenster (siehe Ausgabeformat), unabhängig vom Label.
 
-Fehlt der Startpunkt komplett, frag genau einmal kurz nach („Ab welchem Datum oder
-welcher Version?") und schlage das letzte Tag als Default vor — rate nicht.
+**Fehlt der Startpunkt komplett, ist das der Normalfall** — und du musst nicht
+nachfragen: Der Skill setzt automatisch dort fort, wo die letzten Release Notes
+endeten. Er liest dazu einen **lokalen Fortschrittsmarker** (siehe nächster
+Abschnitt) und sammelt alles, was seit diesem Punkt dazugekommen ist. **Nur wenn
+es noch keinen Marker gibt** (allererster Lauf), frag genau einmal kurz nach („Ab
+welchem Datum oder welcher Version?") und schlage das letzte Tag als Default vor —
+rate nicht. Das Hilfsskript sagt dir von selbst, welcher der beiden Fälle vorliegt.
+
+## Automatisches Fortschritts-Tracking (lokal, nie committet)
+
+Damit niemand sich merken muss, bis wohin die letzten Release Notes gingen, merkt
+sich der Skill das selbst — in einer **lokalen** Datei `.release-notes-state.json`
+im Repo-Wurzelverzeichnis. Sie hält den Commit fest, bis zu dem zuletzt Notes
+erstellt wurden, dazu das neueste darin enthaltene Release-Tag und dessen Datum.
+
+- **Die Datei wird nie eingecheckt.** Sie steht in `.gitignore`, und jedes
+  Schreiben trägt den Eintrag erneut ein und prüft per git, dass die Datei
+  wirklich ignoriert wird. Es ist reines lokales Tracking — beliebig löschbar, geht
+  nie ins Repo.
+- **Gelesen wird automatisch:** Läuft `gather_changes.py` ohne `--since`, nimmt es
+  den gespeicherten Commit als Startpunkt (`<Commit>..HEAD`) und blendet im
+  Changelog genau die Release-Abschnitte ein, die nach diesem Punkt geschnitten
+  wurden. Gibt es noch keinen Marker, bricht es mit einem Hinweis ab (frag dann den
+  Nutzer, siehe oben) — es rät nie einen Startpunkt.
+- **Fortgeschrieben wird in einem eigenen, bewussten Schritt ganz am Ende**
+  (Schritt 7), erst nachdem die Notes geschrieben sind. So wandert der Marker nie
+  weiter, wenn ein Lauf abgebrochen wird, und er geht ausschließlich vorwärts.
+
+Den aktuellen Marker nur ansehen (ändert nichts):
+
+```bash
+python .claude/skills/release-notes/scripts/track_release_notes.py --show
+```
 
 ## Schritt 1 — Rohmaterial sammeln
 
@@ -52,6 +83,9 @@ reichhaltigsten Beschreibungen) und das nach Commit-Typ sortierte Git-Log (das
 das Zeitfenster sauber abgrenzt).
 
 ```bash
+# Normalfall ohne Startpunkt — setzt am lokalen Fortschrittsmarker fort:
+python .claude/skills/release-notes/scripts/gather_changes.py
+# expliziter Startpunkt (Datum oder Tag):
 python .claude/skills/release-notes/scripts/gather_changes.py --since <DATUM-ODER-TAG>
 # mit Uhrzeit (ein Argument, daher quoten oder T-Form):
 python .claude/skills/release-notes/scripts/gather_changes.py --since "2026-05-15 14:30"
@@ -329,6 +363,31 @@ Vergangenheit — beides bleibt bewusst dem Menschen überlassen. Schreibe die D
 nur mit `--write`, prüfe danach das `git diff`, und **committe/pushe nichts**, wenn
 der Nutzer das nicht ausdrücklich verlangt.
 
+## Schritt 7 — Fortschritt fortschreiben (Marker setzen)
+
+Zum Schluss — **erst wenn die Release Notes fertig geschrieben und der Changelog
+nachgeführt ist** — schreibe den lokalen Fortschrittsmarker auf den jetzt
+abgedeckten Endpunkt fort, damit der nächste Lauf ohne Startpunkt nahtlos hier
+weitermacht:
+
+```bash
+python .claude/skills/release-notes/scripts/track_release_notes.py --set
+# --set ohne Wert = HEAD (Normalfall). Alternativ ein Tag/Commit/Datum:
+#   ... --set v0.3.57        ... --set 2026-06-04
+```
+
+- **Immer ausführen, auch bei explizitem `--since`** — so bleibt der Marker aktuell,
+  egal wie der Lauf gestartet wurde.
+- **Der Marker geht nur vorwärts.** `--set` weigert sich, ihn zurückzudrehen — etwa
+  nach einem bewussten Nachtrag für ein altes Fenster (`--since v0.3.40 --until
+  v0.3.45`), während der Marker schon bei v0.3.57 steht; sonst tauchten beim
+  nächsten Lauf bereits kommunizierte Änderungen erneut auf. Nur mit `--force`
+  überschreiben, etwa nach einem absichtlichen History-Rewrite.
+- **Gab es nichts Neues** (Schritt 1 meldete „nothing new"), ist kein `--set` nötig
+  — der Marker bleibt, wo er ist.
+- Die `.release-notes-state.json` **nie committen** — sie ist und bleibt lokal
+  (`.gitignore` sorgt dafür, der Schritt prüft es zusätzlich).
+
 ## Best Practices für Release Notes (Leitlinien mit Begründung)
 
 Diese Prinzipien stehen hinter den Schritten oben — verinnerliche das *Warum*, dann
@@ -377,3 +436,6 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 - [ ] Etwaiger Handlungsbedarf der Nutzer genannt.
 - [ ] CHANGELOG nachgeführt (Schritt 6): Probelauf geprüft, dann `--write`; veröffentlichte
       `[Unreleased]`-Einträge stehen unter ihrem `## [vX.Y.Z]`-Abschnitt, `git diff` gesichtet.
+- [ ] Fortschrittsmarker fortgeschrieben (Schritt 7): nach fertigen Notes
+      `track_release_notes.py --set` ausgeführt; `.release-notes-state.json` ist git-ignored
+      und wird nicht committet. (Bei „nothing new" entfällt das Setzen.)
