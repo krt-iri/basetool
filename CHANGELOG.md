@@ -70,6 +70,8 @@
 
 - **Härtung (defense-in-depth):** Admin-Stammdaten-Create (Sternsysteme, Frequenztypen, Raffineriemethoden, Materialkategorien, Staffeln, SK, Job-Typen) ignoriert jetzt eine client-`id`/`version`; Logout läuft nur noch per CSRF-geschütztem POST; das Frontend hat ein Multipart-Upload-Limit (2 MB); der Backend-Health-Check pinnt in Prod das Backend-Zertifikat statt blind zu vertrauen; der Resource-Server kann optional die JWT-`aud` prüfen (`app.security.jwt.expected-audiences`); und die Docker-Base-Images sind auf ihren Multi-Arch-Digest gepinnt (reproduzierbare Builds, intakte SLSA-Provenance).
 
+- **Ungenutztes Asciidoctor-Gradle-Plugin entfernt — das beseitigt 8 OWASP-Dependency-Check-Alerts an der Wurzel.** Das Plugin war totes Gerüst (keine `.adoc`-Quellen, kein Spring-REST-Docs; die API-Doku kommt von springdoc/OpenAPI) und zog allein die verwundbare `jruby-complete`-Kette (snakeyaml, jline, bcprov, jruby-base) auf den Build-Klassenpfad. Die dadurch obsolete SnakeYAML-Suppression in der OWASP-Suppressions-Datei wurde mitentfernt.
+
 ## [v0.3.44](https://github.com/krt-iri/basetool/releases/tag/v0.3.44) - 2026-06-02
 
 ### Changed

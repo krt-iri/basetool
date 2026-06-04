@@ -5,7 +5,6 @@
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "springDependencyManagement" }
 cyclonedx-bom = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
-asciidoctor-convert = { id = "org.asciidoctor.jvm.convert", version.ref = "asciidoctor" }
 
 [versions]
 
@@ -18,7 +17,6 @@ springBoot = "4.0.6"
 # Stay on 4.0.x stable; only 4.1.0-M1..M4 / RC1 milestones available upstream as of 2026-05.
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.2.4"
-asciidoctor = "4.0.5"
 testcontainers = "1.21.4"
 flyway = "12.7.0"
 mapstruct = "1.6.3"
