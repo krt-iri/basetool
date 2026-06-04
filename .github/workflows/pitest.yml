@@ -1,0 +1,74 @@
+name: Mutation Testing
+
+# Weekly PIT mutation-testing run over the business-logic service layer of both
+# modules (configured in the root build.gradle.kts: targetClasses =
+# ...basetool.<module>.service.*). Mutation testing answers the question line
+# coverage cannot — "would a test actually FAIL if this logic were wrong?" — so
+# it is the quality signal behind the JaCoCo gate, not a replacement for it.
+#
+# Deliberately NOT a PR check and NOT blocking:
+#   - A full mutation run is O(minutes) per service and far too slow for the PR
+#     path (that is why `pitest` is not wired into `check`).
+#   - Per the build-script note, some service tests rely on a Spring context
+#     that PIT's isolated minion JVMs do not start, so the first runs may have
+#     red sub-targets. This workflow surfaces the HTML report as a trend signal
+#     to triage (move offending tests to *IntegrationTest naming or
+#     excludedTestClasses, then tighten the thresholds) — it does not gate
+#     merges. Hence continue-on-error + always-upload.
+#
+# Schedule offset from the other crons (dep-check Mon, codeql Tue, e2e nightly).
+
+on:
+  schedule:
+    - cron: '0 2 * * 3' # weekly, Wednesday 02:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: pitest-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  pitest:
+    name: PIT (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [backend, frontend]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+        with:
+          cache-read-only: true
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Non-blocking: a red sub-target is a trend signal to triage, not a merge
+      # gate (see the header). The report is uploaded regardless.
+      - name: Run PIT mutation analysis
+        continue-on-error: true
+        run: ./gradlew :${{ matrix.module }}:pitest --stacktrace
+
+      - name: Upload PIT report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pitest-report-${{ matrix.module }}
+          path: ${{ matrix.module }}/build/reports/pitest/**
+          retention-days: 14
+          if-no-files-found: ignore

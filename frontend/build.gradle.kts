@@ -132,6 +132,11 @@ dependencies {
   compileOnly(libs.jetbrains.annotations)
   // Optional: metadata for IDE assistance on configuration properties
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
+
+  // FindSecBugs: security-focused SpotBugs detector plugin (taint analysis for
+  // SQLi / path traversal / SSRF / weak crypto / XXE on our OWN code). Loaded
+  // into spotbugsMain via `pluginJarFiles` below; complements CodeQL (CI-only).
+  spotbugsPlugins("com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0")
   
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
@@ -149,21 +154,29 @@ dependencies {
 
 // SpotBugs task for the main source set. We use the `-base` variant of the
 // plugin which does not auto-create tasks, so we register one explicitly and
-// wire it into `check`. Initial introduction is non-blocking
-// (`ignoreFailures = true`) — flip to false once the backlog has been triaged.
+// wire it into `check`. BLOCKING (`ignoreFailures = false`): a HIGH-confidence
+// finding (incl. the FindSecBugs security detectors) fails the build. The
+// codebase is currently clean at this level, so the gate starts green.
 tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   group = "verification"
   description = "Runs SpotBugs analysis on the main source set."
   sourceDirs.from(sourceSets.main.get().allSource.sourceDirectories)
   classDirs.from(sourceSets.main.get().output.classesDirs)
   auxClassPaths.from(sourceSets.main.get().compileClasspath)
+  // Wire the FindSecBugs detectors (declared in the `spotbugsPlugins`
+  // configuration) into this manually-registered task; the `-base` plugin
+  // variant does not auto-wire it.
+  pluginJarFiles.from(configurations.named("spotbugsPlugins"))
   effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
   reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
-  ignoreFailures = true
-  reports.create("html") {
-    required.set(true)
-    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.html"))
-  }
+  ignoreFailures = false
+  // XML reporter ONLY — do NOT also enable HTML here. SpotBugs 4.9.8 has a
+  // multi-output ordering bug: with both reporters configured the plugin
+  // passes `-html` before `-xml`, and in that order SpotBugs writes a report
+  // with ZERO analyzed classes — i.e. the gate silently scans nothing
+  // (verified: html+xml -> total_classes=0; xml-only -> total_classes=N).
+  // XML is the canonical machine-readable format (IDE import, quality tooling).
+  // Re-add an HTML report only once SpotBugs fixes the ordering.
   reports.create("xml") {
     required.set(true)
     outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))
@@ -268,6 +281,10 @@ configurations["e2eRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
 
 dependencies {
   "e2eImplementation"(libs.playwright)
+  // axe-core accessibility engine (Playwright binding) for AccessibilitySmokeE2eTest. Injected and
+  // run via Playwright's evaluate, which executes in an isolated world that bypasses the app's
+  // strict CSP, so axe runs even though inline page scripts are blocked.
+  "e2eImplementation"(libs.axe.core.playwright)
   // PostgreSQL driver for the JDBC catalog seeding (UEX-owned reference data the admin API can't
   // create); version is managed by the Spring Boot BOM.
   "e2eImplementation"("org.postgresql:postgresql")
