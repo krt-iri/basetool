@@ -1761,7 +1761,8 @@ input[type="radio"]:focus {
     display: contents;
 }
 
-.sidebar-links a {
+.sidebar-links a,
+.sidebar-links .sidebar-logout-btn {
     font-family: var(--font-body);
     font-weight: var(--fw-bold);
     font-size: 1.0rem;
@@ -1772,9 +1773,26 @@ input[type="radio"]:focus {
     overflow-wrap: break-word;
 }
 
-.sidebar-links a:hover {
+.sidebar-links a:hover,
+.sidebar-links .sidebar-logout-btn:hover {
     color: var(--color-primary);
     padding-left: 10px;
+}
+
+/* Logout is a CSRF-safe POST <button> (see fragments/sidebar.html), not an <a>. Strip the
+   user-agent button chrome so it renders identically to the surrounding nav anchors — the
+   typography/colour above is shared with the anchors via the grouped selectors. */
+.sidebar-logout-form {
+    margin: 0;
+}
+
+.sidebar-links .sidebar-logout-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
 }
 
 /* Sidebar Group (Collapsible) */
@@ -2386,7 +2404,7 @@ textarea:focus-visible,
         line-height: 1.5;
     }
     
-    .sidebar-links a, .sidebar-group > summary {
+    .sidebar-links a, .sidebar-links .sidebar-logout-btn, .sidebar-group > summary {
         min-height: var(--touch-target);
         line-height: 1.5;
         padding-top: var(--space-2);

@@ -107,4 +107,32 @@ class SecurityHeadersTest {
     // script-src stays nonce-gated as before — regression-pin.
     assertThat(csp).contains("script-src 'nonce-").contains("'strict-dynamic'");
   }
+
+  /**
+   * Regression-pin for the POST-logout CSP block. Logout became a CSRF-safe POST form (audit
+   * finding L-3); its success redirect targets Keycloak's cross-origin {@code
+   * end_session_endpoint}. With {@code form-action 'self'} alone, Chromium blocks that cross-origin
+   * redirect, so the local Spring session is cleared but the Keycloak SSO session survives and the
+   * next login silently re-authenticates instead of prompting for credentials. The Keycloak origin
+   * (derived from the configured {@code issuer-uri}) must therefore appear in {@code form-action}.
+   * Under the {@code test} profile the issuer is {@code http://keycloak.example.com/realms/test},
+   * so the expected origin is {@code http://keycloak.example.com}.
+   */
+  @Test
+  void cspFormActionAllowsKeycloakOriginForLogoutRedirect() throws Exception {
+    String csp =
+        mockMvc
+            .perform(get("/"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Security-Policy");
+
+    assertThat(csp).as("Content-Security-Policy header").isNotNull();
+    assertThat(csp)
+        .as(
+            "form-action must allow 'self' plus the Keycloak origin so the POST-logout redirect to"
+                + " Keycloak's end_session_endpoint is not blocked by the browser")
+        .contains("form-action 'self' http://keycloak.example.com");
+  }
 }
