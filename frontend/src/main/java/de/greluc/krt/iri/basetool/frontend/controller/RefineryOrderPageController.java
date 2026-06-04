@@ -307,7 +307,7 @@ public class RefineryOrderPageController {
                   : null,
               form.getLocationId() != null
                   ? new de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto(
-                      form.getLocationId(), null, null, false, null)
+                      form.getLocationId(), null, null, false, false, null)
                   : null,
               form.getMissionId() != null
                   ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(
@@ -661,7 +661,7 @@ public class RefineryOrderPageController {
                   : null,
               form.getLocationId() != null
                   ? new de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto(
-                      form.getLocationId(), null, null, false, null)
+                      form.getLocationId(), null, null, false, false, null)
                   : null,
               form.getMissionId() != null
                   ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(

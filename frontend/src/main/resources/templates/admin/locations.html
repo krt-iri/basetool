@@ -88,6 +88,10 @@
                                     <input type="hidden" name="hidden" th:value="${!loc.hidden}">
                                     <button type="submit" class="btn" th:classappend="${loc.hidden} ? '' : 'btn-secondary'" th:text="${loc.hidden} ? 'Einblenden' : 'Ausblenden'">Toggle</button>
                                 </form>
+                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-home-location(id=${loc.id})}" class="m-0">
+                                    <input type="hidden" name="homeLocation" th:value="${!loc.homeLocation}">
+                                    <button type="submit" class="btn" th:classappend="${loc.homeLocation} ? 'btn-secondary' : ''" th:text="${loc.homeLocation} ? #{admin.location.home.unmark} : #{admin.location.home.mark}">Home</button>
+                                </form>
                             </div>
                         </td>
                     </tr>

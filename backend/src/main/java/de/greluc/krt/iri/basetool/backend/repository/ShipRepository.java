@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.backend.repository;
 
+import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import java.util.List;
 import java.util.UUID;
@@ -67,6 +68,24 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
       @org.springframework.data.repository.query.Param("memberOrgUnitIds")
           java.util.Collection<UUID> memberOrgUnitIds);
+
+  /**
+   * Bulk-sets the location of every ship owned by {@code ownerId} to {@code location}; backs the
+   * hangar "set home location" action. A single atomic JPQL update — it does NOT touch the
+   * {@code @Version} column, so it never triggers an optimistic-lock storm; the caller reloads the
+   * page afterwards to resync the displayed location. {@code clearAutomatically = true} flushes the
+   * persistence context so any later read in the same transaction sees the new state. The {@code
+   * owner.id} predicate enforces per-user isolation — never touches another user's ships.
+   *
+   * @param ownerId the owning user id whose ships are updated
+   * @param location the location to set on every matching ship
+   * @return the number of ships updated
+   */
+  @Modifying(clearAutomatically = true)
+  @Query("UPDATE Ship s SET s.location = :location WHERE s.owner.id = :ownerId")
+  int setLocationForOwner(
+      @org.springframework.data.repository.query.Param("ownerId") UUID ownerId,
+      @org.springframework.data.repository.query.Param("location") Location location);
 
   /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code

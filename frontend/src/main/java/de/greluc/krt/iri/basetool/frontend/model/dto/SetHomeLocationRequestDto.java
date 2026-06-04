@@ -17,10 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.iri.basetool.backend.model.dto;
+package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import java.util.UUID;
 
-/** Data transfer record carrying Location payload. */
-public record LocationDto(
-    UUID id, String name, String description, boolean hidden, boolean homeLocation, Long version) {}
+/**
+ * Mirror of the backend write payload for the hangar "set home location" bulk action. Carries the
+ * id of the curated home location to assign to every ship the calling user owns.
+ *
+ * @param locationId the curated home location id
+ */
+public record SetHomeLocationRequestDto(UUID locationId) {}

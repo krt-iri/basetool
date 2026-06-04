@@ -111,6 +111,18 @@ public class LocationService {
   }
 
   /**
+   * Lists the admin-curated home locations (non-hidden), name descending — the source for the
+   * hangar bulk "set home location" picker. Single fixed-key cache entry shared by every caller;
+   * evicted whenever a location is created/updated/deleted.
+   *
+   * @return curated home locations, name descending
+   */
+  @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'homeLocations'")
+  public List<Location> getHomeLocations() {
+    return locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
+  }
+
+  /**
    * Persists a new location. Case-insensitive duplicate name throws {@link
    * DuplicateEntityException} → 409 before the DB unique-constraint would.
    *
@@ -152,6 +164,7 @@ public class LocationService {
     location.setName(locationDto.name());
     location.setDescription(locationDto.description());
     location.setHidden(locationDto.hidden());
+    location.setHomeLocation(locationDto.homeLocation());
 
     return locationRepository.save(location);
   }

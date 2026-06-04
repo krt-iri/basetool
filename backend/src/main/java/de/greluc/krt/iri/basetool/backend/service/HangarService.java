@@ -22,6 +22,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
@@ -321,5 +322,32 @@ public class HangarService {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     shipRepository.resetAllFittedScoped(
         scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+  }
+
+  /**
+   * Bulk-sets the location on every ship owned by {@code userId} to the chosen home location. Backs
+   * the hangar "set home location" button. Validates that {@code locationId} resolves to a
+   * selectable home location (curated {@code is_home_location = true} and not hidden) before
+   * applying — defense in depth on top of the already-filtered picker. Operates strictly on the
+   * caller's own ships (per-user isolation enforced by the repository query's {@code owner.id}
+   * predicate), across every OrgUnit, mirroring {@link #getMyShips}.
+   *
+   * @param userId the calling user's id; only their ships are updated
+   * @param locationId the curated home location to assign to every owned ship
+   * @return the number of ships updated
+   * @throws BadRequestException when the location does not exist or is not a selectable home
+   *     location
+   */
+  @Transactional
+  public int setHomeLocationForMyShips(@NotNull UUID userId, @NotNull UUID locationId) {
+    Location location =
+        locationRepository
+            .findById(locationId)
+            .orElseThrow(() -> new BadRequestException("Location not found"));
+    if (!Boolean.TRUE.equals(location.getHomeLocation())
+        || Boolean.TRUE.equals(location.getHidden())) {
+      throw new BadRequestException("Location is not a selectable home location");
+    }
+    return shipRepository.setLocationForOwner(userId, location);
   }
 }

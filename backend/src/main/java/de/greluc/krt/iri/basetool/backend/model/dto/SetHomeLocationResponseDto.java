@@ -19,8 +19,9 @@
 
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
-import java.util.UUID;
-
-/** Data transfer record carrying Location payload. */
-public record LocationDto(
-    UUID id, String name, String description, boolean hidden, boolean homeLocation, Long version) {}
+/**
+ * Response for the hangar "set home location" bulk action.
+ *
+ * @param updatedCount the number of ships whose location was set
+ */
+public record SetHomeLocationResponseDto(int updatedCount) {}

@@ -19125,6 +19125,96 @@
         }
       }
     },
+    "/api/v1/hangar/ships/home-location" : {
+      "post" : {
+        "tags" : [ "hangar-controller" ],
+        "summary" : "Home-Location für alle eigenen Schiffe setzen",
+        "description" : "Setzt den Ort aller Schiffe des authentifizierten Nutzers auf die gewählte, kuratierte Home-Location.",
+        "operationId" : "setHomeLocationForMyShips",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetHomeLocationRequestDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Anzahl der aktualisierten Schiffe",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SetHomeLocationResponseDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/hangar/import/ships" : {
       "post" : {
         "tags" : [ "hangar-controller" ],
@@ -31078,6 +31168,106 @@
         }
       }
     },
+    "/api/v1/locations/home-locations" : {
+      "get" : {
+        "tags" : [ "location-controller" ],
+        "summary" : "Kuratierte Home-Locations",
+        "description" : "Listet die als Home-Location markierten, nicht ausgeblendeten Orte (alphabetisch absteigend) als Quelle für den Hangar-Bulk-Button.",
+        "operationId" : "getHomeLocations",
+        "responses" : {
+          "200" : {
+            "description" : "Liste der Home-Locations",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/LocationDto"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inventory/my-inventory" : {
       "get" : {
         "tags" : [ "inventory-item-controller" ],
@@ -34351,6 +34541,9 @@
           "hidden" : {
             "type" : "boolean"
           },
+          "homeLocation" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -37622,6 +37815,25 @@
           }
         },
         "required" : [ "itemIds" ]
+      },
+      "SetHomeLocationRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "locationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "locationId" ]
+      },
+      "SetHomeLocationResponseDto" : {
+        "type" : "object",
+        "properties" : {
+          "updatedCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
       },
       "FleetviewImportResponseDto" : {
         "type" : "object",

@@ -24,6 +24,8 @@ import de.greluc.krt.iri.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.SetHomeLocationRequestDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.SetHomeLocationResponseDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.SquadronShipOverviewDto;
@@ -336,5 +338,36 @@ public class HangarController {
   @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
   public void resetAllFittedStatus() {
     hangarService.resetAllFittedStatus();
+  }
+
+  /**
+   * Bulk-sets the chosen curated home location on every ship the calling user owns. The location id
+   * comes from the request body; the owner is derived from the JWT, so the action can never touch
+   * another user's ships.
+   *
+   * @param jwt caller's JWT — its {@code sub} claim is the owner whose ships are updated
+   * @param request the curated home location id
+   * @return the number of ships updated
+   */
+  @Operation(
+      summary = "Home-Location für alle eigenen Schiffe setzen",
+      description =
+          "Setzt den Ort aller Schiffe des authentifizierten Nutzers auf die gewählte,"
+              + " kuratierte Home-Location.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Anzahl der aktualisierten Schiffe"),
+    @ApiResponse(responseCode = "400", description = "Ungültige oder keine Home-Location"),
+    @ApiResponse(responseCode = "401", description = "Nicht authentifiziert")
+  })
+  @PostMapping("/ships/home-location")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional
+  public SetHomeLocationResponseDto setHomeLocationForMyShips(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestBody @Valid @NotNull SetHomeLocationRequestDto request) {
+    int updated =
+        hangarService.setHomeLocationForMyShips(
+            userService.getUserIdFromJwt(jwt), request.locationId());
+    return new SetHomeLocationResponseDto(updated);
   }
 }

@@ -116,6 +116,7 @@ public class AdminLocationsPageController {
               currentLocation.name(),
               currentLocation.description(),
               hidden,
+              currentLocation.homeLocation(),
               currentLocation.version());
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -130,6 +131,54 @@ public class AdminLocationsPageController {
     } catch (Exception e) {
       log.error("Toggle location visibility failed", e);
       return "redirect:/admin/locations?error=ToggleVisibilityFailed";
+    }
+    return "redirect:/admin/locations";
+  }
+
+  /**
+   * Toggles a single location's home-location flag (the curated allowlist behind the hangar bulk
+   * "set home location" picker).
+   *
+   * <p>Like {@link #toggleLocationVisibility}, reads the current record first to copy the existing
+   * name/description/hidden/version into the PUT body — the backend endpoint expects a full {@link
+   * LocationDto}, not a JSON merge patch. A 409 with problem type {@code concurrency-conflict}
+   * surfaces as a dedicated optimistic-lock toast.
+   *
+   * @param id location id
+   * @param homeLocation desired new home-location flag
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /admin/locations}
+   */
+  @PostMapping("/{id}/toggle-home-location")
+  @PreAuthorize("hasRole('ADMIN')")
+  public String toggleHomeLocation(
+      @PathVariable @NotNull UUID id,
+      @RequestParam boolean homeLocation,
+      RedirectAttributes redirectAttributes) {
+    try {
+      LocationDto currentLocation =
+          backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+      LocationDto body =
+          new LocationDto(
+              id,
+              currentLocation.name(),
+              currentLocation.description(),
+              currentLocation.hidden(),
+              homeLocation,
+              currentLocation.version());
+      backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      log.error("Toggle home-location failed", e);
+      if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
+      } else {
+        redirectAttributes.addFlashAttribute("errorToast", "error.admin.locations.load");
+      }
+      return "redirect:/admin/locations";
+    } catch (Exception e) {
+      log.error("Toggle home-location failed", e);
+      return "redirect:/admin/locations?error=ToggleHomeLocationFailed";
     }
     return "redirect:/admin/locations";
   }

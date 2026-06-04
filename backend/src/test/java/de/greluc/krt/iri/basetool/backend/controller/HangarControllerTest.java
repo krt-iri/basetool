@@ -31,6 +31,8 @@ import de.greluc.krt.iri.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.iri.basetool.backend.model.Ship;
 import de.greluc.krt.iri.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.SetHomeLocationRequestDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.SetHomeLocationResponseDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.SquadronShipOverviewDto;
@@ -393,6 +395,25 @@ class HangarControllerTest {
     controller.resetAllFittedStatus();
 
     verify(hangarService).resetAllFittedStatus();
+  }
+
+  // ── POST /ships/home-location ─────────────────────────────────────────
+
+  @Test
+  void setHomeLocationForMyShips_forwardsJwtDerivedOwnerAndLocation_andWrapsCount() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(hangarService.setHomeLocationForMyShips(ownerId, locationId)).thenReturn(4);
+
+    SetHomeLocationResponseDto result =
+        controller.setHomeLocationForMyShips(jwt, new SetHomeLocationRequestDto(locationId));
+
+    // The owner is JWT-derived (never client-supplied); the controller wraps the affected-ship
+    // count returned by the service.
+    assertThat(result.updatedCount()).isEqualTo(4);
+    verify(hangarService).setHomeLocationForMyShips(ownerId, locationId);
   }
 
   @Test
