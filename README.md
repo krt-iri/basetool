@@ -63,18 +63,17 @@ documents cover everything else:
 | :--- | :--- |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes and every user-visible change. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to report bugs, suggest features and submit pull requests, plus the coding style guide. |
+| [CLA.md](CLA.md) | Individual Contributor License Agreement every contributor signs before their first pull request; the public roster of signatures lives in [docs/cla-signatures.md](docs/cla-signatures.md). |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards (Contributor Covenant 3.0). |
 | [.github/SECURITY.md](.github/SECURITY.md) | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM). |
 | [LICENSE.md](LICENSE.md) | GNU General Public License v3.0. |
 | [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface. |
-| [MULTI_SQUADRON_PLAN.md](MULTI_SQUADRON_PLAN.md) | The original multi-Staffel refactor plan (Phases 1–7, V80–V93). |
-| [SPEZIALKOMMANDO_PLAN.md](SPEZIALKOMMANDO_PLAN.md) | The Spezialkommando-as-second-tenant-kind extension on top of the multi-Squadron baseline (V95+). |
-| [Styleguide.md](Styleguide.md) | "DAS KARTELL" Corporate Design Manual — brand colors, typography (`Ethnocentric`, `Lato`), department palette, visual rules. |
+| [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md) | "DAS KARTELL" design system / Corporate Design Manual — the source of truth for brand colors, typography, the department palette and UI components (bundles `KRT_Styleguide_V2.pdf`). |
 | [docs/deployment.md](docs/deployment.md) | Production deployment runbook — host bootstrap, normal releases, manual rollback, PAT rotation, troubleshooting. |
 | [backend/src/main/resources/db/migration/README.md](backend/src/main/resources/db/migration/README.md) | Flyway migration conventions — destructive-ops two-phase rule, data-migration patterns, performance / locking, pre-merge checklist. |
+| [docs/e2e-test/README.md](docs/e2e-test/README.md) | End-to-end test use cases — one document per functional flow (actor, preconditions, steps, expected result) linking the Playwright test classes, plus the [role/scope reference](docs/e2e-test/rollen-und-scope.md). |
 | [CLAUDE.md](CLAUDE.md) | Project-specific guidance for the Claude Code AI assistant — build / run / test commands, architectural invariants, conventions. |
 | [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) | The pull-request template that ships with every PR. |
-| [impressum.md](impressum.md) | Imprint (legally required for the deployed application). |
 
 ---
 
@@ -571,8 +570,8 @@ CI runs these as a Chromium/Firefox/WebKit matrix:
 label, a nightly schedule, or manual dispatch;
 [`e2e-smoke.yml`](.github/workflows/e2e-smoke.yml) runs the smoke checks against
 staging on a schedule or manual dispatch (never on PRs) once the repo defines an
-`E2E_BASE_URL` variable. The full design and per-phase status live in
-[`docs/E2E_TESTING_PLAN.md`](docs/E2E_TESTING_PLAN.md).
+`E2E_BASE_URL` variable. The per-flow use cases (actor, preconditions, steps,
+expected result) are documented under [`docs/e2e-test/`](docs/e2e-test/README.md).
 
 ---
 

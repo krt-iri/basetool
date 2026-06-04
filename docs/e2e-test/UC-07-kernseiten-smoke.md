@@ -28,4 +28,4 @@ Jede Kernseite rendert für einen eingeloggten User die App-Shell — keine Weit
 ## Sonderfälle & Lehren
 - **Nicht-destruktiv & ziel-agnostisch:** Der Flow erzeugt/ändert nichts und ist daher gefahrlos gegen ein geteiltes Staging-Deployment einsetzbar. Er läuft sowohl gegen den ephemeren Stack als auch (mit gesetztem `E2E_BASE_URL`) gegen Staging.
 - **Assertion-Ziel `nav-orders`:** dieser Sidebar-Link ist hinter `isAuthenticated()` gegated und damit ein stärkeres Login-Signal als das auch anonym sichtbare `nav-missions`.
-- **CI:** Der Smoke-Subset läuft in einem eigenen Workflow (`e2e-smoke.yml`) auf `schedule` + `workflow_dispatch` gegen Staging — nicht als PR-Check. Lokal/ephemer braucht WebKit den Hosts-Eintrag `127.0.0.1 host.docker.internal` (siehe [`../E2E_TESTING_PLAN.md`](../E2E_TESTING_PLAN.md), Cross-Browser).
+- **CI:** Der Smoke-Subset läuft in einem eigenen Workflow (`e2e-smoke.yml`) auf `schedule` + `workflow_dispatch` gegen Staging — nicht als PR-Check. Lokal/ephemer braucht WebKit den Hosts-Eintrag `127.0.0.1 host.docker.internal` (siehe den Cross-Browser-Abschnitt im [Projekt-README](../../README.md)).
