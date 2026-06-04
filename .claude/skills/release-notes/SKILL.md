@@ -169,7 +169,9 @@ Reine Token-Umbenennung — komplett raus:
   sind, werden *eine* Zeile. (Eine Funktion, die über fünf PRs kam, ist trotzdem
   ein Punkt.) Umgekehrt nie eine Liste technischer Einzel-Fixes 1:1 abschreiben.
 - **Wichtigstes zuerst** innerhalb jeder Rubrik. Bei vielen Punkten optional ein
-  kurzer **Highlights**-Block (1–3 Sätze) ganz oben für die größten Neuerungen.
+  kurzer **Highlights**-Absatz ganz oben (Fließtext, 1–3 Sätze, **kein**
+  Aufzählungspunkt) für die größten Neuerungen — genaue Form siehe
+  »Ausgabeformat → Verbindliche Stil- und Formatregeln«.
 - **Nach Bereich gruppieren**, wenn die Liste lang wird (z. B. mehrere Auftrags-
   Punkte zusammen), damit sie scanbar bleibt.
 
@@ -219,13 +221,49 @@ Hilfsskript gibt diesen Titel oben als `SUGGESTED TITLE` bereits fertig aus —
 übernimm ihn wörtlich (nicht „01.06.-02.06." o. Ä., nicht ohne Pfeil, nicht mit
 Jahr).
 
+### Verbindliche Stil- und Formatregeln
+
+Damit jede Release Note **immer gleich aussieht**, gelten diese Format-Vorgaben
+fest — nicht von Lauf zu Lauf abweichen:
+
+- **Überschriften-Ebenen (die „Schriftgrößen"):** Genau **eine** H1 (`#`) — der
+  Titel, immer die erste Zeile. Jede Rubrik ist eine **H2** (`##`), mit exakt
+  diesem Namen und in dieser Reihenfolge: `## Highlights`, `## Neu`,
+  `## Verbesserungen`, `## Fehlerbehebungen` (Rubriknamen nie übersetzen oder
+  umbenennen). **Keine H3 oder tiefer.** Eine lange Rubrik wird nicht über weitere
+  Überschriften untergliedert, sondern über die fett gesetzten Schlagwörter der
+  Punkte — so bleibt die Größenhierarchie in jeder Note identisch.
+- **Optionale Unterzeile:** direkt unter dem Titel eine **kursive** Zeile
+  `_Version <Label> · Stand <TT.MM.JJJJ>_`. Nur wenn ein Versions-Label vorliegt,
+  sonst komplett weglassen (keine leere Platzhalterzeile).
+- **Highlights = Fließtext-Absatz, kein Aufzählungspunkt.** Unter `## Highlights`
+  steht ein kurzer Absatz aus 1–3 ganzen Sätzen, der die größten Neuerungen nennt;
+  die wichtigsten Bereiche darin **fett**. Nur bei längeren Notes (Faustregel: ab
+  etwa sechs Punkten insgesamt), bei kurzen Notes die ganze Rubrik weglassen.
+- **Rubriken-Inhalt = flache Strichliste.** Neu, Verbesserungen und
+  Fehlerbehebungen sind reine Aufzählungen mit `- ` (Bindestrich + Leerzeichen; nie
+  `*`, `+` oder Nummern), ohne verschachtelte Unterpunkte — ein Gedanke pro Zeile.
+- **Punkt-Aufbau:** Jeder Punkt beginnt mit einem **fett gesetzten Schlagwort samt
+  Doppelpunkt**, dann ein bis zwei ganze Sätze, z. B.
+  `- **Organigramm:** Eine neue Seite zeigt …`. Der Doppelpunkt steht **innerhalb**
+  der Fettung (`**Organigramm:**`); das Schlagwort ist ein Substantiv/Bereichsname,
+  kein Verb. Höchstens zwei Sätze pro Punkt — was länger wird, kürzen oder bündeln.
+- **Satzzeichen & Typografie:** ganze Sätze, die mit **Punkt** enden;
+  Gedankenstrich als Halbgeviertstrich „–" mit Leerzeichen (nicht `--`); deutsche
+  Anführungszeichen „…" (keine geraden oder englischen). App-Begriffe (Seiten,
+  Buttons, Felder) genau in ihrer Oberflächen-Schreibweise.
+- **Leerzeilen & Verbotenes:** genau eine Leerzeile zwischen Titel, Unterzeile,
+  Rubriken-Überschriften und Listen. **Keine** Trennlinien (`---`) zwischen den
+  Rubriken, **keine** Tabellen, Bilder, Zitatblöcke oder Inline-Code (Backticks) —
+  der Nutzertext enthält keinen Code — und **kein einziges Emoji** (siehe Schritt 5).
+
 ```markdown
 # Release Notes (TT.MM. → TT.MM.)
 
 _Version <Label> · Stand <TT.MM.JJJJ>_   <!-- optionale Unterzeile, nur falls ein Versions-Label vorliegt -->
 
 ## Highlights
-- <1–3 Sätze zu den größten Neuerungen — nur bei längeren Notes>
+<Kurzer Fließtext-Absatz, kein Aufzählungspunkt: 1–3 ganze Sätze zu den größten Neuerungen, wichtigste Bereiche **fett** — nur bei längeren Notes.>
 
 ## Neu
 - **<Funktion/Bereich>:** <Was jetzt möglich ist, in einfachen Worten>.
@@ -330,6 +368,9 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 - [ ] Kein Jargon mehr: keine Pfade, `V###`, Framework-Namen, HTTP-Codes, PR-Nummern.
 - [ ] Erste Zeile = Titel „Release Notes (TT.MM. → TT.MM.)" mit korrektem Fenster.
 - [ ] Drei Rubriken, Wichtigstes zuerst, verwandte Punkte gebündelt.
+- [ ] Einheitliches Format (verbindliche Stil- und Formatregeln): genau eine H1,
+      Rubriken als H2 (keine H3+), Highlights als Fließtext-Absatz, jeder Punkt als
+      `- **Schlagwort:** …`; keine Trennlinien, Tabellen, Inline-Code oder Emojis.
 - [ ] Durchgängig unpersönlich (keine direkte Anrede „du"/„Sie").
 - [ ] **Kein einziges Emoji** — Überschriften und Punkte rein als Text.
 - [ ] Echte Umlaute (ä/ö/ü/ß, kein ue/oe/ae/ss), keine Mojibake aus den Quelldaten.
