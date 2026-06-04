@@ -8,6 +8,10 @@
 
 - **Im Hangar setzt der neue Button „Home-Location setzen" alle eigenen Schiffe in einem Schritt auf einen gewählten Ort.** Bei jedem Klick wählt man den Ort neu aus einer kuratierten Liste der Spiel-Home-Locations (alphabetisch absteigend); ein Bestätigungsdialog zeigt vorab die Anzahl betroffener Schiffe. Admins pflegen diese Liste unter „Orte verwalten" über den neuen Schalter „Als Home-Location markieren" (Migration V139).
 
+### Changed
+
+- **Die Seitenleisten-Navigation ist in einklappbare, thematische Gruppen gegliedert (Einsatzplanung, Flotte & Logistik, Handel, Persönlich, Beförderung, Organisation, Administration, Rechtliches), damit sie nicht mehr überladen wirkt.** Die Gruppen sind standardmäßig zugeklappt, merken sich pro Browser ihren Auf-/Zu-Zustand und öffnen automatisch den Bereich der aktuellen Seite; der aktive Menüpunkt wird hervorgehoben. Die umfangreiche Administration ist zusätzlich in Cluster (Benutzer & Inhalte / Stammdaten / System & Daten) gegliedert.
+
 ### Fixed
 
 - **Ein angemeldetes Staffelmitglied (ohne Offiziers- oder Adminrechte) kann seine eigene Auszahlungsart in einem Einsatz jetzt direkt in der Auszahlungs-Übersicht umstellen.** Bisher war ausgerechnet die eigene Zeile gesperrt, während sich die Auszahlungsart anonymer Teilnehmer ändern ließ — Ursache war ein Vergleich der Teilnehmer-ID mit dem Login-Benutzernamen statt mit der Keycloak-ID.

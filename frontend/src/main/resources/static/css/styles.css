@@ -1850,6 +1850,36 @@ input[type="radio"]:focus {
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* Sub-section label inside a sidebar group, used to cluster the long admin list
+   ("Stammdaten" / "System & Daten" ...). A quiet, non-interactive header — never a link.
+   The top margin sits on top of the flex gap to set each cluster apart; the first
+   label in a group drops it so the cluster aligns with the summary. */
+.sidebar-subheading {
+    font-family: var(--font-headline);
+    font-size: 0.7rem;
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-gray-2);
+    margin-top: var(--space-3);
+}
+
+.sidebar-subheading:first-child {
+    margin-top: 0;
+}
+
+/* Active-page markers: the current page's link and its containing section turn
+   brand-orange so the open drawer shows "you are here" at a glance. The link
+   mirrors the hover indent (padding-left) so the active affordance reads the same. */
+.sidebar-links a.sidebar-link-active {
+    color: var(--color-primary);
+    padding-left: 10px;
+}
+
+.sidebar-group.sidebar-group-active > summary {
+    color: var(--color-primary);
+}
+
 /* Move Locale Dropdown in sidebar */
 .sidebar .dropdown {
     margin-left: 0;

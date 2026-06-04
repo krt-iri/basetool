@@ -35,31 +35,42 @@
             <button id="close-sidebar" class="close-sidebar-btn">&times;</button>
             <div class="sidebar-links">
                 <a th:href="@{/}" th:text="#{nav.home}">Home</a>
-                <a th:href="@{/missions}" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
                 <span sec:authorize="isAuthenticated()">
-                <a th:href="@{/operations}" th:text="#{nav.operations}">Operations</a>
-                <a th:href="@{/orders}" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
-                <a th:href="@{/orders/create}" th:unless="${canViewJobOrders}" data-testid="nav-orders-create" th:text="#{orders.create.link}">Auftrag anlegen</a>
-                <a th:href="@{/refinery-orders}" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
-                <a th:href="@{/inventory}" th:text="#{nav.inventory}">Lager</a>
-                <details class="sidebar-group">
-                    <summary th:text="#{nav.materials}">Materialien</summary>
+                <details class="sidebar-group" data-group-key="missions">
+                    <summary th:text="#{nav.section.mission_planning}">Einsatzplanung</summary>
+                    <div class="sidebar-sublinks">
+                        <a th:href="@{/missions}" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
+                        <a th:href="@{/operations}" th:text="#{nav.operations}">Operations</a>
+                    </div>
+                </details>
+                <details class="sidebar-group" data-group-key="logistics">
+                    <summary th:text="#{nav.section.logistics}">Flotte &amp; Logistik</summary>
+                    <div class="sidebar-sublinks">
+                        <a th:href="@{/hangar}" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
+                        <a th:href="@{/inventory}" th:text="#{nav.inventory}">Lager</a>
+                        <a th:href="@{/refinery-orders}" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
+                        <a th:href="@{/orders}" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
+                        <a th:href="@{/orders/create}" th:unless="${canViewJobOrders}" data-testid="nav-orders-create" th:text="#{orders.create.link}">Auftrag anlegen</a>
+                    </div>
+                </details>
+                <details class="sidebar-group" data-group-key="trade">
+                    <summary th:text="#{nav.materials}">Handel</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/materials}" th:text="#{nav.materials.list}">Material-Liste</a>
                         <a th:href="@{/materials/overview}" th:text="#{nav.materials.overview}">Material-Übersicht</a>
                         <a th:href="@{/materials/profit-calculation}" th:text="#{nav.materials.profit_calculation}">Profitberechnung</a>
+                        <a th:href="@{/blueprint-overview}" th:if="${canSeeBlueprintOverview}" data-testid="nav-blueprint-overview" th:text="#{nav.blueprint_overview}">Blueprint Availability</a>
                     </div>
                 </details>
-                <a th:href="@{/hangar}" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
-                <details class="sidebar-group">
-                    <summary th:text="#{nav.personal_inventory}">Persönliches Inventar</summary>
+                <details class="sidebar-group" data-group-key="personal">
+                    <summary th:text="#{nav.section.personal}">Pers\u00f6nlich</summary>
                     <div class="sidebar-sublinks">
-                        <a th:href="@{/personal-inventory}" th:text="#{nav.personal_inventory.items}">Items</a>
-                        <a th:href="@{/personal-inventory/blueprints}" th:text="#{nav.personal_inventory.blueprints}">Blueprints</a>
+                        <a th:href="@{/personal-inventory}" th:text="#{nav.personal.items}">Mein Inventar</a>
+                        <a th:href="@{/personal-inventory/blueprints}" th:text="#{nav.personal.blueprints}">Meine Blueprints</a>
+                        <a th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>
                     </div>
                 </details>
-                <a th:href="@{/blueprint-overview}" th:if="${canSeeBlueprintOverview}" data-testid="nav-blueprint-overview" th:text="#{nav.blueprint_overview}">Blueprint Availability</a>
-                <details class="sidebar-group" th:if="${promotionFeatureEnabled}">
+                <details class="sidebar-group" data-group-key="promotion" th:if="${promotionFeatureEnabled}">
                     <summary th:text="#{nav.promotion}">Bef\u00f6rderung</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/promotion/overview}" th:text="#{nav.promotion.overview}">Bef\u00f6rderungssystem</a>
@@ -69,25 +80,32 @@
                         <a th:href="@{/promotion/admin/rank-requirements}" sec:authorize="hasAnyRole('ADMIN','OFFICER')" th:text="#{nav.promotion.admin_ranks}">Rangvoraussetzungen</a>
                     </div>
                 </details>
-                <a th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>
-                <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
-                <details class="sidebar-group" sec:authorize="hasRole('ADMIN')">
+                <details class="sidebar-group" data-group-key="organisation">
+                    <summary th:text="#{nav.section.organisation}">Organisation</summary>
+                    <div class="sidebar-sublinks">
+                        <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
+                    </div>
+                </details>
+                <details class="sidebar-group" data-group-key="admin" sec:authorize="hasRole('ADMIN')">
                     <summary th:text="#{nav.administration}">Administration</summary>
                     <div class="sidebar-sublinks">
-                        <a th:href="@{/admin/announcement}" th:text="#{info.title}">Informationen</a>
+                        <span class="sidebar-subheading" th:text="#{nav.admin.group.members}">Benutzer &amp; Inhalte</span>
                         <a th:href="@{/members}" th:text="#{nav.members}">Mitgliederverwaltung</a>
-                        <a th:href="@{/admin/mission-data}" th:text="#{nav.mission_data}">Missionsdaten</a>
                         <a th:href="@{/admin/special-commands}" th:text="#{nav.admin.specialcommands}">Spezialkommandos</a>
+                        <a th:href="@{/admin/announcement}" th:text="#{info.title}">Informationen</a>
+                        <span class="sidebar-subheading" th:text="#{nav.admin.group.masterdata}">Stammdaten</span>
+                        <a th:href="@{/admin/mission-data}" th:text="#{nav.mission_data}">Missionsdaten</a>
                         <a th:href="@{/admin/locations}" th:text="#{nav.locations}">Orte</a>
-                        <a th:href="@{/admin/uex-data}" th:text="#{nav.admin.uex}">UEX-Daten</a>
                         <a th:href="@{/ship-data}" th:text="#{nav.hangar_data}">Schiffsdaten</a>
                         <a th:href="@{/admin/materials}" th:text="#{nav.admin.materials}">Materialien</a>
                         <a th:href="@{/admin/material-aliases}" th:text="#{nav.admin.materialAliases}">Material-Aliase</a>
-                        <a th:href="@{/admin/sync-reports}" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>
                         <a th:href="@{/admin/blueprints}" th:text="#{nav.admin.blueprints}">Blueprints</a>
+                        <a th:href="@{/admin/uex-data}" th:text="#{nav.admin.uex}">UEX-Daten</a>
+                        <span class="sidebar-subheading" th:text="#{nav.admin.group.system}">System &amp; Daten</span>
                         <a th:href="@{/admin/settings}" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
-                        <a th:href="@{/admin/personal-inventory}" th:text="#{admin.personalInventory.menu}" sec:authorize="hasRole('ADMIN')">Pers. Inventar (Admin)</a>
-                        <a th:href="@{/admin/personal-blueprints}" th:text="#{admin.personalInventory.blueprints.menu}" sec:authorize="hasRole('ADMIN')">Pers. Blueprints (Admin)</a>
+                        <a th:href="@{/admin/sync-reports}" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>
+                        <a th:href="@{/admin/personal-inventory}" th:text="#{admin.personalInventory.menu}">Pers. Inventar (Admin)</a>
+                        <a th:href="@{/admin/personal-blueprints}" th:text="#{admin.personalInventory.blueprints.menu}">Pers. Blueprints (Admin)</a>
                     </div>
                 </details>
                 <!-- L-3: logout is a POST form (CSRF-protected) instead of a GET link so it cannot
@@ -100,21 +118,22 @@
                      form-action 'self' alone the browser blocks the redirect and the Keycloak SSO
                      session is never ended, leaving a silent re-login on the next login click. -->
                 <form th:action="@{/logout}" method="post" class="sidebar-logout-form">
-                    <button type="submit" class="sidebar-logout-btn" th:text="#{nav.logout}">Logout</button>
+                    <button type="submit" class="sidebar-logout-btn" data-testid="nav-logout" th:text="#{nav.logout}">Logout</button>
                 </form>
             </span>
                 <span sec:authorize="isAnonymous()">
+                <a th:href="@{/missions}" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
                 <a th:href="@{/orders/create}" th:text="#{orders.create.link}">Auftrag anlegen</a>
                 <a th:href="@{/oauth2/authorization/keycloak}" th:text="#{nav.login}">Login</a>
             </span>
-                <details class="sidebar-group">
+                <details class="sidebar-group" data-group-key="legal">
                     <summary th:text="#{nav.legal}">Rechtliches</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/terms}" th:text="#{nav.terms}">Nutzungsbedingungen</a>
                         <a th:href="@{/privacy}" th:text="#{nav.privacy}">Datenschutz</a>
+                        <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
                     </div>
                 </details>
-                <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
             </div>
             <!-- R5.e — active-OrgUnit switcher. Visible to any authenticated user with >1 option
                  in the dropdown: admins see the Squadron + SpecialCommand catalogue, non-admins
@@ -194,6 +213,61 @@
                     if (overlayEl) overlayEl.classList.add('visible');
                 });
             }
+
+            // Sidebar sections: mark the active page's link + its section, then
+            // restore each section's open/closed state from localStorage. The drawer
+            // is re-rendered on every server round-trip, so a <details> would
+            // otherwise reopen collapsed on every navigation; persisting the state
+            // (and force-opening the active section) keeps the user's context. All
+            // localStorage access is guarded so privacy modes that throw on access
+            // degrade to "always collapsed" instead of breaking the drawer.
+            (function initSidebarSections() {
+                const here = window.location.pathname;
+                let activeLink = null;
+                let activeLen = -1;
+                document.querySelectorAll('.sidebar-links a').forEach(function (link) {
+                    const href = link.getAttribute('href');
+                    if (!href || href.charAt(0) !== '/') return;
+                    const linkPath = href.split('?')[0].split('#')[0];
+                    const isMatch = linkPath === '/'
+                        ? here === '/'
+                        : (here === linkPath || here.indexOf(linkPath + '/') === 0);
+                    // Most specific (longest) matching path wins, so /materials/overview
+                    // beats /materials on the overview page.
+                    if (isMatch && linkPath.length > activeLen) {
+                        activeLink = link;
+                        activeLen = linkPath.length;
+                    }
+                });
+                let activeGroup = null;
+                if (activeLink) {
+                    activeLink.classList.add('sidebar-link-active');
+                    activeLink.setAttribute('aria-current', 'page');
+                    activeGroup = activeLink.closest('.sidebar-group');
+                    if (activeGroup) activeGroup.classList.add('sidebar-group-active');
+                }
+                const readState = function (storageKey) {
+                    try { return localStorage.getItem(storageKey); } catch (e) { return null; }
+                };
+                const writeState = function (storageKey, value) {
+                    try { localStorage.setItem(storageKey, value); } catch (e) { /* storage unavailable */ }
+                };
+                document.querySelectorAll('.sidebar-group').forEach(function (group) {
+                    const groupKey = group.getAttribute('data-group-key');
+                    if (group === activeGroup) {
+                        group.open = true;
+                    } else if (groupKey) {
+                        const stored = readState('krt.sidebar.' + groupKey);
+                        if (stored === 'open') group.open = true;
+                        else if (stored === 'closed') group.open = false;
+                    }
+                    if (groupKey) {
+                        group.addEventListener('toggle', function () {
+                            writeState('krt.sidebar.' + groupKey, group.open ? 'open' : 'closed');
+                        });
+                    }
+                });
+            })();
 
             // Admin-mode visual marker: every page under /admin/* gets a
             // `.admin-mode` body class plus a small "ADMIN" chip injected
