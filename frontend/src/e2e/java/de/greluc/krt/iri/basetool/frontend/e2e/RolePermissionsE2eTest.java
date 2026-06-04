@@ -123,9 +123,11 @@ class RolePermissionsE2eTest {
 
   /**
    * Logs in as the given user in a fresh context, opens the seeded order, and asserts whether the
-   * {@code order-handover-open} control is present. {@code nav-orders} is asserted first as a
-   * locale-independent proof that the authenticated detail page actually rendered (so an absent
-   * handover control means "role-gated away", not "page failed to load").
+   * {@code order-handover-open} control is present. {@code nav-logout} is asserted first as a
+   * locale-independent proof that the authenticated app shell actually rendered (so an absent
+   * handover control means "role-gated away", not "page failed to load"). It is used instead of a
+   * nav link because the links now sit inside collapsed {@code <details>} sections (hidden until
+   * expanded), whereas the logout control is always rendered for a logged-in user.
    *
    * @param user the Keycloak username to log in as
    * @param password the Keycloak password
@@ -141,7 +143,7 @@ class RolePermissionsE2eTest {
         E2eSupport.login(page, baseUrl, user, password);
         page.navigate(baseUrl + "/orders/" + jobOrderId);
         page.waitForLoadState();
-        assertThat(page.getByTestId("nav-orders")).isVisible();
+        assertThat(page.getByTestId("nav-logout")).isVisible();
         if (expectedVisible) {
           assertThat(page.getByTestId("order-handover-open")).isVisible();
         } else {

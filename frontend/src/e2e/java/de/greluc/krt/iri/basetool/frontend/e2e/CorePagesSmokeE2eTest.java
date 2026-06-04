@@ -43,10 +43,11 @@ import org.junit.jupiter.params.provider.ValueSource;
  * by default, or an external {@code E2E_BASE_URL} (staging) when set, with the user supplied via
  * {@code -Pe2e.username} / {@code -Pe2e.password} (CI secrets).
  *
- * <p>The assertion targets {@code nav-orders}, a sidebar link gated by {@code isAuthenticated()},
- * so its visibility proves the session is authenticated and the page neither errored nor bounced to
- * the identity provider — a stronger signal than {@code nav-missions}, which renders for anonymous
- * visitors too.
+ * <p>The assertion targets {@code nav-logout}, the authenticated-only sidebar logout control, so
+ * its visibility proves the session is authenticated and the page neither errored nor bounced to
+ * the identity provider. It replaced {@code nav-orders}: the nav links now live inside collapsed
+ * {@code <details>} sections ({@code display:none} until expanded), whereas the logout control is
+ * always rendered for a logged-in user.
  */
 @Tag("smoke")
 class CorePagesSmokeE2eTest {
@@ -99,7 +100,7 @@ class CorePagesSmokeE2eTest {
       Page page = context.newPage();
       try {
         page.navigate(baseUrl + path);
-        assertThat(page.getByTestId("nav-orders")).isVisible();
+        assertThat(page.getByTestId("nav-logout")).isVisible();
       } catch (RuntimeException | AssertionError failure) {
         String slug = path.equals("/") ? "home" : path.substring(1).replace('/', '-');
         E2eSupport.dump(page, "smoke-" + slug);
