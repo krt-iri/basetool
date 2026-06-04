@@ -290,7 +290,9 @@ public class SquadronContextAdvice {
               "/api/v1/squadrons?size=1000&sort=name,asc", new ParameterizedTypeReference<>() {});
       if (squadrons != null && squadrons.content() != null) {
         for (SquadronDto s : squadrons.content()) {
-          combined.add(new OrgUnitMembershipOptionDto(s.id(), s.name(), s.shorthand(), "SQUADRON"));
+          combined.add(
+              new OrgUnitMembershipOptionDto(
+                  s.id(), s.name(), s.shorthand(), "SQUADRON", s.isProfitEligible()));
         }
       }
     } catch (Exception ex) {
@@ -305,7 +307,7 @@ public class SquadronContextAdvice {
         for (SquadronDto sk : specialCommands.content()) {
           combined.add(
               new OrgUnitMembershipOptionDto(
-                  sk.id(), sk.name(), sk.shorthand(), "SPECIAL_COMMAND"));
+                  sk.id(), sk.name(), sk.shorthand(), "SPECIAL_COMMAND", sk.isProfitEligible()));
         }
       }
     } catch (Exception ex) {

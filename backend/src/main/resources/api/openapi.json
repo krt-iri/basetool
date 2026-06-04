@@ -27174,7 +27174,7 @@
       "get" : {
         "tags" : [ "org-unit-controller" ],
         "summary" : "List every active org unit",
-        "description" : "Returns the full active Staffel + Spezialkommando catalog as picker options. Drives the R5.d.c Job Order create form's owner-picker — Job Orders are cross-staffel workspaces and the picker must offer the full active list, not the caller's memberships.",
+        "description" : "Returns the full active Staffel + Spezialkommando catalog as picker options, each with its isProfitEligible flag. Drives the Job Order create form's owner-pickers — Job Orders are cross-staffel workspaces and the picker must offer the full active list, not the caller's memberships. Open to anonymous callers because the request form is public; the payload carries no PII.",
         "operationId" : "listActiveOrgUnits",
         "responses" : {
           "200" : {
@@ -38079,6 +38079,9 @@
           "kind" : {
             "type" : "string",
             "enum" : [ "SQUADRON", "SPECIAL_COMMAND" ]
+          },
+          "isProfitEligible" : {
+            "type" : "boolean"
           }
         }
       },

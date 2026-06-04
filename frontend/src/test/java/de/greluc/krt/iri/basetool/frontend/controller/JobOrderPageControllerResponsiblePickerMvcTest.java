@@ -20,6 +20,8 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,10 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.iri.basetool.frontend.model.dto.SpecialCommandDto;
-import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.hamcrest.Matchers;
@@ -50,19 +51,20 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Regression test for the "profit-eligible Spezialkommando never appears in the Job-Order
- * responsible picker" bug. The squadron catalog ({@code /api/v1/squadrons}) is permitAll, but the
- * SK catalog ({@code /api/v1/special-commands}) requires authentication; fetching it through the
- * anonymous public WebClient silently 401s and drops every SK from the picker, so an authenticated
- * caller saw only squadrons. The fix routes {@code fetchSpecialCommands()} through the
- * authenticated WebClient ({@code isPublic = false}). This test pins that an eligible SK reaches
- * the rendered picker and that the catalog is fetched authenticated, never via the public client.
+ * responsible picker" bug. Both owner-pickers are now fed by the single {@code permitAll} {@code
+ * GET /api/v1/org-units/active} catalog (each option carries its {@code isProfitEligible} flag), so
+ * a profit-eligible SK reaches the responsible picker for authenticated callers <em>and</em>
+ * anonymous guests alike. The previous design fetched the authenticated-only SK catalog ({@code
+ * /api/v1/special-commands}) separately, which 401s for a guest and dropped every SK. This test
+ * pins that an eligible SK reaches the rendered picker, that the catalog is fetched through the
+ * public client, and that the deprecated SK-catalog call is no longer made for the picker.
  */
 @SpringBootTest
 @SuppressWarnings("unchecked")
 class JobOrderPageControllerResponsiblePickerMvcTest {
 
-  private static final String SQUADRONS_URI = "/api/v1/squadrons?size=1000&sort=name,asc";
-  private static final String SK_URI = "/api/v1/special-commands?size=1000&sort=name,asc";
+  private static final String ACTIVE_URI = "/api/v1/org-units/active";
+  private static final String SK_CATALOG_URI = "/api/v1/special-commands?size=1000&sort=name,asc";
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
@@ -81,17 +83,19 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
   @Test
   @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
   void viewCreateForm_eligibleSpecialCommand_appearsInResponsiblePicker() throws Exception {
-    SquadronDto squadron =
-        new SquadronDto(UUID.randomUUID(), "Test Staffel", "TS", null, true, false, true, 0L);
-    SpecialCommandDto sk =
-        new SpecialCommandDto(
-            UUID.randomUUID(), "Profit Spezialkommando", "PSK", null, true, true, 0L);
+    OrgUnitMembershipOptionDto profitStaffel =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Test Staffel", "TS", "SQUADRON", true);
+    OrgUnitMembershipOptionDto profitSk =
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "Profit Spezialkommando", "PSK", "SPECIAL_COMMAND", true);
 
+    // Reference catalogs (materials / orderable items / squadrons) go through the cached client;
+    // empty keeps them from blocking the render.
     when(backendApiClient.getCached(
-            eq(SQUADRONS_URI), any(ParameterizedTypeReference.class), eq(true)))
-        .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
-    when(backendApiClient.getCached(eq(SK_URI), any(ParameterizedTypeReference.class), eq(false)))
-        .thenReturn(new PageResponse<>(List.of(sk), 0, 1000, 1, 1, List.of()));
+            anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(List.of(profitStaffel, profitSk));
 
     mockMvc
         .perform(get("/orders/create"))
@@ -99,11 +103,10 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .andExpect(view().name("orders-create"))
         .andExpect(content().string(Matchers.containsString("Profit Spezialkommando")));
 
-    // The SK catalog must be fetched through the authenticated (bearer-relaying) client, never the
-    // anonymous public one — the latter 401s and silently drops every SK from the picker.
-    verify(backendApiClient)
-        .getCached(eq(SK_URI), any(ParameterizedTypeReference.class), eq(false));
+    // The catalog must come from the permitAll active endpoint via the public client — the previous
+    // design fetched the authenticated SK catalog, which 401s and drops every SK for a guest.
+    verify(backendApiClient).get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), eq(true));
     verify(backendApiClient, never())
-        .getCached(eq(SK_URI), any(ParameterizedTypeReference.class), eq(true));
+        .getCached(eq(SK_CATALOG_URI), any(ParameterizedTypeReference.class), anyBoolean());
   }
 }

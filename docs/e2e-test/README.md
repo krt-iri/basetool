@@ -29,6 +29,7 @@ Die folgenden Dokumente erweitern die Grund-Flows um **Rollen** (Offizier, einfa
 | [UC-09](UC-09-handover-staffel-uebergreifend.md) | Handover staffel-übergreifend (Material von B, Empfänger ggf. dritte Staffel) | `CrossStaffelHandoverE2eTest` |
 | [UC-10](UC-10-mission-staffel-uebergreifend.md) | Öffentlicher Einsatz mit Teilnehmern aus anderer Staffel | `PublicMissionCrossStaffelE2eTest` |
 | [UC-11](UC-11-sk-spezialkommando.md) | Spezialkommando (SK) als OrgUnit (Lifecycle, Mitglieder, aktuelle Grenzen) | `SpecialCommandE2eTest` |
+| [UC-12](UC-12-anonymer-auftrag.md) | Anonymer Auftrag: Gast wählt Auftraggeber (alle) & bearbeitende Einheit (nur profit-fähige, Eingangs-SK vorbelegt), Material + Item | `AnonymousJobOrderE2eTest` |
 
 > **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel** (nicht staffel-übergreifend). Die staffel-übergreifende Zusammenarbeit läuft über öffentliche Einsätze (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
 

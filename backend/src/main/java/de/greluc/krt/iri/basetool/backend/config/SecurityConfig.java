@@ -363,6 +363,13 @@ public class SecurityConfig {
                         "/api/v1/orders/item-catalog",
                         "/api/v1/orders/item-catalog/**")
                     .permitAll()
+                    // The Job Order create form is reachable anonymously (the public request form),
+                    // so the org-unit catalog that fills its requesting/responsible pickers must be
+                    // too. The payload carries no PII — only name + shorthand + kind + profit flag
+                    // —
+                    // mirroring the already-permitAll /api/v1/squadrons catalog.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/org-units/active")
+                    .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/finance-entries")
                     .permitAll()
                     .requestMatchers(

@@ -461,7 +461,8 @@ class UserControllerTest {
   void getUserMemberships_delegatesToService() {
     UUID userId = UUID.randomUUID();
     OrgUnitMembershipOptionDto option =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON);
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, false);
     when(orgUnitMembershipService.listOptionsForUser(userId)).thenReturn(List.of(option));
 
     List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId);

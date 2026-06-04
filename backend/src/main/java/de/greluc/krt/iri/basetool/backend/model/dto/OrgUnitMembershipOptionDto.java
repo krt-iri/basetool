@@ -49,6 +49,15 @@ import java.util.UUID;
  * @param kind Discriminator of the referenced org unit; lets the picker render two {@code
  *     <optgroup>} sections when the user has both kinds, and collapse to a flat list when only one
  *     kind is present.
+ * @param isProfitEligible Whether this org unit may be selected as the <em>responsible</em>
+ *     (processing) unit of a Job Order. Lets a single {@code /api/v1/org-units/active} fetch feed
+ *     both pickers on the create form: the requesting picker offers every option, the responsible
+ *     picker keeps only the {@code true} ones — so the (anonymous-reachable) form no longer needs a
+ *     second, authenticated call to the Spezialkommando catalog just to learn the SK profit flags.
  */
 public record OrgUnitMembershipOptionDto(
-    UUID orgUnitId, String orgUnitName, String orgUnitShorthand, OrgUnitKind kind) {}
+    UUID orgUnitId,
+    String orgUnitName,
+    String orgUnitShorthand,
+    OrgUnitKind kind,
+    Boolean isProfitEligible) {}

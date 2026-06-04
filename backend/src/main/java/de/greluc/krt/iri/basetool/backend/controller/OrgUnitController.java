@@ -62,22 +62,28 @@ public class OrgUnitController {
   private final OrgUnitMembershipService orgUnitMembershipService;
 
   /**
-   * Lists every active org unit (Staffel + Spezialkommando) as picker options. Open to every
-   * authenticated member — the response reveals only public attributes (name + shorthand + kind),
-   * no PII, and Job Order creation already exposes the requesting org unit on the wire.
+   * Lists every active org unit (Staffel + Spezialkommando) as picker options, each carrying its
+   * {@code isProfitEligible} flag. {@code permitAll}: the Job Order create form is reachable
+   * anonymously (the public request form), so an unauthenticated guest must be able to fill both
+   * the requesting picker (all options) and the responsible picker (the profit-eligible subset)
+   * from this single fetch. The response reveals only public attributes (name + shorthand + kind +
+   * profit flag) — no PII — mirroring the already-{@code permitAll} {@code /api/v1/squadrons}
+   * catalog, and Job Order creation already exposes the requesting/responsible org unit on the
+   * wire.
    *
    * @return picker options sorted Staffel-first then Spezialkommandos alphabetical.
    */
   @GetMapping("/active")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
+  @PreAuthorize("permitAll()")
   @Transactional(readOnly = true)
   @Operation(
       summary = "List every active org unit",
       description =
-          "Returns the full active Staffel + Spezialkommando catalog as picker options. Drives the"
-              + " R5.d.c Job Order create form's owner-picker — Job Orders are cross-staffel"
-              + " workspaces and the picker must offer the full active list, not the caller's"
-              + " memberships.")
+          "Returns the full active Staffel + Spezialkommando catalog as picker options, each with"
+              + " its isProfitEligible flag. Drives the Job Order create form's owner-pickers — Job"
+              + " Orders are cross-staffel workspaces and the picker must offer the full active"
+              + " list, not the caller's memberships. Open to anonymous callers because the request"
+              + " form is public; the payload carries no PII.")
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Active org-unit options")})
   public List<OrgUnitMembershipOptionDto> listActiveOrgUnits() {

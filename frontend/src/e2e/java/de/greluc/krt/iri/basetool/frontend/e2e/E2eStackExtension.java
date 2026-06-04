@@ -207,6 +207,22 @@ public final class E2eStackExtension implements BeforeAllCallback {
       // (not per test class) guarantees the cache never pins a stale not-eligible snapshot.
       seeder.setSquadronProfitEligible(
           E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID, true);
+      // Seed one orderable item (a game_item + an active blueprint with a resolved RESOURCE
+      // ingredient) so the item-order create form's *frontend-cached* item picker is never empty.
+      // Done here — before any test navigates to /orders/create and warms that 10-minute cache —
+      // for the same reason the profit-eligibility seeding above runs at bootstrap. Non-fatal: only
+      // the anonymous item-order flow (UC-12) depends on it, so a seed hiccup must not sink the
+      // whole suite's bring-up.
+      try {
+        String ingredientMaterialId =
+            seeder.ensureJobOrderMaterial(
+                E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, "E2E Blueprint Ingredient");
+        seeder.seedOrderableItem("E2E Orderable Widget", ingredientMaterialId);
+      } catch (RuntimeException seedFailure) {
+        System.out.printf(
+            "[E2E] orderable-item seeding failed (item-order flow will be skipped/failing): %s%n",
+            seedFailure.getMessage());
+      }
       started = true;
       context
           .getRoot()

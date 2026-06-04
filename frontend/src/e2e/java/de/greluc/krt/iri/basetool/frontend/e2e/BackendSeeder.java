@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
@@ -38,10 +39,12 @@ import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
@@ -576,6 +579,213 @@ public final class BackendSeeder {
   }
 
   /**
+   * Opts a Spezialkommando into (or out of) Job-Order processing by setting its {@code
+   * is_profit_eligible} flag via {@code PATCH /api/v1/special-commands/{id}/profit-eligible}
+   * (admin-only, body {@code {"eligible": …}}). The SK counterpart of {@link
+   * #setSquadronProfitEligible}: only profit-eligible org units may be a job order's responsible
+   * (processing) unit and appear in the create form's responsible picker (V128). Throws on a
+   * non-2xx status.
+   *
+   * @param adminUser an admin Keycloak username (the endpoint is ADMIN-gated)
+   * @param adminPassword the admin password
+   * @param specialCommandId the SK OrgUnit id to toggle
+   * @param eligible the new {@code is_profit_eligible} value
+   */
+  public void setSpecialCommandProfitEligible(
+      String adminUser, String adminPassword, String specialCommandId, boolean eligible) {
+    try {
+      String token = passwordGrant(adminUser, adminPassword);
+      int status =
+          patch(
+              token,
+              "/api/v1/special-commands/" + specialCommandId + "/profit-eligible",
+              "{\"eligible\":" + eligible + "}");
+      if (status < 200 || status >= 300) {
+        throw new IllegalStateException("SK profit-eligibility PATCH failed: HTTP " + status);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.setSpecialCommandProfitEligible failed", e);
+    }
+  }
+
+  /**
+   * Sets a system setting's value via {@code PUT /api/v1/settings/{key}} (admin-only, body {@code
+   * {value, version}}), re-reading the optimistic-lock version on a 409 like {@link
+   * #ensureIridiumMembership}. Used to point {@code job_order.intake_special_command_id} at the
+   * seeded intake Spezialkommando, so guest order creations — and the create form's
+   * responsible-picker preselection — resolve to it. Throws once retries are exhausted.
+   *
+   * @param adminUser an admin Keycloak username (the endpoint is ADMIN-gated)
+   * @param adminPassword the admin password
+   * @param key the setting key (table primary key)
+   * @param value the new setting value
+   */
+  public void setSystemSetting(String adminUser, String adminPassword, String key, String value) {
+    try {
+      String token = passwordGrant(adminUser, adminPassword);
+      for (int attempt = 1; attempt <= MAX_VERSION_RETRIES; attempt++) {
+        long version = getJson("/api/v1/settings/" + key, token).get("version").getAsLong();
+        String body = "{\"value\":\"" + value + "\",\"version\":" + version + "}";
+        int status = put(token, "/api/v1/settings/" + key, body);
+        if (status >= 200 && status < 300) {
+          return;
+        }
+        if (status != 409) {
+          throw new IllegalStateException("Setting PUT failed: HTTP " + status);
+        }
+      }
+      throw new IllegalStateException("System-setting update exhausted retries on HTTP 409");
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.setSystemSetting failed", e);
+    }
+  }
+
+  /**
+   * Seeds one orderable item — a {@code game_item} plus an active {@code blueprint} that outputs it
+   * with a single resolved RESOURCE ingredient — directly over JDBC, so the item-order create
+   * form's (frontend-cached) item picker has at least one entry. An item is "orderable" iff it is
+   * the output of an active blueprint that has a RESOURCE ingredient resolved to a {@code material}
+   * ({@code BlueprintRepository.findOrderableItems}); this seeds exactly that minimal shape, with
+   * the ingredient pointing at the given (already-created) material. Local-stack only (JDBC to the
+   * ephemeral Postgres). Returns the created game item's id.
+   *
+   * @param gameItemName the display name of the orderable item (shown in the picker)
+   * @param materialId the id of an existing material used as the blueprint's RESOURCE ingredient
+   * @return the created game item's id
+   */
+  public String seedOrderableItem(String gameItemName, String materialId) {
+    UUID gameItemId = UUID.randomUUID();
+    UUID blueprintId = UUID.randomUUID();
+    UUID ingredientId = UUID.randomUUID();
+    UUID scwikiUuid = UUID.randomUUID();
+    try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
+      try (PreparedStatement ps =
+          connection.prepareStatement(
+              "INSERT INTO game_item (id, name, kind) VALUES (?, ?, 'GENERIC')"
+                  + " ON CONFLICT DO NOTHING")) {
+        ps.setObject(1, gameItemId);
+        ps.setString(2, gameItemName);
+        ps.executeUpdate();
+      }
+      try (PreparedStatement ps =
+          connection.prepareStatement(
+              "INSERT INTO blueprint (id, scwiki_uuid, output_item_id, output_name,"
+                  + " is_available_by_default) VALUES (?, ?, ?, ?, TRUE) ON CONFLICT DO NOTHING")) {
+        ps.setObject(1, blueprintId);
+        ps.setObject(2, scwikiUuid);
+        ps.setObject(3, gameItemId);
+        ps.setString(4, gameItemName);
+        ps.executeUpdate();
+      }
+      try (PreparedStatement ps =
+          connection.prepareStatement(
+              "INSERT INTO blueprint_ingredient (id, blueprint_id, order_index, kind, material_id,"
+                  + " quantity_scu) VALUES (?, ?, 0, 'RESOURCE', ?, 1.0) ON CONFLICT DO NOTHING")) {
+        ps.setObject(1, ingredientId);
+        ps.setObject(2, blueprintId);
+        ps.setObject(3, UUID.fromString(materialId));
+        ps.executeUpdate();
+      }
+      return gameItemId.toString();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.seedOrderableItem failed", e);
+    }
+  }
+
+  /**
+   * Files a Job Order as an ANONYMOUS guest (no bearer token) via {@code POST /api/v1/orders}
+   * ({@code permitAll}) and returns the parsed response body, so a test can assert the guest
+   * redaction's retained fields — notably {@code responsibleOrgUnit} (honoured when
+   * profit-eligible, else the configured intake SK) and {@code requestingOrgUnit}. A {@code null}
+   * responsibleOrgUnitId is sent as a JSON {@code null}, exercising the omitted-responsible
+   * fallback. Throws on a non-2xx status.
+   *
+   * @param responsibleOrgUnitId the responsible (processing) OrgUnit id to request, or {@code null}
+   *     to omit it (guest fallback to the intake SK)
+   * @param requestingOrgUnitId the requesting (customer) OrgUnit id (mandatory)
+   * @param handle the order contact handle
+   * @param materialId the requested material id
+   * @param minQuality the minimum quality ({@code >= 700})
+   * @param amount the requested amount
+   * @return the created order as a {@link JsonObject} (guest-redacted but org-unit-bearing)
+   */
+  public JsonObject anonymousCreateMaterialOrder(
+      String responsibleOrgUnitId,
+      String requestingOrgUnitId,
+      String handle,
+      String materialId,
+      int minQuality,
+      double amount) {
+    String responsibleJson =
+        responsibleOrgUnitId == null ? "null" : "\"" + responsibleOrgUnitId + "\"";
+    String body =
+        "{\"responsibleOrgUnitId\":"
+            + responsibleJson
+            + ",\"requestingOrgUnitId\":\""
+            + requestingOrgUnitId
+            + "\",\"handle\":\""
+            + handle
+            + "\",\"materials\":[{\"materialId\":\""
+            + materialId
+            + "\",\"minQuality\":"
+            + minQuality
+            + ",\"amount\":"
+            + amount
+            + "}]}";
+    try {
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/orders"))
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
+      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        throw new IllegalStateException(
+            "Anonymous order create failed: HTTP " + response.statusCode() + " " + response.body());
+      }
+      return JsonParser.parseString(response.body()).getAsJsonObject();
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.anonymousCreateMaterialOrder failed", e);
+    }
+  }
+
+  /**
+   * Reads back the Job Order carrying the given (unique) contact handle as an admin via {@code GET
+   * /api/v1/orders?size=1000&status=OPEN}, so a test can assert the responsible / requesting org
+   * units that an anonymous UI submission persisted — the guest cannot read the order back itself.
+   * An admin with no active org-unit pin sees the full cross-scope list, so the order is visible
+   * whatever its responsible unit. Returns {@code null} when no open order carries the handle.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param handle the unique contact handle to match
+   * @return the matching order as a {@link JsonObject}, or {@code null} if none matches
+   */
+  public JsonObject findOrderByHandle(String adminUser, String adminPassword, String handle) {
+    try {
+      String token = passwordGrant(adminUser, adminPassword);
+      JsonObject page = getJson("/api/v1/orders?size=1000&status=OPEN", token);
+      for (JsonElement element : page.getAsJsonArray("content")) {
+        JsonObject order = element.getAsJsonObject();
+        if (order.has("handle")
+            && !order.get("handle").isJsonNull()
+            && handle.equals(order.get("handle").getAsString())) {
+          return order;
+        }
+      }
+      return null;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.findOrderByHandle failed", e);
+    }
+  }
+
+  /**
    * Assigns {@code targetUserId} to a Staffel via {@code PATCH /api/v1/users/{id}/squadron}
    * (admin-only, body {@code {squadronId, version}}), re-reading the user's version on a 409 like
    * {@link #ensureIridiumMembership}. A user has at most one Staffel membership, so this also
@@ -672,6 +882,26 @@ public final class BackendSeeder {
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .method("PATCH", HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build();
+    return http.send(request, BodyHandlers.ofString()).statusCode();
+  }
+
+  /**
+   * Issues an authenticated {@code PUT} and returns the HTTP status, so callers can react to a 409
+   * optimistic-lock conflict (the system-setting update carries its version in the body).
+   *
+   * @param token bearer token
+   * @param path backend path beginning with {@code /}
+   * @param jsonBody the JSON request body
+   * @return the HTTP status code
+   * @throws Exception on transport failure
+   */
+  private int put(String token, String path, String jsonBody) throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + path))
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "application/json")
+            .PUT(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build();
     return http.send(request, BodyHandlers.ofString()).statusCode();
   }

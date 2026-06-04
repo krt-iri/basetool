@@ -95,12 +95,20 @@ public class OrgUnitMembershipService {
     for (Squadron s : squadronRepository.findAllByActiveTrue()) {
       options.add(
           new OrgUnitMembershipOptionDto(
-              s.getId(), s.getName(), s.getShorthand(), OrgUnitKind.SQUADRON));
+              s.getId(),
+              s.getName(),
+              s.getShorthand(),
+              OrgUnitKind.SQUADRON,
+              s.isProfitEligible()));
     }
     for (SpecialCommand sc : specialCommandRepository.findAllByActiveTrue()) {
       options.add(
           new OrgUnitMembershipOptionDto(
-              sc.getId(), sc.getName(), sc.getShorthand(), OrgUnitKind.SPECIAL_COMMAND));
+              sc.getId(),
+              sc.getName(),
+              sc.getShorthand(),
+              OrgUnitKind.SPECIAL_COMMAND,
+              sc.isProfitEligible()));
     }
     options.sort(
         Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(
@@ -147,14 +155,22 @@ public class OrgUnitMembershipService {
             s ->
                 options.add(
                     new OrgUnitMembershipOptionDto(
-                        s.getId(), s.getName(), s.getShorthand(), OrgUnitKind.SQUADRON)));
+                        s.getId(),
+                        s.getName(),
+                        s.getShorthand(),
+                        OrgUnitKind.SQUADRON,
+                        s.isProfitEligible())));
       } else if (row.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
         Optional<SpecialCommand> sc = specialCommandRepository.findById(orgUnitId);
         sc.ifPresent(
             s ->
                 options.add(
                     new OrgUnitMembershipOptionDto(
-                        s.getId(), s.getName(), s.getShorthand(), OrgUnitKind.SPECIAL_COMMAND)));
+                        s.getId(),
+                        s.getName(),
+                        s.getShorthand(),
+                        OrgUnitKind.SPECIAL_COMMAND,
+                        s.isProfitEligible())));
       }
     }
     options.sort(
