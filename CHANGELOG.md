@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Die Operations-Auszahlungsansicht zeigt Spenden jetzt zentral an: pro Spender den gespendeten Betrag und eine operationsweite Summe „Spenden gesamt" (im Auszahlungs- und im Finanz-Panel).** Spenden bleiben wie bisher bei der Organisation und werden nicht auf Mitglieder mit Auszahlungsart „Auszahlen" verteilt — die Summe macht den bisher unsichtbaren Betrag nun nachvollziehbar.
+
 - **Der Schiffs-Import im Hangar erkennt jetzt zusätzlich das JSON des [Fleetyards](https://fleetyards.net)-Hangar-Exports**, das bisher als „Unbekanntes Format" abgewiesen wurde. Schiffe werden über denselben toleranten Namens- und Slug-Abgleich wie die übrigen Formate (Fleetview, HangarXPLOR, StarJump FleetViewer) den vorhandenen Schiffstypen zugeordnet; ein in Fleetyards vergebener Schiffsname wird als individueller Name übernommen.
 
 - **Neue Seite „Organigramm" (`/org-chart`): visualisiert die Funktionsränge des Profit-Bereichs — die Bereichsleitung an der Spitze, darunter die profit-berechtigten Staffeln (Staffelleiter, bis zu vier benennbare Kommandogruppen mit je Kommandoleiter, Stv. und bis zu vier Ensign) und Spezialkommandos (1–2 SK-Leiter).** Eine Kommandogruppe lässt sich benennen und schon vor ihrem Kommandoleiter mit Stv. und Ensign besetzen — untergeordnete Posten sind also unabhängig vom übergeordneten besetzbar. Jeder angemeldete Nutzer kann das Organigramm ansehen; nur Admins bearbeiten es inline an den Knoten (zuweisen, neu zuweisen, umbenennen, entfernen). Rein informativ — eine Eintragung vergibt keine Berechtigungen (Migrationen V136/V138).

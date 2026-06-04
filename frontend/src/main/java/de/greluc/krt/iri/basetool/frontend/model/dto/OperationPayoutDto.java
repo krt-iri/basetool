@@ -35,7 +35,9 @@ import java.time.Instant;
  * @param participationPercentage clamped attendance-time share, 0–100, two decimals
  * @param payoutPreference {@code PAYOUT} or {@code DONATE} (sticky DONATE across the operation)
  * @param personalExpenses out-of-pocket expenses attributable to the participant (&gt;= 0)
- * @param shareAmount totalSum × percentage / 100, or zero for DONATE
+ * @param shareAmount totalSum × percentage / 100 for PAYOUT, or zero for DONATE
+ * @param donatedAmount the share a DONATE participant contributes to the org (totalSum × percentage
+ *     / 100), or zero for PAYOUT; aggregated into {@code OperationPayoutSummaryDto.totalDonations}
  * @param transferFee 0.5% of {@code personalExpenses + shareAmount}, deducted to cover the in-game
  *     aUEC transfer fee — always &gt;= 0 and zero when the gross payout is zero
  * @param payoutAmount {@code round(personalExpenses + shareAmount - transferFee)} (HALF_UP to scale
@@ -52,6 +54,7 @@ public record OperationPayoutDto(
     PayoutPreference payoutPreference,
     BigDecimal personalExpenses,
     BigDecimal shareAmount,
+    BigDecimal donatedAmount,
     BigDecimal transferFee,
     BigDecimal payoutAmount,
     boolean paidOut,

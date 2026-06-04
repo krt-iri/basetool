@@ -44,6 +44,7 @@ import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
@@ -1103,10 +1104,24 @@ class OperationServiceTest {
           new BigDecimal("0.00"),
           aliceRow.shareAmount(),
           "DONATE participants contribute their share; only reimbursement is paid out");
+      assertEquals(
+          new BigDecimal("350.00"),
+          aliceRow.donatedAmount(),
+          "the share alice forgoes (50% of the 700 pool) is surfaced as her donatedAmount");
       assertEquals(new BigDecimal("1.50"), aliceRow.transferFee());
       assertEquals(new BigDecimal("299"), aliceRow.payoutAmount());
       assertEquals(new BigDecimal("1.75"), bobRow.transferFee());
       assertEquals(new BigDecimal("348"), bobRow.payoutAmount());
+      // Regression guard for "donations are NOT redistributed to PAYOUT users": bob's share is his
+      // own 50% of the FULL 700 pool (350), not boosted to 100% just because alice donated.
+      assertEquals(
+          new BigDecimal("350.00"),
+          bobRow.shareAmount(),
+          "PAYOUT share stays the donor-inclusive percentage of the full pool");
+      assertEquals(
+          new BigDecimal("0.00"),
+          bobRow.donatedAmount(),
+          "PAYOUT participants contribute nothing to donations");
     }
 
     @Test
@@ -1369,6 +1384,53 @@ class OperationServiceTest {
       assertTrue(row.paidOut());
       assertEquals(when, row.paidOutAt());
       assertEquals("Officer Bob", row.paidOutByName());
+    }
+
+    @Test
+    void summary_totalDonations_aggregatesEveryDonorsForgoneShare() {
+      // alice + carol DONATE, bob PAYOUT — all three present for the full window, so each is
+      // 33.33%.
+      // INCOME 900, no expenses → totalSum 900; each full share = 900 × 33.33% = 299.97 (2dp).
+      // totalDonations = alice 299.97 + carol 299.97 = 599.94 (the sum of the per-row donations).
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      User bob = newUser("bob");
+      User carol = newUser("carol");
+      addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.DONATE);
+      MissionParticipant bobP =
+          addUserParticipantWithUser(m, bob, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      addUserParticipantWithUser(m, carol, T0, T0_PLUS_60M, PayoutPreference.DONATE);
+      stubOperation(Set.of(m));
+      stubFinances(
+          List.of(newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("900.00"))), List.of());
+
+      OperationPayoutSummaryDto summary = operationService.getOperationPayoutSummary(OPERATION_ID);
+
+      OperationPayoutDto aliceRow = byName(summary.payouts(), "alice");
+      OperationPayoutDto carolRow = byName(summary.payouts(), "carol");
+      assertEquals(
+          aliceRow.donatedAmount().add(carolRow.donatedAmount()),
+          summary.totalDonations(),
+          "totalDonations is exactly the sum of the per-donor donated shares");
+      assertEquals(
+          new BigDecimal("599.94"),
+          summary.totalDonations(),
+          "two donors each forgoing 33.33% of the 900 pool");
+    }
+
+    @Test
+    void summary_totalDonations_isZero_whenNobodyDonates() {
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      MissionParticipant aliceP =
+          addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+      stubFinances(
+          List.of(newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("500.00"))), List.of());
+
+      OperationPayoutSummaryDto summary = operationService.getOperationPayoutSummary(OPERATION_ID);
+
+      assertEquals(new BigDecimal("0.00"), summary.totalDonations());
     }
 
     // ----- helpers ---------------------------------------------------

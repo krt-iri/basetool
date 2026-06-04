@@ -28296,7 +28296,7 @@
       "get" : {
         "tags" : [ "Operations" ],
         "summary" : "Get participation payout breakdown with amounts and paid-out status",
-        "description" : "For each participant across all missions of the operation, returns the time-share (percent), the personal out-of-pocket reimbursement (mission EXPENSE entries they own + refinery `expenses + otherExpenses` they own), the per-share amount (totalSum × percentage / 100, 0 for DONATE), the in-game banking transfer fee deducted from the gross payout (`transferFee`, rate from the runtime-editable `operation.transfer_fee_rate` system setting, default 0.005 = 0.5%) and the resulting net payout amount (`payoutAmount = round(personalExpenses + shareAmount − transferFee)`, HALF_UP to whole aUEC because Star Citizen's mobiGlas does not accept fractional credits in a transfer). Also includes the paid-out flag set by mission managers (`paidOut`, `paidOutAt`, `paidOutByName`) — absent flag rows are treated as `paidOut=false`. A participant who chose DONATE in any mission is treated as DONATE for the whole operation; their reimbursement is still paid (it is their own money returned) but their share is contributed to the org.",
+        "description" : "For each participant across all missions of the operation, returns the time-share (percent), the personal out-of-pocket reimbursement (mission EXPENSE entries they own + refinery `expenses + otherExpenses` they own), the per-share amount (totalSum × percentage / 100, 0 for DONATE), the in-game banking transfer fee deducted from the gross payout (`transferFee`, rate from the runtime-editable `operation.transfer_fee_rate` system setting, default 0.005 = 0.5%) and the resulting net payout amount (`payoutAmount = round(personalExpenses + shareAmount − transferFee)`, HALF_UP to whole aUEC because Star Citizen's mobiGlas does not accept fractional credits in a transfer). Also includes the paid-out flag set by mission managers (`paidOut`, `paidOutAt`, `paidOutByName`) — absent flag rows are treated as `paidOut=false`. A participant who chose DONATE in any mission is treated as DONATE for the whole operation; their reimbursement is still paid (it is their own money returned) but their share is contributed to the org. The response wraps the payout rows in an object that also carries `totalDonations` — the operation-wide sum of every DONATE participant's contributed share (`donatedAmount` per row), shown centrally and never redistributed to PAYOUT participants.",
         "operationId" : "getOperationPayouts",
         "parameters" : [ {
           "name" : "id",
@@ -28327,10 +28327,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/OperationPayoutDto"
-                  }
+                  "$ref" : "#/components/schemas/OperationPayoutSummaryDto"
                 }
               }
             }
@@ -35745,6 +35742,9 @@
           "shareAmount" : {
             "type" : "number"
           },
+          "donatedAmount" : {
+            "type" : "number"
+          },
           "transferFee" : {
             "type" : "number"
           },
@@ -39499,6 +39499,20 @@
             "type" : "array",
             "items" : {
               "type" : "string"
+            }
+          }
+        }
+      },
+      "OperationPayoutSummaryDto" : {
+        "type" : "object",
+        "properties" : {
+          "totalDonations" : {
+            "type" : "number"
+          },
+          "payouts" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OperationPayoutDto"
             }
           }
         }

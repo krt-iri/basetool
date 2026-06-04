@@ -93,6 +93,7 @@ class OperationPayoutPaidOutSecurityTest {
         BigDecimal.ZERO,
         BigDecimal.ZERO,
         BigDecimal.ZERO,
+        BigDecimal.ZERO,
         true,
         null,
         null);

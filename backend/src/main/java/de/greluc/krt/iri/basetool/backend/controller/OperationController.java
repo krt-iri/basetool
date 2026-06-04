@@ -25,6 +25,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationFinanceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutStatusUpdateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
@@ -295,15 +296,19 @@ public class OperationController {
               + "(`paidOut`, `paidOutAt`, `paidOutByName`) — absent flag rows are treated as "
               + "`paidOut=false`. A participant who chose DONATE in any mission is treated as "
               + "DONATE for the whole operation; their reimbursement is still paid (it is their "
-              + "own money returned) but their share is contributed to the org.")
+              + "own money returned) but their share is contributed to the org. The response wraps "
+              + "the payout rows in an object that also carries `totalDonations` — the "
+              + "operation-wide sum of every DONATE participant's contributed share "
+              + "(`donatedAmount` per row), shown centrally and never redistributed to PAYOUT "
+              + "participants.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Payout breakdown returned."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
     @ApiResponse(responseCode = "404", description = "Operation not found.")
   })
   @Transactional(readOnly = true)
-  public List<OperationPayoutDto> getOperationPayouts(@PathVariable UUID id) {
-    return operationService.getOperationPayouts(id);
+  public OperationPayoutSummaryDto getOperationPayouts(@PathVariable UUID id) {
+    return operationService.getOperationPayoutSummary(id);
   }
 
   /**

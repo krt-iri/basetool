@@ -39,6 +39,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationFinanceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
@@ -200,9 +201,9 @@ class OperationPageControllerMvcTest {
         .thenReturn(new OperationFinanceDto(opId, BigDecimal.ZERO, List.of()));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
-            any(ParameterizedTypeReference.class),
+            eq(OperationPayoutSummaryDto.class),
             anyBoolean()))
-        .thenReturn(List.of());
+        .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
   }
 
   @Test
@@ -253,9 +254,9 @@ class OperationPageControllerMvcTest {
         .thenReturn(new OperationFinanceDto(opId, BigDecimal.ZERO, List.of()));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
-            any(ParameterizedTypeReference.class),
+            eq(OperationPayoutSummaryDto.class),
             anyBoolean()))
-        .thenReturn(List.of());
+        .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
 
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
@@ -271,6 +272,44 @@ class OperationPageControllerMvcTest {
         // The nested missions table renders status through the .status-pill
         // component; the cancelled mission resolves to the danger-hued modifier.
         .andExpect(content().string(containsString("status-cancelled")));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_rendersDonationTotals_whenParticipantsDonate() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op", "", "COMPLETED", null, 0L, null, null, Boolean.FALSE));
+    // Override the (zero) payout stub with a donor row + an operation-wide donation total.
+    OperationPayoutDto donor =
+        new OperationPayoutDto(
+            UUID.randomUUID().toString(),
+            "Donor Dan",
+            50.0,
+            PayoutPreference.DONATE,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            new BigDecimal("350.00"),
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            false,
+            null,
+            null);
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId + "/payouts"),
+            eq(OperationPayoutSummaryDto.class),
+            anyBoolean()))
+        .thenReturn(new OperationPayoutSummaryDto(new BigDecimal("350.00"), List.of(donor)));
+
+    mockMvc
+        .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        // Central donation total surfaces in both the payout panel and the finance panel.
+        .andExpect(content().string(containsString("Spenden gesamt")))
+        .andExpect(content().string(containsString("Davon gespendet")))
+        // Per-donor donated amount sublabel renders in the payout row.
+        .andExpect(content().string(containsString("gespendet")))
+        .andExpect(content().string(containsString("350")));
   }
 
   @Test
@@ -362,6 +401,7 @@ class OperationPageControllerMvcTest {
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
+                BigDecimal.ZERO,
                 false,
                 null,
                 null));
@@ -392,6 +432,7 @@ class OperationPageControllerMvcTest {
                 "Alice",
                 100.0,
                 PayoutPreference.PAYOUT,
+                BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,

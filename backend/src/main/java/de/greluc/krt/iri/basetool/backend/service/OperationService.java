@@ -32,6 +32,7 @@ import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
@@ -426,12 +427,18 @@ public class OperationService {
           personalExpensesByKey
               .getOrDefault(key, BigDecimal.ZERO)
               .setScale(2, RoundingMode.HALF_UP);
-      BigDecimal shareAmount =
-          pref == PayoutPreference.DONATE
-              ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
-              : totalSum
-                  .multiply(BigDecimal.valueOf(percentage))
-                  .divide(ONE_HUNDRED, 2, RoundingMode.HALF_UP);
+      boolean donating = pref == PayoutPreference.DONATE;
+      // Full pool share earned by attendance: a PAYOUT participant receives it as shareAmount, a
+      // DONATE participant forgoes it (shareAmount = 0) and contributes it to the org. That
+      // contributed slice is surfaced as donatedAmount and summed into totalDonations.
+      // Computed once so the PAYOUT/DONATE split cannot drift apart.
+      BigDecimal fullShare =
+          totalSum
+              .multiply(BigDecimal.valueOf(percentage))
+              .divide(ONE_HUNDRED, 2, RoundingMode.HALF_UP);
+      BigDecimal zeroShare = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+      BigDecimal shareAmount = donating ? zeroShare : fullShare;
+      BigDecimal donatedAmount = donating ? fullShare : zeroShare;
       BigDecimal grossPayout = personalExpenses.add(shareAmount);
       // Star Citizen banking deducts a small percentage from any aUEC transfer to the recipient —
       // model that here so the displayed Auszahlungsbetrag is what actually lands in the
@@ -467,6 +474,7 @@ public class OperationService {
               pref,
               personalExpenses,
               shareAmount,
+              donatedAmount,
               transferFee,
               payoutAmount,
               paidOut,
@@ -477,6 +485,32 @@ public class OperationService {
     result.sort(
         Comparator.comparing(OperationPayoutDto::participantName, String.CASE_INSENSITIVE_ORDER));
     return result;
+  }
+
+  /**
+   * Returns the operation payout breakdown together with the operation-wide donation total.
+   *
+   * <p>Thin aggregation wrapper over {@link #getOperationPayouts(UUID)}: it builds the payout rows
+   * once (a single load of the participant graph) and sums every row's {@link
+   * OperationPayoutDto#donatedAmount()} into {@code totalDonations}. The total therefore equals the
+   * sum of the per-donor donated shares shown in the table — there is no separate, independently
+   * rounded computation that could drift from the rows. PAYOUT rows contribute {@link
+   * BigDecimal#ZERO}, so the total is exactly the pool slice the DONATE participants contributed to
+   * the org rather than received. This is the canonical read path for the operation-detail payout
+   * panel.
+   *
+   * @param id operation primary key
+   * @return the payout rows (sorted by participant name) plus the aggregated donation total
+   * @throws NotFoundException when no operation matches the id
+   */
+  public OperationPayoutSummaryDto getOperationPayoutSummary(@NotNull UUID id) {
+    List<OperationPayoutDto> payouts = getOperationPayouts(id);
+    BigDecimal totalDonations =
+        payouts.stream()
+            .map(OperationPayoutDto::donatedAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+    return new OperationPayoutSummaryDto(totalDonations, payouts);
   }
 
   /**
