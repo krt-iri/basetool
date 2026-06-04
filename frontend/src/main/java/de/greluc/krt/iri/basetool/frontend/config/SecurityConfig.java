@@ -206,7 +206,6 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       ClientRegistrationRepository clientRegistrationRepository,
-      RoleHierarchy roleHierarchy,
       @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri:}")
           String keycloakIssuerUri)
       throws Exception {
