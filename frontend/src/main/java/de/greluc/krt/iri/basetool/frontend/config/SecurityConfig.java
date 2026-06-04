@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -93,7 +94,12 @@ public class SecurityConfig {
   //   * M-9: added {@code form-action 'self'} (an injected {@code &lt;form action=evil&gt;} cannot
   //     POST any visible field — including the CSRF token — to a third-party origin) and {@code
   //     upgrade-insecure-requests} (auto-rewrites HTTP subresources to HTTPS so a mixed-content
-  //     bug never falls back to plain HTTP).
+  //     bug never falls back to plain HTTP). The Keycloak origin (derived per-environment from the
+  //     OIDC issuer-uri) is appended to {@code form-action} at runtime in {@code
+  //     cspNonceHeaderWriter}: the POST {@code /logout} form's success redirect targets Keycloak's
+  //     cross-origin {@code end_session_endpoint}, and with {@code 'self'} alone Chromium blocks
+  //     that redirect — the local session is cleared but the Keycloak SSO session stays alive, so
+  //     the next login silently re-authenticates (the regression after logout became POST-only).
   // Audit finding L-3 (2026-05-20): {@code style-src} no longer carries {@code 'unsafe-inline'}.
   // Every {@code <style>} block in the templates ({@code grep} verified: 38 blocks across the
   // page set) was patched to {@code <style th:attr="nonce=${cspNonce}">}, so {@code <style>}
@@ -109,18 +115,68 @@ public class SecurityConfig {
   // style-src}.
   private static final String CSP_TEMPLATE =
       "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
-          + "form-action 'self'; upgrade-insecure-requests; "
+          + "form-action %2$s; upgrade-insecure-requests; "
           + "img-src 'self' data:; font-src 'self' data:; "
           + "style-src 'self' 'nonce-%1$s'; "
           + "style-src-attr 'unsafe-inline'; "
           + "script-src 'nonce-%1$s' 'strict-dynamic'";
 
-  private org.springframework.security.web.header.HeaderWriter cspNonceHeaderWriter() {
+  /**
+   * Builds the per-request CSP header writer. The nonce is substituted per request; the {@code
+   * form-action} source list is computed once here (this method runs a single time while the filter
+   * chain is assembled). {@code 'self'} covers every same-origin form in the app. The Keycloak
+   * origin is appended because exactly one form submits cross-origin: the POST {@code /logout},
+   * whose success redirect targets Keycloak's {@code end_session_endpoint}. Without the Keycloak
+   * origin in {@code form-action}, Chromium blocks that redirect — the local Spring session is
+   * cleared but the Keycloak SSO session survives, so the next login silently re-authenticates
+   * instead of prompting for credentials.
+   *
+   * @param issuerUri the configured Keycloak issuer URI, used to derive the allowed logout-redirect
+   *     origin
+   * @return a header writer that emits the {@code Content-Security-Policy} response header
+   */
+  private org.springframework.security.web.header.HeaderWriter cspNonceHeaderWriter(
+      String issuerUri) {
+    String keycloakOrigin = keycloakOriginOf(issuerUri);
+    String formAction = keycloakOrigin.isEmpty() ? "'self'" : "'self' " + keycloakOrigin;
     return (request, response) -> {
       Object nonceAttr = request.getAttribute(CspNonceFilter.REQUEST_ATTRIBUTE);
       String nonce = nonceAttr != null ? nonceAttr.toString() : "";
-      response.setHeader("Content-Security-Policy", String.format(CSP_TEMPLATE, nonce));
+      response.setHeader("Content-Security-Policy", String.format(CSP_TEMPLATE, nonce, formAction));
     };
+  }
+
+  /**
+   * Derives the origin ({@code scheme://host[:port]}) from the configured OIDC issuer URI, for use
+   * in the CSP {@code form-action} directive. Keycloak's {@code end_session_endpoint} shares the
+   * issuer's origin, so this is precisely the origin the POST-logout redirect must be allowed to
+   * reach.
+   *
+   * @param issuerUri the configured Keycloak issuer URI; may be {@code null}, blank, or unparseable
+   * @return the {@code scheme://host[:port]} origin, or an empty string if it cannot be derived (in
+   *     which case {@code form-action} stays {@code 'self'}-only)
+   */
+  private static String keycloakOriginOf(String issuerUri) {
+    if (issuerUri == null || issuerUri.isBlank()) {
+      return "";
+    }
+    try {
+      java.net.URI uri = java.net.URI.create(issuerUri.trim());
+      String scheme = uri.getScheme();
+      String host = uri.getHost();
+      if (scheme == null || host == null) {
+        return "";
+      }
+      return uri.getPort() == -1
+          ? scheme + "://" + host
+          : scheme + "://" + host + ":" + uri.getPort();
+    } catch (IllegalArgumentException ex) {
+      log.warn(
+          "Could not derive the Keycloak origin from issuer-uri '{}' for the CSP form-action"
+              + " directive; the POST /logout redirect to Keycloak may be blocked by the browser.",
+          issuerUri);
+      return "";
+    }
   }
 
   /**
@@ -142,13 +198,17 @@ public class SecurityConfig {
   /**
    * Main security filter chain. Wires CSP-nonce, bot-protection, session-debug, request-logging and
    * backend-role-sync filters; configures OAuth2 login against Keycloak with smart OIDC logout; and
-   * declares the path-by-path permitAll / authenticated matrix.
+   * declares the path-by-path permitAll / authenticated matrix. The injected Keycloak issuer URI
+   * feeds the CSP {@code form-action} allow-list so the POST-logout redirect to Keycloak's
+   * end-session endpoint is not blocked by the browser.
    */
   @Bean
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       ClientRegistrationRepository clientRegistrationRepository,
-      RoleHierarchy roleHierarchy)
+      RoleHierarchy roleHierarchy,
+      @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri:}")
+          String keycloakIssuerUri)
       throws Exception {
     SmartOidcLogoutSuccessHandler oidcLogoutSuccessHandler =
         new SmartOidcLogoutSuccessHandler(clientRegistrationRepository, "{baseUrl}");
@@ -185,7 +245,7 @@ public class SecurityConfig {
         .csrf(org.springframework.security.config.Customizer.withDefaults())
         .headers(
             headers -> {
-              headers.addHeaderWriter(cspNonceHeaderWriter());
+              headers.addHeaderWriter(cspNonceHeaderWriter(keycloakIssuerUri));
               headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
               headers.referrerPolicy(
                   ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
