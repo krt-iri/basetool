@@ -179,12 +179,26 @@ jobs:
 
       - name: Open the release PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The krt-iri org policy forbids Actions from creating PRs with the
+          # default GITHUB_TOKEN (the same constraint refresh-versions.yml
+          # documents), so a dedicated RELEASE_TOKEN -- a fine-grained PAT or
+          # GitHub App token with contents:write + pull-requests:write -- opens
+          # the PR instead. Using a real identity here is also what makes the
+          # PR's required status checks run at all: a PR opened by GITHUB_TOKEN
+          # does NOT trigger pull_request workflows (GitHub's anti-recursion
+          # rule), so the branch-protection checks would never report and the PR
+          # could never be merged. release-publish.yml already prefers the same
+          # secret for the tag push, so one token drives the whole release flow.
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           TAG: ${{ steps.ver.outputs.tag }}
           BRANCH: ${{ steps.ver.outputs.branch }}
           NOTES: ${{ steps.notes.outputs.path }}
         run: |
           set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::RELEASE_TOKEN secret is not set -- add a fine-grained PAT or GitHub App token with contents:write + pull-requests:write so the release PR can be opened (the org policy forbids GITHUB_TOKEN from creating PRs)."
+            exit 1
+          fi
           # Best-effort label so humans can filter release PRs; the publish
           # workflow keys off the release/ branch name, not the label.
           gh label create release --color FFA500 --description "Automated release PR" 2>/dev/null || true
