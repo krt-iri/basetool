@@ -81,8 +81,13 @@
     /* Glows — orange bloom for the primary CTA, red bloom for error fields. */
     --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
     --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
+}
 
-    /* PatternFly Overrides to enforce simple CSS design */
+/* PatternFly variable overrides live in their own block so the :root above holds
+   only the KRT design tokens — its token declarations stay identical to
+   login/krt-login-v3.css :root (token-sync rule). Same :root selector as before,
+   so the cascade is unchanged. */
+:root {
     --pf-v5-global--FontFamily--sans-serif: var(--font-body);
     --pf-v5-global--FontFamily--heading--sans-serif: var(--font-headline);
     --pf-v5-global--primary-color--100: var(--color-primary);
