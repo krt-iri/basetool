@@ -8,15 +8,31 @@
 
 - **Im Hangar setzt der neue Button „Home-Location setzen" alle eigenen Schiffe in einem Schritt auf einen gewählten Ort.** Bei jedem Klick wählt man den Ort neu aus einer kuratierten Liste der Spiel-Home-Locations (alphabetisch absteigend); ein Bestätigungsdialog zeigt vorab die Anzahl betroffener Schiffe. Admins pflegen diese Liste unter „Orte verwalten" über den neuen Schalter „Als Home-Location markieren" (Migration V139).
 
-- **Der Schiffs-Import im Hangar erkennt jetzt zusätzlich das JSON des [Fleetyards](https://fleetyards.net)-Hangar-Exports**, das bisher als „Unbekanntes Format" abgewiesen wurde. Schiffe werden über denselben toleranten Namens- und Slug-Abgleich wie die übrigen Formate (Fleetview, HangarXPLOR, StarJump FleetViewer) den vorhandenen Schiffstypen zugeordnet; ein in Fleetyards vergebener Schiffsname wird als individueller Name übernommen.
+### Fixed
 
-- **Neue Seite „Organigramm" (`/org-chart`): visualisiert die Funktionsränge des Profit-Bereichs — die Bereichsleitung an der Spitze, darunter die profit-berechtigten Staffeln (Staffelleiter, bis zu vier benennbare Kommandogruppen mit je Kommandoleiter, Stv. und bis zu vier Ensign) und Spezialkommandos (1–2 SK-Leiter).** Eine Kommandogruppe lässt sich benennen und schon vor ihrem Kommandoleiter mit Stv. und Ensign besetzen — untergeordnete Posten sind also unabhängig vom übergeordneten besetzbar. Jeder angemeldete Nutzer kann das Organigramm ansehen; nur Admins bearbeiten es inline an den Knoten (zuweisen, neu zuweisen, umbenennen, entfernen). Rein informativ — eine Eintragung vergibt keine Berechtigungen (Migrationen V136/V138).
+- **Ein angemeldetes Staffelmitglied (ohne Offiziers- oder Adminrechte) kann seine eigene Auszahlungsart in einem Einsatz jetzt direkt in der Auszahlungs-Übersicht umstellen.** Bisher war ausgerechnet die eigene Zeile gesperrt, während sich die Auszahlungsart anonymer Teilnehmer ändern ließ — Ursache war ein Vergleich der Teilnehmer-ID mit dem Login-Benutzernamen statt mit der Keycloak-ID.
 
-- **Der Footer zeigt jetzt das „Made By The Community"-Logo und den erforderlichen Markenhinweis von Cloud Imperium Rights LLC.** Damit erfüllt die App die Vorgaben des offiziellen Star-Citizen-Fankits für Fan-Projekte; der Hinweis ist über den fest eingeblendeten Footer auf jeder Seite sichtbar.
+### Security
 
-- **Der Blueprint-Import im persönlichen Inventar akzeptiert jetzt zusätzlich das JSON des [Basetool Blueprint Extractor](https://github.com/krt-iri/basetool-bp-extractor), nicht mehr nur den SCMDB-Log-Watcher-Export.** Beide Formate liefern dieselben Bauplan-Namen; der Erhalt-Zeitstempel wird aus `ts` (SCMDB) oder `receivedAt` (Extractor) gelesen, und gelernte Namens-Aliase gelten für beide Tools.
+- **Ungenutztes Asciidoctor-Gradle-Plugin entfernt — das beseitigt 8 OWASP-Dependency-Check-Alerts an der Wurzel.** Das Plugin war totes Gerüst (keine `.adoc`-Quellen, kein Spring-REST-Docs; die API-Doku kommt von springdoc/OpenAPI) und zog allein die verwundbare `jruby-complete`-Kette (snakeyaml, jline, bcprov, jruby-base) auf den Build-Klassenpfad. Die dadurch obsolete SnakeYAML-Suppression in der OWASP-Suppressions-Datei wurde mitentfernt.
 
-- **Mehrfaches Importieren ist unkritisch: bereits vorhandene Baupläne werden nicht doppelt angelegt, und ihr Erhalt-Zeitpunkt wird nur dann aktualisiert, wenn der erneute Import einen früheren Zeitpunkt liefert.**
+## [v0.3.54](https://github.com/krt-iri/basetool/releases/tag/v0.3.54) - 2026-06-04
+
+### Fixed
+
+- **Der „Abmelden"-Button im Menü funktioniert wieder korrekt** — er sah seit der Umstellung auf ein CSRF-sicheres POST-Formular schmaler und blasser aus (gemischte Schreibweise statt Versalien) und beendete zwar die lokale Sitzung, nicht aber die Keycloak-SSO-Sitzung: die Seite lud nicht neu und ein erneuter Login ging ohne Passwortabfrage durch. Ursache war die CSP-Regel `form-action 'self'`, die den Abmelde-Redirect auf die anders-originige Keycloak-URL blockierte; die Keycloak-Herkunft ist jetzt erlaubt, und der Button erbt wieder das Navigations-Styling.
+
+## [v0.3.53](https://github.com/krt-iri/basetool/releases/tag/v0.3.53) - 2026-06-04
+
+### Fixed
+
+- **Das öffentliche Auftrags-Anlageformular zeigt anonymen Gästen jetzt befüllte Auswahlfelder: „Auftraggeber" listet alle Staffeln und Spezialkommandos, „bearbeitende Einheit" alle profit-berechtigten Staffeln und Spezialkommandos** (bisher war „Auftraggeber" leer und die Profit-SKs fehlten bei der bearbeitenden Einheit). Die bearbeitende Einheit ist mit dem konfigurierten Eingangs-Spezialkommando (Systemeinstellung unter `/admin/settings`) vorbelegt; ein Gast kann stattdessen eine andere profit-berechtigte Einheit wählen, sonst läuft der Auftrag wie bisher auf das Eingangs-SK.
+
+- **Ein Gast in einem Einsatz lässt sich jetzt von jedem, der ihn eintragen darf (auch anonym), mit einer beliebigen Staffel oder einem beliebigen Spezialkommando markieren.** Bisher verwarf das Backend die Markierung anonymer Nutzer und wies angemeldete Nutzer ab, die nicht selbst Mitglied der gewählten Org-Einheit waren (403) — insbesondere konnte ein SK-Leiter dem Einsatz seines eigenen Spezialkommandos keinen Gast mit dem SK-Label hinzufügen. Die Markierung ist reine Einsatz-Metadaten (nur fürs Roster), vergibt keine Rechte und ändert keine Nutzerdaten.
+
+- **Mitglieder eines Spezialkommandos — insbesondere staffellose SK-Leiter — können „ihre" SK-Daten jetzt auch im Detail öffnen und bearbeiten, nicht mehr nur in Listen sehen.** Die Detail- und Schreib-Zugriffsprüfungen (Einsätze inkl. interner sowie SK-eigene Schiffe/Lager/Raffinerie/Operationen) prüften bisher nur die Heimat-Staffel des Aufrufers und wiesen reine SK-Zugehörigkeiten ab; sie verwenden jetzt denselben Geltungsbereich wie die Listen — die Union aus Staffel und allen SK-Mitgliedschaften bzw. die angepinnte Org-Einheit. Die Strikt-Staffel-Isolation bleibt erhalten: Zugriff weiterhin nur auf eigene Org-Einheiten.
+
+## [v0.3.52](https://github.com/krt-iri/basetool/releases/tag/v0.3.52) - 2026-06-04
 
 ### Changed
 
@@ -24,39 +40,43 @@
 
 - **Das Keycloak-Login und die Account-Konsole sind an dasselbe Design-System angeglichen, damit der SSO-Redirect nahtlos wirkt.** Headlines erscheinen in Audiowide statt Ethnocentric, Validierungsfehler werden rot (mit ⚠-Symbol und rotem Feldrand) statt orange dargestellt, der Primär-Button hellt beim Hover auf und trägt den Orange-Bloom (eine gefüllte Hauptaktion pro Seite), der Login zeigt denselben Waben-Hintergrund wie die App, und der Tastatur-Fokus ist auf allen Bedienelementen sichtbar.
 
-- **Der automatische Deploy (`deploy.sh` / `iri-deploy.timer`) wiederholt ein Image, dessen Health-Check fehlschlägt, jetzt mit exponentiellem Backoff statt bei jedem 5-Minuten-Tick.** Bisher fuhr ein kaputtes `:stable` (oder ein vorübergehender Fehler) die Anwendung alle paar Minuten in die Wartungsseite, weil derselbe defekte Digest endlos neu ausgerollt und zurückgerollt wurde. Der Backoff ist an das Digest-Paar gekoppelt — ein neu promotetes (repariertes) Image wird sofort ausgerollt, nur Wiederholungen desselben fehlerhaften Images werden gedrosselt (`--force` erzwingt einen Sofort-Retry, `IRI_BACKOFF_BASE` / `IRI_BACKOFF_MAX` steuern die Zeiten).
+## [v0.3.51](https://github.com/krt-iri/basetool/releases/tag/v0.3.51) - 2026-06-04
 
-- **Der Einsatz-Filter der Lageransichten („Mein Lager" / „Alle Lager") zeigt jetzt zusätzlich abgeschlossene und abgebrochene Einsätze der letzten drei Monate an, nicht mehr nur geplante und aktive.** Gerade beendete Operationen bleiben so im Filter — und im Einsatz-Zuordnungs-Dropdown — auswählbar; ältere abgeschlossene/abgebrochene Einsätze fallen weiterhin heraus, damit die Liste nicht zuwächst.
+### Changed
 
 - **Der Einsatz-Filter der Lageransichten (und das Einsatz-Zuordnungs-Dropdown) sortiert die Einsätze jetzt nach geplantem Start absteigend, sodass die neuesten oben stehen.** Bisher standen die ältesten oben; Einsätze ohne geplanten Start folgen weiterhin zuletzt.
 
 - **Der Auftrags-Filter der Lageransichten und die Auftrags-Auswahlfelder in den Lagereinträgen sortieren die Aufträge jetzt nach Priorität (wichtigste zuerst) — wie in der Auftragsverwaltung.** Aufträge ohne Priorität stehen zuletzt; bei gleicher Priorität entscheidet die höchste Auftragsnummer.
 
-- **Auftrags-Workflow jetzt profit-gegated: nur Mitglieder einer profit-berechtigten Staffel/SK (und Admins) dürfen Aufträge sehen, bearbeiten (Status/Priorität/Materialien/Handover/Reassign) und Material-Claims setzen; reine Nicht-Profit-Mitglieder können Aufträge nur noch anlegen, sonst nichts.** Im Menü ersetzt „Auftrag anlegen" den „Aufträge"-Link, und ein Direktaufruf von `/orders` bzw. `/orders/{id}` leitet für sie auf das Anlege-Formular um. Das Backend setzt dasselbe Gate auf Lese-, Schreib- und Claim-Endpunkten durch (leere Liste bzw. `403`) — auch die sonst staffelübergreifend öffentliche SK-Warteschlange bleibt für Nicht-Profit-Mitglieder verborgen.
+## [v0.3.50](https://github.com/krt-iri/basetool/releases/tag/v0.3.50) - 2026-06-03
 
-- **Beförderungssystem: ein Admin ohne aktive Staffel (Alle-Staffeln-Modus) sieht jetzt einen Hinweis „Bitte wähle eine Staffel" statt der zusammengeführten Daten aller Staffeln; erst nach Auswahl einer Staffel erscheint deren System.** Ein Beförderungskatalog ist inhärent pro Staffel, daher ergibt die vermischte Allansicht keinen Sinn. Nutzer ganz ohne Staffelzugehörigkeit haben kein eigenes Beförderungssystem mehr und sehen den Menüpunkt nicht (direkter Seitenaufruf wird mit 403 blockiert).
+### Added
+
+- **Der Schiffs-Import im Hangar erkennt jetzt zusätzlich das JSON des [Fleetyards](https://fleetyards.net)-Hangar-Exports**, das bisher als „Unbekanntes Format" abgewiesen wurde. Schiffe werden über denselben toleranten Namens- und Slug-Abgleich wie die übrigen Formate (Fleetview, HangarXPLOR, StarJump FleetViewer) den vorhandenen Schiffstypen zugeordnet; ein in Fleetyards vergebener Schiffsname wird als individueller Name übernommen.
+
+- **Neue Seite „Organigramm" (`/org-chart`): visualisiert die Funktionsränge des Profit-Bereichs — die Bereichsleitung an der Spitze, darunter die profit-berechtigten Staffeln (Staffelleiter, bis zu vier benennbare Kommandogruppen mit je Kommandoleiter, Stv. und bis zu vier Ensign) und Spezialkommandos (1–2 SK-Leiter).** Eine Kommandogruppe lässt sich benennen und schon vor ihrem Kommandoleiter mit Stv. und Ensign besetzen — untergeordnete Posten sind also unabhängig vom übergeordneten besetzbar. Jeder angemeldete Nutzer kann das Organigramm ansehen; nur Admins bearbeiten es inline an den Knoten (zuweisen, neu zuweisen, umbenennen, entfernen). Rein informativ — eine Eintragung vergibt keine Berechtigungen (Migrationen V136/V138).
+
+### Changed
+
+- **Der automatische Deploy (`deploy.sh` / `iri-deploy.timer`) wiederholt ein Image, dessen Health-Check fehlschlägt, jetzt mit exponentiellem Backoff statt bei jedem 5-Minuten-Tick.** Bisher fuhr ein kaputtes `:stable` (oder ein vorübergehender Fehler) die Anwendung alle paar Minuten in die Wartungsseite, weil derselbe defekte Digest endlos neu ausgerollt und zurückgerollt wurde. Der Backoff ist an das Digest-Paar gekoppelt — ein neu promotetes (repariertes) Image wird sofort ausgerollt, nur Wiederholungen desselben fehlerhaften Images werden gedrosselt (`--force` erzwingt einen Sofort-Retry, `IRI_BACKOFF_BASE` / `IRI_BACKOFF_MAX` steuern die Zeiten).
 
 ### Fixed
 
-- **Der „Abmelden"-Button im Menü funktioniert wieder korrekt** — er sah seit der Umstellung auf ein CSRF-sicheres POST-Formular schmaler und blasser aus (gemischte Schreibweise statt Versalien) und beendete zwar die lokale Sitzung, nicht aber die Keycloak-SSO-Sitzung: die Seite lud nicht neu und ein erneuter Login ging ohne Passwortabfrage durch. Ursache war die CSP-Regel `form-action 'self'`, die den Abmelde-Redirect auf die anders-originige Keycloak-URL blockierte; die Keycloak-Herkunft ist jetzt erlaubt, und der Button erbt wieder das Navigations-Styling.
-
-- **Das öffentliche Auftrags-Anlageformular zeigt anonymen Gästen jetzt befüllte Auswahlfelder: „Auftraggeber" listet alle Staffeln und Spezialkommandos, „bearbeitende Einheit" alle profit-berechtigten Staffeln und Spezialkommandos** (bisher war „Auftraggeber" leer und die Profit-SKs fehlten bei der bearbeitenden Einheit). Die bearbeitende Einheit ist mit dem konfigurierten Eingangs-Spezialkommando (Systemeinstellung unter `/admin/settings`) vorbelegt; ein Gast kann stattdessen eine andere profit-berechtigte Einheit wählen, sonst läuft der Auftrag wie bisher auf das Eingangs-SK.
-
-- **Ein Gast in einem Einsatz lässt sich jetzt von jedem, der ihn eintragen darf (auch anonym), mit einer beliebigen Staffel oder einem beliebigen Spezialkommando markieren.** Bisher verwarf das Backend die Markierung anonymer Nutzer und wies angemeldete Nutzer ab, die nicht selbst Mitglied der gewählten Org-Einheit waren (403) — insbesondere konnte ein SK-Leiter dem Einsatz seines eigenen Spezialkommandos keinen Gast mit dem SK-Label hinzufügen. Die Markierung ist reine Einsatz-Metadaten (nur fürs Roster), vergibt keine Rechte und ändert keine Nutzerdaten.
-
-- **Ein angemeldetes Staffelmitglied (ohne Offiziers- oder Adminrechte) kann seine eigene Auszahlungsart in einem Einsatz jetzt direkt in der Auszahlungs-Übersicht umstellen.** Bisher war ausgerechnet die eigene Zeile gesperrt, während sich die Auszahlungsart anonymer Teilnehmer ändern ließ — Ursache war ein Vergleich der Teilnehmer-ID mit dem Login-Benutzernamen statt mit der Keycloak-ID.
-
-- **Mitglieder eines Spezialkommandos — insbesondere staffellose SK-Leiter — können „ihre" SK-Daten jetzt auch im Detail öffnen und bearbeiten, nicht mehr nur in Listen sehen.** Die Detail- und Schreib-Zugriffsprüfungen (Einsätze inkl. interner sowie SK-eigene Schiffe/Lager/Raffinerie/Operationen) prüften bisher nur die Heimat-Staffel des Aufrufers und wiesen reine SK-Zugehörigkeiten ab; sie verwenden jetzt denselben Geltungsbereich wie die Listen — die Union aus Staffel und allen SK-Mitgliedschaften bzw. die angepinnte Org-Einheit. Die Strikt-Staffel-Isolation bleibt erhalten: Zugriff weiterhin nur auf eigene Org-Einheiten.
-
 - **Die Frontend-Readiness-Prüfung schlägt in Produktion nicht mehr am selbstsignierten Backend-Zertifikat fehl, sodass Deployments nicht mehr alle paar Minuten in die Wartungsseite kippen.** Die seit dem Sicherheits-Audit (L-5) gepinnte Health-Probe lief über den JDK-HTTP-Client, der — anders als der WebClient — die Hostnamen-Prüfung nicht abschalten kann; da das Backend-Zertifikat nur `localhost` (nicht den Docker-Alias `backend`) im SAN führt, meldete sie dauerhaft `DOWN`. Die Probe validiert die Zertifikatskette weiterhin gegen den gepinnten Truststore, überspringt jetzt aber die Hostnamen-Prüfung; fehlt das `backend-trust`-Bundle, fällt sie auf trust-all (wie der WebClient) statt auf den JVM-Standard-Truststore zurück.
+
+## [v0.3.49](https://github.com/krt-iri/basetool/releases/tag/v0.3.49) - 2026-06-03
+
+### Changed
+
+- **Der Einsatz-Filter der Lageransichten („Mein Lager" / „Alle Lager") zeigt jetzt zusätzlich abgeschlossene und abgebrochene Einsätze der letzten drei Monate an, nicht mehr nur geplante und aktive.** Gerade beendete Operationen bleiben so im Filter — und im Einsatz-Zuordnungs-Dropdown — auswählbar; ältere abgeschlossene/abgebrochene Einsätze fallen weiterhin heraus, damit die Liste nicht zuwächst.
+
+### Fixed
 
 - **Lagerbestände mit Mengentyp SCU werden jetzt zuverlässig auf drei Nachkommastellen gerundet (kaufmännisch).** Beim Einlagern von Raffinerie-Ausbeuten summierte das Backend die Mengen als Gleitkommazahl ohne Rundung, sodass im Lager und im Ausbuchen-Dialog Werte wie 37,160000000000004 SCU auftauchten. Ein Persistenz-Guard am Lagereintrag rundet jetzt jeden Schreibpfad auf drei Stellen, und eine Migration bereinigt die bereits betroffenen Einträge (V137).
 
 - **Verlinkte Raffinerieaufträge auf der Missions-Detailseite zeigen die Endzeit jetzt in der lokalen Zeitzone des Nutzers statt in UTC.** Die Spalte „Ende" wurde serverseitig ohne Zeitzonenumrechnung formatiert; sie wird jetzt — wie in der Raffinerieauftrags-Liste — im Browser DST-korrekt in die Lokalzeit umgerechnet.
 
 - **Sicherheit: Die Raffinerie-Aufträge einer Mission (`GET /api/v1/refinery-orders/mission/{id}`) sind jetzt auf die Orgeinheit(en) des Aufrufers beschränkt.** Ein Logistiker konnte zuvor die Raffinerie-Finanzdaten (Ausgaben, Erlöse, Gewinn, Besitzer) einer fremden Staffel auslesen, indem er eine öffentliche Mission dieser Staffel aufrief; die Logistiker-Ansicht liefert jetzt nur noch Aufträge der eigenen Orgeinheit(en). Admins ohne aktive Staffel sehen weiterhin alles, eine angepinnte Staffel nur diese; die eigentümergefilterte Ansicht normaler Nutzer war nie betroffen.
-
-- **Das Beförderungssystem ist jetzt durchgängig staffel-scoped: jede Staffel sieht nur ihre eigenen Themenbereiche, Bewertungen, Rangvoraussetzungen und Eignungsprüfungen.** Bisher filterten nur die Themenbereiche nach Staffel — Kategorien, Lerninhalte, Rangvoraussetzungen, „Meine Bewertungen", die Bewertungsverwaltung und die Eignungsberechnung werteten staffelübergreifend aus; ein Offizier oder Mitglied einer Staffel konnte so die Beförderungsdaten anderer Staffeln sehen. Admins sehen weiterhin alles bzw. die angepinnte Staffel. Rangvoraussetzungen (inklusive staffelweiter „globaler" ohne Themenbereich/Kategorie) gehören jetzt einer eigenen Staffel und werden beim Anlegen aus dem aktiven Staffelkontext gestempelt (Migration V135).
 
 - **Operations- und Einsatz-Detailseite: der fest eingeblendete Footer verdeckt nicht mehr den unteren Seiteninhalt.** Diese beiden Seiten betten ihren Inhalt neben dem `<main>`-Element ein, wodurch die globale Footer-Freiraum-Reservierung verloren ging und die letzte Panel-Zeile beim Scrollen unter den Footer rutschte; der Seiten-Wrapper reserviert den Platz jetzt selbst.
 
@@ -78,7 +98,29 @@
 
 - **Härtung (defense-in-depth):** Admin-Stammdaten-Create (Sternsysteme, Frequenztypen, Raffineriemethoden, Materialkategorien, Staffeln, SK, Job-Typen) ignoriert jetzt eine client-`id`/`version`; Logout läuft nur noch per CSRF-geschütztem POST; das Frontend hat ein Multipart-Upload-Limit (2 MB); der Backend-Health-Check pinnt in Prod das Backend-Zertifikat statt blind zu vertrauen; der Resource-Server kann optional die JWT-`aud` prüfen (`app.security.jwt.expected-audiences`); und die Docker-Base-Images sind auf ihren Multi-Arch-Digest gepinnt (reproduzierbare Builds, intakte SLSA-Provenance).
 
-- **Ungenutztes Asciidoctor-Gradle-Plugin entfernt — das beseitigt 8 OWASP-Dependency-Check-Alerts an der Wurzel.** Das Plugin war totes Gerüst (keine `.adoc`-Quellen, kein Spring-REST-Docs; die API-Doku kommt von springdoc/OpenAPI) und zog allein die verwundbare `jruby-complete`-Kette (snakeyaml, jline, bcprov, jruby-base) auf den Build-Klassenpfad. Die dadurch obsolete SnakeYAML-Suppression in der OWASP-Suppressions-Datei wurde mitentfernt.
+## [v0.3.47](https://github.com/krt-iri/basetool/releases/tag/v0.3.47) - 2026-06-03
+
+### Added
+
+- **Der Footer zeigt jetzt das „Made By The Community"-Logo und den erforderlichen Markenhinweis von Cloud Imperium Rights LLC.** Damit erfüllt die App die Vorgaben des offiziellen Star-Citizen-Fankits für Fan-Projekte; der Hinweis ist über den fest eingeblendeten Footer auf jeder Seite sichtbar.
+
+- **Der Blueprint-Import im persönlichen Inventar akzeptiert jetzt zusätzlich das JSON des [Basetool Blueprint Extractor](https://github.com/krt-iri/basetool-bp-extractor), nicht mehr nur den SCMDB-Log-Watcher-Export.** Beide Formate liefern dieselben Bauplan-Namen; der Erhalt-Zeitstempel wird aus `ts` (SCMDB) oder `receivedAt` (Extractor) gelesen, und gelernte Namens-Aliase gelten für beide Tools.
+
+- **Mehrfaches Importieren ist unkritisch: bereits vorhandene Baupläne werden nicht doppelt angelegt, und ihr Erhalt-Zeitpunkt wird nur dann aktualisiert, wenn der erneute Import einen früheren Zeitpunkt liefert.**
+
+## [v0.3.46](https://github.com/krt-iri/basetool/releases/tag/v0.3.46) - 2026-06-03
+
+### Changed
+
+- **Auftrags-Workflow jetzt profit-gegated: nur Mitglieder einer profit-berechtigten Staffel/SK (und Admins) dürfen Aufträge sehen, bearbeiten (Status/Priorität/Materialien/Handover/Reassign) und Material-Claims setzen; reine Nicht-Profit-Mitglieder können Aufträge nur noch anlegen, sonst nichts.** Im Menü ersetzt „Auftrag anlegen" den „Aufträge"-Link, und ein Direktaufruf von `/orders` bzw. `/orders/{id}` leitet für sie auf das Anlege-Formular um. Das Backend setzt dasselbe Gate auf Lese-, Schreib- und Claim-Endpunkten durch (leere Liste bzw. `403`) — auch die sonst staffelübergreifend öffentliche SK-Warteschlange bleibt für Nicht-Profit-Mitglieder verborgen.
+
+- **Beförderungssystem: ein Admin ohne aktive Staffel (Alle-Staffeln-Modus) sieht jetzt einen Hinweis „Bitte wähle eine Staffel" statt der zusammengeführten Daten aller Staffeln; erst nach Auswahl einer Staffel erscheint deren System.** Ein Beförderungskatalog ist inhärent pro Staffel, daher ergibt die vermischte Allansicht keinen Sinn. Nutzer ganz ohne Staffelzugehörigkeit haben kein eigenes Beförderungssystem mehr und sehen den Menüpunkt nicht (direkter Seitenaufruf wird mit 403 blockiert).
+
+## [v0.3.45](https://github.com/krt-iri/basetool/releases/tag/v0.3.45) - 2026-06-03
+
+### Fixed
+
+- **Das Beförderungssystem ist jetzt durchgängig staffel-scoped: jede Staffel sieht nur ihre eigenen Themenbereiche, Bewertungen, Rangvoraussetzungen und Eignungsprüfungen.** Bisher filterten nur die Themenbereiche nach Staffel — Kategorien, Lerninhalte, Rangvoraussetzungen, „Meine Bewertungen", die Bewertungsverwaltung und die Eignungsberechnung werteten staffelübergreifend aus; ein Offizier oder Mitglied einer Staffel konnte so die Beförderungsdaten anderer Staffeln sehen. Admins sehen weiterhin alles bzw. die angepinnte Staffel. Rangvoraussetzungen (inklusive staffelweiter „globaler" ohne Themenbereich/Kategorie) gehören jetzt einer eigenen Staffel und werden beim Anlegen aus dem aktiven Staffelkontext gestempelt (Migration V135).
 
 ## [v0.3.44](https://github.com/krt-iri/basetool/releases/tag/v0.3.44) - 2026-06-02
 
