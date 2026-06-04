@@ -79,4 +79,21 @@ public record ScopePredicate(
   public boolean memberOrgUnitIdsEmpty() {
     return memberOrgUnitIds.isEmpty();
   }
+
+  /**
+   * In-memory mirror of the JPQL scope clause documented above, for the per-row {@code canSee*} /
+   * {@code canEdit*} detail and write gates. A single org-unit id is permitted iff a row owned by
+   * it would appear in this caller's scoped <em>list</em> view: admin-all-scope sees everything, a
+   * pinned caller sees only the pinned id, and an unpinned non-admin sees any org unit in their
+   * membership union (Staffel + every Spezialkommando). Keeping this on the record guarantees the
+   * detail/edit checks and the list queries can never diverge.
+   *
+   * @param orgUnitId the org-unit id (Staffel or Spezialkommando) to test; never {@code null}.
+   * @return {@code true} iff a row owned by {@code orgUnitId} is in scope for this caller.
+   */
+  public boolean permits(@NotNull UUID orgUnitId) {
+    return adminAllScope
+        || (activeOrgUnitId != null && activeOrgUnitId.equals(orgUnitId))
+        || memberOrgUnitIds.contains(orgUnitId);
+  }
 }
