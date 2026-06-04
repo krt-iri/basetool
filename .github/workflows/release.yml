@@ -1,0 +1,216 @@
+name: Release
+
+# Cut a GitHub Release when a semver tag `vX.Y.Z` is pushed, and make that tag
+# self-contained: it carries a tidied CHANGELOG.md and freshly regenerated
+# CycloneDX SBOMs that match the dependency graph at release time (issue #416).
+#
+# What happens on a `vX.Y.Z` push:
+#   1. Tidy CHANGELOG.md -- `reconcile_changelog.py --write` moves every
+#      `[Unreleased]` bullet that has now shipped under this tag into the tag's
+#      own dated `## [vX.Y.Z] - DATE` section.
+#   2. Regenerate the SBOMs -- `./gradlew :backend:cyclonedxBom
+#      :frontend:cyclonedxBom`. The CycloneDX serial number + timestamp rotate on
+#      every run; a regeneration that only rotated those volatile fields is
+#      treated as "no change" (bom_unchanged.py) and the committed copy is
+#      restored, so a no-op release produces no phantom diff and cannot loop.
+#      This is the deliberate handling of issue #416's serial-number churn.
+#   3. If step 1 or 2 produced a real diff, commit it on top of the tagged
+#      commit, FORCE-MOVE the tag to that commit (so the tag literally contains
+#      the refreshed artifacts), and fast-forward `main` when the tag sat at
+#      main's HEAD (the normal release flow).
+#   4. Create the GitHub Release: body = this tag's CHANGELOG section rendered in
+#      the release-notes skill's German rubric style (extract_release_notes.py),
+#      plus links to the signed multi-arch GHCR images that `release-images.yml`
+#      builds in parallel, with the four SBOM files attached as release assets.
+#
+# Re-trigger note: force-moving the tag in step 3 fires this workflow (and
+# `release-images.yml`) a second time on the new commit. That second run is a
+# no-op here -- `reconcile_changelog.py` is idempotent and the SBOM component set
+# is unchanged, so nothing is committed and the tag is not moved again. The
+# convergence costs one extra, fully cache-hit image build. That is the accepted
+# trade-off for the requirement "the tag contains the refreshed artifacts".
+#
+# Operational prerequisites:
+#   - `contents: write` (below) lets the default GITHUB_TOKEN push the doc
+#     commit, force-move the tag, and create the Release.
+#   - If a tag-protection rule guards `v*`, GITHUB_TOKEN must be allowed to
+#     update it, otherwise step 3's force-push fails. If branch protection
+#     guards `main`, the fast-forward is best-effort and only warns.
+
+on:
+  push:
+    # Match the same strict semver tags as `release-images.yml`; malformed typo
+    # tags (e.g. `v-0.2.23`) neither build images nor cut a release.
+    tags: ['v*.*.*']
+
+# Serialise releases for the same tag; never cancel a half-done release (it
+# could leave the tag moved but the Release uncreated).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # push the doc commit, force-move the tag, create the Release
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+
+jobs:
+  release:
+    name: Reconcile, refresh SBOM & publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout tag (full history for blame + tag resolution)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # `reconcile_changelog.py` blames the changelog and resolves each
+          # commit to the earliest containing tag, so it needs the full history
+          # AND every tag, not the default shallow tagless clone.
+          fetch-depth: 0
+          # Keep the default GITHUB_TOKEN credentials so the later push / tag
+          # force-move authenticate without a separate checkout.
+
+      - name: Resolve tag + image version
+        id: ver
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          # Image tags drop the leading `v` (OCI convention): v1.4.2 -> 1.4.2.
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+        with:
+          cache-read-only: true
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Tidy CHANGELOG (move shipped entries under their tag)
+        run: python3 .claude/skills/release-notes/scripts/reconcile_changelog.py --write
+
+      - name: Regenerate CycloneDX SBOMs
+        run: ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom --stacktrace
+
+      - name: Drop SBOM churn that is only serial-number / timestamp rotation
+        run: |
+          set -euo pipefail
+          for module in backend frontend; do
+            json="${module}/docs/${module}-bom.json"
+            xml="${module}/docs/${module}-bom.xml"
+            old="$(mktemp)"
+            git show "HEAD:${json}" > "$old" 2>/dev/null || true
+            # Compare the regenerated JSON to the committed one ignoring the
+            # volatile serialNumber + metadata.timestamp. If only those rotated,
+            # restore BOTH json and xml so no phantom diff is committed; the JSON
+            # and XML encode the same dependency graph, so the JSON verdict is
+            # authoritative for both.
+            if python3 .github/scripts/bom_unchanged.py "$old" "$json"; then
+              echo "::notice::${module} SBOM unchanged (serial/timestamp churn only) -- restoring committed copy"
+              git checkout -- "$json" "$xml"
+            else
+              echo "${module} SBOM changed -- keeping regenerated copy"
+            fi
+            rm -f "$old"
+          done
+
+      - name: Detect real changes
+        id: diff
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No CHANGELOG/SBOM changes for this tag."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git --no-pager diff --stat
+          fi
+
+      - name: Commit artifacts, force-move tag, fast-forward main
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          # `-s` adds a DCO sign-off matching the bot author identity (github-actions[bot]
+          # is DCO-exempt, but the trailer keeps the history uniform).
+          git commit -s -m "chore(release): tidy CHANGELOG + refresh SBOM for ${TAG}"
+          new_commit="$(git rev-parse HEAD)"
+
+          # Force-move the tag to the doc commit so the tag itself carries the
+          # refreshed CHANGELOG + SBOM.
+          git tag -f "${TAG}" "${new_commit}"
+          git push --force origin "refs/tags/${TAG}"
+          echo "Moved tag ${TAG} -> ${new_commit}"
+
+          # Fast-forward main only when the tag sat exactly at main's tip (the
+          # normal "cut a release from main" flow); otherwise leave the doc
+          # commit living solely in the tag -- the next release's reconcile folds
+          # it forward. Best-effort: branch protection may reject the push.
+          git fetch origin main --quiet
+          if [ "$(git rev-parse origin/main)" = "${GITHUB_SHA}" ]; then
+            if git push origin "${new_commit}:refs/heads/main"; then
+              echo "Fast-forwarded main to the release doc commit."
+            else
+              echo "::warning::Could not push to main (branch protection?); doc commit lives in the tag only."
+            fi
+          else
+            echo "::warning::main advanced past the tag; doc commit lives in the tag only. Reconcile folds it forward next release."
+          fi
+
+      - name: Build release notes body
+        id: notes
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          # This tag's CHANGELOG section, remapped to the release-notes skill's
+          # German rubrics (Neu / Verbesserungen / Fehlerbehebungen / ...).
+          python3 .github/scripts/extract_release_notes.py "${TAG}" CHANGELOG.md >> "$body"
+          # Footer via printf (not a heredoc) so every line stays indented under
+          # the YAML block scalar; backticks are literal inside the format string.
+          {
+            printf '\n## Docker Images\n\n'
+            printf 'Multi-arch (linux/amd64, linux/arm64), cosign-signed (keyless / Sigstore). Pull by version tag:\n\n'
+            printf -- '- Backend: `%s/%s/basetool-backend:%s`\n' "$REGISTRY" "$IMAGE_OWNER" "$VERSION"
+            printf -- '- Frontend: `%s/%s/basetool-frontend:%s`\n\n' "$REGISTRY" "$IMAGE_OWNER" "$VERSION"
+            printf 'Also tagged `:latest`. Package pages:\n'
+            printf '[backend](https://github.com/%s/basetool/pkgs/container/basetool-backend) ·\n' "$IMAGE_OWNER"
+            printf '[frontend](https://github.com/%s/basetool/pkgs/container/basetool-frontend)\n\n' "$IMAGE_OWNER"
+            printf '## SBOM\n\n'
+            printf 'CycloneDX SBOMs for this release are attached below and committed under `backend/docs/` and `frontend/docs/`.\n'
+          } >> "$body"
+          echo "path=${body}" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          NOTES: ${{ steps.notes.outputs.path }}
+        run: |
+          set -euo pipefail
+          assets=(
+            backend/docs/backend-bom.json backend/docs/backend-bom.xml
+            frontend/docs/frontend-bom.json frontend/docs/frontend-bom.xml
+          )
+          # Idempotent: a tag force-move re-fires this workflow, so an existing
+          # release is updated in place rather than failing on a duplicate.
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --title "${TAG}" --notes-file "${NOTES}"
+            gh release upload "${TAG}" "${assets[@]}" --clobber
+          else
+            gh release create "${TAG}" --title "${TAG}" --notes-file "${NOTES}" "${assets[@]}"
+          fi
