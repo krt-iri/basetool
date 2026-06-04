@@ -228,15 +228,43 @@ live.
 
 ### Cutting a release
 
-From a developer's laptop, working on the `main` branch:
+Releases are cut through a two-phase, PR-based GitHub Actions flow — there is
+**no** hand-pushed git tag and no tag is ever force-moved. Tidying the CHANGELOG
+and regenerating the CycloneDX SBOMs happens automatically as part of the run.
 
-```bash
-git tag -a v1.4.3 -m "Release v1.4.3"
-git push origin v1.4.3
-```
+**Phase 1 — prepare.** Trigger *Actions → Release · Prepare → Run workflow* and
+enter the version **without** the leading `v` (e.g. `1.4.3`). Off `main` the
+workflow:
+- reconciles any historical `[Unreleased]` CHANGELOG drift and **cuts**
+  `[Unreleased]` into a dated `## [v1.4.3]` section;
+- regenerates `*/docs/*-bom.{json,xml}` (pure serial-number / timestamp churn is
+  discarded — only a real dependency change is kept);
+- commits the result on a `release/v1.4.3` branch and opens a
+  `chore(release): v1.4.3` PR carrying a preview of the release notes.
 
-The push to `v*.*.*` fires `release-images.yml`. Within ~10 minutes the
-images are built, scanned, signed, and available in GHCR as:
+**Phase 2 — merge.** Review and **merge** that PR. The merge *is* the release:
+`release-publish.yml` then
+- creates the `v1.4.3` tag **once**, at the merge commit (which already carries
+  the refreshed CHANGELOG + SBOM, so the tag is never moved afterwards);
+- publishes the GitHub Release (notes + image links + the four SBOM files as
+  assets);
+- and the tag push fires `release-images.yml`.
+
+Closing the prep PR without merging cancels the release cleanly — no tag, no
+orphan commit on `main`.
+
+> **`RELEASE_TOKEN` is required for the images to build automatically.** A tag
+> created by CI with the default `GITHUB_TOKEN` does not trigger other workflows
+> (GitHub's anti-recursion rule), so `release-publish.yml` creates the tag with
+> the `RELEASE_TOKEN` secret (a fine-grained PAT or GitHub App with `contents:
+> write`) so that `release-images.yml` fires. If the secret is absent the tag and
+> the GitHub Release are still produced, but you must start the image build by
+> hand (*Actions → Release Images → Run workflow → `v1.4.3`*); the publish job
+> logs a warning saying exactly this. `RELEASE_TOKEN` is a CI secret, separate
+> from the server's GHCR-pull PAT under [Token rotation](#token-rotation).
+
+Within ~10 minutes the images are built, scanned, signed, and available in GHCR
+as:
 
 ```
 ghcr.io/krt-iri/basetool-backend:1.4.3   (also :1.4, :1, :latest)
