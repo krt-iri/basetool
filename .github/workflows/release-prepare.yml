@@ -64,9 +64,11 @@ jobs:
             echo "::error::version '$VERSION' must be MAJOR.MINOR.PATCH without a leading 'v'"
             exit 1
           fi
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "branch=release/v${VERSION}" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=${VERSION}"
+            echo "tag=v${VERSION}"
+            echo "branch=release/v${VERSION}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout main (full history for blame + reconcile)
         uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
