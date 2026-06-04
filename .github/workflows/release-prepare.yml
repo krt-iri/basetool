@@ -135,23 +135,42 @@ jobs:
             rm -f "$old"
           done
 
-      - name: Commit on the release branch
+      - name: Commit on the release branch (GitHub-signed via API)
         env:
+          # createCommitOnBranch signs the commit with GitHub's own key, so the
+          # release commit is "Verified" and satisfies the required_signatures
+          # rule on main. A plain `git commit` on the runner is unsigned (the
+          # runner holds no signing key) and would block the release PR. The
+          # default GITHUB_TOKEN is enough -- this is a commit, not a PR, so the
+          # org's no-Actions-PRs policy does not apply -- and it keeps
+          # github-actions[bot] as the author, which the DCO check exempts. No
+          # signing key is ever stored on or handed to the runner.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.ver.outputs.tag }}
           BRANCH: ${{ steps.ver.outputs.branch }}
+          BOT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "${BRANCH}"
-          git add -A
-          if git diff --cached --quiet; then
+          # Commit only the known release artifacts -- never an incidental change
+          # such as the gradlew mode bit flipped by `chmod +x` in an earlier step.
+          mapfile -t files < <(git diff --name-only HEAD -- CHANGELOG.md backend/docs frontend/docs)
+          if [ "${#files[@]}" -eq 0 ]; then
             echo "::error::nothing to release: no CHANGELOG/SBOM changes were produced for ${TAG}"
             exit 1
           fi
-          # github-actions[bot] is DCO-exempt; -s keeps the trailer uniform.
-          git commit -s -m "chore(release): prepare ${TAG}"
-          git push -u origin "${BRANCH}"
+          printf '::notice::committing release artifacts: %s\n' "${files[*]}"
+          head_oid="$(git rev-parse HEAD)"
+          # Create the release branch at the current main tip; the signed commit
+          # then lands on top of it via the GraphQL API below.
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/heads/${BRANCH}" -f "sha=${head_oid}" >/dev/null
+          python3 .github/scripts/create_signed_commit.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --branch "${BRANCH}" \
+            --expected-head-oid "${head_oid}" \
+            --message "chore(release): prepare ${TAG}" \
+            --trailer "Signed-off-by: github-actions[bot] <${BOT_EMAIL}>" \
+            "${files[@]}"
 
       - name: Build the release-notes preview for the PR body
         id: notes
