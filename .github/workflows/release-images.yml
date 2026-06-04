@@ -173,7 +173,7 @@ jobs:
             org.opencontainers.image.vendor=KRT IRIDIUM
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
-            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.licenses=GPL-3.0-only
 
       - name: Build & push per-arch image by digest
         id: build
@@ -349,6 +349,11 @@ jobs:
         working-directory: /tmp/digests/${{ matrix.module }}
         run: |
           set -eu
+          # Intentional word-splitting: each $(...) must expand into MULTIPLE
+          # separate CLI arguments — `-t tagA -t tagB ...` from the jq output
+          # and N `image@sha256:...` source refs from the printf. Quoting would
+          # collapse each into a single argument and break the manifest merge.
+          # shellcheck disable=SC2046
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@sha256:%s ' *)

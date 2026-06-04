@@ -79,6 +79,13 @@ dependencies {
 
   developmentOnly("org.springframework.boot:spring-boot-devtools")
 
+  // FindSecBugs: security-focused SpotBugs detector plugin (taint analysis for
+  // SQLi / path traversal / SSRF / weak crypto / XXE on our OWN code). Loaded
+  // into spotbugsMain via `pluginJarFiles` below. Runs inside the Gradle build,
+  // complementing CodeQL (CI-only) with the same class of analysis on every
+  // local `check`.
+  spotbugsPlugins("com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0")
+
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
   testImplementation("org.springframework.security:spring-security-test")
@@ -112,8 +119,9 @@ extra["snippetsDir"] = file("build/generated-snippets")
 
 // SpotBugs task for the main source set. We use the `-base` variant of the
 // plugin which does not auto-create tasks, so we register one explicitly and
-// wire it into `check`. Initial introduction is non-blocking
-// (`ignoreFailures = true`) — flip to false once the backlog has been triaged.
+// wire it into `check`. BLOCKING (`ignoreFailures = false`): a HIGH-confidence
+// finding (incl. the FindSecBugs security detectors) fails the build. The
+// codebase is currently clean at this level, so the gate starts green.
 tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   group = "verification"
   description = "Runs SpotBugs analysis on the main source set."
@@ -124,13 +132,21 @@ tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   // architectural justification in the filter file. Keeps the bot's
   // recurring per-commit re-flagging out of PR threads.
   excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))
+  // Wire the FindSecBugs detectors (declared in the `spotbugsPlugins`
+  // configuration) into this manually-registered task. The convention
+  // `spotbugsMain` task auto-wires this, but the `-base` plugin variant used
+  // here does not, so it is explicit.
+  pluginJarFiles.from(configurations.named("spotbugsPlugins"))
   effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
   reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
-  ignoreFailures = true
-  reports.create("html") {
-    required.set(true)
-    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.html"))
-  }
+  ignoreFailures = false
+  // XML reporter ONLY — do NOT also enable HTML here. SpotBugs 4.9.8 has a
+  // multi-output ordering bug: with both reporters configured the plugin
+  // passes `-html` before `-xml`, and in that order SpotBugs writes a report
+  // with ZERO analyzed classes — i.e. the gate silently scans nothing
+  // (verified: html+xml -> total_classes=0; xml-only -> total_classes=768).
+  // XML is the canonical machine-readable format (IDE import, quality tooling).
+  // Re-add an HTML report only once SpotBugs fixes the ordering.
   reports.create("xml") {
     required.set(true)
     outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))

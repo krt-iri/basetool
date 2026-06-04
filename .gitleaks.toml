@@ -1,0 +1,23 @@
+# gitleaks configuration. Extends the upstream default ruleset and adds an
+# allowlist for the two intentionally-committed fixtures that carry throwaway /
+# placeholder credentials — never production secrets (see CLAUDE.md "Never use
+# production / real credentials in tests or local test stacks"):
+#
+#   - .env.example                                       placeholder env values
+#   - frontend/src/e2e/resources/realm-export.e2e.json   stripped Keycloak realm
+#       export with a rotated, synthetic test client secret + a synthetic user
+#
+# The PR scan in .github/workflows/gitleaks.yml is range-scoped (it only walks
+# the commits the PR introduces), so a NEW secret added anywhere else still
+# fails the check. This allowlist only stops the two known fixtures from
+# tripping the manual full-history scan (workflow_dispatch).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Committed test/sample fixtures with throwaway placeholder credentials"
+paths = [
+  '''\.env\.example$''',
+  '''frontend/src/e2e/resources/realm-export\.e2e\.json$''',
+]

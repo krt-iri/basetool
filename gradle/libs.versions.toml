@@ -32,6 +32,7 @@ archunit = "1.4.2"
 springdocOpenapi = "3.0.3"
 okhttp3 = "5.3.2"
 playwright = "1.60.0"
+axeCorePlaywright = "4.10.1"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
 openpdf = "3.0.5"
@@ -54,6 +55,7 @@ archunit-core = { module = "com.tngtech.archunit:archunit", version.ref = "archu
 springdoc-openapi-starter-webmvc-api = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdocOpenapi" }
 okhttp3-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp3" }
 playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
+axe-core-playwright = { module = "com.deque.html.axe-core:playwright", version.ref = "axeCorePlaywright" }
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrainsAnnotations" }
 lombok-mapstruct-binding = { module = "org.projectlombok:lombok-mapstruct-binding", version.ref = "lombokMapstructBinding" }
 openpdf-core = { module = "com.github.librepdf:openpdf", version.ref = "openpdf" }

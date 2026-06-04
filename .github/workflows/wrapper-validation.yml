@@ -1,0 +1,42 @@
+name: Gradle Wrapper Validation
+
+# Verifies that gradle/wrapper/gradle-wrapper.jar matches the published checksum
+# of an official Gradle release rather than a tampered binary.
+#
+# The wrapper JAR is the one executable committed to the repository that runs
+# with full privileges on every developer machine and CI runner BEFORE any
+# other check (it bootstraps the build itself), so a swapped JAR is a
+# high-value supply-chain target — the canonical "malicious gradle-wrapper.jar"
+# attack. `gradle/actions/wrapper-validation` compares the committed JAR
+# against the checksums of every known Gradle release and fails on a mismatch.
+#
+# Cheap (a few seconds, no Gradle run), so it runs on every PR and main push.
+# Reuses the same pinned `gradle/actions` SHA as the other workflows, so
+# Dependabot's github-actions ecosystem bumps all of them in lockstep.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: wrapper-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  validation:
+    name: Validate Gradle Wrapper
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Validate wrapper JAR checksum
+        uses: gradle/actions/wrapper-validation@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0

@@ -8,6 +8,13 @@ name: Dependency Check
 #   - workflow_dispatch lets a maintainer force a fresh scan on demand
 #   - push to main that touches dependency declarations triggers an
 #     immediate scan so newly-introduced libraries get a same-day verdict
+#   - pull_request that touches dependency declarations scans the proposed
+#     change BEFORE merge, so a vulnerable bump is caught on the PR instead of
+#     only by the next weekly run. The scan restores the weekly-warmed NVD DB
+#     read-only; the gate is the gradle `failBuildOnCVSS = 7.0` build failure
+#     (the SARIF upload is skipped on PRs). Kept NON-required on purpose: it is
+#     path-filtered, and a required path-filtered check never reports on PRs
+#     that don't touch the filtered paths (see flyway-migrations.yml).
 #
 # The plugin's first run downloads the NVD feed (~500 MB) and takes 5-15
 # minutes; subsequent runs reuse the cache and finish in seconds. Set the
@@ -20,6 +27,14 @@ on:
     - cron: '0 6 * * 1'
   workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      - 'build.gradle.kts'
+      - '**/build.gradle.kts'
+      - 'versions.properties'
+      - 'gradle/libs.versions.toml'
+      - 'gradle/wrapper/gradle-wrapper.properties'
+  pull_request:
     branches: [main]
     paths:
       - 'build.gradle.kts'
@@ -55,7 +70,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
         with:
-          cache-read-only: false
+          # PRs restore the weekly-warmed NVD DB read-only (never write the
+          # shared cache from a PR branch); scheduled / main runs keep
+          # re-warming it.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       # The cache key rotates weekly to match the Monday cron and the
       # `nvd.validForHours = 168` configured on the gradle plugin (see
@@ -122,8 +140,11 @@ jobs:
             echo "::warning::SARIF report missing - dependency-check did not finish; skipping the GitHub Security upload."
           fi
 
+      # Skipped on PRs: a PR branch (and especially a fork) may lack
+      # security-events:write, and the PR gate is the CVSS>=7 build failure
+      # above, not the Security-tab upload. Scheduled / main runs publish it.
       - name: Upload SARIF report to GitHub Security
-        if: always() && steps.sarif.outputs.exists == 'true'
+        if: always() && steps.sarif.outputs.exists == 'true' && github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
         with:
           sarif_file: build/reports/dependency-check/dependency-check-report.sarif

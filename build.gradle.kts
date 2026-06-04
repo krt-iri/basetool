@@ -107,6 +107,24 @@ subprojects {
     tasks.withType<Test>().configureEach {
       finalizedBy(tasks.named("jacocoTestReport"))
     }
+
+    // Generated / untestable code excluded from BOTH the coverage report and
+    // the coverage gate so the ratio reflects hand-written logic only:
+    //  - MapStruct *MapperImpl: its `@Generated` is
+    //    `javax.annotation.processing.Generated` (SOURCE retention), invisible
+    //    to JaCoCo's bytecode-time annotation filter, so it must be removed by
+    //    class pattern. The `*Mapper` interface is NOT excluded — it carries
+    //    default methods / comparators / `computeProfit(...)` that we test.
+    //  - The one-line Spring Boot `*Application` `SpringApplication.run(...)`
+    //    stub, which has no meaningful unit test.
+    // (Lombok-generated members are auto-excluded because lombok.config sets
+    // `lombok.addLombokGeneratedAnnotation = true`, and JaCoCo 0.8.2+ skips any
+    // CLASS/RUNTIME `@Generated`.)
+    val generatedClassExcludes =
+      listOf("**/*MapperImpl.class", "**/*MapperImpl\$*.class", "**/*Application.class")
+    fun filterGenerated(classes: FileCollection): FileCollection =
+      files(classes.files.map { dir -> fileTree(dir) { exclude(generatedClassExcludes) } })
+
     tasks.named<JacocoReport>("jacocoTestReport") {
       // L-1: only generate the JaCoCo report when actually running in CI.
       // Locally a developer running `./gradlew :backend:test` from the IDE pays
@@ -121,37 +139,39 @@ subprojects {
         csv.required.set(true)
         html.required.set(true)
       }
-      // Strip generated code from the JaCoCo report — coverage on Lombok /
-      // MapStruct / Spring-Boot-Application boilerplate is noise, not signal.
-      //
-      // Lombok-generated methods are auto-excluded by JaCoCo because
-      // `lombok.config` at the project root sets
-      // `lombok.addLombokGeneratedAnnotation = true` (JaCoCo 0.8.2+ honours
-      // any annotation named "Generated" with CLASS/RUNTIME retention).
-      //
-      // MapStruct's `@Generated` is `javax.annotation.processing.Generated`
-      // which is SOURCE-retention — invisible to JaCoCo at bytecode time —
-      // so the generated *MapperImpl classes have to be removed by class-
-      // pattern excludes. The interface (`*Mapper`) is NOT excluded: it
-      // carries default methods, comparators, `computeProfit(...)` etc. that
-      // we explicitly test.
-      //
-      // Also exclude the auto-generated Spring Boot `*Application` main
-      // class (one-line `SpringApplication.run(...)` stubs) so coverage is
-      // not artificially lowered by code we have no meaningful way to
-      // unit-test.
-      classDirectories.setFrom(
-        files(classDirectories.files.map { dir ->
-          fileTree(dir) {
-            exclude(
-              "**/*MapperImpl.class",
-              "**/*MapperImpl\$*.class",
-              "**/*Application.class"
-            )
-          }
-        })
-      )
+      classDirectories.setFrom(filterGenerated(classDirectories))
     }
+
+    // Coverage ratchet, wired into `check`. A module-specific floor (set a few
+    // points below the measured baseline — backend ~87% instr / ~71% branch,
+    // frontend ~65% / ~52%) fails the build on a real coverage regression
+    // without flapping on small fluctuations. Tighten these minimums upward
+    // over time. Uses the same generated-code excludes as the report so the
+    // denominator matches; runs on the test exec data that `check` already
+    // produces (so no extra test run). Unlike the report it is NOT gated on
+    // `CI`, so a regression fails fast on a local `./gradlew check` too.
+    val instructionFloor = mapOf("backend" to "0.82", "frontend" to "0.60")[project.name] ?: "0.50"
+    val branchFloor = mapOf("backend" to "0.65", "frontend" to "0.46")[project.name] ?: "0.40"
+    tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+      dependsOn(tasks.named("test"))
+      classDirectories.setFrom(filterGenerated(classDirectories))
+      violationRules {
+        rule {
+          element = "BUNDLE"
+          limit {
+            counter = "INSTRUCTION"
+            value = "COVEREDRATIO"
+            minimum = instructionFloor.toBigDecimal()
+          }
+          limit {
+            counter = "BRANCH"
+            value = "COVEREDRATIO"
+            minimum = branchFloor.toBigDecimal()
+          }
+        }
+      }
+    }
+    tasks.named("check").configure { dependsOn(tasks.named("jacocoTestCoverageVerification")) }
   }
 
   // Pitest mutation testing (info.solidsoft.pitest). Runs on demand via
@@ -251,6 +271,34 @@ subprojects {
         // 1.35.0 targets the new JDK 25 javac signature.
         googleJavaFormat("1.35.0").reflowLongStrings()
         removeUnusedImports()
+        // GPLv3 file header, enforced on every Java source (main + test + e2e).
+        // The project is GPL-3.0-only (LICENSE.md is the GPLv3 text); the SPDX
+        // tag makes that machine-readable. Fixed year (no `$YEAR` token) so
+        // `spotlessCheck` never churns the header across calendar years. Run
+        // `./gradlew spotlessApply` to (re)stamp.
+        licenseHeader(
+            """
+            /*
+             * Profit Basetool - squadron-management web app.
+             * Copyright (C) 2026 Lucas Greuloch
+             *
+             * SPDX-License-Identifier: GPL-3.0-only
+             *
+             * This program is free software: you can redistribute it and/or modify
+             * it under the terms of the GNU General Public License as published by
+             * the Free Software Foundation, version 3.
+             *
+             * This program is distributed in the hope that it will be useful,
+             * but WITHOUT ANY WARRANTY; without even the implied warranty of
+             * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+             * GNU General Public License for more details.
+             *
+             * You should have received a copy of the GNU General Public License
+             * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+             */
+
+            """
+                .trimIndent() + "\n")
       }
     }
   }
