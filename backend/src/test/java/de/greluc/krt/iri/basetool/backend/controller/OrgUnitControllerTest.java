@@ -52,7 +52,8 @@ class OrgUnitControllerTest {
   @Test
   void listActiveOrgUnits_delegatesToService() {
     OrgUnitMembershipOptionDto option =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON);
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, true);
     when(orgUnitMembershipService.listAllActiveOptions()).thenReturn(List.of(option));
 
     List<OrgUnitMembershipOptionDto> result = controller.listActiveOrgUnits();

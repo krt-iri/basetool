@@ -27,11 +27,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import java.util.regex.Pattern;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,21 +51,27 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression test for the "anonymous guest cannot import scmdb shopping list" bug: an
- * unauthenticated caller hitting GET {@code /orders/create} must load the job-order materials
- * catalog through the public WebClient ({@code isPublic=true}), not the OAuth2-bearer-relaying
- * authenticated one.
+ * Anonymous-guest behaviour of the Job-Order create form ({@code GET /orders/create}).
  *
- * <p>Symptom before the fix: the page rendered with an empty {@code material-options-template}
- * (because the authenticated WebClient had no bearer token for an anonymous caller), so the
- * client-side scmdb parser found zero matches for legitimate material names and surfaced "Folgende
- * Materialien wurden nicht im System gefunden: Agricium, ...". The fix routes {@code
- * fetchMaterials()} through the public client, mirroring {@code fetchSquadrons()} and the
- * order-creation POST.
+ * <p>Covers two things an unauthenticated caller must get right:
+ *
+ * <ul>
+ *   <li>The job-order materials catalog loads through the <em>public</em> WebClient ({@code
+ *       isPublic=true}), not the OAuth2-bearer-relaying authenticated one — otherwise the scmdb
+ *       shopping-list import finds zero matches (the regression that first motivated this test).
+ *   <li>Both owner-pickers populate from the {@code permitAll} {@code /api/v1/org-units/active}
+ *       catalog (requesting = all, responsible = the profit-eligible subset incl. SKs), and the
+ *       responsible picker is pre-selected to the configured intake Spezialkommando — mirroring the
+ *       backend's guest fallback so the form shows the unit the order will land on.
+ * </ul>
  */
 @SpringBootTest
 @SuppressWarnings("unchecked")
 class JobOrderPageControllerCreateFormAnonymousMvcTest {
+
+  private static final String ACTIVE_URI = "/api/v1/org-units/active";
+  private static final String INTAKE_SETTING_URI =
+      "/api/v1/settings/job_order.intake_special_command_id";
 
   @Autowired private WebApplicationContext context;
 
@@ -92,5 +105,52 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
             eq("/api/v1/materials/job-order"), any(ParameterizedTypeReference.class), eq(true));
     verify(backendApiClient, never())
         .getCached(eq("/api/v1/materials/job-order"), any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @WithAnonymousUser
+  void viewCreateForm_AsAnonymousGuest_PopulatesPickersAndPreselectsIntakeSk() throws Exception {
+    UUID intakeId = UUID.randomUUID();
+    OrgUnitMembershipOptionDto profitStaffel =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit Staffel", "PS", "SQUADRON", true);
+    OrgUnitMembershipOptionDto intakeSk =
+        new OrgUnitMembershipOptionDto(intakeId, "Intake SK", "INTK", "SPECIAL_COMMAND", true);
+    OrgUnitMembershipOptionDto nonProfitSk =
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "Combat SK", "CSK", "SPECIAL_COMMAND", false);
+
+    // Reference catalogs (materials / orderable items / squadrons) go through the cached public
+    // client; an empty list keeps them from blocking the render.
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+    // The org-unit catalog and the intake-SK setting are reachable anonymously (permitAll) via the
+    // public client.
+    when(backendApiClient.get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(List.of(profitStaffel, intakeSk, nonProfitSk));
+    when(backendApiClient.get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true)))
+        .thenReturn(new SystemSettingDto(INTAKE_SETTING_URI, intakeId.toString(), 0L));
+
+    mockMvc
+        .perform(get("/orders/create"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("orders-create"))
+        // Requesting picker offers every active org unit, including the non-profit SK ...
+        .andExpect(content().string(Matchers.containsString("Combat SK")))
+        .andExpect(content().string(Matchers.containsString("Profit Staffel")))
+        // ... and the responsible picker pre-selects the configured intake SK. Thymeleaf preserves
+        // the template's inter-attribute newline, so value and selected are whitespace- (not
+        // space-) separated — match with a DOTALL regex.
+        .andExpect(
+            content()
+                .string(
+                    Matchers.matchesPattern(
+                        Pattern.compile(
+                            ".*value=\""
+                                + Pattern.quote(intakeId.toString())
+                                + "\"\\s+selected=\"selected\".*",
+                            Pattern.DOTALL))));
+
+    verify(backendApiClient).get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), eq(true));
+    verify(backendApiClient).get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true));
   }
 }

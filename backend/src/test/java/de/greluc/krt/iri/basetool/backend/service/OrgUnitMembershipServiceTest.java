@@ -489,4 +489,33 @@ class OrgUnitMembershipServiceTest {
     assertEquals(OrgUnitKind.SPECIAL_COMMAND, result.get(3).kind());
     assertEquals("Bravo", result.get(3).orgUnitName());
   }
+
+  @Test
+  void listAllActiveOptions_carriesProfitEligibleFlagPerOrgUnit() {
+    // The flag lets the anonymous-reachable create form fill both pickers from one fetch:
+    // requesting
+    // = all options, responsible = the profit-eligible subset. Pin that each option mirrors its own
+    // org unit's flag (a profit Squadron and a non-profit SK here).
+    Squadron profitSquadron = new Squadron();
+    profitSquadron.setId(UUID.randomUUID());
+    profitSquadron.setName("IRIDIUM");
+    profitSquadron.setShorthand("IRI");
+    profitSquadron.setProfitEligible(true);
+    when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of(profitSquadron));
+
+    SpecialCommand nonProfitSk = new SpecialCommand();
+    nonProfitSk.setId(UUID.randomUUID());
+    nonProfitSk.setName("Alpha");
+    nonProfitSk.setShorthand("ALF");
+    nonProfitSk.setProfitEligible(false);
+    when(specialCommandRepository.findAllByActiveTrue()).thenReturn(List.of(nonProfitSk));
+
+    List<OrgUnitMembershipOptionDto> result = membershipService.listAllActiveOptions();
+
+    assertEquals(2, result.size());
+    assertEquals(OrgUnitKind.SQUADRON, result.get(0).kind());
+    assertEquals(Boolean.TRUE, result.get(0).isProfitEligible());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, result.get(1).kind());
+    assertEquals(Boolean.FALSE, result.get(1).isProfitEligible());
+  }
 }

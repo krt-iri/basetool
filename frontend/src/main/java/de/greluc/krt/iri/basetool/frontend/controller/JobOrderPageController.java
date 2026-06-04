@@ -41,7 +41,6 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverEntryCr
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.iri.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UpdateJobOrderStatusDto;
@@ -61,7 +60,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -377,16 +375,22 @@ public class JobOrderPageController {
   }
 
   /**
-   * Renders the create-order form ({@code /orders/create}). Seeds the materials, job-types and
-   * locations catalogs; the {@code source} parameter threads through so the post-save redirect can
-   * return to the originating page.
+   * Renders the create-order form ({@code /orders/create}). Seeds the materials + orderable-item
+   * catalogs and the two owner-pickers; the {@code source} parameter threads through so the
+   * post-save redirect can return to the originating page. For an anonymous guest, the responsible
+   * (processing) picker is pre-selected to the configured intake Spezialkommando (see {@link
+   * #preselectIntakeForGuest}).
    *
    * @param source optional origin marker
+   * @param principal the caller, or {@code null} for an anonymous guest
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code order-create} view name
    */
   @GetMapping("/create")
-  public String viewCreateForm(@RequestParam(required = false) String source, Model model) {
+  public String viewCreateForm(
+      @RequestParam(required = false) String source,
+      @AuthenticationPrincipal OidcUser principal,
+      Model model) {
     if (!model.containsAttribute("jobOrderForm")) {
       JobOrderForm form = new JobOrderForm();
       form.setSource(source);
@@ -406,6 +410,12 @@ public class JobOrderPageController {
     model.addAttribute("orderableItems", fetchOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
     addOwnerPickerOptions(model);
+    // Anonymous guests have no org-unit context; default the responsible (processing) picker to the
+    // configured intake Spezialkommando — the unit the backend routes a guest order to absent a
+    // profit-eligible pick — so the form shows it up front. Authenticated callers pick their own.
+    if (principal == null) {
+      preselectIntakeForGuest(model);
+    }
     return "orders-create";
   }
 
@@ -1347,18 +1357,23 @@ public class JobOrderPageController {
   }
 
   /**
-   * Fetches the active-org-units catalog from {@code GET /api/v1/org-units/active} for the R5.d.c
-   * Job Order create form's owner-picker fragment. Job Orders are cross-staffel workspaces — the
-   * picker offers every active Staffel + Spezialkommando, not just the caller's memberships. Falls
-   * back to an empty list on backend hiccup so the picker collapses to its hidden state and the
-   * rest of the form stays renderable.
+   * Fetches the active-org-units catalog from {@code GET /api/v1/org-units/active} — the single
+   * source for both Job Order owner-pickers. Job Orders are cross-staffel workspaces, so the picker
+   * offers every active Staffel + Spezialkommando, not just the caller's memberships; each option
+   * carries its {@code isProfitEligible} flag so {@link #addOwnerPickerOptions} can derive the
+   * responsible picker from the requesting one without a second, authenticated SK-catalog call.
+   * Read through the public client ({@code isPublic = true}) because the endpoint is {@code
+   * permitAll}: the create form is reachable anonymously, and the authenticated client has no
+   * bearer token for a guest — it would 401 and leave both pickers empty. Falls back to an empty
+   * list on backend hiccup so the rest of the form stays renderable.
    *
    * @return picker options or empty list; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchActiveOrgUnitOptions() {
     try {
       List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get("/api/v1/org-units/active", new ParameterizedTypeReference<>() {});
+          backendApiClient.get(
+              "/api/v1/org-units/active", new ParameterizedTypeReference<>() {}, true);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch active org units for Job Order owner-picker", e);
@@ -1367,16 +1382,23 @@ public class JobOrderPageController {
   }
 
   /**
-   * Populates the create/edit form model with the two owner-picker option lists: {@code
-   * responsibleOptions} (only profit-eligible squadrons + SKs may process orders) and {@code
-   * requestingOptions} (any active squadron or SK may be the customer), each with a boolean flag
-   * telling the template whether to render the SK optgroup.
+   * Populates the create/edit form model with the two owner-picker option lists, both derived from
+   * a single {@link #fetchActiveOrgUnitOptions} fetch: {@code requestingOptions} (any active
+   * squadron or SK may be the customer) is the full list, and {@code responsibleOptions} (only
+   * profit-eligible squadrons + SKs may process orders) is the {@code isProfitEligible} subset.
+   * Each carries a boolean flag telling the template whether to render the SK optgroup. Sourcing
+   * both from the one {@code permitAll} endpoint is what lets the anonymous create form show profit
+   * SKs in the responsible picker — the previous split fetch needed an authenticated SK-catalog
+   * call that dropped every SK for a guest.
    *
    * @param model the Thymeleaf model to populate.
    */
   private void addOwnerPickerOptions(Model model) {
-    List<OrgUnitMembershipOptionDto> responsibleOptions = fetchResponsibleOptions();
     List<OrgUnitMembershipOptionDto> requestingOptions = fetchActiveOrgUnitOptions();
+    List<OrgUnitMembershipOptionDto> responsibleOptions =
+        requestingOptions.stream()
+            .filter(o -> Boolean.TRUE.equals(o.isProfitEligible()))
+            .collect(Collectors.toList());
     model.addAttribute("responsibleOptions", responsibleOptions);
     model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
     model.addAttribute("requestingOptions", requestingOptions);
@@ -1384,77 +1406,51 @@ public class JobOrderPageController {
   }
 
   /**
-   * Builds the responsible-picker options: only profit-eligible org units (squadrons and SKs) may
-   * be selected as the processing unit of an order. The template's optgroups keep squadrons and SKs
-   * visually separated; within each the list is sorted by name.
+   * Pre-selects the configured intake Spezialkommando as the responsible (processing) unit on the
+   * anonymous create form's two form beans, but only when the caller has not already chosen one (a
+   * re-render after a failed submit keeps their pick). Mirrors the backend's guest fallback — a
+   * guest order with no profit-eligible pick routes to the intake SK — so the form shows up front
+   * the unit the order will actually land on. Never invoked for authenticated callers (they pick
+   * their own unit). No-op when no intake SK is configured.
    *
-   * @return profit-eligible org-unit options; never {@code null}.
+   * @param model the Thymeleaf model carrying the two form beans.
    */
-  private List<OrgUnitMembershipOptionDto> fetchResponsibleOptions() {
-    List<OrgUnitMembershipOptionDto> options = new ArrayList<>();
-    for (SquadronDto s : fetchSquadrons()) {
-      if (Boolean.TRUE.equals(s.isProfitEligible())) {
-        options.add(new OrgUnitMembershipOptionDto(s.id(), s.name(), s.shorthand(), "SQUADRON"));
-      }
+  private void preselectIntakeForGuest(Model model) {
+    UUID intakeId = fetchIntakeSpecialCommandId();
+    if (intakeId == null) {
+      return;
     }
-    for (SpecialCommandDto sk : fetchSpecialCommands()) {
-      if (Boolean.TRUE.equals(sk.isProfitEligible())) {
-        options.add(
-            new OrgUnitMembershipOptionDto(sk.id(), sk.name(), sk.shorthand(), "SPECIAL_COMMAND"));
-      }
+    if (model.getAttribute("jobOrderForm") instanceof JobOrderForm form
+        && form.getResponsibleOrgUnitId() == null) {
+      form.setResponsibleOrgUnitId(intakeId);
     }
-    options.sort(
-        Comparator.comparing(
-            o -> o.orgUnitName() == null ? "" : o.orgUnitName(), String.CASE_INSENSITIVE_ORDER));
-    return options;
+    if (model.getAttribute("jobOrderItemForm") instanceof JobOrderItemForm itemForm
+        && itemForm.getResponsibleOrgUnitId() == null) {
+      itemForm.setResponsibleOrgUnitId(intakeId);
+    }
   }
 
   /**
-   * Fetches all active Spezialkommandos (with the profit-eligibility flag) for the responsible
-   * picker. Unlike the permitAll {@code /api/v1/squadrons} catalog, the {@code
-   * /api/v1/special-commands} endpoint requires an authenticated caller, so this goes through the
-   * bearer-relaying authenticated WebClient ({@code isPublic = false}). Using the anonymous public
-   * client here silently 401s and drops every SK from the picker. Anonymous guests cannot read the
-   * catalog and are force-routed to the intake SK at create time anyway, so the call is skipped for
-   * them rather than firing a doomed 401 that logs a misleading error on every guest create-form
-   * view. Falls back to an empty list on backend hiccup so the form still renders.
+   * Resolves the configured intake Spezialkommando id (system setting {@code
+   * job_order.intake_special_command_id}) for the anonymous responsible-picker preselection. Read
+   * through the public client because the settings endpoint is {@code permitAll} and the create
+   * form is reachable by guests. Returns {@code null} when the setting is unset / blank / malformed
+   * or the backend call fails, so the picker simply renders with nothing preselected.
    *
-   * @return SK DTOs; never {@code null}.
+   * @return the intake SK id, or {@code null} when none is configured / resolvable.
    */
-  private List<SpecialCommandDto> fetchSpecialCommands() {
-    if (!isAuthenticatedCaller()) {
-      return new ArrayList<>();
-    }
+  private UUID fetchIntakeSpecialCommandId() {
     try {
-      PageResponse<SpecialCommandDto> p =
-          backendApiClient.getCached(
-              "/api/v1/special-commands?size=1000&sort=name,asc",
-              new ParameterizedTypeReference<>() {},
-              false);
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
+      SystemSettingDto setting =
+          backendApiClient.get(
+              "/api/v1/settings/job_order.intake_special_command_id", SystemSettingDto.class, true);
+      if (setting != null && setting.value() != null && !setting.value().isBlank()) {
+        return UUID.fromString(setting.value().trim());
       }
     } catch (Exception e) {
-      log.error("Failed to fetch special commands", e);
+      log.warn("Failed to resolve intake Spezialkommando id for responsible-picker preselection");
     }
-    return new ArrayList<>();
-  }
-
-  /**
-   * Reports whether the current request carries a real authenticated principal (not an anonymous
-   * guest), used to gate the authenticated-only Spezialkommando catalog fetch. Reads the security
-   * context directly because the picker-population helpers run without an injected principal.
-   *
-   * @return {@code true} for an authenticated, non-anonymous caller; {@code false} otherwise.
-   */
-  private boolean isAuthenticatedCaller() {
-    org.springframework.security.core.Authentication auth =
-        org.springframework.security.core.context.SecurityContextHolder.getContext()
-            .getAuthentication();
-    return auth != null
-        && auth.isAuthenticated()
-        && !(auth
-            instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
+    return null;
   }
 
   private UUID getCurrentUserId(OidcUser principal) {

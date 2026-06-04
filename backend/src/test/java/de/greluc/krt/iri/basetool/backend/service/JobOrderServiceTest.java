@@ -369,15 +369,18 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void createJobOrder_Guest_RoutesResponsibleToIntakeSpecialCommand() {
-    // Given — a guest (anonymous) creation. The responsible org unit is forced to the configured
-    // intake SK regardless of what the client supplies; the requesting (customer) is honoured.
+  void createJobOrder_Guest_UnresolvableResponsible_FallsBackToIntakeSpecialCommand() {
+    // Given — a guest (anonymous) creation whose responsible pick does not resolve to a known org
+    // unit (here: an unknown id). The order falls back to the configured intake SK; the requesting
+    // (customer) is honoured.
+    UUID unknownResponsibleId = UUID.randomUUID();
     UUID intakeId = UUID.randomUUID();
     SpecialCommand intake = new SpecialCommand();
     intake.setId(intakeId);
     intake.setShorthand("INTK");
 
     when(authHelperService.isAuthenticated()).thenReturn(false);
+    when(orgUnitRepository.findById(unknownResponsibleId)).thenReturn(Optional.empty());
     when(systemSettingService.getSettingValue("job_order.intake_special_command_id"))
         .thenReturn(Optional.of(intakeId.toString()));
     when(orgUnitRepository.findById(intakeId)).thenReturn(Optional.of(intake));
@@ -385,7 +388,12 @@ class JobOrderServiceTest {
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            UUID.randomUUID(), requestingOrgUnitId, "anon-handle", null, List.of(createMat), null);
+            unknownResponsibleId,
+            requestingOrgUnitId,
+            "anon-handle",
+            null,
+            List.of(createMat),
+            null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -404,13 +412,102 @@ class JobOrderServiceTest {
     // When
     jobOrderService.createJobOrder(createDto);
 
-    // Then — responsible is the intake SK (client id ignored), requesting is honoured.
+    // Then — responsible is the intake SK (unresolvable pick), requesting is honoured.
     verify(jobOrderRepository)
         .save(
             argThat(
                 jo ->
                     jo.getResponsibleOrgUnit() == intake
                         && jo.getRequestingOrgUnit().getId().equals(requestingOrgUnitId)));
+  }
+
+  @Test
+  void createJobOrder_Guest_HonorsProfitEligiblePick() {
+    // Given — a guest creation that picks a *profit-eligible* responsible unit from the create
+    // form's responsible picker. The pick is honoured verbatim (no intake-SK fallback) and the
+    // intake SK setting is never consulted.
+    UUID pickedId = UUID.randomUUID();
+    Squadron picked = new Squadron();
+    picked.setId(pickedId);
+    picked.setShorthand("PROF");
+    picked.setProfitEligible(true);
+
+    when(authHelperService.isAuthenticated()).thenReturn(false);
+    when(orgUnitRepository.findById(pickedId)).thenReturn(Optional.of(picked));
+
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
+    CreateJobOrderDto createDto =
+        new CreateJobOrderDto(
+            pickedId, requestingOrgUnitId, "anon-handle", null, List.of(createMat), null);
+
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class)))
+        .thenAnswer(
+            i -> {
+              JobOrder saved = i.getArgument(0);
+              saved.setId(orderId);
+              return saved;
+            });
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
+        .thenReturn(0.0);
+
+    // When
+    jobOrderService.createJobOrder(createDto);
+
+    // Then — responsible is the guest's profit-eligible pick; the intake SK setting is not read.
+    verify(jobOrderRepository).save(argThat(jo -> jo.getResponsibleOrgUnit() == picked));
+    verify(systemSettingService, never()).getSettingValue("job_order.intake_special_command_id");
+  }
+
+  @Test
+  void createJobOrder_Guest_NonProfitPick_FallsBackToIntakeSpecialCommand() {
+    // Given — a guest creation that picks a resolvable but NON-profit-eligible responsible unit.
+    // The
+    // profit-eligibility guard rejects it (a guest may not direct work to a non-opted-in unit), so
+    // the order falls back to the configured intake SK rather than 400-ing the public form.
+    UUID nonProfitId = UUID.randomUUID();
+    Squadron nonProfit = new Squadron();
+    nonProfit.setId(nonProfitId);
+    nonProfit.setShorthand("NOPF");
+    nonProfit.setProfitEligible(false);
+    UUID intakeId = UUID.randomUUID();
+    SpecialCommand intake = new SpecialCommand();
+    intake.setId(intakeId);
+    intake.setShorthand("INTK");
+
+    when(authHelperService.isAuthenticated()).thenReturn(false);
+    when(orgUnitRepository.findById(nonProfitId)).thenReturn(Optional.of(nonProfit));
+    when(systemSettingService.getSettingValue("job_order.intake_special_command_id"))
+        .thenReturn(Optional.of(intakeId.toString()));
+    when(orgUnitRepository.findById(intakeId)).thenReturn(Optional.of(intake));
+
+    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 700, 5.0);
+    CreateJobOrderDto createDto =
+        new CreateJobOrderDto(
+            nonProfitId, requestingOrgUnitId, "anon-handle", null, List.of(createMat), null);
+
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.save(any(JobOrder.class)))
+        .thenAnswer(
+            i -> {
+              JobOrder saved = i.getArgument(0);
+              saved.setId(orderId);
+              return saved;
+            });
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any()))
+        .thenReturn(0.0);
+
+    // When
+    jobOrderService.createJobOrder(createDto);
+
+    // Then — the non-profit pick is rejected and the order routes to the intake SK.
+    verify(jobOrderRepository).save(argThat(jo -> jo.getResponsibleOrgUnit() == intake));
   }
 
   @Test

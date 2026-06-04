@@ -34,6 +34,14 @@ import java.util.UUID;
  * @param kind Discriminator string ({@code SQUADRON} or {@code SPECIAL_COMMAND}) — kept as a plain
  *     string so the frontend does not need a parallel enum that drifts out of sync with the
  *     backend.
+ * @param isProfitEligible Whether the org unit may process Job Orders (be the responsible unit).
+ *     {@code true} for the entries the Job Order create form keeps in its responsible picker; the
+ *     requesting picker offers every entry regardless. {@code null} on the {@code
+ *     /users/{id}/memberships} payload paths that predate the flag — treat null as "not eligible".
  */
 public record OrgUnitMembershipOptionDto(
-    UUID orgUnitId, String orgUnitName, String orgUnitShorthand, String kind) {}
+    UUID orgUnitId,
+    String orgUnitName,
+    String orgUnitShorthand,
+    String kind,
+    Boolean isProfitEligible) {}

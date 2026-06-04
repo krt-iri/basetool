@@ -979,24 +979,38 @@ public class JobOrderService {
    * Resolves the responsible (processing) org unit for a freshly-created job order.
    *
    * <ul>
-   *   <li>Anonymous / guest callers (the public request form is {@code permitAll}) are routed onto
-   *       the configured intake Spezialkommando ({@link #INTAKE_SK_SETTING_KEY}); any
-   *       client-supplied {@code responsibleOrgUnitId} is ignored so a guest cannot assign work to
-   *       an arbitrary unit.
+   *   <li>Anonymous / guest callers (the public request form is {@code permitAll}) may pick any
+   *       <em>profit-eligible</em> squadron or Spezialkommando from the create form's responsible
+   *       picker, and that pick is honoured. When the picker output is absent, unresolvable, or
+   *       points at a non-profit unit, the order routes to the configured intake Spezialkommando
+   *       ({@link #INTAKE_SK_SETTING_KEY}) as a forgiving fallback — so a guest can still never
+   *       direct work to a unit that has not opted in to processing orders.
    *   <li>Authenticated callers must supply a {@code responsibleOrgUnitId} that resolves to a
    *       profit-eligible squadron or Spezialkommando — only Profit-side units process orders.
    * </ul>
    *
    * @param responsibleOrgUnitId picker output from the create DTO; required for authenticated
-   *     callers, ignored for guests.
+   *     callers, honoured-when-profit-eligible (else intake-SK fallback) for guests.
    * @return the resolved, profit-eligible responsible org unit; never {@code null}.
-   * @throws BadRequestException when the id is missing/unresolvable, the unit is not
-   *     profit-eligible, or no intake SK is configured for a guest creation.
+   * @throws BadRequestException when an authenticated caller's id is missing/unresolvable or not
+   *     profit-eligible, or no intake SK is configured for a guest creation that falls back.
    */
   @org.jetbrains.annotations.NotNull
   private OrgUnit resolveResponsibleOrgUnit(
       @org.jetbrains.annotations.Nullable UUID responsibleOrgUnitId) {
     if (!authHelperService.isAuthenticated()) {
+      // Guest (public request form): honour a profit-eligible pick from the responsible picker,
+      // otherwise route to the configured intake Spezialkommando. A non-profit or unresolvable id
+      // is
+      // not a 400 here — the public form stays forgiving and silently falls back rather than
+      // surfacing a validation gate to an anonymous probe. The profit-eligibility guard is
+      // preserved, so a guest still cannot direct work to a unit that has not opted in.
+      if (responsibleOrgUnitId != null) {
+        OrgUnit picked = orgUnitRepository.findById(responsibleOrgUnitId).orElse(null);
+        if (picked != null && picked.isProfitEligible()) {
+          return picked;
+        }
+      }
       return resolveIntakeSpecialCommand();
     }
     if (responsibleOrgUnitId == null) {
