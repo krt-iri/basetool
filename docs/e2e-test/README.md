@@ -2,7 +2,7 @@
 
 Dieses Verzeichnis dokumentiert die End-to-end-Testszenarien des Profit Basetool als Use Cases — je ein Dokument pro funktionalem Flow. Jeder Use Case beschreibt Akteur, Vorbedingungen, Ablauf und erwartetes Ergebnis und verlinkt die implementierende Playwright-Testklasse.
 
-Für Architektur, Phasenplan und Designentscheidungen der E2E-Suite siehe [`../E2E_TESTING_PLAN.md`](../E2E_TESTING_PLAN.md).
+Für Aufbau, Cross-Browser-Matrix und CI-Workflows der E2E-Suite siehe den Testing-Abschnitt im [Projekt-README](../../README.md).
 
 ## Übersicht
 

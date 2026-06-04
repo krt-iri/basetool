@@ -12,10 +12,10 @@
     1. CPE confusion - the NVD entry refers to a different product that shares
        a token (e.g. "line", "spring boot tools") with the dependency we ship.
     2. Build-time-only path - the affected JAR is on the buildscript /
-       checkstyle / pitest / asciidoctor plugin classpath, never reaches the
+       checkstyle / pitest plugin classpath, never reaches the
        runtime classpath of the deployed Spring Boot fat JAR.
     3. Nested JAR inside a build-time tool - same as #2 but the SHA-1 match
-       happens because OWASP unpacks `jruby-complete` (etc.) and inspects the
+       happens because OWASP unpacks a fat tool JAR and inspects the
        embedded JARs.
 
   Real production CVEs are NEVER suppressed; they are fixed by upgrading the
@@ -66,22 +66,6 @@
     <notes>Build-time-only: plexus-utils 3.3.0 is a transitive dependency of Checkstyle (doxia-core). The Expand.extractFile zip slip is unreachable through Checkstyle's source-scanning path and the JAR never ships in the deployed Spring Boot fat JAR.</notes>
     <packageUrl regex="true">^pkg:maven/org\.codehaus\.plexus/plexus-utils@3\.3\.0$</packageUrl>
     <cve>CVE-2025-67030</cve>
-  </suppress>
-
-  <!--
-    SnakeYAML 1.31 is detected as an embedded JAR inside jruby-complete
-    9.3.8.0 (path `META-INF/jruby.home/lib/ruby/stdlib/org/yaml/snakeyaml/`).
-    jruby-complete is the Ruby runtime that the asciidoctor Gradle plugin
-    spins up to render the backend's REST-docs snippets - it is exclusively
-    on the `asciidoctor` configuration and never reaches the deployed JAR.
-    Our application-side YAML parser is SnakeYAML 2.5 (managed by the Spring
-    Boot 4 BOM); 2.x has a safe default `Constructor` and is not affected by
-    CVE-2022-1471.
-  -->
-  <suppress>
-    <notes>Build-time-only: SnakeYAML 1.31 is bundled inside jruby-complete, used by the asciidoctor Gradle plugin for REST docs rendering. It is not on the runtime classpath and our app-level SnakeYAML version is 2.5 (managed by Spring Boot BOM).</notes>
-    <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@1\.31$</packageUrl>
-    <cve>CVE-2022-1471</cve>
   </suppress>
 
 </suppressions>

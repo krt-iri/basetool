@@ -10,7 +10,6 @@ plugins {
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
-  alias(libs.plugins.asciidoctor.convert)
   id("com.github.spotbugs-base") version "6.5.5"
   id("info.solidsoft.pitest") version "1.19.0"
   id("com.diffplug.spotless")
@@ -112,8 +111,6 @@ idea {
   }
 }
 
-extra["snippetsDir"] = file("build/generated-snippets")
-
 // Test, JavaCompile and BootRun task setup is shared with the frontend module via
 // the `basetool.java-conventions` precompiled script plugin (see buildSrc/).
 
@@ -170,11 +167,6 @@ tasks {
     includeBomSerialNumber = true
     includeLicenseText = true
     includeBuildSystem = true
-  }
-
-  asciidoctor {
-    inputs.dir(project.extra["snippetsDir"]!!)
-    dependsOn(test)
   }
 }
 

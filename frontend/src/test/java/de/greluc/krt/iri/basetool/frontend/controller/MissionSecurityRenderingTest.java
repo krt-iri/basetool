@@ -23,6 +23,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -57,6 +58,13 @@ class MissionSecurityRenderingTest {
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
       clientRegistrationRepository;
+
+  /** Static marker attribute that uniquely identifies the inline payout-preference select. */
+  private static final String PAYOUT_SELECT_MARKER = "data-trigger=\"mission-update-payout\"";
+
+  /** The payout select as rendered in its disabled state (marker immediately followed by it). */
+  private static final String PAYOUT_SELECT_DISABLED =
+      PAYOUT_SELECT_MARKER + " disabled=\"disabled\"";
 
   @BeforeEach
   void setup() {
@@ -141,7 +149,7 @@ class MissionSecurityRenderingTest {
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            eq(true)))
+            anyBoolean()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             anyString(),
@@ -150,13 +158,18 @@ class MissionSecurityRenderingTest {
             anyBoolean()))
         .thenReturn(Collections.emptyList());
 
-    // Anonymously access the mission detail page
+    // Anonymously access the mission detail page: a registered participant's payout select must be
+    // disabled for guests, and guests never get the edit-participant button on a registered row.
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("disabled=\"disabled\"")))
+        .andExpect(content().string(containsString(PAYOUT_SELECT_DISABLED)))
         .andExpect(content().string(containsString("payout-preference")))
-        .andExpect(content().string(not(containsString("class=\"btn edit-participant-btn\""))));
+        // The rendered edit-participant button element must be absent for a guest viewing a
+        // registered participant (the "edit-participant-btn" token still appears in the page's
+        // JS, so assert on the full rendered class attribute, not the bare CSS class name).
+        .andExpect(
+            content().string(not(containsString("class=\"btn btn-ghost edit-participant-btn\""))));
   }
 
   @Test
@@ -237,7 +250,7 @@ class MissionSecurityRenderingTest {
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            eq(true)))
+            anyBoolean()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             anyString(),
@@ -254,7 +267,6 @@ class MissionSecurityRenderingTest {
   }
 
   @Test
-  @WithMockUser(username = "11111111-1111-1111-1111-111111111111")
   void missionDetail_AsOtherUser_ShouldDisableRegisteredParticipantPayoutDropdown()
       throws Exception {
     UUID missionId = UUID.randomUUID();
@@ -332,7 +344,7 @@ class MissionSecurityRenderingTest {
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            eq(true)))
+            anyBoolean()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             anyString(),
@@ -341,15 +353,25 @@ class MissionSecurityRenderingTest {
             anyBoolean()))
         .thenReturn(Collections.emptyList());
 
-    // Authenticated as another user
+    // Authenticated as another user. The OIDC subject (the Keycloak sub, which equals app_user.id)
+    // differs from the participant's user id, and preferred_username deliberately differs from the
+    // sub to mirror production — the self-edit carve-out must key off the sub (authUserId), never
+    // authentication.name (the preferred_username). A foreign member must see the select disabled.
     mockMvc
-        .perform(get("/missions/" + missionId))
+        .perform(
+            get("/missions/" + missionId)
+                .with(
+                    oidcLogin()
+                        .idToken(
+                            token ->
+                                token
+                                    .subject("11111111-1111-1111-1111-111111111111")
+                                    .claim("preferred_username", "other1"))))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("disabled=\"disabled\"")));
+        .andExpect(content().string(containsString(PAYOUT_SELECT_DISABLED)));
   }
 
   @Test
-  @WithMockUser(username = "22222222-2222-2222-2222-222222222222")
   void missionDetail_AsSelf_ShouldEnableRegisteredParticipantPayoutDropdown() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -426,7 +448,7 @@ class MissionSecurityRenderingTest {
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            eq(true)))
+            anyBoolean()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             anyString(),
@@ -435,21 +457,24 @@ class MissionSecurityRenderingTest {
             anyBoolean()))
         .thenReturn(Collections.emptyList());
 
-    // Authenticated as the participant user
+    // Authenticated as the participant themselves via an OIDC login whose subject (sub) equals the
+    // participant's app_user.id. preferred_username is intentionally different from the sub so this
+    // test fails if the template ever regresses to comparing against authentication.name. The
+    // member's own payout select must be enabled even though they cannot edit the mission itself.
     String expectedUrl =
         "/missions/" + missionId + "/participants/" + participantId + "/payout-preference";
     mockMvc
-        .perform(get("/missions/" + missionId))
+        .perform(
+            get("/missions/" + missionId)
+                .with(
+                    oidcLogin()
+                        .idToken(
+                            token ->
+                                token
+                                    .subject(userId.toString())
+                                    .claim("preferred_username", "member1"))))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(expectedUrl)))
-        .andExpect(
-            content()
-                .string(
-                    not(
-                        containsString(
-                            "data-payout-url=\""
-                                + expectedUrl
-                                + "\" onchange=\"updatePayoutPreference(this)\""
-                                + " disabled=\"disabled\""))));
+        .andExpect(content().string(not(containsString(PAYOUT_SELECT_DISABLED))));
   }
 }
