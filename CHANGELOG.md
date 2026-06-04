@@ -34,6 +34,8 @@
 
 ### Fixed
 
+- **Der „Abmelden"-Button im Menü funktioniert wieder korrekt** — er sah seit der Umstellung auf ein CSRF-sicheres POST-Formular schmaler und blasser aus (gemischte Schreibweise statt Versalien) und beendete zwar die lokale Sitzung, nicht aber die Keycloak-SSO-Sitzung: die Seite lud nicht neu und ein erneuter Login ging ohne Passwortabfrage durch. Ursache war die CSP-Regel `form-action 'self'`, die den Abmelde-Redirect auf die anders-originige Keycloak-URL blockierte; die Keycloak-Herkunft ist jetzt erlaubt, und der Button erbt wieder das Navigations-Styling.
+
 - **Das öffentliche Auftrags-Anlageformular zeigt anonymen Gästen jetzt befüllte Auswahlfelder: „Auftraggeber" listet alle Staffeln und Spezialkommandos, „bearbeitende Einheit" alle profit-berechtigten Staffeln und Spezialkommandos** (bisher war „Auftraggeber" leer und die Profit-SKs fehlten bei der bearbeitenden Einheit). Die bearbeitende Einheit ist mit dem konfigurierten Eingangs-Spezialkommando (Systemeinstellung unter `/admin/settings`) vorbelegt; ein Gast kann stattdessen eine andere profit-berechtigte Einheit wählen, sonst läuft der Auftrag wie bisher auf das Eingangs-SK.
 
 - **Ein Gast in einem Einsatz lässt sich jetzt von jedem, der ihn eintragen darf (auch anonym), mit einer beliebigen Staffel oder einem beliebigen Spezialkommando markieren.** Bisher verwarf das Backend die Markierung anonymer Nutzer und wies angemeldete Nutzer ab, die nicht selbst Mitglied der gewählten Org-Einheit waren (403) — insbesondere konnte ein SK-Leiter dem Einsatz seines eigenen Spezialkommandos keinen Gast mit dem SK-Label hinzufügen. Die Markierung ist reine Einsatz-Metadaten (nur fürs Roster), vergibt keine Rechte und ändert keine Nutzerdaten.
