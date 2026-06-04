@@ -552,10 +552,12 @@ tr:hover {
         align-items: flex-start;
     }
     /*
-     * No mobile-specific `main { padding-bottom }` override needed — the
-     * `--krt-footer-height` measurement from sidebar.html JS already
-     * reflects the larger height of the column-stacked footer, so
-     * `main { padding-bottom: calc(var(...) + 1rem) }` automatically grows.
+     * The base `main` rule's padding-bottom reserves room for this fixed
+     * footer and grows automatically on mobile: `--krt-footer-height` (set by
+     * sidebar.html JS) reflects the taller column-stacked footer above. This
+     * only holds because the responsive `main` rules set padding via longhand
+     * (padding-top + padding-inline) — a `padding` shorthand there silently
+     * resets padding-bottom and hides content behind the footer.
      */
 }
 
@@ -2380,8 +2382,18 @@ textarea:focus-visible,
         padding: var(--space-3) var(--space-6);
     }
 
+    /*
+     * Set top + inline padding via LONGHAND — never the `padding` shorthand.
+     * The shorthand would reset `padding-bottom` and wipe the fixed-footer
+     * reservation from the base `main` rule, dropping the last lines of a page
+     * behind the footer on tablet/mobile (where the column-stacked footer is
+     * tallest). padding-bottom intentionally stays inherited from the base
+     * rule's calc(var(--krt-footer-height) + 5rem), which grows with the
+     * measured footer height.
+     */
     main {
-        padding: var(--space-6);
+        padding-top: var(--space-6);
+        padding-inline: var(--space-6);
     }
 
     /* Touch target size optimization (fat-finger) */
@@ -2424,8 +2436,12 @@ textarea:focus-visible,
         gap: var(--space-4);
     }
 
+    /* Longhand only — see the <=1024px note above. A `padding` shorthand here
+       would wipe the base footer reservation (padding-bottom), which matters
+       most on mobile where the stacked footer is tallest. */
     main {
-        padding: var(--space-4);
+        padding-top: var(--space-4);
+        padding-inline: var(--space-4);
     }
 
     .hud-box {
@@ -2695,7 +2711,11 @@ textarea:focus-visible,
     border-top: none;
     max-height: 300px;
     overflow-y: auto;
-    z-index: 100;
+    /* Must clear the fixed footer (z-index 999) so the lower options never hide
+       behind it when the filter sits low in the viewport. Same popover tier as
+       .krt-pi-typeahead-results. Opens downward (top: 100%), so painting above
+       the sticky header (1000) never overlaps it in practice. */
+    z-index: 1100;
     display: none;
     box-shadow: 0 4px 6px rgb(0 0 0 / 50%);
 }
