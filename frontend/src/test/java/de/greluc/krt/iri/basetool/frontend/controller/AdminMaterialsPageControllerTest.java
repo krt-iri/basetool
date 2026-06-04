@@ -53,12 +53,12 @@ class AdminMaterialsPageControllerTest {
     UUID matId = UUID.randomUUID();
     MaterialDto currentMaterial =
         new MaterialDto(
-            matId, 1, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, false, false,
+            matId, "Alpha", "RAW", "SCU", "Desc", null, null, false, false, false, false, false,
             false, true, 1L);
     MaterialDto updatedMaterial =
         new MaterialDto(
-            matId, 1, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, false,
-            false, false, true, 2L);
+            matId, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, false, false,
+            false, true, 2L);
 
     when(backendApiClient.get("/api/v1/materials/" + matId, MaterialDto.class))
         .thenReturn(currentMaterial)
@@ -87,7 +87,6 @@ class AdminMaterialsPageControllerTest {
     materials.add(
         new MaterialDto(
             UUID.randomUUID(),
-            1,
             "Alpha",
             "RAW",
             "SCU",
@@ -105,7 +104,6 @@ class AdminMaterialsPageControllerTest {
     materials.add(
         new MaterialDto(
             UUID.randomUUID(),
-            4,
             "Delta",
             "REFINED",
             "SCU",
@@ -123,7 +121,6 @@ class AdminMaterialsPageControllerTest {
     materials.add(
         new MaterialDto(
             UUID.randomUUID(),
-            3,
             "Charlie",
             "RAW",
             "SCU",
@@ -141,7 +138,6 @@ class AdminMaterialsPageControllerTest {
     materials.add(
         new MaterialDto(
             UUID.randomUUID(),
-            5,
             "Echo",
             "NO_REFINE",
             "SCU",
@@ -159,7 +155,6 @@ class AdminMaterialsPageControllerTest {
     materials.add(
         new MaterialDto(
             UUID.randomUUID(),
-            2,
             "Bravo",
             "RAW",
             "SCU",
@@ -217,7 +212,6 @@ class AdminMaterialsPageControllerTest {
     MaterialDto created =
         new MaterialDto(
             UUID.randomUUID(),
-            null,
             "Raw Ouratite",
             "RAW",
             "SCU",

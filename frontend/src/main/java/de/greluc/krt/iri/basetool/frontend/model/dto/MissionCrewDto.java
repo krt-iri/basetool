@@ -24,4 +24,4 @@ import java.util.UUID;
 
 /** Data transfer record carrying Mission Crew payload. */
 public record MissionCrewDto(
-    UUID id, UUID participantId, String participantName, Set<JobTypeDto> jobTypes, Long version) {}
+    UUID id, UUID participantId, String participantName, Set<JobTypeDto> jobTypes) {}

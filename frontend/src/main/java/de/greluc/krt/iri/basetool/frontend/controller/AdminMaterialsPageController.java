@@ -230,7 +230,6 @@ public class AdminMaterialsPageController {
       MaterialDto body =
           new MaterialDto(
               id,
-              currentMaterial.idCommodity(),
               currentMaterial.name(),
               currentMaterial.type(),
               quantityType,
