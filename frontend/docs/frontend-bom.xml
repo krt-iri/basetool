@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:e96b98b9-a50d-41bd-9baa-2869cc11a13e" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:5d1d64ff-eaed-4120-91ef-d725074cf5f7" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-06-01T05:53:24Z</timestamp>
+    <timestamp>2026-06-04T20:16:34Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -18,8 +18,11 @@
       <purl>pkg:maven/de.greluc.krt.iri.basetool/frontend@0.0.1-SNAPSHOT?project_path=%3Afrontend</purl>
       <modified>false</modified>
       <externalReferences>
+        <reference type="build-system">
+          <url>https://github.com/krt-iri/basetool/actions/runs/26977015714</url>
+        </reference>
         <reference type="vcs">
-          <url>https://github.com/krt-iri/basetool.git</url>
+          <url>https://github.com/krt-iri/basetool</url>
         </reference>
       </externalReferences>
     </component>
@@ -722,6 +725,34 @@ of Jackson components maintained by FasterXML.com</description>
           <url>http://github.com/google/j2objc</url>
         </reference>
       </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar">
+      <group>com.h3xstream.findsecbugs</group>
+      <name>findsecbugs-plugin</name>
+      <version>1.14.0</version>
+      <description>Core module of the project. It include all the SpotBugs detectors.
+        The resulting jar is the published plugin.</description>
+      <hashes>
+        <hash alg="MD5">206b79320d0fd19553bd88c754ddb546</hash>
+        <hash alg="SHA-1">6cc9a0bbd3d1ff0920a1113bbcf0ed3782c91d23</hash>
+        <hash alg="SHA-256">6fa340344fa433ff46c2985dab1010e8bc739f9395c983594a5240095e92abc8</hash>
+        <hash alg="SHA-512">9eb87ea65584d6ab9e79cfcc9a2ffe3519adab9356084c74aaead8b3c7ca1e025ae2c2ba1aa70fab701fcd2f960e044ab467da6199d3a7feb64da5db42bc7991</hash>
+        <hash alg="SHA-384">7a8221da5b22fa2509f1e2d0009333e1a64d0cb602d7a6adeea106cf880106d95989c4bfc5651f4d0e7302998b4c11f4</hash>
+        <hash alg="SHA3-384">8efb3e6d393e69cb7427e7637bd2dd067d6b2a3f08b6891e3b0193c8efd9eab1c23c9b0f3c14da9d8f57f7bf63b34f8a</hash>
+        <hash alg="SHA3-256">feab89df877833798bbeb4bf0825e879b3807c99b2d2088f778f05458d14009e</hash>
+        <hash alg="SHA3-512">0414ac063ef6acadf4b7f415a71e4064ac6294004d46201244a625d741f75a7ab5019d322fa12093f3395d550c83a14282c6e71ab3d655cc8fc507405ec495c9</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <name>GNU Lesser General Public License</name>
+          <url>http://www.gnu.org/copyleft/lesser.html</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar</purl>
+      <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
@@ -9070,6 +9101,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     </dependency>
     <dependency ref="pkg:maven/com.google.guava/listenablefuture@9999.0-empty-to-avoid-conflict-with-guava?type=jar"/>
     <dependency ref="pkg:maven/com.google.j2objc/j2objc-annotations@3.1?type=jar"/>
+    <dependency ref="pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar"/>
     <dependency ref="pkg:maven/com.jayway.jsonpath/json-path@2.10.0?type=jar">
       <dependency ref="pkg:maven/net.minidev/json-smart@2.6.0?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
@@ -9133,6 +9165,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.2?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar"/>
       <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar"/>
+      <dependency ref="pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar"/>
       <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar"/>
       <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar"/>
       <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar"/>

@@ -2,25 +2,33 @@
 
 ## [Unreleased]
 
-### Added
-
-- **Die Operations-Auszahlungsansicht zeigt Spenden jetzt zentral an: pro Spender den gespendeten Betrag und eine operationsweite Summe „Spenden gesamt" (im Auszahlungs- und im Finanz-Panel).** Spenden bleiben wie bisher bei der Organisation und werden nicht auf Mitglieder mit Auszahlungsart „Auszahlen" verteilt — die Summe macht den bisher unsichtbaren Betrag nun nachvollziehbar.
-
-- **Im Hangar setzt der neue Button „Home-Location setzen" alle eigenen Schiffe in einem Schritt auf einen gewählten Ort.** Bei jedem Klick wählt man den Ort neu aus einer kuratierten Liste der Spiel-Home-Locations (alphabetisch absteigend); ein Bestätigungsdialog zeigt vorab die Anzahl betroffener Schiffe. Admins pflegen diese Liste unter „Orte verwalten" über den neuen Schalter „Als Home-Location markieren" (Migration V139).
+## [v0.3.57](https://github.com/krt-iri/basetool/releases/tag/v0.3.57) - 2026-06-04
 
 ### Changed
 
 - **Die Seitenleisten-Navigation ist in einklappbare, thematische Gruppen gegliedert (Einsatzplanung, Flotte & Logistik, Handel, Persönlich, Beförderung, Organisation, Administration, Rechtliches), damit sie nicht mehr überladen wirkt.** Die Gruppen sind standardmäßig zugeklappt, merken sich pro Browser ihren Auf-/Zu-Zustand und öffnen automatisch den Bereich der aktuellen Seite; der aktive Menüpunkt wird hervorgehoben. Die umfangreiche Administration ist zusätzlich in Cluster (Benutzer & Inhalte / Stammdaten / System & Daten) gegliedert.
 
-### Fixed
+## [v0.3.56](https://github.com/krt-iri/basetool/releases/tag/v0.3.56) - 2026-06-04
 
-- **Ein angemeldetes Staffelmitglied (ohne Offiziers- oder Adminrechte) kann seine eigene Auszahlungsart in einem Einsatz jetzt direkt in der Auszahlungs-Übersicht umstellen.** Bisher war ausgerechnet die eigene Zeile gesperrt, während sich die Auszahlungsart anonymer Teilnehmer ändern ließ — Ursache war ein Vergleich der Teilnehmer-ID mit dem Login-Benutzernamen statt mit der Keycloak-ID.
+### Fixed
 
 - **Auf Smartphone und Tablet wurde der untere Seiteninhalt nicht mehr hinter dem fixierten Footer versteckt — sichtbar u. a. auf der Startseite.** Die responsiven Seitenabstände hatten die Platzreservierung für den Footer überschrieben; sie bleibt jetzt auf allen Bildschirmgrößen erhalten und wächst mit dem mobil höher gestapelten Footer mit.
 
 - **Die Mehrfachauswahl-Filter (Lager, Material-Übersicht, Profitberechnung) zeigen ihre aufgeklappte Optionsliste jetzt vollständig über dem Footer statt teilweise dahinter.**
 
 - **Auf der Bewertungsverwaltung (Beförderungssystem) rutschte die untere Kante der Bewertungsmatrix samt horizontaler Bildlaufleiste hinter den fixierten Footer — vor allem auf schmalen und mobilen Viewports, wo der Footer höher gestapelt ist.** Die Matrix-Höhe rechnet die tatsächliche Footer-Höhe jetzt ein, wie bereits auf der Material-Übersicht und der Profitberechnung.
+
+## [v0.3.55](https://github.com/krt-iri/basetool/releases/tag/v0.3.55) - 2026-06-04
+
+### Added
+
+- **Die Operations-Auszahlungsansicht zeigt Spenden jetzt zentral an: pro Spender den gespendeten Betrag und eine operationsweite Summe „Spenden gesamt" (im Auszahlungs- und im Finanz-Panel).** Spenden bleiben wie bisher bei der Organisation und werden nicht auf Mitglieder mit Auszahlungsart „Auszahlen" verteilt — die Summe macht den bisher unsichtbaren Betrag nun nachvollziehbar.
+
+- **Im Hangar setzt der neue Button „Home-Location setzen" alle eigenen Schiffe in einem Schritt auf einen gewählten Ort.** Bei jedem Klick wählt man den Ort neu aus einer kuratierten Liste der Spiel-Home-Locations (alphabetisch absteigend); ein Bestätigungsdialog zeigt vorab die Anzahl betroffener Schiffe. Admins pflegen diese Liste unter „Orte verwalten" über den neuen Schalter „Als Home-Location markieren" (Migration V139).
+
+### Fixed
+
+- **Ein angemeldetes Staffelmitglied (ohne Offiziers- oder Adminrechte) kann seine eigene Auszahlungsart in einem Einsatz jetzt direkt in der Auszahlungs-Übersicht umstellen.** Bisher war ausgerechnet die eigene Zeile gesperrt, während sich die Auszahlungsart anonymer Teilnehmer ändern ließ — Ursache war ein Vergleich der Teilnehmer-ID mit dem Login-Benutzernamen statt mit der Keycloak-ID.
 
 ### Security
 

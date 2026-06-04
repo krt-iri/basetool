@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:e67caa2a-c683-4761-8bc6-555e51376451",
+  "serialNumber" : "urn:uuid:44d27b9d-49f3-4f1b-9683-4f2ab8207742",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-06-01T05:53:28Z",
+    "timestamp" : "2026-06-04T20:16:34Z",
     "tools" : {
       "components" : [
         {
@@ -25,8 +25,12 @@
       "modified" : false,
       "externalReferences" : [
         {
+          "type" : "build-system",
+          "url" : "https://github.com/krt-iri/basetool/actions/runs/26977015714"
+        },
+        {
           "type" : "vcs",
-          "url" : "https://github.com/krt-iri/basetool.git"
+          "url" : "https://github.com/krt-iri/basetool"
         }
       ]
     }
@@ -391,73 +395,6 @@
       ],
       "purl" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
       "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.beust/jcommander@1.82?type=jar",
-      "group" : "com.beust",
-      "name" : "jcommander",
-      "version" : "1.82",
-      "description" : "Command line parsing library for Java",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "c350dc0db8aa038e6bbaf0050720d69c"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "0a7c5fef184d238065de38f81bbc6ee50cca2e21"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "72c9beb5d282ecdebadbd595c4f05710599328e48432dc196a261d8973ec767d52038e5bd26e7c0b78b85b4455687d59f9d0a367221e848e39c72f2f583baf26"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "4c1c536205e57f4ee6e27bdbeb809ce4b9e0c8273d678b06a8178660aca4704676197f70c28399886fcad70cf1bb8cdf"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "fe46acbe164c85af46002f3e76e5a2fe1a134cf0a9f0471890965ebd388b860e1e8469d1fa39fbfdfa9de718be5eb8ec"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "78737587181801bb459d4f09a1d2fba34c9bca274884a262cf9bc880fdd52c3d"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "9e0926e4e04de682de15a780422a5e7c31e8c5eecd6372122ba78a8e70c5ac8156b6b9b4e714ff280306d60d3dbc9d5b915fa8d11b472caa0080da0ba962a79a"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.beust/jcommander@1.82?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/cbeust/jcommander/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/cbeust/jcommander"
-        }
-      ],
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -1947,6 +1884,64 @@
           "url" : "http://github.com/google/j2objc"
         }
       ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar",
+      "group" : "com.h3xstream.findsecbugs",
+      "name" : "findsecbugs-plugin",
+      "version" : "1.14.0",
+      "description" : "Core module of the project. It include all the SpotBugs detectors. The resulting jar is the published plugin.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "206b79320d0fd19553bd88c754ddb546"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "6cc9a0bbd3d1ff0920a1113bbcf0ed3782c91d23"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "6fa340344fa433ff46c2985dab1010e8bc739f9395c983594a5240095e92abc8"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "9eb87ea65584d6ab9e79cfcc9a2ffe3519adab9356084c74aaead8b3c7ca1e025ae2c2ba1aa70fab701fcd2f960e044ab467da6199d3a7feb64da5db42bc7991"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "7a8221da5b22fa2509f1e2d0009333e1a64d0cb602d7a6adeea106cf880106d95989c4bfc5651f4d0e7302998b4c11f4"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "8efb3e6d393e69cb7427e7637bd2dd067d6b2a3f08b6891e3b0193c8efd9eab1c23c9b0f3c14da9d8f57f7bf63b34f8a"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "feab89df877833798bbeb4bf0825e879b3807c99b2d2088f778f05458d14009e"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "0414ac063ef6acadf4b7f415a71e4064ac6294004d46201244a625d741f75a7ab5019d322fa12093f3395d550c83a14282c6e71ab3d655cc8fc507405ec495c9"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "name" : "GNU Lesser General Public License",
+            "url" : "http://www.gnu.org/copyleft/lesser.html"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar",
+      "modified" : false,
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -7404,132 +7399,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.asciidoctor/asciidoctorj-api@2.5.7?type=jar",
-      "group" : "org.asciidoctor",
-      "name" : "asciidoctorj-api",
-      "version" : "2.5.7",
-      "description" : "API for AsciidoctorJ",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "c81feb8db629e8f92f08d3f97f3e3c44"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "37ea651d5f1ba2ad3d1c09eb2356b17f35c15bb5"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "3fe1e4a778bf2ad73c756d4be5f6b983e4002c407e2e29a04fda7f36e6faa5d5"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "3548c0285bffe394e72c8bcfedee10f862ef6bf579a60132f116686af9de8a5113f24957995cabf2dee0f993296e74f5fdc56263b01314c2e45535fcbd663868"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "40baf59ad6065b90c2e251401c73455e9e74783d427753b3650185fb826c56ff8771bdbc08067e8fef73f3148d0c1c30"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "2a4781914f438e7e7f78a0b6a6f6906784f3d4f9810c1114066f7526958b7321ed6cbed9752ff9557b7bb8dd78153696"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "6ec50d0022bcf31754be4827135a6562a0b8300b5ee1b7b533371871322a19b0"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "c3c3143d13a5b957c8ddb6fe748738987ff41d9a19a703d4475766dca3ccbe0456d9aae2cafa45630babc35f9dd7a02652f8d71aee8330e09d40c9c3c7dc3361"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.asciidoctor/asciidoctorj-api@2.5.7?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/asciidoctor/asciidoctorj"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar",
-      "group" : "org.asciidoctor",
-      "name" : "asciidoctorj",
-      "version" : "2.5.7",
-      "description" : "AsciidoctorJ provides Java bindings for the Asciidoctor RubyGem (asciidoctor) using JRuby.",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "0bfe80189a03a3f5ebd255c5e021f460"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "8667fe77c2ffb5270a17389e6fe76ea89b1087e4"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "17deb7ab1ea8e62f43e7c85843b252e684e9000ca539fdbc1a903748623496b2"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "fcdbf78ac9c5f4bdecc1480aaaa28b8b2a00d89ecc858fdbc4ebf57c3d7d7e841d90d12aa1fee2ad1a03e9071a1a4733e9d4bb5985411422c130de43501215e3"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "a08c2f82cb4302153b55caeab079b406ba99fabbd504e0e5daab48c8f5722f78bf8e279d065f2b87adb6e4cad836ab80"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "4a333b495cda56621b2ccadb4d5ee3e9ff06d01c82713d98d3e4ff82a6e3eeb34ff1b62566535a6d1347dd667e914ef7"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "e95917ba6b3ad1e1496281595d8acf0d9eff3ee690c4273970715d3795e2e9eb"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "8992aae7234dab549378dff441c4d2fe6297eb9f55206a3fc4afe1692c4b32ba198b325f98f917c41936264b09fa68ad62920fa9513940e3d5f9882c7e993152"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/asciidoctor/asciidoctorj"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar",
       "group" : "org.aspectj",
       "name" : "aspectjweaver",
@@ -9324,75 +9193,6 @@
           "url" : "https://github.com/JetBrains/java-annotations"
         }
       ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.jruby/jruby-complete@9.3.8.0?type=jar",
-      "group" : "org.jruby",
-      "name" : "jruby-complete",
-      "version" : "9.3.8.0",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "2d5ad438a1fefda48f8ab797454f43fd"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "8e11191265ab501930125081d8c21a3f55f1b8cd"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "b574542f75c71d543ae057a707ca9840e778d62ab6da610e94cd7bbfa5eef5d5"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "e2cfd249b276dfb2eacd4b207d9a4ccabd463d8c30c6fe35ab5faae664493b3f86cd1e914247eb002e9551508491cbe15cd2c2c79b413839a50fc94a96dc34a5"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "3b889dcd2d8e6045b61ddbd5bc2be98fcab2350bf5e741a90714d4636ccf207d6ed6aa4c95b3fa47995ceed13b6e471c"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "530e307216eddda3d52c8f3542ed7699ac53bcd485b44af6b0522585f090b0f81a1b84ef24303a82785d8b2874871a1f"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "11035a2bb239ce21833e7447af873c67ca37f8289a9032272eb0cbc78088128a"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "f4e2ae0787f54193015b4709606e4a29267be7aa4ac95b14e137d92f94447bf067eeb190fed34f9644f58460a0810a51bfaa3ebef0a2817e1cdb422cb47545ef"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "GPL-2.0",
-            "url" : "https://www.gnu.org/licenses/old-licenses/gpl-2.0-standalone.html"
-          }
-        },
-        {
-          "license" : {
-            "id" : "LGPL-2.1",
-            "url" : "https://www.gnu.org/licenses/old-licenses/lgpl-2.1-standalone.html"
-          }
-        },
-        {
-          "license" : {
-            "id" : "EPL-2.0",
-            "url" : "https://www.eclipse.org/legal/epl-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.jruby/jruby-complete@9.3.8.0?type=jar",
-      "modified" : false,
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -18671,10 +18471,6 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.beust/jcommander@1.82?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
       "dependsOn" : [ ]
     },
@@ -18832,6 +18628,10 @@
       "dependsOn" : [ ]
     },
     {
+      "ref" : "pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar",
+      "dependsOn" : [ ]
+    },
+    {
       "ref" : "pkg:maven/com.jayway.jsonpath/json-path@2.10.0?type=jar",
       "dependsOn" : [
         "pkg:maven/net.minidev/json-smart@2.6.0?type=jar",
@@ -18946,11 +18746,11 @@
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.3?type=jar",
         "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
         "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
+        "pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar",
         "pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar",
         "pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar",
         "pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar",
         "pkg:maven/org.flywaydb/flyway-core@12.7.0?type=jar",
         "pkg:maven/org.flywaydb/flyway-database-postgresql@12.7.0?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
@@ -19484,18 +19284,6 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.asciidoctor/asciidoctorj-api@2.5.7?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/org.asciidoctor/asciidoctorj@2.5.7?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.beust/jcommander@1.82?type=jar",
-        "pkg:maven/org.asciidoctor/asciidoctorj-api@2.5.7?type=jar",
-        "pkg:maven/org.jruby/jruby-complete@9.3.8.0?type=jar"
-      ]
-    },
-    {
       "ref" : "pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar",
       "dependsOn" : [ ]
     },
@@ -19662,10 +19450,6 @@
     },
     {
       "ref" : "pkg:maven/org.jetbrains/annotations@26.1.0?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/org.jruby/jruby-complete@9.3.8.0?type=jar",
       "dependsOn" : [ ]
     },
     {
