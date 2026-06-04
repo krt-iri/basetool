@@ -21,7 +21,14 @@ TAG (``v0.3.40``), or a commit SHA. Dates/times are matched with ``git log
 day; add a time to scope from a precise hour and minute. ``--until`` works the same
 way (a bare end date stays inclusive through 23:59:59).
 
+If ``--since`` is omitted entirely, the start point is read from the local progress
+pointer maintained by ``track_release_notes.py`` (the range becomes
+``<stored-commit>..HEAD`` and the matching post-anchor changelog sections are
+included). When no pointer exists yet the script exits with guidance rather than
+guessing a start point.
+
 Usage:
+    python gather_changes.py                        # resume from the local pointer
     python gather_changes.py --since v0.3.40
     python gather_changes.py --since 2026-05-15 --until 2026-05-31
     python gather_changes.py --since "2026-05-15 14:30"
@@ -121,16 +128,21 @@ def version_ref_key(value: str) -> tuple[int, int, int] | None:
     return tuple(int(part) for part in match.groups()) if match else None  # type: ignore[return-value]
 
 
-def select_changelog(changelog_path: str, since: str, until: str) -> str:
+def select_changelog(changelog_path: str, since: str, until: str,
+                     exclude_tags: set[str] | None = None) -> str:
     """Return ``[Unreleased]`` plus every version section inside the window.
 
     The window mirrors the git-log boundary: when ``since`` is a tag, keep
     sections strictly newer than it (and ``<= until`` if ``until`` is also a tag);
     when ``since`` is a date, keep sections dated on/after it (and ``<= until`` if
-    ``until`` is a date). A commit-SHA ``since`` cannot be mapped to versions, so
-    only ``[Unreleased]`` is returned and the git log carries the boundary. On a
-    legacy un-reconciled changelog there are no version headings, so the whole
-    ``[Unreleased]`` block (the entire history) is returned -- old behaviour.
+    ``until`` is a date). When ``since`` is a commit SHA / ref, ``exclude_tags``
+    (the release tags already reachable from that commit -- supplied for a resume
+    run) drives selection instead: keep every version section whose tag is *not*
+    in that set, i.e. the releases cut after the anchor. With no ``exclude_tags``
+    a SHA ``since`` keeps only ``[Unreleased]`` and the git log carries the
+    boundary -- the original behaviour. On a legacy un-reconciled changelog there
+    are no version headings, so the whole ``[Unreleased]`` block (the entire
+    history) is returned regardless.
     """
     if not os.path.isfile(changelog_path):
         return f"(no CHANGELOG.md found at {changelog_path})"
@@ -159,7 +171,11 @@ def select_changelog(changelog_path: str, since: str, until: str) -> str:
             keep = ver > since_ver and (until_ver is None or ver <= until_ver)
         elif since_date is not None:
             keep = date >= since_date and (until_date is None or date <= until_date)
-        else:  # since is a commit SHA -> rely on the git log for the boundary
+        elif exclude_tags is not None:  # SHA/ref anchor (resume run): keep releases after it
+            keep = (f"v{ver[0]}.{ver[1]}.{ver[2]}" not in exclude_tags
+                    and (until_ver is None or ver <= until_ver)
+                    and (until_date is None or date <= until_date))
+        else:  # bare commit SHA -> rely on the git log for the boundary
             keep = False
         if keep:
             out.append(header)
@@ -250,14 +266,70 @@ def suggested_title(log: str, since: str) -> str:
     return f"Release Notes ({left} → {ddmm(dates[-1])})"
 
 
+# Path (relative to the repo root) the model copies to advance the pointer; kept
+# in sync with the command shown in SKILL.md so the reminder is paste-ready.
+TRACK_CMD = ".claude/skills/release-notes/scripts/track_release_notes.py"
+
+
+def load_state_module():
+    """Import the sibling ``release_state`` helper, or return ``None`` if absent.
+
+    The tracker is optional sugar; if its module is missing the explicit
+    ``--since`` path must keep working, so this degrades to ``None`` rather than
+    raising. Python puts this script's directory on ``sys.path``, so the sibling
+    import resolves when run as ``python .../gather_changes.py``.
+    """
+    try:
+        import release_state  # noqa: PLC0415 -- sibling script, same directory
+        return release_state
+    except ImportError:
+        return None
+
+
+def resolve_since(repo: str, arg_since: str | None, state):
+    """Resolve the effective start point and resume context.
+
+    Returns ``(since, resumed, anchor_desc)``. An explicit ``arg_since`` is used
+    verbatim (``resumed=False``). With no start point the local tracking pointer
+    is read: a healthy pointer yields its commit SHA as ``since`` (``resumed=True``)
+    so the run picks up exactly where the last notes ended; a missing or stale
+    pointer prints guidance and exits 2, signalling the caller to ask the user.
+    """
+    if arg_since is not None:
+        return arg_since, False, None
+    if state is None:
+        sys.exit("error: no --since given and the release_state.py tracking helper "
+                 "is missing next to this script.")
+    covered = (state.read_state(repo) or {}).get("last_covered") or {}
+    sha = covered.get("sha")
+    if not sha:
+        sys.stderr.write(
+            "no start point given and no local tracking pointer yet "
+            f"({state.STATE_FILENAME} absent).\n"
+            "  -> Ask the user once for a start point (date or tag) and re-run with "
+            "--since,\n"
+            f"     then create the pointer after writing the notes:  python {TRACK_CMD} --set\n")
+        sys.exit(2)
+    if not state.commit_exists(repo, sha):
+        sys.stderr.write(
+            f"the tracking pointer ({state.STATE_FILENAME}) points at {sha[:12]}, which is "
+            "not in this repository\n  (history rewrite or fresh clone?). Ask the user for "
+            f"a start point, re-run with --since,\n  then re-set the pointer:  python {TRACK_CMD} --set\n")
+        sys.exit(2)
+    anchor = covered.get("tag") or sha[:12]
+    return sha, True, f"{anchor} (covered through {covered.get('date', '?')})"
+
+
 def main() -> None:
     """Parse arguments, gather both sources, and print the digest to stdout."""
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--since", required=True,
+    parser.add_argument("--since", default=None,
                         help="Starting point: a date (YYYY-MM-DD), a date+time "
                              "(\"YYYY-MM-DD HH:MM\" or YYYY-MM-DDTHH:MM, seconds "
-                             "optional), a git tag, or a commit SHA.")
+                             "optional), a git tag, or a commit SHA. If omitted, "
+                             "resume from the local tracking pointer (see "
+                             "track_release_notes.py).")
     parser.add_argument("--until", default="HEAD",
                         help="End point: same forms as --since (date / date+time / "
                              "ref). Default: HEAD / now.")
@@ -271,11 +343,25 @@ def main() -> None:
         if not os.path.exists(os.path.join(repo, ".git")):
             sys.exit(f"error: {repo} is not a git repository")
 
-    log = collect_commits(repo, args.since, args.until)
+    state = load_state_module()
+    since, resumed, anchor_desc = resolve_since(repo, args.since, state)
+
+    # A SHA/ref start point (a resume run, or a hand-passed commit) cannot be
+    # mapped to a version like a tag/date can; feed select_changelog the set of
+    # releases already reachable from it so it keeps only the *newer* sections.
+    since_is_ref = as_git_date(since) is None and version_ref_key(since) is None
+    exclude_tags = None
+    if since_is_ref and state is not None and state.commit_exists(repo, since):
+        exclude_tags = state.merged_version_tags(repo, since)
+
+    log = collect_commits(repo, since, args.until)
+    shown_since = f"{since[:12]} [tracked]" if resumed else since
 
     print("=" * 78)
-    print(f"RELEASE-NOTES SOURCE DIGEST   since={args.since}  until={args.until}")
-    print(f"SUGGESTED TITLE (use verbatim as the H1): {suggested_title(log, args.since)}")
+    print(f"RELEASE-NOTES SOURCE DIGEST   since={shown_since}  until={args.until}")
+    print(f"SUGGESTED TITLE (use verbatim as the H1): {suggested_title(log, since)}")
+    if resumed:
+        print(f"RESUMED from local pointer {state.STATE_FILENAME}: {anchor_desc}")
     print("=" * 78)
 
     print("\n### SOURCE 1 -- CHANGELOG.md: [Unreleased] + version sections in range")
@@ -283,18 +369,26 @@ def main() -> None:
     print("#   in-window ones are printed below (richest descriptions). [Unreleased]")
     print("#   then holds only not-yet-released entries. A legacy all-in-[Unreleased]")
     print("#   changelog prints whole. Cross-check the git log for the exact boundary.\n")
-    print(select_changelog(os.path.join(repo, "CHANGELOG.md"), args.since, args.until))
+    print(select_changelog(os.path.join(repo, "CHANGELOG.md"), since, args.until, exclude_tags))
 
     print("\n\n### SOURCE 2 -- git log in range, bucketed by Conventional-Commit type")
     print("# feat/fix/perf are the user-facing candidates; the internal bucket is")
     print("# almost always dropped from user release notes.\n")
     if not log:
-        print("(no commits in range -- check the --since value)")
+        if resumed:
+            print(f"(no commits since the tracking pointer {anchor_desc} -- nothing new to write)")
+        else:
+            print("(no commits in range -- check the --since value)")
         return
     for label, entries in bucket_commits(log).items():
         print(f"\n-- {label} [{len(entries)}]")
         for entry in entries:
             print(f"   {entry}")
+
+    print("\n" + "-" * 78)
+    print("REMINDER: once the notes are written (and the changelog reconciled), advance the")
+    print("local, git-ignored tracking pointer so the next no-argument run resumes from here:")
+    print(f"   python {TRACK_CMD} --set")
 
 
 if __name__ == "__main__":
