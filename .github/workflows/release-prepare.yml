@@ -1,0 +1,192 @@
+name: Release · Prepare
+
+# Phase 1 of the two-phase release flow (no force-pushed tags, no rewritten
+# history -- see also release-publish.yml).
+#
+# Trigger: manual `workflow_dispatch` with the target version (e.g. 0.3.55).
+# There is no hand-cut git tag anymore; you click "Run workflow" and type the
+# version. This job then PREPARES the release on a branch and opens a PR:
+#
+#   1. Tidy historical CHANGELOG drift (reconcile_changelog.py).
+#   2. Cut `## [Unreleased]` into `## [vX.Y.Z] - <today>` and open a fresh empty
+#      `[Unreleased]` (cut_release.py). This is a pure text transform, so -- unlike
+#      `git tag --contains` reconciliation -- it needs no tag to exist yet, which
+#      is exactly what lets us prepare the changelog BEFORE the tag is created.
+#   3. Regenerate the CycloneDX SBOMs, dropping pure serial-number / timestamp
+#      churn (bom_unchanged.py, issue #416).
+#   4. Commit the result on a `release/vX.Y.Z` branch and open a PR to main.
+#
+# Merging that PR is what actually releases: release-publish.yml then tags the
+# merge commit and publishes the GitHub Release + images. Closing the PR without
+# merging cancels the release cleanly -- no tag, no orphaned commit on main.
+#
+# Why this instead of force-moving a human-pushed tag: a tag is immutable by
+# contract. Moving one leaves every teammate (and every other CI run) on a stale
+# ref until they `git fetch --force --tags`. Here the tag is born -- once -- on a
+# commit that already carries the tidied changelog + fresh SBOM, and the only
+# thing that lands on main is an ordinary, reviewable PR merge.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, WITHOUT the leading v (e.g. 0.3.55).'
+        required: true
+        type: string
+
+# One preparation at a time; never cancel a half-prepared release.
+concurrency:
+  group: release-prepare
+  cancel-in-progress: false
+
+permissions:
+  contents: write        # create the release/* branch
+  pull-requests: write   # open the release PR
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+
+jobs:
+  prepare:
+    name: Cut changelog, refresh SBOM, open release PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Validate version input
+        id: ver
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::version '$VERSION' must be MAJOR.MINOR.PATCH without a leading 'v'"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "branch=release/v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout main (full history for blame + reconcile)
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Guard against an existing tag or release branch
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          BRANCH: ${{ steps.ver.outputs.branch }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "::error::tag ${TAG} already exists -- pick a new version"; exit 1
+          fi
+          if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
+            echo "::error::branch ${BRANCH} already exists on origin -- a release for ${TAG} is already in flight"
+            exit 1
+          fi
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+        with:
+          cache-read-only: true
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Tidy historical CHANGELOG drift
+        run: python3 .claude/skills/release-notes/scripts/reconcile_changelog.py --write
+
+      - name: Cut [Unreleased] into the release section
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: python3 .github/scripts/cut_release.py "${TAG}"
+
+      - name: Regenerate CycloneDX SBOMs
+        run: ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom --stacktrace
+
+      - name: Drop SBOM churn that is only serial-number / timestamp rotation
+        run: |
+          set -euo pipefail
+          for module in backend frontend; do
+            json="${module}/docs/${module}-bom.json"
+            xml="${module}/docs/${module}-bom.xml"
+            old="$(mktemp)"
+            git show "HEAD:${json}" > "$old" 2>/dev/null || true
+            # Restore BOTH json and xml when only the volatile serialNumber +
+            # metadata.timestamp rotated; the JSON verdict is authoritative as
+            # both encode the same dependency graph.
+            if python3 .github/scripts/bom_unchanged.py "$old" "$json"; then
+              echo "::notice::${module} SBOM unchanged (serial/timestamp churn only) -- restoring committed copy"
+              git checkout -- "$json" "$xml"
+            else
+              echo "${module} SBOM changed -- keeping regenerated copy"
+            fi
+            rm -f "$old"
+          done
+
+      - name: Commit on the release branch
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          BRANCH: ${{ steps.ver.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${BRANCH}"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::error::nothing to release: no CHANGELOG/SBOM changes were produced for ${TAG}"
+            exit 1
+          fi
+          # github-actions[bot] is DCO-exempt; -s keeps the trailer uniform.
+          git commit -s -m "chore(release): prepare ${TAG}"
+          git push -u origin "${BRANCH}"
+
+      - name: Build the release-notes preview for the PR body
+        id: notes
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          {
+            echo "Automated release preparation for **${TAG}**."
+            echo ""
+            echo "Merging this PR creates the ${TAG} tag at the merge commit and publishes"
+            echo "the GitHub Release plus the signed multi-arch images. Closing it without"
+            echo "merging cancels the release (no tag is created)."
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Release notes preview"
+            echo ""
+            python3 .github/scripts/extract_release_notes.py "${TAG}" CHANGELOG.md \
+              --version "${VERSION}" --registry "${REGISTRY}" --owner "${IMAGE_OWNER}"
+          } > "$body"
+          echo "path=${body}" >> "$GITHUB_OUTPUT"
+
+      - name: Open the release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          BRANCH: ${{ steps.ver.outputs.branch }}
+          NOTES: ${{ steps.notes.outputs.path }}
+        run: |
+          set -euo pipefail
+          # Best-effort label so humans can filter release PRs; the publish
+          # workflow keys off the release/ branch name, not the label.
+          gh label create release --color FFA500 --description "Automated release PR" 2>/dev/null || true
+          gh pr create --base main --head "${BRANCH}" \
+            --title "chore(release): ${TAG}" \
+            --body-file "${NOTES}" \
+            --label release

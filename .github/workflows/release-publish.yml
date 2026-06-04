@@ -1,0 +1,123 @@
+name: Release · Publish
+
+# Phase 2 of the two-phase release flow (see release-prepare.yml for phase 1).
+#
+# Trigger: a `release/vX.Y.Z` PR (opened by release-prepare.yml) being MERGED
+# into main. On merge this job:
+#   1. Derives the version from the release branch name.
+#   2. Creates the `vX.Y.Z` tag at the merge commit -- ONCE, on a commit that
+#      already carries the tidied changelog + fresh SBOM, so the tag never has to
+#      be moved.
+#   3. Publishes the GitHub Release: body = the freshly cut CHANGELOG section in
+#      the release-notes skill's German rubric style, plus links to the signed
+#      multi-arch GHCR images and the four SBOM files attached as assets.
+#
+# The tag push is what drives release-images.yml to build/sign/push the images.
+# IMPORTANT: a tag created with the default GITHUB_TOKEN does NOT trigger other
+# workflows (GitHub's anti-recursion rule), so the image build would not start.
+# To get a fully automatic build, set a `RELEASE_TOKEN` secret (a fine-grained
+# PAT or GitHub App token with `contents: write`); the tag is then created with
+# it and release-images.yml fires normally. Without the secret the tag is still
+# created (with GITHUB_TOKEN) and everything else publishes -- only the image
+# build must be kicked once by hand (Actions -> Release Images -> Run workflow),
+# and this job prints a warning saying so.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+# Serialise per release branch; never cancel a half-published release.
+concurrency:
+  group: release-publish-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # create the GitHub Release (tag is created via the API below)
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+
+jobs:
+  publish:
+    name: Tag merge commit & publish release
+    # Only merged release/vX.Y.Z PRs reach the release machinery; every other
+    # closed PR skips this job.
+    if: >-
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Resolve version from the release branch
+        id: ver
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          tag="${HEAD_REF#release/}"          # release/v0.3.55 -> v0.3.55
+          if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::unexpected release branch name '${HEAD_REF}'"; exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the merge commit (changelog + SBOM assets)
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Create the release tag at the merge commit
+        env:
+          # Prefer RELEASE_TOKEN so the tag push triggers release-images.yml;
+          # fall back to GITHUB_TOKEN (tag still created, but no auto image build).
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          HAS_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::notice::tag ${TAG} already exists -- skipping creation"
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/tags/${TAG}" -f "sha=${MERGE_SHA}" >/dev/null
+            echo "Created tag ${TAG} at ${MERGE_SHA}"
+          fi
+          if [ "${HAS_RELEASE_TOKEN}" != "true" ]; then
+            echo "::warning::RELEASE_TOKEN is not set, so the tag was created with GITHUB_TOKEN and release-images.yml will NOT auto-run. Build the images manually (Actions -> Release Images -> Run workflow), or add a RELEASE_TOKEN secret for full automation."
+          fi
+
+      - name: Build release notes body
+        id: notes
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          python3 .github/scripts/extract_release_notes.py "${TAG}" CHANGELOG.md \
+            --version "${VERSION}" --registry "${REGISTRY}" --owner "${IMAGE_OWNER}" > "$body"
+          echo "path=${body}" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          NOTES: ${{ steps.notes.outputs.path }}
+        run: |
+          set -euo pipefail
+          assets=(
+            backend/docs/backend-bom.json backend/docs/backend-bom.xml
+            frontend/docs/frontend-bom.json frontend/docs/frontend-bom.xml
+          )
+          # Idempotent: re-running on the same tag updates the release in place.
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --title "${TAG}" --notes-file "${NOTES}"
+            gh release upload "${TAG}" "${assets[@]}" --clobber
+          else
+            gh release create "${TAG}" --title "${TAG}" --notes-file "${NOTES}" "${assets[@]}"
+          fi
