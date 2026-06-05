@@ -507,7 +507,14 @@ tr:hover {
 }
 
 .krt-footer-version {
-    color: var(--color-gray-2);
+    /*
+     * gray-1, not the "muted" gray-2: #646464 on the #141414 footer is only
+     * ~3.1:1, below the WCAG AA 4.5:1 floor for this small body-size text
+     * (#441). gray-1 (#D2D2D2 ~12:1) is the lowest official grayscale token
+     * that clears AA; the version still reads as secondary via its small
+     * monospaced size next to the brighter links.
+     */
+    color: var(--color-gray-1);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-size: 0.75rem;
@@ -1926,7 +1933,13 @@ input[type="radio"]:focus {
 }
 
 .squadron-context-chip-label {
-    color: var(--color-gray-2);
+    /*
+     * gray-1, not the "muted" gray-2: #646464 on the ~#141414 chip is only
+     * ~3.1:1, below WCAG AA 4.5:1 for this fs-2xs label (#441). The uppercase
+     * + letter-spacing + small size keep it visually subordinate to the bold
+     * orange value beside it without relying on a sub-AA ink.
+     */
+    color: var(--color-gray-1);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-size: var(--fs-2xs);

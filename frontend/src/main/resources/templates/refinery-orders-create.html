@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{refineryorder.create.title} + ' - ' + ${appTitle}">Neuer Raffinerieauftrag - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -153,7 +153,7 @@
 
 <header>
     <nav>
-        <button id="hamburger" class="hamburger-btn" type="button">
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
             <span></span>
             <span></span>
             <span></span>
@@ -225,8 +225,8 @@
                         <div class="flex-gap-xs">
                             <input type="hidden" id="startedAt" th:field="*{startedAt}">
                             <div class="datetime-split-inputs flex-1">
-                                <input type="date" class="date-part">
-                                <input type="time" class="time-part">
+                                <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
                             </div>
                             <button type="button" class="btn btn-ghost" data-trigger="rfc-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
                         </div>

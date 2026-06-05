@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -50,11 +51,13 @@ import org.junit.jupiter.params.provider.ValueSource;
  * world that bypasses the app's strict Content-Security-Policy, so the scan works even though the
  * page blocks inline scripts.
  *
- * <p>The gate is intentionally set at {@code critical} only for its introduction — the most severe
- * axe impact, and rare in practice, so it is a meaningful non-flaky floor rather than a wall of
- * pre-existing contrast nits. Every violation at every impact level is written to {@code
- * build/e2e/a11y-<page>.txt} and logged, so {@code serious} / {@code moderate} findings are visible
- * for triage. Tighten the threshold to {@code serious} once that backlog is cleared.
+ * <p>The gate fails on {@code critical} <em>and</em> {@code serious} impacts — the two most severe
+ * axe levels. It started {@code critical}-only at introduction; the {@code serious} backlog
+ * (icon-only hamburger name, the missions filter date/time inputs, the chrome contrast nits and the
+ * missing {@code <html lang>}) was cleared in #441, so the floor was tightened to {@code serious}.
+ * Every violation at every impact level is still written to {@code build/e2e/a11y-<page>.txt} and
+ * logged, so the remaining {@code moderate} / {@code minor} findings stay visible for triage and
+ * can drive a future tightening to {@code moderate}.
  */
 @Tag("smoke")
 @Tag("e2e")
@@ -65,6 +68,9 @@ class AccessibilitySmokeE2eTest {
 
   /** WCAG 2.0 + 2.1, levels A and AA — the conformance target for the app. */
   private static final List<String> WCAG_TAGS = List.of("wcag2a", "wcag2aa", "wcag21a", "wcag21aa");
+
+  /** The axe impact levels that fail the gate: the two most severe of axe's four. */
+  private static final Set<String> GATED_IMPACTS = Set.of("critical", "serious");
 
   private static final String USERNAME = System.getProperty("e2e.username", "test-admin");
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
@@ -95,13 +101,14 @@ class AccessibilitySmokeE2eTest {
 
   /**
    * Loads a core page with the authenticated session, runs the axe WCAG A+AA scan, records every
-   * violation, and fails only if any has {@code critical} impact.
+   * violation, and fails if any has {@code critical} or {@code serious} impact (see {@link
+   * #GATED_IMPACTS}).
    *
    * @param path the app-relative path of the core page to scan
    */
   @ParameterizedTest(name = "a11y scan of {0}")
   @ValueSource(strings = {"/", "/missions", "/orders", "/refinery-orders", "/hangar"})
-  void corePageHasNoCriticalAccessibilityViolations(String path) {
+  void corePageHasNoCriticalOrSeriousAccessibilityViolations(String path) {
     String slug = path.equals("/") ? "home" : path.substring(1).replace('/', '-');
     try (BrowserContext context =
         browser.newContext(
@@ -115,15 +122,15 @@ class AccessibilitySmokeE2eTest {
       List<Rule> violations = results.getViolations();
       dump(slug, violations);
 
-      List<Rule> critical =
-          violations.stream().filter(rule -> "critical".equals(rule.getImpact())).toList();
+      List<Rule> gated =
+          violations.stream().filter(rule -> GATED_IMPACTS.contains(rule.getImpact())).toList();
       assertTrue(
-          critical.isEmpty(),
+          gated.isEmpty(),
           () ->
-              "Critical accessibility violation(s) on "
+              "Critical/serious accessibility violation(s) on "
                   + path
                   + ":\n"
-                  + critical.stream()
+                  + gated.stream()
                       .map(AccessibilitySmokeE2eTest::describe)
                       .collect(Collectors.joining()));
     }
