@@ -1,5 +1,5 @@
 /*
- * Admin — P4K catalog import flow (#326).
+ * Admin — P4K catalog import flow.
  *
  * Responsibilities:
  *  - "Datei wählen" -> file pick -> enable the Vorschau/Anwenden buttons.
