@@ -374,4 +374,23 @@ public class ShipType extends AbstractEntity<UUID> {
   @Enumerated(EnumType.STRING)
   @Column(name = "source_systems", nullable = false, length = 16)
   private GameItemSourceSystem sourceSystems = GameItemSourceSystem.UEX_ONLY;
+
+  // ───── KRT P4K Reader source lane (catalog import) ─────
+
+  /**
+   * DataForge {@code __ref} asset GUID observed by the KRT P4K Reader import for this ship. Kept
+   * alongside (not in place of) {@link #externalUuid}: the importer backfills {@code external_uuid}
+   * only when it is null and unclaimed, but always records the P4K-observed GUID here so a UUID
+   * disagreement stays auditable. Not UNIQUE.
+   */
+  @Column(name = "p4k_uuid")
+  private UUID p4kUuid;
+
+  /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
+  @Column(name = "p4k_synced_at")
+  private Instant p4kSyncedAt;
+
+  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  @Column(name = "p4k_deleted_at")
+  private Instant p4kDeletedAt;
 }

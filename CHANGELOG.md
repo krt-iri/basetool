@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Neuer Admin-Import „KRT P4K Reader" (Administration → Stammdaten): Administratoren laden den aus den echten Spieldaten (Game2.dcb) erzeugten JSON-Katalog hoch, um vorhandene Items, Schiffe, Hersteller, Materialien und Baupläne anzureichern, fehlende Spiel-UUIDs abzugleichen und offene Bauplan-Zutaten zu verknüpfen.** Eine Vorschau zeigt je Typ, was angereichert bzw. neu angelegt würde; „Anwenden" schreibt die Änderungen, wobei fehlende Datensätze nur bei gesetztem Schalter „Neue Datensätze anlegen" entstehen (gefiltert auf spielbare Inhalte, als Quelle „P4K" gekennzeichnet, Materialien zunächst unsichtbar zur Freigabe). Widersprüchliche UUIDs bleiben erhalten und werden im neuen „P4K"-Sync-Bericht protokolliert (Migration V140).
+
 - **Die UEX-Synchronisation schreibt jetzt ebenfalls in das Sync-Protokoll, sodass der UEX-Tab unter „Sync-Berichte" (Administration) nicht mehr leer bleibt.** Pro Lauf erscheint eine Zusammenfassungszeile (besuchte Kategorien, angelegte/aktualisierte/entfernte Items); bisher protokollierte dort nur die SC-Wiki-Synchronisation.
 
 - **Neuer Voll-Abgleich der Item-Daten zwischen UEX und SC Wiki: Beim vollständigen Wiki-Item-Import werden UEX-Items ohne Spiel-UUID per Name/Slug ihrem Wiki-Gegenstück zugeordnet und zusammengeführt, statt eine Dublette anzulegen.** Das schließt die Lücke, durch die rund ein Drittel der UEX-Items (u. a. die meisten Waffen und Lackierungen) bisher ohne Wiki-Daten wie Beschreibung, Masse und Klassifizierung blieb. Aktiviert über die Einstellung `krt.scwiki.sync-all-items` (in Dev aktiv, in Prod vorerst standardmäßig aus).

@@ -90,5 +90,13 @@ public enum SyncEventType {
    * always visible on the admin sync-report page even when it produced no other findings — the UEX
    * item sync is the first emitter.
    */
-  SYNC_RUN_SUMMARY
+  SYNC_RUN_SUMMARY,
+
+  /**
+   * KRT P4K Reader catalog import: a brand-new row was seeded from the game's DataForge catalog for
+   * a record that matched no existing UEX / SC-Wiki row (and passed the importer's real-record
+   * filter). Inserted as {@code source_systems = P4K} (items / ships / materials) so it is clearly
+   * attributable and reviewable; the game DCB is the upstream source the live game itself reads.
+   */
+  CREATED_FROM_P4K
 }

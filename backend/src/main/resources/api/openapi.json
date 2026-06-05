@@ -69,6 +69,9 @@
   }, {
     "name" : "Promotion Topics",
     "description" : "Manage promotion system topic groups."
+  }, {
+    "name" : "Admin – P4K Import",
+    "description" : "Administrator endpoints for importing the KRT P4K Reader catalog (Game2.dcb master data)."
   } ],
   "paths" : {
     "/api/v1/users/{id}/attributes" : {
@@ -20646,6 +20649,211 @@
         } ]
       }
     },
+    "/api/v1/admin/import/p4k/preview" : {
+      "post" : {
+        "tags" : [ "Admin – P4K Import" ],
+        "summary" : "Preview a P4K catalog import (no writes).",
+        "operationId" : "preview",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "file" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Preview computed.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/P4kImportResultDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/import/p4k/apply" : {
+      "post" : {
+        "tags" : [ "Admin – P4K Import" ],
+        "summary" : "Apply a P4K catalog import (enriches existing rows; optionally seeds new ones via seedNew).",
+        "operationId" : "apply",
+        "parameters" : [ {
+          "name" : "seedNew",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "file" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Import applied; see the summary.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/P4kImportResultDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/users/{id}/squadron" : {
       "patch" : {
         "tags" : [ "user-controller" ],
@@ -37891,6 +38099,69 @@
           }
         },
         "required" : [ "amount", "missionId", "participantId", "type" ]
+      },
+      "Counts" : {
+        "type" : "object",
+        "properties" : {
+          "matched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "uuidBackfilled" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "uuidConflicts" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "enriched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "created" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unmatched" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "P4kImportResultDto" : {
+        "type" : "object",
+        "properties" : {
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "seedingEnabled" : {
+            "type" : "boolean"
+          },
+          "manufacturers" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "items" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "ships" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "commodities" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "blueprints" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "ingredientsResolved" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "runId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
       },
       "UpdateUserSquadronRequest" : {
         "type" : "object",

@@ -52,6 +52,19 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   Optional<Blueprint> findByScwikiUuid(UUID scwikiUuid);
 
   /**
+   * Secondary upsert key for the P4K import: match an inbound P4K blueprint by its human-readable
+   * {@code BP_CRAFT_*} key (= {@code scwiki_key}) when the {@code scwiki_uuid} lookup missed.
+   * {@code scwiki_key} is not declared UNIQUE, so {@code findFirst} returns at most one row rather
+   * than risking a {@code NonUniqueResultException}. The result is ordered by the NOT-NULL UNIQUE
+   * {@code scwiki_uuid} so the pick is deterministic across runs when duplicate keys exist (rather
+   * than an arbitrary database row order).
+   *
+   * @param scwikiKey the blueprint key (e.g. {@code "BP_CRAFT_AMRS_LaserCannon_S1"})
+   * @return the lowest-{@code scwiki_uuid} blueprint with that key if any exists
+   */
+  Optional<Blueprint> findFirstByScwikiKeyOrderByScwikiUuidAsc(String scwikiKey);
+
+  /**
    * Returns the distinct Wiki item UUIDs referenced by blueprint ITEM ingredient lines. Feeds the
    * R4 closure-mode item sync (§8.4): a blueprint may reference an item UEX never placed in {@code
    * game_item}, so the closure run must also fetch those uuids and create the {@code WIKI_ONLY}

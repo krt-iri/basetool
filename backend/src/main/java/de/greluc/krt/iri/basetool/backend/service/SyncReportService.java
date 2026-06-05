@@ -151,6 +151,43 @@ public class SyncReportService {
   }
 
   /**
+   * Records one KRT-P4K-Reader-import finding for an arbitrary aggregate. Stamps {@code source =
+   * P4K} and {@code ran_at = now}; the caller supplies the aggregate label ({@code "game_item"} /
+   * {@code "ship_type"} / {@code "manufacturer"} / {@code "material"} / {@code "blueprint"}). The
+   * P4K catalog import is the only writer — it emits {@link SyncEventType#LINKED_VIA_NAME} for a
+   * canonical-UUID backfill reached through the name/slug fallback, {@link
+   * SyncEventType#BACKFILL_AMBIGUOUS} when the existing canonical UUID disagrees with the P4K GUID
+   * (kept, not overwritten), {@link SyncEventType#CREATED_FROM_P4K} for an opt-in seeded row, and
+   * one {@link SyncEventType#SYNC_RUN_SUMMARY} per run.
+   *
+   * @param runId the current run's id (from {@link #beginRun()})
+   * @param eventType the kind of finding
+   * @param aggregate the aggregate the event concerns
+   * @param externalUuid the external asset UUID the event concerns, or {@code null}
+   * @param externalName the external display name, or {@code null}
+   * @param detail free-form human-readable detail
+   */
+  public void logP4kEvent(
+      UUID runId,
+      SyncEventType eventType,
+      String aggregate,
+      UUID externalUuid,
+      String externalName,
+      String detail) {
+    repository.save(
+        ExternalSyncReport.builder()
+            .runId(runId)
+            .ranAt(Instant.now())
+            .sourceSystem(SyncSourceSystem.P4K)
+            .eventType(eventType)
+            .aggregate(aggregate)
+            .externalUuid(externalUuid)
+            .externalName(externalName)
+            .detail(detail)
+            .build());
+  }
+
+  /**
    * Enforces the §8.8 retention: deletes every event of {@code source} whose run is older than the
    * newest {@link #RUNS_TO_KEEP}. No-op when the source has fewer than the cap (the keep set would
    * be the whole population). Skips the delete entirely on an empty keep set so the {@code NOT IN

@@ -277,4 +277,24 @@ public class GameItem extends AbstractEntity<UUID> {
   /** Game version in which UEX last observed this row. */
   @Column(name = "uex_game_version_seen")
   private String uexGameVersionSeen;
+
+  // ───── KRT P4K Reader source lane (catalog import) ─────
+
+  /**
+   * DataForge {@code __ref} asset GUID observed by the KRT P4K Reader import for this item. Kept
+   * alongside (not in place of) {@link #externalUuid}: the importer backfills {@code external_uuid}
+   * only when it is null and no other row holds the GUID, but always records the P4K-observed GUID
+   * here so a UUID disagreement between UEX/Wiki and the game DCB stays auditable. Not UNIQUE —
+   * conflicting rows may legitimately carry the same P4K GUID until reconciled.
+   */
+  @Column(name = "p4k_uuid")
+  private UUID p4kUuid;
+
+  /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
+  @Column(name = "p4k_synced_at")
+  private Instant p4kSyncedAt;
+
+  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  @Column(name = "p4k_deleted_at")
+  private Instant p4kDeletedAt;
 }

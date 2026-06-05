@@ -40,5 +40,14 @@ public enum GameItemSourceSystem {
   WIKI_ONLY,
 
   /** Both syncs have written to this row; the canonical fields use the §6.3.3 tie-breaker. */
-  BOTH
+  BOTH,
+
+  /**
+   * The KRT P4K Reader catalog import has touched this row. Unlike {@link #UEX_ONLY} / {@link
+   * #WIKI_ONLY} / {@link #BOTH}, P4K participation is normally signalled by a non-null {@code
+   * p4k_synced_at} rather than by flipping {@code source_systems} — the importer enriches existing
+   * rows in place and does not rewrite their owning source. This value exists so the CHECK
+   * constraint accepts it and a future flow may set it explicitly if the policy changes.
+   */
+  P4K
 }
