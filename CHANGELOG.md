@@ -8,6 +8,10 @@
 
 - **Neuer Voll-Abgleich der Item-Daten zwischen UEX und SC Wiki: Beim vollständigen Wiki-Item-Import werden UEX-Items ohne Spiel-UUID per Name/Slug ihrem Wiki-Gegenstück zugeordnet und zusammengeführt, statt eine Dublette anzulegen.** Das schließt die Lücke, durch die rund ein Drittel der UEX-Items (u. a. die meisten Waffen und Lackierungen) bisher ohne Wiki-Daten wie Beschreibung, Masse und Klassifizierung blieb. Aktiviert über die Einstellung `krt.scwiki.sync-all-items` (in Dev aktiv, in Prod vorerst standardmäßig aus).
 
+### Changed
+
+- **Bei einem Item-Auftrag lässt sich das gewünschte Item jetzt durch Tippen suchen: Das Auswahlfeld ist ein durchsuchbares Dropdown, das die Liste live auf die eingegebenen Buchstaben filtert und sich per Tastatur bedienen lässt.** Das ersetzt die lange, schwer überschaubare Auswahlliste und macht die Item-Wahl deutlich schneller.
+
 ## [v0.3.59](https://github.com/krt-iri/basetool/releases/tag/v0.3.59) - 2026-06-05
 
 ### Changed

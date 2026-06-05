@@ -249,6 +249,7 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
     let materialIndex = /*[[${jobOrderForm.materials.size()}]]*/ 1;
@@ -382,7 +383,11 @@
         qualityNone: /*[[#{orders.create.item.quality.none}]]*/ 'Keine',
         subTitle: /*[[#{orders.create.item.subassembly.title}]]*/ 'Unterbaugruppen',
         subAdopt: /*[[#{orders.create.item.subassembly.adopt}]]*/ 'Uebernehmen',
-        unresolved: /*[[#{orders.create.item.unresolved}]]*/ 'Nicht aufgeloeste Zutaten:'
+        unresolved: /*[[#{orders.create.item.unresolved}]]*/ 'Nicht aufgeloeste Zutaten:',
+        searchPlaceholder: /*[[#{orders.create.item.search.placeholder}]]*/ 'Item suchen oder waehlen...',
+        searchNoResults: /*[[#{orders.create.item.search.noResults}]]*/ 'Keine passenden Items',
+        searchHint: /*[[#{orders.create.item.search.hint}]]*/ 'Weiter tippen, um die Liste einzugrenzen...',
+        searchInvalid: /*[[#{orders.create.item.search.invalid}]]*/ 'Bitte ein Item aus der Liste waehlen.'
     };
     let itemLineIndex = 0;
     // Edit mode (item-order edit): the existing lines, injected server-side. Null on the create page.
@@ -426,7 +431,7 @@
             <div style="display:flex; gap:1rem; align-items:flex-end;">
                 <div class="form-group flex-2 mb-0">
                     <label>${ITEM_I18N.item}</label>
-                    <select name="items[${idx}].gameItemId" data-role="item-select" required>${options}</select>
+                    <select name="items[${idx}].gameItemId" data-role="item-select" data-testid="order-item-combobox" required>${options}</select>
                 </div>
                 <div class="form-group flex-1 mb-0" data-role="blueprint-wrap" hidden>
                     <label>${ITEM_I18N.blueprint}</label>
@@ -443,10 +448,25 @@
             <div data-role="subassemblies" style="margin-top:0.5rem;"></div>
         `;
         container.appendChild(row);
+        // Seed the native select's value BEFORE enhancing it so the combobox renders the
+        // matching label, then upgrade it into a searchable type-to-filter dropdown. If the
+        // enhancer script failed to load, the plain <select> keeps working as a fallback.
+        const itemSelect = row.querySelector('select[data-role="item-select"]');
+        if (itemSelect && prefill.gameItemId) {
+            itemSelect.value = prefill.gameItemId;
+        }
+        if (itemSelect && window.krtSearchableSelect) {
+            window.krtSearchableSelect(itemSelect, {
+                placeholder: ITEM_I18N.searchPlaceholder,
+                noResultsText: ITEM_I18N.searchNoResults,
+                hintText: ITEM_I18N.searchHint,
+                invalidText: ITEM_I18N.searchInvalid
+            });
+        }
         if (prefill.gameItemId) {
-            row.querySelector('[data-role="item-select"]').value = prefill.gameItemId;
             // In edit mode, thread the stored blueprint + per-material qualities through the async
-            // load so the line restores exactly as ordered.
+            // load so the line restores exactly as ordered. After enhancement the value lives on
+            // the combobox's hidden input, which still carries data-role="item-select".
             loadBlueprints(row, prefill.blueprintId, prefill.qualities);
         }
         return row;
