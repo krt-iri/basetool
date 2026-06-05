@@ -99,14 +99,15 @@ public class MaterialClaimController {
   @Operation(
       summary = "Create or update a material claim",
       description =
-          "Signs a squadron up for a partial quantity of a material bucket on a Spezialkommando"
-              + " order, or updates its existing claim. Rejected on non-SK or terminal orders and"
-              + " on overclaim.")
+          "Signs a profit-eligible squadron up for a partial quantity of a material bucket on a"
+              + " Spezialkommando order, or updates its existing claim. Rejected on non-SK or"
+              + " terminal orders, on overclaim, and when a new claim names a squadron that is not"
+              + " profit-eligible.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Claim created or updated"),
     @ApiResponse(
         responseCode = "400",
-        description = "Not an open SK order, unknown bucket, or" + " overclaim"),
+        description = "Not an open SK order, unknown bucket, overclaim, or non-profit squadron"),
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order not found")
   })

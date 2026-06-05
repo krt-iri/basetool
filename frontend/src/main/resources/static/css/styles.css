@@ -420,14 +420,37 @@ tr {
  * Subtle zebra striping for long data tables. The 0.02 alpha is intentionally
  * minimal — strong enough to break the eye line on dense rows, weak enough
  * not to compete with hover or with department-tinted rows (e.g. the
- * `.unit-color-*` palette on mission-detail). Hover still wins.
+ * `.unit-color-*` palette on mission-detail).
+ *
+ * Hover must out-rank the stripe on BOTH odd and even rows. A bare `tr:hover`
+ * (specificity 0,1,1) lost to `tbody tr:nth-child(even)` (0,1,2), so the
+ * lighter striped rows showed no hover feedback while the dark rows did — the
+ * explicit even-row hover (0,2,2) restores a uniform hover across every row.
  */
 tbody tr:nth-child(even) {
     background-color: rgb(255 255 255 / 2%);
 }
 
-tr:hover {
+tbody tr:hover,
+tbody tr:nth-child(even):hover {
     background-color: var(--color-gray-3);
+}
+
+/*
+ * SK-order claim tables (orders-detail): the open-amount and its "Eintragen"
+ * action share one flex row so every button's left edge lines up down the
+ * column no matter how wide the amount text is (SCU decimals vs. piece counts
+ * differ in width). The amount grows to fill, pushing each button to the same
+ * offset; the gap replaces the button's former left margin.
+ */
+.claim-open-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.claim-open-cell .claim-open-amount {
+    flex: 1 1 auto;
 }
 
 /*
