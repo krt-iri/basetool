@@ -57,6 +57,7 @@ import lombok.Setter;
 public class P4kImportJob extends AbstractEntity<UUID> {
 
   /** Surrogate primary key, assigned by Hibernate before insert. */
+  @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
