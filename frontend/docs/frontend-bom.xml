@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:ac2cdb0e-7d03-442a-8e90-d872c0cb7a66" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:f4ba2bf8-3e7c-443c-b7de-c3d324337a78" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-06-05T12:22:12Z</timestamp>
+    <timestamp>2026-06-05T18:53:03Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-iri/basetool/actions/runs/27014520722</url>
+          <url>https://github.com/krt-iri/basetool/actions/runs/27033949474</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-iri/basetool</url>
