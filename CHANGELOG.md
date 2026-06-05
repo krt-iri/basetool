@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.59](https://github.com/krt-iri/basetool/releases/tag/v0.3.59) - 2026-06-05
+
 ### Changed
 
 - **Beim „Material eintragen" auf einen Spezialkommando-Auftrag lassen sich jetzt nur noch profit-berechtigte Staffeln eintragen.** Die Staffelauswahl im Eintragungs-Dialog listet nur noch profit-berechtigte Staffeln, und das Backend weist eine Eintragung für eine nicht profit-berechtigte Staffel ab.
