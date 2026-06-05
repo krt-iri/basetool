@@ -195,13 +195,13 @@ class AnonymousJobOrderE2eTest {
         page.locator("#item-requestingOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#item-handle").fill(handle);
 
-        // Pick whatever orderable item the (bootstrap-seeded, frontend-cached) picker offers, then
-        // wait until its blueprint + material derivation has rendered the first material's quality
-        // control. That visible control appears together with the hidden materialId and the
-        // (already-set) blueprintId the create payload needs — and unlike the hidden input it
-        // satisfies Playwright's default visible-state wait.
-        page.locator("select[data-role='item-select']")
-            .selectOption(new SelectOption().setIndex(1));
+        // Pick whatever orderable item the (bootstrap-seeded, frontend-cached) picker offers. The
+        // item picker is now a searchable combobox (krtSearchableSelect): open it and pick the
+        // first offered option, then wait until the blueprint + material derivation renders the
+        // first material's quality control. That control appears with the hidden materialId and
+        // the (already-set) blueprintId the create payload needs.
+        page.getByTestId("order-item-combobox").first().click();
+        page.locator("li[role='option']").first().click();
         page.locator("select[name='items[0].materials[0].quality']").waitFor();
 
         E2eSupport.clickSubmitClearingFooter(page.getByTestId("order-item-submit"));
