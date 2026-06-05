@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{orders.detail.title} + ' - ' + ${appTitle}">Auftrag Details - Profit Basetool</title>
 </head>
@@ -8,7 +8,7 @@
 
 <header>
     <nav>
-        <button id="hamburger" class="hamburger-btn" type="button">
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
             <span></span>
             <span></span>
             <span></span>
@@ -629,8 +629,8 @@
                 <label for="handoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
-                    <input type="time" class="time-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
                 </div>
             </div>
 
@@ -679,8 +679,8 @@
                 <label for="itemHandoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="itemHandoverTime" th:field="*{handoverTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
-                    <input type="time" class="time-part" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
                 </div>
             </div>
 

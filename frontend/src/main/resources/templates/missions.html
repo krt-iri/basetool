@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Missions - Profit Basetool</title>
 </head>
@@ -8,7 +8,7 @@
 
 <header>
     <nav>
-        <button id="hamburger" class="hamburger-btn" type="button">
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
             <span></span>
             <span></span>
             <span></span>
@@ -37,8 +37,8 @@
                 <label for="mission-start" th:text="#{mission.filter.start}">From</label>
                 <input type="hidden" name="start" id="mission-start" th:value="${start}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part">
-                    <input type="time" class="time-part">
+                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
                 </div>
             </div>
 
@@ -46,8 +46,8 @@
                 <label for="mission-end" th:text="#{mission.filter.end}">To</label>
                 <input type="hidden" name="end" id="mission-end" th:value="${end}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part">
-                    <input type="time" class="time-part">
+                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
                 </div>
             </div>
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.materials.list} + ' - ' + ${appTitle}">Materialien - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -70,7 +70,7 @@
 
 <header>
     <nav>
-        <button id="hamburger" class="hamburger-btn" type="button">
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
             <span></span>
             <span></span>
             <span></span>

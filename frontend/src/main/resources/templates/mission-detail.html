@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Mission Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -257,7 +257,7 @@
 
 <header>
     <nav>
-        <button id="hamburger" class="hamburger-btn" type="button">
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
             <span></span>
             <span></span>
             <span></span>
@@ -369,8 +369,8 @@
                 <label th:text="#{mission.meeting_time}">Treffen Teamspeak</label>
                 <input type="hidden" name="meetingTime" id="meetingTime" th:value="*{meetingTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
-                    <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
                 </div>
                 <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" class="field-error"></div>
             </div>
@@ -381,8 +381,8 @@
                 <label th:text="#{mission.planned_start}">Planned Start</label>
                 <input type="hidden" name="plannedStartTime" id="plannedStartTime" th:value="*{plannedStartTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" data-testid="mission-start-date" required th:disabled="${!isNew and !mission.canEdit}">
-                    <input type="time" class="time-part" data-testid="mission-start-time" required th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" data-testid="mission-start-date" required th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" data-testid="mission-start-time" required th:disabled="${!isNew and !mission.canEdit}">
                 </div>
                 <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" class="field-error"></div>
             </div>
@@ -391,8 +391,8 @@
                 <label th:text="#{mission.planned_end}">Planned End</label>
                 <input type="hidden" name="plannedEndTime" id="plannedEndTime" th:value="*{plannedEndTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
-                    <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
+                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
                 </div>
                 <div th:if="${#fields.hasErrors('plannedEndTime')}" th:errors="*{plannedEndTime}" class="field-error"></div>
             </div>
@@ -404,8 +404,8 @@
                 <input type="hidden" name="actualStartTime" id="actualStartTime" th:value="*{actualStartTime}">
                 <div style="display: flex; gap: 0.5rem; align-items: center; width: fit-content;">
                     <div class="datetime-split-inputs">
-                        <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
-                        <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
+                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
+                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
                     </div>
                     <button type="button" class="btn btn-ghost btn-sm" th:text="#{general.now}"
                             data-trigger="mission-set-now" data-input-id="actualStartTime"
@@ -419,8 +419,8 @@
                 <input type="hidden" name="actualEndTime" id="actualEndTime" th:value="*{actualEndTime}">
                 <div style="display: flex; gap: 0.5rem; align-items: center; width: fit-content;">
                     <div class="datetime-split-inputs">
-                        <input type="date" class="date-part" th:disabled="${!isNew and !mission.canEdit}">
-                        <input type="time" class="time-part" th:disabled="${!isNew and !mission.canEdit}">
+                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
+                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
                     </div>
                     <button type="button" class="btn btn-ghost btn-sm" th:text="#{general.now}"
                             data-trigger="mission-set-now" data-input-id="actualEndTime"
@@ -1083,8 +1083,8 @@
                     <label th:text="#{mission.participant.start_time}">Startzeit</label>
                     <input type="hidden" id="edit-participant-start-time-ui">
                     <div class="datetime-split-inputs">
-                        <input type="date" class="date-part">
-                        <input type="time" class="time-part">
+                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
                     </div>
                 </div>
 
@@ -1092,8 +1092,8 @@
                     <label th:text="#{mission.participant.end_time}">Endzeit</label>
                     <input type="hidden" id="edit-participant-end-time-ui">
                     <div class="datetime-split-inputs">
-                        <input type="date" class="date-part">
-                        <input type="time" class="time-part">
+                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
                     </div>
                 </div>
                 
