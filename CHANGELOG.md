@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.58](https://github.com/krt-iri/basetool/releases/tag/v0.3.58) - 2026-06-05
+
 ### Fixed
 
 - **Nutzer werden nicht mehr häufig ausgeloggt: Eine Anmeldung bleibt bei regelmäßiger Nutzung gleitend bis zu 30 Tage bestehen und übersteht jetzt das Schließen des Browsers wie auch einen Neustart des Redis-Containers.** Das Sitzungs-Cookie ist dazu 30 Tage persistent, die Server-Sitzung läuft erst nach 30 Tagen Inaktivität ab (vorher 10 Tage), Redis sichert die Sitzungen wieder per Snapshot, und die im Login-Theme zuvor fehlende Option „Angemeldet bleiben" ist wieder vorhanden (standardmäßig aktiv).
