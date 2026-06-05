@@ -47,6 +47,7 @@ import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -64,7 +65,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -816,9 +816,10 @@ public class P4kImportService {
 
   /**
    * Seeds a brand-new {@code manufacturer} for an unmatched record and registers it in {@code
-   * byGuid} so items / ships in the same run can link to it. Requires a parseable GUID, a resolved
-   * name and a non-blank code (both {@code name} and {@code abbreviation} are NOT NULL + UNIQUE);
-   * guards all three keys.
+   * byGuid} so items / ships in the same run can link to it — including on a dry-run preview (the
+   * entity is built and indexed but only persisted on apply) so the preview's item/ship enrichment
+   * counts match the apply. Requires a parseable GUID, a resolved name and a non-blank code (both
+   * {@code name} and {@code abbreviation} are NOT NULL + UNIQUE); guards all three keys.
    *
    * @return whether a row was (or would be) inserted
    */
@@ -845,17 +846,18 @@ public class P4kImportService {
         || manufacturerRepository.findByAbbreviationIgnoreCase(code).isPresent()) {
       return false;
     }
+    Manufacturer manufacturer = new Manufacturer();
+    manufacturer.setName(name);
+    manufacturer.setAbbreviation(code);
+    manufacturer.setScwikiUuid(guid);
+    manufacturer.setScwikiCode(code);
+    manufacturer.setDescription(blankToNull(dto.desc()));
+    manufacturer.setP4kUuid(guid);
+    manufacturer.setP4kSyncedAt(now);
+    // Indexed for in-run linking on preview and apply (count parity); persisted only on apply.
+    byGuid.put(dto.guid(), manufacturer);
     if (apply) {
-      Manufacturer manufacturer = new Manufacturer();
-      manufacturer.setName(name);
-      manufacturer.setAbbreviation(code);
-      manufacturer.setScwikiUuid(guid);
-      manufacturer.setScwikiCode(code);
-      manufacturer.setDescription(blankToNull(dto.desc()));
-      manufacturer.setP4kUuid(guid);
-      manufacturer.setP4kSyncedAt(now);
-      Manufacturer saved = manufacturerRepository.save(manufacturer);
-      byGuid.put(dto.guid(), saved);
+      manufacturerRepository.save(manufacturer);
       recordSeed(runId, "manufacturer", guid, name);
     }
     return true;
@@ -1385,12 +1387,13 @@ public class P4kImportService {
   // ───────────────────────────────────────────────────────────────── parsing ──
 
   /**
-   * Reads the multipart body and converts it into a {@link P4kCatalogDto}. Mirrors the {@code
-   * BlueprintImportService} pattern: parse the tree with the runtime Jackson 3 mapper, then convert
-   * to the DTO. A failed parse is surfaced as a {@link BadRequestException} (HTTP 400).
+   * Reads the multipart body and binds straight to a {@link P4kCatalogDto} in one streaming pass,
+   * with no intermediate {@code JsonNode} tree, so a large catalog upload costs roughly the bound
+   * object rather than a full tree plus the DTO. An empty body, malformed JSON, or a non-object
+   * root (e.g. a JSON array) surfaces as a {@link BadRequestException} (HTTP 400), not a 500.
    *
    * @param file the uploaded catalog JSON
-   * @return the parsed catalog (arrays may be {@code null})
+   * @return the parsed catalog (its arrays may be {@code null})
    * @throws BadRequestException if the file is empty or not valid P4K catalog JSON
    */
   @NotNull
@@ -1398,26 +1401,19 @@ public class P4kImportService {
     if (file.isEmpty()) {
       throw new BadRequestException("The uploaded file is empty.");
     }
-    JsonNode root;
-    try {
-      root = objectMapper.readTree(file.getInputStream());
+    P4kCatalogDto catalog;
+    try (InputStream in = file.getInputStream()) {
+      catalog = objectMapper.readValue(in, P4kCatalogDto.class);
     } catch (IOException | JacksonException e) {
-      log.warn("P4K import: failed to parse JSON — {}", e.getMessage());
+      log.warn("P4K import: failed to read catalog JSON — {}", e.getMessage());
       throw new BadRequestException(
-          "The uploaded file could not be parsed as valid P4K catalog JSON.");
-    }
-    if (root == null || !root.isObject()) {
-      throw new BadRequestException(
-          "The uploaded file must be a P4K catalog object (manufacturers / items / ships /"
+          "The uploaded file is not valid P4K catalog JSON (manufacturers / items / ships /"
               + " commodities / blueprints).");
     }
-    try {
-      return objectMapper.convertValue(root, P4kCatalogDto.class);
-    } catch (IllegalArgumentException | JacksonException e) {
-      log.warn("P4K import: failed to bind catalog — {}", e.getMessage());
-      throw new BadRequestException(
-          "The uploaded file is not a valid P4K catalog (could not bind its fields).");
+    if (catalog == null) {
+      throw new BadRequestException("The uploaded file is empty or not a P4K catalog object.");
     }
+    return catalog;
   }
 
   /**

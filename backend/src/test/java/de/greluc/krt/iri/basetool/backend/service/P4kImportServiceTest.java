@@ -569,6 +569,51 @@ class P4kImportServiceTest {
     verify(syncReportService, never()).beginRun();
   }
 
+  @Test
+  void preview_matchedItemLinkingASeededManufacturer_countsEnrichmentLikeApply() {
+    // Parity guarantee: a preview that would seed a manufacturer indexes it in the dry run too, so
+    // a
+    // matched item linking that manufacturer is counted as enriched exactly as the apply would
+    // report — without writing anything. Regression for the dry-run byGuid registration.
+    UUID mfgGuid = UUID.randomUUID();
+    UUID itemGuid = UUID.randomUUID();
+
+    // Manufacturer is unmatched on every key -> the run would seed it.
+    when(manufacturerRepository.findByScwikiUuid(mfgGuid)).thenReturn(Optional.empty());
+    when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
+        .thenReturn(Optional.empty());
+    when(manufacturerRepository.findByAbbreviationIgnoreCase("AEGS")).thenReturn(Optional.empty());
+
+    // Item is an existing GUID match with no manufacturer yet.
+    GameItem existing = new GameItem();
+    existing.setName("Gladius");
+    existing.setExternalUuid(itemGuid);
+    when(gameItemRepository.findByExternalUuid(itemGuid)).thenReturn(Optional.of(existing));
+
+    String json =
+        "{\"manufacturers\":[{\"guid\":\""
+            + mfgGuid
+            + "\",\"code\":\"AEGS\",\"name\":\"Aegis Dynamics\"}],"
+            + "\"items\":[{\"guid\":\""
+            + itemGuid
+            + "\",\"name\":\"Gladius\",\"manufacturerGuid\":\""
+            + mfgGuid
+            + "\"}]}";
+
+    P4kImportResultDto result = service.previewImport(upload(json));
+
+    assertEquals(1, result.manufacturers().created());
+    assertEquals(1, result.items().matched());
+    // The would-be-seeded manufacturer is indexed in the dry run, so the item's manufacturer fill
+    // is
+    // counted as enrichment — matching what the apply would report.
+    assertEquals(1, result.items().enriched());
+    // ...but nothing is written and no run is started.
+    assertNull(existing.getManufacturer());
+    verify(manufacturerRepository, never()).save(any());
+    verify(syncReportService, never()).beginRun();
+  }
+
   // ──────────────────────────────── bad input ──
 
   @Test
