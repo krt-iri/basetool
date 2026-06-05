@@ -17,6 +17,15 @@
                     <input tabindex="2" id="password" class="krt-input" name="password" type="password" autocomplete="off" />
                 </div>
 
+                <#if realm.rememberMe>
+                    <div class="form-group">
+                        <label class="krt-checkbox-label">
+                            <input tabindex="3" id="rememberMe" name="rememberMe" type="checkbox" class="krt-checkbox" checked />
+                            ${msg("rememberMe")}
+                        </label>
+                    </div>
+                </#if>
+
                 <#if realm.resetPasswordAllowed>
                     <div class="krt-form-footer">
                         <a tabindex="5" href="${url.loginResetCredentialsUrl!''}" class="krt-link">${msg("doForgotPassword")}</a>
