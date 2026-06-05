@@ -79,6 +79,26 @@ class SyncReportServiceTest {
   }
 
   @Test
+  void logUexEvent_persistsUexRowWithGivenFields() {
+    UUID runId = UUID.randomUUID();
+
+    service.logUexEvent(
+        runId, SyncEventType.SYNC_RUN_SUMMARY, "game_item", null, null, "categories=1, upserted=1");
+
+    ArgumentCaptor<ExternalSyncReport> saved = ArgumentCaptor.forClass(ExternalSyncReport.class);
+    verify(repository).save(saved.capture());
+    ExternalSyncReport row = saved.getValue();
+    assertEquals(runId, row.getRunId());
+    assertEquals(SyncSourceSystem.UEX, row.getSourceSystem());
+    assertEquals(SyncEventType.SYNC_RUN_SUMMARY, row.getEventType());
+    assertEquals("game_item", row.getAggregate());
+    assertNull(row.getExternalUuid());
+    assertNull(row.getExternalName());
+    assertEquals("categories=1, upserted=1", row.getDetail());
+    assertNotNull(row.getRanAt());
+  }
+
+  @Test
   void pruneRuns_deletesEverythingOutsideTheKeepSet() {
     List<UUID> kept = List.of(UUID.randomUUID(), UUID.randomUUID());
     when(repository.findRecentRunIds(eq(SyncSourceSystem.SCWIKI), any(Pageable.class)))

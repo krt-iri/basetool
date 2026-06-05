@@ -22,6 +22,9 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.dto.uex.UexItemDto;
@@ -30,6 +33,8 @@ import de.greluc.krt.iri.basetool.backend.model.GameItem;
 import de.greluc.krt.iri.basetool.backend.model.GameItemKind;
 import de.greluc.krt.iri.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.Manufacturer;
+import de.greluc.krt.iri.basetool.backend.model.SyncEventType;
+import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.UexCategory;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
@@ -54,6 +59,7 @@ class UexItemSyncServiceTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private ShipTypeRepository shipTypeRepository;
+  @Mock private SyncReportService syncReportService;
 
   @InjectMocks private UexItemSyncService service;
 
@@ -249,6 +255,32 @@ class UexItemSyncServiceTest {
     service.syncItems();
 
     verify(gameItemRepository).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
+  void syncItems_writesOneUexRunSummaryEvent_andPrunesUexRuns() {
+    UexItemDto helmet =
+        helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
+    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(helmet));
+    when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(gameItemRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncItems();
+
+    // Exactly one summary row per run (carrying the tally), so the run shows on the admin UEX tab
+    // without one event per created item; then the UEX retention sweep runs.
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.SYNC_RUN_SUMMARY),
+            eq("game_item"),
+            isNull(),
+            isNull(),
+            contains("created=1"));
+    verify(syncReportService).pruneRuns(SyncSourceSystem.UEX);
   }
 
   @Test

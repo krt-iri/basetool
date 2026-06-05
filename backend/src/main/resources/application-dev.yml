@@ -23,7 +23,9 @@ spring:
 # SC Wiki catalogue sync. The per-sync feature flags default to false in code
 # (ScWikiProperties -- "ships dark"); enabled here so each scheduler step actually
 # runs and the admin sync-report log (/admin/sync-reports) gets populated.
-# sync-all-items stays at its default (false) -- closure mode, not the heavy full backfill.
+# sync-all-items is ON in dev (Weg 2): the full ~12 700-row backfill plus the name/slug
+# reconciliation that merges uuid-less UEX rows into their Wiki twins. Prod keeps the
+# default (false / closure mode) until the heavier backfill is signed off for production.
 krt:
   scwiki:
     scheduler-enabled: true
@@ -32,3 +34,5 @@ krt:
     item-sync-enabled: true
     blueprint-sync-enabled: true
     manufacturer-sync-enabled: true
+    sync-all-items: true
+    reconcile-uuidless-by-name: true

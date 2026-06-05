@@ -260,9 +260,24 @@ public class ScWikiItemSyncService {
    */
   private void syncItemsBackfill() {
     log.info("Starting SC Wiki item sync (FULL BACKFILL mode) — paging every kind endpoint...");
+    boolean reconcile = Boolean.TRUE.equals(properties.getReconcileUuidlessByName());
+    List<GameItem> uuidlessUexRows =
+        reconcile
+            ? gameItemRepository.findByExternalUuidIsNullAndSourceSystems(
+                GameItemSourceSystem.UEX_ONLY)
+            : List.of();
+    if (reconcile) {
+      log.info(
+          "Weg-2 reconciliation enabled: indexed {} uuid-less UEX row(s) for name/slug merge.",
+          uuidlessUexRows.size());
+    }
     BackfillContext ctx =
         new BackfillContext(
-            syncReportService.beginRun(), Instant.now(), manufacturerRepository.findAll());
+            syncReportService.beginRun(),
+            Instant.now(),
+            manufacturerRepository.findAll(),
+            uuidlessUexRows,
+            reconcile);
     boolean allPassesSucceeded = true;
 
     for (KindPass pass : kindPasses()) {
@@ -291,10 +306,11 @@ public class ScWikiItemSyncService {
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki item sync (full backfill): {} created WIKI_ONLY, {} linked"
-            + " UEX_ONLY→BOTH, {} skipped (junk), {} deferred (lock collision), {} pass(es)"
-            + " empty/capped.",
+            + " UEX_ONLY→BOTH, {} reconciled (uuid-less UEX merged by name/slug), {} skipped"
+            + " (junk), {} deferred (lock collision), {} pass(es) empty/capped.",
         ctx.created,
         ctx.linked,
+        ctx.reconciled,
         ctx.skipped,
         ctx.deferred,
         ctx.failedPasses);
@@ -404,18 +420,22 @@ public class ScWikiItemSyncService {
         continue; // no UUID, or already claimed by an earlier (more-specific) pass
       }
       try {
-        // Resolve the manufacturer from the in-memory cache OUTSIDE the write transaction, then
-        // persist the row in its own REQUIRES_NEW transaction (via the self proxy) so a deadlock
-        // rolls back only this row and the pass keeps going.
+        // Resolve the manufacturer and the Weg-2 reconciliation candidate from the in-memory caches
+        // OUTSIDE the write transaction, then persist the row in its own REQUIRES_NEW transaction
+        // (via the self proxy) so a deadlock rolls back only this row and the pass keeps going.
         Manufacturer resolvedManufacturer = ctx.resolveManufacturer(dto.manufacturer());
+        UUID reconcileUexId = ctx.resolveUuidlessUexMatch(dto);
         BackfillOutcome outcome =
             self.getObject()
                 .upsertBackfillItemWithinTransaction(
-                    dto, pass.kind(), ctx.runId, ctx.now, resolvedManufacturer);
+                    dto, pass.kind(), ctx.runId, ctx.now, resolvedManufacturer, reconcileUexId);
         if (outcome == BackfillOutcome.CREATED) {
           ctx.created++;
         } else if (outcome == BackfillOutcome.LINKED) {
           ctx.linked++;
+        } else if (outcome == BackfillOutcome.RECONCILED) {
+          ctx.reconciled++;
+          ctx.markConsumed(reconcileUexId);
         } else if (outcome == BackfillOutcome.SKIPPED) {
           ctx.skipped++;
         }
@@ -439,15 +459,19 @@ public class ScWikiItemSyncService {
    * a deadlock or lock-timeout on this row rolls back only this row — not the whole backfill — and
    * the pass loop continues. Invoked through the {@link #self} proxy (a direct {@code this} call
    * would be self-invocation and skip the new transaction). The pass loop pages the Wiki and
-   * resolves the manufacturer beforehand, outside this transaction, so the per-row lock window is
-   * milliseconds.
+   * resolves the manufacturer + reconciliation candidate beforehand, outside this transaction, so
+   * the per-row lock window is milliseconds.
    *
-   * <p>A brand-new row is created {@code WIKI_ONLY} (its name screened by {@link
-   * #shouldSkipNewItem(ScWikiItemDto)}; manufacturer supplied by the caller from the pre-loaded
-   * cache) and logs {@link SyncEventType#CREATED_WIKI_ONLY}. An existing row has its Wiki columns
-   * filled, its kind merged via {@link GameItemKind#mergeMoreSpecific} and its {@code
-   * source_systems} flipped {@code UEX_ONLY → BOTH}; the UEX-canonical {@code name} and (on
-   * existing rows) {@code manufacturer} are never touched.
+   * <p>Resolution order when no row carries {@code dto.uuid()} yet: (1) if the name screen {@link
+   * #shouldSkipNewItem(ScWikiItemDto)} rejects it, skip with {@link SyncEventType#SKIP_JUNK}; (2)
+   * else, when the caller supplied a Weg-2 reconciliation candidate ({@code reconcileUexId}), try
+   * {@link #reconcileIntoUexRow} to fold this Wiki item into that uuid-less {@code UEX_ONLY} row
+   * (logs {@link SyncEventType#LINKED_VIA_NAME}, returns {@link BackfillOutcome#RECONCILED}); (3)
+   * else create a fresh {@code WIKI_ONLY} row (logs {@link SyncEventType#CREATED_WIKI_ONLY}). An
+   * existing row matched by {@code external_uuid} has its Wiki columns filled, its kind merged via
+   * {@link GameItemKind#mergeMoreSpecific} and its {@code source_systems} flipped {@code UEX_ONLY →
+   * BOTH}; the UEX-canonical {@code name} and (on existing rows) {@code manufacturer} are never
+   * touched.
    *
    * @param dto the Wiki item payload
    * @param passKind the kind derived from the source endpoint
@@ -455,6 +479,8 @@ public class ScWikiItemSyncService {
    * @param now the shared {@code scwiki_synced_at} timestamp
    * @param resolvedManufacturer the manufacturer resolved from the cache (applied only to new
    *     rows), or {@code null}
+   * @param reconcileUexId the id of a uuid-less {@code UEX_ONLY} row the caller matched to this
+   *     Wiki item by slug/name, or {@code null} when none matched / reconciliation is off
    * @return the {@link BackfillOutcome} describing what happened to the row
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -463,7 +489,8 @@ public class ScWikiItemSyncService {
       GameItemKind passKind,
       UUID runId,
       Instant now,
-      Manufacturer resolvedManufacturer) {
+      Manufacturer resolvedManufacturer,
+      UUID reconcileUexId) {
     GameItem item = gameItemRepository.findByExternalUuid(dto.uuid()).orElse(null);
     if (item == null) {
       if (shouldSkipNewItem(dto)) {
@@ -476,6 +503,11 @@ public class ScWikiItemSyncService {
             "Wiki item failed the new-row guard (blank/markup name or NOITEM_Vehicle); not"
                 + " created.");
         return BackfillOutcome.SKIPPED;
+      }
+      // Weg-2: fold this Wiki item into the uuid-less UEX row matched by slug/name (null → skip).
+      if (reconcileUexId != null
+          && reconcileIntoUexRow(reconcileUexId, dto, passKind, runId, now) != null) {
+        return BackfillOutcome.RECONCILED;
       }
       item = new GameItem();
       item.setExternalUuid(dto.uuid());
@@ -506,12 +538,60 @@ public class ScWikiItemSyncService {
     return outcome;
   }
 
+  /**
+   * Merges a Wiki item into a uuid-less {@code UEX_ONLY} row (Weg-2 reconciliation), running inside
+   * the caller's {@code REQUIRES_NEW} transaction. Re-loads the candidate by id and re-checks,
+   * under the row lock, that it is still a uuid-less {@code UEX_ONLY} row — a prior merge this run
+   * or a racing sync may have given it a uuid in the meantime, in which case this returns {@code
+   * null} and the caller creates a normal {@code WIKI_ONLY} row instead. On success the row absorbs
+   * the Wiki item's {@code external_uuid}, has its Wiki columns filled and its kind merged
+   * more-specific-wins, flips {@code UEX_ONLY → BOTH}, and a {@link SyncEventType#LINKED_VIA_NAME}
+   * event is logged. The UEX-canonical {@code name} and sticky {@code manufacturer} are left
+   * untouched (a slug/name match means the names already agree).
+   *
+   * @param uexRowId the id of the uuid-less UEX row the caller matched by slug/name
+   * @param dto the Wiki item payload supplying the {@code external_uuid} and Wiki columns
+   * @param passKind the kind derived from the source endpoint, merged in more-specific-wins
+   * @param runId the current run id for the {@link SyncEventType#LINKED_VIA_NAME} event
+   * @param now the shared {@code scwiki_synced_at} timestamp
+   * @return the merged row, or {@code null} if the candidate no longer qualifies
+   */
+  private GameItem reconcileIntoUexRow(
+      UUID uexRowId, ScWikiItemDto dto, GameItemKind passKind, UUID runId, Instant now) {
+    GameItem uexRow = gameItemRepository.findById(uexRowId).orElse(null);
+    if (uexRow == null
+        || uexRow.getExternalUuid() != null
+        || uexRow.getSourceSystems() != GameItemSourceSystem.UEX_ONLY) {
+      return null;
+    }
+    uexRow.setExternalUuid(dto.uuid());
+    uexRow.setKind(GameItemKind.mergeMoreSpecific(uexRow.getKind(), passKind));
+    applyWikiFields(uexRow, dto, now);
+    uexRow.setSourceSystems(GameItemSourceSystem.BOTH);
+    gameItemRepository.save(uexRow);
+    syncReportService.logScwikiEvent(
+        runId,
+        SyncEventType.LINKED_VIA_NAME,
+        "game_item",
+        dto.uuid(),
+        uexRow.getName(),
+        "Merged Wiki item into uuid-less UEX row '"
+            + uexRow.getName()
+            + "' by slug/name; backfilled external_uuid and flipped UEX_ONLY → BOTH.");
+    return uexRow;
+  }
+
   /** Outcome of a single Mode-B backfill upsert, used by {@link #runKindPass} to tally counters. */
   public enum BackfillOutcome {
     /** A new {@code WIKI_ONLY} row was created. */
     CREATED,
     /** An existing {@code UEX_ONLY} row was linked to the Wiki ({@code UEX_ONLY → BOTH}). */
     LINKED,
+    /**
+     * A uuid-less {@code UEX_ONLY} row was merged with this Wiki item by slug/name (Weg-2
+     * reconciliation): it absorbed the {@code external_uuid} and flipped {@code UEX_ONLY → BOTH}.
+     */
+    RECONCILED,
     /** An existing {@code BOTH} / {@code WIKI_ONLY} row had its Wiki columns refreshed. */
     UPDATED,
     /** The Wiki row failed the junk-name guard and no row was created. */
@@ -623,7 +703,8 @@ public class ScWikiItemSyncService {
   /**
    * Mutable per-run state threaded through the Mode-B passes: the sync-report run id, the shared
    * timestamp, the cross-kind seen set, the in-memory manufacturer lookup (loaded once to keep new
-   * {@code WIKI_ONLY} rows from issuing a DB query per row), and the result counters.
+   * {@code WIKI_ONLY} rows from issuing a DB query per row), the Weg-2 uuid-less-UEX reconciliation
+   * index, and the result counters.
    */
   private static final class BackfillContext {
     private final UUID runId;
@@ -631,21 +712,45 @@ public class ScWikiItemSyncService {
     private final Set<UUID> seen = new HashSet<>();
     private final Map<UUID, Manufacturer> manufacturersByScwikiUuid = new HashMap<>();
     private final Map<String, Manufacturer> manufacturersByLowerName = new HashMap<>();
+
+    /**
+     * Weg-2 reconciliation index: lower-cased {@code uex_slug} → id of the single uuid-less {@code
+     * UEX_ONLY} row carrying it. Keys carried by more than one row are dropped (ambiguous → never a
+     * unique match), so a hit is always safe to merge.
+     */
+    private final Map<String, UUID> uexIdBySlug = new HashMap<>();
+
+    /** Weg-2 reconciliation index: lower-cased name → id of the single uuid-less UEX row. */
+    private final Map<String, UUID> uexIdByLowerName = new HashMap<>();
+
+    /** UEX row ids already merged this run, so a second Wiki item can never re-consume one. */
+    private final Set<UUID> consumedUexIds = new HashSet<>();
+
     private int created;
     private int linked;
+    private int reconciled;
     private int skipped;
     private int deferred;
     private int failedPasses;
 
     /**
-     * Captures the run id and timestamp and indexes the manufacturer table by Wiki UUID and by
-     * lower-cased name for in-memory resolution.
+     * Captures the run id and timestamp, indexes the manufacturer table by Wiki UUID and by
+     * lower-cased name, and builds the Weg-2 reconciliation index over the uuid-less {@code
+     * UEX_ONLY} rows (by {@code uex_slug} and by name, ambiguous keys excluded).
      *
      * @param runId the sync-report run id
      * @param now the shared {@code scwiki_synced_at} timestamp
      * @param manufacturers every manufacturer row, loaded once
+     * @param uuidlessUexRows the uuid-less {@code UEX_ONLY} rows to index for reconciliation (empty
+     *     when reconciliation is disabled)
+     * @param reconcileEnabled whether Weg-2 name/slug reconciliation is active
      */
-    BackfillContext(UUID runId, Instant now, List<Manufacturer> manufacturers) {
+    BackfillContext(
+        UUID runId,
+        Instant now,
+        List<Manufacturer> manufacturers,
+        List<GameItem> uuidlessUexRows,
+        boolean reconcileEnabled) {
       this.runId = runId;
       this.now = now;
       for (Manufacturer mfr : manufacturers) {
@@ -655,6 +760,50 @@ public class ScWikiItemSyncService {
         if (StringUtils.hasText(mfr.getName())) {
           manufacturersByLowerName.putIfAbsent(mfr.getName().trim().toLowerCase(Locale.ROOT), mfr);
         }
+      }
+      if (reconcileEnabled) {
+        Set<String> ambiguousSlugs = new HashSet<>();
+        Set<String> ambiguousNames = new HashSet<>();
+        for (GameItem row : uuidlessUexRows) {
+          if (StringUtils.hasText(row.getUexSlug())) {
+            indexUnique(
+                uexIdBySlug,
+                ambiguousSlugs,
+                row.getUexSlug().trim().toLowerCase(Locale.ROOT),
+                row.getId());
+          }
+          if (StringUtils.hasText(row.getName())) {
+            indexUnique(
+                uexIdByLowerName,
+                ambiguousNames,
+                row.getName().trim().toLowerCase(Locale.ROOT),
+                row.getId());
+          }
+        }
+      }
+    }
+
+    /**
+     * Inserts {@code key → id} into {@code index}, but keeps the mapping only while the key stays
+     * unique: the first {@code id} wins, and a second distinct {@code id} for the same key drops
+     * the key entirely and records it as ambiguous so a later duplicate cannot re-add it.
+     * Guarantees a lookup hit always points at exactly one uuid-less UEX row, never a wrong guess
+     * between two.
+     *
+     * @param index the slug- or name-keyed unique index being built
+     * @param ambiguous the set of keys already found to be non-unique
+     * @param key the normalised lookup key
+     * @param id the candidate UEX row id
+     */
+    private static void indexUnique(
+        Map<String, UUID> index, Set<String> ambiguous, String key, UUID id) {
+      if (ambiguous.contains(key)) {
+        return;
+      }
+      UUID existing = index.putIfAbsent(key, id);
+      if (existing != null && !existing.equals(id)) {
+        index.remove(key);
+        ambiguous.add(key);
       }
     }
 
@@ -680,6 +829,42 @@ public class ScWikiItemSyncService {
         return manufacturersByLowerName.get(dto.name().trim().toLowerCase(Locale.ROOT));
       }
       return null;
+    }
+
+    /**
+     * Weg-2 match: finds the uuid-less {@code UEX_ONLY} row this Wiki item should merge into,
+     * preferring an exact {@code uex_slug} match over an exact name match (both lower-cased). Only
+     * unambiguous, not-yet-consumed candidates are returned; anything else yields {@code null} (the
+     * caller then creates a normal {@code WIKI_ONLY} row). Empty indexes (reconciliation off)
+     * always return {@code null}.
+     *
+     * @param dto the Wiki item payload
+     * @return the id of the uuid-less UEX row to merge into, or {@code null} when none is safe
+     */
+    private UUID resolveUuidlessUexMatch(ScWikiItemDto dto) {
+      if (StringUtils.hasText(dto.slug())) {
+        UUID bySlug = uexIdBySlug.get(dto.slug().trim().toLowerCase(Locale.ROOT));
+        if (bySlug != null && !consumedUexIds.contains(bySlug)) {
+          return bySlug;
+        }
+      }
+      if (StringUtils.hasText(dto.name())) {
+        UUID byName = uexIdByLowerName.get(dto.name().trim().toLowerCase(Locale.ROOT));
+        if (byName != null && !consumedUexIds.contains(byName)) {
+          return byName;
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Marks a UEX row id as consumed by a successful reconciliation so a second Wiki item sharing
+     * the slug/name cannot merge into the same row (it falls through to {@code WIKI_ONLY} instead).
+     *
+     * @param uexId the id of the just-merged UEX row
+     */
+    private void markConsumed(UUID uexId) {
+      consumedUexIds.add(uexId);
     }
   }
 }
