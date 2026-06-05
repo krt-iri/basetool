@@ -177,18 +177,20 @@
                     </span>
                 </td>
                 <td th:if="${showClaims}" data-claim-control>
-                    <span th:switch="${mat.material.quantityType}">
-                        <span th:case="'PIECE'" th:text="|${mat.openAmount != null ? #numbers.formatInteger(mat.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
-                        <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
-                    </span>
-                    <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add" data-claim-control data-trigger="claim-add"
-                            style="margin-left:0.5rem;padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
-                            th:data-material-id="${mat.material.id}"
-                            th:data-quality="${mat.minQuality != null ? 'GOOD' : 'NONE'}"
-                            th:data-material-name="${mat.material.name}"
-                            th:data-quantity-type="${mat.material.quantityType}"
-                            th:data-open="${mat.openAmount}"
-                            th:text="#{orders.claim.add}">Eintragen</button>
+                    <div class="claim-open-cell">
+                        <span class="claim-open-amount" th:switch="${mat.material.quantityType}">
+                            <span th:case="'PIECE'" th:text="|${mat.openAmount != null ? #numbers.formatInteger(mat.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
+                            <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                        </span>
+                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add" data-claim-control data-trigger="claim-add"
+                                style="padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
+                                th:data-material-id="${mat.material.id}"
+                                th:data-quality="${mat.minQuality != null ? 'GOOD' : 'NONE'}"
+                                th:data-material-name="${mat.material.name}"
+                                th:data-quantity-type="${mat.material.quantityType}"
+                                th:data-open="${mat.openAmount}"
+                                th:text="#{orders.claim.add}">Eintragen</button>
+                    </div>
                 </td>
                 <td>
                     <span th:if="${mat.currentStock >= mat.amount}" class="text-success" th:text="'✓ ' + #{orders.detail.status.fulfilled}">✓ Erfüllt</span>
@@ -305,18 +307,20 @@
                     </span>
                 </td>
                 <td th:if="${showClaims}">
-                    <span th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
-                        <span th:case="'PIECE'" th:text="|${agg.openAmount != null ? #numbers.formatInteger(agg.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
-                        <span th:case="*" th:text="|${agg.openAmount != null ? #numbers.formatDecimal(agg.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
-                    </span>
-                    <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add" data-trigger="claim-add"
-                            style="margin-left:0.5rem;padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
-                            th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
-                            th:data-quality="${agg.qualityRequirement}"
-                            th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
-                            th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
-                            th:data-open="${agg.openAmount}"
-                            th:text="#{orders.claim.add}">Eintragen</button>
+                    <div class="claim-open-cell">
+                        <span class="claim-open-amount" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                            <span th:case="'PIECE'" th:text="|${agg.openAmount != null ? #numbers.formatInteger(agg.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
+                            <span th:case="*" th:text="|${agg.openAmount != null ? #numbers.formatDecimal(agg.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                        </span>
+                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add" data-trigger="claim-add"
+                                style="padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
+                                th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
+                                th:data-quality="${agg.qualityRequirement}"
+                                th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
+                                th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
+                                th:data-open="${agg.openAmount}"
+                                th:text="#{orders.claim.add}">Eintragen</button>
+                    </div>
                 </td>
             </tr>
             <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
@@ -602,7 +606,9 @@
             <label for="claim-squadron" class="form-label" th:text="#{orders.claim.squadron}">Staffel</label>
             <select id="claim-squadron" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white; min-height: 44px;">
                 <option value="" th:text="#{orders.claim.squadron.choose}">Bitte wählen…</option>
-                <option th:each="s : ${squadrons}" th:value="${s.id}" th:text="${s.name}"></option>
+                <!-- Only Profit-side squadrons sign up for SK-order material; the backend rejects a
+                     non-profit claimant, so the picker is filtered to the profit-eligible subset. -->
+                <option th:each="s : ${squadrons}" th:if="${s.isProfitEligible}" th:value="${s.id}" th:text="${s.name}"></option>
             </select>
         </div>
         <div class="form-group mb-2">
