@@ -109,4 +109,23 @@ public class Manufacturer extends AbstractEntity<UUID> {
   /** Soft-delete marker mirroring {@link #uexDeletedAt} for the SC Wiki side. */
   @Column(name = "scwiki_deleted_at")
   private Instant scwikiDeletedAt;
+
+  // ───── KRT P4K Reader source lane (catalog import) ─────
+
+  /**
+   * DataForge {@code __ref} manufacturer GUID observed by the KRT P4K Reader import. Kept alongside
+   * (not in place of) {@link #scwikiUuid}: the importer backfills {@code scwiki_uuid} only when it
+   * is null and unclaimed, but always records the P4K-observed GUID here so a UUID disagreement
+   * stays auditable. Not UNIQUE.
+   */
+  @Column(name = "p4k_uuid")
+  private UUID p4kUuid;
+
+  /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
+  @Column(name = "p4k_synced_at")
+  private Instant p4kSyncedAt;
+
+  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  @Column(name = "p4k_deleted_at")
+  private Instant p4kDeletedAt;
 }

@@ -58,5 +58,13 @@ public enum MaterialSourceSystem {
    * Admin-created row that has not (yet) been linked to either UEX or SC Wiki. The post-R8 V116
    * backfill flips every legacy {@code is_manual_entry=true} row into this value.
    */
-  MANUAL
+  MANUAL,
+
+  /**
+   * The KRT P4K Reader catalog import has touched this material (commodity enrichment). Like the
+   * item / ship lanes, P4K participation is normally signalled by a non-null {@code p4k_synced_at}
+   * rather than by flipping {@code source_systems}; this value exists so the (future) CHECK
+   * constraint accepts it and an explicit P4K-owned flow may set it if the policy changes.
+   */
+  P4K
 }

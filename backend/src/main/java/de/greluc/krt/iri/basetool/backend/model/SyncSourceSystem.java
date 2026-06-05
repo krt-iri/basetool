@@ -33,5 +33,10 @@ public enum SyncSourceSystem {
   UEX,
 
   /** Event emitted by an SC Wiki sync service. */
-  SCWIKI
+  SCWIKI,
+
+  /**
+   * Event emitted by the KRT P4K Reader catalog import (admin upload of {@code Game2.dcb} data).
+   */
+  P4K
 }

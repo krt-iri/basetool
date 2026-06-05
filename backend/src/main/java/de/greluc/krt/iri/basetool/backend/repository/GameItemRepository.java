@@ -60,6 +60,29 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
   Optional<GameItem> findByUexItemId(Integer uexItemId);
 
   /**
+   * Case-insensitive {@code class_name} lookup driving the P4K import's secondary resolution step
+   * (when an inbound item carries no matching {@code external_uuid}). Returns a {@code List} on
+   * purpose: {@code class_name} is not UNIQUE, so the caller links the P4K row only when exactly
+   * one candidate matches and treats a multi-row result as ambiguous (no enrichment).
+   *
+   * @param className the RSI engine class name to match ignoring case
+   * @return every item whose {@code class_name} equals {@code className} ignoring case (possibly
+   *     empty)
+   */
+  java.util.List<GameItem> findByClassNameIgnoreCase(String className);
+
+  /**
+   * Case-insensitive {@code name} lookup driving the P4K import's tertiary resolution step (when
+   * neither {@code external_uuid} nor a unique {@code class_name} matched). Returns a {@code List}
+   * because {@code name} is not UNIQUE on {@code game_item}; the caller enriches only on an
+   * unambiguous single match.
+   *
+   * @param name the display name to match ignoring case
+   * @return every item whose {@code name} equals {@code name} ignoring case (possibly empty)
+   */
+  java.util.List<GameItem> findByNameIgnoreCase(String name);
+
+  /**
    * Returns every non-null {@code external_uuid} in the table. Drives the R4 closure-mode Wiki item
    * sync (§8.4 Mode A): it fetches Wiki detail for exactly the items UEX already placed in {@code
    * game_item} (plus blueprint item references), never enumerating the full ~12 700-row Wiki item

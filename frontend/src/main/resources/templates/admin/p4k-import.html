@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.p4kImport.title}">Admin: P4K-Import</title>
+    <th:block th:fragment="extraLinks"></th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span><span></span><span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="krt-admin-banner" th:text="#{admin.personalInventory.bannerMode}">ADMIN MODE</div>
+
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.p4kImport.title}">Admin: P4K-Import</h1>
+        <p class="krt-subtitle" th:text="#{admin.p4kImport.subtitle}">Spielkatalog importieren</p>
+    </div>
+
+    <!-- Upload + preview/apply controls -->
+    <div class="hud-box mt-2">
+        <p th:text="#{admin.p4kImport.intro}">Vorschau zeigt eine Trockenlauf-Analyse; Anwenden schreibt die Änderungen.</p>
+
+        <div class="form-group">
+            <input type="file" id="krt-p4k-file" accept=".json,application/json" hidden>
+            <button type="button" id="krt-p4k-pick" class="btn btn-outline" data-trigger="p4k-pick"
+                    th:text="#{admin.p4kImport.file.choose}">Datei wählen</button>
+            <span id="krt-p4k-filename" class="text-muted" th:text="#{admin.p4kImport.file.none}">Keine Datei ausgewählt</span>
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="krt-p4k-seed">
+                <span th:text="#{admin.p4kImport.seed.label}">Neue Datensätze aus dem Spiel anlegen</span>
+            </label>
+            <p class="alert alert-warning">
+                <span aria-hidden="true">&#9888;</span>
+                <span th:text="#{admin.p4kImport.seed.warning}">Achtung: Beim Anlegen werden neue Spiel-Datensätze in die Datenbank eingefügt.</span>
+            </p>
+        </div>
+
+        <div class="mt-2-flex-gap">
+            <button type="button" id="krt-p4k-preview-btn" class="btn btn-ghost" data-trigger="p4k-preview" disabled
+                    th:text="#{admin.p4kImport.preview.button}">Vorschau</button>
+            <button type="button" id="krt-p4k-apply-btn" class="btn btn--cta" data-trigger="p4k-apply" disabled
+                    th:text="#{admin.p4kImport.apply.button}">Anwenden</button>
+        </div>
+    </div>
+
+    <!-- Results panel (hidden until a preview/apply returns) -->
+    <div id="krt-p4k-results" class="hud-box mt-2" hidden>
+        <h2 th:text="#{admin.p4kImport.results.title}">Ergebnis</h2>
+        <p>
+            <span th:text="#{admin.p4kImport.results.mode}">Modus</span>:
+            <span id="krt-p4k-mode" class="data-value"></span>
+            &nbsp;·&nbsp;
+            <span th:text="#{admin.p4kImport.results.seeding}">Seeding</span>:
+            <span id="krt-p4k-seeding" class="data-value"></span>
+        </p>
+
+        <div class="table-responsive">
+            <table class="krt-table">
+                <thead>
+                <tr>
+                    <th th:text="#{admin.p4kImport.col.type}">Typ</th>
+                    <th th:text="#{admin.p4kImport.col.matched}">Zugeordnet</th>
+                    <th th:text="#{admin.p4kImport.col.backfilled}">UUID ergänzt</th>
+                    <th th:text="#{admin.p4kImport.col.conflicts}">UUID-Konflikte</th>
+                    <th th:text="#{admin.p4kImport.col.enriched}">Angereichert</th>
+                    <th th:text="#{admin.p4kImport.col.created}">Neu angelegt</th>
+                    <th th:text="#{admin.p4kImport.col.unmatched}">Nicht zugeordnet</th>
+                </tr>
+                </thead>
+                <tbody id="krt-p4k-rows">
+                <!-- rows injected by p4k-import.js -->
+                </tbody>
+            </table>
+        </div>
+
+        <p class="mt-2">
+            <span th:text="#{admin.p4kImport.results.ingredients}">Zutaten-Verknüpfungen repariert</span>:
+            <span id="krt-p4k-ingredients" class="data-value">0</span>
+        </p>
+        <p class="mt-2" id="krt-p4k-runid-line" hidden>
+            <span th:text="#{admin.p4kImport.results.runId}">Lauf-ID</span>:
+            <span id="krt-p4k-runid" class="data-value data-value--mono"></span>
+        </p>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    /*<![CDATA[*/
+    window.krtP4kImportI18n = {
+        modeDryRun:    /*[[#{admin.p4kImport.results.mode.dryRun}]]*/ 'Vorschau (Trockenlauf)',
+        modeApplied:   /*[[#{admin.p4kImport.results.mode.applied}]]*/ 'Angewendet',
+        seedingOn:     /*[[#{admin.p4kImport.results.seeding.on}]]*/ 'aktiv',
+        seedingOff:    /*[[#{admin.p4kImport.results.seeding.off}]]*/ 'inaktiv',
+        rowManufacturers: /*[[#{admin.p4kImport.row.manufacturers}]]*/ 'Hersteller',
+        rowItems:      /*[[#{admin.p4kImport.row.items}]]*/ 'Items',
+        rowShips:      /*[[#{admin.p4kImport.row.ships}]]*/ 'Schiffe',
+        rowCommodities: /*[[#{admin.p4kImport.row.commodities}]]*/ 'Commodities',
+        rowBlueprints: /*[[#{admin.p4kImport.row.blueprints}]]*/ 'Blueprints',
+        previewToast:  /*[[#{admin.p4kImport.toast.preview}]]*/ 'Vorschau erstellt.',
+        appliedToast:  /*[[#{admin.p4kImport.toast.applied}]]*/ 'Import angewendet.',
+        error:         /*[[#{admin.p4kImport.toast.error}]]*/ 'Import fehlgeschlagen.',
+        pickFirst:     /*[[#{admin.p4kImport.toast.pickFirst}]]*/ 'Bitte zuerst eine Datei wählen.'
+    };
+    window.krtP4kImportEndpoints = {
+        preview: /*[[${previewUrl}]]*/ '/admin/p4k-import/preview',
+        apply:   /*[[${applyUrl}]]*/   '/admin/p4k-import/apply'
+    };
+    /*]]>*/
+</script>
+<script th:src="@{/js/p4k-import.js}" th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

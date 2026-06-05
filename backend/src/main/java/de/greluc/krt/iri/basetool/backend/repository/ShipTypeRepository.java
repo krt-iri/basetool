@@ -57,6 +57,18 @@ public interface ShipTypeRepository extends JpaRepository<ShipType, UUID> {
   Optional<ShipType> findByUexVehicleId(Integer uexVehicleId);
 
   /**
+   * Case-insensitive {@code class_name} lookup driving the P4K import's secondary resolution step
+   * for ships (when the inbound ship carries no matching {@code external_uuid}). Returns a {@code
+   * List} because {@code class_name} is not UNIQUE on {@code ship_type}; the caller enriches only
+   * on an unambiguous single match and treats a multi-row result as ambiguous.
+   *
+   * @param className the RSI engine class name to match ignoring case
+   * @return every ship whose {@code class_name} equals {@code className} ignoring case (possibly
+   *     empty)
+   */
+  java.util.List<ShipType> findByClassNameIgnoreCase(String className);
+
+  /**
    * Soft-deletes UEX-side ownership of every row whose {@code uex_vehicle_id} is set, NOT included
    * in {@code seenIds}, and whose {@code uex_deleted_at} is currently NULL. Gated by a non-empty
    * {@code seenIds} so a failed sync run does not wipe local data.
