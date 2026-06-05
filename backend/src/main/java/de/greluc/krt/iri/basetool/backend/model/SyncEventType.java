@@ -74,5 +74,21 @@ public enum SyncEventType {
   WIKI_MISSING,
 
   /** Vehicle backfill: a {@code ship_type.name} matched more than one UEX vehicle. */
-  BACKFILL_AMBIGUOUS
+  BACKFILL_AMBIGUOUS,
+
+  /**
+   * Wiki item full backfill (Weg 2): a Wiki item with no existing UUID match was merged into a
+   * uuid-less {@code UEX_ONLY} row found by exact {@code uex_slug} / name, backfilling that row's
+   * {@code external_uuid} and flipping {@code UEX_ONLY → BOTH} instead of inserting a duplicate
+   * {@code WIKI_ONLY} row.
+   */
+  LINKED_VIA_NAME,
+
+  /**
+   * Any sync (UEX or SC Wiki): a once-per-run summary line whose {@code detail} carries the run's
+   * tallies (rows visited / created / updated / soft-deleted). Emitted unconditionally so a run is
+   * always visible on the admin sync-report page even when it produced no other findings — the UEX
+   * item sync is the first emitter.
+   */
+  SYNC_RUN_SUMMARY
 }

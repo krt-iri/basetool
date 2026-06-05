@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.GameItem;
+import de.greluc.krt.iri.basetool.backend.model.GameItemSourceSystem;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
@@ -68,6 +69,22 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    */
   @Query("SELECT DISTINCT g.externalUuid FROM GameItem g WHERE g.externalUuid IS NOT NULL")
   java.util.List<java.util.UUID> findAllExternalUuids();
+
+  /**
+   * Loads every row that still lacks an {@code external_uuid} and is owned by the given source
+   * system — in practice the uuid-less {@code UEX_ONLY} rows (the ~30% of UEX items UEX ships with
+   * an empty UUID: Avionics, Decorations, Liveries, Armor). Drives the Weg-2 full-backfill
+   * name/slug reconciliation: the Wiki item backfill indexes these by name + {@code uex_slug} and
+   * merges a Wiki item into the unique match rather than inserting a duplicate {@code WIKI_ONLY}
+   * row. Loaded once per backfill run (≤ a few thousand rows), so the full-entity fetch is
+   * acceptable.
+   *
+   * @param sourceSystems the owning source system to filter on (always {@link
+   *     GameItemSourceSystem#UEX_ONLY} at the only call site)
+   * @return the uuid-less rows owned solely by {@code sourceSystems}
+   */
+  java.util.List<GameItem> findByExternalUuidIsNullAndSourceSystems(
+      GameItemSourceSystem sourceSystems);
 
   /**
    * Soft-deletes UEX-side ownership of every row whose {@code uex_item_id} is set, NOT included in

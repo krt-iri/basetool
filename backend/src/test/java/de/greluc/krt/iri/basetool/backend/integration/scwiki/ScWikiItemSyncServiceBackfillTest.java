@@ -362,6 +362,94 @@ class ScWikiItemSyncServiceBackfillTest {
         "the healthy row persists despite the sibling row deadlocking");
   }
 
+  // ---- Weg-2 uuid-less UEX reconciliation ------------------------------------------------------
+
+  @Test
+  void backfill_reconcilesUuidlessUexRowByName_insteadOfCreatingADuplicate() {
+    UUID wikiUuid = UUID.randomUUID();
+    UUID uexRowId = UUID.randomUUID();
+    GameItem uexRow = uuidlessUex(uexRowId, "Avionics Blade", "avionics-blade");
+
+    when(gameItemRepository.findByExternalUuidIsNullAndSourceSystems(GameItemSourceSystem.UEX_ONLY))
+        .thenReturn(List.of(uexRow));
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.findById(uexRowId)).thenReturn(Optional.of(uexRow));
+    // The Wiki item shares the name (the helper's slug differs, so the name branch resolves it).
+    stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Avionics Blade"));
+
+    service.syncItems();
+
+    // The existing uuid-less UEX row absorbed the Wiki uuid and flipped to BOTH — no duplicate
+    // WIKI_ONLY row, and its Wiki columns are now filled.
+    GameItem merged = captureSaves().get(wikiUuid);
+    assertSame(uexRow, merged);
+    assertEquals(GameItemSourceSystem.BOTH, merged.getSourceSystems());
+    assertEquals(wikiUuid, merged.getExternalUuid());
+    assertEquals("Avionics Blade", merged.getName());
+    assertEquals("classif", merged.getClassification());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(), eq(SyncEventType.LINKED_VIA_NAME), eq("game_item"), eq(wikiUuid), any(), any());
+  }
+
+  @Test
+  void backfill_doesNotReconcile_whenNameMatchesMultipleUuidlessUexRows() {
+    UUID wikiUuid = UUID.randomUUID();
+    GameItem rowA = uuidlessUex(UUID.randomUUID(), "Power Plant", "power-plant-a");
+    GameItem rowB = uuidlessUex(UUID.randomUUID(), "Power Plant", "power-plant-b");
+
+    when(gameItemRepository.findByExternalUuidIsNullAndSourceSystems(GameItemSourceSystem.UEX_ONLY))
+        .thenReturn(List.of(rowA, rowB));
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Power Plant"));
+
+    service.syncItems();
+
+    // The shared name is ambiguous → excluded from the index → no merge; a WIKI_ONLY row is made.
+    assertEquals(GameItemSourceSystem.WIKI_ONLY, captureSaves().get(wikiUuid).getSourceSystems());
+    verify(gameItemRepository, never()).findById(any());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.LINKED_VIA_NAME), any(), any(), any(), any());
+  }
+
+  @Test
+  void backfill_skipsReconciliation_whenFlagOff_evenWithAMatchingUexRow() {
+    properties.setReconcileUuidlessByName(false);
+    UUID wikiUuid = UUID.randomUUID();
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Avionics Blade"));
+
+    service.syncItems();
+
+    // Flag off → the uuid-less index is never even queried and a WIKI_ONLY row is created.
+    assertEquals(GameItemSourceSystem.WIKI_ONLY, captureSaves().get(wikiUuid).getSourceSystems());
+    verify(gameItemRepository, never()).findByExternalUuidIsNullAndSourceSystems(any());
+    verify(gameItemRepository, never()).findById(any());
+  }
+
+  @Test
+  void backfill_consumesEachUexRowOnce_soASecondNameTwinBecomesWikiOnly() {
+    UUID firstWiki = UUID.randomUUID();
+    UUID secondWiki = UUID.randomUUID();
+    UUID uexRowId = UUID.randomUUID();
+    GameItem uexRow = uuidlessUex(uexRowId, "Cooler", "cooler-x");
+
+    when(gameItemRepository.findByExternalUuidIsNullAndSourceSystems(GameItemSourceSystem.UEX_ONLY))
+        .thenReturn(List.of(uexRow));
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.findById(uexRowId)).thenReturn(Optional.of(uexRow));
+    lenient()
+        .when(scWikiClient.fetchAllPages(eq(VEHICLE_ITEMS), any(), any(), any(), any()))
+        .thenReturn(List.of(itemDto(firstWiki, "Cooler"), itemDto(secondWiki, "Cooler")));
+
+    service.syncItems();
+
+    Map<UUID, GameItem> saved = captureSaves();
+    // The first twin merged into the UEX row; the second could not re-consume it → WIKI_ONLY.
+    assertEquals(GameItemSourceSystem.BOTH, saved.get(firstWiki).getSourceSystems());
+    assertEquals(GameItemSourceSystem.WIKI_ONLY, saved.get(secondWiki).getSourceSystems());
+  }
+
   // ---- helpers ---------------------------------------------------------------------------------
 
   /**
@@ -446,5 +534,24 @@ class ScWikiItemSyncServiceBackfillTest {
     Manufacturer m = new Manufacturer();
     m.setName(name);
     return m;
+  }
+
+  /**
+   * Builds a detached uuid-less {@code UEX_ONLY} game item — the Weg-2 reconciliation target — with
+   * the given id, canonical name and {@code uex_slug}.
+   *
+   * @param id the row id (matched back via {@code findById})
+   * @param name the UEX-canonical name used for the name index
+   * @param uexSlug the {@code uex_slug} used for the slug index
+   * @return the detached uuid-less UEX row
+   */
+  private static GameItem uuidlessUex(UUID id, String name, String uexSlug) {
+    GameItem g = new GameItem();
+    g.setId(id);
+    g.setName(name);
+    g.setUexSlug(uexSlug);
+    g.setKind(GameItemKind.VEHICLE_ITEM);
+    g.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
+    return g;
   }
 }

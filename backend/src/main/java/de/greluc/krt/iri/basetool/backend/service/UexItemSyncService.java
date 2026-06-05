@@ -26,6 +26,8 @@ import de.greluc.krt.iri.basetool.backend.model.GameItemKind;
 import de.greluc.krt.iri.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.Manufacturer;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
+import de.greluc.krt.iri.basetool.backend.model.SyncEventType;
+import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.UexCategory;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
@@ -87,6 +89,7 @@ public class UexItemSyncService {
   private final GameItemRepository gameItemRepository;
   private final ManufacturerRepository manufacturerRepository;
   private final ShipTypeRepository shipTypeRepository;
+  private final SyncReportService syncReportService;
 
   /**
    * Runs the full UEX item sync: ensures the category reference table is fresh, then walks every
@@ -96,6 +99,9 @@ public class UexItemSyncService {
   @Transactional
   public void syncItems() {
     log.info("Starting synchronization of UEX items...");
+    // final: the run id is captured at the start of the run but first used in the summary event at
+    // the end, past the category loop — VariableDeclarationUsageDistance allows the gap when final.
+    final UUID runId = syncReportService.beginRun();
     List<UexCategory> categories = categoryRefService.syncCategories();
 
     Set<Integer> seenUexItemIds = new HashSet<>();
@@ -139,12 +145,13 @@ public class UexItemSyncService {
       }
     }
 
+    int marked = 0;
     if (seenUexItemIds.isEmpty()) {
       log.warn(
           "Skipping orphan sweep — no UEX item was processed across {} category response(s).",
           categoriesProcessed);
     } else {
-      int marked = gameItemRepository.markUexDeletedExcept(seenUexItemIds, now);
+      marked = gameItemRepository.markUexDeletedExcept(seenUexItemIds, now);
       if (marked > 0) {
         log.info("Marked {} game_item row(s) uex_deleted (no longer in UEX feed)", marked);
       }
@@ -160,6 +167,22 @@ public class UexItemSyncService {
         itemsProcessed,
         itemsCreated,
         itemsProcessed - itemsCreated);
+
+    // One always-emitted SYNC_RUN_SUMMARY row per run, so the run shows on the admin UEX tab.
+    syncReportService.logUexEvent(
+        runId,
+        SyncEventType.SYNC_RUN_SUMMARY,
+        "game_item",
+        null,
+        null,
+        "categories=%d, upserted=%d, created=%d, updated=%d, uexDeleted=%d"
+            .formatted(
+                categoriesProcessed,
+                itemsProcessed,
+                itemsCreated,
+                itemsProcessed - itemsCreated,
+                marked));
+    syncReportService.pruneRuns(SyncSourceSystem.UEX);
   }
 
   /**

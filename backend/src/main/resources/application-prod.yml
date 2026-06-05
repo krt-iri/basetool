@@ -75,10 +75,11 @@ app:
 # SC Wiki catalogue sync. The per-sync feature flags default to false in code
 # (ScWikiProperties -- "ships dark"); enabled here so each scheduler step runs on the
 # live instance and the admin sync-report log (/admin/sync-reports) gets populated.
-# This generates real traffic against api.star-citizen.wiki (item sync ~5000+ fetches
-# at 5 req/s per cycle). sync-all-items stays false (closure mode, not the full backfill).
+# This generates real traffic against api.star-citizen.wiki. sync-all-items is ON (Weg 2):
+# the full ~12 700-row item backfill plus the name/slug reconciliation that merges uuid-less
+# UEX rows into their Wiki twins (~10-15 min per cycle at 5 req/s, vs the lighter closure mode).
 # Any flag is overridable per the deployment runbook via env var, e.g.
-# KRT_SCWIKI_ITEM_SYNC_ENABLED=false, without a redeploy.
+# KRT_SCWIKI_SYNC_ALL_ITEMS=false, without a redeploy.
 krt:
   scwiki:
     scheduler-enabled: true
@@ -87,3 +88,5 @@ krt:
     item-sync-enabled: true
     blueprint-sync-enabled: true
     manufacturer-sync-enabled: true
+    sync-all-items: true
+    reconcile-uuidless-by-name: true

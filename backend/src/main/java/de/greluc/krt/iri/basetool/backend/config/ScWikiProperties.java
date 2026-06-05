@@ -181,6 +181,18 @@ public class ScWikiProperties {
   @NotNull private Boolean syncAllItems = false;
 
   /**
+   * Weg-2 toggle for the full-backfill name/slug reconciliation. When {@code true} (default) the
+   * Mode-B backfill, before inserting a fresh {@code WIKI_ONLY} row for a Wiki item that no
+   * existing row carries by {@code external_uuid}, first looks for a uuid-less {@code UEX_ONLY} row
+   * matching the Wiki item's {@code slug} or name and — on a single unambiguous match — merges into
+   * it (backfilling {@code external_uuid}, flipping {@code UEX_ONLY → BOTH}) instead of creating a
+   * duplicate. Set to {@code false} to fall back to the pure-UUID join (a Wiki item with no UUID
+   * twin then always becomes a separate {@code WIKI_ONLY} row). Only consulted in Mode B ({@link
+   * #syncAllItems} {@code = true}); closure mode never reconciles.
+   */
+  @NotNull private Boolean reconcileUuidlessByName = true;
+
+  /**
    * Mode-B {@code filter[classification]} value for {@code /api/armor}. <b>Must stay non-blank.</b>
    * The live Wiki {@code /api/armor} endpoint returns the FULL {@code /api/items} pool (~12 700
    * rows) when no classification filter is set (SC_WIKI_SYNC_PLAN.md §3.4 quirk #1, §13 open

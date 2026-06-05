@@ -118,6 +118,39 @@ public class SyncReportService {
   }
 
   /**
+   * Records one UEX-sync finding for an arbitrary aggregate. Stamps {@code source = UEX} and {@code
+   * ran_at = now}; the caller supplies the aggregate label ({@code "game_item"} / {@code
+   * "commodity"} / …). The UEX side was previously log-only — only the SC Wiki syncs wrote here —
+   * so the {@code /admin/sync-reports/uex} tab stayed empty; this method is the first UEX writer.
+   *
+   * @param runId the current run's id (from {@link #beginRun()})
+   * @param eventType the kind of finding
+   * @param aggregate the aggregate the event concerns
+   * @param externalUuid the external asset UUID the event concerns, or {@code null}
+   * @param externalName the external display name, or {@code null}
+   * @param detail free-form human-readable detail (e.g. the per-run tally string)
+   */
+  public void logUexEvent(
+      UUID runId,
+      SyncEventType eventType,
+      String aggregate,
+      UUID externalUuid,
+      String externalName,
+      String detail) {
+    repository.save(
+        ExternalSyncReport.builder()
+            .runId(runId)
+            .ranAt(Instant.now())
+            .sourceSystem(SyncSourceSystem.UEX)
+            .eventType(eventType)
+            .aggregate(aggregate)
+            .externalUuid(externalUuid)
+            .externalName(externalName)
+            .detail(detail)
+            .build());
+  }
+
+  /**
    * Enforces the §8.8 retention: deletes every event of {@code source} whose run is older than the
    * newest {@link #RUNS_TO_KEEP}. No-op when the source has fewer than the cap (the keep set would
    * be the whole population). Skips the delete entirely on an empty keep set so the {@code NOT IN
