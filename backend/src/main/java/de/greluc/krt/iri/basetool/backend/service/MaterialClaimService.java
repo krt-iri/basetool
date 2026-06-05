@@ -157,15 +157,17 @@ public class MaterialClaimService {
   /**
    * Creates or updates a squadron's claim on a bucket (upsert keyed on {@code (bucket, squadron)}).
    * Enforces every invariant: the order must be a non-terminal SK order, the caller must be allowed
-   * to act for the claiming squadron, the bucket must exist on the order, and the new amount must
-   * not push the bucket's total claims past its required amount.
+   * to act for the claiming squadron, the bucket must exist on the order, the new amount must not
+   * push the bucket's total claims past its required amount, and — on a new claim — the claiming
+   * squadron must itself be profit-eligible (only Profit-side squadrons take part in the order
+   * workflow).
    *
    * @param jobOrderId the order.
    * @param dto the claim payload.
    * @return the persisted claim.
    * @throws NotFoundException when the order or material is unknown.
    * @throws BadRequestException when the order is not an open SK order, the bucket does not exist,
-   *     or the amount would overclaim.
+   *     the amount would overclaim, or a new claim names a non-profit-eligible squadron.
    * @throws AccessDeniedException when the caller may not act for the claiming squadron.
    */
   @Transactional
@@ -472,12 +474,21 @@ public class MaterialClaimService {
   }
 
   /**
-   * Resolves the claiming org unit and validates it is a squadron — claims are made by squadrons,
-   * never by Spezialkommandos.
+   * Resolves the claiming org unit and validates it may sign up for material: it must be a squadron
+   * (Spezialkommandos place orders, they never claim against them) <em>and</em> that squadron must
+   * be profit-eligible. A claim models a profit squadron volunteering to deliver part of an SK
+   * order, so a squadron an admin has not marked {@code isProfitEligible} is outside the order
+   * workflow — the claim modal's squadron picker is already filtered to the profit-eligible subset,
+   * and this check is the authoritative server-side guard behind that filter (it also blocks a
+   * hand-crafted request, and an admin or responsible-SK lead from claiming on behalf of a
+   * non-profit squadron). Reached only on the insert branch of {@link #upsertClaim}; an existing
+   * claim's squadron is not re-resolved, so a squadron that loses eligibility may still adjust or
+   * withdraw a claim it lodged while eligible.
    *
    * @param claimingOrgUnitId the org unit id from the payload.
-   * @return the managed squadron-kind org unit.
-   * @throws BadRequestException when the id is unknown or not a squadron.
+   * @return the managed, profit-eligible squadron-kind org unit.
+   * @throws BadRequestException when the id is unknown, is not a squadron, or is a squadron that is
+   *     not profit-eligible.
    */
   private OrgUnit resolveClaimingOrgUnit(UUID claimingOrgUnitId) {
     OrgUnit orgUnit =
@@ -491,6 +502,12 @@ public class MaterialClaimService {
     if (orgUnit.getKind() != OrgUnitKind.SQUADRON) {
       throw new BadRequestException(
           "Only squadrons may claim material; " + claimingOrgUnitId + " is not a squadron.");
+    }
+    if (!orgUnit.isProfitEligible()) {
+      throw new BadRequestException(
+          "Only profit-eligible squadrons may claim material; "
+              + claimingOrgUnitId
+              + " is not profit-eligible.");
     }
     return orgUnit;
   }

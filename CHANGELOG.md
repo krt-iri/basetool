@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Beim „Material eintragen" auf einen Spezialkommando-Auftrag lassen sich jetzt nur noch profit-berechtigte Staffeln eintragen.** Die Staffelauswahl im Eintragungs-Dialog listet nur noch profit-berechtigte Staffeln, und das Backend weist eine Eintragung für eine nicht profit-berechtigte Staffel ab.
+
+### Fixed
+
+- **In den Material-Tabellen der Auftragsdetails beginnen die „Eintragen"-Buttons jetzt auf gleicher Höhe untereinander, statt je nach Breite der Mengenangabe zu verspringen.**
+
+- **In allen Daten-Tabellen reagieren jetzt auch die hell hinterlegten Zeilen (jede zweite Zeile) auf das Überfahren mit der Maus — bisher zeigten nur die dunklen Zeilen einen Hover-Effekt, was verwirrend wirkte.**
+
 ## [v0.3.58](https://github.com/krt-iri/basetool/releases/tag/v0.3.58) - 2026-06-05
 
 ### Fixed

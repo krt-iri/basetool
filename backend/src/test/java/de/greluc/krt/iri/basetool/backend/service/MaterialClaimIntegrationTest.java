@@ -93,6 +93,7 @@ class MaterialClaimIntegrationTest {
           Squadron sqB = new Squadron();
           sqB.setName("Claim-B-" + tag);
           sqB.setShorthand("B" + tag);
+          sqB.setProfitEligible(true);
           sqB = squadronRepository.save(sqB);
 
           Material mat = new Material();
@@ -146,6 +147,31 @@ class MaterialClaimIntegrationTest {
                 materialClaimService.upsertClaim(
                     f.orderId(), claim(f.materialId(), f.squadronBId(), 5.0)))
         .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  void nonProfitSquadron_cannotClaim() {
+    // Only profit-eligible squadrons may sign up: a squadron the admin has not marked
+    // profit-eligible is rejected with a 400 and no claim row is written, even though the order is
+    // an open SK order with an unclaimed bucket and the caller is an admin.
+    Fixture f = seed();
+    UUID nonProfitSquadronId =
+        transactionTemplate.execute(
+            status -> {
+              String tag = UUID.randomUUID().toString().substring(0, 8);
+              Squadron sq = new Squadron();
+              sq.setName("NonProfit-" + tag);
+              sq.setShorthand("N" + tag);
+              // profit-eligible defaults to false — left unset on purpose.
+              return squadronRepository.save(sq).getId();
+            });
+
+    assertThatThrownBy(
+            () ->
+                materialClaimService.upsertClaim(
+                    f.orderId(), claim(f.materialId(), nonProfitSquadronId, 5.0)))
+        .isInstanceOf(BadRequestException.class);
+    assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(f.orderId())).isEmpty();
   }
 
   @Test
@@ -211,10 +237,12 @@ class MaterialClaimIntegrationTest {
               Squadron sqA = new Squadron();
               sqA.setName("Orph-A-" + tag);
               sqA.setShorthand("A" + tag);
+              sqA.setProfitEligible(true);
               sqA = squadronRepository.save(sqA);
               Squadron sqB = new Squadron();
               sqB.setName("Orph-B-" + tag);
               sqB.setShorthand("B" + tag);
+              sqB.setProfitEligible(true);
               sqB = squadronRepository.save(sqB);
               Material matA = new Material();
               matA.setName("OrphMatA-" + tag);

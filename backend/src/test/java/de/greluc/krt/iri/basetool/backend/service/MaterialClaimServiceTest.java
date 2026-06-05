@@ -104,10 +104,12 @@ class MaterialClaimServiceTest {
     squadronA = new Squadron();
     squadronA.setId(SQUADRON_A);
     squadronA.setShorthand("ALF");
+    squadronA.setProfitEligible(true);
 
     squadronB = new Squadron();
     squadronB.setId(SQUADRON_B);
     squadronB.setShorthand("BRV");
+    squadronB.setProfitEligible(true);
   }
 
   // ---------------------------------------------------------------
@@ -247,6 +249,32 @@ class MaterialClaimServiceTest {
       service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 2.0));
 
       verify(materialClaimRepository).save(any(MaterialClaim.class));
+    }
+
+    @Test
+    void nonProfitEligibleSquadron_rejected() {
+      // Only Profit-side squadrons may sign up for SK-order material — a squadron the admin has not
+      // marked profit-eligible is rejected even when every other invariant (open SK order, known
+      // bucket, no overclaim, admin caller) passes.
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      adminCaller();
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
+              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+          .thenReturn(List.of());
+      when(materialClaimRepository
+              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+          .thenReturn(Optional.empty());
+      Squadron nonProfit = new Squadron();
+      nonProfit.setId(SQUADRON_A);
+      nonProfit.setShorthand("NPF");
+      // profit-eligible defaults to false — left unset on purpose.
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(nonProfit));
+
+      assertThrows(
+          BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0)));
+      verify(materialClaimRepository, never()).save(any());
     }
   }
 
