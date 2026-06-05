@@ -154,9 +154,11 @@ public class SyncReportService {
    * Records one KRT-P4K-Reader-import finding for an arbitrary aggregate. Stamps {@code source =
    * P4K} and {@code ran_at = now}; the caller supplies the aggregate label ({@code "game_item"} /
    * {@code "ship_type"} / {@code "manufacturer"} / {@code "material"} / {@code "blueprint"}). The
-   * P4K catalog import is the only writer — it emits {@link SyncEventType#LINKED_VIA_UUID} for a
-   * canonical-UUID backfill and {@link SyncEventType#BACKFILL_AMBIGUOUS} when the existing
-   * canonical UUID disagrees with the P4K GUID (kept, not overwritten).
+   * P4K catalog import is the only writer — it emits {@link SyncEventType#LINKED_VIA_NAME} for a
+   * canonical-UUID backfill reached through the name/slug fallback, {@link
+   * SyncEventType#BACKFILL_AMBIGUOUS} when the existing canonical UUID disagrees with the P4K GUID
+   * (kept, not overwritten), {@link SyncEventType#CREATED_FROM_P4K} for an opt-in seeded row, and
+   * one {@link SyncEventType#SYNC_RUN_SUMMARY} per run.
    *
    * @param runId the current run's id (from {@link #beginRun()})
    * @param eventType the kind of finding

@@ -49,12 +49,19 @@ spring:
     multipart:
       # Audit finding M-8: explicit multipart caps. Without these, Spring Boot's implicit
       # defaults (1MB file / 10MB request) apply — restrictive enough today but fragile to a
-      # Spring Boot version bump that might change them. The only legitimate multipart-uploading
-      # endpoints in the backend are the hangar ship-list / fleetview imports
-      # (`HangarController.importShips` / `importFleetview`); real fleetview JSON tops out
-      # under ~500 KB for a 100-ship hangar, so 2 MB covers it by an order of magnitude.
-      max-file-size: 2MB
-      max-request-size: 2MB
+      # Spring Boot version bump that might change them. Two endpoint classes upload multipart:
+      # the hangar ship-list / fleetview imports (`HangarController.importShips` /
+      # `importFleetview`), whose JSON tops out under ~500 KB for a 100-ship hangar, and the
+      # admin-only P4K catalog import (`AdminP4kImportController`), which ingests the full game
+      # DataForge export and is the driver for the larger ceiling below. The cap is global to
+      # every multipart endpoint (all are auth-gated). 64 MB is a generous ceiling for the P4K
+      # catalog; validate it against a measured real export before lowering it, and mind the
+      # transient heap — the import parses the whole upload into a Jackson tree.
+      # NOTE (deployment): the prod nginx-proxy-manager has its own `client_max_body_size`
+      # (default 1 MB) — raise it there too, or large uploads 413 at the proxy before reaching
+      # the app.
+      max-file-size: 64MB
+      max-request-size: 72MB
   threads:
     virtual:
       enabled: true

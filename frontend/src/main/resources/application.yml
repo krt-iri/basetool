@@ -55,12 +55,14 @@ server:
 spring:
   servlet:
     multipart:
-      # L-4: mirror the backend's explicit multipart caps (2MB). The frontend's only multipart
-      # endpoints are the import proxies (HangarImportProxyController /
-      # PersonalBlueprintImportProxyController), which buffer the whole upload via file.getBytes();
-      # an explicit cap stops a large upload from materialising unbounded in the heap.
-      max-file-size: 2MB
-      max-request-size: 2MB
+      # L-4: mirror the backend's explicit multipart caps. The frontend's multipart endpoints are
+      # the import proxies (HangarImportProxyController / PersonalBlueprintImportProxyController /
+      # AdminP4kImportPageController), which buffer the whole upload via file.getBytes() and relay
+      # it to the backend. The admin-only P4K catalog import is the large one and drives the 64 MB
+      # ceiling; keep these in lockstep with the backend caps. An explicit cap stops a large upload
+      # from materialising unbounded in the heap.
+      max-file-size: 64MB
+      max-request-size: 72MB
   threads:
     virtual:
       enabled: true

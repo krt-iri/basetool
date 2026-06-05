@@ -145,9 +145,12 @@ public class AdminP4kImportPageController {
           .bodyToMono(P4kImportResultDto.class)
           .block();
     } catch (WebClientResponseException e) {
+      // Log the raw backend status + body server-side for diagnosis, but never echo the backend
+      // response body back into the thrown reason phrase: the page JS shows its own i18n toast on
+      // any non-2xx, so a fixed reason avoids relaying backend internals to the client.
       log.warn(
           "P4K import proxy ({}): backend {} — {}", targetUri, e.getStatusCode(), e.getMessage());
-      throw new ResponseStatusException(e.getStatusCode(), e.getMessage());
+      throw new ResponseStatusException(e.getStatusCode(), "The P4K import request was rejected.");
     } catch (ResponseStatusException e) {
       throw e;
     } catch (Exception e) {

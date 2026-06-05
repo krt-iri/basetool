@@ -175,6 +175,12 @@ public class P4kImportService {
    * events for backfills, conflicts and seeded rows plus one run summary, then prunes the P4K
    * report history.
    *
+   * <p>The whole apply runs in a single transaction and is deliberately all-or-nothing: an
+   * unexpected failure on any record (e.g. a constraint violation while seeding) rolls the entire
+   * run back — every enrichment included — rather than leaving the master data half-updated. There
+   * is no per-record error isolation; re-run the import after correcting the offending catalog
+   * record.
+   *
    * @param file the uploaded P4K catalog JSON
    * @param seedNew {@code true} to insert new {@code source = P4K} rows for unmatched records that
    *     pass the real-record filter; {@code false} to enrich existing rows only
@@ -656,7 +662,9 @@ public class P4kImportService {
       }
     }
     if (dto.key() != null && !dto.key().isBlank()) {
-      return blueprintRepository.findFirstByScwikiKey(dto.key().trim()).orElse(null);
+      return blueprintRepository
+          .findFirstByScwikiKeyOrderByScwikiUuidAsc(dto.key().trim())
+          .orElse(null);
     }
     return null;
   }

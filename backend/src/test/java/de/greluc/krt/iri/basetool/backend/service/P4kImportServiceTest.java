@@ -34,6 +34,7 @@ import de.greluc.krt.iri.basetool.backend.model.GameItem;
 import de.greluc.krt.iri.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.Manufacturer;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.ShipType;
 import de.greluc.krt.iri.basetool.backend.model.SyncEventType;
 import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
@@ -577,5 +578,101 @@ class P4kImportServiceTest {
     org.junit.jupiter.api.Assertions.assertThrows(
         de.greluc.krt.iri.basetool.backend.exception.BadRequestException.class,
         () -> service.previewImport(empty));
+  }
+
+  @Test
+  void malformedJson_throwsBadRequest() {
+    // Truncated / non-JSON body -> the Jackson parse fails -> surfaced as HTTP 400, not a 500.
+    MultipartFile bad =
+        new MockMultipartFile("file", "p4k.json", "application/json", "{ not json ".getBytes());
+    org.junit.jupiter.api.Assertions.assertThrows(
+        de.greluc.krt.iri.basetool.backend.exception.BadRequestException.class,
+        () -> service.previewImport(bad));
+  }
+
+  @Test
+  void nonObjectJson_throwsBadRequest() {
+    // Syntactically valid JSON but not a catalog object (an array) -> rejected as 400.
+    org.junit.jupiter.api.Assertions.assertThrows(
+        de.greluc.krt.iri.basetool.backend.exception.BadRequestException.class,
+        () -> service.previewImport(upload("[1,2,3]")));
+  }
+
+  // ──────────────────────────────── UNIQUE-collision guard on backfill ──
+
+  @Test
+  void item_backfillSkippedWhenAnotherRowAlreadyHoldsTheGuid() {
+    UUID guid = UUID.randomUUID();
+    GameItem matched = new GameItem();
+    matched.setName("Hornet");
+    matched.setExternalUuid(null); // uuid-less -> normally eligible for backfill
+    GameItem otherHolder = new GameItem();
+    otherHolder.setName("Already Holds The Guid");
+    otherHolder.setExternalUuid(guid);
+    // First lookup (resolution) misses so the class_name fallback matches; the second lookup (the
+    // alreadyClaimed guard inside the backfill) finds the other row that already owns the GUID.
+    when(gameItemRepository.findByExternalUuid(guid))
+        .thenReturn(Optional.empty())
+        .thenReturn(Optional.of(otherHolder));
+    when(gameItemRepository.findByClassNameIgnoreCase("ship_hornet")).thenReturn(List.of(matched));
+
+    String json =
+        "{\"items\":[{\"guid\":\""
+            + guid
+            + "\",\"className\":\"ship_hornet\",\"name\":\"Hornet\"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), false);
+
+    assertEquals(1, result.items().matched());
+    assertEquals(0, result.items().uuidBackfilled()); // guard prevented the UNIQUE collision
+    assertEquals(0, result.items().uuidConflicts());
+
+    // The matched row's external_uuid is left null (the GUID belongs to another row); the P4K lane
+    // is still stamped so the observation stays auditable.
+    assertNull(matched.getExternalUuid());
+    assertEquals(guid, matched.getP4kUuid());
+    assertNotNull(matched.getP4kSyncedAt());
+
+    // No name/slug backfill event is logged when the backfill is skipped.
+    verify(syncReportService, never())
+        .logP4kEvent(any(), eq(SyncEventType.LINKED_VIA_NAME), any(), any(), any(), any());
+  }
+
+  // ──────────────────────────────── seeded commodity stays invisible ──
+
+  @Test
+  void commodity_unmatchedSeedable_isCreatedInvisibleForReview() {
+    UUID guid = UUID.randomUUID();
+    when(materialRepository.findByScwikiUuid(guid)).thenReturn(Optional.empty());
+    when(materialRepository.findByNameIgnoreCase("Quantanium")).thenReturn(Optional.empty());
+
+    String json =
+        "{\"commodities\":[{\"guid\":\""
+            + guid
+            + "\",\"name\":\"Quantanium\",\"desc\":\"Volatile ore.\"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), true);
+
+    assertEquals(1, result.commodities().created());
+
+    ArgumentCaptor<Material> captor = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository).save(captor.capture());
+    Material seeded = captor.getValue();
+    assertEquals("Quantanium", seeded.getName());
+    // Seeded commodities are inserted invisible so they stay out of trading flows until an admin
+    // reviews them (mirrors the SC-Wiki commodity sync).
+    assertEquals(Boolean.FALSE, seeded.getIsVisible());
+    assertEquals(MaterialSourceSystem.P4K, seeded.getSourceSystems());
+    assertEquals(guid, seeded.getScwikiUuid());
+    assertEquals(guid, seeded.getP4kUuid());
+    assertNotNull(seeded.getP4kSyncedAt());
+    verify(syncReportService)
+        .logP4kEvent(
+            any(),
+            eq(SyncEventType.CREATED_FROM_P4K),
+            eq("material"),
+            eq(guid),
+            eq("Quantanium"),
+            any());
   }
 }
