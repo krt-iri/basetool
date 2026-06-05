@@ -54,6 +54,12 @@ public class AsyncConfig {
   public static final String SCWIKI_EXECUTOR = "scWikiExecutor";
 
   /**
+   * Spring-bean name of the P4K import executor, referenced from {@code @Async("importExecutor")}.
+   * A single worker thread so catalog imports (preview / apply) run strictly one at a time.
+   */
+  public static final String IMPORT_EXECUTOR = "importExecutor";
+
+  /**
    * Bounded executor for the periodic UEX sync sweep dispatched by {@link
    * de.greluc.krt.iri.basetool.backend.service.UexScheduler}.
    *
@@ -130,6 +136,41 @@ public class AsyncConfig {
     executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
     executor.setWaitForTasksToCompleteOnShutdown(true);
     executor.setAwaitTerminationSeconds(20);
+    executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
+    executor.initialize();
+    return executor;
+  }
+
+  /**
+   * Single-thread executor for the asynchronous P4K catalog import dispatched by {@code
+   * P4kImportJobRunner}.
+   *
+   * <p>Sizing rationale: a core and max pool of <b>one</b> serializes every import run (preview and
+   * apply) so two heavy imports never overlap — the apply path rewrites master-data rows under a
+   * transaction, and a second concurrent apply would only add lock contention for no benefit (an
+   * admin triggers these by hand, rarely). The 20-slot queue lets a burst of uploads line up behind
+   * the active run rather than being rejected; {@link ThreadPoolExecutor.AbortPolicy} only engages
+   * once even that backlog is exhausted, surfacing loudly as a {@link
+   * java.util.concurrent.RejectedExecutionException}.
+   *
+   * <p>{@code setAwaitTerminationSeconds(60)} is more generous than the sync executors because an
+   * import can legitimately run for minutes; a job still in flight when the JVM exits is left
+   * {@code RUNNING} and reconciled to {@code FAILED} on next startup. {@link
+   * MdcPropagatingTaskDecorator} keeps the correlation / user / org-unit MDC fields on the worker
+   * thread, as for the other executors.
+   *
+   * @return configured P4K import async executor
+   */
+  @Bean(name = IMPORT_EXECUTOR)
+  public Executor importExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(1);
+    executor.setQueueCapacity(20);
+    executor.setThreadNamePrefix("p4k-import-");
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+    executor.setWaitForTasksToCompleteOnShutdown(true);
+    executor.setAwaitTerminationSeconds(60);
     executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
     executor.initialize();
     return executor;
