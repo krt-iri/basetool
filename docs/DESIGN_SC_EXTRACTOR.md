@@ -7,10 +7,10 @@
 > <https://api.anthropic.com/v1/design/h/mM6v29vZctN6kiBsF62_eA>
 > — a gzip bundle; extract it and open `project/Basetool SC Extractor.html` to click
 > through every screen and state. **Offline-capable mirror (vendored in this repo):**
-> [`design/basetool-sc-extractor.offline.html`](design/basetool-sc-extractor.offline.html)
+> [`design/basetool-sc-extractor.offline.zip`](design/basetool-sc-extractor.offline.zip)
 > — a single self-contained HTML file (all CSS / JS / fonts / images embedded; **no
-> network needed**); open it directly in any browser to click through every screen
-> offline. This Markdown file is the written contract that
+> network needed**), shipped zipped; extract it and open the HTML in any browser to click
+> through every screen offline. This Markdown file is the written contract that
 > travels with the basetool repo; the prototype is the pixel source of truth. Where
 > the two disagree, the prototype wins and this doc is updated. Imported 2026-06-05.
 > When Phase 3 (#436) is built in `basetool-sc-extractor`, carry this doc (and the
@@ -26,8 +26,8 @@
 >
 > **Reference prototype:** the interactive HTML prototype inside the Claude Design
 > bundle linked above (`project/Basetool SC Extractor.html`), or — fully offline — the
-> vendored single-file mirror
-> [`design/basetool-sc-extractor.offline.html`](design/basetool-sc-extractor.offline.html) — every screen and state
+> vendored mirror
+> [`design/basetool-sc-extractor.offline.zip`](design/basetool-sc-extractor.offline.zip) (extract + open the HTML) — every screen and state
 > below is clickable; the DE/EN toggle, density, nav model and confidence display are
 > togglable via the in-app Tweaks panel, but the **frozen defaults** are the ones
 > listed under *Locked decisions*.
@@ -279,6 +279,6 @@ the GB-per-model-size + CPU-speed numbers so the preflight thresholds are exact.
 
 *Source of truth for pixels: the prototype in the Claude Design bundle
 (<https://api.anthropic.com/v1/design/h/mM6v29vZctN6kiBsF62_eA>), mirrored offline at
-the vendored single file `design/basetool-sc-extractor.offline.html`. This doc is the
+the vendored zip `design/basetool-sc-extractor.offline.zip` (extract + open the HTML). This doc is the
 written contract; where they disagree, reconcile against the prototype and update
 this doc.*

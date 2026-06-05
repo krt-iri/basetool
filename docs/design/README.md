@@ -3,12 +3,13 @@
 This folder holds the **offline-capable design prototype** for the SC Extractor rebuild
 (epic [#439](https://github.com/krt-iri/basetool/issues/439)).
 
-- **[`basetool-sc-extractor.offline.html`](basetool-sc-extractor.offline.html)** — a single,
+- **[`basetool-sc-extractor.offline.zip`](basetool-sc-extractor.offline.zip)** — a single,
   fully self-contained HTML file (all CSS, JS, fonts and images embedded as an inline
-  asset blob; **no network needed**). Open it in any browser to click through every screen
-  and state of the launcher / Blueprint / Refinery workflows offline. It is the offline
-  mirror of the Claude Design prototype, and a permanent template even if the online link
-  ever goes away.
+  asset blob; **no network needed**), shipped zipped so the prototype's generated JS stays
+  out of the repo's code scanning. Extract it and open the HTML in any browser to click
+  through every screen and state of the launcher / Blueprint / Refinery workflows offline.
+  It is the offline mirror of the Claude Design prototype, and a permanent template even if
+  the online link ever goes away.
 
 **Authoritative sources**
 
