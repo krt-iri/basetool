@@ -37,11 +37,20 @@ server:
     mime-types: text/html,text/plain,text/css,application/javascript,application/json,image/svg+xml
   servlet:
     session:
-      timeout: 240h
+      # 30-day rolling idle window (was 240h / 10 days). RedisSessionConfig's
+      # SessionRepositoryCustomizer applies this as the repository's
+      # defaultMaxInactiveInterval (sliding, refreshed on every request), so a
+      # user who visits at least once every 30 days never expires server-side.
+      timeout: 720h
       cookie:
         secure: true
         http-only: true
         same-site: strict
+        # Persist the SESSION cookie for 30 days so the login survives a browser
+        # restart. Without max-age this is a session cookie that dies on browser
+        # close, forcing a fresh login even though the Redis-backed session is
+        # still valid.
+        max-age: 30d
 
 spring:
   servlet:

@@ -199,24 +199,28 @@ x-redis: &redis-template
   # Same digest pin policy as the Postgres images. Refresh with
   # `docker buildx imagetools inspect redis:8-alpine`.
   image: redis:8-alpine@sha256:09160599abd229764c0fb44cb6be640294e1d360a54b19985ab4843dcf2d90f1
-  # Persistence disabled (M-7 from the performance audit). The previous
-  # `--save 1 1 --appendonly yes` triggered an AOF fsync after every Spring
-  # Session write (~200 fsync/s under our active-user count) and RDB snapshots
-  # on every change — pure I/O overhead with no asset to protect: Spring
-  # Session-Redis only holds the OidcUser / OAuth2AuthorizedClient + flash
-  # attributes, so a Redis restart drops sessions silently and the next request
-  # hits SsoReAuthenticationEntryPoint, which issues a `prompt=none` Keycloak
-  # redirect that is transparent to a still-logged-in SSO user. There is no
-  # durable state worth fsyncing here. The volume mount survives in case a
-  # future use-case (e.g. distributed cache with persistent keys) wants to
-  # re-enable persistence — flip the two flags back on if so.
-  command: redis-server --save "" --appendonly no --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+  # Lightweight RDB persistence (re-enabled 2026-06 for the 30-day session
+  # goal). M-7 had turned all persistence off (`--save "" --appendonly no`) on
+  # the premise that a Redis restart only drops Spring Sessions, which
+  # SsoReAuthenticationEntryPoint rebuilds via a transparent `prompt=none`
+  # Keycloak redirect. That premise no longer holds: the Spring Session now
+  # carries the OAuth2 refresh token behind a rolling 30-day login, and losing
+  # it forces a re-auth round-trip that is only silent while the browser still
+  # holds a live Keycloak SSO cookie. RDB snapshots restore that durability
+  # cheaply via periodic background forks with NO per-write fsync -- the
+  # ~200 fsync/s AOF cost M-7 removed stays off (`--appendonly no`). The session
+  # dataset is tiny (OidcUser / OAuth2AuthorizedClient + flash attributes), so a
+  # fork-and-dump every few minutes is negligible I/O. `--save "300 1 60 1000"`
+  # snapshots after 300s if >=1 key changed (<=5 min worst-case loss) or after
+  # 60s under heavy churn; dump.rdb lands on the /var/iri/redis bind mount and
+  # is reloaded on restart.
+  command: redis-server --save "300 1 60 1000" --appendonly no --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: unless-stopped
   logging: *default-logging
   stop_grace_period: 30s
   # Only stores Spring sessions (OidcUser / OAuth2AuthorizedClient + flash
-  # attributes). 256 MB is generous for our active-user count; no AOF append
-  # buffer needed now that persistence is off.
+  # attributes). 256 MB is generous for our active-user count plus the
+  # copy-on-write headroom an RDB snapshot fork transiently needs.
   deploy:
     resources:
       limits:
