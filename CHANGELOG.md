@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.60](https://github.com/krt-iri/basetool/releases/tag/v0.3.60) - 2026-06-05
+
 ### Added
 
 - **Neuer Admin-Import „KRT P4K Reader" (Administration → Stammdaten): Administratoren laden den aus den echten Spieldaten (Game2.dcb) erzeugten JSON-Katalog hoch, um vorhandene Items, Schiffe, Hersteller, Materialien und Baupläne anzureichern, fehlende Spiel-UUIDs abzugleichen und offene Bauplan-Zutaten zu verknüpfen.** Eine Vorschau zeigt je Typ, was angereichert bzw. neu angelegt würde; „Anwenden" schreibt die Änderungen, wobei fehlende Datensätze nur bei gesetztem Schalter „Neue Datensätze anlegen" entstehen (gefiltert auf spielbare Inhalte, als Quelle „P4K" gekennzeichnet, Materialien zunächst unsichtbar zur Freigabe). Widersprüchliche UUIDs bleiben erhalten und werden im neuen „P4K"-Sync-Bericht protokolliert (Migration V140).
