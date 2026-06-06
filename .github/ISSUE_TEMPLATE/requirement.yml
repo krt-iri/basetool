@@ -1,0 +1,92 @@
+name: Requirement / Spec
+description: Capture a durable, ratified requirement — the "what must always hold". Accepted requirements are recorded in docs/specs/ via PR.
+title: "[Requirement] "
+labels:
+  - triage
+  - requirement
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Use this for a **durable requirement** (a rule the software must satisfy
+        long-term), not for proposing a feature (use *Feature Request*) or tracking a task
+        (use *Task*). Once accepted, this requirement is written into `docs/specs/` via a
+        pull request — see
+        [`docs/specs/INDEX.md`](https://github.com/krt-iri/basetool/blob/main/docs/specs/INDEX.md).
+
+  - type: textarea
+    id: statement
+    attributes:
+      label: Requirement statement
+      description: >-
+        What must hold, stated as an outcome — not an implementation. One requirement per
+        issue; split compound requirements.
+      placeholder: "An SK-responsible job order must be visible to every squadron, while a squadron-responsible order stays private to that squadron + admins."
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale / context
+      description: Why is this required? Who benefits, and what breaks without it?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area (REQ-ID prefix)
+      description: Drives the `REQ-<AREA>-NNN` id when this lands in docs/specs.
+      options:
+        - AUTH (auth / roles / OIDC)
+        - ORG (org-unit / tenancy / scope)
+        - ORDERS (job orders)
+        - INV (inventory / stock)
+        - MISSION (missions / operations)
+        - REFINERY
+        - HANGAR
+        - PROMO (promotion system)
+        - ADMIN
+        - UEX integration
+        - UI / design
+        - I18N
+        - DB / migration
+        - OPS / deployment
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkable statements that prove the requirement is met. Each should map to a test.
+      value: |
+        - [ ]
+        - [ ] Enforced by an automated test (unit / MVC / integration)
+        - [ ] Recorded as REQ-<AREA>-NNN in docs/specs/ via PR
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Out of scope
+      description: What this requirement deliberately does NOT cover.
+
+  - type: input
+    id: relates
+    attributes:
+      label: Supersedes / relates to
+      description: Existing REQ-ID, ADR, or issue this changes or depends on (if any).
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Self-Check
+      options:
+        - label: I have searched open and closed issues for duplicates.
+          required: true
+        - label: This is a durable requirement, not a feature proposal or a one-off task.
+          required: true

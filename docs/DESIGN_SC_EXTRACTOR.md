@@ -1,5 +1,7 @@
 # Design Spec — Basetool SC Extractor (GUI rebuild for epic #439)
 
+> **Doc type:** Binding design spec for epic #439 (not yet built). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md).
+>
 > **Provenance / how to read this.** This is the **binding** UI/UX design for the SC
 > Extractor desktop tool (and the shared visual language of the frontend review
 > surface). It was produced with **Claude Design** and exported as a handoff bundle.

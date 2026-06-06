@@ -1,5 +1,9 @@
 # OAuth2 Confidential-Client-Migration (Audit-Finding M-6)
 
+> **Doc type:** Implementation runbook for [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md).
+> The *decision* and its rationale live in the ADR; this document is the step-by-step *how*.
+> Registered in [`docs/specs/INDEX.md`](specs/INDEX.md).
+
 **Status:** offen — Code-Anteil noch nicht implementiert, Keycloak-Anteil noch nicht durchgeführt.
 **Audit-Finding:** M-6 (Security-Audit 2026-05-20).
 **Schweregrad:** Medium (Defense-in-Depth — kein akut ausnutzbarer Vektor).
