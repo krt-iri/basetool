@@ -10,6 +10,8 @@
 
 - **SCU-Mengen lassen sich jetzt wahlweise mit Punkt oder Komma als Dezimaltrennzeichen eingeben (z. B. `0,01` oder `0.01`); die Eingabe wird intern auf das Punktformat normalisiert.** Bisher akzeptierte das Mengenfeld je nach Browser-Sprache nur eines der beiden Zeichen. Gilt für alle SCU-Mengenfelder: Lager-Ein-/Aus-/Umbuchung, Material-Auftrag (Anlegen/Bearbeiten), Material-Eintragung, Übergabe und Raffinerie-Einlagerung.
 
+- **Mengenfelder erzwingen jetzt die Eingaberegeln des Mengentyps:** SCU-Materialien akzeptieren nur positive Werte (> 0) mit bis zu drei Nachkommastellen (Schrittweite 0,001); werden mehr Nachkommastellen eingegeben, wird kaufmännisch auf drei gerundet. Stück-Materialien akzeptieren nur positive Ganzzahlen. Der Zielbestand beim Ausbuchen darf weiterhin 0 sein.
+
 ### Fixed
 
 - **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.

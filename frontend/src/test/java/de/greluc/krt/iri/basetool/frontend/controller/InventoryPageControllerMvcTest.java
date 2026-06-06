@@ -163,9 +163,13 @@ class InventoryPageControllerMvcTest {
         // into the shared normaliser.
         .andExpect(content().string(containsString("data-scu-decimal")))
         .andExpect(content().string(containsString("inputmode=\"decimal\"")))
-        // The normaliser script and its defensive inline stub are wired into every page's <head>.
+        // The book-out target stock legitimately accepts 0, so it opts out of the > 0 rule.
+        .andExpect(content().string(containsString("data-scu-allow-zero")))
+        // The normaliser script, its defensive inline stub, and the localised positivity
+        // messages are wired into every page's <head>.
         .andExpect(content().string(containsString("/js/scu-decimal-input.js")))
-        .andExpect(content().string(containsString("window.krtScuInput")));
+        .andExpect(content().string(containsString("window.krtScuInput")))
+        .andExpect(content().string(containsString("window.krtScuI18n")));
   }
 
   @Test
