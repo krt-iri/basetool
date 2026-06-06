@@ -41,9 +41,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Lifecycle and persistence for asynchronous P4K catalog-import runs ({@link P4kImportJob} +
- * {@link P4kImportJobPayload}). It owns the transactional state machine — create, the {@code
- * PENDING → RUNNING → SUCCEEDED | FAILED} transitions, payload load/copy/delete, and the prune /
+ * Lifecycle and persistence for asynchronous P4K catalog-import runs ({@link P4kImportJob} + {@link
+ * P4kImportJobPayload}). It owns the transactional state machine — create, the {@code PENDING →
+ * RUNNING → SUCCEEDED | FAILED} transitions, payload load/copy/delete, and the prune /
  * startup-reconcile housekeeping — while the heavy parse-and-reconcile work and the orchestration
  * across these transactions live in {@code P4kImportJobRunner} (which runs them on a single-thread
  * {@code @Async} executor, off the request path).

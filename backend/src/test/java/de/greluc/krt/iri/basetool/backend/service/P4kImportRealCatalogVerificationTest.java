@@ -47,8 +47,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>The assertion that matters is simply that {@link P4kImportService#previewImport(byte[])}
  * returns rather than throwing: a successful preview means every one of the catalog's tens of
  * thousands of manufacturer / item / ship / commodity / blueprint records deserialized into the
- * {@code P4k*Dto} shapes and ran through the reconciliation chain. (A fresh test database carries no
- * UEX / SC-Wiki master data, so the records resolve as would-be seeds / unmatched rather than
+ * {@code P4k*Dto} shapes and ran through the reconciliation chain. (A fresh test database carries
+ * no UEX / SC-Wiki master data, so the records resolve as would-be seeds / unmatched rather than
  * matches — the point is coverage of the parse + classify path across the whole file, not match
  * counts.) {@link JwtDecoder} is mocked so the resource-server context boots without Keycloak.
  */
@@ -100,12 +100,6 @@ class P4kImportRealCatalogVerificationTest {
   }
 
   private static String fmt(P4kImportResultDto.Counts c) {
-    return "[m="
-        + c.matched()
-        + ",cr="
-        + c.created()
-        + ",un="
-        + c.unmatched()
-        + "]";
+    return "[m=" + c.matched() + ",cr=" + c.created() + ",un=" + c.unmatched() + "]";
   }
 }

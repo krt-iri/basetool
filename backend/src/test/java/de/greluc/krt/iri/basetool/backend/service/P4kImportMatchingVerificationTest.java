@@ -48,12 +48,13 @@ import org.springframework.transaction.annotation.Transactional;
  * against existing UEX / SC-Wiki master data — the part the empty-database parse test cannot cover.
  * Runs against the real Testcontainers Postgres of the {@code test} profile and uses <em>real</em>
  * DataForge identifiers lifted from the live catalog (Upsiders, a Gyson undersuit, the Drake
- * Clipper, Zeta-Prolanide, a real {@code BP_CRAFT_*} blueprint and one of its resource ingredients).
+ * Clipper, Zeta-Prolanide, a real {@code BP_CRAFT_*} blueprint and one of its resource
+ * ingredients).
  *
  * <p>The match-key contract under test: the P4K {@code guid} is the DataForge {@code __ref}, which
- * is the same UUID SC-Wiki publishes (so it equals {@code game_item.external_uuid} /
- * {@code ship_type.external_uuid} and {@code manufacturer.scwiki_uuid} / {@code material.scwiki_uuid}
- * / {@code blueprint.scwiki_uuid}). UEX-origin rows that never received that canonical UUID are still
+ * is the same UUID SC-Wiki publishes (so it equals {@code game_item.external_uuid} / {@code
+ * ship_type.external_uuid} and {@code manufacturer.scwiki_uuid} / {@code material.scwiki_uuid} /
+ * {@code blueprint.scwiki_uuid}). UEX-origin rows that never received that canonical UUID are still
  * merged via the case-insensitive {@code class_name} / {@code name} / {@code code} / {@code key}
  * fallback, which then backfills the UUID ({@code LINKED_VIA_NAME}).
  *
@@ -63,11 +64,11 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li><b>Seed</b> the "existing" master data by applying the catalog with seeding on — this
  *       creates a row of every type carrying the canonical UUID, exactly as a UEX/Wiki sync would.
  *   <li><b>Strip</b> the canonical UUIDs ({@code external_uuid} / {@code scwiki_uuid}) from those
- *       rows and clear one blueprint ingredient's resolved material, simulating the UEX-origin
- *       "no UUID yet" / "unresolved ingredient" state the merge is meant to repair.
+ *       rows and clear one blueprint ingredient's resolved material, simulating the UEX-origin "no
+ *       UUID yet" / "unresolved ingredient" state the merge is meant to repair.
  *   <li><b>Re-import</b> (apply, seeding off): every row must now re-match by name / class_name /
- *       code / key, backfill its canonical UUID, and the blueprint ingredient must re-resolve — with
- *       <em>zero</em> new rows created.
+ *       code / key, backfill its canonical UUID, and the blueprint ingredient must re-resolve —
+ *       with <em>zero</em> new rows created.
  * </ol>
  *
  * {@link JwtDecoder} is mocked so the resource-server context boots without Keycloak.
@@ -93,7 +94,9 @@ class P4kImportMatchingVerificationTest {
 
   @MockitoBean private JwtDecoder jwtDecoder;
 
-  /** Compact catalog built from real DataForge identifiers; the descriptions/mass are enrichment. */
+  /**
+   * Compact catalog built from real DataForge identifiers; the descriptions/mass are enrichment.
+   */
   private static byte[] catalog() {
     String json =
         """
@@ -160,7 +163,8 @@ class P4kImportMatchingVerificationTest {
     zeta.setScwikiUuid(null);
     materialRepository.saveAndFlush(zeta);
 
-    Blueprint blueprint = blueprintRepository.findByScwikiUuid(UUID.fromString(BLUEPRINT_GUID)).orElseThrow();
+    Blueprint blueprint =
+        blueprintRepository.findByScwikiUuid(UUID.fromString(BLUEPRINT_GUID)).orElseThrow();
     blueprint.getIngredients().get(0).setMaterial(null);
     blueprintRepository.saveAndFlush(blueprint);
 
@@ -193,7 +197,10 @@ class P4kImportMatchingVerificationTest {
         "manufacturer scwiki_uuid restored from the P4K guid");
     assertEquals(
         UUID.fromString(ITEM_GUID),
-        gameItemRepository.findByClassNameIgnoreCase("gys_undersuit_01_01_11").get(0).getExternalUuid(),
+        gameItemRepository
+            .findByClassNameIgnoreCase("gys_undersuit_01_01_11")
+            .get(0)
+            .getExternalUuid(),
         "item external_uuid restored from the P4K guid");
   }
 }

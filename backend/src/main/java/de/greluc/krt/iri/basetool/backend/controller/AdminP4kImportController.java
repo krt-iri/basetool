@@ -57,8 +57,8 @@ import org.springframework.web.multipart.MultipartFile;
  * from the game's {@code Data/Game2.dcb}; rather than parsing and reconciling ~60k records inside
  * the request (which outran the frontend / proxy timeouts and hung the page), the upload only
  * enqueues a job and returns {@code 202 Accepted} immediately. A single-thread {@code @Async}
- * worker ({@link P4kImportJobRunner}) does the heavy work in the background and writes the
- * per-type result back onto the job, which the page polls.
+ * worker ({@link P4kImportJobRunner}) does the heavy work in the background and writes the per-type
+ * result back onto the job, which the page polls.
  *
  * <ul>
  *   <li>{@code POST /jobs} — upload a catalog and enqueue a PREVIEW (dry-run) job.

@@ -57,8 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
  * the {@code test} profile (Flyway-migrated through {@code V140}). The {@link
  * de.greluc.krt.iri.basetool.backend.service.P4kImportServiceTest pure-Mockito suite} cannot catch
  * a NOT&nbsp;NULL / CHECK violation on a seeded row because its repositories never reach a database
- * — this boots the full context (Flyway-migrated through {@code V141}) and actually persists one new row of every catalog type with
- * seeding opted in, proving:
+ * — this boots the full context (Flyway-migrated through {@code V141}) and actually persists one
+ * new row of every catalog type with seeding opted in, proving:
  *
  * <ul>
  *   <li>every {@code source = P4K} seed satisfies the live schema (no NOT&nbsp;NULL / CHECK / FK

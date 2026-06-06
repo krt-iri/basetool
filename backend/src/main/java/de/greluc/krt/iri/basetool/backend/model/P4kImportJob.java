@@ -86,8 +86,8 @@ public class P4kImportJob extends AbstractEntity<UUID> {
 
   /**
    * The serialized {@code P4kImportResultDto} (plain JSON text) once the run succeeds, or {@code
-   * null} while pending / running / on failure. Only ever stored and echoed back to the page,
-   * never queried into, hence {@code TEXT} rather than {@code jsonb}.
+   * null} while pending / running / on failure. Only ever stored and echoed back to the page, never
+   * queried into, hence {@code TEXT} rather than {@code jsonb}.
    */
   @Column(name = "result_json", columnDefinition = "TEXT")
   private String resultJson;

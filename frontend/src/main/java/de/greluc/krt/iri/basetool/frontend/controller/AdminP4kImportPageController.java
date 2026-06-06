@@ -51,8 +51,8 @@ import reactor.core.publisher.Mono;
  * Spring MVC controller backing the {@code /admin/p4k-import} page (#326): an admin uploads a JSON
  * catalog extracted from the Star Citizen game files, which is processed as an <b>asynchronous
  * background job</b>. The upload returns immediately; the page polls the job list until each run
- * finishes, shows the per-type preview, and can then apply a finished preview, all without the
- * page hanging or hitting a request timeout.
+ * finishes, shows the per-type preview, and can then apply a finished preview, all without the page
+ * hanging or hitting a request timeout.
  *
  * <p>Every action proxies to the backend admin import job endpoints ({@code
  * /api/v1/admin/import/p4k/jobs}) via the authenticated {@link WebClient}, which relays the OAuth2

@@ -51,11 +51,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-Mockito unit tests for {@link P4kImportJobService}: the two repositories are mocked, no Spring
- * context and no database. {@code jobRepository.save} is stubbed to assign an id, standing in for the
- * Hibernate {@code GenerationType.UUID} generator, so the create paths can wire the payload to the
- * persisted job id. Covers job creation (preview + apply-from-preview with its guards), the lifecycle
- * transitions, payload reclaim, prune delegation and the startup orphan reconciliation.
+ * Pure-Mockito unit tests for {@link P4kImportJobService}: the two repositories are mocked, no
+ * Spring context and no database. {@code jobRepository.save} is stubbed to assign an id, standing
+ * in for the Hibernate {@code GenerationType.UUID} generator, so the create paths can wire the
+ * payload to the persisted job id. Covers job creation (preview + apply-from-preview with its
+ * guards), the lifecycle transitions, payload reclaim, prune delegation and the startup orphan
+ * reconciliation.
  */
 @ExtendWith(MockitoExtension.class)
 class P4kImportJobServiceTest {
@@ -65,7 +66,9 @@ class P4kImportJobServiceTest {
 
   @InjectMocks private P4kImportJobService service;
 
-  /** Stubs {@code save} to assign a random id (mimicking the JPA UUID generator) and echo the job. */
+  /**
+   * Stubs {@code save} to assign a random id (mimicking the JPA UUID generator) and echo the job.
+   */
   private void stubSaveAssignsId() {
     when(jobRepository.save(any(P4kImportJob.class)))
         .thenAnswer(
@@ -103,7 +106,8 @@ class P4kImportJobServiceTest {
     assertEquals((long) bytes.length, job.getFileSizeBytes());
     assertNotNull(job.getId());
 
-    ArgumentCaptor<P4kImportJobPayload> payload = ArgumentCaptor.forClass(P4kImportJobPayload.class);
+    ArgumentCaptor<P4kImportJobPayload> payload =
+        ArgumentCaptor.forClass(P4kImportJobPayload.class);
     verify(payloadRepository).save(payload.capture());
     assertEquals(job.getId(), payload.getValue().getJobId());
     assertArrayEquals(bytes, payload.getValue().getContent());
@@ -146,7 +150,8 @@ class P4kImportJobServiceTest {
   void createApplyJob_unknownJob_throwsNotFound() {
     UUID id = UUID.randomUUID();
     when(jobRepository.findById(id)).thenReturn(Optional.empty());
-    assertThrows(NotFoundException.class, () -> service.createApplyJob(id, false, UUID.randomUUID()));
+    assertThrows(
+        NotFoundException.class, () -> service.createApplyJob(id, false, UUID.randomUUID()));
     verify(payloadRepository, never()).copyPayload(any(), any());
   }
 
@@ -177,7 +182,8 @@ class P4kImportJobServiceTest {
         .thenReturn(Optional.of(jobWithId(previewId, P4kImportJobStatus.SUCCEEDED)));
     when(payloadRepository.copyPayload(any(UUID.class), eq(previewId))).thenReturn(0);
     assertThrows(
-        BadRequestException.class, () -> service.createApplyJob(previewId, false, UUID.randomUUID()));
+        BadRequestException.class,
+        () -> service.createApplyJob(previewId, false, UUID.randomUUID()));
   }
 
   // ──────────────────────────────────────────────────── lifecycle transitions ──
