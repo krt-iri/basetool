@@ -5,44 +5,44 @@
 Production deployment runs as a closed loop between three actors:
 
 ```
-   ┌──────────────────────────────┐       ┌────────────────────────────┐
-   │  GitHub Actions              │       │  GitHub Container Registry │
-   │                              │       │                            │
-   │  .github/workflows/          │  push │  ghcr.io/krt-iri/          │
-   │    release-images.yml ───────┼──────►│    basetool-backend:1.4.2  │
-   │      build  + push           │       │    basetool-frontend:1.4.2 │
-   │      scan   (Trivy SARIF)    │       │      ... :latest, :edge,   │
-   │      sign   (cosign keyless) │       │      :sha-abc1234, :stable │
-   │                              │       │                            │
-   │  .github/workflows/          │       │                            │
-   │    promote.yml      ─────────┼──────►│    (re-tags an existing    │
-   │      manual dispatch         │       │     digest to :stable)     │
-   └──────────────────────────────┘       └────────────────────┬───────┘
-                                                               │
-                                                               │ docker pull
-                                                               │
-                                          ┌────────────────────▼───────┐
-                                          │  Production host           │
-                                          │                            │
-                                          │  /var/iri/code/            │
-                                          │    docker-compose.yml      │
-                                          │    .env                    │
-                                          │    scripts/deploy.sh ──┐   │
-                                          │                        │   │
-                                          │  /var/iri/secrets/     │   │
-                                          │    keystore.p12        │   │
-                                          │                        │   │
-                                          │  /etc/iri/             │   │
-                                          │    ghcr-pull-token     │   │
-                                          │                        │   │
-                                          │  /var/lib/iri/         │   │
-                                          │    current-digest-pin.yml  │
-                                          │    previous-digest-pin.yml │
-                                          │    last-deployed.digests   │
-                                          │                            │
-                                          │  systemd: iri-deploy.timer │
-                                          │    OnUnitActiveSec=5min    │
-                                          └────────────────────────────┘
+┌──────────────────────────────┐       ┌────────────────────────────┐
+│  GitHub Actions              │       │  GitHub Container Registry │
+│                              │       │                            │
+│  .github/workflows/          │  push │  ghcr.io/krt-iri/          │
+│    release-images.yml ───────┼──────►│    basetool-backend:1.4.2  │
+│      build  + push           │       │    basetool-frontend:1.4.2 │
+│      scan   (Trivy SARIF)    │       │      ... :latest, :edge,   │
+│      sign   (cosign keyless) │       │      :sha-abc1234, :stable │
+│                              │       │                            │
+│  .github/workflows/          │       │                            │
+│    promote.yml      ─────────┼──────►│    (re-tags an existing    │
+│      manual dispatch         │       │     digest to :stable)     │
+└──────────────────────────────┘       └────────────────────┬───────┘
+                                                            │
+                                                            │ docker pull
+                                                            │
+                                       ┌────────────────────▼───────┐
+                                       │  Production host           │
+                                       │                            │
+                                       │  /var/iri/code/            │
+                                       │    docker-compose.yml      │
+                                       │    .env                    │
+                                       │    scripts/deploy.sh ──┐   │
+                                       │                        │   │
+                                       │  /var/iri/secrets/     │   │
+                                       │    keystore.p12        │   │
+                                       │                        │   │
+                                       │  /etc/iri/             │   │
+                                       │    ghcr-pull-token     │   │
+                                       │                        │   │
+                                       │  /var/lib/iri/         │   │
+                                       │    current-digest-pin.yml  │
+                                       │    previous-digest-pin.yml │
+                                       │    last-deployed.digests   │
+                                       │                            │
+                                       │  systemd: iri-deploy.timer │
+                                       │    OnUnitActiveSec=5min    │
+                                       └────────────────────────────┘
 ```
 
 **What gets pushed to GHCR carries no secrets.** The keystore, `.env`,
@@ -236,18 +236,18 @@ and regenerating the CycloneDX SBOMs happens automatically as part of the run.
 enter the version **without** the leading `v` (e.g. `1.4.3`). Off `main` the
 workflow:
 - reconciles any historical `[Unreleased]` CHANGELOG drift and **cuts**
-  `[Unreleased]` into a dated `## [v1.4.3]` section;
+`[Unreleased]` into a dated `## [v1.4.3]` section;
 - regenerates `*/docs/*-bom.{json,xml}` (pure serial-number / timestamp churn is
-  discarded — only a real dependency change is kept);
+discarded — only a real dependency change is kept);
 - commits the result on a `release/v1.4.3` branch and opens a
-  `chore(release): v1.4.3` PR carrying a preview of the release notes.
+`chore(release): v1.4.3` PR carrying a preview of the release notes.
 
 **Phase 2 — merge.** Review and **merge** that PR. The merge *is* the release:
 `release-publish.yml` then
 - creates the `v1.4.3` tag **once**, at the merge commit (which already carries
-  the refreshed CHANGELOG + SBOM, so the tag is never moved afterwards);
+the refreshed CHANGELOG + SBOM, so the tag is never moved afterwards);
 - publishes the GitHub Release (notes + image links + the four SBOM files as
-  assets);
+assets);
 - and the tag push fires `release-images.yml`.
 
 Closing the prep PR without merging cancels the release cleanly — no tag, no
@@ -291,13 +291,13 @@ rebuild. Same digest, two tags.
 Within at most 5 minutes (timer interval + RandomizedDelaySec):
 1. `iri-deploy.service` fires.
 2. `deploy.sh` resolves `:stable` → digest, compares with
-   `/var/lib/iri/last-deployed.digests`.
+`/var/lib/iri/last-deployed.digests`.
 3. If different: writes `current-digest-pin.yml` with the new digest pair,
-   runs `docker compose pull && docker compose up -d --wait`.
+runs `docker compose pull && docker compose up -d --wait`.
 4. On all-healthy: updates `last-deployed.digests`, logs success.
 5. On any-unhealthy within 180 s: restores `previous-digest-pin.yml`,
-   re-ups, logs failure, exits non-zero (journald and OnFailure= hooks
-   pick it up).
+re-ups, logs failure, exits non-zero (journald and OnFailure= hooks
+pick it up).
 
 You see the result in `journalctl -u iri-deploy.service -n 100` or in
 `/var/log/iri-deploy.log`.
@@ -347,9 +347,9 @@ location @maintenance {
 `$maintenance_target` is set by a small `map` in `/data/nginx/custom/http.conf`
 that branches on the request's `Accept` header:
 
-| `Accept`                                | Response               | Content-Type                     |
-| --------------------------------------- | ---------------------- | -------------------------------- |
-| `text/html`, `*/*`, missing             | `maintenance.html`     | `text/html; charset=utf-8`       |
+|                    `Accept`                    |      Response      |               Content-Type                |
+|------------------------------------------------|--------------------|-------------------------------------------|
+| `text/html`, `*/*`, missing                    | `maintenance.html` | `text/html; charset=utf-8`                |
 | `application/json`, `application/problem+json` | `maintenance.json` | `application/problem+json; charset=utf-8` |
 
 Both responses are returned with HTTP `503 Service Unavailable` and
@@ -487,15 +487,15 @@ journalctl -u iri-deploy.service -n 50
 
 ## Troubleshooting
 
-| Symptom | Where to look | Common cause |
-|---|---|---|
-| Timer fires but image never updates | `journalctl -u iri-deploy.service` | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`. |
-| `docker login` fails | `/var/log/iri-deploy.log` | Expired or revoked PAT. See *Token rotation*. |
-| Health check times out | `docker compose ps`, `docker logs <service>` | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause. |
-| Service stays "unhealthy" after rollback | `docker logs db-backend` etc. | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy. |
-| Keystore mount fails on `up` | `docker compose config`, `ls -la /var/iri/secrets` | Keystore file missing or wrong owner. `gid=10001` must be readable. |
-| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env` | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents. |
-| Compose pulls but does not restart | journald log | All target digests match the last-deployed digests — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart. |
+|                         Symptom                          |                   Where to look                    |                                                                              Common cause                                                                              |
+|----------------------------------------------------------|----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Timer fires but image never updates                      | `journalctl -u iri-deploy.service`                 | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                          |
+| `docker login` fails                                     | `/var/log/iri-deploy.log`                          | Expired or revoked PAT. See *Token rotation*.                                                                                                                          |
+| Health check times out                                   | `docker compose ps`, `docker logs <service>`       | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                           |
+| Service stays "unhealthy" after rollback                 | `docker logs db-backend` etc.                      | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                      |
+| Keystore mount fails on `up`                             | `docker compose config`, `ls -la /var/iri/secrets` | Keystore file missing or wrong owner. `gid=10001` must be readable.                                                                                                    |
+| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env`                                             | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                             |
+| Compose pulls but does not restart                       | journald log                                       | All target digests match the last-deployed digests — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart. |
 
 ---
 
@@ -522,3 +522,4 @@ A few decisions worth keeping in mind when you touch any of the pieces:
   (no local `docker build` accidentally bakes it in). The production
   keystore lives only on the server, behind a root-owned 0640 file
   whose group matches the in-container app uid.
+

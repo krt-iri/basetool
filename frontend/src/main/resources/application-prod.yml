@@ -1,6 +1,6 @@
 # ===================================================================
 # Production Configuration for Frontend
-# 
+#
 # JVM Tuning Recommendations (apply via JAVA_TOOL_OPTIONS in Docker):
 #   -XX:+UseContainerSupport
 #   -XX:MaxRAMPercentage=75.0

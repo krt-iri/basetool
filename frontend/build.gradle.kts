@@ -20,11 +20,7 @@ plugins {
 
 description = "frontend"
 
-java {
-  toolchain {
-    languageVersion = JavaLanguageVersion.of(25)
-  }
-}
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 // Resolve the version string that ends up in `META-INF/build-info.properties`
 // (consumed by `AppVersionAdvice` to render the sidebar's discreet version
@@ -55,16 +51,16 @@ java {
 val resolvedAppVersion: String by lazy {
   val override = (findProperty("appVersion") as String?)?.takeIf { it.isNotBlank() }
   val gitDescribed: String? =
-      runCatching {
-            val proc =
-                ProcessBuilder("git", "describe", "--tags", "--always", "--dirty")
-                    .directory(rootDir)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start()
-            val stdout = proc.inputStream.bufferedReader().readText().trim()
-            if (proc.waitFor() == 0 && stdout.isNotBlank()) stdout else null
-          }
-          .getOrNull()
+    runCatching {
+        val proc =
+          ProcessBuilder("git", "describe", "--tags", "--always", "--dirty")
+            .directory(rootDir)
+            .redirectError(ProcessBuilder.Redirect.DISCARD)
+            .start()
+        val stdout = proc.inputStream.bufferedReader().readText().trim()
+        if (proc.waitFor() == 0 && stdout.isNotBlank()) stdout else null
+      }
+      .getOrNull()
   val raw = override ?: gitDescribed ?: project.version.toString()
   raw.removePrefix("v")
 }
@@ -90,8 +86,10 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
   // Jackson 2 — kept ONLY for ThymeleafJavaScriptSerializerConfig, the JS-inlining bridge that must
-  // track Thymeleaf's own Jackson version. Every other frontend class is on Jackson 3 (tools.jackson).
-  // Thymeleaf 3.1.x (via thymeleaf-spring6) only supports Jackson 2 internally: the bridge delegates
+  // track Thymeleaf's own Jackson version. Every other frontend class is on Jackson 3
+  // (tools.jackson).
+  // Thymeleaf 3.1.x (via thymeleaf-spring6) only supports Jackson 2 internally: the bridge
+  // delegates
   // primitive values to Thymeleaf's StandardJavaScriptSerializer and mirrors its character-escape
   // table, and it needs the JSR-310 module so [[${dto}]] inline expressions can render java.time.*
   // fields (Instant/OffsetDateTime/LocalDateTime). Drop both deps once Thymeleaf supports Jackson 3
@@ -121,12 +119,13 @@ dependencies {
   // Resilience4j for resilience patterns + Reactor operators
   implementation(libs.resilience4j.spring.boot3)
   implementation(libs.resilience4j.reactor)
-  // Reactor ThreadLocal propagation across WebClient worker threads — required so the active-OrgUnit
+  // Reactor ThreadLocal propagation across WebClient worker threads — required so the
+  // active-OrgUnit
   // pin and the correlation id flow from the servlet thread into the WebClient exchange filter.
   // Version is resolved by the Spring Boot BOM (no version.ref here).
   implementation(libs.micrometer.context.propagation)
   implementation(libs.logstash.logback.encoder)
-  
+
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   compileOnly(libs.jetbrains.annotations)
@@ -137,7 +136,7 @@ dependencies {
   // SQLi / path traversal / SSRF / weak crypto / XXE on our OWN code). Loaded
   // into spotbugsMain via `pluginJarFiles` below; complements CodeQL (CI-only).
   spotbugsPlugins("com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0")
-  
+
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
   testImplementation("org.springframework.security:spring-security-test")
@@ -183,6 +182,7 @@ tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   }
   dependsOn("classes")
 }
+
 tasks.named("check").configure { dependsOn("spotbugsMain") }
 
 tasks.cyclonedxBom {
@@ -242,27 +242,32 @@ tasks.register("minifyStaticCss") {
     val blockComment = Regex("""/\*[\s\S]*?\*/""")
     var totalBefore = 0L
     var totalAfter = 0L
-    cssDir.walkTopDown().filter { it.isFile && it.extension == "css" }.forEach { file ->
-      val original = file.readText(Charsets.UTF_8)
-      val withoutComments = blockComment.replace(original, "")
-      val minified =
+    cssDir
+      .walkTopDown()
+      .filter { it.isFile && it.extension == "css" }
+      .forEach { file ->
+        val original = file.readText(Charsets.UTF_8)
+        val withoutComments = blockComment.replace(original, "")
+        val minified =
           withoutComments
-              .lineSequence()
-              .map { it.trim() }
-              .filter { it.isNotEmpty() }
-              .joinToString(separator = "\n")
-              .plus("\n")
-      file.writeText(minified, Charsets.UTF_8)
-      totalBefore += original.toByteArray(Charsets.UTF_8).size.toLong()
-      totalAfter += minified.toByteArray(Charsets.UTF_8).size.toLong()
-    }
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .joinToString(separator = "\n")
+            .plus("\n")
+        file.writeText(minified, Charsets.UTF_8)
+        totalBefore += original.toByteArray(Charsets.UTF_8).size.toLong()
+        totalAfter += minified.toByteArray(Charsets.UTF_8).size.toLong()
+      }
     if (totalBefore > 0) {
       val pct = 100.0 * (totalBefore - totalAfter) / totalBefore
       logger.lifecycle(
-          "minifyStaticCss: ${totalBefore} -> ${totalAfter} bytes (-${"%.1f".format(pct)}%)")
+        "minifyStaticCss: ${totalBefore} -> ${totalAfter} bytes (-${"%.1f".format(pct)}%)"
+      )
     }
   }
 }
+
 tasks.named("classes").configure { dependsOn("minifyStaticCss") }
 
 // ---------------------------------------------------------------------------
@@ -277,6 +282,7 @@ tasks.named("classes").configure { dependsOn("minifyStaticCss") }
 sourceSets { create("e2e") }
 
 configurations["e2eImplementation"].extendsFrom(configurations["testImplementation"])
+
 configurations["e2eRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
 
 dependencies {
@@ -300,20 +306,24 @@ tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
 // Installs the Playwright-managed browsers into the per-user cache (~/.cache/ms-playwright).
 // Cached in CI; a no-op once present. On a CI Linux runner it additionally installs the browsers'
 // OS libraries via `--with-deps` — WebKit needs libs ubuntu-latest lacks and otherwise fails to
-// launch with a DriverException. That path uses apt + passwordless sudo, so it is gated to CI Linux;
+// launch with a DriverException. That path uses apt + passwordless sudo, so it is gated to CI
+// Linux;
 // local runs on any OS just download the browser binaries (a Linux dev installs deps manually).
-val playwrightInstall by tasks.registering(JavaExec::class) {
-  group = "verification"
-  description = "Installs the Playwright browsers (Chromium, Firefox, WebKit) for e2eTest/smokeTest."
-  classpath = sourceSets["e2e"].runtimeClasspath
-  mainClass.set("com.microsoft.playwright.CLI")
-  val withDeps =
+val playwrightInstall by
+  tasks.registering(JavaExec::class) {
+    group = "verification"
+    description =
+      "Installs the Playwright browsers (Chromium, Firefox, WebKit) for e2eTest/smokeTest."
+    classpath = sourceSets["e2e"].runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+    val withDeps =
       System.getenv("CI") == "true" &&
-          System.getProperty("os.name").orEmpty().lowercase().contains("linux")
-  val browsers = listOf("chromium", "firefox", "webkit")
-  setArgs(
-      if (withDeps) listOf("install", "--with-deps") + browsers else listOf("install") + browsers)
-}
+        System.getProperty("os.name").orEmpty().lowercase().contains("linux")
+    val browsers = listOf("chromium", "firefox", "webkit")
+    setArgs(
+      if (withDeps) listOf("install", "--with-deps") + browsers else listOf("install") + browsers
+    )
+  }
 
 // Shared wiring for the two Playwright Test tasks below. Both run from the `e2e` source set with a
 // provisioned Chromium and forward the same `e2e.*` knobs; they differ only in the JUnit tag they
@@ -335,12 +345,13 @@ val playwrightSuiteConfig: Test.() -> Unit = {
     System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
   }
   listOf("e2e.baseUrl", "e2e.browser", "e2e.username", "e2e.password", "e2e.hostResolverRules")
-      .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
+    .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
 }
 
 // Full functional flows incl. destructive CRUD; assumes an isolated stack (ephemeral by default).
 tasks.register<Test>("e2eTest") {
-  description = "Runs the destructive Playwright e2e flows against an isolated stack (JUnit tag: e2e)."
+  description =
+    "Runs the destructive Playwright e2e flows against an isolated stack (JUnit tag: e2e)."
   playwrightSuiteConfig()
   useJUnitPlatform { includeTags("e2e") }
 }
@@ -374,43 +385,44 @@ node {
 }
 
 val lintCss =
-    tasks.register<NpxTask>("lintCss") {
-      group = "verification"
-      description = "Lints CSS sources with Stylelint (strict; fails the build on findings)."
-      dependsOn(tasks.named("npmInstall"))
-      command.set("stylelint")
-      args.set(listOf("src/main/resources/static/css/**/*.css"))
-      ignoreExitValue.set(false)
-      inputs.files(fileTree("src/main/resources/static/css") { include("**/*.css") })
-      inputs.file("package.json")
-      inputs.file(".stylelintrc.json")
-    }
+  tasks.register<NpxTask>("lintCss") {
+    group = "verification"
+    description = "Lints CSS sources with Stylelint (strict; fails the build on findings)."
+    dependsOn(tasks.named("npmInstall"))
+    command.set("stylelint")
+    args.set(listOf("src/main/resources/static/css/**/*.css"))
+    ignoreExitValue.set(false)
+    inputs.files(fileTree("src/main/resources/static/css") { include("**/*.css") })
+    inputs.file("package.json")
+    inputs.file(".stylelintrc.json")
+  }
 
 val lintHtml =
-    tasks.register<NpxTask>("lintHtml") {
-      group = "verification"
-      description = "Lints Thymeleaf HTML templates with HTMLHint (strict; fails the build on findings)."
-      dependsOn(tasks.named("npmInstall"))
-      command.set("htmlhint")
-      args.set(listOf("src/main/resources/templates/**/*.html"))
-      ignoreExitValue.set(false)
-      inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
-      inputs.file("package.json")
-      inputs.file(".htmlhintrc")
-    }
+  tasks.register<NpxTask>("lintHtml") {
+    group = "verification"
+    description =
+      "Lints Thymeleaf HTML templates with HTMLHint (strict; fails the build on findings)."
+    dependsOn(tasks.named("npmInstall"))
+    command.set("htmlhint")
+    args.set(listOf("src/main/resources/templates/**/*.html"))
+    ignoreExitValue.set(false)
+    inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
+    inputs.file("package.json")
+    inputs.file(".htmlhintrc")
+  }
 
 val lintJs =
-    tasks.register<NpxTask>("lintJs") {
-      group = "verification"
-      description = "Lints hand-written browser scripts with ESLint (strict; fails the build on findings)."
-      dependsOn(tasks.named("npmInstall"))
-      command.set("eslint")
-      args.set(listOf("src/main/resources/static/js/**/*.js"))
-      ignoreExitValue.set(false)
-      inputs.files(fileTree("src/main/resources/static/js") { include("**/*.js") })
-      inputs.file("package.json")
-      inputs.file("eslint.config.mjs")
-    }
+  tasks.register<NpxTask>("lintJs") {
+    group = "verification"
+    description =
+      "Lints hand-written browser scripts with ESLint (strict; fails the build on findings)."
+    dependsOn(tasks.named("npmInstall"))
+    command.set("eslint")
+    args.set(listOf("src/main/resources/static/js/**/*.js"))
+    ignoreExitValue.set(false)
+    inputs.files(fileTree("src/main/resources/static/js") { include("**/*.js") })
+    inputs.file("package.json")
+    inputs.file("eslint.config.mjs")
+  }
 
 tasks.named("check").configure { dependsOn(lintCss, lintHtml, lintJs) }
-

@@ -15,7 +15,7 @@
 > the two disagree, the prototype wins and this doc is updated. Imported 2026-06-05.
 > When Phase 3 (#436) is built in `basetool-sc-extractor`, carry this doc (and the
 > prototype from the bundle) into that repo too.
-
+>
 > **Zusammenfassung (DE):** Verbindliches UI/UX-Design für den Umbau von
 > `basetool-bp-extractor` → **`basetool-sc-extractor`**. Ein zentraler Launcher
 > führt per **Top-Tabs** in zwei Workflows: **Blueprints** (bestehend, Game.log →
@@ -42,14 +42,14 @@ sub-issue are in §7.
 
 ## 1. Locked decisions (owner, 2026-06-05)
 
-| Aspect | Decision | Rationale |
-| :-- | :-- | :-- |
-| Navigation model | **Top-Tabs + step stepper** | Workflows are peers and always one click away; the per-workflow stepper keeps the multi-step Refinery flow legible. |
-| Density | **Comfortable** | 44px touch targets, generous table rows — readability over cramming. |
-| Background texture | **Honeycomb on** (`honeycomb-bg.svg`, ~0.32 opacity) | On-brand ambient HUD texture without hurting contrast. |
-| Confidence display (review) | **Percent + status dot** | Compact, exact, colour-coded by threshold. |
-| Window chrome | **Custom undecorated KRT title bar** | Keep the existing `WindowChrome.kt` look (logo + title + min/max/close, orange hairline, resize grip). |
-| UI language | **German default, full EN parity** | Matches the live app's i18n; DE/EN toggle in the title bar. |
+| Aspect                      | Decision                                             | Rationale                                                                                                           |
+|:----------------------------|:-----------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------|
+| Navigation model            | **Top-Tabs + step stepper**                          | Workflows are peers and always one click away; the per-workflow stepper keeps the multi-step Refinery flow legible. |
+| Density                     | **Comfortable**                                      | 44px touch targets, generous table rows — readability over cramming.                                                |
+| Background texture          | **Honeycomb on** (`honeycomb-bg.svg`, ~0.32 opacity) | On-brand ambient HUD texture without hurting contrast.                                                              |
+| Confidence display (review) | **Percent + status dot**                             | Compact, exact, colour-coded by threshold.                                                                          |
+| Window chrome               | **Custom undecorated KRT title bar**                 | Keep the existing `WindowChrome.kt` look (logo + title + min/max/close, orange hairline, resize grip).              |
+| UI language                 | **German default, full EN parity**                   | Matches the live app's i18n; DE/EN toggle in the title bar.                                                         |
 
 These freeze the prototype's defaults. The other nav models (rail, launcher) and
 the bar/flag confidence styles were explored and **rejected for v1** but remain in

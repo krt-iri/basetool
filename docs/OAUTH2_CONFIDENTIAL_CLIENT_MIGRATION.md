@@ -197,6 +197,7 @@ Damit weist Keycloak jeden Authorization-Request ohne PKCE ab. Spring sendet PKC
 Falls auf dem Prod-Host eine `realm-export.json` als Source-of-Truth liegt, die nach Container-Recreate re-imported wird (`docker-compose.yml` mountet sie nach `/opt/keycloak/data/import/realm-export.json`), muss die Client-Definition dort auch aktualisiert werden. Sonst wird beim nächsten Realm-Import der manuelle Umstellung wieder überschrieben.
 
 Konkret in der `clients`-Liste den `basetool-frontend`-Eintrag suchen und:
+
 ```diff
    "publicClient": true,
 +  "publicClient": false,
@@ -204,7 +205,9 @@ Konkret in der `clients`-Liste den `basetool-frontend`-Eintrag suchen und:
 +  "secret": "<das gleiche secret wie in .env>",
    "standardFlowEnabled": true,
 ```
+
 plus in `attributes`:
+
 ```diff
 +  "pkce.code.challenge.method": "S256",
 ```
@@ -224,6 +227,7 @@ Wenn `realm-export.json` als Source-of-Truth: erst die Datei updaten (B.5), dann
 **C.3 — Prod-`.env` updaten**
 
 Auf dem Prod-Host:
+
 ```bash
 # Backup
 sudo cp /opt/iri/.env /opt/iri/.env.backup-$(date +%Y%m%d-%H%M%S)
@@ -403,3 +407,4 @@ dann den Operator-Runbook-Block.
 - [`README.md`](README.md) — Sektion "Running the Local Test Stack" / Env-Vars.
 - [`CHANGELOG.md`](CHANGELOG.md) — Audit-Findings 2026-05-20, `### Security`-Block.
 - [`frontend/src/main/resources/application.yml`](frontend/src/main/resources/application.yml) — Ausgangs-Konfiguration.
+

@@ -59,21 +59,21 @@ The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECI
 The README focuses on getting the project up and running. The following
 documents cover everything else:
 
-| Document | Purpose |
-| :--- | :--- |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes and every user-visible change. |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to report bugs, suggest features and submit pull requests, plus the coding style guide. |
-| [CLA.md](CLA.md) | Individual Contributor License Agreement every contributor signs before their first pull request; the public roster of signatures lives in [docs/cla-signatures.md](docs/cla-signatures.md). |
-| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards (Contributor Covenant 3.0). |
-| [.github/SECURITY.md](.github/SECURITY.md) | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM). |
-| [LICENSE.md](LICENSE.md) | GNU General Public License v3.0. |
-| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface. |
-| [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md) | "DAS KARTELL" design system / Corporate Design Manual — the source of truth for brand colors, typography, the department palette and UI components (bundles `KRT_Styleguide_V2.pdf`). |
-| [docs/deployment.md](docs/deployment.md) | Production deployment runbook — host bootstrap, normal releases, manual rollback, PAT rotation, troubleshooting. |
-| [backend/src/main/resources/db/migration/README.md](backend/src/main/resources/db/migration/README.md) | Flyway migration conventions — destructive-ops two-phase rule, data-migration patterns, performance / locking, pre-merge checklist. |
-| [docs/e2e-test/README.md](docs/e2e-test/README.md) | End-to-end test use cases — one document per functional flow (actor, preconditions, steps, expected result) linking the Playwright test classes, plus the [role/scope reference](docs/e2e-test/rollen-und-scope.md). |
-| [CLAUDE.md](CLAUDE.md) | Project-specific guidance for the Claude Code AI assistant — build / run / test commands, architectural invariants, conventions. |
-| [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) | The pull-request template that ships with every PR. |
+| Document                                                                                               | Purpose                                                                                                                                                                                                              |
+|:-------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [CHANGELOG.md](CHANGELOG.md)                                                                           | Release notes and every user-visible change.                                                                                                                                                                         |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                                                                     | How to report bugs, suggest features and submit pull requests, plus the coding style guide.                                                                                                                          |
+| [CLA.md](CLA.md)                                                                                       | Individual Contributor License Agreement every contributor signs before their first pull request; the public roster of signatures lives in [docs/cla-signatures.md](docs/cla-signatures.md).                         |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)                                                               | Community standards (Contributor Covenant 3.0).                                                                                                                                                                      |
+| [.github/SECURITY.md](.github/SECURITY.md)                                                             | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM).                                       |
+| [LICENSE.md](LICENSE.md)                                                                               | GNU General Public License v3.0.                                                                                                                                                                                     |
+| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md)                                                   | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface.          |
+| [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md)             | "DAS KARTELL" design system / Corporate Design Manual — the source of truth for brand colors, typography, the department palette and UI components (bundles `KRT_Styleguide_V2.pdf`).                                |
+| [docs/deployment.md](docs/deployment.md)                                                               | Production deployment runbook — host bootstrap, normal releases, manual rollback, PAT rotation, troubleshooting.                                                                                                     |
+| [backend/src/main/resources/db/migration/README.md](backend/src/main/resources/db/migration/README.md) | Flyway migration conventions — destructive-ops two-phase rule, data-migration patterns, performance / locking, pre-merge checklist.                                                                                  |
+| [docs/e2e-test/README.md](docs/e2e-test/README.md)                                                     | End-to-end test use cases — one document per functional flow (actor, preconditions, steps, expected result) linking the Playwright test classes, plus the [role/scope reference](docs/e2e-test/rollen-und-scope.md). |
+| [CLAUDE.md](CLAUDE.md)                                                                                 | Project-specific guidance for the Claude Code AI assistant — build / run / test commands, architectural invariants, conventions.                                                                                     |
+| [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)                                   | The pull-request template that ships with every PR.                                                                                                                                                                  |
 
 ---
 
@@ -166,16 +166,16 @@ Same images, same orchestration as production, but on your own machine:
 
 1. **Authenticate to GHCR** (one-time): create a fine-grained PAT with
    `Packages: Read` on `krt-iri/basetool`, then
+
    ```bash
    echo "$GHCR_TOKEN" | docker login ghcr.io --username your-gh-handle --password-stdin
    ```
-
 2. **Provide a `keystore.p12`** at the path your `.env`'s
    `IRI_KEYSTORE_HOST_PATH` points to (default: repo root `./keystore.p12`).
    See [§4.4 Running the Local Test Stack](#44-running-the-local-test-stack)
    for the `keytool` recipe.
-
 3. **Start**:
+
    ```bash
    docker compose --profile prod up -d         # pulls :stable
    # or pin a specific version:
@@ -207,7 +207,9 @@ What changed at the data layer:
   `refinery_order` — gain an `owning_squadron_id` column.
 * `job_order` started cross-squadron with `creating_squadron_id` +
   `requesting_squadron_id`. **This was later reworked** (parent issue
-  #340): `creating` was dropped in favour of a `responsible_org_unit_id`
+
+  # 340): `creating` was dropped in favour of a `responsible_org_unit_id`
+
   (the *processing* unit, which governs visibility), `requesting`
   became `requesting_org_unit_id`, the order became conditionally scoped
   (SK-responsible = public, squadron-responsible = private), and
@@ -298,24 +300,30 @@ Recommended for active development — the apps run on the host JVM with
 fast restarts; only the dependencies live in containers.
 
 1. **Start dependencies** (Postgres × 2, Keycloak, Redis):
+
    ```bash
    docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-dev
    ```
+
    This exposes ports `15432` (backend DB), `15433` (Keycloak DB), `18080`
    (Keycloak) and `6379` (Redis) on the host.
 
 2. **Run the backend** (uses the `dev` profile by default, HTTPS):
+
    ```bash
    ./gradlew :backend:bootRun
    ```
+
    Backend at `https://localhost:11261`. The OpenAPI document is served at
    `https://localhost:11261/v3/api-docs` in the `dev`/`test` profiles (disabled
    in `prod`); there is no Swagger UI.
 
 3. **Run the frontend** (uses the `dev` profile by default, HTTP):
+
    ```bash
    ./gradlew :frontend:bootRun
    ```
+
    Frontend at `http://localhost:18081`.
 
 *If you need to override `KEYCLOAK_ISSUER_URI`, set it as an environment
@@ -370,6 +378,7 @@ worktree; the commands are identical).
 
 1. **Create `.env.test`** with throwaway credentials. The strings below are
    placeholders — pick anything that is *not* a value you use anywhere else.
+
    ```env
    # Backend DB (Postgres)
    POSTGRES_DB=krt_basetool_test
@@ -399,12 +408,12 @@ worktree; the commands are identical).
    # which lines up with step 2 below.
    IRI_KEYSTORE_HOST_PATH=./keystore.p12
    ```
-
 2. **Generate a test keystore** with the password from step 1. Place it at
    the repo root so the default `IRI_KEYSTORE_HOST_PATH=./keystore.p12`
    from step 1 resolves. Do *not* copy a `keystore.p12` from any other
    checkout — the password would not match and `keytool` errors are hard
    to debug.
+
    ```bash
    keytool -genkeypair -alias basetool -storetype PKCS12 \
      -keystore ./keystore.p12 \
@@ -414,7 +423,6 @@ worktree; the commands are identical).
      -dname "CN=localhost, OU=Test, O=KRT Basetool Test, L=Test, ST=Test, C=DE" \
      -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend"
    ```
-
 3. **Provide a test `realm-export.json`** at the repo root containing a
    Keycloak realm named `iri` with a `basetool-frontend` public client, a
    `backend-service` confidential client whose `secret` matches
@@ -422,6 +430,7 @@ worktree; the commands are identical).
    user. The minimal recipe: copy the production export, replace the
    `backend-service` secret, clear the SMTP block, drop the password
    policy, and replace the `users` array with a single test admin:
+
    ```python
    # build-test-realm.py — run once, never commit the output
    import json
@@ -445,16 +454,15 @@ worktree; the commands are identical).
    }]
    json.dump(r, open('realm-export.json', 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
    ```
-
 4. **Use the `docker-compose.test.yml` override.** This file lives in the
    repo root and overrides three things in the base `docker-compose.yml`:
    * the hardcoded production `KEYCLOAK_ISSUER_URI` in the backend / frontend templates,
    * `KC_HOSTNAME=host.docker.internal` on Keycloak so the OIDC issuer URL resolves identically from the host browser (Docker Desktop magic) and from inside containers (`extra_hosts: host-gateway`),
    * the matching `KEYCLOAK_ADMIN_URL`, `KEYCLOAK_REALM` and `KEYCLOAK_ADMIN_CLIENT_ID` on the backend.
-
 5. **One-time cleanup** if a previous Postgres init left stale credentials
    in the bind-mount data dirs (you will see
    `FATAL: password authentication failed` in the logs):
+
    ```bash
    docker compose --env-file .env.test \
      -f docker-compose.yml -f docker-compose.test.yml --profile dev down
@@ -463,26 +471,27 @@ worktree; the commands are identical).
    MSYS_NO_PATHCONV=1 docker run --rm -v /var/iri/db-keycloak:/data alpine \
      sh -c "rm -rf /data/* /data/.[!.]*"
    ```
+
    The `MSYS_NO_PATHCONV=1` prefix is only needed on Git Bash for Windows;
    it prevents the shell from translating the `/var/iri/...` Linux path
    into a Windows path inside the Docker CLI.
 
 6. **Start the stack**:
+
    ```bash
    docker compose --env-file .env.test \
      -f docker-compose.yml -f docker-compose.test.yml --profile dev up -d
    ```
-
 7. **Access** (same ports as the regular dev stack):
    * **Frontend**: `http://localhost:18081`
    * **Backend API**: `https://localhost:11261` (self-signed cert from the test keystore)
    * **OpenAPI document** (dev/test only): `https://localhost:11261/v3/api-docs`
    * **Keycloak**: `http://localhost:18080` — log in with the bootstrap admin from `.env.test`
    * **Realm `iri` test user**: username `test-admin`, password `test-admin-pw`
-
 8. **Tear down** after the verification — leaving a test stack running
    consumes 2+ GB of RAM and the named anonymous volumes will collide
    with the next spin-up:
+
    ```bash
    docker compose --env-file .env.test \
      -f docker-compose.yml -f docker-compose.test.yml --profile dev down --volumes
@@ -610,19 +619,19 @@ The backend never serves HTML.
 Both modules read configuration from environment variables. The most
 commonly tuned values:
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `KEYCLOAK_ISSUER_URI` | The URL of the Keycloak realm. | `https://keycloak.profit-base.online/realms/iri` |
-| `KEYCLOAK_CLIENT_SECRET` | (Frontend only) The secret for the Keycloak client. | `YOUR_CLIENT_SECRET` |
-| `BACKEND_URL` | (Frontend only) The URL of the backend API. | `http://localhost:11261` |
-| `APP_LOGGING_CORRELATION_ID_HEADER` | HTTP header used for inbound / outbound request correlation (MDC-backed). | `X-Correlation-Id` |
-| `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS` | Threshold (ms) above which a request is logged at `WARN` instead of `INFO`. | `2000` |
-| `APP_LOGGING_STRUCTURED_ENABLED` | Enables the JSON (Logstash) log appender. Automatically `true` in the `prod` profile. | `false` (dev / test), `true` (prod) |
-| `APP_LOGGING_SLOW_BACKEND_CALL_THRESHOLD_MS` | (Frontend only) Threshold (ms) above which an outbound backend call is logged at `WARN`. | `1500` |
-| `IRI_BASETOOL_VERSION` | Image tag pulled by the production compose stack. | `stable` |
-| `IRI_IMAGE_NAMESPACE` | GHCR namespace for the image lookup. | `krt-iri` |
-| `IRI_KEYSTORE_HOST_PATH` | Absolute host path of the production `keystore.p12`. Bind-mounted read-only into backend + frontend at `/run/secrets/keystore.p12`. | `/var/iri/secrets/keystore.p12` |
-| `REDIS_PASSWORD` | Password for the Redis session store. | *(required, no default)* |
+| Variable                                     | Description                                                                                                                         | Default                                          |
+|:---------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------|
+| `KEYCLOAK_ISSUER_URI`                        | The URL of the Keycloak realm.                                                                                                      | `https://keycloak.profit-base.online/realms/iri` |
+| `KEYCLOAK_CLIENT_SECRET`                     | (Frontend only) The secret for the Keycloak client.                                                                                 | `YOUR_CLIENT_SECRET`                             |
+| `BACKEND_URL`                                | (Frontend only) The URL of the backend API.                                                                                         | `http://localhost:11261`                         |
+| `APP_LOGGING_CORRELATION_ID_HEADER`          | HTTP header used for inbound / outbound request correlation (MDC-backed).                                                           | `X-Correlation-Id`                               |
+| `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS`      | Threshold (ms) above which a request is logged at `WARN` instead of `INFO`.                                                         | `2000`                                           |
+| `APP_LOGGING_STRUCTURED_ENABLED`             | Enables the JSON (Logstash) log appender. Automatically `true` in the `prod` profile.                                               | `false` (dev / test), `true` (prod)              |
+| `APP_LOGGING_SLOW_BACKEND_CALL_THRESHOLD_MS` | (Frontend only) Threshold (ms) above which an outbound backend call is logged at `WARN`.                                            | `1500`                                           |
+| `IRI_BASETOOL_VERSION`                       | Image tag pulled by the production compose stack.                                                                                   | `stable`                                         |
+| `IRI_IMAGE_NAMESPACE`                        | GHCR namespace for the image lookup.                                                                                                | `krt-iri`                                        |
+| `IRI_KEYSTORE_HOST_PATH`                     | Absolute host path of the production `keystore.p12`. Bind-mounted read-only into backend + frontend at `/run/secrets/keystore.p12`. | `/var/iri/secrets/keystore.p12`                  |
+| `REDIS_PASSWORD`                             | Password for the Redis session store.                                                                                               | *(required, no default)*                         |
 
 Relevant `application-*.yml` settings live in `@ConfigurationProperties`
 classes with `@Validated` (Keycloak URIs, backend URLs, limits). Constraints
@@ -712,10 +721,10 @@ in the display layer only.
 The custom theme lives under `keycloak-theme/krt-theme/` and contains two
 FreeMarker theme families:
 
-| Folder | Used for | Parent | Locales |
-| :--- | :--- | :--- | :--- |
-| `login/` | The Keycloak login flow (`login.ftl`, OTP, password reset, …) | `keycloak` (Keycloak's classic theme) | `de` (default), `en` |
-| `account/` | The user-facing self-service Account Console | `keycloak.v3` (Keycloak's modern v3 account theme) | `de` (default), `en` |
+| Folder     | Used for                                                      | Parent                                             | Locales              |
+|:-----------|:--------------------------------------------------------------|:---------------------------------------------------|:---------------------|
+| `login/`   | The Keycloak login flow (`login.ftl`, OTP, password reset, …) | `keycloak` (Keycloak's classic theme)              | `de` (default), `en` |
+| `account/` | The user-facing self-service Account Console                  | `keycloak.v3` (Keycloak's modern v3 account theme) | `de` (default), `en` |
 
 Both flavours pull in the `Ethnocentric` and `Lato` font faces from
 `<flavour>/resources/fonts/` and a single CSS file
@@ -744,10 +753,13 @@ Keycloak boots.
 1. Edit the relevant FreeMarker template (`login/login.ftl`, …) or CSS
    file under `keycloak-theme/krt-theme/<login|account>/`.
 2. Restart only the Keycloak container so it re-reads the theme:
+
    ```bash
    docker compose --profile prod restart keycloak     # or `keycloak-dev` for the dev profile
    ```
+
    Keycloak caches theme resources by default; the restart bumps the cache.
+
 3. Hard-reload the login / account page (browser cache clear or
    `Ctrl+Shift+R`) — the CSS file is served with a long cache header, so
    without a hard reload you may keep seeing the previous version.

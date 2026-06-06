@@ -35,14 +35,14 @@ This document is written to be executed by an AI coding agent, one phase per ses
 
 ## 2. Hard constraints (non-negotiable)
 
-| # | Constraint | Consequence for the design |
-|---|---|---|
-| C1 | **Only free / open-source tools.** No paid API, no API key, no third-party SaaS. | Vision reading runs through a **local** VLM (Ollama). |
-| C2 | **The production server must not be overloaded.** It is a single Hetzner VM: **4 vCPU / 8 GB RAM / 160 GB disk, no GPU**. The basetool must stay usable and the disk must not fill. | The VM does **no** image handling and **no** inference. It only ingests a small JSON and matches against master data. No screenshot is ever uploaded to or stored on the server. |
-| C3 | **v1 = manual JSON upload through the frontend only.** There is currently **no** way for the desktop tool to authenticate to and push data into the backend directly. | The desktop tool writes a JSON **file**; the user uploads it via the existing frontend, exactly like the hangar ship-list import. **No desktop→backend channel in v1** (that is Phase 4, deferred). |
-| C4 | **Screenshots can be any resolution 1080p → 8K, including ultrawide 5K (21:9 / 32:9).** | A fixed-pixel crop is impossible. The desktop pipeline is resolution-agnostic (§9 Phase 3). |
-| C5 | **Newest/best free VLM via Ollama.** | Default model `qwen3-vl` (configurable), low-VRAM fallback identified in Phase 0. |
-| C6 | **Client-side resource safety.** Running the VLM while SC is active is unsafe (GPU/RAM contention → SC stutter/crash or very slow extraction). The user must be warned of minimum PC requirements and warned when below them. | "Close SC" guidance + SC-process detection + preflight hardware check + throttling (§9 Phase 3, §6 resource safety). |
+| #  |                                                                                                          Constraint                                                                                                           |                                                                                     Consequence for the design                                                                                      |
+|----|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| C1 | **Only free / open-source tools.** No paid API, no API key, no third-party SaaS.                                                                                                                                              | Vision reading runs through a **local** VLM (Ollama).                                                                                                                                               |
+| C2 | **The production server must not be overloaded.** It is a single Hetzner VM: **4 vCPU / 8 GB RAM / 160 GB disk, no GPU**. The basetool must stay usable and the disk must not fill.                                           | The VM does **no** image handling and **no** inference. It only ingests a small JSON and matches against master data. No screenshot is ever uploaded to or stored on the server.                    |
+| C3 | **v1 = manual JSON upload through the frontend only.** There is currently **no** way for the desktop tool to authenticate to and push data into the backend directly.                                                         | The desktop tool writes a JSON **file**; the user uploads it via the existing frontend, exactly like the hangar ship-list import. **No desktop→backend channel in v1** (that is Phase 4, deferred). |
+| C4 | **Screenshots can be any resolution 1080p → 8K, including ultrawide 5K (21:9 / 32:9).**                                                                                                                                       | A fixed-pixel crop is impossible. The desktop pipeline is resolution-agnostic (§9 Phase 3).                                                                                                         |
+| C5 | **Newest/best free VLM via Ollama.**                                                                                                                                                                                          | Default model `qwen3-vl` (configurable), low-VRAM fallback identified in Phase 0.                                                                                                                   |
+| C6 | **Client-side resource safety.** Running the VLM while SC is active is unsafe (GPU/RAM contention → SC stutter/crash or very slow extraction). The user must be warned of minimum PC requirements and warned when below them. | "Close SC" guidance + SC-process detection + preflight hardware check + throttling (§9 Phase 3, §6 resource safety).                                                                                |
 
 ---
 
@@ -59,37 +59,37 @@ This document is written to be executed by an AI coding agent, one phase per ses
 ## 4. Architecture overview
 
 ```
- ┌─ DESKTOP (user's PC, has a GPU) ──────────────────────────────┐
- │ basetool-sc-extractor  ──launcher──►  [Blueprint] / [Refinery] │
- │                                                                │
- │ Refinery workflow:                                             │
- │   1. user selects screenshot(s)  (1 selection = 1 order)       │
- │   2. preflight: hardware check + "is SC running?" warning      │
- │   3. local VLM via Ollama (qwen3-vl)                           │
- │      Locate → Normalize → Read   (per image)                   │
- │   4. stitch + dedupe rows across the scrolled screenshots      │
- │   5. write  RefineryExtract.json   to a user-chosen path       │
- └───────────────────────────────┬───────────────────────────────┘
-                                  │  user manually uploads the JSON file
-                                  │  (browser → frontend; ~KB)
- ┌─ BROWSER ──────────────────────▼───────────────────────────────┐
- │ basetool frontend  /refinery-orders/import  (multipart upload)  │
- └───────────────────────────────┬───────────────────────────────┘
-                                  │  WebClient relay (JSON body)
- ┌─ BASETOOL BACKEND (Hetzner VM — light work only) ──────────────▼┐
- │ POST /api/v1/refinery-orders/import-extract   (application/json) │
- │   • parse + validate RefineryExtract                            │
- │   • fuzzy-match Material / Location / RefiningMethod → master    │
- │   • derive outputMaterial via Material.refinedMaterial          │
- │   • build a best-effort RefineryOrderDto draft + issue list     │
- │   ► returns RefineryImportDraftDto (NOT persisted)              │
- └───────────────────────────────┬───────────────────────────────┘
-                                  │  draft
- ┌─ BROWSER ──────────────────────▼───────────────────────────────┐
- │ existing refinery create form, PRE-FILLED + unmatched flagged   │
- │ user reviews / fixes / confirms                                 │
- │   ► POST /api/v1/refinery-orders   (the existing create path)   │
- └─────────────────────────────────────────────────────────────────┘
+┌─ DESKTOP (user's PC, has a GPU) ──────────────────────────────┐
+│ basetool-sc-extractor  ──launcher──►  [Blueprint] / [Refinery] │
+│                                                                │
+│ Refinery workflow:                                             │
+│   1. user selects screenshot(s)  (1 selection = 1 order)       │
+│   2. preflight: hardware check + "is SC running?" warning      │
+│   3. local VLM via Ollama (qwen3-vl)                           │
+│      Locate → Normalize → Read   (per image)                   │
+│   4. stitch + dedupe rows across the scrolled screenshots      │
+│   5. write  RefineryExtract.json   to a user-chosen path       │
+└───────────────────────────────┬───────────────────────────────┘
+                                 │  user manually uploads the JSON file
+                                 │  (browser → frontend; ~KB)
+┌─ BROWSER ──────────────────────▼───────────────────────────────┐
+│ basetool frontend  /refinery-orders/import  (multipart upload)  │
+└───────────────────────────────┬───────────────────────────────┘
+                                 │  WebClient relay (JSON body)
+┌─ BASETOOL BACKEND (Hetzner VM — light work only) ──────────────▼┐
+│ POST /api/v1/refinery-orders/import-extract   (application/json) │
+│   • parse + validate RefineryExtract                            │
+│   • fuzzy-match Material / Location / RefiningMethod → master    │
+│   • derive outputMaterial via Material.refinedMaterial          │
+│   • build a best-effort RefineryOrderDto draft + issue list     │
+│   ► returns RefineryImportDraftDto (NOT persisted)              │
+└───────────────────────────────┬───────────────────────────────┘
+                                 │  draft
+┌─ BROWSER ──────────────────────▼───────────────────────────────┐
+│ existing refinery create form, PRE-FILLED + unmatched flagged   │
+│ user reviews / fixes / confirms                                 │
+│   ► POST /api/v1/refinery-orders   (the existing create path)   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 **Why this satisfies the constraints:** all vision inference is on the player's GPU (C1, C2); the server only parses a tiny JSON and does DB lookups (C2 — negligible CPU/disk, no image storage); the hand-off is a file the user uploads manually (C3).
@@ -149,17 +149,18 @@ This is the **single** integration point. Phase 1 (backend) and Phase 3 (desktop
 
 The REFINEMENT CENTER **SETUP** tab (where an order is placed). Columns, left→right:
 
-| Column | Meaning | Contract field |
-|---|---|---|
+|         Column         |                                           Meaning                                           |      Contract field       |
+|------------------------|---------------------------------------------------------------------------------------------|---------------------------|
 | **MATERIALS SELECTED** | the raw ore, e.g. `LINDINIUM (ORE)`; an `INERT MATERIALS` row aggregates non-refinable slag | `goods[].rawMaterialName` |
-| **QUALITY** | composition/quality figure | `goods[].quality` |
-| **QTY** | raw input quantity | `goods[].inputQuantity` |
-| **YIELD** | projected refined output | `goods[].outputQuantity` |
-| **REFINE** | per-row ON/OFF toggle (inert rows are OFF) | `goods[].refine` |
+| **QUALITY**            | composition/quality figure                                                                  | `goods[].quality`         |
+| **QTY**                | raw input quantity                                                                          | `goods[].inputQuantity`   |
+| **YIELD**              | projected refined output                                                                    | `goods[].outputQuantity`  |
+| **REFINE**             | per-row ON/OFF toggle (inert rows are OFF)                                                  | `goods[].refine`          |
 
 Header/footer fields: refinery **location** (e.g. `LEVSKI`), **method** (e.g. `FERRON EXCHANGE`), **TOTAL COST** (aUEC), **PROCESSING TIME** (e.g. `20h 58m`).
 
 **Reference rows** (English client, from the owner's example "Auftrag 1"; full screenshot set at <https://nc.greluc.me/s/bbzFYL4PT4jkBKK>):
+
 ```
 LINDINIUM (ORE)   QUALITY 618   QTY 957    YIELD 448   REFINE ON
 TUNGSTEN (ORE)    QUALITY 530   QTY 1431   YIELD 695   REFINE ON
@@ -174,25 +175,25 @@ One order frequently spans **several scrolled screenshots**; the desktop tool st
 
 ### 7.1 Order-level mapping
 
-| Contract | basetool field (`RefineryOrderDto`) | How |
-|---|---|---|
-| `rawLocationName` | `location` (`LocationDto`) | match a `Location` **that has a refinery**, by normalized name; unresolved → `UNRESOLVED_LOCATION` issue, `location` left null |
-| `rawMethodName` | `refiningMethod` (`RefiningMethodDto`) | `RefiningMethodRepository.findByName` (add a case-insensitive variant); unresolved → `UNRESOLVED_METHOD` issue |
-| `expenses` | `expenses` (`Double`, `@PositiveOrZero @DecimalMax 1e9`) | copy; null stays null |
-| `durationMinutes` | `durationMinutes` (`Long`, `@PositiveOrZero`) | copy; null stays null |
-| — | `status` (`String`) | default to the open/not-started constant in `RefineryOrderStatus` (e.g. `OPEN`) |
-| — | `owner`, `startedAt`, `otherExpenses`, `oreSales`, `mission`, `owningOrgUnitId` | **not** filled from the screenshot — left for the user/normal create flow (see §7.4) |
+|     Contract      |                       basetool field (`RefineryOrderDto`)                       |                                                              How                                                               |
+|-------------------|---------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `rawLocationName` | `location` (`LocationDto`)                                                      | match a `Location` **that has a refinery**, by normalized name; unresolved → `UNRESOLVED_LOCATION` issue, `location` left null |
+| `rawMethodName`   | `refiningMethod` (`RefiningMethodDto`)                                          | `RefiningMethodRepository.findByName` (add a case-insensitive variant); unresolved → `UNRESOLVED_METHOD` issue                 |
+| `expenses`        | `expenses` (`Double`, `@PositiveOrZero @DecimalMax 1e9`)                        | copy; null stays null                                                                                                          |
+| `durationMinutes` | `durationMinutes` (`Long`, `@PositiveOrZero`)                                   | copy; null stays null                                                                                                          |
+| —                 | `status` (`String`)                                                             | default to the open/not-started constant in `RefineryOrderStatus` (e.g. `OPEN`)                                                |
+| —                 | `owner`, `startedAt`, `otherExpenses`, `oreSales`, `mission`, `owningOrgUnitId` | **not** filled from the screenshot — left for the user/normal create flow (see §7.4)                                           |
 
 ### 7.2 Per-good mapping (`RefineryGoodDto`)
 
-| Contract | DTO field | How |
-|---|---|---|
-| `rawMaterialName` | `inputMaterial` (`MaterialDto`, `@NotNull`) | normalize → match a `Material` (§7.3); unresolved → `UNMATCHED_MATERIAL` issue, row kept with null material so the user can pick it |
-| (derived) | `outputMaterial` (`MaterialDto`, nullable) | `matchedInputMaterial.getRefinedMaterial()` if present; else null + `NO_REFINED_MATERIAL` info |
-| `inputQuantity` | `inputQuantity` (`Integer`, `@NotNull @Min(1)`) | copy |
-| `outputQuantity` | `outputQuantity` (`Integer`, `@NotNull @Min(1)`) | copy |
-| `quality` | `quality` (`Integer`, entity range 0..1000) | copy; out-of-range → warning (§5) |
-| — | `yieldBonusPercent` | leave null — it is a read-only UEX enrichment the backend fills on read, never on import |
+|     Contract      |                    DTO field                     |                                                                 How                                                                 |
+|-------------------|--------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `rawMaterialName` | `inputMaterial` (`MaterialDto`, `@NotNull`)      | normalize → match a `Material` (§7.3); unresolved → `UNMATCHED_MATERIAL` issue, row kept with null material so the user can pick it |
+| (derived)         | `outputMaterial` (`MaterialDto`, nullable)       | `matchedInputMaterial.getRefinedMaterial()` if present; else null + `NO_REFINED_MATERIAL` info                                      |
+| `inputQuantity`   | `inputQuantity` (`Integer`, `@NotNull @Min(1)`)  | copy                                                                                                                                |
+| `outputQuantity`  | `outputQuantity` (`Integer`, `@NotNull @Min(1)`) | copy                                                                                                                                |
+| `quality`         | `quality` (`Integer`, entity range 0..1000)      | copy; out-of-range → warning (§5)                                                                                                   |
+| —                 | `yieldBonusPercent`                              | leave null — it is a read-only UEX enrichment the backend fills on read, never on import                                            |
 
 ### 7.3 Material matching algorithm (deterministic, ordered; stop at first hit)
 
@@ -281,7 +282,7 @@ For the desktop repo (`basetool-sc-extractor`), the analogous rules live in its 
 - **Draft DTOs** (§7.5): `RefineryImportDraftDto`, `ImportIssueDto`, enums `ImportIssueCode`, `ImportIssueSeverity`.
 - **Service** `RefineryImportService` (constructor-injected `MaterialRepository`, `RefiningMethodRepository`, `LocationRepository`/location lookup, `AuthHelperService`/`OwnerScopeService` as needed). Methods: `RefineryImportDraftDto buildDraft(RefineryExtractDto extract, UUID callerId)`; `Optional<Material> matchMaterial(String rawName)` (§7.3); `Optional<RefiningMethod> matchMethod(String rawName)`; `Optional<Location> matchRefineryLocation(String rawName)`. Keep matching **pure and unit-testable** (no `SecurityContextHolder` here).
 - **Endpoint** on `RefineryOrderController` (or a new `RefineryImportController`):
-  `POST /api/v1/refinery-orders/import-extract`, `consumes = application/json`, `@PreAuthorize("isAuthenticated()")`, `@RequestBody @Valid RefineryExtractDto`, returns `RefineryImportDraftDto`. SpringDoc `@Operation`/`@ApiResponses` (200 draft, 400 invalid/unsupported panel, 401). **Does not** create anything — the existing `POST /api/v1/refinery-orders` still does that, untouched.
+`POST /api/v1/refinery-orders/import-extract`, `consumes = application/json`, `@PreAuthorize("isAuthenticated()")`, `@RequestBody @Valid RefineryExtractDto`, returns `RefineryImportDraftDto`. SpringDoc `@Operation`/`@ApiResponses` (200 draft, 400 invalid/unsupported panel, 401). **Does not** create anything — the existing `POST /api/v1/refinery-orders` still does that, untouched.
 - **Alias resource** (English) seeded from the Phase 0 golden set.
 - **i18n** keys `refineryImport.issue.*` (one per `ImportIssueCode`) in all three `messages*.properties`.
 
@@ -378,3 +379,4 @@ The SC `Game.log` cannot provide the materials breakdown (verified: the only ref
 - **RefineryExtract** — the frozen JSON contract (§5), the single desktop→frontend→backend hand-off.
 - **Draft** — `RefineryImportDraftDto`: a non-persisted, best-effort pre-fill + issue list returned by the backend import endpoint.
 - **Strict-staffel aggregate** — a basetool org-unit-scoped entity (Refinery Order is one); scope is enforced in the service layer via `OwnerScopeService`.
+

@@ -39,7 +39,6 @@ which device classes (Smartphone / Tablet / Desktop / Ultra-wide) and
 which browsers? If UI tests were not possible, say so EXPLICITLY —
 don't use "tests pass" as a stand-in.
 -->
-
 - 
 
 ## Checklist
