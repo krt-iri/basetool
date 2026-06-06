@@ -88,10 +88,12 @@ rather than refusing over-precise input.
 
 ## Out of scope
 
-Whole-unit counts that are **not** material quantities — item-order piece counts and item-handover
-entries (`Integer`, `≥ 1`), refinery good input/output quantities — and money amounts (mission
-finance, currency). Those keep their own `Integer` / currency validation. The DB-precision /
-migration mechanics live in [`data-persistence.md`](data-persistence.md).
+Whole-unit counts and currency that are **not** material quantities — item-order piece counts,
+item-handover entries, personal-inventory quantity (all `Integer`, `≥ 1`) and mission-finance money
+amounts (whole aUEC) — are specified in [`whole-number-amounts.md`](whole-number-amounts.md)
+(`REQ-MISSION-001`, `REQ-ORDERS-001` / `002`, `REQ-INV-004`). Refinery good input/output quantities
+keep their own validation. The DB-precision / migration mechanics live in
+[`data-persistence.md`](data-persistence.md).
 
 ## Open questions
 

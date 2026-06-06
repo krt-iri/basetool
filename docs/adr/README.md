@@ -36,7 +36,8 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 
 ## Index
 
-|                         ADR                         |                          Title                           |              Status               |
-|-----------------------------------------------------|----------------------------------------------------------|-----------------------------------|
-| [0001](0001-frontend-confidential-oauth2-client.md) | Frontend as a confidential OAuth2 client (PKCE + secret) | Accepted — implementation pending |
+|                         ADR                         |                                         Title                                         |              Status               |
+|-----------------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------|
+| [0001](0001-frontend-confidential-oauth2-client.md) | Frontend as a confidential OAuth2 client (PKCE + secret)                              | Accepted — implementation pending |
+| [0002](0002-whole-number-amounts.md)                | Whole-number amounts: value-based validation, reject-not-round, display-only rounding | Accepted                          |
 
