@@ -322,6 +322,84 @@ class AuthHelperServiceTest {
   }
 
   // ---------------------------------------------------------------------
+  // isMemberOrAbove() — the "mission outsider" predicate (its negation): false for anonymous and
+  // for an authenticated role-less GUEST; true for every registered-member / elevated role.
+  // ---------------------------------------------------------------------
+
+  @Nested
+  class IsMemberOrAboveTests {
+
+    @Test
+    void falseWhenNobodyIsLoggedIn_withoutConsultingRoleHierarchy() {
+      assertFalse(helper.isMemberOrAbove());
+      verify(roleHierarchy, never()).getReachableGrantedAuthorities(any());
+    }
+
+    @Test
+    void falseForAnonymous() {
+      AnonymousAuthenticationToken anon =
+          new AnonymousAuthenticationToken(
+              "key", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
+      SecurityContextHolder.getContext().setAuthentication(anon);
+      stubHierarchyReaches(List.of("ROLE_ANONYMOUS"));
+
+      assertFalse(helper.isMemberOrAbove());
+    }
+
+    @Test
+    void falseForRoleLessGuest() {
+      authContextWith("ROLE_GUEST");
+      stubHierarchyReaches(List.of("ROLE_GUEST"));
+
+      assertFalse(
+          helper.isMemberOrAbove(),
+          "an authenticated but role-less GUEST is a mission outsider, like an anonymous visitor");
+    }
+
+    @Test
+    void trueForSquadronMember() {
+      authContextWith("ROLE_SQUADRON_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_SQUADRON_MEMBER"));
+
+      assertTrue(helper.isMemberOrAbove());
+    }
+
+    @Test
+    void trueForLegacyMemberAlias() {
+      authContextWith("ROLE_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_MEMBER"));
+
+      assertTrue(helper.isMemberOrAbove());
+    }
+
+    @Test
+    void trueForOfficer() {
+      authContextWith("ROLE_OFFICER");
+      stubHierarchyReaches(List.of("ROLE_OFFICER", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
+
+      assertTrue(helper.isMemberOrAbove());
+    }
+
+    @Test
+    void trueForAdmin() {
+      authContextWith("ROLE_ADMIN");
+      stubHierarchyReaches(List.of("ROLE_ADMIN", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
+
+      assertTrue(helper.isMemberOrAbove());
+    }
+
+    @Test
+    void trueForContextualLogisticianWithoutSquadronMemberRole() {
+      // A user promoted via an org-unit is_logistician flag carries ROLE_LOGISTICIAN even without a
+      // SQUADRON_MEMBER realm role — they are still an insider, not an outsider.
+      authContextWith("ROLE_LOGISTICIAN");
+      stubHierarchyReaches(List.of("ROLE_LOGISTICIAN"));
+
+      assertTrue(helper.isMemberOrAbove());
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------
 

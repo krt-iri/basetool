@@ -665,7 +665,7 @@ class MissionControllerSlimEndpointsTest {
   }
 
   @Test
-  void addParticipantSlim_anonymousGuest_redactsOtherParticipantsPii() throws Exception {
+  void addParticipantSlim_anonymousGuest_returnsOnlyOwnEntryNotTheRoster() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID guestParticipantId = UUID.randomUUID();
@@ -685,14 +685,16 @@ class MissionControllerSlimEndpointsTest {
             .getResponse()
             .getContentAsString();
 
-    // Username + displayName-equivalent ("public callsign tuple") stay visible — guests need a
-    // way to identify the other participants on the public mission page.
+    // Outsider sign-up must NOT expose the participant roster (treat guest like anonymous): the
+    // slim response carries only the caller's own just-added guest entry, never the other
+    // participants — strictly stronger than the previous PII-only redaction (audit finding C-1).
     org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob.callsign"), "username must remain visible to guests");
-    // PII redaction: email must NOT appear in the response.
+        body.contains("Anon-Guest"), "the caller's own just-added guest entry is returned");
     org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob@example.invalid"),
-        "anonymous response must not leak participant email — audit finding C-1");
+        body.contains("bob.callsign"),
+        "an outsider must not see the other participants of the roster on sign-up");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"), "and certainly never another participant's email");
   }
 
   @Test
@@ -729,7 +731,7 @@ class MissionControllerSlimEndpointsTest {
   }
 
   @Test
-  void addParticipantPublic_anonymousGuest_redactsOtherParticipantsPii() throws Exception {
+  void addParticipantPublic_anonymousGuest_returnsStrictlyRedactedMission() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID guestParticipantId = UUID.randomUUID();
@@ -744,15 +746,19 @@ class MissionControllerSlimEndpointsTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"guestName\":\"Anon-Guest\"}"))
             .andExpect(status().isOk())
+            // The legacy public-add returns the full MissionDto; for an outsider it is strictly
+            // redacted (cleanupOutsiderMissionForGuest), so the participant roster is emptied
+            // entirely — no other participant, no PII (strictly stronger than the previous C-1
+            // PII redaction).
+            .andExpect(jsonPath("$.participants").isEmpty())
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob.callsign"), "username must remain visible to guests");
     org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob@example.invalid"),
-        "anonymous response must not leak participant email — audit finding C-1");
+        body.contains("bob.callsign"), "an outsider must not see the participant roster");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob@example.invalid"), "and never a participant's email");
   }
 
   @Test

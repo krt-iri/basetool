@@ -80,19 +80,45 @@ public class MissionDataLeakTest {
   }
 
   @Test
-  void testMissionDetail_Anonymous_ShouldNotLeakInternalUserData() throws Exception {
-    mockMvc
-        .perform(get("/api/v1/missions/" + publicMission.getId()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.participants[0].user.username").value("leaked_user"))
-        .andExpect(jsonPath("$.participants[0].user.email").value(nullValue()));
+  void testMissionDetail_Anonymous_ShouldNotLeakParticipantRosterOrPii() throws Exception {
+    // Outsider redaction now hides the participant roster entirely (and with it any nested user
+    // PII), so neither the participant's username nor email may appear anywhere in the response.
+    String body =
+        mockMvc
+            .perform(get("/api/v1/missions/" + publicMission.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.participants").isEmpty())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("leaked_user"), "outsider must not see the participant roster at all");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("secret@leaked.org"), "outsider must never receive a participant email");
   }
 
+  // A role-less GUEST is treated exactly like an anonymous visitor on the mission surface
+  // (isMemberOrAbove() == false → same strict outsider redaction). That equivalence is proven
+  // without the fragile full-stack synthetic-JWT path here: AuthHelperServiceTest pins GUEST →
+  // isMemberOrAbove() == false, MissionControllerLifecycleTest pins isMemberOrAbove() == false →
+  // strict redaction, and MissionFinanceEntryControllerSecurityTest pins the GUEST → 403 finance
+  // gate over the full security wiring.
+
   @Test
-  void testMissionDetail_Anonymous_ShouldNotLeakInternalMissionData() throws Exception {
+  void testMissionDetail_Anonymous_ShouldNotLeakMissionInternals() throws Exception {
+    // The strict outsider view hides description, owning organisation, units, frequencies and the
+    // payout/operation linkage, and clears internal inventory / refinery orders.
     mockMvc
         .perform(get("/api/v1/missions/" + publicMission.getId()))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("Public Mission"))
+        .andExpect(jsonPath("$.description").value(nullValue()))
+        .andExpect(jsonPath("$.owningSquadron").value(nullValue()))
+        .andExpect(jsonPath("$.owner").value(nullValue()))
+        .andExpect(jsonPath("$.operation").value(nullValue()))
+        .andExpect(jsonPath("$.assignedUnits").isEmpty())
+        .andExpect(jsonPath("$.frequencies").isEmpty())
         .andExpect(jsonPath("$.refineryOrders").isEmpty())
         .andExpect(jsonPath("$.inventoryEntries").isEmpty());
   }

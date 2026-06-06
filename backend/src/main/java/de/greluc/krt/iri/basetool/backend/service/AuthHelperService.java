@@ -21,6 +21,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -55,6 +56,24 @@ public class AuthHelperService {
 
   private final RoleHierarchy roleHierarchy;
   private final ApplicationContext applicationContext;
+
+  /**
+   * The authorities that mark a caller as a registered organisation member (or a role above it). A
+   * caller that reaches none of these — i.e. an anonymous request OR an authenticated but role-less
+   * {@code GUEST} account — is treated as a mission "outsider" by {@link #isMemberOrAbove()}. The
+   * elevated roles are listed explicitly (not only {@code ROLE_SQUADRON_MEMBER}) because the role
+   * hierarchy promotes {@code ADMIN}/{@code OFFICER} to {@code LOGISTICIAN}/{@code MISSION_MANAGER}
+   * but never down to {@code SQUADRON_MEMBER}; the legacy {@code ROLE_MEMBER} alias is kept for
+   * accounts whose Keycloak realm role predates the {@code SQUADRON_MEMBER} rename.
+   */
+  private static final Set<String> MEMBER_OR_ABOVE_ROLES =
+      Set.of(
+          "ROLE_ADMIN",
+          "ROLE_OFFICER",
+          "ROLE_MISSION_MANAGER",
+          "ROLE_LOGISTICIAN",
+          "ROLE_SQUADRON_MEMBER",
+          "ROLE_MEMBER");
 
   /**
    * Returns the current {@link Authentication}, or empty if no security context is bound, the
@@ -122,6 +141,30 @@ public class AuthHelperService {
    */
   public boolean isAdmin() {
     return hasReachableRole("ROLE_ADMIN");
+  }
+
+  /**
+   * {@code true} when the current caller is a registered organisation member or holds an elevated
+   * role ({@code SQUADRON_MEMBER}/{@code MEMBER}/{@code LOGISTICIAN}/{@code MISSION_MANAGER}/{@code
+   * OFFICER}/{@code ADMIN}), evaluated through the configured {@link RoleHierarchy}.
+   *
+   * <p>Its negation is the project's "mission outsider" predicate: it returns {@code false} for an
+   * anonymous request (only {@code ROLE_ANONYMOUS}) AND for an authenticated but role-less {@code
+   * GUEST} account (empty authorities / only {@code ROLE_GUEST}). Mission read and write paths use
+   * this to apply the same minimised, redacted view to anonymous and guest callers alike — a guest
+   * is deliberately treated like an anonymous visitor on the mission surface (no description,
+   * organisation, participant roster, units, payout, or finance ledger), while still being allowed
+   * to sign up and edit their own guest participant.
+   *
+   * @return {@code true} iff the caller reaches one of {@link #MEMBER_OR_ABOVE_ROLES}
+   */
+  public boolean isMemberOrAbove() {
+    Authentication auth = rawAuthentication();
+    if (auth == null) {
+      return false;
+    }
+    return roleHierarchy.getReachableGrantedAuthorities(auth.getAuthorities()).stream()
+        .anyMatch(a -> MEMBER_OR_ABOVE_ROLES.contains(a.getAuthority()));
   }
 
   /**

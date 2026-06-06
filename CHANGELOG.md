@@ -16,6 +16,10 @@
 
 - **Finanzeinträge einer Mission werden jetzt nur noch als ganze aUEC-Beträge erfasst:** Das Betragsfeld akzeptiert nur Ganzzahlen (Schrittweite 1), gebrochene Eingaben werden auch serverseitig abgewiesen, und der Bearbeiten-Dialog übernimmt den gerundeten Wert. Angezeigt wurden Finanzbeträge ohnehin schon kaufmännisch auf ganze aUEC gerundet; intern bleibt für abgeleitete Summen (etwa den Raffinerie-Gewinn) die volle Genauigkeit erhalten.
 
+- **Nicht angemeldete Besucher und eingeloggte Gäste ohne Rolle sehen bei Einsätzen jetzt nur noch das Nötigste:** Die öffentliche Einsatz-Detailsicht blendet Beschreibung, Organisation, Teilnehmerliste, Einheiten, Frequenzen und Auszahlung aus; Anmelden sowie das Pflegen des eigenen Gast-Teilnehmers (inkl. Auszahlungsart) bleiben möglich. Ein eingeloggter Gast wird bei Einsätzen jetzt genauso behandelt wie ein anonymer Besucher.
+
+- **Finanz-Einträge eines Einsatzes lassen sich nicht mehr anonym lesen oder anlegen:** Die Finanz-/Auszahlungssicht ist jetzt Mitgliedern (und höher) vorbehalten — anonyme und rollenlose Gast-Zugriffe werden abgewiesen. Aufträge anlegen bleibt für alle möglich.
+
 ### Fixed
 
 - **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.
