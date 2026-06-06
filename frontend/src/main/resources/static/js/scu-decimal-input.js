@@ -29,9 +29,9 @@
  * stub so normalize()/parse() stay callable even if this file is slow to load.
  */
 (function (root) {
-    "use strict";
+    'use strict';
 
-    const SELECTOR = "input[data-scu-decimal]";
+    const SELECTOR = 'input[data-scu-decimal]';
 
     /**
      * Canonicalises a user-entered amount to a dot-decimal string: trims, turns
@@ -45,15 +45,15 @@
      */
     function normalize(raw) {
         if (raw === null || raw === undefined) {
-            return "";
+            return '';
         }
-        let s = String(raw).trim().replace(/,/g, ".");
+        let s = String(raw).trim().replace(/,/g, '.');
         if (!/[0-9]/.test(s)) {
-            return "";
+            return '';
         }
-        const dot = s.indexOf(".");
+        const dot = s.indexOf('.');
         if (dot !== -1) {
-            s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, "");
+            s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '');
         }
         return s;
     }
@@ -81,11 +81,11 @@
      * @returns {boolean} true when only whole digits are allowed
      */
     function isIntegerMode(el) {
-        const step = el.getAttribute("step");
-        if (!step || step === "any") {
+        const step = el.getAttribute('step');
+        if (!step || step === 'any') {
             return false;
         }
-        const n = parseFloat(step.replace(",", "."));
+        const n = parseFloat(step.replace(',', '.'));
         return Number.isInteger(n);
     }
 
@@ -98,12 +98,12 @@
      */
     function sanitize(e) {
         const el = e.target;
-        if (!el || typeof el.matches !== "function" || !el.matches(SELECTOR)) {
+        if (!el || typeof el.matches !== 'function' || !el.matches(SELECTOR)) {
             return;
         }
         const disallowed = isIntegerMode(el) ? /[^0-9]/g : /[^0-9.,]/g;
         const before = el.value;
-        const cleaned = before.replace(disallowed, "");
+        const cleaned = before.replace(disallowed, '');
         if (cleaned === before) {
             return;
         }
@@ -129,7 +129,7 @@
      */
     function canonicaliseForm(e) {
         const form = e.target;
-        if (!form || typeof form.querySelectorAll !== "function") {
+        if (!form || typeof form.querySelectorAll !== 'function') {
             return;
         }
         form.querySelectorAll(SELECTOR).forEach((el) => {
@@ -143,8 +143,8 @@
     // Capture phase on both listeners so they run before any page-level handler
     // (the book-out sync reads the value, the handover validator reads it on
     // submit) - those consumers then see an already-sanitised / canonical value.
-    document.addEventListener("input", sanitize, true);
-    document.addEventListener("submit", canonicaliseForm, true);
+    document.addEventListener('input', sanitize, true);
+    document.addEventListener('submit', canonicaliseForm, true);
 
     root.krtScuInput = { normalize: normalize, parse: parse };
 })(window);
