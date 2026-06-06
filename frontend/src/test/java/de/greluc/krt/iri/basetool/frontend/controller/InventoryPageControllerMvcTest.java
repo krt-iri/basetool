@@ -31,11 +31,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.iri.basetool.frontend.controller.InventoryPageController.GroupedInventoryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -235,14 +237,31 @@ class InventoryPageControllerMvcTest {
             missionName,
             null,
             null,
-            1L);
+            1L,
+            Instant.parse("2026-01-01T00:00:00Z"));
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            null,
+            null,
+            missionId,
+            missionName,
+            false,
+            null,
+            10.0,
+            90.0,
+            90,
+            1,
+            List.of(item));
     GroupedInventoryDto group =
         new GroupedInventoryDto(
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
             10.0,
             90.0,
             90,
-            List.of(item));
+            List.of(stack));
 
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenAnswer(
@@ -294,14 +313,31 @@ class InventoryPageControllerMvcTest {
             missionName,
             null,
             null,
-            1L);
+            1L,
+            Instant.parse("2026-01-01T00:00:00Z"));
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            null,
+            null,
+            missionId,
+            missionName,
+            false,
+            null,
+            10.0,
+            90.0,
+            90,
+            1,
+            List.of(item));
     GroupedInventoryDto group =
         new GroupedInventoryDto(
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
             10.0,
             90.0,
             90,
-            List.of(item));
+            List.of(stack));
 
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenAnswer(
@@ -321,5 +357,167 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
         .andExpect(content().string(containsString(missionName)))
         .andExpect(content().string(containsString("selected=\"selected\"")));
+  }
+
+  /**
+   * Full-render guard for the personal Lager's Material → Stack → Entries layout. Stubs the {@code
+   * /grouped} backend call with one material → one stack (with a non-null {@code createdAt} on its
+   * single entry, plus a linked job order) → one entry, and asserts the page renders (HTTP 200)
+   * showing the stack's location name, its entry count and the formatted added-date. Renders the
+   * real {@code inventory-my} view so a Thymeleaf 500 — e.g. from the {@code
+   * T(java.time.ZoneOffset)} date formatting or a stale {@code #{...}} key — fails the build
+   * instead of production.
+   */
+  @Test
+  @WithMockUser(roles = "MEMBER", username = "test-user-123")
+  void viewMyInventory_WithStackAndEntries_ShouldRenderStackAndEntryData() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    String locationName = "Port Olisar Hangar 7";
+
+    InventoryItemDto entry =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            new LocationReferenceDto(locationId, locationName),
+            95,
+            12.5,
+            false,
+            jobOrderId,
+            4242,
+            null,
+            null,
+            null,
+            null,
+            3L,
+            Instant.parse("2026-02-03T10:15:30Z"));
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new LocationReferenceDto(locationId, locationName),
+            95,
+            jobOrderId,
+            4242,
+            null,
+            null,
+            false,
+            null,
+            12.5,
+            95.0,
+            95,
+            1,
+            List.of(entry));
+    GroupedInventoryDto group =
+        new GroupedInventoryDto(
+            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            12.5,
+            95.0,
+            95,
+            List.of(stack));
+
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/my-inventory/grouped")) {
+                return List.of(group);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(locationName)))
+        .andExpect(content().string(containsString("data-trigger=\"inv-my-toggle-stack\"")))
+        .andExpect(content().string(containsString("stack-entry-count")))
+        .andExpect(content().string(containsString("03.02.2026")))
+        .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")));
+  }
+
+  /**
+   * Full-render guard for the admin Lager's Material → Stack → Entries layout ({@code
+   * inventory-admin.html}). Mirrors {@link
+   * #viewMyInventory_WithStackAndEntries_ShouldRenderStackAndEntryData()} for the {@code
+   * /inventory/all} endpoint: one material → one stack (owner + non-null {@code createdAt} entry) →
+   * one entry. Asserts the real {@code inventory-admin} view renders (HTTP 200) with the stack's
+   * location name, owner, the stack-toggle trigger and the formatted added-date — catching any
+   * render-500 from the date formatting or the {@code sec:authorize}-gated action column.
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
+  void viewAllInventory_WithStackAndEntries_ShouldRenderStackAndEntryData() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    String locationName = "Everus Harbor Storage";
+    String ownerName = "Logi Owner";
+
+    InventoryItemDto entry =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "owner", "Owner", ownerName, null),
+            new MaterialReferenceDto(materialId, "Laranite", "SCU"),
+            new LocationReferenceDto(locationId, locationName),
+            80,
+            7.0,
+            false,
+            jobOrderId,
+            777,
+            null,
+            null,
+            null,
+            null,
+            2L,
+            Instant.parse("2026-03-04T08:00:00Z"));
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(userId, "owner", "Owner", ownerName, null),
+            new LocationReferenceDto(locationId, locationName),
+            80,
+            jobOrderId,
+            777,
+            null,
+            null,
+            false,
+            null,
+            7.0,
+            80.0,
+            80,
+            1,
+            List.of(entry));
+    GroupedInventoryDto group =
+        new GroupedInventoryDto(
+            new MaterialReferenceDto(materialId, "Laranite", "SCU"), 7.0, 80.0, 80, List.of(stack));
+
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/all/grouped")) {
+                return List.of(group);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/all"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(locationName)))
+        .andExpect(content().string(containsString(ownerName)))
+        .andExpect(content().string(containsString("data-trigger=\"inv-admin-toggle-stack\"")))
+        .andExpect(content().string(containsString("stack-entry-count")))
+        .andExpect(content().string(containsString("04.03.2026")))
+        .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")));
   }
 }

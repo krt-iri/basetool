@@ -20,10 +20,7 @@
 package de.greluc.krt.iri.basetool.backend.repository;
 
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
-import de.greluc.krt.iri.basetool.backend.model.JobOrder;
-import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.Material;
-import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import jakarta.persistence.LockModeType;
 import java.util.List;
@@ -250,81 +247,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Modifying
   @Query("UPDATE InventoryItem i SET i.mission = null WHERE i.mission.id IN :missionIds")
   void unlinkMissions(@Param("missionIds") List<UUID> missionIds);
-
-  /**
-   * Finds inventory items whose seven natural-key dimensions ({@code user}, {@code material},
-   * {@code location}, {@code quality}, {@code mission}, {@code jobOrder}, {@code personal}) all
-   * match - including the case where the mission, job-order or personal flag is {@code null} on
-   * both sides. Used by the create flow to merge new stock into an existing row instead of
-   * inserting a duplicate.
-   */
-  @Query(
-      "SELECT i FROM InventoryItem i WHERE "
-          + "i.user = :user AND "
-          + "i.material = :material AND "
-          + "i.location = :location AND "
-          + "i.quality = :quality AND "
-          + "((i.mission IS NULL AND :mission IS NULL) OR (i.mission = :mission)) AND "
-          + "((i.jobOrder IS NULL AND :jobOrder IS NULL) OR (i.jobOrder = :jobOrder)) AND "
-          + "((i.personal IS NULL AND :personal IS NULL) OR (i.personal = :personal))")
-  java.util.List<InventoryItem> findMatchingInventoryItem(
-      @Param("user") User user,
-      @Param("material") Material material,
-      @Param("location") Location location,
-      @Param("quality") Integer quality,
-      @Param("mission") Mission mission,
-      @Param("jobOrder") JobOrder jobOrder,
-      @Param("personal") Boolean personal);
-
-  /**
-   * Pessimistic-write variant of {@link #findMatchingInventoryItem} for the inventory merge
-   * race-condition guard. Same seven-dimension match, but acquires a row-level {@code SELECT … FOR
-   * UPDATE} on every matched row for the duration of the surrounding transaction. The eighth
-   * identity dimension — {@code owning_org_unit} — is deliberately NOT part of this query: callers
-   * apply it as an in-memory filter on the returned candidates (so the row lock covers the
-   * seven-dimension superset and concurrent transfers across org units still serialise), which is
-   * why stock of two different org-unit pools never merges into one row.
-   *
-   * <p>Why: the merge path on inventory create/update and on refinery-order store reads the
-   * existing row, adds the incoming amount to its {@code amount}, and writes the sum back. Two
-   * callers hitting the same natural-key match concurrently would both read {@code amount = X},
-   * both compute {@code X + delta_n}, and the last writer would clobber the other's increment with
-   * its own — silent stock loss. Sequentialising the read via {@code PESSIMISTIC_WRITE} makes the
-   * second caller block until the first transaction commits, then re-read the post-commit row and
-   * compute against the fresh amount. PostgreSQL row locks are released on commit/rollback.
-   *
-   * <p>Callers MUST be inside a {@code @Transactional} method — Spring Data requires an active
-   * transaction to apply the lock, and a no-transaction call would silently drop the lock and fall
-   * back to the unlocked read path.
-   *
-   * @param user the owning user (one of the seven natural-key dimensions)
-   * @param material the material reference
-   * @param location the location reference
-   * @param quality the quality grade
-   * @param mission the optional mission reference; {@code null} matches rows where mission is null
-   * @param jobOrder the optional job-order reference; {@code null} matches rows where jobOrder is
-   *     null
-   * @param personal the optional personal flag; {@code null} matches rows where personal is null
-   * @return the matching rows (typically zero or one) with row locks held
-   */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query(
-      "SELECT i FROM InventoryItem i WHERE "
-          + "i.user = :user AND "
-          + "i.material = :material AND "
-          + "i.location = :location AND "
-          + "i.quality = :quality AND "
-          + "((i.mission IS NULL AND :mission IS NULL) OR (i.mission = :mission)) AND "
-          + "((i.jobOrder IS NULL AND :jobOrder IS NULL) OR (i.jobOrder = :jobOrder)) AND "
-          + "((i.personal IS NULL AND :personal IS NULL) OR (i.personal = :personal))")
-  java.util.List<InventoryItem> findMatchingInventoryItemForUpdate(
-      @Param("user") User user,
-      @Param("material") Material material,
-      @Param("location") Location location,
-      @Param("quality") Integer quality,
-      @Param("mission") Mission mission,
-      @Param("jobOrder") JobOrder jobOrder,
-      @Param("personal") Boolean personal);
 
   /**
    * Bulk-reassigns every inventory item owned by {@code oldUser} to {@code newUser}; used by the

@@ -21,10 +21,14 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 import java.util.List;
 
-/** Data transfer record carrying Grouped Inventory payload. */
+/**
+ * Frontend mirror of the per-material Lager roll-up. Each material breaks down into {@link
+ * InventoryStackDto} stacks (one per stock identity), which in turn hold the individual append-only
+ * entries, so the UI renders Material → Stack → Entries.
+ */
 public record GroupedInventoryDto(
     MaterialReferenceDto material,
     Double totalAmount,
     Double averageQuality,
     Integer maxQuality,
-    List<InventoryItemDto> items) {}
+    List<InventoryStackDto> stacks) {}

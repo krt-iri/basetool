@@ -80,11 +80,14 @@ class InventoryItemServiceTest {
   @InjectMocks private InventoryItemService inventoryItemService;
 
   @Test
-  void updateInventoryItem_withExistingMatchingItem_shouldMergeAndReturnMergedItem() {
+  void updateInventoryItem_savesInPlaceWithoutMerging() {
+    // Append-only Lager: an update edits the targeted row in place and never folds it into another
+    // matching stack. Even when a sibling row with the same stock identity exists, the edited row's
+    // amount becomes exactly the DTO amount (no summing), nothing is deleted, and the returned DTO
+    // is the mapper's projection of the edited row.
     // Given
     UUID itemId = UUID.randomUUID();
     UUID currentUserId = UUID.randomUUID();
-    UUID existingItemId = UUID.randomUUID();
 
     User user = new User();
     user.setId(currentUserId);
@@ -120,44 +123,41 @@ class InventoryItemServiceTest {
             1L // version
             );
 
-    InventoryItem existingItem = new InventoryItem();
-    existingItem.setId(existingItemId);
-    existingItem.setUser(user);
-    existingItem.setMaterial(material);
-    existingItem.setLocation(location);
-    existingItem.setQuality(10);
-    existingItem.setAmount(10.0);
-    existingItem.setPersonal(false);
-    existingItem.setJobOrder(jobOrder);
-    existingItem.setVersion(1L);
+    InventoryItemDto mapped =
+        new InventoryItemDto(
+            itemId,
+            null,
+            null,
+            null,
+            10,
+            2.0,
+            false,
+            jobOrder.getId(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L,
+            null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
     when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrder.getId())).thenReturn(Optional.of(jobOrder));
-
-    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-            any(User.class),
-            any(Material.class),
-            any(Location.class),
-            anyInt(),
-            isNull(),
-            any(JobOrder.class),
-            anyBoolean()))
-        .thenReturn(List.of(item, existingItem));
-
-    when(inventoryItemRepository.save(existingItem)).thenReturn(existingItem);
-    when(inventoryItemMapper.toDto(existingItem)).thenReturn(null);
+    when(inventoryItemRepository.save(item)).thenReturn(item);
+    when(inventoryItemMapper.toDto(item)).thenReturn(mapped);
 
     // When
     InventoryItemDto result =
         inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false);
 
     // Then
-    assertNull(result);
-    assertEquals(12.0, existingItem.getAmount());
-    verify(inventoryItemRepository).delete(item);
-    verify(inventoryItemRepository).save(existingItem);
+    assertSame(mapped, result, "the returned DTO is the mapper projection of the edited row");
+    assertEquals(
+        2.0, item.getAmount(), "amount equals the DTO amount, never summed with a sibling");
+    verify(inventoryItemRepository).save(item);
+    verify(inventoryItemRepository, never()).delete(any());
   }
 
   @Test
@@ -443,6 +443,7 @@ class InventoryItemServiceTest {
             null,
             null,
             false,
+            null,
             null,
             null,
             null,
@@ -1237,9 +1238,10 @@ class InventoryItemServiceTest {
   }
 
   @Test
-  void createInventoryItem_doesNotMergeAcrossOwningOrgUnit() {
-    // The eighth merge-key dimension: a candidate that matches on the other seven dimensions but
-    // belongs to a DIFFERENT owning org unit must NOT be merged into — a new row is inserted.
+  void createInventoryItem_alwaysInsertsSeparateRow() {
+    // Append-only Lager: create always inserts its own brand-new row and is never folded into any
+    // existing stack — not even one matching every stock-identity dimension. The saved row carries
+    // exactly the DTO amount and the resolved owning org unit.
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1256,41 +1258,24 @@ class InventoryItemServiceTest {
     Location location = new Location();
     location.setId(locationId);
 
-    // The picker resolves to org B, but the only candidate stack belongs to org A.
     Squadron orgB = new Squadron();
     orgB.setId(pickedOrgUnitId);
-    Squadron orgA = new Squadron();
-    orgA.setId(UUID.randomUUID());
-    InventoryItem foreignOrgItem = new InventoryItem();
-    foreignOrgItem.setId(UUID.randomUUID());
-    foreignOrgItem.setOwningOrgUnit(orgA);
-    foreignOrgItem.setAmount(5.0);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
         .thenReturn(orgB);
-    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-            any(User.class),
-            any(Material.class),
-            any(Location.class),
-            anyInt(),
-            isNull(),
-            isNull(),
-            anyBoolean()))
-        .thenReturn(List.of(foreignOrgItem));
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     inventoryItemService.createInventoryItem(dto, userId, true);
 
-    // A brand-new row is saved (not the foreign-org candidate), stamped with org B; the foreign
-    // stack's amount is left untouched.
+    // A brand-new row is saved, stamped with the resolved org unit and carrying the DTO amount.
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
     assertSame(orgB, captor.getValue().getOwningOrgUnit());
-    assertEquals(5.0, foreignOrgItem.getAmount(), "foreign-org stack must be left untouched");
+    assertEquals(10.0, captor.getValue().getAmount(), "saved row carries the DTO amount verbatim");
   }
 }

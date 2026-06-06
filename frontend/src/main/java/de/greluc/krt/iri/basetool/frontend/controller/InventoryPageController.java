@@ -26,6 +26,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemUpdateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
@@ -162,20 +163,21 @@ public class InventoryPageController {
    *
    * <p>The backend's {@code /grouped} endpoint returns this shape directly so the page renders an
    * outer "material" row with summary stats (total amount, average + max quality) and an inner list
-   * of the underlying inventory items for expansion.
+   * of {@link InventoryStackDto} stacks, each of which expands to the individual append-only
+   * entries (Material → Stack → Entries).
    *
    * @param material the grouping material
-   * @param totalAmount sum across all items
-   * @param averageQuality weighted average quality across all items
+   * @param totalAmount sum across all stacks of this material
+   * @param averageQuality weighted average quality across all stacks
    * @param maxQuality the highest quality value seen in the group
-   * @param items the underlying individual inventory rows
+   * @param stacks the per-stock-identity stacks this material breaks down into
    */
   public record GroupedInventoryDto(
       de.greluc.krt.iri.basetool.frontend.model.dto.MaterialReferenceDto material,
       Double totalAmount,
       Double averageQuality,
       Integer maxQuality,
-      List<InventoryItemDto> items) {}
+      List<InventoryStackDto> stacks) {}
 
   /**
    * Renders the personal inventory list ({@code /inventory/my}). Filters are URL-driven so a user

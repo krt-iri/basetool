@@ -481,11 +481,11 @@ class InventoryItemServiceBookOutTest {
     }
 
     @Test
-    void transferIntoExistingIdenticalStack_mergesInsteadOfDuplicating() {
-      // REGRESSION: a transfer onto a (user, location) slot that already holds an identical stack
-      // must add to that stack, not insert a second row. Previously the TRANSFER branch always did
-      // `new InventoryItem()`, which produced the visible duplicates reported in the inventory
-      // view.
+    void transferAlwaysInsertsNewRowAtTarget() {
+      // Append-only Lager: a transfer always inserts its own brand-new row at the target carrying
+      // the moved amount — it is never folded into an existing identical stack there. The source is
+      // decremented by the moved amount; the group-on-read view collapses same-identity rows for
+      // display, so no visible duplicate results.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
@@ -493,7 +493,8 @@ class InventoryItemServiceBookOutTest {
       // Source: alice @ ARC-L1, Quantanium, quality 500, 10 units.
       InventoryItem source = newItem(10.0, 1L);
 
-      // An identical stack already exists at the target (same location/material/quality, 6 units).
+      // An identical stack already exists at the target (same location/material/quality, 6 units) —
+      // it must be left untouched.
       InventoryItem existingTarget = new InventoryItem();
       existingTarget.setId(UUID.randomUUID());
       existingTarget.setUser(targetUser);
@@ -506,9 +507,6 @@ class InventoryItemServiceBookOutTest {
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(java.util.List.of(existingTarget));
       when(inventoryItemRepository.save(any(InventoryItem.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
@@ -518,18 +516,24 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      // The moved 4 units land on the existing stack (6 -> 10); the source keeps 10 - 4 = 6.
-      assertEquals(10.0, existingTarget.getAmount(), "moved amount merges into the existing stack");
+      // The existing target stack is never merged into and keeps its 6 units. Two saves happen: the
+      // new target row (amount 4, owned by targetUser) and the decremented source (10 - 4 = 6).
+      assertEquals(6.0, existingTarget.getAmount(), "existing target stack must be left untouched");
       assertEquals(6.0, source.getAmount(), "source keeps the remainder");
-      verify(inventoryItemRepository).save(existingTarget);
-      verify(inventoryItemRepository).save(source);
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+      InventoryItem newRow = captor.getAllValues().get(0);
+      assertSame(targetUser, newRow.getUser(), "the inserted row is owned by the target user");
+      assertEquals(4.0, newRow.getAmount(), "the inserted row carries the moved amount");
+      assertSame(source, captor.getAllValues().get(1), "the second save is the decremented source");
       verify(inventoryItemRepository, never()).delete(any());
     }
 
     @Test
     void transferDoesNotMergeAcrossOwningOrgUnit() {
-      // The eighth merge-key dimension on the transfer path: an identical-looking target stack that
-      // belongs to a DIFFERENT owning org unit must NOT be merged into — a new row is inserted.
+      // Append-only Lager: the transfer never folds into a pre-existing stack, regardless of its
+      // owning org unit. An identical-looking target stack in a different org unit is left
+      // untouched and the moved stock is inserted as a brand-new row stamped with the resolved org.
       UUID targetUserId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
@@ -556,9 +560,6 @@ class InventoryItemServiceBookOutTest {
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
       when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any())).thenReturn(orgB);
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(java.util.List.of(foreignOrgTarget));
       when(inventoryItemRepository.save(any(InventoryItem.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
@@ -575,6 +576,7 @@ class InventoryItemServiceBookOutTest {
       InventoryItem newRow = captor.getAllValues().get(0);
       assertSame(orgB, newRow.getOwningOrgUnit());
       assertSame(targetUser, newRow.getUser());
+      assertEquals(4.0, newRow.getAmount(), "the inserted row carries the moved amount");
     }
   }
 
@@ -813,6 +815,7 @@ class InventoryItemServiceBookOutTest {
         null,
         null,
         null,
-        1L);
+        1L,
+        null);
   }
 }

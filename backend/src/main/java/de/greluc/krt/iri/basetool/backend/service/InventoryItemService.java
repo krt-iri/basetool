@@ -41,6 +41,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemUpdateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
@@ -291,54 +292,133 @@ public class InventoryItemService {
     return aggregateInventoryItems(items);
   }
 
+  /**
+   * Groups a flat list of inventory rows into the Material → Stack → Entries shape the {@code
+   * /grouped} views render. Outer grouping is by material; within each material, rows that share
+   * the full stock identity (owner, location, quality, job-order / mission association, personal
+   * flag, owning org-unit pool) collapse into one {@link InventoryStackDto} whose {@code entries}
+   * are the underlying append-only rows ordered oldest-first. Inventory is never merged in the
+   * database, so this read-time grouping is the only place stacks are formed.
+   */
   private List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
       aggregateInventoryItems(List<InventoryItemDto> items) {
     return items.stream()
         .collect(java.util.stream.Collectors.groupingBy(InventoryItemDto::material))
         .entrySet()
         .stream()
-        .map(
-            entry -> {
-              final de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto mat =
-                  entry.getKey();
-              List<InventoryItemDto> matItems = entry.getValue();
-
-              matItems.sort(
-                  java.util.Comparator.<InventoryItemDto, Integer>comparing(
-                          i -> i.quality() != null ? i.quality() : 0)
-                      .reversed()
-                      .thenComparing(
-                          i ->
-                              i.location() != null && i.location().name() != null
-                                  ? i.location().name()
-                                  : "")
-                      .thenComparing(
-                          java.util.Comparator.<InventoryItemDto, Double>comparing(
-                                  i -> i.amount() != null ? i.amount() : 0.0)
-                              .reversed()));
-
-              double totalAmount = 0.0;
-              double qualitySum = 0.0;
-              int maxQuality = 0;
-
-              for (InventoryItemDto item : matItems) {
-                double amt = item.amount() != null ? item.amount() : 0.0;
-                int qual = item.quality() != null ? item.quality() : 0;
-                totalAmount += amt;
-                qualitySum += amt * qual;
-                if (qual > maxQuality) {
-                  maxQuality = qual;
-                }
-              }
-
-              double avgQuality = totalAmount > 0 ? qualitySum / totalAmount : 0.0;
-              avgQuality = Math.round(avgQuality * 100.0) / 100.0;
-
-              return new de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto(
-                  mat, totalAmount, avgQuality, maxQuality, matItems);
-            })
+        .map(entry -> buildMaterialGroup(entry.getKey(), entry.getValue()))
         .sorted(java.util.Comparator.comparing(g -> g.material().name()))
         .toList();
+  }
+
+  /**
+   * Builds one material roll-up: its stacks (sorted quality desc, location asc, amount desc) plus
+   * the material-wide totals (summed amount, amount-weighted mean quality, max quality) computed
+   * directly over the entries so the figures stay independent of per-stack rounding.
+   *
+   * @param material the grouping material
+   * @param matItems every inventory row of that material in the current scope
+   * @return the populated material group with its nested stacks
+   */
+  private static de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto
+      buildMaterialGroup(
+          de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto material,
+          List<InventoryItemDto> matItems) {
+    List<InventoryStackDto> stacks =
+        matItems.stream()
+            .collect(java.util.stream.Collectors.groupingBy(InventoryItemService::stackKeyOf))
+            .values()
+            .stream()
+            .map(InventoryItemService::buildStack)
+            .sorted(STACK_ORDER)
+            .toList();
+
+    double totalAmount = 0.0;
+    double qualitySum = 0.0;
+    int maxQuality = 0;
+    for (InventoryItemDto item : matItems) {
+      double amt = item.amount() != null ? item.amount() : 0.0;
+      int qual = item.quality() != null ? item.quality() : 0;
+      totalAmount += amt;
+      qualitySum += amt * qual;
+      if (qual > maxQuality) {
+        maxQuality = qual;
+      }
+    }
+    double avgQuality = totalAmount > 0 ? qualitySum / totalAmount : 0.0;
+    avgQuality = Math.round(avgQuality * 100.0) / 100.0;
+    return new de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto(
+        material, totalAmount, avgQuality, maxQuality, stacks);
+  }
+
+  /**
+   * Collapses the rows of one stack (all sharing the stock identity) into an {@link
+   * InventoryStackDto}: entries ordered oldest-first by creation instant, with the summed amount,
+   * amount-weighted mean quality, max quality and entry count. The shared identity fields are taken
+   * from the oldest entry.
+   *
+   * @param stackEntries the rows that share a single stock identity; never empty
+   * @return the collapsed display stack carrying its underlying entries
+   */
+  private static InventoryStackDto buildStack(List<InventoryItemDto> stackEntries) {
+    List<InventoryItemDto> ordered =
+        stackEntries.stream()
+            .sorted(
+                java.util.Comparator.comparing(
+                    InventoryItemDto::createdAt,
+                    java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+            .toList();
+    InventoryItemDto head = ordered.get(0);
+
+    double totalAmount = 0.0;
+    double qualitySum = 0.0;
+    int maxQuality = 0;
+    for (InventoryItemDto entry : ordered) {
+      double amt = entry.amount() != null ? entry.amount() : 0.0;
+      int qual = entry.quality() != null ? entry.quality() : 0;
+      totalAmount += amt;
+      qualitySum += amt * qual;
+      if (qual > maxQuality) {
+        maxQuality = qual;
+      }
+    }
+    double avgQuality = totalAmount > 0 ? qualitySum / totalAmount : 0.0;
+    avgQuality = Math.round(avgQuality * 100.0) / 100.0;
+
+    return new InventoryStackDto(
+        head.user(),
+        head.location(),
+        head.quality(),
+        head.jobOrderId(),
+        head.jobOrderDisplayId(),
+        head.missionId(),
+        head.missionName(),
+        head.personal(),
+        head.owningSquadron(),
+        totalAmount,
+        avgQuality,
+        maxQuality,
+        ordered.size(),
+        ordered);
+  }
+
+  /**
+   * Derives the stack-identity key of one row: the inventory natural key minus the material
+   * (already the enclosing group). Reference ids are read null-safe so two rows with, for example,
+   * no job order both land in the same stack.
+   *
+   * @param i the inventory row to key
+   * @return the value-based grouping key for that row's stack
+   */
+  private static StackKey stackKeyOf(InventoryItemDto i) {
+    return new StackKey(
+        i.user() != null ? i.user().id() : null,
+        i.location() != null ? i.location().id() : null,
+        i.quality(),
+        i.jobOrderId(),
+        i.missionId(),
+        i.personal(),
+        i.owningSquadron() != null ? i.owningSquadron().id() : null);
   }
 
   /**
@@ -444,30 +524,14 @@ public class InventoryItemService {
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
 
-    // The owning org unit is the eighth natural-key dimension of an inventory stack. Resolve it up
-    // front (validating the picker output) so a new row only merges into a candidate that also
-    // matches on it — stock of two different org-unit pools must never collapse into one row.
+    // The owning org unit is the eighth dimension of an inventory stack's identity. Resolve it up
+    // front (validating the picker output) so the new row is stamped with the correct org-unit
+    // pool. Inventory is append-only: every create inserts its own row and is never folded into an
+    // existing stack — rows that share the stack identity are grouped only for display
+    // (group-on-read, see aggregateInventoryItems). This also removes the read-add-write race the
+    // former merge path had to guard with a pessimistic lock.
     final OrgUnit owningOrgUnit =
         ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId());
-
-    // Pessimistic write lock on the merge target so two concurrent createInventoryItem calls with
-    // the same natural key serialise on the row instead of both reading the same `amount`, both
-    // adding their delta, and the last writer clobbering the other's increment. The owning-org-unit
-    // dimension is applied as an in-memory filter on the locked candidates — see sameOwningOrgUnit
-    // and the findMatchingInventoryItemForUpdate Javadoc.
-    java.util.Optional<InventoryItem> existingItemOpt =
-        inventoryItemRepository
-            .findMatchingInventoryItemForUpdate(
-                user, material, location, dto.quality(), mission, jobOrder, isPersonal)
-            .stream()
-            .filter(candidate -> sameOwningOrgUnit(candidate.getOwningOrgUnit(), owningOrgUnit))
-            .findFirst();
-
-    if (existingItemOpt.isPresent()) {
-      InventoryItem existingItem = existingItemOpt.orElseThrow();
-      existingItem.setAmount(roundAmount(existingItem.getAmount() + dto.amount()));
-      return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
-    }
 
     InventoryItem item = new InventoryItem();
     item.setUser(user);
@@ -555,32 +619,9 @@ public class InventoryItemService {
       item.setMission(null);
     }
 
-    // Pessimistic write lock on the merge target — same race-condition reasoning as the create
-    // path; if a concurrent update mutates the merge target between our read and our write, the
-    // unguarded read would let us overwrite that update with a stale amount.
-    java.util.List<InventoryItem> existingItems =
-        inventoryItemRepository.findMatchingInventoryItemForUpdate(
-            item.getUser(),
-            item.getMaterial(),
-            item.getLocation(),
-            item.getQuality(),
-            item.getMission(),
-            item.getJobOrder(),
-            item.getPersonal());
-
-    java.util.Optional<InventoryItem> existingItemOpt =
-        existingItems.stream()
-            .filter(i -> !i.getId().equals(item.getId()))
-            .filter(i -> sameOwningOrgUnit(i.getOwningOrgUnit(), item.getOwningOrgUnit()))
-            .findFirst();
-
-    if (existingItemOpt.isPresent()) {
-      InventoryItem existingItem = existingItemOpt.orElseThrow();
-      existingItem.setAmount(roundAmount(existingItem.getAmount() + item.getAmount()));
-      inventoryItemRepository.delete(item);
-      return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
-    }
-
+    // Append-only: an update edits the row in place and is never folded into another matching
+    // stack.
+    // Rows that now share a stack identity are grouped only for display (group-on-read).
     return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
   }
 
@@ -638,11 +679,11 @@ public class InventoryItemService {
    * Consumes or transfers an inventory item.
    *
    * <p>The {@code type} discriminator selects: CONSUME (just decrement), TRANSFER (decrement here,
-   * then merge the moved quantity into the matching stack at the target location/owner — or create
-   * a new row when no identical stack exists there), SELL (decrement here, create a finance entry
-   * for the participant). When the post-decrement quantity is below {@link #QUANTITY_EPSILON} the
-   * row is removed entirely. Fulfills attached job-order materials when the amount delivered
-   * reaches the required quantity.
+   * then insert a new row for the moved quantity at the target location/owner — inventory is
+   * append-only, so the moved stock is never folded into an existing target stack), SELL (decrement
+   * here, create a finance entry for the participant). When the post-decrement quantity is below
+   * {@link #QUANTITY_EPSILON} the row is removed entirely. Fulfills attached job-order materials
+   * when the amount delivered reaches the required quantity.
    *
    * <p>Follows the bulk-update-after-loop concurrency pattern: collects every {@code
    * JobOrderMaterial} id that may be ready for a clearing bulk update in a {@code Set<UUID>},
@@ -721,54 +762,26 @@ public class InventoryItemService {
         throw new BadRequestException("Transfer must change either the user or the location");
       }
 
-      // Resolve the target stack's owning org unit up front — the eighth natural-key dimension — so
-      // the merge only folds into a target row of the SAME org-unit pool and a freshly created row
-      // is stamped with that pool.
+      // Resolve the target stack's owning org-unit pool up front — the eighth identity dimension —
+      // so the freshly created target row is stamped with that pool.
       final OrgUnit targetOwningOrgUnit =
           ownerScopeService.resolveOrgUnitForPickerOutputNullable(
               targetUser, dto.targetOwningOrgUnitId());
 
-      // Merge the moved quantity into an existing identical stack at the target instead of
-      // inserting a duplicate — the same natural-key merge the create path (createInventoryItem)
-      // and the refinery-store path already use. Without this, transferring stock onto a (user,
-      // location) slot that already holds an identical row (same material, quality, mission, job
-      // order, personal flag, owning org unit) silently produced a second row that the inventory
-      // view shows as a duplicate. The transfer guard above guarantees the target differs from the
-      // source in user or location, so the source row can never be its own merge target; the id
-      // filter is a defensive guard. The matched row is locked FOR UPDATE so two concurrent
-      // transfers into the same stack serialise instead of clobbering each other's increment.
-      java.util.Optional<InventoryItem> targetMatch =
-          inventoryItemRepository
-              .findMatchingInventoryItemForUpdate(
-                  targetUser,
-                  item.getMaterial(),
-                  targetLocation,
-                  item.getQuality(),
-                  item.getMission(),
-                  item.getJobOrder(),
-                  item.getPersonal())
-              .stream()
-              .filter(c -> !c.getId().equals(item.getId()))
-              .filter(c -> sameOwningOrgUnit(c.getOwningOrgUnit(), targetOwningOrgUnit))
-              .findFirst();
-      InventoryItem savedNew;
-      if (targetMatch.isPresent()) {
-        InventoryItem existingTarget = targetMatch.orElseThrow();
-        existingTarget.setAmount(roundAmount(existingTarget.getAmount() + dto.amount()));
-        savedNew = inventoryItemRepository.save(existingTarget);
-      } else {
-        InventoryItem newItem = new InventoryItem();
-        newItem.setUser(targetUser);
-        newItem.setOwningOrgUnit(targetOwningOrgUnit);
-        newItem.setMaterial(item.getMaterial());
-        newItem.setLocation(targetLocation);
-        newItem.setQuality(item.getQuality());
-        newItem.setAmount(roundAmount(dto.amount()));
-        newItem.setPersonal(item.getPersonal());
-        newItem.setJobOrder(item.getJobOrder());
-        newItem.setMission(item.getMission());
-        savedNew = inventoryItemRepository.save(newItem);
-      }
+      // Append-only: a transfer always inserts its own row at the target and is never folded into
+      // an existing identical stack there. The view collapses rows that share a stack identity for
+      // display (group-on-read), so no duplicate is visible and no read-add-write race exists.
+      InventoryItem newItem = new InventoryItem();
+      newItem.setUser(targetUser);
+      newItem.setOwningOrgUnit(targetOwningOrgUnit);
+      newItem.setMaterial(item.getMaterial());
+      newItem.setLocation(targetLocation);
+      newItem.setQuality(item.getQuality());
+      newItem.setAmount(roundAmount(dto.amount()));
+      newItem.setPersonal(item.getPersonal());
+      newItem.setJobOrder(item.getJobOrder());
+      newItem.setMission(item.getMission());
+      InventoryItem savedNew = inventoryItemRepository.save(newItem);
       if (remainingAmount <= QUANTITY_EPSILON) {
         inventoryItemRepository.delete(item);
       } else {
@@ -964,19 +977,38 @@ public class InventoryItemService {
   }
 
   /**
-   * Null-safe identity check of two owning-org-unit references by id — the eighth merge-key
-   * dimension layered on top of {@link
-   * InventoryItemRepository#findMatchingInventoryItemForUpdate}'s seven-dimension candidate set.
-   * Two {@code null} references (ownerless-personal rows) count as the same pool; a {@code null}
-   * and a present reference never match, so stock owned by different org units never merges.
-   *
-   * @param a first owning-org-unit reference, may be {@code null}
-   * @param b second owning-org-unit reference, may be {@code null}
-   * @return {@code true} iff both are {@code null} or both reference the same org-unit id
+   * Display order of the stacks within a material: highest quality first, then location name
+   * ascending, then largest total amount first — mirrors the previous per-row ordering.
    */
-  private static boolean sameOwningOrgUnit(OrgUnit a, OrgUnit b) {
-    UUID idA = a == null ? null : a.getId();
-    UUID idB = b == null ? null : b.getId();
-    return java.util.Objects.equals(idA, idB);
-  }
+  private static final java.util.Comparator<InventoryStackDto> STACK_ORDER =
+      java.util.Comparator.<InventoryStackDto, Integer>comparing(
+              s -> s.quality() != null ? s.quality() : 0)
+          .reversed()
+          .thenComparing(
+              s -> s.location() != null && s.location().name() != null ? s.location().name() : "")
+          .thenComparing(
+              java.util.Comparator.<InventoryStackDto, Double>comparing(
+                      s -> s.totalAmount() != null ? s.totalAmount() : 0.0)
+                  .reversed());
+
+  /**
+   * In-memory grouping key for one inventory stack: the natural key minus material. A record so it
+   * gets value-based {@code equals} / {@code hashCode} for {@code Collectors.groupingBy}.
+   *
+   * @param userId owning user id
+   * @param locationId storage location id
+   * @param quality quality grade, may be {@code null}
+   * @param jobOrderId linked job-order id, or {@code null}
+   * @param missionId linked mission id, or {@code null}
+   * @param personal private-stock flag
+   * @param owningSquadronId owning org-unit pool id, or {@code null}
+   */
+  private record StackKey(
+      UUID userId,
+      UUID locationId,
+      Integer quality,
+      UUID jobOrderId,
+      UUID missionId,
+      Boolean personal,
+      UUID owningSquadronId) {}
 }

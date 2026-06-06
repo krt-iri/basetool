@@ -36,6 +36,7 @@ import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
@@ -269,7 +270,8 @@ class InventoryItemServiceAggregateTest {
       assertEquals(100.0, result.get(0).totalAmount());
       assertEquals(500.0, result.get(0).averageQuality());
       assertEquals(500, result.get(0).maxQuality());
-      assertEquals(1, result.get(0).items().size());
+      assertEquals(1, result.get(0).stacks().size());
+      assertEquals(1, result.get(0).stacks().get(0).entryCount());
     }
 
     @Test
@@ -356,11 +358,9 @@ class InventoryItemServiceAggregateTest {
 
     @Test
     void nullAmount_inSort_whenQualityAndLocationTie() {
-      // Regression companion to nullQuality_coercedToZeroInSortAndLoop:
-      // two items with the SAME quality and SAME location so the
-      // comparator chain falls through to the tertiary amount key.
-      // Pre-fix, that key NPE'd on a null amount because it called
-      // Double.compareTo(null).
+      // Two entries share the stock identity (same location + quality), so they collapse into one
+      // stack with two entries. The null amount must still coerce to 0 in the aggregation loop
+      // instead of NPE-ing.
       MaterialReferenceDto mat = newMat("Quantanium");
       InventoryItemDto withAmt = newItem(mat, "ARC-L1", 200, 100.0);
       InventoryItemDto nullAmt = newItem(mat, "ARC-L1", 200, null);
@@ -395,7 +395,8 @@ class InventoryItemServiceAggregateTest {
               null,
               null,
               null,
-              1L);
+              1L,
+              null);
       InventoryItemDto withLoc = newItem(mat, "ARC-L2", 200, 100.0);
 
       stubGlobalQuery(nullLoc, withLoc);
@@ -453,27 +454,56 @@ class InventoryItemServiceAggregateTest {
     }
 
     @Test
-    void itemsWithinMaterial_sortedByQualityDescThenLocationAscThenAmountDesc() {
+    void stacksWithinMaterial_collapseSameIdentityAndSortByQualityDescLocationAscAmountDesc() {
       MaterialReferenceDto mat = newMat("Quantanium");
-      // a: q=500, loc=B, amt=10
-      // b: q=500, loc=A, amt=10  -> ties with a on quality, location A < B
-      // c: q=500, loc=A, amt=20  -> ties with b on quality+location, amount 20 > 10
-      // d: q=300, loc=A, amt=100 -> lowest quality, sorts last
-      InventoryItemDto a = newItem(mat, "B", 500, 10.0);
-      InventoryItemDto b = newItem(mat, "A", 500, 10.0);
-      InventoryItemDto c = newItem(mat, "A", 500, 20.0);
-      InventoryItemDto d = newItem(mat, "A", 300, 100.0);
+      // b and c share the stock identity (loc=A, q=500) and collapse into one stack (10 + 20 = 30);
+      // a and d form their own stacks. Append-only keeps b and c as separate entries in the stack.
+      InventoryItemDto a = newItem(mat, "B", 500, 10.0); // stack (B, 500) total 10
+      InventoryItemDto b = newItem(mat, "A", 500, 10.0); // stack (A, 500) ...
+      InventoryItemDto c = newItem(mat, "A", 500, 20.0); // ... + 20 = total 30, 2 entries
+      InventoryItemDto d = newItem(mat, "A", 300, 100.0); // stack (A, 300) total 100
 
       stubGlobalQuery(d, a, b, c);
 
-      List<InventoryItemDto> items = service.getAllAggregatedInventory(null, null).get(0).items();
+      List<InventoryStackDto> stacks =
+          service.getAllAggregatedInventory(null, null).get(0).stacks();
 
-      // Expected order: c (q=500, locA, amt=20), b (q=500, locA, amt=10),
-      //                 a (q=500, locB, amt=10),  d (q=300, locA, amt=100)
-      assertEquals(c, items.get(0), "highest quality + location A + highest amount wins");
-      assertEquals(b, items.get(1), "q=500 + locA + amt=10 second");
-      assertEquals(a, items.get(2), "q=500 + locB third (location B > A)");
-      assertEquals(d, items.get(3), "q=300 last");
+      // Expected order: (A,500) total 30, then (B,500) total 10, then (A,300) total 100.
+      assertEquals(3, stacks.size(), "b and c collapse into one stack, so three stacks remain");
+
+      assertEquals("A", stacks.get(0).location().name(), "highest quality, location A first");
+      assertEquals(500, stacks.get(0).quality());
+      assertEquals(30.0, stacks.get(0).totalAmount(), "the two locA/q500 entries sum");
+      assertEquals(2, stacks.get(0).entryCount());
+
+      assertEquals("B", stacks.get(1).location().name(), "q=500 location B after A");
+      assertEquals(10.0, stacks.get(1).totalAmount());
+      assertEquals(1, stacks.get(1).entryCount());
+
+      assertEquals("A", stacks.get(2).location().name());
+      assertEquals(300, stacks.get(2).quality(), "lowest quality sorts last");
+      assertEquals(100.0, stacks.get(2).totalAmount());
+    }
+
+    @Test
+    void entriesWithinStack_orderedOldestFirstByCreatedAt() {
+      MaterialReferenceDto mat = newMat("Quantanium");
+      java.time.Instant t1 = java.time.Instant.parse("2026-01-01T00:00:00Z");
+      java.time.Instant t2 = java.time.Instant.parse("2026-02-01T00:00:00Z");
+      java.time.Instant t3 = java.time.Instant.parse("2026-03-01T00:00:00Z");
+      // Same stock identity (loc A, q500) recorded out of order; the stack must list them oldest
+      // first regardless of input order.
+      InventoryItemDto newest = newItem(mat, "A", 500, 1.0, t3);
+      InventoryItemDto oldest = newItem(mat, "A", 500, 1.0, t1);
+      InventoryItemDto middle = newItem(mat, "A", 500, 1.0, t2);
+
+      stubGlobalQuery(newest, oldest, middle);
+
+      InventoryStackDto stack =
+          service.getAllAggregatedInventory(null, null).get(0).stacks().get(0);
+      assertEquals(3, stack.entryCount());
+      assertEquals(
+          List.of(oldest, middle, newest), stack.entries(), "entries ordered oldest-first");
     }
   }
 
@@ -541,7 +571,22 @@ class InventoryItemServiceAggregateTest {
 
   private static InventoryItemDto newItem(
       MaterialReferenceDto material, String locationName, Integer quality, Double amount) {
-    LocationReferenceDto loc = new LocationReferenceDto(UUID.randomUUID(), locationName);
+    return newItem(material, locationName, quality, amount, null);
+  }
+
+  /**
+   * Builds an inventory DTO whose location id is derived from the location name so two {@code
+   * newItem} calls with the same name land in the same stack (the grouping keys on the location id,
+   * not the object identity). {@code createdAt} controls the oldest-first entry order within a
+   * stack.
+   */
+  private static InventoryItemDto newItem(
+      MaterialReferenceDto material,
+      String locationName,
+      Integer quality,
+      Double amount,
+      java.time.Instant createdAt) {
+    LocationReferenceDto loc = new LocationReferenceDto(locationId(locationName), locationName);
     return new InventoryItemDto(
         UUID.randomUUID(), // id
         null, // user
@@ -556,7 +601,14 @@ class InventoryItemServiceAggregateTest {
         null, // missionId, missionName
         null, // note
         null, // owningSquadron
-        1L); // version
+        1L, // version
+        createdAt);
+  }
+
+  /** Deterministic UUID per location name so same-named locations share one stack. */
+  private static UUID locationId(String name) {
+    return UUID.nameUUIDFromBytes(
+        ("loc:" + name).getBytes(java.nio.charset.StandardCharsets.UTF_8));
   }
 
   private static void assertFalse_NaN(double v) {

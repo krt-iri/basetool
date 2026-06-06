@@ -33,7 +33,10 @@ non-admins see the union of their memberships unless they pin one.
 
 - **Strict-staffel** (no cross-staffel escape): `Ship`, `InventoryItem` (direct Lager-View),
   `RefineryOrder`, `Operation`. List/CRUD filter by `owning_org_unit_id`; detail gates on
-  `canSee*`/`canEdit*`.
+  `canSee*`/`canEdit*`. `InventoryItem` rows are append-only and collapsed into display
+  *stacks* only at read time (see [`inventory-lager.md`](inventory-lager.md), `REQ-INV-*`);
+  the grouping is a display concern keyed within a single `owning_org_unit_id` pool and never
+  widens this scope.
 - **Cross-staffel with public escape:** `Mission` — visible to other OrgUnits iff
   `is_internal = false`; editable only by the owning OrgUnit + admins (`searchMissions`
   enforces `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false`).

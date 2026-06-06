@@ -554,7 +554,7 @@ public class RefineryOrderService {
     }
 
     for (RefineryOrderStoreItemDto itemDto : dto.items()) {
-      de.greluc.krt.iri.basetool.backend.model.Material mat =
+      final de.greluc.krt.iri.basetool.backend.model.Material mat =
           materialRepository
               .findById(itemDto.materialId())
               .orElseThrow(
@@ -562,7 +562,7 @@ public class RefineryOrderService {
                       new de.greluc.krt.iri.basetool.backend.exception.NotFoundException(
                           "Material not found: " + itemDto.materialId()));
 
-      de.greluc.krt.iri.basetool.backend.model.Location loc =
+      final de.greluc.krt.iri.basetool.backend.model.Location loc =
           locationRepository
               .findById(itemDto.locationId())
               .orElseThrow(
@@ -594,70 +594,40 @@ public class RefineryOrderService {
                             "JobOrder not found: " + itemDto.jobOrderId()));
       }
 
-      // Resolve the assignee's owning org unit up front — the eighth natural-key dimension — so the
-      // refinery output only merges into a stack of the SAME org-unit pool, and a freshly created
-      // row is stamped with that pool. The store form has no owner picker, so the picker output is
-      // null: the resolver auto-stamps for a single-membership assignee (today's 100% case), yields
-      // an ownerless personal row (owningOrgUnit == null, V132) for none, and 400s for a
-      // multi-membership assignee (a per-output picker on the store form is a follow-up to the SK
-      // §5.5 stamping wave). See sameOwningOrgUnit and InventoryItemService.
+      // Resolve the assignee's owning org-unit pool up front — the eighth identity dimension — so
+      // the
+      // freshly created row is stamped with that pool. The store form has no owner picker, so the
+      // picker output is null: the resolver auto-stamps for a single-membership assignee (today's
+      // 100% case), yields an ownerless personal row (owningOrgUnit == null, V132) for none, and
+      // 400s
+      // for a multi-membership assignee (a per-output picker on the store form is a follow-up to
+      // the
+      // SK §5.5 stamping wave). See InventoryItemService.
       final de.greluc.krt.iri.basetool.backend.model.OrgUnit owningOrgUnit =
           ownerScopeService.resolveOrgUnitForPickerOutputNullable(assignee, null);
 
-      // Pessimistic write lock on the merge target so a parallel store of the same refinery
-      // order (or a parallel inventory create with the same natural key) cannot read the same
-      // pre-merge amount and both write their delta on top of it — see
-      // InventoryItemRepository.findMatchingInventoryItemForUpdate Javadoc.
-      java.util.Optional<InventoryItem> existingItemOpt =
-          inventoryItemRepository
-              .findMatchingInventoryItemForUpdate(
-                  assignee, mat, loc, itemDto.quality(), order.getMission(), jobOrder, false)
-              .stream()
-              .filter(c -> sameOwningOrgUnit(c.getOwningOrgUnit(), owningOrgUnit))
-              .findFirst();
-
       // Why: The amount the user enters in the store dialog is the authoritative
       // amount (it overrides the originally calculated output amount of the refinery
-      // order). The note is optionally propagated to the resulting InventoryItem so
-      // the user can attach storage remarks directly to the inventory item.
+      // order). The note is propagated to the resulting InventoryItem so the user can
+      // attach storage remarks directly to the inventory item.
       String incomingNote = normalizeNote(itemDto.note());
 
-      if (existingItemOpt.isPresent()) {
-        InventoryItem existingItem = existingItemOpt.orElseThrow();
-        // Round the summed quantity at the source (defence in depth): InventoryItem's
-        // @PrePersist/@PreUpdate hook is the guarantee, but rounding the double sum here keeps the
-        // in-memory amount clean so no caller observes a >3-decimal artefact before flush.
-        existingItem.setAmount(
-            InventoryItem.roundToScuScale(existingItem.getAmount() + itemDto.amount()));
-        if (incomingNote != null) {
-          String existingNote = existingItem.getNote();
-          if (existingNote == null || existingNote.isBlank()) {
-            existingItem.setNote(incomingNote);
-          } else if (!existingNote.contains(incomingNote)) {
-            // Keep the existing note and append the new one so that no
-            // information is lost.
-            String combined = existingNote + "\n" + incomingNote;
-            if (combined.length() > 1000) {
-              combined = combined.substring(0, 1000);
-            }
-            existingItem.setNote(combined);
-          }
-        }
-        inventoryItemRepository.save(existingItem);
-      } else {
-        InventoryItem item = new InventoryItem();
-        item.setUser(assignee);
-        item.setOwningOrgUnit(owningOrgUnit);
-        item.setJobOrder(jobOrder);
-        item.setMaterial(mat);
-        item.setLocation(loc);
-        item.setQuality(itemDto.quality());
-        item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
-        item.setMission(order.getMission());
-        item.setNote(incomingNote);
+      // Append-only: every stored refinery output becomes its own row and is never folded into an
+      // existing identical stack. Rows that share a stack identity are grouped only for display
+      // (group-on-read in aggregateInventoryItems), so no read-add-write race exists and each
+      // entry keeps its own note and provenance.
+      InventoryItem item = new InventoryItem();
+      item.setUser(assignee);
+      item.setOwningOrgUnit(owningOrgUnit);
+      item.setJobOrder(jobOrder);
+      item.setMaterial(mat);
+      item.setLocation(loc);
+      item.setQuality(itemDto.quality());
+      item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
+      item.setMission(order.getMission());
+      item.setNote(incomingNote);
 
-        inventoryItemRepository.save(item);
-      }
+      inventoryItemRepository.save(item);
 
       // Write the adjusted amount back into the refinery order so that the
       // actually stored output amount is documented there as well.
@@ -676,26 +646,6 @@ public class RefineryOrderService {
     }
     String trimmed = note.trim();
     return trimmed.isEmpty() ? null : trimmed;
-  }
-
-  /**
-   * Null-safe identity check of two owning-org-unit references by id — the eighth merge-key
-   * dimension applied on top of the seven-dimension {@code findMatchingInventoryItemForUpdate}
-   * candidate set. Two {@code null} references (ownerless-personal rows) count as the same pool; a
-   * {@code null} and a present reference never match, so refinery output owned by different org
-   * units never merges into one inventory row. Mirrors the helper of the same name in {@code
-   * InventoryItemService}.
-   *
-   * @param a first owning-org-unit reference, may be {@code null}
-   * @param b second owning-org-unit reference, may be {@code null}
-   * @return {@code true} iff both are {@code null} or both reference the same org-unit id
-   */
-  private static boolean sameOwningOrgUnit(
-      de.greluc.krt.iri.basetool.backend.model.OrgUnit a,
-      de.greluc.krt.iri.basetool.backend.model.OrgUnit b) {
-    java.util.UUID idA = a == null ? null : a.getId();
-    java.util.UUID idB = b == null ? null : b.getId();
-    return java.util.Objects.equals(idA, idB);
   }
 
   /**

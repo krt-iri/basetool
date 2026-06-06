@@ -278,7 +278,8 @@ class JobOrderControllerTest {
             null,
             null,
             null,
-            1L);
+            1L,
+            null);
     when(jobOrderService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
         .thenReturn(List.of(inv));
 

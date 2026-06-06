@@ -43,10 +43,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link InventoryOrgUnitReconciler} — the merge-safe re-stamp of a user's shared
- * inventory when they cross the membershipless boundary. Pins the auto-promote (NULL → org) and
- * auto-demote (org → NULL) policies and, crucially, that re-stamping collapses stacks that become
- * identical (the eighth merge-key dimension) instead of leaving duplicates.
+ * Unit tests for {@link InventoryOrgUnitReconciler} — the re-stamp of a user's shared inventory
+ * when they cross the membershipless boundary. Pins the auto-promote (NULL → org) and auto-demote
+ * (org → NULL) policies and, crucially, that re-stamping ONLY changes {@code owningOrgUnit}: rows
+ * that become identical after the re-stamp stay separate (inventory is append-only and the Lager
+ * view collapses same-identity rows for display), amounts are never touched and nothing is ever
+ * deleted.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryOrgUnitReconcilerTest {
@@ -86,26 +88,29 @@ class InventoryOrgUnitReconcilerTest {
   }
 
   @Test
-  void onUserLostLastOrgUnit_demotesToNullAndMergesCollidingStacks() {
+  void onUserLostLastOrgUnit_demotesToNullWithoutMerging() {
     UUID userId = UUID.randomUUID();
     OrgUnit orgA = squadron();
     OrgUnit orgB = squadron();
-    // Same natural key (matA / loc / 900) in two different org units → collide once both go NULL.
+    // Same natural key (matA / loc / 900) in two different org units → become identical once both
+    // go
+    // NULL, but append-only inventory keeps them as separate rows (collapsed only for display).
     InventoryItem a = sharedRow(orgA, 4.0, matA, 900);
     InventoryItem b = sharedRow(orgB, 6.0, matA, 900);
-    // A distinct stack (different material) that just gets nulled, never merged.
+    // A distinct stack (different material) that just gets nulled.
     InventoryItem c = sharedRow(orgA, 2.0, matB, 900);
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(a, b, c));
 
     reconciler.onUserLostLastOrgUnit(userId);
 
+    // Every row drops its org stamp; amounts stay exactly as they were and no row is removed.
     assertNull(a.getOwningOrgUnit());
     assertNull(b.getOwningOrgUnit());
     assertNull(c.getOwningOrgUnit());
-    assertEquals(10.0, a.getAmount(), "colliding stacks merge into the first row (4 + 6)");
-    verify(inventoryItemRepository).delete(b);
-    verify(inventoryItemRepository, never()).delete(a);
-    verify(inventoryItemRepository, never()).delete(c);
+    assertEquals(4.0, a.getAmount(), "amounts are never merged or changed");
+    assertEquals(6.0, b.getAmount(), "the would-be colliding row keeps its own amount");
+    assertEquals(2.0, c.getAmount());
+    verify(inventoryItemRepository, never()).delete(any());
   }
 
   @Test

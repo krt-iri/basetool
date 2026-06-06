@@ -20,6 +20,8 @@
 
 - **Finanz-Einträge eines Einsatzes lassen sich nicht mehr anonym lesen oder anlegen:** Die Finanz-/Auszahlungssicht ist jetzt Mitgliedern (und höher) vorbehalten — anonyme und rollenlose Gast-Zugriffe werden abgewiesen. Aufträge anlegen bleibt für alle möglich.
 
+- **Das Lager fasst gleiche Materialeinträge nicht mehr automatisch zu einem Eintrag zusammen:** Jede Einbuchung, Umlagerung und Raffinerie-Einlagerung bleibt ein eigener Eintrag. In „Mein Lager" und „Globales Lager" werden Einträge mit gleichem Material, Ort, Qualität, Auftrags-/Einsatzbezug und Besitzer weiterhin als eine Zeile angezeigt, die sich aufklappen lässt, um die einzelnen Einträge zu sehen und einzeln zu bearbeiten.
+
 ### Fixed
 
 - **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.

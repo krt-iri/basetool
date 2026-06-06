@@ -36498,6 +36498,10 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
@@ -40907,7 +40911,65 @@
             "type" : "integer",
             "format" : "int32"
           },
-          "items" : {
+          "stacks" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/InventoryStackDto"
+            }
+          }
+        }
+      },
+      "InventoryStackDto" : {
+        "type" : "object",
+        "properties" : {
+          "user" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/LocationReferenceDto"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderDisplayId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "missionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "missionName" : {
+            "type" : "string"
+          },
+          "personal" : {
+            "type" : "boolean"
+          },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "totalAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "averageQuality" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "maxQuality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "entryCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "entries" : {
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/InventoryItemDto"

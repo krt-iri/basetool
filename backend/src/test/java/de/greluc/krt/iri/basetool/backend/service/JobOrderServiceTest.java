@@ -912,7 +912,8 @@ class JobOrderServiceTest {
             null,
             null,
             null,
-            1L);
+            1L,
+            null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -1089,7 +1090,8 @@ class JobOrderServiceTest {
             null,
             null,
             null,
-            1L);
+            1L,
+            null);
     // Same owner "Alpha", higher quality 90 → comes before quality 80
     InventoryItemDto dto2 =
         new InventoryItemDto(
@@ -1106,7 +1108,8 @@ class JobOrderServiceTest {
             null,
             null,
             null,
-            1L);
+            1L,
+            null);
     // Owner "Beta" → after all "Alpha" entries
     InventoryItemDto dto3 =
         new InventoryItemDto(
@@ -1123,7 +1126,8 @@ class JobOrderServiceTest {
             null,
             null,
             null,
-            1L);
+            1L,
+            null);
     // Same owner "Alpha", same quality 80, same location ArcCorp, higher amount → comes before
     // lower amount
     InventoryItemDto dto4 =
@@ -1141,7 +1145,8 @@ class JobOrderServiceTest {
             null,
             null,
             null,
-            1L);
+            1L,
+            null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
