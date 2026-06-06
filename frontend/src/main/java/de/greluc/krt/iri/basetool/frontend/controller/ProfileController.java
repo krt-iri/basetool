@@ -19,7 +19,9 @@
 
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.frontend.model.form.ProfileDescriptionForm;
+import de.greluc.krt.iri.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -42,12 +44,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Spring MVC controller for the user profile page ({@code /profile}).
  *
- * <p>Renders the current user's profile data and exposes a single editable field (description +
- * display name). The page layers two data sources: the OIDC token claims (used as the immediate
- * default) and the backend {@code /api/v1/users/me} payload (used to overwrite the token values
- * with the authoritative DB state, including the optimistic-locking {@code version} needed for
- * subsequent updates). When the backend is unreachable, the token-only view still renders so the
- * user always sees something.
+ * <p>Renders the current user's profile data and exposes the editable fields (description, display
+ * name, and the default payout preference — the latter persisted through its own lightweight
+ * endpoint so the central {@code UserDto} contract stays untouched). The page layers two data
+ * sources: the OIDC token claims (used as the immediate default) and the backend {@code
+ * /api/v1/users/me} payload (used to overwrite the token values with the authoritative DB state,
+ * including the optimistic-locking {@code version} needed for subsequent updates). When the backend
+ * is unreachable, the token-only view still renders so the user always sees something.
  */
 @Controller
 @RequiredArgsConstructor
@@ -121,6 +124,24 @@ public class ProfileController {
       // Backend unavailable? Keep Token data.
     }
 
+    // Default payout preference, fetched from its own lightweight endpoint so the central UserDto
+    // contract stays untouched. Resilient: a backend hiccup or an unexpected value leaves the
+    // selector at PAYOUT rather than failing the whole page.
+    PayoutPreference defaultPayoutPreference = PayoutPreference.PAYOUT;
+    try {
+      Map<String, Object> pref =
+          backendApiClient.get(
+              "/api/v1/users/me/payout-preference",
+              new ParameterizedTypeReference<Map<String, Object>>() {});
+      if (pref != null && pref.get("defaultPayoutPreference") != null) {
+        defaultPayoutPreference =
+            PayoutPreference.valueOf(String.valueOf(pref.get("defaultPayoutPreference")));
+      }
+    } catch (Exception e) {
+      // Backend unavailable or unrecognised value — keep the PAYOUT default.
+    }
+    model.addAttribute("defaultPayoutPreference", defaultPayoutPreference);
+
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
 
     if (!model.containsAttribute("profileDescriptionForm")) {
@@ -131,6 +152,13 @@ public class ProfileController {
           "profileDescriptionForm",
           new ProfileDescriptionForm(
               currentDesc, currentDisplayName, version != null ? version : 0L));
+    }
+
+    if (!model.containsAttribute("profilePayoutPreferenceForm")) {
+      Long version = (Long) model.getAttribute("version");
+      model.addAttribute(
+          "profilePayoutPreferenceForm",
+          new ProfilePayoutPreferenceForm(defaultPayoutPreference, version != null ? version : 0L));
     }
 
     return "profile";
@@ -174,6 +202,61 @@ public class ProfileController {
               "description", form.description() == null ? "" : form.description(),
               "displayName", form.displayName() == null ? "" : form.displayName(),
               "version", form.version()),
+          Void.class);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.error("Update failed", e);
+      if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
+      } else {
+        redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
+      }
+      return "redirect:/profile";
+    } catch (Exception e) {
+      log.error("Update failed", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
+      return "redirect:/profile";
+    }
+    return "redirect:/profile";
+  }
+
+  /**
+   * Handles the default-payout-preference selector post. Kept as a separate form (and backend
+   * endpoint) from the description update so the central {@code UserDto} contract stays untouched;
+   * both forms echo the same user-row {@code version}, so the post-redirect-GET refresh after
+   * either save re-renders the other with the bumped version (no stale-version 409 on the next
+   * click). A 409 with problem type {@code concurrency-conflict} surfaces as the optimistic-lock
+   * toast; any other failure as the generic update-failed toast.
+   *
+   * @param form validated selector payload (preference + version)
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used when re-rendering inline
+   * @param principal authenticated OIDC user
+   * @param redirectAttributes flash attributes carrier for the result toast
+   * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
+   *     /profile}
+   */
+  @PostMapping("/profile/payout-preference")
+  public String updatePayoutPreference(
+      @Valid @ModelAttribute("profilePayoutPreferenceForm") ProfilePayoutPreferenceForm form,
+      BindingResult bindingResult,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal,
+      RedirectAttributes redirectAttributes) {
+    if (bindingResult.hasErrors()) {
+      // Render inline so the BindingResult stays request-scoped (never a Redis FlashMap).
+      return profile(model, principal);
+    }
+    try {
+      backendApiClient.put(
+          "/api/v1/users/me/payout-preference",
+          Map.of(
+              "preference",
+              form.defaultPayoutPreference() == null
+                  ? PayoutPreference.PAYOUT.name()
+                  : form.defaultPayoutPreference().name(),
+              "version",
+              form.version()),
           Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {

@@ -21,6 +21,8 @@ package de.greluc.krt.iri.basetool.backend.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -80,6 +82,19 @@ public class User extends AbstractEntity<UUID> {
   @Nullable
   @Column(name = "join_date")
   private LocalDate joinDate;
+
+  /**
+   * The user's personal default payout preference. Pre-fills the per-participant {@code
+   * payoutPreference} when this user signs up to a mission (see {@link
+   * de.greluc.krt.iri.basetool.backend.service.MissionService#addParticipant}). {@code null} means
+   * the user has expressed no explicit choice, in which case sign-up falls back to {@link
+   * PayoutPreference#PAYOUT}; the value is never auto-populated. Editing it is a forward-only
+   * default — it does not rewrite existing {@link MissionParticipant} rows. REQ-MISSION-002.
+   */
+  @Nullable
+  @Enumerated(EnumType.STRING)
+  @Column(name = "default_payout_preference")
+  private PayoutPreference defaultPayoutPreference;
 
   public String getEffectiveName() {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;
