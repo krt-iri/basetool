@@ -125,19 +125,15 @@ class ValidQuantityAmountValidatorTest {
   }
 
   @Test
-  void shouldBeInvalidWhenScuHasMoreThanThreeDecimals() {
+  void shouldBeValidWhenScuHasMoreThanThreeDecimals() {
+    // SCU precision is no longer rejected: an amount with more than three decimals is rounded
+    // HALF_UP to three places at the persistence boundary (the entity @PrePersist/@PreUpdate
+    // hooks), mirroring the frontend, so the validator must accept it rather than refuse it.
     Material material = new Material();
     material.setQuantityType(QuantityType.SCU);
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
 
-    when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
-    when(builder.addPropertyNode("amount")).thenReturn(nodeBuilder);
-
-    assertFalse(validator.isValid(new TestDto(materialId, 10.1234), context));
-
-    verify(context).disableDefaultConstraintViolation();
-    verify(context)
-        .buildConstraintViolationWithTemplate("{error.validation.quantity_max_3_decimals}");
+    assertTrue(validator.isValid(new TestDto(materialId, 10.1234), context));
   }
 
   record TestDto(UUID materialId, Double amount) implements QuantityAware {}

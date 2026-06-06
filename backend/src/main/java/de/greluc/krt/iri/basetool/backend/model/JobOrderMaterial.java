@@ -27,6 +27,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -69,4 +71,20 @@ public class JobOrderMaterial extends AbstractEntity<UUID> {
 
   @Column(nullable = false)
   private Double amount;
+
+  /**
+   * Rounds the requirement {@code amount} to SCU scale (three decimals, {@code HALF_UP}) on every
+   * insert and update. This is the persistence chokepoint that normalises both the value
+   * snapshotted at order creation and the result of the handover decrement ({@code amount -=
+   * delivered}), so no row is ever stored with more than three decimals. Rounding is unconditional
+   * — {@code PIECE} amounts are whole, so it is a no-op for them, and reading {@link #material}
+   * inside a lifecycle callback would force a lazy-load of the proxy on every flush.
+   *
+   * @see InventoryItem#roundToScuScale(Double)
+   */
+  @PrePersist
+  @PreUpdate
+  void roundAmountToScuScale() {
+    amount = InventoryItem.roundToScuScale(amount);
+  }
 }

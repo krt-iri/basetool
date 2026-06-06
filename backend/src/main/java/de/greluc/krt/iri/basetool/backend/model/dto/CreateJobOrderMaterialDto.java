@@ -19,13 +19,23 @@
 
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
+import de.greluc.krt.iri.basetool.backend.validation.QuantityAware;
+import de.greluc.krt.iri.basetool.backend.validation.ValidQuantityAmount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
-/** Data transfer record carrying Create Job Order Material payload. */
+/**
+ * Data transfer record carrying Create Job Order Material payload.
+ *
+ * <p>Implements {@link QuantityAware} and carries {@link ValidQuantityAmount} so the per-material
+ * amount is enforced server-side (same as inventory book-in): {@code > 0} for both quantity types,
+ * whole numbers for {@code PIECE}, and SCU fractional precision rounded to three decimals at
+ * persistence. Used for both order creation and the same-shape update endpoint.
+ */
+@ValidQuantityAmount
 public record CreateJobOrderMaterialDto(
     @NotNull UUID materialId,
     @org.jetbrains.annotations.Nullable
@@ -42,4 +52,5 @@ public record CreateJobOrderMaterialDto(
     // + downstream BigDecimal aggregation overflow). Tightening from "no upper bound" to
     // 100 000 covers any realistic legitimate Star Citizen cargo manifest by an order of
     // magnitude.
-    @NotNull @Min(0) @Max(100_000) Double amount) {}
+    @NotNull @Max(100_000) Double amount)
+    implements QuantityAware {}

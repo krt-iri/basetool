@@ -29,6 +29,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -111,6 +113,20 @@ public class MaterialClaim extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "claimed_by_user_id")
   private User claimedByUser;
+
+  /**
+   * Rounds the claimed {@code amount} to SCU scale (three decimals, {@code HALF_UP}) on insert and
+   * update, so an SCU claim never stores more than three decimals (the service enforces {@code > 0}
+   * and the {@code PIECE}-integer rule separately). Unconditional — a no-op for whole {@code PIECE}
+   * amounts — to avoid lazy-loading {@link #material} on every flush.
+   *
+   * @see InventoryItem#roundToScuScale(Double)
+   */
+  @PrePersist
+  @PreUpdate
+  void roundAmountToScuScale() {
+    amount = InventoryItem.roundToScuScale(amount);
+  }
 
   /**
    * Renders the claim using only safe scalar identifiers — its own id, the {@code

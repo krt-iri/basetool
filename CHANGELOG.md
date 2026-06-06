@@ -12,6 +12,8 @@
 
 - **Mengenfelder erzwingen jetzt die Eingaberegeln des Mengentyps:** SCU-Materialien akzeptieren nur positive Werte (> 0) mit bis zu drei Nachkommastellen (Schrittweite 0,001); werden mehr Nachkommastellen eingegeben, wird kaufmännisch auf drei gerundet. Stück-Materialien akzeptieren nur positive Ganzzahlen. Der Zielbestand beim Ausbuchen darf weiterhin 0 sein.
 
+- **Diese Mengenregeln gelten jetzt auch serverseitig, nicht nur im Browser:** Material-Mengen müssen positiv (> 0) sein, und SCU-Mengen werden beim Speichern kaufmännisch auf drei Nachkommastellen gerundet (statt eine zu genaue Eingabe abzulehnen) — über alle Schreibwege inklusive Auftrag anlegen/bearbeiten, das bisher eine Menge von 0 und ungerundete Werte annahm.
+
 ### Fixed
 
 - **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.

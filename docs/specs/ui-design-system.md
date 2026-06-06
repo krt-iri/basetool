@@ -141,10 +141,15 @@ via `data-scu-allow-zero`.
 - [ ] An amount that is `0`, negative, or rounds to `0` (e.g. `0.0004`) is rejected before submit; the book-out target stock may be `0`.
 - [ ] The field carries `step="0.001"` and is `type="text" inputmode="decimal" data-scu-decimal`.
 
-**Enforced by:** `scu-decimal-input.js` (shared client helper; mode read from the live `step`
-attribute) + `InventoryPageControllerMvcTest` (render-wiring) + web-asset linting (ESLint /
-HTMLHint / Prettier). **Code:** `frontend/.../static/js/scu-decimal-input.js`,
-`fragments/head.html` (`window.krtScuI18n`). **Issues:** PR #465.
+**Enforced by:** _Client_ — `scu-decimal-input.js` (mode read from the live `step` attribute) +
+`InventoryPageControllerMvcTest` (render-wiring) + web-asset linting (ESLint / HTMLHint / Prettier).
+_Server_ — `@ValidQuantityAmount` rejects `≤ 0` on the inventory create/update, refinery-store and
+**job-order material** (create + edit) DTOs, and amounts are rounded HALF_UP to three decimals at
+the persistence boundary (see [REQ-DATA-004](data-persistence.md), `ValidQuantityAmountValidatorTest`,
+`MaterialAmountRoundingTest`). **Code:** `frontend/.../static/js/scu-decimal-input.js`,
+`fragments/head.html`; `backend/.../validation/ValidQuantityAmount*`,
+`backend/.../model/{InventoryItem,JobOrderMaterial,MaterialClaim,JobOrderHandoverItem}`. **Issues:**
+PR #465.
 
 ### REQ-UI-011 — Material-amount input: PIECE quantity type
 
@@ -159,8 +164,11 @@ a PIECE material is selected.
 - [ ] Only digits can be entered; a typed `.` or `,` is dropped.
 - [ ] A value `< 1` (including `0`) is rejected before submit.
 
-**Enforced by:** `scu-decimal-input.js` (integer mode) + web-asset linting. **Code:**
-`frontend/.../static/js/scu-decimal-input.js`. **Issues:** PR #465.
+**Enforced by:** _Client_ — `scu-decimal-input.js` (integer mode) + web-asset linting. _Server_ —
+`@ValidQuantityAmount` rejects fractional and `≤ 0` PIECE amounts on the validated DTOs, and the
+book-out / handover / claim services apply the same integer + positivity checks inline. **Code:**
+`frontend/.../static/js/scu-decimal-input.js`; `backend/.../validation/ValidQuantityAmount*`.
+**Issues:** PR #465.
 
 ## Out of scope
 
@@ -172,8 +180,4 @@ Extractor's GUI design (see [`docs/DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACT
 - Should REQ-UI-008 (no native dialogs) and REQ-UI-005 (frozen hex values) get a dedicated
   ESLint/Stylelint rule so they are gate-enforced, not review-enforced? (Promote to an ADR
   if yes.)
-- REQ-UI-010 / REQ-UI-011 are enforced at the input layer (client). Should the `> 0` and
-  three-decimal-rounding / integer rules also be enforced **server-side** (DTO validation +
-  rounding) so non-browser API clients cannot bypass them? (Currently the backend binds
-  `Double` and the DB column scale is the only server-side guard.)
 

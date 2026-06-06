@@ -24,7 +24,6 @@ import de.greluc.krt.iri.basetool.backend.model.QuantityType;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
-import java.math.BigDecimal;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -33,10 +32,14 @@ import org.springframework.stereotype.Component;
  * Constraint validator for {@link ValidQuantityAmount}.
  *
  * <p>Resolves the material by id (one DB hit per validated DTO) and applies the
- * quantity-type-specific rules listed on {@link ValidQuantityAmount}. If the material does not
- * exist, validation silently passes — the surrounding {@code @NotNull}/foreign-key checks (or the
- * service layer) report that case so the user gets the right error key, not a confusing "invalid
- * quantity" message.
+ * quantity-type-specific rules listed on {@link ValidQuantityAmount}: {@code amount > 0} for both
+ * types and whole-number amounts for {@code PIECE}. {@code SCU} fractional precision is
+ * <em>not</em> rejected here — an amount with more than three decimals is commercially rounded
+ * (HALF_UP) to three places at the persistence boundary (the {@code @PrePersist}/{@code @PreUpdate}
+ * hooks on the amount entities), mirroring the frontend, so the server accepts and normalises it
+ * rather than refusing it. If the material does not exist, validation silently passes — the
+ * surrounding {@code @NotNull}/foreign-key checks (or the service layer) report that case so the
+ * user gets the right error key, not a confusing "invalid quantity" message.
  */
 @Component
 @RequiredArgsConstructor
@@ -68,27 +71,17 @@ public class ValidQuantityAmountValidator
     // The isEmpty()/early-return guard above already excludes the empty case;
     // orElseThrow makes that contract explicit (and silences SpotBugs).
     Material material = materialOpt.orElseThrow();
-    if (material.getQuantityType() == QuantityType.PIECE) {
-      if (dto.amount() % 1 != 0) {
-        context.disableDefaultConstraintViolation();
-        context
-            .buildConstraintViolationWithTemplate("{error.validation.quantity_must_be_integer}")
-            .addPropertyNode("amount")
-            .addConstraintViolation();
-        return false;
-      }
-    } else if (material.getQuantityType() == QuantityType.SCU) {
-      BigDecimal bd = BigDecimal.valueOf(dto.amount()).stripTrailingZeros();
-      if (bd.scale() > 3) {
-        context.disableDefaultConstraintViolation();
-        context
-            .buildConstraintViolationWithTemplate("{error.validation.quantity_max_3_decimals}")
-            .addPropertyNode("amount")
-            .addConstraintViolation();
-        return false;
-      }
+    if (material.getQuantityType() == QuantityType.PIECE && dto.amount() % 1 != 0) {
+      context.disableDefaultConstraintViolation();
+      context
+          .buildConstraintViolationWithTemplate("{error.validation.quantity_must_be_integer}")
+          .addPropertyNode("amount")
+          .addConstraintViolation();
+      return false;
     }
-
+    // SCU amounts with more than three decimals are NOT rejected: they are rounded HALF_UP to
+    // three places at the persistence boundary (see roundAmountToScuScale on the amount entities),
+    // so the server normalises fractional precision the same way the frontend does.
     return true;
   }
 }

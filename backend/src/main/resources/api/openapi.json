@@ -35753,8 +35753,7 @@
           "amount" : {
             "type" : "number",
             "format" : "double",
-            "maximum" : 100000,
-            "minimum" : 0
+            "maximum" : 100000
           }
         },
         "required" : [ "amount", "materialId" ]
