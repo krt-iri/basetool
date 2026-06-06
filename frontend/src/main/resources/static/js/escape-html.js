@@ -18,12 +18,14 @@
         '>': '&gt;',
         '"': '&quot;',
         "'": '&#39;',
-        '/': '&#x2F;'
+        '/': '&#x2F;',
     };
 
     function escapeHtml(value) {
         if (value === null || value === undefined) return '';
-        return String(value).replace(/[&<>"'/]/g, function (c) { return ENTITY[c]; });
+        return String(value).replace(/[&<>"'/]/g, function (c) {
+            return ENTITY[c];
+        });
     }
 
     root.escapeHtml = escapeHtml;

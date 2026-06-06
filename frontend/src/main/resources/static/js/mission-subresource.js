@@ -25,13 +25,13 @@
 
     function i18n(key, fallback) {
         const dict = window.MISSION_SUBRES_I18N || {};
-        return (dict[key] != null && dict[key] !== '') ? dict[key] : (fallback || key);
+        return dict[key] != null && dict[key] !== '' ? dict[key] : fallback || key;
     }
 
     function csrfHeaders() {
         const headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
         };
         const token = document.querySelector('meta[name="_csrf"]')?.content;
         const header = document.querySelector('meta[name="_csrf_header"]')?.content;
@@ -54,9 +54,10 @@
         if (newVersion == null) {
             return;
         }
-        const container = (typeof containerSelector === 'string')
-            ? document.querySelector(containerSelector)
-            : containerSelector;
+        const container =
+            typeof containerSelector === 'string'
+                ? document.querySelector(containerSelector)
+                : containerSelector;
         if (!container) {
             return;
         }
@@ -87,16 +88,18 @@
     async function handleProblem(response, sectionKey, problem) {
         const sectionLabel = i18n('mission.conflict.section.' + sectionKey, sectionKey);
         if (response.status === 409) {
-            const problemCode = (problem && typeof problem === 'object' && problem.code)
-                ? String(problem.code)
-                : null;
-            const isStaleData = (problemCode === 'OPTIMISTIC_LOCK'
-                || problemCode === 'PESSIMISTIC_LOCK');
+            const problemCode =
+                problem && typeof problem === 'object' && problem.code
+                    ? String(problem.code)
+                    : null;
+            const isStaleData =
+                problemCode === 'OPTIMISTIC_LOCK' || problemCode === 'PESSIMISTIC_LOCK';
             if (isStaleData) {
                 const title = i18n('mission.conflict.toast.title', 'Konflikt');
-                const detail = (problem && problem.detail)
-                    ? problem.detail
-                    : i18n('mission.conflict.toast.detail', 'Bitte Seite neu laden.');
+                const detail =
+                    problem && problem.detail
+                        ? problem.detail
+                        : i18n('mission.conflict.toast.detail', 'Bitte Seite neu laden.');
                 const msg = sectionLabel + ': ' + detail;
                 if (typeof window.showFrontendErrorToast === 'function') {
                     window.showFrontendErrorToast(msg);
@@ -104,10 +107,12 @@
                 if (typeof window.showKrtConfirm === 'function') {
                     const ok = await window.showKrtConfirm(
                         title,
-                        i18n('mission.conflict.action.reload.question',
-                             'Aktuelle Werte laden? Eingaben in anderen Bereichen bleiben erhalten (via Neuladen gehen sie verloren).'),
+                        i18n(
+                            'mission.conflict.action.reload.question',
+                            'Aktuelle Werte laden? Eingaben in anderen Bereichen bleiben erhalten (via Neuladen gehen sie verloren).',
+                        ),
                         i18n('mission.conflict.action.reload', 'Aktuelle Werte laden'),
-                        i18n('mission.conflict.action.dismiss', 'Schliessen')
+                        i18n('mission.conflict.action.dismiss', 'Schliessen'),
                     );
                     if (ok) {
                         window.location.reload();
@@ -118,17 +123,19 @@
             // Domain conflict (duplicate, in-use, business-state). Surface the backend's
             // localized detail directly — never the reload prompt, because the user's input
             // is fine, the operation itself is what the server refused.
-            const detail = (problem && problem.detail)
-                ? problem.detail
-                : i18n('mission.save.section.error', 'Speichern fehlgeschlagen.');
+            const detail =
+                problem && problem.detail
+                    ? problem.detail
+                    : i18n('mission.save.section.error', 'Speichern fehlgeschlagen.');
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(sectionLabel + ': ' + detail);
             }
             return;
         }
-        const generic = (problem && problem.detail)
-            ? problem.detail
-            : i18n('mission.save.section.error', 'Speichern fehlgeschlagen.');
+        const generic =
+            problem && problem.detail
+                ? problem.detail
+                : i18n('mission.save.section.error', 'Speichern fehlgeschlagen.');
         if (typeof window.showFrontendErrorToast === 'function') {
             window.showFrontendErrorToast(sectionLabel + ': ' + generic);
         }
@@ -150,7 +157,7 @@
         const method = opts.method || 'PATCH';
         const init = {
             method: method,
-            headers: csrfHeaders()
+            headers: csrfHeaders(),
         };
         if (opts.payload !== undefined && method !== 'GET' && method !== 'DELETE') {
             init.body = JSON.stringify(opts.payload);
@@ -161,8 +168,10 @@
         } catch (e) {
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(
-                    i18n('mission.save.section.error', 'Speichern fehlgeschlagen.')
-                    + ' (' + (e && e.message ? e.message : 'network') + ')'
+                    i18n('mission.save.section.error', 'Speichern fehlgeschlagen.') +
+                        ' (' +
+                        (e && e.message ? e.message : 'network') +
+                        ')',
                 );
             }
             return { ok: false, status: 0, body: null };
@@ -171,8 +180,10 @@
         let body;
         const contentType = response.headers.get('Content-Type') || '';
         try {
-            if (contentType.indexOf('application/json') >= 0
-                || contentType.indexOf('application/problem+json') >= 0) {
+            if (
+                contentType.indexOf('application/json') >= 0 ||
+                contentType.indexOf('application/problem+json') >= 0
+            ) {
                 body = await response.json();
             } else {
                 body = await response.text();
@@ -191,10 +202,16 @@
         }
         if (typeof window.showFrontendSuccessToast === 'function') {
             const sectionLabel = i18n('mission.save.section.' + opts.sectionKey, opts.sectionKey);
-            window.showFrontendSuccessToast(sectionLabel + ': ' + i18n('mission.save.section.ok', 'Gespeichert.'));
+            window.showFrontendSuccessToast(
+                sectionLabel + ': ' + i18n('mission.save.section.ok', 'Gespeichert.'),
+            );
         }
         if (typeof opts.onSuccess === 'function') {
-            try { opts.onSuccess(body); } catch (_e) { /* callback errors must not break UX */ }
+            try {
+                opts.onSuccess(body);
+            } catch (_e) {
+                /* callback errors must not break UX */
+            }
         }
         return { ok: true, status: response.status, body: body };
     }
@@ -202,6 +219,6 @@
     window.MissionSubresource = {
         patchSubResource: patchSubResource,
         syncVersion: syncVersion,
-        handleProblem: handleProblem
+        handleProblem: handleProblem,
     };
 })();

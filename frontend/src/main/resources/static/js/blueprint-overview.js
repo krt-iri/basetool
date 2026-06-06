@@ -59,7 +59,7 @@
         panel.appendChild(el('div', 'bp-owners-loading', i18n().loading || 'Loading...'));
         fetch(ownersUrl(productKey), {
             credentials: 'same-origin',
-            headers: { 'Accept': 'application/json' }
+            headers: { Accept: 'application/json' },
         })
             .then(function (resp) {
                 return resp.ok ? resp.json() : null;
@@ -117,7 +117,7 @@
                 }
             });
             if (noResults) {
-                noResults.style.display = (!anyVisible && query !== '') ? '' : 'none';
+                noResults.style.display = !anyVisible && query !== '' ? '' : 'none';
             }
         });
     }

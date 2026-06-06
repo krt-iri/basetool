@@ -31,7 +31,9 @@
     let hiddenLocationType = null;
     let debounceTimer = null;
 
-    function $(id) { return document.getElementById(id); }
+    function $(id) {
+        return document.getElementById(id);
+    }
 
     function init() {
         modal = $('krt-pi-modal');
@@ -83,7 +85,8 @@
         setField('note', btn.getAttribute('data-note'));
         setField('quantity', btn.getAttribute('data-quantity'));
         if (hiddenUexId) hiddenUexId.value = btn.getAttribute('data-location-uex-id') || '';
-        if (hiddenLocationType) hiddenLocationType.value = btn.getAttribute('data-location-type') || '';
+        if (hiddenLocationType)
+            hiddenLocationType.value = btn.getAttribute('data-location-type') || '';
         if (searchInput) searchInput.value = btn.getAttribute('data-location-name') || '';
         modal.style.display = 'flex';
     }
@@ -94,13 +97,17 @@
 
     function openDelete(btn) {
         if (!deleteModal || !deleteForm) return;
-        deleteForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
+        deleteForm.action = window.safeSameOriginUrl(
+            btn.getAttribute('data-action'),
+            deleteForm.action,
+        );
         let msgEl = $('krt-pi-delete-message');
         let name = btn.getAttribute('data-name');
         if (msgEl && name) {
-            msgEl.textContent = (window.krtPersonalInventoryI18n && window.krtPersonalInventoryI18n.confirmBody)
-                ? (window.krtPersonalInventoryI18n.confirmBody + ' (' + name + ')')
-                : msgEl.textContent;
+            msgEl.textContent =
+                window.krtPersonalInventoryI18n && window.krtPersonalInventoryI18n.confirmBody
+                    ? window.krtPersonalInventoryI18n.confirmBody + ' (' + name + ')'
+                    : msgEl.textContent;
         }
         deleteModal.style.display = 'flex';
     }
@@ -112,12 +119,14 @@
     function setField(name, value) {
         if (!form) return;
         let el = form.querySelector('[name="' + name + '"]');
-        if (el) el.value = (value == null ? '' : value);
+        if (el) el.value = value == null ? '' : value;
     }
 
     function clearForm() {
         if (!form) return;
-        ['id', 'version', 'name', 'note', 'quantity'].forEach(function (n) { setField(n, ''); });
+        ['id', 'version', 'name', 'note', 'quantity'].forEach(function (n) {
+            setField(n, '');
+        });
         if (hiddenUexId) hiddenUexId.value = '';
         if (hiddenLocationType) hiddenLocationType.value = '';
         if (searchInput) searchInput.value = '';
@@ -132,43 +141,67 @@
         if (!searchInput || !resultsEl) return;
         let q = searchInput.value || '';
         let endpoints = window.krtPersonalInventoryEndpoints || {};
-        let url = (endpoints.uexSearch || '/personal-inventory/uex-search')
-                + '?q=' + encodeURIComponent(q) + '&limit=2000';
+        let url =
+            (endpoints.uexSearch || '/personal-inventory/uex-search') +
+            '?q=' +
+            encodeURIComponent(q) +
+            '&limit=2000';
         resultsEl.hidden = false;
-        resultsEl.innerHTML = '<div class="krt-pi-typeahead-loading">'
-                + escapeHtml((window.krtPersonalInventoryI18n || {}).searching || 'Suche...') + '</div>';
-        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
-            .then(function (resp) { return resp.ok ? resp.json() : []; })
+        resultsEl.innerHTML =
+            '<div class="krt-pi-typeahead-loading">' +
+            escapeHtml((window.krtPersonalInventoryI18n || {}).searching || 'Suche...') +
+            '</div>';
+        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+            .then(function (resp) {
+                return resp.ok ? resp.json() : [];
+            })
             .then(renderResults)
-            .catch(function () { renderResults([]); });
+            .catch(function () {
+                renderResults([]);
+            });
     }
 
     function renderResults(items) {
         if (!resultsEl) return;
         if (!items || items.length === 0) {
-            resultsEl.innerHTML = '<div class="krt-pi-typeahead-empty">'
-                    + escapeHtml((window.krtPersonalInventoryI18n || {}).noResults || 'Keine Treffer') + '</div>';
+            resultsEl.innerHTML =
+                '<div class="krt-pi-typeahead-empty">' +
+                escapeHtml((window.krtPersonalInventoryI18n || {}).noResults || 'Keine Treffer') +
+                '</div>';
             return;
         }
         let html = '';
         items.forEach(function (it) {
             let typeClass = it.type === 'CITY' ? 'krt-pi-loc-city' : 'krt-pi-loc-station';
-            html += '<button type="button" class="krt-pi-typeahead-item" '
-                    + 'data-uex-id="' + escapeAttr(it.uexId) + '" '
-                    + 'data-type="' + escapeAttr(it.type) + '" '
-                    + 'data-name="' + escapeAttr(it.name) + '">'
-                    + '<span class="krt-pi-location-marker ' + typeClass + '"></span>'
-                    + '<span class="krt-pi-typeahead-name">' + escapeHtml(it.name || '') + '</span>'
-                    + '<span class="krt-pi-typeahead-meta">'
-                    + escapeHtml(it.parentName || '') + (it.starSystemName ? ' / ' + escapeHtml(it.starSystemName) : '')
-                    + '</span>'
-                    + '</button>';
+            html +=
+                '<button type="button" class="krt-pi-typeahead-item" ' +
+                'data-uex-id="' +
+                escapeAttr(it.uexId) +
+                '" ' +
+                'data-type="' +
+                escapeAttr(it.type) +
+                '" ' +
+                'data-name="' +
+                escapeAttr(it.name) +
+                '">' +
+                '<span class="krt-pi-location-marker ' +
+                typeClass +
+                '"></span>' +
+                '<span class="krt-pi-typeahead-name">' +
+                escapeHtml(it.name || '') +
+                '</span>' +
+                '<span class="krt-pi-typeahead-meta">' +
+                escapeHtml(it.parentName || '') +
+                (it.starSystemName ? ' / ' + escapeHtml(it.starSystemName) : '') +
+                '</span>' +
+                '</button>';
         });
         resultsEl.innerHTML = html;
         resultsEl.querySelectorAll('.krt-pi-typeahead-item').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 if (hiddenUexId) hiddenUexId.value = btn.getAttribute('data-uex-id') || '';
-                if (hiddenLocationType) hiddenLocationType.value = btn.getAttribute('data-type') || '';
+                if (hiddenLocationType)
+                    hiddenLocationType.value = btn.getAttribute('data-type') || '';
                 if (searchInput) searchInput.value = btn.getAttribute('data-name') || '';
                 resultsEl.hidden = true;
             });
