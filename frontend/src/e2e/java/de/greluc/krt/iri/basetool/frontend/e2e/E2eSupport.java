@@ -279,15 +279,50 @@ final class E2eSupport {
    * {@code eval}), then performs a normal, trusted click that submits with full validation,
    * consistently across Chromium, Firefox and WebKit.
    *
+   * <p>The click is wrapped in {@link #awaitFormPost} so the method only returns once the form's
+   * POST navigation has been answered by the server — see that method for why a bare click would
+   * otherwise let a follow-up {@code navigate(...)} abort the in-flight submit on WebKit.
+   *
    * @param submit the submit control (a {@code <button type="submit">}) to click
    */
   static void clickSubmitClearingFooter(Locator submit) {
-    submit
-        .page()
-        .evaluate(
-            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
-                + " 'none'; } }");
-    submit.click();
+    Page page = submit.page();
+    page.evaluate(
+        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+            + " 'none'; } }");
+    awaitFormPost(page, submit::click);
+  }
+
+  /**
+   * Runs a submit action that triggers a full-page form POST and blocks until the browser has
+   * received the server's response to that POST navigation, so the submit cannot be dropped by what
+   * follows it.
+   *
+   * <p>Playwright's {@code locator.click()} returns once the click is dispatched — it does NOT wait
+   * for any navigation the click starts. The old pattern ({@code click()} then {@code
+   * waitForLoadState()}) was therefore racy: when the POST navigation had not yet committed, {@code
+   * waitForLoadState()} saw the still-current form document (already in the {@code load} state) and
+   * resolved immediately, and the test's next {@code navigate(...)} (or context close) aborted the
+   * in-flight POST. The mutation was silently lost and the expected row never appeared. WebKit,
+   * slower under CI load, lost this race intermittently while Chromium and Firefox usually
+   * committed the POST in time — the cause of the flaky, engine-specific "row not visible" failures
+   * across the mission-create, hangar-add-ship and cross-Staffel-handover flows.
+   *
+   * <p>Waiting for the POST navigation's response removes the race deterministically: the app's
+   * form handlers complete the backend mutation before issuing their {@code 3xx} redirect, so once
+   * the response is in hand the mutation has provably landed and any subsequent navigation is safe.
+   * The predicate matches only the top-level form submit ({@code isNavigationRequest} excludes
+   * XHR/WebSocket/beacon POSTs).
+   *
+   * @param page the page whose main-frame POST navigation to await
+   * @param submitAction the action (typically a submit-button click) that starts the form POST
+   */
+  static void awaitFormPost(Page page, Runnable submitAction) {
+    page.waitForResponse(
+        response ->
+            "POST".equals(response.request().method()) && response.request().isNavigationRequest(),
+        new Page.WaitForResponseOptions().setTimeout(15_000),
+        submitAction);
   }
 
   /**
