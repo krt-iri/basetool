@@ -43,7 +43,7 @@ this version.
   `InventoryStackAggregate` projection); the grouped response carries only the collapsed stack
   rows. A stack's entries are **not** inlined — append-only growth is unbounded per stack — but
   fetched lazily and paginated on expand via `/api/v1/inventory/{my-inventory|all}/stack/entries`,
-  oldest-first, backed by the composite `idx_inventory_item_stack_key` index (Flyway `V142`).
+  oldest-first, backed by the composite `idx_inventory_item_stack_key` index (Flyway `V143`).
   This keeps the grouped read O(stacks) rather than O(rows) and bounds the per-expand load
   (REQ-INV-005).
 - A new response DTO (`InventoryStackDto`, entries not inlined), a `createdAt` field on

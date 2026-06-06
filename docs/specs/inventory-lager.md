@@ -127,7 +127,7 @@ impersonation). Per-entry actions (REQ-INV-003) operate on the fetched rows unch
 `InventoryItemController#getMyStackEntries` / `#getAllStackEntries`,
 `InventoryItemRepository#findUserStackEntries` / `#findGlobalStackEntries`,
 `InventoryPageController#viewMyStackEntries` / `#viewAllStackEntries`,
-`fragments/inventory-stack-entries.html`, `V142__add_inventory_item_stack_key_index.sql` ·
+`fragments/inventory-stack-entries.html`, `V143__add_inventory_item_stack_key_index.sql` ·
 **Issues:** #466
 
 ## Out of scope
