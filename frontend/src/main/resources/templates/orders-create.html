@@ -207,7 +207,7 @@
 
                 <h3 style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: 700; margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.create.items.title}">Items</h3>
 
-                <div th:if="${#lists.isEmpty(orderableItems)}" class="hud-box hud-box-error">
+                <div th:if="${!hasOrderableItems}" class="hud-box hud-box-error">
                     <p th:text="#{orders.create.item.noItems}">Keine bestellbaren Items verfügbar.</p>
                 </div>
 
@@ -241,10 +241,11 @@
         <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
     </select>
 
-    <!-- Template for orderable-item options, cloned by addItemLine() -->
+    <!-- Placeholder-only template cloned by addItemLine(); the item options themselves are fetched
+         on demand from the backend (see fetchItemOptions / GET /orders/item-search), so the picker
+         no longer preloads — and silently truncates past an alphabetical cap — the whole catalog. -->
     <select id="item-options-template" style="display: none;">
         <option value="" th:text="#{orders.create.item.select}">-- Item wählen --</option>
-        <option th:each="gi : ${orderableItems}" th:value="${gi.id()}" th:text="${gi.name()}"></option>
     </select>
 </main>
 
@@ -387,11 +388,24 @@
         searchPlaceholder: /*[[#{orders.create.item.search.placeholder}]]*/ 'Item suchen oder waehlen...',
         searchNoResults: /*[[#{orders.create.item.search.noResults}]]*/ 'Keine passenden Items',
         searchHint: /*[[#{orders.create.item.search.hint}]]*/ 'Weiter tippen, um die Liste einzugrenzen...',
-        searchInvalid: /*[[#{orders.create.item.search.invalid}]]*/ 'Bitte ein Item aus der Liste waehlen.'
+        searchInvalid: /*[[#{orders.create.item.search.invalid}]]*/ 'Bitte ein Item aus der Liste waehlen.',
+        searchLoading: /*[[#{orders.create.item.search.loading}]]*/ 'Suche laeuft...'
     };
     let itemLineIndex = 0;
     // Edit mode (item-order edit): the existing lines, injected server-side. Null on the create page.
     const EDIT_ITEMS = /*[[${editItems}]]*/ null;
+
+    // Live-searches the orderable-item catalog on the backend (the combobox debounces the calls) and
+    // maps the result to the combobox's {value, label} option shape. Returns [] on any failure so the
+    // picker degrades to "no matches" instead of throwing.
+    function fetchItemOptions(query) {
+        return fetch('/orders/item-search?q=' + encodeURIComponent(query || ''), {headers: {'Accept': 'application/json'}})
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (list) {
+                return (list || []).map(function (gi) { return {value: gi.id, label: gi.name}; });
+            })
+            .catch(function () { return []; });
+    }
 
     function escapeName(s) {
         if (window.escapeHtml) { return window.escapeHtml(String(s)); }
@@ -448,11 +462,18 @@
             <div data-role="subassemblies" style="margin-top:0.5rem;"></div>
         `;
         container.appendChild(row);
-        // Seed the native select's value BEFORE enhancing it so the combobox renders the
-        // matching label, then upgrade it into a searchable type-to-filter dropdown. If the
-        // enhancer script failed to load, the plain <select> keeps working as a fallback.
+        // Seed the chosen item as a selected <option> BEFORE enhancing, so the combobox shows its
+        // label even though the option list is now fetched on demand rather than preloaded. Built via
+        // the DOM so the backend-supplied name is never parsed as HTML. Then upgrade into a
+        // searchable, backend-backed dropdown; if the enhancer failed to load, the plain <select>
+        // with the seeded option keeps working as a fallback.
         const itemSelect = row.querySelector('select[data-role="item-select"]');
         if (itemSelect && prefill.gameItemId) {
+            const seeded = document.createElement('option');
+            seeded.value = prefill.gameItemId;
+            seeded.textContent = prefill.gameItemName || prefill.gameItemId;
+            seeded.selected = true;
+            itemSelect.appendChild(seeded);
             itemSelect.value = prefill.gameItemId;
         }
         if (itemSelect && window.krtSearchableSelect) {
@@ -460,7 +481,9 @@
                 placeholder: ITEM_I18N.searchPlaceholder,
                 noResultsText: ITEM_I18N.searchNoResults,
                 hintText: ITEM_I18N.searchHint,
-                invalidText: ITEM_I18N.searchInvalid
+                invalidText: ITEM_I18N.searchInvalid,
+                loadingText: ITEM_I18N.searchLoading,
+                remoteSource: fetchItemOptions
             });
         }
         if (prefill.gameItemId) {
@@ -548,7 +571,7 @@
                         const gi = sa.gameItem || {};
                         s += `<div style="display:flex; gap:1rem; align-items:center; margin-top:0.4rem;">
                             <span style="flex:2;">${escapeName(gi.name || '')} &times; ${sa.quantity}</span>
-                            <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
+                            <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-game-item-name="${escapeName(gi.name || '')}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
                         </div>`;
                     });
                     subs.innerHTML = s;
@@ -573,7 +596,7 @@
             if (removeBtn) { const row = removeBtn.closest('.item-line'); if (row) { row.remove(); } return; }
             const adoptBtn = e.target.closest('[data-trigger="orders-adopt-sub"]');
             if (adoptBtn) {
-                addItemLine({gameItemId: adoptBtn.dataset.gameItemId, amount: parseInt(adoptBtn.dataset.amount, 10) || 1, parentId: adoptBtn.dataset.parent});
+                addItemLine({gameItemId: adoptBtn.dataset.gameItemId, gameItemName: adoptBtn.dataset.gameItemName, amount: parseInt(adoptBtn.dataset.amount, 10) || 1, parentId: adoptBtn.dataset.parent});
             }
         });
         // Edit mode: rebuild the existing lines from the injected prefill; otherwise start with one

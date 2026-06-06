@@ -124,6 +124,27 @@ public class BackendApiClient {
   }
 
   /**
+   * Public (anonymous) GET that expands {@code uriVariables} into {@code uriTemplate} so the
+   * WebClient encodes them per RFC 3986, targeting the anonymous {@code publicWebClient}. The
+   * {@code isPublic} counterpart of {@link #get(String, ParameterizedTypeReference, Object...)}:
+   * use it when a free-text value (e.g. an item-search term carrying spaces or quotes) must reach a
+   * {@code permitAll()} backend endpoint from an unauthenticated page, where hand-encoding the
+   * value into the URI string would be re-mangled across the frontend&rarr;backend hop.
+   *
+   * @param uriTemplate the URI template containing {@code {name}} placeholders
+   * @param responseType the decoded response type
+   * @param uriVariables the values expanded into the template, encoded by the WebClient
+   * @param <T> the response body type
+   * @return the decoded response body
+   */
+  @Retry(name = "backend")
+  @CircuitBreaker(name = "backend")
+  public <T> T getPublic(
+      String uriTemplate, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
+    return executeGet(publicWebClient, uriTemplate, responseType, uriVariables);
+  }
+
+  /**
    * Cached GET; subsequent calls within {@link CacheConfig#STATIC_DATA_CACHE}'s TTL hit the cache.
    */
   @Retry(name = "backend")
