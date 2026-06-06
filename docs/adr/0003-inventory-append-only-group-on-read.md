@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-06
 - **Deciders:** Repository owner (@greluc)
-- **Related:** spec [`inventory-lager.md`](../specs/inventory-lager.md) `REQ-INV-001..004` · [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003` · issue #466
+- **Related:** spec [`inventory-lager.md`](../specs/inventory-lager.md) `REQ-INV-001..005` · [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003` · issue #466
 
 ## Context
 
@@ -23,11 +23,12 @@ lost updates under concurrency.
 
 We will make inventory **append-only** and form stacks only at read time (group-on-read).
 Every write path inserts (or edits in place) its own row and never folds into a different
-row. The grouped Lager views compute display *stacks* by the natural key, summing amount and
-aggregating quality, and expose the underlying entries oldest-first; the UI renders Material
-→ Stack → Entries with click-to-expand. Mutating actions stay **per entry** (by id +
-version); the stack row is display-and-expand only — there is no aggregate book-out with
-automatic allocation in this version.
+row. The grouped Lager views compute display *stacks* by the natural key **in SQL**, summing
+amount and aggregating quality; a stack's underlying entries are **not** inlined but fetched
+lazily and paginated on expand (oldest-first). The UI renders Material → Stack and expands a
+stack to load its entries. Mutating actions stay **per entry** (by id + version); the stack
+row is display-and-expand only — there is no aggregate book-out with automatic allocation in
+this version.
 
 ## Consequences
 
@@ -35,12 +36,20 @@ automatic allocation in this version.
 - The lost-update race disappears: no shared row is mutated, so the pessimistic merge lock and
   the `findMatchingInventoryItem(ForUpdate)` queries are deleted (a net concurrency
   simplification — the `*WithinTransaction` / bulk-update-after-loop rules are unaffected).
-- More physical rows and read-time grouping; pagination on the grouped views is by stack, not
-  by raw row. Job-order completion and material-collection are sum-based, so totals are
-  unchanged — only row counts grow.
-- A new response DTO (`InventoryStackDto`), a `createdAt` field on `InventoryItemDto`, and a
-  three-level template were introduced; the frontend mirrors and `openapi.json` move in lock
-  step (the `DtoOpenApiContractTest` enforces it).
+- More physical rows and read-time grouping. The grouped read returns all stacks (sorted,
+  client-filtered); only the per-stack entries drill-down is paginated. Job-order completion
+  and material-collection are sum-based, so totals are unchanged — only row counts grow.
+- Stacks are aggregated in SQL (a `GROUP BY` over the natural key into an
+  `InventoryStackAggregate` projection); the grouped response carries only the collapsed stack
+  rows. A stack's entries are **not** inlined — append-only growth is unbounded per stack — but
+  fetched lazily and paginated on expand via `/api/v1/inventory/{my-inventory|all}/stack/entries`,
+  oldest-first, backed by the composite `idx_inventory_item_stack_key` index (Flyway `V142`).
+  This keeps the grouped read O(stacks) rather than O(rows) and bounds the per-expand load
+  (REQ-INV-005).
+- A new response DTO (`InventoryStackDto`, entries not inlined), a `createdAt` field on
+  `InventoryItemDto`, a two-level grouped page plus a lazy entries fragment
+  (`fragments/inventory-stack-entries.html`) were introduced; the frontend mirrors and
+  `openapi.json` move in lock step (the `DtoOpenApiContractTest` enforces it).
 - No data migration: previously-merged rows remain valid; the change is forward-only.
 
 ## Alternatives considered

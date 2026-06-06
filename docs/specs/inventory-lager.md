@@ -46,27 +46,29 @@ removed.
 `RefineryOrderServiceTest` · **Code:** `InventoryItemService`, `RefineryOrderService` ·
 **Issues:** #466
 
-### REQ-INV-002 — Group-on-read display: Material → Stack → Entries
+### REQ-INV-002 — Group-on-read display: Material → Stack
 
 The grouped Lager views (`/inventory/my`, `/inventory/all`) present each material as a group
-whose stacks are computed at read time by the stock identity. Each stack shows the summed
-amount, the amount-weighted mean quality, the max quality and the entry count; its entries
-are the underlying rows, ordered **oldest-first** by creation instant. The UI renders three
-levels — material group → stack row → expandable entries — so a stack row can be expanded to
-see the individual entries it consists of. The per-material aggregate page (`/inventory`,
-`AggregatedInventoryDto`) is unchanged.
+whose stacks are computed **in SQL** (a `GROUP BY` over the stock identity) at read time. Each
+stack shows the summed amount, the amount-weighted mean quality, the max quality and the entry
+count. The grouped response carries **only** the collapsed stack rows — it does **not** inline
+the underlying entries (those are loaded on demand, see REQ-INV-005). The UI renders two server
+levels — material group → stack row — and a stack row expands to fetch its entries. The
+per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchanged.
 
 **Acceptance**
 
-- [ ] Rows sharing the stock identity appear as one stack row with the correct summed amount
-  and entry count.
+- [ ] Rows sharing the stock identity appear as one stack row with the correct summed amount,
+  amount-weighted mean quality and entry count.
 - [ ] Rows differing in any stock-identity dimension appear as separate stacks.
-- [ ] A stack's entries are returned oldest-first by `createdAt`.
-- [ ] Both grouped pages render without error for a stack carrying multiple entries.
+- [ ] The grouped response contains no per-entry rows (entries are lazy — REQ-INV-005).
+- [ ] Both grouped pages render the collapsed stack rows without error.
 
-**Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryPageControllerMvcTest` ·
-**Code:** `InventoryItemService#aggregateInventoryItems`, `InventoryStackDto`,
-`GroupedInventoryDto`, `inventory-my.html`, `inventory-admin.html` · **Issues:** #466
+**Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
+`InventoryPageControllerMvcTest` · **Code:** `InventoryItemService#buildGroupedFromStacks`,
+`InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
+`InventoryStackDto`, `GroupedInventoryDto`, `inventory-my.html`, `inventory-admin.html` ·
+**Issues:** #466
 
 ### REQ-INV-003 — Actions operate per entry
 
@@ -98,6 +100,34 @@ they remain separate and are collapsed only for display.
   row is deleted.
 
 **Enforced by:** `InventoryOrgUnitReconcilerTest` · **Code:** `InventoryOrgUnitReconciler` ·
+**Issues:** #466
+
+### REQ-INV-005 — Entries are lazy-loaded, paginated and index-backed
+
+A stack does not inline its entries: an append-only stack grows unboundedly as contributions
+accumulate, so materialising every entry on each grouped read does not scale. Entries are
+fetched on expand from `GET /api/v1/inventory/{my-inventory|all}/stack/entries`, addressed by
+the stock-identity fields the stack already exposes (a `null` job-order / mission / owning
+org-unit selects the rows where that association is itself absent), returned **oldest-first** by
+`createdAt` and **paginated** (default 20, max 100 per page). A composite index
+`idx_inventory_item_stack_key` on the inventory natural key backs both the grouped `GROUP BY`
+and the per-stack entries lookup. The `/all` drill-down re-applies the same org-unit scope
+predicate as the grouped view; the `/my` drill-down is owner-scoped from the JWT (no
+impersonation). Per-entry actions (REQ-INV-003) operate on the fetched rows unchanged.
+
+**Acceptance**
+
+- [ ] A stack's entries are returned oldest-first by `createdAt`.
+- [ ] A requested page size above 100 is clamped to 100; an absent page/size yields the first 20.
+- [ ] The drill-down never returns rows outside the caller's org-unit / owner scope.
+- [ ] Expanding a stack on either grouped page fetches and renders its entries without error.
+
+**Enforced by:** `InventoryItemStackQueryTest`, `InventoryItemControllerTest`,
+`InventoryPageControllerMvcTest`, `DatabaseIndexMigrationTest` · **Code:**
+`InventoryItemController#getMyStackEntries` / `#getAllStackEntries`,
+`InventoryItemRepository#findUserStackEntries` / `#findGlobalStackEntries`,
+`InventoryPageController#viewMyStackEntries` / `#viewAllStackEntries`,
+`fragments/inventory-stack-entries.html`, `V142__add_inventory_item_stack_key_index.sql` ·
 **Issues:** #466
 
 ## Out of scope

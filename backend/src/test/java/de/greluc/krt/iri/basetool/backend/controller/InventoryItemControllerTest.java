@@ -22,6 +22,7 @@ package de.greluc.krt.iri.basetool.backend.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -209,6 +210,100 @@ class InventoryItemControllerTest {
     // not by a runtime ownership decision.
     assertThat(result).containsExactly(group);
     verifyNoInteractions(userService, authHelperService);
+  }
+
+  // ── GET /my-inventory/stack/entries (JWT-derived owner, clamped paging) ──
+
+  @Test
+  void getMyStackEntries_resolvesOwnerFromJwt_clampsPageSize_andWrapsPage() {
+    Jwt jwt = jwt("owner-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    UUID owningOrgUnitId = UUID.randomUUID();
+    InventoryItemDto dto = inventoryItem(UUID.randomUUID());
+    Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 100), 1);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryItemService.getMyStackEntries(
+            eq(ownerId),
+            eq(materialId),
+            eq(locationId),
+            eq(800),
+            eq(jobOrderId),
+            eq(missionId),
+            eq(Boolean.TRUE),
+            eq(owningOrgUnitId),
+            any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<InventoryItemDto> result =
+        controller.getMyStackEntries(
+            jwt, materialId, locationId, 800, jobOrderId, missionId, true, owningOrgUnitId, 0, 500);
+
+    assertThat(result.content()).containsExactly(dto);
+    // The owner id is derived from the JWT, never a request parameter (personal-inventory
+    // isolation).
+    verify(userService).getUserIdFromJwt(jwt);
+    // A request for size=500 is clamped to the STACK_ENTRIES_MAX_SIZE bound (100).
+    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+    verify(inventoryItemService)
+        .getMyStackEntries(
+            eq(ownerId),
+            eq(materialId),
+            eq(locationId),
+            eq(800),
+            eq(jobOrderId),
+            eq(missionId),
+            eq(Boolean.TRUE),
+            eq(owningOrgUnitId),
+            pageable.capture());
+    assertThat(pageable.getValue().getPageSize()).isEqualTo(100);
+    assertThat(pageable.getValue().getPageNumber()).isZero();
+  }
+
+  // ── GET /all/stack/entries (per-owner stack key, default paging) ──
+
+  @Test
+  void getAllStackEntries_forwardsUserIdParam_appliesDefaultPaging_andWrapsPage() {
+    UUID materialId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemDto dto = inventoryItem(UUID.randomUUID());
+    Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(inventoryItemService.getAllStackEntries(
+            eq(materialId),
+            eq(userId),
+            eq(locationId),
+            isNull(),
+            isNull(),
+            isNull(),
+            isNull(),
+            any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<InventoryItemDto> result =
+        controller.getAllStackEntries(
+            materialId, userId, locationId, null, null, null, null, null, null);
+
+    assertThat(result.content()).containsExactly(dto);
+    // The squadron-wide drill-down is gated by @PreAuthorize + service scope, not a JWT-owner read.
+    verifyNoInteractions(userService, authHelperService);
+    // Null page/size fall back to the first page of STACK_ENTRIES_DEFAULT_SIZE (20).
+    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+    verify(inventoryItemService)
+        .getAllStackEntries(
+            eq(materialId),
+            eq(userId),
+            eq(locationId),
+            isNull(),
+            isNull(),
+            isNull(),
+            isNull(),
+            pageable.capture());
+    assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
+    assertThat(pageable.getValue().getPageNumber()).isZero();
   }
 
   // ── POST /inventory (create) ─────────────────────────────────────────

@@ -19,7 +19,6 @@
 
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -29,10 +28,17 @@ import java.util.UUID;
  * GroupedInventoryDto} group): owner ({@code user}), {@code location}, {@code quality}, the
  * optional job-order / mission association, the {@code personal} flag and the {@code
  * owningSquadron} owner pool. The aggregate figures ({@code totalAmount}, {@code averageQuality},
- * {@code maxQuality}, {@code entryCount}) are computed across {@code entries} for the collapsed
- * display row; {@code entries} is the full list of the underlying rows, ordered oldest-first, on
- * which every per-entry action (book-out, transfer, note, delivered, delete) operates by id +
- * version.
+ * {@code maxQuality}, {@code entryCount}) are computed across the underlying rows directly in SQL
+ * for the collapsed display row.
+ *
+ * <p>The individual entries are <em>not</em> inlined: append-only inventory grows unboundedly per
+ * stack, so the entries are loaded lazily and paginated on expand via the {@code
+ * /api/v1/inventory/{my-inventory|all}/stack/entries} endpoint (ADR-0003, REQ-INV-002). The lazy
+ * fetch is keyed off exactly the stock-identity fields this record exposes — {@code user.id()},
+ * {@code location.id()}, {@code quality}, {@code jobOrderId}, {@code missionId}, {@code personal}
+ * and {@code owningSquadron.id()} — so the client can request a stack's entries without any opaque
+ * token. Every per-entry action (book-out, transfer, note, delivered, delete) still operates on a
+ * single fetched entry by id + version.
  *
  * @param user the owning user shared by every entry in the stack
  * @param location the storage location shared by every entry
@@ -48,7 +54,6 @@ import java.util.UUID;
  * @param averageQuality the amount-weighted mean quality across all entries
  * @param maxQuality the highest quality value among the entries
  * @param entryCount the number of underlying entries collapsed into this stack
- * @param entries the underlying individual rows, ordered oldest-first by creation instant
  */
 public record InventoryStackDto(
     UserReferenceDto user,
@@ -63,5 +68,4 @@ public record InventoryStackDto(
     Double totalAmount,
     Double averageQuality,
     Integer maxQuality,
-    Integer entryCount,
-    List<InventoryItemDto> entries) {}
+    Integer entryCount) {}

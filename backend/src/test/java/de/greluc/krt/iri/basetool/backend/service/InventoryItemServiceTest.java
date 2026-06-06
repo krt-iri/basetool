@@ -301,17 +301,16 @@ class InventoryItemServiceTest {
     user.setId(userId);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(inventoryItemRepository.findUserByFilters(
-            eq(user),
+    when(inventoryItemRepository.findUserStacks(
+            eq(userId),
             eq(false),
             eq(null),
             eq(null),
             eq(true),
             eq(jobOrderIds),
             eq(true),
-            eq(missionIds),
-            any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of()));
+            eq(missionIds)))
+        .thenReturn(List.of());
 
     // When
     List<GroupedInventoryDto> result =
@@ -320,16 +319,15 @@ class InventoryItemServiceTest {
     // Then
     assertNotNull(result);
     verify(inventoryItemRepository)
-        .findUserByFilters(
-            eq(user),
+        .findUserStacks(
+            eq(userId),
             eq(false),
             eq(null),
             eq(null),
             eq(true),
             eq(jobOrderIds),
             eq(true),
-            eq(missionIds),
-            any(Pageable.class));
+            eq(missionIds));
   }
 
   @Test
@@ -338,32 +336,16 @@ class InventoryItemServiceTest {
     User user = new User();
     user.setId(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(inventoryItemRepository.findUserByFilters(
-            eq(user),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(false),
-            eq(null),
-            any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of()));
+    when(inventoryItemRepository.findUserStacks(
+            eq(userId), eq(false), eq(null), eq(null), eq(false), eq(null), eq(false), eq(null)))
+        .thenReturn(List.of());
 
     List<GroupedInventoryDto> result = inventoryItemService.getMyAggregatedInventory(userId);
 
     assertNotNull(result);
     verify(inventoryItemRepository)
-        .findUserByFilters(
-            eq(user),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(false),
-            eq(null),
-            any(Pageable.class));
+        .findUserStacks(
+            eq(userId), eq(false), eq(null), eq(null), eq(false), eq(null), eq(false), eq(null));
   }
 
   @Test
@@ -377,17 +359,16 @@ class InventoryItemServiceTest {
     user.setId(userId);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(inventoryItemRepository.findUserByFilters(
-            eq(user),
+    when(inventoryItemRepository.findUserStacks(
+            eq(userId),
             eq(true),
             eq(materialIds),
             eq(minQuality),
             eq(false),
             eq(null),
             eq(false),
-            eq(null),
-            any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of()));
+            eq(null)))
+        .thenReturn(List.of());
 
     // When
     List<GroupedInventoryDto> result =
@@ -396,16 +377,15 @@ class InventoryItemServiceTest {
     // Then
     assertNotNull(result);
     verify(inventoryItemRepository)
-        .findUserByFilters(
-            eq(user),
+        .findUserStacks(
+            eq(userId),
             eq(true),
             eq(materialIds),
             eq(minQuality),
             eq(false),
             eq(null),
             eq(false),
-            eq(null),
-            any(Pageable.class));
+            eq(null));
   }
 
   @Test

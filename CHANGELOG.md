@@ -20,7 +20,7 @@
 
 - **Finanz-Einträge eines Einsatzes lassen sich nicht mehr anonym lesen oder anlegen:** Die Finanz-/Auszahlungssicht ist jetzt Mitgliedern (und höher) vorbehalten — anonyme und rollenlose Gast-Zugriffe werden abgewiesen. Aufträge anlegen bleibt für alle möglich.
 
-- **Das Lager fasst gleiche Materialeinträge nicht mehr automatisch zu einem Eintrag zusammen:** Jede Einbuchung, Umlagerung und Raffinerie-Einlagerung bleibt ein eigener Eintrag. In „Mein Lager" und „Globales Lager" werden Einträge mit gleichem Material, Ort, Qualität, Auftrags-/Einsatzbezug und Besitzer weiterhin als eine Zeile angezeigt, die sich aufklappen lässt, um die einzelnen Einträge zu sehen und einzeln zu bearbeiten.
+- **Das Lager fasst gleiche Materialeinträge nicht mehr automatisch zu einem Eintrag zusammen:** Jede Einbuchung, Umlagerung und Raffinerie-Einlagerung bleibt ein eigener Eintrag. In „Mein Lager" und „Globales Lager" werden Einträge mit gleichem Material, Ort, Qualität, Auftrags-/Einsatzbezug und Besitzer weiterhin als eine Zeile angezeigt, die sich aufklappen lässt, um die einzelnen Einträge zu sehen und einzeln zu bearbeiten. Die Einträge eines Stapels werden dabei erst beim Aufklappen nachgeladen und bei vielen Einträgen seitenweise angezeigt, damit auch große Lager schnell laden.
 
 ### Fixed
 
