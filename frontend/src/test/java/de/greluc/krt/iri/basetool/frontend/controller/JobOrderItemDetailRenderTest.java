@@ -224,7 +224,7 @@ class JobOrderItemDetailRenderTest {
 
     // Then: the aggregated-material rows are now clickable linked-inventory drill-downs (the same
     // toggleInventory handler the MATERIAL requirement rows use), carrying the material id the AJAX
-    // endpoint needs; and the Materialsammelübersicht link renders for the aggregated view.
+    // endpoint needs; and the Materialsammelübersicht link renders in the handover toolbar.
     assertThat(html)
         .as("aggregated rows are clickable inventory drill-downs")
         .contains("aggregated-material-row");
@@ -320,6 +320,68 @@ class JobOrderItemDetailRenderTest {
     // Then: the Materialsammelübersicht link targets the per-order material-collection page.
     assertThat(html)
         .as("material-collection link")
+        .contains("/orders/" + orderId + "/material-collection");
+  }
+
+  @Test
+  void itemOrderDetail_AllDelivered_StillShowsMaterialCollectionButton() throws Exception {
+    // Given: a fully-delivered item order (3 ordered, 3 delivered -> 0 outstanding). The handover
+    // button is gated out, but the Materialsammelübersicht button must stay reachable in the
+    // handover toolbar — mirroring the status-independent MATERIAL handover toolbar.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    JobOrderItemDto line =
+        new JobOrderItemDto(
+            UUID.randomUUID(),
+            new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+            new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
+            3,
+            3,
+            null,
+            List.of(
+                new JobOrderItemMaterialDto(
+                    UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+            1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            12,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "COMPLETED",
+            "ITEM",
+            List.of(),
+            List.of(line),
+            List.of(
+                new AggregatedMaterialDto(
+                    material("Agricium", "SCU"), "NONE", 12.0, List.of(), null)),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L);
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    // When
+    String html =
+        mockMvc
+            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: the handover button is gated out (no outstanding lines)...
+    assertThat(html)
+        .as("handover button hidden once fully delivered")
+        .doesNotContain("data-testid=\"item-handover-open\"");
+    // ...but the Materialsammelübersicht button is still rendered in the toolbar.
+    assertThat(html)
+        .as("material-collection button stays reachable after delivery")
         .contains("/orders/" + orderId + "/material-collection");
   }
 
