@@ -47,7 +47,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -58,8 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
  * the {@code test} profile (Flyway-migrated through {@code V140}). The {@link
  * de.greluc.krt.iri.basetool.backend.service.P4kImportServiceTest pure-Mockito suite} cannot catch
  * a NOT&nbsp;NULL / CHECK violation on a seeded row because its repositories never reach a database
- * — this boots the full context and actually persists one new row of every catalog type with
- * seeding opted in, proving:
+ * — this boots the full context (Flyway-migrated through {@code V141}) and actually persists one
+ * new row of every catalog type with seeding opted in, proving:
  *
  * <ul>
  *   <li>every {@code source = P4K} seed satisfies the live schema (no NOT&nbsp;NULL / CHECK / FK
@@ -89,14 +88,13 @@ class P4kImportServiceIntegrationTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   /**
-   * Wraps a catalog JSON string as the multipart {@code file} part the import service consumes.
+   * Encodes a catalog JSON string as the {@code byte[]} the import service consumes.
    *
    * @param json the catalog JSON
-   * @return the upload
+   * @return the UTF-8 bytes
    */
-  private static MockMultipartFile upload(String json) {
-    return new MockMultipartFile(
-        "file", "p4k.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
+  private static byte[] upload(String json) {
+    return json.getBytes(StandardCharsets.UTF_8);
   }
 
   @Test

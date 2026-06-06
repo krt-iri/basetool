@@ -46,8 +46,6 @@ import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
-import java.io.IOException;
-import java.io.InputStream;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -63,7 +61,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -158,14 +155,14 @@ public class P4kImportService {
    * including how many brand-new rows seeding <em>would</em> create — without persisting anything
    * or emitting audit rows.
    *
-   * @param file the uploaded P4K catalog JSON
+   * @param bytes the uploaded P4K catalog JSON bytes
    * @return the per-type action summary with {@code dryRun = true}, {@code seedingEnabled = true}
    *     and {@code runId = null}
-   * @throws BadRequestException if the file is empty or not valid P4K catalog JSON
+   * @throws BadRequestException if the catalog is empty or not valid P4K catalog JSON
    */
   @NotNull
-  public P4kImportResultDto previewImport(@NotNull MultipartFile file) {
-    P4kCatalogDto catalog = parse(file);
+  public P4kImportResultDto previewImport(byte[] bytes) {
+    P4kCatalogDto catalog = parse(bytes);
     return reconcile(catalog, false, true, null);
   }
 
@@ -181,16 +178,16 @@ public class P4kImportService {
    * is no per-record error isolation; re-run the import after correcting the offending catalog
    * record.
    *
-   * @param file the uploaded P4K catalog JSON
+   * @param bytes the uploaded P4K catalog JSON bytes
    * @param seedNew {@code true} to insert new {@code source = P4K} rows for unmatched records that
    *     pass the real-record filter; {@code false} to enrich existing rows only
    * @return the per-type action summary with {@code dryRun = false} and the stamped {@code runId}
-   * @throws BadRequestException if the file is empty or not valid P4K catalog JSON
+   * @throws BadRequestException if the catalog is empty or not valid P4K catalog JSON
    */
   @Transactional
   @NotNull
-  public P4kImportResultDto applyImport(@NotNull MultipartFile file, boolean seedNew) {
-    P4kCatalogDto catalog = parse(file);
+  public P4kImportResultDto applyImport(byte[] bytes, boolean seedNew) {
+    P4kCatalogDto catalog = parse(bytes);
     UUID runId = syncReportService.beginRun();
     P4kImportResultDto result = reconcile(catalog, true, seedNew, runId);
     syncReportService.logP4kEvent(
@@ -1387,24 +1384,24 @@ public class P4kImportService {
   // ───────────────────────────────────────────────────────────────── parsing ──
 
   /**
-   * Reads the multipart body and binds straight to a {@link P4kCatalogDto} in one streaming pass,
-   * with no intermediate {@code JsonNode} tree, so a large catalog upload costs roughly the bound
-   * object rather than a full tree plus the DTO. An empty body, malformed JSON, or a non-object
-   * root (e.g. a JSON array) surfaces as a {@link BadRequestException} (HTTP 400), not a 500.
+   * Binds the uploaded catalog bytes straight to a {@link P4kCatalogDto} in one pass, with no
+   * intermediate {@code JsonNode} tree, so a large catalog costs roughly the bound object rather
+   * than a full tree plus the DTO. Empty bytes, malformed JSON, or a non-object root (e.g. a JSON
+   * array) surface as a {@link BadRequestException} (HTTP 400), not a 500.
    *
-   * @param file the uploaded catalog JSON
+   * @param bytes the uploaded catalog JSON bytes
    * @return the parsed catalog (its arrays may be {@code null})
-   * @throws BadRequestException if the file is empty or not valid P4K catalog JSON
+   * @throws BadRequestException if the catalog is empty or not valid P4K catalog JSON
    */
   @NotNull
-  private P4kCatalogDto parse(@NotNull MultipartFile file) {
-    if (file.isEmpty()) {
+  private P4kCatalogDto parse(byte[] bytes) {
+    if (bytes == null || bytes.length == 0) {
       throw new BadRequestException("The uploaded file is empty.");
     }
     P4kCatalogDto catalog;
-    try (InputStream in = file.getInputStream()) {
-      catalog = objectMapper.readValue(in, P4kCatalogDto.class);
-    } catch (IOException | JacksonException e) {
+    try {
+      catalog = objectMapper.readValue(bytes, P4kCatalogDto.class);
+    } catch (JacksonException e) {
       log.warn("P4K import: failed to read catalog JSON — {}", e.getMessage());
       throw new BadRequestException(
           "The uploaded file is not valid P4K catalog JSON (manufacturers / items / ships /"

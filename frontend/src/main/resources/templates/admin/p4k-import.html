@@ -27,17 +27,53 @@
         <p class="krt-subtitle" th:text="#{admin.p4kImport.subtitle}">Spielkatalog importieren</p>
     </div>
 
-    <!-- Upload + preview/apply controls -->
+    <!-- Upload: enqueues a background preview job -->
     <div class="hud-box mt-2">
-        <p th:text="#{admin.p4kImport.intro}">Vorschau zeigt eine Trockenlauf-Analyse; Anwenden schreibt die Änderungen.</p>
+        <p th:text="#{admin.p4kImport.intro}">Der Katalog wird im Hintergrund analysiert.</p>
 
         <div class="form-group">
             <input type="file" id="krt-p4k-file" accept=".json,application/json" hidden>
-            <button type="button" id="krt-p4k-pick" class="btn btn-outline" data-trigger="p4k-pick"
+            <button type="button" id="krt-p4k-pick" class="btn btn-outline"
                     th:text="#{admin.p4kImport.file.choose}">Datei wählen</button>
             <span id="krt-p4k-filename" class="text-muted" th:text="#{admin.p4kImport.file.none}">Keine Datei ausgewählt</span>
         </div>
 
+        <div class="mt-2-flex-gap">
+            <button type="button" id="krt-p4k-upload-btn" class="btn btn--cta" disabled
+                    th:text="#{admin.p4kImport.upload.button}">Hochladen &amp; analysieren</button>
+        </div>
+    </div>
+
+    <!-- Job list (polled) -->
+    <div class="hud-box mt-2">
+        <h2 th:text="#{admin.p4kImport.jobs.title}">Importe</h2>
+        <div class="table-responsive">
+            <table class="krt-table">
+                <thead>
+                <tr>
+                    <th th:text="#{admin.p4kImport.jobs.col.created}">Zeit</th>
+                    <th th:text="#{admin.p4kImport.jobs.col.kind}">Typ</th>
+                    <th th:text="#{admin.p4kImport.jobs.col.status}">Status</th>
+                    <th th:text="#{admin.p4kImport.jobs.col.file}">Datei</th>
+                    <th th:text="#{admin.p4kImport.jobs.col.summary}">Zusammenfassung</th>
+                    <th th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</th>
+                </tr>
+                </thead>
+                <tbody id="krt-p4k-jobs">
+                <!-- rows injected by p4k-import.js -->
+                </tbody>
+            </table>
+        </div>
+        <p id="krt-p4k-jobs-empty" class="text-muted" th:text="#{admin.p4kImport.jobs.empty}" hidden>Noch keine Importe.</p>
+    </div>
+
+    <!-- Apply panel (revealed when applying a finished preview) -->
+    <div id="krt-p4k-apply-panel" class="hud-box mt-2" hidden>
+        <h2 th:text="#{admin.p4kImport.apply.panel.title}">Import anwenden</h2>
+        <p>
+            <span class="text-muted" th:text="#{admin.p4kImport.jobs.col.file}">Datei</span>:
+            <span id="krt-p4k-apply-filename" class="data-value"></span>
+        </p>
         <div class="form-group">
             <label>
                 <input type="checkbox" id="krt-p4k-seed">
@@ -45,21 +81,24 @@
             </label>
             <p class="alert alert-warning">
                 <span aria-hidden="true">&#9888;</span>
-                <span th:text="#{admin.p4kImport.seed.warning}">Achtung: Beim Anlegen werden neue Spiel-Datensätze in die Datenbank eingefügt.</span>
+                <span th:text="#{admin.p4kImport.seed.warning}">Achtung: Beim Anlegen werden neue Spiel-Datensätze eingefügt.</span>
             </p>
         </div>
-
         <div class="mt-2-flex-gap">
-            <button type="button" id="krt-p4k-preview-btn" class="btn btn-ghost" data-trigger="p4k-preview" disabled
-                    th:text="#{admin.p4kImport.preview.button}">Vorschau</button>
-            <button type="button" id="krt-p4k-apply-btn" class="btn btn--cta" data-trigger="p4k-apply" disabled
-                    th:text="#{admin.p4kImport.apply.button}">Anwenden</button>
+            <button type="button" id="krt-p4k-apply-confirm" class="btn btn--cta"
+                    th:text="#{admin.p4kImport.apply.panel.confirm}">Jetzt anwenden</button>
+            <button type="button" id="krt-p4k-apply-cancel" class="btn btn-ghost"
+                    th:text="#{admin.p4kImport.apply.panel.cancel}">Abbrechen</button>
         </div>
     </div>
 
-    <!-- Results panel (hidden until a preview/apply returns) -->
+    <!-- Details panel (per-type result of the selected job) -->
     <div id="krt-p4k-results" class="hud-box mt-2" hidden>
-        <h2 th:text="#{admin.p4kImport.results.title}">Ergebnis</h2>
+        <div class="mt-2-flex-gap">
+            <h2 th:text="#{admin.p4kImport.results.title}">Ergebnis</h2>
+            <button type="button" id="krt-p4k-details-close" class="btn btn-ghost"
+                    th:text="#{admin.p4kImport.apply.panel.cancel}">Schließen</button>
+        </div>
         <p>
             <span th:text="#{admin.p4kImport.results.mode}">Modus</span>:
             <span id="krt-p4k-mode" class="data-value"></span>
@@ -102,23 +141,32 @@
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
     window.krtP4kImportI18n = {
-        modeDryRun:    /*[[#{admin.p4kImport.results.mode.dryRun}]]*/ 'Vorschau (Trockenlauf)',
-        modeApplied:   /*[[#{admin.p4kImport.results.mode.applied}]]*/ 'Angewendet',
-        seedingOn:     /*[[#{admin.p4kImport.results.seeding.on}]]*/ 'aktiv',
-        seedingOff:    /*[[#{admin.p4kImport.results.seeding.off}]]*/ 'inaktiv',
-        rowManufacturers: /*[[#{admin.p4kImport.row.manufacturers}]]*/ 'Hersteller',
-        rowItems:      /*[[#{admin.p4kImport.row.items}]]*/ 'Items',
-        rowShips:      /*[[#{admin.p4kImport.row.ships}]]*/ 'Schiffe',
-        rowCommodities: /*[[#{admin.p4kImport.row.commodities}]]*/ 'Commodities',
-        rowBlueprints: /*[[#{admin.p4kImport.row.blueprints}]]*/ 'Blueprints',
-        previewToast:  /*[[#{admin.p4kImport.toast.preview}]]*/ 'Vorschau erstellt.',
-        appliedToast:  /*[[#{admin.p4kImport.toast.applied}]]*/ 'Import angewendet.',
-        error:         /*[[#{admin.p4kImport.toast.error}]]*/ 'Import fehlgeschlagen.',
-        pickFirst:     /*[[#{admin.p4kImport.toast.pickFirst}]]*/ 'Bitte zuerst eine Datei wählen.'
+        kindPreview:      /*[[#{admin.p4kImport.kind.preview}]]*/ 'Preview',
+        kindApply:        /*[[#{admin.p4kImport.kind.apply}]]*/ 'Apply',
+        statusPending:    /*[[#{admin.p4kImport.status.pending}]]*/ 'Queued',
+        statusRunning:    /*[[#{admin.p4kImport.status.running}]]*/ 'Running',
+        statusSucceeded:  /*[[#{admin.p4kImport.status.succeeded}]]*/ 'Done',
+        statusFailed:     /*[[#{admin.p4kImport.status.failed}]]*/ 'Failed',
+        summaryRunning:   /*[[#{admin.p4kImport.summary.running}]]*/ 'Processing...',
+        colCreated:       /*[[#{admin.p4kImport.col.created}]]*/ 'Created',
+        actionView:       /*[[#{admin.p4kImport.action.view}]]*/ 'Details',
+        actionApply:      /*[[#{admin.p4kImport.action.apply}]]*/ 'Apply',
+        modeDryRun:       /*[[#{admin.p4kImport.results.mode.dryRun}]]*/ 'Preview (dry run)',
+        modeApplied:      /*[[#{admin.p4kImport.results.mode.applied}]]*/ 'Applied',
+        seedingOn:        /*[[#{admin.p4kImport.results.seeding.on}]]*/ 'on',
+        seedingOff:       /*[[#{admin.p4kImport.results.seeding.off}]]*/ 'off',
+        rowManufacturers: /*[[#{admin.p4kImport.row.manufacturers}]]*/ 'Manufacturers',
+        rowItems:         /*[[#{admin.p4kImport.row.items}]]*/ 'Items',
+        rowShips:         /*[[#{admin.p4kImport.row.ships}]]*/ 'Ships',
+        rowCommodities:   /*[[#{admin.p4kImport.row.commodities}]]*/ 'Commodities',
+        rowBlueprints:    /*[[#{admin.p4kImport.row.blueprints}]]*/ 'Blueprints',
+        toastUploaded:    /*[[#{admin.p4kImport.toast.uploaded}]]*/ 'Uploaded.',
+        toastApplyStarted:/*[[#{admin.p4kImport.toast.applyStarted}]]*/ 'Apply started.',
+        error:            /*[[#{admin.p4kImport.toast.error}]]*/ 'Import failed.',
+        pickFirst:        /*[[#{admin.p4kImport.toast.pickFirst}]]*/ 'Please choose a file first.'
     };
     window.krtP4kImportEndpoints = {
-        preview: /*[[${previewUrl}]]*/ '/admin/p4k-import/preview',
-        apply:   /*[[${applyUrl}]]*/   '/admin/p4k-import/apply'
+        jobs: /*[[${jobsUrl}]]*/ '/admin/p4k-import/jobs'
     };
     /*]]>*/
 </script>
