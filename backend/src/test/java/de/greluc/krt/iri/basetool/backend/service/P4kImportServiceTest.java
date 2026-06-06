@@ -47,6 +47,7 @@ import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.ShipTypeRepository;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,8 +57,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -94,8 +93,8 @@ class P4kImportServiceTest {
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
-  private static MultipartFile upload(String json) {
-    return new MockMultipartFile("file", "p4k.json", "application/json", json.getBytes());
+  private static byte[] upload(String json) {
+    return json.getBytes(StandardCharsets.UTF_8);
   }
 
   // ─────────────────────────────────────────────────────── GUID match enrich ──
@@ -618,21 +617,17 @@ class P4kImportServiceTest {
 
   @Test
   void emptyFile_throwsBadRequest() {
-    MultipartFile empty =
-        new MockMultipartFile("file", "p4k.json", "application/json", new byte[0]);
     org.junit.jupiter.api.Assertions.assertThrows(
         de.greluc.krt.iri.basetool.backend.exception.BadRequestException.class,
-        () -> service.previewImport(empty));
+        () -> service.previewImport(new byte[0]));
   }
 
   @Test
   void malformedJson_throwsBadRequest() {
     // Truncated / non-JSON body -> the Jackson parse fails -> surfaced as HTTP 400, not a 500.
-    MultipartFile bad =
-        new MockMultipartFile("file", "p4k.json", "application/json", "{ not json ".getBytes());
     org.junit.jupiter.api.Assertions.assertThrows(
         de.greluc.krt.iri.basetool.backend.exception.BadRequestException.class,
-        () -> service.previewImport(bad));
+        () -> service.previewImport("{ not json ".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test

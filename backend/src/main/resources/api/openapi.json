@@ -64,14 +64,14 @@
     "name" : "Orders",
     "description" : "Operations related to job orders"
   }, {
+    "name" : "Admin – P4K Import",
+    "description" : "Administrator endpoints for importing the KRT P4K Reader catalog (Game2.dcb master data) as asynchronous background jobs."
+  }, {
     "name" : "Member Evaluations",
     "description" : "Manage member promotion evaluations."
   }, {
     "name" : "Promotion Topics",
     "description" : "Manage promotion system topic groups."
-  }, {
-    "name" : "Admin – P4K Import",
-    "description" : "Administrator endpoints for importing the KRT P4K Reader catalog (Game2.dcb master data)."
   } ],
   "paths" : {
     "/api/v1/users/{id}/attributes" : {
@@ -20649,11 +20649,111 @@
         } ]
       }
     },
-    "/api/v1/admin/import/p4k/preview" : {
+    "/api/v1/admin/import/p4k/jobs" : {
+      "get" : {
+        "tags" : [ "Admin – P4K Import" ],
+        "summary" : "List recent P4K import jobs.",
+        "operationId" : "listJobs",
+        "responses" : {
+          "200" : {
+            "description" : "The recent jobs.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/P4kImportJobDto"
+                  }
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      },
       "post" : {
         "tags" : [ "Admin – P4K Import" ],
-        "summary" : "Preview a P4K catalog import (no writes).",
-        "operationId" : "preview",
+        "summary" : "Upload a P4K catalog and enqueue an async preview (dry-run) job.",
+        "operationId" : "enqueuePreview",
         "requestBody" : {
           "content" : {
             "multipart/form-data" : {
@@ -20671,12 +20771,12 @@
           }
         },
         "responses" : {
-          "200" : {
-            "description" : "Preview computed.",
+          "202" : {
+            "description" : "Preview job enqueued.",
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/P4kImportResultDto"
+                  "$ref" : "#/components/schemas/P4kImportJobDto"
                 }
               }
             }
@@ -20747,12 +20847,20 @@
         } ]
       }
     },
-    "/api/v1/admin/import/p4k/apply" : {
+    "/api/v1/admin/import/p4k/jobs/{id}/apply" : {
       "post" : {
         "tags" : [ "Admin – P4K Import" ],
-        "summary" : "Apply a P4K catalog import (enriches existing rows; optionally seeds new ones via seedNew).",
-        "operationId" : "apply",
+        "summary" : "Enqueue an async apply job from a finished preview (optionally seeding).",
+        "operationId" : "enqueueApply",
         "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
           "name" : "seedNew",
           "in" : "query",
           "required" : false,
@@ -20761,29 +20869,13 @@
             "default" : false
           }
         } ],
-        "requestBody" : {
-          "content" : {
-            "multipart/form-data" : {
-              "schema" : {
-                "type" : "object",
-                "properties" : {
-                  "file" : {
-                    "type" : "string",
-                    "format" : "binary"
-                  }
-                },
-                "required" : [ "file" ]
-              }
-            }
-          }
-        },
         "responses" : {
-          "200" : {
-            "description" : "Import applied; see the summary.",
+          "202" : {
+            "description" : "Apply job enqueued.",
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/P4kImportResultDto"
+                  "$ref" : "#/components/schemas/P4kImportJobDto"
                 }
               }
             }
@@ -20808,8 +20900,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Unauthorized",
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20818,8 +20910,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Not Found",
+          "401" : {
+            "description" : "Unauthorized",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -33278,6 +33370,114 @@
         }
       }
     },
+    "/api/v1/admin/import/p4k/jobs/{id}" : {
+      "get" : {
+        "tags" : [ "Admin – P4K Import" ],
+        "summary" : "Fetch one P4K import job (poll its status / result).",
+        "operationId" : "getJob",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The job.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/P4kImportJobDto"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/terminals/{id}/loading-dock-override" : {
       "delete" : {
         "tags" : [ "terminal-controller" ],
@@ -38126,6 +38326,55 @@
           "unmatched" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "P4kImportJobDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "PREVIEW", "APPLY" ]
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "PENDING", "RUNNING", "SUCCEEDED", "FAILED" ]
+          },
+          "seedNew" : {
+            "type" : "boolean"
+          },
+          "sourceFilename" : {
+            "type" : "string"
+          },
+          "fileSizeBytes" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "previewJobId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "result" : {
+            "$ref" : "#/components/schemas/P4kImportResultDto"
+          },
+          "errorMessage" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "startedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "finishedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
