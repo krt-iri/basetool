@@ -425,4 +425,50 @@ val lintJs =
     inputs.file("eslint.config.mjs")
   }
 
-tasks.named("check").configure { dependsOn(lintCss, lintHtml, lintJs) }
+// Prettier formats the hand-written CSS + JS — the function modern Stylelint and
+// ESLint no longer cover (both dropped their stylistic rules and defer formatting
+// to a dedicated formatter). It runs through the same node-gradle toolchain as the
+// linters above; vendored/minified bundles are skipped via `.prettierignore`.
+// `prettierCheck` is strict and wired into `check`; `prettierApply` rewrites in place.
+val prettierCheck =
+  tasks.register<NpxTask>("prettierCheck") {
+    group = "verification"
+    description = "Checks CSS/JS formatting with Prettier (strict; fails the build on findings)."
+    dependsOn(tasks.named("npmInstall"))
+    command.set("prettier")
+    args.set(
+      listOf(
+        "--check",
+        "src/main/resources/static/css/**/*.css",
+        "src/main/resources/static/js/**/*.js",
+      )
+    )
+    ignoreExitValue.set(false)
+    inputs.files(fileTree("src/main/resources/static/css") { include("**/*.css") })
+    inputs.files(
+      fileTree("src/main/resources/static/js") {
+        include("**/*.js")
+        exclude("vendor/**")
+      }
+    )
+    inputs.file("package.json")
+    inputs.file(".prettierrc.json")
+    inputs.file(".prettierignore")
+  }
+
+tasks.register<NpxTask>("prettierApply") {
+  group = "formatting"
+  description = "Reformats the hand-written CSS/JS in place with Prettier."
+  dependsOn(tasks.named("npmInstall"))
+  command.set("prettier")
+  args.set(
+    listOf(
+      "--write",
+      "src/main/resources/static/css/**/*.css",
+      "src/main/resources/static/js/**/*.js",
+    )
+  )
+  ignoreExitValue.set(false)
+}
+
+tasks.named("check").configure { dependsOn(lintCss, lintHtml, lintJs, prettierCheck) }

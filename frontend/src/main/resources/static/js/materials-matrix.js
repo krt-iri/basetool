@@ -36,7 +36,7 @@
         noResults: config.getAttribute('data-label-no-results') || '',
         illegal: config.getAttribute('data-label-illegal') || '',
         volatileQt: config.getAttribute('data-label-volatile-qt') || '',
-        volatileTime: config.getAttribute('data-label-volatile-time') || ''
+        volatileTime: config.getAttribute('data-label-volatile-time') || '',
     };
 
     // Group thousands with '.' to preserve the server's previous `formatInteger(.., 'POINT')` look,
@@ -55,17 +55,17 @@
             .replace(/'/g, '&#39;');
     }
 
-    const BUFFER = 8;        // extra rows rendered above and below the viewport
-    const collapsed = {};    // kind -> true when its rows are hidden
+    const BUFFER = 8; // extra rows rendered above and below the viewport
+    const collapsed = {}; // kind -> true when its rows are hidden
 
-    let rowHeight = 0;       // measured from the first rendered row (uniform via CSS)
+    let rowHeight = 0; // measured from the first rendered row (uniform via CSS)
     let calibrated = false;
-    let grid = null;         // full data: { terminals: [...], groups: [...] }
-    let cols = [];           // current (column-filtered) terminal columns
-    let flat = [];           // flattened display items: { type: 'kind'|'row', ... }
+    let grid = null; // full data: { terminals: [...], groups: [...] }
+    let cols = []; // current (column-filtered) terminal columns
+    let flat = []; // flattened display items: { type: 'kind'|'row', ... }
     let renderedStart = -1;
     let renderedEnd = -1;
-    let colsSig = '';        // signature of current columns, to know when headers must rebuild
+    let colsSig = ''; // signature of current columns, to know when headers must rebuild
     let scrollPending = false;
     let filterTimer = null;
 
@@ -82,16 +82,22 @@
             .then(function (data) {
                 grid = {
                     terminals: (data && data.terminals) || [],
-                    groups: (data && data.groups) || []
+                    groups: (data && data.groups) || [],
                 };
-                if (loading) { loading.style.display = 'none'; }
+                if (loading) {
+                    loading.style.display = 'none';
+                }
                 wrapper.style.display = '';
                 bindFilters();
                 applyFilters();
             })
             .catch(function () {
-                if (loading) { loading.style.display = 'none'; }
-                if (errorBox) { errorBox.style.display = ''; }
+                if (loading) {
+                    loading.style.display = 'none';
+                }
+                if (errorBox) {
+                    errorBox.style.display = '';
+                }
             });
     }
 
@@ -104,7 +110,7 @@
             materials: selectedSet(document.getElementsByClassName('matCheck')),
             systems: selectedSet(document.getElementsByClassName('sysCheck')),
             loadingDock: isChecked('filterLoadingDock'),
-            autoLoad: isChecked('filterAutoLoad')
+            autoLoad: isChecked('filterAutoLoad'),
         };
     }
 
@@ -136,9 +142,15 @@
         const f = readFilters();
 
         cols = grid.terminals.filter(function (t) {
-            if (f.systems && !f.systems[t.starSystemName]) { return false; }
-            if (f.loadingDock && !t.hasLoadingDock) { return false; }
-            if (f.autoLoad && !t.isAutoLoad) { return false; }
+            if (f.systems && !f.systems[t.starSystemName]) {
+                return false;
+            }
+            if (f.loadingDock && !t.hasLoadingDock) {
+                return false;
+            }
+            if (f.autoLoad && !t.isAutoLoad) {
+                return false;
+            }
             return true;
         });
 
@@ -176,7 +188,14 @@
     /* ------------------------------------------------------------------- header build */
 
     function renderHead() {
-        const sig = String(cols.length) + '|' + cols.map(function (c) { return c.name; }).join('');
+        const sig =
+            String(cols.length) +
+            '|' +
+            cols
+                .map(function (c) {
+                    return c.name;
+                })
+                .join('');
         if (sig === colsSig) {
             return; // columns unchanged — keep existing header/colgroup
         }
@@ -194,14 +213,21 @@
 
         cols.forEach(function (c) {
             const label = c.nickname ? c.nickname : c.name;
-            const title = c.planetName ? (label + ' — ' + c.planetName) : label;
+            const title = c.planetName ? label + ' — ' + c.planetName : label;
             const cls = 'col-terminal' + (c.planetCssClass ? ' ' + c.planetCssClass : '');
-            termRow.push('<th class="' + cls + '" title="' + esc(title) + '">' + esc(label) + '</th>');
+            termRow.push(
+                '<th class="' + cls + '" title="' + esc(title) + '">' + esc(label) + '</th>',
+            );
         });
 
         colgroup.innerHTML = cg.join('');
-        head.innerHTML = '<tr class="row-system">' + sysRow.join('') + '</tr>'
-            + '<tr class="row-terminal">' + termRow.join('') + '</tr>';
+        head.innerHTML =
+            '<tr class="row-system">' +
+            sysRow.join('') +
+            '</tr>' +
+            '<tr class="row-terminal">' +
+            termRow.join('') +
+            '</tr>';
     }
 
     // Contiguous-run counts of the star-system header over the (filtered) column order.
@@ -232,8 +258,12 @@
 
     function renderBody() {
         if (!flat.length) {
-            body.innerHTML = '<tr><td colspan="' + (cols.length + 1) + '" class="mtx-no-results">'
-                + esc(I18N.noResults) + '</td></tr>';
+            body.innerHTML =
+                '<tr><td colspan="' +
+                (cols.length + 1) +
+                '" class="mtx-no-results">' +
+                esc(I18N.noResults) +
+                '</td></tr>';
             renderedStart = 0;
             renderedEnd = 0;
             return;
@@ -268,18 +298,33 @@
     }
 
     function spacer(heightPx) {
-        return '<tr class="row-spacer"><td colspan="' + (cols.length + 1)
-            + '" style="height:' + heightPx + 'px"></td></tr>';
+        return (
+            '<tr class="row-spacer"><td colspan="' +
+            (cols.length + 1) +
+            '" style="height:' +
+            heightPx +
+            'px"></td></tr>'
+        );
     }
 
     function rowHtml(item) {
         if (item.type === 'kind') {
             const label = item.kind === I18N.unsortedSentinel ? I18N.unsorted : item.kind;
             const icon = collapsed[item.kind] ? '+' : '−';
-            return '<tr class="row-kind" data-kind="' + esc(item.kind) + '">'
-                + '<td colspan="' + (cols.length + 1) + '" class="mtx-kind-cell">'
-                + '<span class="toggle-icon">' + icon + '</span>'
-                + '<span>' + esc(label) + '</span></td></tr>';
+            return (
+                '<tr class="row-kind" data-kind="' +
+                esc(item.kind) +
+                '">' +
+                '<td colspan="' +
+                (cols.length + 1) +
+                '" class="mtx-kind-cell">' +
+                '<span class="toggle-icon">' +
+                icon +
+                '</span>' +
+                '<span>' +
+                esc(label) +
+                '</span></td></tr>'
+            );
         }
         const r = item.row;
         const cells = ['<td class="mtx-name-cell">' + warnings(r) + esc(r.materialName) + '</td>'];
@@ -297,10 +342,14 @@
             out += '<span class="text-danger mtx-warn" title="' + esc(I18N.illegal) + '">⚠</span>';
         }
         if (r.isVolatileQt) {
-            out += '<span class="text-warning mtx-warn" title="' + esc(I18N.volatileQt) + '">⚠</span>';
+            out +=
+                '<span class="text-warning mtx-warn" title="' + esc(I18N.volatileQt) + '">⚠</span>';
         }
         if (r.isVolatileTime) {
-            out += '<span class="text-warning mtx-warn" title="' + esc(I18N.volatileTime) + '">⚠</span>';
+            out +=
+                '<span class="text-warning mtx-warn" title="' +
+                esc(I18N.volatileTime) +
+                '">⚠</span>';
         }
         return out;
     }
@@ -405,16 +454,19 @@
 
     function bindFilters() {
         // Dropdown open / close.
-        Array.prototype.forEach.call(document.getElementsByClassName('mtx-multi-header'), function (h) {
-            h.addEventListener('click', function () {
-                const opts = document.getElementById(h.getAttribute('data-options-id'));
-                const wasOpen = opts.classList.contains('open');
-                closeAllDropdowns();
-                if (!wasOpen) {
-                    opts.classList.add('open');
-                }
-            });
-        });
+        Array.prototype.forEach.call(
+            document.getElementsByClassName('mtx-multi-header'),
+            function (h) {
+                h.addEventListener('click', function () {
+                    const opts = document.getElementById(h.getAttribute('data-options-id'));
+                    const wasOpen = opts.classList.contains('open');
+                    closeAllDropdowns();
+                    if (!wasOpen) {
+                        opts.classList.add('open');
+                    }
+                });
+            },
+        );
         document.addEventListener('click', function (ev) {
             if (!ev.target.closest('.multi-select-container')) {
                 closeAllDropdowns();
@@ -422,17 +474,20 @@
         });
 
         // Select-all toggles.
-        Array.prototype.forEach.call(document.getElementsByClassName('mtx-select-all'), function (box) {
-            box.addEventListener('change', function () {
-                const checkClass = box.getAttribute('data-check-class');
-                const checks = document.getElementsByClassName(checkClass);
-                for (let i = 0; i < checks.length; i++) {
-                    checks[i].checked = box.checked;
-                }
-                updateSelectedText(checkClass, box.getAttribute('data-header-id'));
-                scheduleApply();
-            });
-        });
+        Array.prototype.forEach.call(
+            document.getElementsByClassName('mtx-select-all'),
+            function (box) {
+                box.addEventListener('change', function () {
+                    const checkClass = box.getAttribute('data-check-class');
+                    const checks = document.getElementsByClassName(checkClass);
+                    for (let i = 0; i < checks.length; i++) {
+                        checks[i].checked = box.checked;
+                    }
+                    updateSelectedText(checkClass, box.getAttribute('data-header-id'));
+                    scheduleApply();
+                });
+            },
+        );
 
         // Individual option toggles.
         Array.prototype.forEach.call(document.getElementsByClassName('mtx-check'), function (chk) {
@@ -441,19 +496,27 @@
                 const siblings = document.getElementsByClassName(checkClass);
                 let allChecked = true;
                 for (let i = 0; i < siblings.length; i++) {
-                    if (!siblings[i].checked) { allChecked = false; break; }
+                    if (!siblings[i].checked) {
+                        allChecked = false;
+                        break;
+                    }
                 }
                 const allBox = document.getElementById(chk.getAttribute('data-all-id'));
-                if (allBox) { allBox.checked = allChecked; }
+                if (allBox) {
+                    allBox.checked = allChecked;
+                }
                 updateSelectedText(checkClass, chk.getAttribute('data-header-id'));
                 scheduleApply();
             });
         });
 
         // Boolean filters.
-        Array.prototype.forEach.call(document.getElementsByClassName('mtx-bool-filter'), function (b) {
-            b.addEventListener('change', scheduleApply);
-        });
+        Array.prototype.forEach.call(
+            document.getElementsByClassName('mtx-bool-filter'),
+            function (b) {
+                b.addEventListener('change', scheduleApply);
+            },
+        );
 
         // Category collapse / expand (delegated to the virtual <tbody>).
         body.addEventListener('click', function (ev) {
@@ -471,8 +534,12 @@
     }
 
     function closeAllDropdowns() {
-        Array.prototype.forEach.call(document.getElementsByClassName('multi-select-options'),
-            function (o) { o.classList.remove('open'); });
+        Array.prototype.forEach.call(
+            document.getElementsByClassName('multi-select-options'),
+            function (o) {
+                o.classList.remove('open');
+            },
+        );
     }
 
     init();

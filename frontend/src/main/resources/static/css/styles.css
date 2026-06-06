@@ -48,62 +48,62 @@
 :root {
     color-scheme: dark;
     /* Colors */
-    --color-primary: #E77E23;
-    --color-white: #FFF;
+    --color-primary: #e77e23;
+    --color-white: #fff;
     --color-bg-black: #000;
     --color-bg-dark-gray: #141414;
-    
-    --color-accent-light: #EEB64B;
-    --color-accent-dark: #C45C00;
-    
-    --color-gray-1: #D2D2D2;       /* primary body text on dark */
-    --color-gray-2: #646464;       /* muted text, placeholders, disabled */
-    --color-gray-3: #282828;       /* hairline borders, hover-row fill */
-    --color-gray-4: #141414;       /* darkest standard surface (alias: --color-bg-dark-gray) */
+
+    --color-accent-light: #eeb64b;
+    --color-accent-dark: #c45c00;
+
+    --color-gray-1: #d2d2d2; /* primary body text on dark */
+    --color-gray-2: #646464; /* muted text, placeholders, disabled */
+    --color-gray-3: #282828; /* hairline borders, hover-row fill */
+    --color-gray-4: #141414; /* darkest standard surface (alias: --color-bg-dark-gray) */
 
     /* Half-step between Grau 4 (#141414) and Grau 3 (#282828); NOT part of the
        official 4-step manual grayscale. Used for input + table-head fills so
        controls read slightly above the surface. */
-    --color-surface-input: #1C1C1C;
-    
+    --color-surface-input: #1c1c1c;
+
     /* Departments - Bereichsfarben (Corporate Design Manual V2, p.14).
        Names and hex are authoritative per the manual; the values must
        never be altered and never used for the logo. Prefer the semantic
        aliases below in generic UI - department hues are functional, not
        decorative. */
-    --color-dept-raumueberlegenheit: #37BBC0; /* Raumueberlegenheit / Space Superiority (teal) */
-    --color-dept-forschung: #355DDC;          /* Forschung / Research (blue) */
-    --color-dept-sub-radar: #A3000A;          /* Sub-Radar / covert (red) */
-    --color-dept-marinekorps: #7A5E96;        /* Marinekorps / Marine Corps (purple) */
-    --color-dept-profit: #239E33;             /* Profit (green) */
-    --color-dept-search-rescue: #FFD23F;      /* Search and Rescue (yellow) */
+    --color-dept-raumueberlegenheit: #37bbc0; /* Raumueberlegenheit / Space Superiority (teal) */
+    --color-dept-forschung: #355ddc; /* Forschung / Research (blue) */
+    --color-dept-sub-radar: #a3000a; /* Sub-Radar / covert (red) */
+    --color-dept-marinekorps: #7a5e96; /* Marinekorps / Marine Corps (purple) */
+    --color-dept-profit: #239e33; /* Profit (green) */
+    --color-dept-search-rescue: #ffd23f; /* Search and Rescue (yellow) */
 
     /* Legacy aliases - previously shipped (mis-)names, kept so existing
        code and templates still resolve. Prefer the official names above. */
     --color-dept-combat: var(--color-dept-raumueberlegenheit);
     --color-dept-research: var(--color-dept-forschung);
     --color-dept-marine: var(--color-dept-marinekorps);
-    
+
     /* Semantic Colors - status meaning, decoupled from the department
        tokens so renaming a Bereichsfarbe can never shift a status colour.
        Values reuse Bereichsfarben hues by appearance. */
-    --color-danger:  #A3000A; /* same value as Sub-Radar */
-    --color-success: #239E33; /* same value as Profit */
-    --color-warning: #FFD23F; /* same value as Search and Rescue */
-    --color-info:    #355DDC; /* same value as Forschung */
-    --color-secondary: #FFD23F; /* cross-squadron / foreign-link highlight */
-    --color-danger-hover:  #D41A25;
-    --color-success-hover: #2EBC3D;
+    --color-danger: #a3000a; /* same value as Sub-Radar */
+    --color-success: #239e33; /* same value as Profit */
+    --color-warning: #ffd23f; /* same value as Search and Rescue */
+    --color-info: #355ddc; /* same value as Forschung */
+    --color-secondary: #ffd23f; /* cross-squadron / foreign-link highlight */
+    --color-danger-hover: #d41a25;
+    --color-success-hover: #2ebc3d;
 
     /* Action hierarchy - how the orange accent is allocated. The filled
        orange CTA marks the ONE primary action per context; orange is for
        action + identity (logo, badges, headings), never plain data values.
        See .btn--cta / .btn-outline / .btn-ghost / .btn-quiet-danger /
        .data-value in the components section, and README "Action hierarchy". */
-    --action-primary: var(--color-primary);   /* filled CTA */
-    --action-emphasis: var(--color-primary);  /* outline secondary */
-    --action-neutral: var(--color-gray-3);    /* ghost border */
-    --data-fg: var(--color-white);            /* bright neutral readouts */
+    --action-primary: var(--color-primary); /* filled CTA */
+    --action-emphasis: var(--color-primary); /* outline secondary */
+    --action-neutral: var(--color-gray-3); /* ghost border */
+    --data-fg: var(--color-white); /* bright neutral readouts */
 
     /* Typography */
     --font-headline: 'Audiowide', sans-serif;
@@ -122,13 +122,13 @@
     --fs-xs: 0.8rem;
     --fs-2xs: 0.7rem;
 
-    --fw-thin: 300;       /* body default */
+    --fw-thin: 300; /* body default */
     --fw-regular: 400;
-    --fw-bold: 700;       /* labels, nav, btn, strong */
+    --fw-bold: 700; /* labels, nav, btn, strong */
     --fw-black: 900;
 
-    --tracking-display: 0.05em;   /* Audiowide display tracking */
-    --tracking-overline: 0.15em;  /* admin chip, overlines */
+    --tracking-display: 0.05em; /* Audiowide display tracking */
+    --tracking-overline: 0.15em; /* admin chip, overlines */
     --lh-body: 1.5;
 
     /* Shape / elevation - square-first. Corners are SHARP; only pills
@@ -141,7 +141,7 @@
     --border-heading: 2px solid var(--color-primary);
 
     /* Glows / shadows - the orange bloom is the brand's only "shadow" idiom. */
-    --glow-primary: 0 0 5px rgb(231 126 35 / 30%);     /* input focus */
+    --glow-primary: 0 0 5px rgb(231 126 35 / 30%); /* input focus */
     --glow-primary-lg: 0 0 20px rgb(231 126 35 / 20%); /* toasts, modals */
     --glow-danger-lg: 0 0 20px rgb(163 0 10 / 20%);
     --shadow-drawer: 5px 0 15px rgb(0 0 0 / 50%);
@@ -155,9 +155,9 @@
     --space-6: 1.5rem;
     --space-8: 2rem;
 
-    --touch-target: 44px;    /* min hit area for every interactive control */
-    --content-max: 1200px;   /* main column cap */
-    --measure: 80ch;         /* paragraph max line length */
+    --touch-target: 44px; /* min hit area for every interactive control */
+    --content-max: 1200px; /* main column cap */
+    --measure: 80ch; /* paragraph max line length */
 }
 
 body {
@@ -169,7 +169,7 @@ body {
      * rather than decoration. background-attachment: fixed keeps the texture still
      * while content scrolls; the 46x26.56px tile preserves the SVG's 72:41.57 ratio.
      */
-    background-image: url("../images/honeycomb-bg.svg");
+    background-image: url('../images/honeycomb-bg.svg');
     background-repeat: repeat;
     background-size: 46px 26.56px;
     background-attachment: fixed;
@@ -194,7 +194,12 @@ body {
     min-height: 100vh;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     font-family: var(--font-headline);
     color: var(--color-primary);
     text-transform: uppercase;
@@ -214,13 +219,16 @@ a:hover {
 
 /* "Mono" data contexts use Lato with tabular figures (the brand has no monospace
    face) — see --font-mono. Aligned with the design-system update (#274). */
-code, kbd, samp {
+code,
+kbd,
+samp {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
 }
 
-strong, b {
+strong,
+b {
     font-weight: var(--fw-bold);
 }
 
@@ -382,7 +390,9 @@ main {
    `table` element selector, `.krt-table` and `.data-table` are interchangeable
    aliases (templates use all three historically); keeping them on a single rule
    guarantees identical rendering regardless of which class a page picked. */
-table, .krt-table, .data-table {
+table,
+.krt-table,
+.data-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: var(--space-4);
@@ -390,7 +400,8 @@ table, .krt-table, .data-table {
     border: var(--border-hairline);
 }
 
-th, td {
+th,
+td {
     padding: var(--space-4);
     text-align: left;
     border-bottom: var(--border-hairline);
@@ -413,7 +424,9 @@ td {
 }
 
 tr {
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
 }
 
 /*
@@ -605,14 +618,14 @@ tbody tr:nth-child(even):hover {
  * Date-Part daher eine ausreichende Mindestbreite und lassen nur
  * das Time-Feld auf seine kompakte Minimalbreite schrumpfen.
  */
-.datetime-split-inputs input[type="date"] {
+.datetime-split-inputs input[type='date'] {
     flex: 0 0 auto;
     width: 10.5rem;
     min-width: 10.5rem;
     max-width: 10.5rem;
 }
 
-.datetime-split-inputs input[type="time"] {
+.datetime-split-inputs input[type='time'] {
     flex: 0 0 auto;
     width: 7rem;
     min-width: 7rem;
@@ -626,15 +639,15 @@ tbody tr:nth-child(even):hover {
 }
 
 /* Forms & Inputs */
-input[type="text"],
-input[type="search"],
-input[type="password"],
-input[type="email"],
-input[type="number"],
-input[type="url"],
-input[type="date"],
-input[type="time"],
-input[type="datetime-local"],
+input[type='text'],
+input[type='search'],
+input[type='password'],
+input[type='email'],
+input[type='number'],
+input[type='url'],
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'],
 select,
 textarea {
     background-color: var(--color-surface-input);
@@ -659,15 +672,15 @@ textarea {
  * the inputs land at the same Y position regardless of control type.
  * textarea is intentionally excluded so it can grow vertically.
  */
-input[type="text"],
-input[type="search"],
-input[type="password"],
-input[type="email"],
-input[type="number"],
-input[type="url"],
-input[type="date"],
-input[type="time"],
-input[type="datetime-local"] {
+input[type='text'],
+input[type='search'],
+input[type='password'],
+input[type='email'],
+input[type='number'],
+input[type='url'],
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'] {
     height: 2.75rem;
 }
 
@@ -714,7 +727,7 @@ select.association-select {
     min-height: var(--touch-target);
     padding: 0.375rem 2.5rem 0.375rem var(--space-3);
     background-color: var(--color-bg-dark-gray, #141414);
-    border: 1px solid var(--color-primary, #E77E23);
+    border: 1px solid var(--color-primary, #e77e23);
     color: var(--color-gray-1, #d6d6d6);
     box-sizing: border-box;
 }
@@ -887,7 +900,7 @@ main .form-group select {
     white-space: nowrap;
 }
 
-.search-form > div > input[type="hidden"] {
+.search-form > div > input[type='hidden'] {
     display: none;
 }
 
@@ -917,14 +930,13 @@ main .form-group select {
     flex: 0 0 2.75rem;
 }
 
-
 /* Inner date/time inputs inside the split wrapper keep the same height
    so the wrapper and a standalone input are visually identical. The
    explicit min-height: 0 prevents the native date/time picker UI (which
    has an intrinsic min-content size larger than 2.75rem in Chromium) from
    forcing the column taller than a plain text input column. */
-.search-form .datetime-split-inputs input[type="date"],
-.search-form .datetime-split-inputs input[type="time"] {
+.search-form .datetime-split-inputs input[type='date'],
+.search-form .datetime-split-inputs input[type='time'] {
     height: 2.75rem;
     min-height: 0;
     max-height: 2.75rem;
@@ -953,14 +965,14 @@ main .form-group select {
  * with box-sizing: border-box. Neutralise them explicitly so the inputs
  * behave like a plain text input and match the search field height.
  */
-.search-form .datetime-split-inputs input[type="date"]::-moz-focus-inner,
-.search-form .datetime-split-inputs input[type="time"]::-moz-focus-inner {
+.search-form .datetime-split-inputs input[type='date']::-moz-focus-inner,
+.search-form .datetime-split-inputs input[type='time']::-moz-focus-inner {
     border: 0;
     padding: 0;
 }
 
-.search-form .datetime-split-inputs input[type="date"]::-webkit-calendar-picker-indicator,
-.search-form .datetime-split-inputs input[type="time"]::-webkit-calendar-picker-indicator {
+.search-form .datetime-split-inputs input[type='date']::-webkit-calendar-picker-indicator,
+.search-form .datetime-split-inputs input[type='time']::-webkit-calendar-picker-indicator {
     padding: 0;
     margin: 0;
 }
@@ -983,7 +995,7 @@ main .form-group select {
 /* Mark mandatory fields with an asterisk */
 .form-group:has([required]) > label::after,
 label:has(+ [required])::after {
-    content: " *";
+    content: ' *';
     color: var(--color-primary);
 }
 
@@ -1025,29 +1037,75 @@ label:has(+ [required])::after {
 }
 
 /* Layout Utility Classes */
-.mt-1 { margin-top: var(--space-4); }
-.mt-1-5 { margin-top: var(--space-6); }
-.mt-2 { margin-top: var(--space-8); }
-.mt-0 { margin-top: 0; }
-.mb-1 { margin-bottom: var(--space-4); }
-.mb-2 { margin-bottom: var(--space-8); }
-.mb-0 { margin-bottom: 0; }
-.m-0 { margin: 0; }
-.p-0 { padding: 0; }
-.nowrap { white-space: nowrap; }
-.text-center { text-align: center; }
-.w-full { width: 100%; }
-.w-1 { width: 1%; }
+.mt-1 {
+    margin-top: var(--space-4);
+}
+.mt-1-5 {
+    margin-top: var(--space-6);
+}
+.mt-2 {
+    margin-top: var(--space-8);
+}
+.mt-0 {
+    margin-top: 0;
+}
+.mb-1 {
+    margin-bottom: var(--space-4);
+}
+.mb-2 {
+    margin-bottom: var(--space-8);
+}
+.mb-0 {
+    margin-bottom: 0;
+}
+.m-0 {
+    margin: 0;
+}
+.p-0 {
+    padding: 0;
+}
+.nowrap {
+    white-space: nowrap;
+}
+.text-center {
+    text-align: center;
+}
+.w-full {
+    width: 100%;
+}
+.w-1 {
+    width: 1%;
+}
 /* Flex-item grow shorthands (distinct from the container .flex-* helpers above). */
-.flex-1 { flex: 1; }
-.flex-2 { flex: 2; }
-.flex-gap-2xs { display: flex; align-items: center; gap: var(--space-1); }
-.text-left { text-align: left; }
-.ml-1 { margin-left: var(--space-4); }
-.overflow-x-auto { overflow-x: auto; }
-.grid-col-full { grid-column: 1 / -1; }
-.w-15 { width: 15%; }
-.cursor-pointer { cursor: pointer; }
+.flex-1 {
+    flex: 1;
+}
+.flex-2 {
+    flex: 2;
+}
+.flex-gap-2xs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+.text-left {
+    text-align: left;
+}
+.ml-1 {
+    margin-left: var(--space-4);
+}
+.overflow-x-auto {
+    overflow-x: auto;
+}
+.grid-col-full {
+    grid-column: 1 / -1;
+}
+.w-15 {
+    width: 15%;
+}
+.cursor-pointer {
+    cursor: pointer;
+}
 
 /* Small muted "inactive" tag appended after a name in the admin master-data
    tables (Staffeln / Aufgaben / SKs). Square by design. */
@@ -1079,24 +1137,63 @@ label:has(+ [required])::after {
     margin-top: 0.2rem;
 }
 
-.flex-gap-xs { display: flex; gap: var(--space-2); }
-.flex-gap-sm { display: flex; gap: var(--space-2); align-items: center; }
-.flex-gap-md { display: flex; gap: var(--space-4); }
-.flex-gap-md-wrap { display: flex; gap: var(--space-4); flex-wrap: wrap; }
-.flex-col-gap { display: flex; flex-direction: column; gap: var(--space-4); }
-.flex-between { display: flex; justify-content: space-between; align-items: center; }
-.flex-between-mb { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); }
-.flex-end { display: flex; align-items: center; justify-content: flex-end; }
-.flex-center-gap { display: flex; justify-content: center; gap: var(--space-4); }
-.mt-2-flex-gap { margin-top: var(--space-8); display: flex; gap: var(--space-4); }
+.flex-gap-xs {
+    display: flex;
+    gap: var(--space-2);
+}
+.flex-gap-sm {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+.flex-gap-md {
+    display: flex;
+    gap: var(--space-4);
+}
+.flex-gap-md-wrap {
+    display: flex;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+.flex-col-gap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.flex-between-mb {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+}
+.flex-end {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+.flex-center-gap {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-4);
+}
+.mt-2-flex-gap {
+    margin-top: var(--space-8);
+    display: flex;
+    gap: var(--space-4);
+}
 
 /* Custom styling for number input spin buttons to match the dark/orange KRT design */
-input[type="number"] {
+input[type='number'] {
     -moz-appearance: textfield;
 }
 
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
     -webkit-appearance: none;
     appearance: none;
     margin: 0;
@@ -1111,21 +1208,21 @@ input[type="number"]::-webkit-outer-spin-button {
     background-position: center;
 }
 
-input[type="number"]::-webkit-inner-spin-button:hover,
-input[type="number"]::-webkit-outer-spin-button:hover {
+input[type='number']::-webkit-inner-spin-button:hover,
+input[type='number']::-webkit-outer-spin-button:hover {
     background-color: var(--color-primary);
     background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000000'%3E%3Cpath d='M4 6L8 2L12 6Z M4 10L8 14L12 10Z'/%3E%3C/svg%3E");
 }
 
-input[type="text"]:focus,
-input[type="search"]:focus,
-input[type="password"]:focus,
-input[type="email"]:focus,
-input[type="number"]:focus,
-input[type="url"]:focus,
-input[type="date"]:focus,
-input[type="time"]:focus,
-input[type="datetime-local"]:focus,
+input[type='text']:focus,
+input[type='search']:focus,
+input[type='password']:focus,
+input[type='email']:focus,
+input[type='number']:focus,
+input[type='url']:focus,
+input[type='date']:focus,
+input[type='time']:focus,
+input[type='datetime-local']:focus,
 select:focus,
 textarea:focus {
     border-color: var(--color-primary);
@@ -1138,8 +1235,8 @@ input::placeholder {
     font-style: italic;
 }
 
-input[type="checkbox"],
-input[type="radio"] {
+input[type='checkbox'],
+input[type='radio'] {
     appearance: none;
     -webkit-appearance: none;
     background-color: var(--color-surface-input);
@@ -1152,17 +1249,17 @@ input[type="radio"] {
     vertical-align: middle;
 }
 
-input[type="radio"] {
+input[type='radio'] {
     border-radius: 50%;
 }
 
-input[type="checkbox"]:checked,
-input[type="radio"]:checked {
+input[type='checkbox']:checked,
+input[type='radio']:checked {
     background-color: var(--color-primary);
     border-color: var(--color-primary);
 }
 
-input[type="checkbox"]:checked::after {
+input[type='checkbox']:checked::after {
     content: '✔';
     font-size: var(--fs-xs);
     color: var(--color-bg-black);
@@ -1173,7 +1270,7 @@ input[type="checkbox"]:checked::after {
     font-weight: bold;
 }
 
-input[type="radio"]:checked::after {
+input[type='radio']:checked::after {
     content: '';
     width: 0.5rem;
     height: 0.5rem;
@@ -1185,8 +1282,8 @@ input[type="radio"]:checked::after {
     transform: translate(-50%, -50%);
 }
 
-input[type="checkbox"]:focus,
-input[type="radio"]:focus {
+input[type='checkbox']:focus,
+input[type='radio']:focus {
     outline: none;
     box-shadow: var(--glow-primary);
     border-color: var(--color-primary);
@@ -1224,8 +1321,14 @@ input[type="radio"]:focus {
     fill: currentcolor;
     color: currentcolor;
 }
-.krt-icon-lg { width: 1.5em; height: 1.5em; }
-.krt-icon-xl { width: 2em; height: 2em; }
+.krt-icon-lg {
+    width: 1.5em;
+    height: 1.5em;
+}
+.krt-icon-xl {
+    width: 2em;
+    height: 2em;
+}
 
 /* Buttons (if any) */
 /*
@@ -1251,7 +1354,9 @@ input[type="radio"]:focus {
     border: none;
     border-radius: var(--radius-none);
     cursor: pointer;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
     text-decoration: none;
 }
 
@@ -1272,12 +1377,12 @@ input[type="radio"]:focus {
 
 .btn-danger {
     background-color: var(--color-danger);
-    color: #FFF;
+    color: #fff;
 }
 
 .btn-danger:hover {
     background-color: var(--color-danger-hover); /* Consistent with error pages hover */
-    color: #FFF;
+    color: #fff;
 }
 
 .btn-outline-danger {
@@ -1294,12 +1399,12 @@ input[type="radio"]:focus {
 
 .btn-success {
     background-color: var(--color-success);
-    color: #FFF;
+    color: #fff;
 }
 
 .btn-success:hover {
     background-color: var(--color-success-hover);
-    color: #FFF;
+    color: #fff;
 }
 
 /* ----------------------------------------------------------------------------
@@ -1501,14 +1606,26 @@ input[type="radio"]:focus {
 }
 
 /* Text Colors */
-.text-danger { color: var(--color-danger) !important; }
-.text-success { color: var(--color-success) !important; }
-.text-warning { color: var(--color-warning) !important; }
-.text-muted { color: var(--color-gray-2) !important; }
+.text-danger {
+    color: var(--color-danger) !important;
+}
+.text-success {
+    color: var(--color-success) !important;
+}
+.text-warning {
+    color: var(--color-warning) !important;
+}
+.text-muted {
+    color: var(--color-gray-2) !important;
+}
 
 /* Utilities */
-.text-primary { color: var(--color-primary); }
-.bg-dark { background-color: var(--color-bg-dark-gray); }
+.text-primary {
+    color: var(--color-primary);
+}
+.bg-dark {
+    background-color: var(--color-bg-dark-gray);
+}
 
 /* Sci-Fi Elements */
 .hud-box-error {
@@ -1543,8 +1660,10 @@ input[type="radio"]:focus {
 .hud-box::before {
     content: '';
     position: absolute;
-    top: -1px; left: -1px;
-    width: 10px; height: 10px;
+    top: -1px;
+    left: -1px;
+    width: 10px;
+    height: 10px;
     border-top: 2px solid var(--color-primary);
     border-left: 2px solid var(--color-primary);
 }
@@ -1552,8 +1671,10 @@ input[type="radio"]:focus {
 .hud-box::after {
     content: '';
     position: absolute;
-    bottom: -1px; right: -1px;
-    width: 10px; height: 10px;
+    bottom: -1px;
+    right: -1px;
+    width: 10px;
+    height: 10px;
     border-bottom: 2px solid var(--color-primary);
     border-right: 2px solid var(--color-primary);
 }
@@ -1571,7 +1692,9 @@ input[type="radio"]:focus {
     box-shadow: var(--glow-primary-lg);
     opacity: 0;
     transform: translateX(30px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
+    transition:
+        opacity 0.5s ease,
+        transform 0.5s ease;
     pointer-events: none; /* Prevent clicks when hidden */
 }
 
@@ -1584,8 +1707,10 @@ input[type="radio"]:focus {
 .notification-toast::before {
     content: '';
     position: absolute;
-    top: -1px; left: -1px;
-    width: 10px; height: 10px;
+    top: -1px;
+    left: -1px;
+    width: 10px;
+    height: 10px;
     border-top: 2px solid var(--color-primary);
     border-left: 2px solid var(--color-primary);
 }
@@ -1593,8 +1718,10 @@ input[type="radio"]:focus {
 .notification-toast::after {
     content: '';
     position: absolute;
-    bottom: -1px; right: -1px;
-    width: 10px; height: 10px;
+    bottom: -1px;
+    right: -1px;
+    width: 10px;
+    height: 10px;
     border-bottom: 2px solid var(--color-primary);
     border-right: 2px solid var(--color-primary);
 }
@@ -1693,7 +1820,9 @@ input[type="radio"]:focus {
     gap: 0.8rem;
     margin-left: 0 !important; /* Force override */
     font-weight: normal;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
 }
 
 .dropdown-content a:hover {
@@ -1797,10 +1926,13 @@ input[type="radio"]:focus {
 .sidebar-links .sidebar-logout-btn {
     font-family: var(--font-body);
     font-weight: var(--fw-bold);
-    font-size: 1.0rem;
+    font-size: 1rem;
     text-transform: uppercase;
     color: var(--color-gray-1);
-    transition: background-color 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        padding-left 0.2s ease;
     margin-left: 0 !important;
     overflow-wrap: break-word;
 }
@@ -1837,7 +1969,7 @@ input[type="radio"]:focus {
     cursor: pointer;
     font-family: var(--font-body);
     font-weight: var(--fw-bold);
-    font-size: 1.0rem;
+    font-size: 1rem;
     text-transform: uppercase;
     color: var(--color-gray-1);
     display: flex;
@@ -1877,7 +2009,9 @@ input[type="radio"]:focus {
 
 .sidebar-sublinks a {
     font-size: 0.95rem;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
 }
 
 /* Sub-section label inside a sidebar group, used to cluster the long admin list
@@ -2210,14 +2344,22 @@ input[type="radio"]:focus {
     height: 8px;
     background: currentcolor;
 }
-.status-planned   { color: var(--color-info); }
-.status-active    { color: var(--color-success); }
-.status-completed { color: var(--color-gray-2); }
+.status-planned {
+    color: var(--color-info);
+}
+.status-active {
+    color: var(--color-success);
+}
+.status-completed {
+    color: var(--color-gray-2);
+}
 /* Two spellings exist in the domain enums: missions use CANCELLED, operations
    use CANCELED. Both map to the danger hue so a generated `status-<enum>` class
    resolves regardless of which aggregate produced the value. */
 .status-cancelled,
-.status-canceled  { color: var(--color-danger); }
+.status-canceled {
+    color: var(--color-danger);
+}
 
 /*
  * Modal Styles — KRT canonical modal pattern.
@@ -2419,7 +2561,7 @@ details.hud-details[open] > summary::after {
 }
 
 /* The committed value, marked while the cursor is on a different row. */
-.krt-combobox__option[aria-selected="true"]:not(.krt-combobox__option--active) {
+.krt-combobox__option[aria-selected='true']:not(.krt-combobox__option--active) {
     color: var(--color-primary);
     box-shadow: inset 3px 0 0 var(--color-primary);
 }
@@ -2554,7 +2696,11 @@ textarea:focus-visible,
     }
 
     /* Touch target size optimization (fat-finger) */
-    input, select, textarea, .btn, .hamburger-btn {
+    input,
+    select,
+    textarea,
+    .btn,
+    .hamburger-btn {
         min-height: var(--touch-target);
         padding: var(--space-3) var(--space-4);
     }
@@ -2572,8 +2718,10 @@ textarea:focus-visible,
         padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
         line-height: 1.5;
     }
-    
-    .sidebar-links a, .sidebar-links .sidebar-logout-btn, .sidebar-group > summary {
+
+    .sidebar-links a,
+    .sidebar-links .sidebar-logout-btn,
+    .sidebar-group > summary {
         min-height: var(--touch-target);
         line-height: 1.5;
         padding-top: var(--space-2);
@@ -2621,15 +2769,12 @@ textarea:focus-visible,
     }
 }
 
-
 /* --- Ultra-Wide Breakpoints --- */
 @media (width >= 1600px) {
     main {
         max-width: 1600px; /* Expand the main container to utilize space */
     }
 }
-
-
 
 /* ==========================================================================
    KRT Loading Indicator (used by live-filter overlays, e.g. mission list).
@@ -2670,7 +2815,9 @@ textarea:focus-visible,
 }
 
 @keyframes krt-spinner-rotate {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ==========================================================================
@@ -2680,9 +2827,15 @@ textarea:focus-visible,
    Awareness only — does not block any input.
    ========================================================================== */
 @keyframes krt-presence-pulse {
-    0%   { box-shadow: 0 0 0 0 rgb(231 126 35 / 55%); }
-    70%  { box-shadow: 0 0 0 6px rgb(231 126 35 / 0%); }
-    100% { box-shadow: 0 0 0 0 rgb(231 126 35 / 0%); }
+    0% {
+        box-shadow: 0 0 0 0 rgb(231 126 35 / 55%);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgb(231 126 35 / 0%);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgb(231 126 35 / 0%);
+    }
 }
 
 .krt-presence-indicator {
@@ -2716,11 +2869,10 @@ textarea:focus-visible,
     letter-spacing: 0.02em;
 }
 
-#missions-results[aria-busy="true"] {
+#missions-results[aria-busy='true'] {
     opacity: 0.55;
     transition: opacity 120ms ease-in-out;
 }
-
 
 /* ==========================================================================
    KRT Confirm Modal (showKrtConfirm) — corporate-design-konformes
@@ -2781,7 +2933,9 @@ textarea:focus-visible,
     font-size: 0.85rem;
     cursor: pointer;
     border: 1px solid transparent;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
 }
 
 .krt-confirm-actions .btn-secondary {
@@ -2900,7 +3054,7 @@ textarea:focus-visible,
     background-color: var(--color-gray-3);
 }
 
-.multi-select-option input[type="checkbox"] {
+.multi-select-option input[type='checkbox'] {
     margin: 0;
     flex-shrink: 0;
 }
@@ -2912,37 +3066,83 @@ textarea:focus-visible,
     max-width: 150px;
 }
 
-
 /* ============================================================
    Mission Unit Box – Color Palette (KRT Dark Mode)
    Dezente, dunkle Hintergrundfärbungen für Einheitsboxen.
    Nur für .mission-unit-box – keine anderen .hud-box betroffen.
    ============================================================ */
-.mission-unit-box.unit-color-0  { background-color: rgb(231 126  35 / 8%); }
-.mission-unit-box.unit-color-1  { background-color: rgb(  0 180 200 / 8%); }
-.mission-unit-box.unit-color-2  { background-color: rgb(120  60 200 / 8%); }
-.mission-unit-box.unit-color-3  { background-color: rgb( 30 160  80 / 8%); }
-.mission-unit-box.unit-color-4  { background-color: rgb(200  40  60 / 8%); }
-.mission-unit-box.unit-color-5  { background-color: rgb( 60 120 220 / 8%); }
-.mission-unit-box.unit-color-6  { background-color: rgb(180 140  20 / 8%); }
-.mission-unit-box.unit-color-7  { background-color: rgb(  0 140 160 / 8%); }
-.mission-unit-box.unit-color-8  { background-color: rgb(160  30 120 / 8%); }
-.mission-unit-box.unit-color-9  { background-color: rgb( 20 180 120 / 8%); }
-.mission-unit-box.unit-color-10 { background-color: rgb(220  80  20 / 8%); }
-.mission-unit-box.unit-color-11 { background-color: rgb( 80  60 200 / 8%); }
-.mission-unit-box.unit-color-12 { background-color: rgb(  0 200 100 / 8%); }
-.mission-unit-box.unit-color-13 { background-color: rgb(200  20 100 / 8%); }
-.mission-unit-box.unit-color-14 { background-color: rgb( 40 100 200 / 8%); }
-.mission-unit-box.unit-color-15 { background-color: rgb(160 120  20 / 8%); }
-.mission-unit-box.unit-color-16 { background-color: rgb( 20 160 200 / 8%); }
-.mission-unit-box.unit-color-17 { background-color: rgb(100  20 180 / 8%); }
-.mission-unit-box.unit-color-18 { background-color: rgb( 20 200  60 / 8%); }
-.mission-unit-box.unit-color-19 { background-color: rgb(180  60  20 / 8%); }
-.mission-unit-box.unit-color-20 { background-color: rgb( 60 180 160 / 8%); }
-.mission-unit-box.unit-color-21 { background-color: rgb(140  40 160 / 8%); }
-.mission-unit-box.unit-color-22 { background-color: rgb( 20 120  80 / 8%); }
-.mission-unit-box.unit-color-23 { background-color: rgb(200 100  40 / 8%); }
-
+.mission-unit-box.unit-color-0 {
+    background-color: rgb(231 126 35 / 8%);
+}
+.mission-unit-box.unit-color-1 {
+    background-color: rgb(0 180 200 / 8%);
+}
+.mission-unit-box.unit-color-2 {
+    background-color: rgb(120 60 200 / 8%);
+}
+.mission-unit-box.unit-color-3 {
+    background-color: rgb(30 160 80 / 8%);
+}
+.mission-unit-box.unit-color-4 {
+    background-color: rgb(200 40 60 / 8%);
+}
+.mission-unit-box.unit-color-5 {
+    background-color: rgb(60 120 220 / 8%);
+}
+.mission-unit-box.unit-color-6 {
+    background-color: rgb(180 140 20 / 8%);
+}
+.mission-unit-box.unit-color-7 {
+    background-color: rgb(0 140 160 / 8%);
+}
+.mission-unit-box.unit-color-8 {
+    background-color: rgb(160 30 120 / 8%);
+}
+.mission-unit-box.unit-color-9 {
+    background-color: rgb(20 180 120 / 8%);
+}
+.mission-unit-box.unit-color-10 {
+    background-color: rgb(220 80 20 / 8%);
+}
+.mission-unit-box.unit-color-11 {
+    background-color: rgb(80 60 200 / 8%);
+}
+.mission-unit-box.unit-color-12 {
+    background-color: rgb(0 200 100 / 8%);
+}
+.mission-unit-box.unit-color-13 {
+    background-color: rgb(200 20 100 / 8%);
+}
+.mission-unit-box.unit-color-14 {
+    background-color: rgb(40 100 200 / 8%);
+}
+.mission-unit-box.unit-color-15 {
+    background-color: rgb(160 120 20 / 8%);
+}
+.mission-unit-box.unit-color-16 {
+    background-color: rgb(20 160 200 / 8%);
+}
+.mission-unit-box.unit-color-17 {
+    background-color: rgb(100 20 180 / 8%);
+}
+.mission-unit-box.unit-color-18 {
+    background-color: rgb(20 200 60 / 8%);
+}
+.mission-unit-box.unit-color-19 {
+    background-color: rgb(180 60 20 / 8%);
+}
+.mission-unit-box.unit-color-20 {
+    background-color: rgb(60 180 160 / 8%);
+}
+.mission-unit-box.unit-color-21 {
+    background-color: rgb(140 40 160 / 8%);
+}
+.mission-unit-box.unit-color-22 {
+    background-color: rgb(20 120 80 / 8%);
+}
+.mission-unit-box.unit-color-23 {
+    background-color: rgb(200 100 40 / 8%);
+}
 
 /* ==========================================================================
    SCU Input Hint - an inline "?" disc shown next to every material-quantity
@@ -2971,7 +3171,9 @@ textarea:focus-visible,
     text-transform: none;
     vertical-align: middle;
     cursor: help;
-    transition: color 0.2s ease, border-color 0.2s ease;
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease;
 }
 
 .scu-hint:hover {
@@ -3013,7 +3215,9 @@ textarea:focus-visible,
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.2s ease, visibility 0.2s ease;
+    transition:
+        opacity 0.2s ease,
+        visibility 0.2s ease;
 }
 
 .scu-hint:hover .scu-hint__bubble,

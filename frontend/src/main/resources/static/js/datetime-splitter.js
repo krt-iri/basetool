@@ -23,7 +23,7 @@
  *   laeuft (Ursache fuer leere Check-in/Check-out-Felder im Teilnehmer-Edit).
  */
 (function () {
-    const pad = n => String(n).padStart(2, '0');
+    const pad = (n) => String(n).padStart(2, '0');
     // Erkennt, ob der Wert bereits Zonen-Information (Z oder +/-HH:MM) traegt.
     const hasZoneInfo = (val) => /Z$|[+-]\d{2}:?\d{2}$/.test(val);
     const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -76,7 +76,7 @@
     window.krtSyncDatetimeSplitGroup = syncGroup;
 
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.datetime-split-group').forEach(group => {
+        document.querySelectorAll('.datetime-split-group').forEach((group) => {
             const hidden = group.querySelector('input[type="hidden"]');
             const datePart = group.querySelector('.date-part');
             const timePart = group.querySelector('.time-part');
@@ -111,7 +111,7 @@
                     // Lokale Eingabe -> Date-Objekt -> toISOString() liefert UTC mit 'Z'.
                     const [y, m, d] = dVal.split('-').map(Number);
                     const [hh, mm] = tVal.split(':').map(Number);
-                    const local = new Date(y, (m - 1), d, hh, mm, 0, 0);
+                    const local = new Date(y, m - 1, d, hh, mm, 0, 0);
                     hidden.value = isNaN(local) ? '' : local.toISOString();
                 } else if (filterRole && (dVal || tVal)) {
                     // Teil-Eingabe im Filter: fehlende Teile mit Defaults auffuellen.
@@ -128,11 +128,13 @@
                     if (tVal) {
                         [hh, mm] = tVal.split(':').map(Number);
                     } else if (filterRole === 'end') {
-                        hh = 23; mm = 59;
+                        hh = 23;
+                        mm = 59;
                     } else {
-                        hh = 0; mm = 0;
+                        hh = 0;
+                        mm = 0;
                     }
-                    const local = new Date(y, (m - 1), d, hh, mm, 0, 0);
+                    const local = new Date(y, m - 1, d, hh, mm, 0, 0);
                     hidden.value = isNaN(local) ? '' : local.toISOString();
                 } else if (dVal) {
                     // Nur Datum (keine Filter-Rolle) -> als reines Datum (ohne Zone) uebermitteln
@@ -147,7 +149,9 @@
 
                     if (group.getAttribute('data-validate-not-past') === 'true') {
                         if (selectedDate < currentDate) {
-                            errorDiv.textContent = group.getAttribute('data-error-past') || 'Date cannot be in the past.';
+                            errorDiv.textContent =
+                                group.getAttribute('data-error-past') ||
+                                'Date cannot be in the past.';
                             errorDiv.style.display = '';
                         }
                     }
@@ -158,7 +162,9 @@
                         if (targetHidden && targetHidden.value) {
                             const targetDate = new Date(targetHidden.value);
                             if (selectedDate <= targetDate) {
-                                errorDiv.textContent = group.getAttribute('data-error-after') || 'End time must be after start time.';
+                                errorDiv.textContent =
+                                    group.getAttribute('data-error-after') ||
+                                    'End time must be after start time.';
                                 errorDiv.style.display = '';
                             }
                         }

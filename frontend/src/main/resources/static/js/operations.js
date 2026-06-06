@@ -23,9 +23,11 @@
     function loadResults() {
         if (loadingIndicator) loadingIndicator.style.display = 'block';
         fetch('/operations?' + buildQueryString(), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
         })
-            .then(function (res) { return res.text(); })
+            .then(function (res) {
+                return res.text();
+            })
             .then(function (html) {
                 resultsContainer.innerHTML = html;
                 if (loadingIndicator) loadingIndicator.style.display = 'none';
@@ -47,7 +49,9 @@
 
     if (resetBtn) {
         resetBtn.addEventListener('click', function () {
-            form.querySelectorAll('input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]').forEach(function (el) {
+            form.querySelectorAll(
+                'input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
+            ).forEach(function (el) {
                 el.value = '';
             });
             form.querySelectorAll('input[type="checkbox"]').forEach(function (el) {

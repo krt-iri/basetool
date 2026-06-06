@@ -35,9 +35,11 @@
     // handlers cannot lose its registration to a load-order race — even if this
     // script is deferred, slowed by the network or blocked by a stale browser cache.
     // See the comment in `fragments/head.html` for why the stub exists.
-    let pendingQueue = (window.krtEvents
-        && window.krtEvents._isBootstrapStub
-        && window.krtEvents._queuedRegistrations) || [];
+    let pendingQueue =
+        (window.krtEvents &&
+            window.krtEvents._isBootstrapStub &&
+            window.krtEvents._queuedRegistrations) ||
+        [];
 
     /**
      * Register a delegated handler.
@@ -80,9 +82,10 @@
             if (stub && stub._isBootstrapStub) {
                 if (typeof console !== 'undefined' && typeof console.error === 'function') {
                     console.error(
-                        '[krtEvents] event-delegation.js did not install the real handler '
-                        + 'registry — ' + (stub._queuedRegistrations || []).length
-                        + ' registration(s) are queued but inactive. Check network/CSP/cache.'
+                        '[krtEvents] event-delegation.js did not install the real handler ' +
+                            'registry — ' +
+                            (stub._queuedRegistrations || []).length +
+                            ' registration(s) are queued but inactive. Check network/CSP/cache.',
                     );
                 }
             }

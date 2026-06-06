@@ -17,21 +17,31 @@
 (function () {
     'use strict';
 
-    function i18n() { return window.krtBlueprintsRecipeI18n || {}; }
+    function i18n() {
+        return window.krtBlueprintsRecipeI18n || {};
+    }
 
-    function endpoints() { return window.krtBlueprintsEndpoints || {}; }
+    function endpoints() {
+        return window.krtBlueprintsEndpoints || {};
+    }
 
     /* ------------------------------------------------------------ DOM helpers */
 
     function el(tag, cls, text) {
         const node = document.createElement(tag);
-        if (cls) { node.className = cls; }
-        if (text != null) { node.textContent = text; }
+        if (cls) {
+            node.className = cls;
+        }
+        if (text != null) {
+            node.textContent = text;
+        }
         return node;
     }
 
     function clear(node) {
-        while (node.firstChild) { node.removeChild(node.firstChild); }
+        while (node.firstChild) {
+            node.removeChild(node.firstChild);
+        }
     }
 
     function resolveUrl(template, id) {
@@ -43,9 +53,13 @@
 
     function toggleRecipe(btn) {
         const id = btn.getAttribute('data-id');
-        if (!id) { return; }
+        if (!id) {
+            return;
+        }
         const row = document.getElementById('bp-recipe-' + id);
-        if (!row) { return; }
+        if (!row) {
+            return;
+        }
         const expanded = btn.getAttribute('aria-expanded') === 'true';
         if (expanded) {
             row.hidden = true;
@@ -66,14 +80,21 @@
         panel.appendChild(el('div', 'krt-bp-recipe-loading', i18n().loading || 'Loading...'));
         fetch(resolveUrl(endpoints().recipe, id), {
             credentials: 'same-origin',
-            headers: { 'Accept': 'application/json' }
+            headers: { Accept: 'application/json' },
         })
-            .then(function (resp) { return resp.ok ? resp.json() : null; })
+            .then(function (resp) {
+                return resp.ok ? resp.json() : null;
+            })
             .then(function (recipe) {
-                if (!recipe) { showError(panel); return; }
+                if (!recipe) {
+                    showError(panel);
+                    return;
+                }
                 renderRecipe(panel, recipe);
             })
-            .catch(function () { showError(panel); });
+            .catch(function () {
+                showError(panel);
+            });
     }
 
     function showError(panel) {
@@ -98,8 +119,12 @@
 
         const wrap = el('div', 'krt-bp-recipe');
         if (recipe.variantCount > 1) {
-            const hint = recipe.variantCount + ' ' + (i18n().variants || 'variants')
-                    + ' · ' + (i18n().exampleRecipe || 'example recipe');
+            const hint =
+                recipe.variantCount +
+                ' ' +
+                (i18n().variants || 'variants') +
+                ' · ' +
+                (i18n().exampleRecipe || 'example recipe');
             wrap.appendChild(el('p', 'krt-bp-recipe-variants', hint));
         }
 
@@ -113,7 +138,9 @@
 
         const tbody = document.createElement('tbody');
         if (groups.length > 0) {
-            groups.forEach(function (g) { tbody.appendChild(renderGroupRow(g)); });
+            groups.forEach(function (g) {
+                tbody.appendChild(renderGroupRow(g));
+            });
         } else {
             tbody.appendChild(renderFlatRow(flat));
         }
@@ -127,7 +154,9 @@
     function renderFlatRow(ingredients) {
         const tr = document.createElement('tr');
         const ingCell = ingredientCell();
-        ingredients.forEach(function (ing) { ingCell.appendChild(renderIngredient(ing)); });
+        ingredients.forEach(function (ing) {
+            ingCell.appendChild(renderIngredient(ing));
+        });
         tr.appendChild(ingCell);
         const statCell = statContributionCell();
         statCell.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
@@ -140,10 +169,14 @@
 
         const ingCell = ingredientCell();
         const slot = group.name || group.groupKey;
-        if (slot) { ingCell.appendChild(el('span', 'krt-bp-recipe-slot', slot)); }
+        if (slot) {
+            ingCell.appendChild(el('span', 'krt-bp-recipe-slot', slot));
+        }
         const ings = group.ingredients || [];
         if (ings.length > 0) {
-            ings.forEach(function (ing) { ingCell.appendChild(renderIngredient(ing)); });
+            ings.forEach(function (ing) {
+                ingCell.appendChild(renderIngredient(ing));
+            });
         } else {
             ingCell.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
         }
@@ -152,7 +185,9 @@
         const statCell = statContributionCell();
         const mods = group.modifiers || [];
         if (mods.length > 0) {
-            mods.forEach(function (m) { statCell.appendChild(renderModifier(m)); });
+            mods.forEach(function (m) {
+                statCell.appendChild(renderModifier(m));
+            });
         } else {
             statCell.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
         }
@@ -178,15 +213,25 @@
         const span = el('span', 'krt-bp-recipe-ing');
         span.appendChild(el('span', null, ing.name || '?'));
         if (ing.quantityScu != null) {
-            span.appendChild(el('span', 'krt-bp-recipe-ing-meta',
-                    ' · ' + Number(ing.quantityScu).toFixed(2) + ' SCU'));
+            span.appendChild(
+                el(
+                    'span',
+                    'krt-bp-recipe-ing-meta',
+                    ' · ' + Number(ing.quantityScu).toFixed(2) + ' SCU',
+                ),
+            );
         }
         if (ing.quantityUnits != null) {
             span.appendChild(el('span', 'krt-bp-recipe-ing-meta', ' · ' + ing.quantityUnits + 'x'));
         }
         if (ing.minQuality != null) {
-            span.appendChild(el('span', 'krt-bp-recipe-ing-meta',
-                    ' · ' + (i18n().minQuality || 'min. quality') + ' ' + ing.minQuality));
+            span.appendChild(
+                el(
+                    'span',
+                    'krt-bp-recipe-ing-meta',
+                    ' · ' + (i18n().minQuality || 'min. quality') + ' ' + ing.minQuality,
+                ),
+            );
         }
         return span;
     }
@@ -195,18 +240,28 @@
         const stat = el('div', 'krt-bp-recipe-stat');
         stat.appendChild(el('span', 'krt-bp-recipe-stat-label', m.label || m.propertyKey || ''));
         const bw = betterWhenText(m.betterWhen);
-        if (bw) { stat.appendChild(el('span', 'krt-bp-recipe-stat-bw', '(' + bw + ')')); }
+        if (bw) {
+            stat.appendChild(el('span', 'krt-bp-recipe-stat-bw', '(' + bw + ')'));
+        }
 
-        const hasBand = m.effectiveQualityMin != null && m.effectiveQualityMax != null
-                && m.effectiveQualityMax > m.effectiveQualityMin;
+        const hasBand =
+            m.effectiveQualityMin != null &&
+            m.effectiveQualityMax != null &&
+            m.effectiveQualityMax > m.effectiveQualityMin;
         stat.appendChild(hasBand ? buildSlider(m) : buildFallback(m));
         return stat;
     }
 
     function betterWhenText(bw) {
-        if (bw === 'higher') { return i18n().betterHigher || 'higher is better'; }
-        if (bw === 'lower') { return i18n().betterLower || 'lower is better'; }
-        if (bw === 'neutral') { return i18n().betterNeutral || 'neutral'; }
+        if (bw === 'higher') {
+            return i18n().betterHigher || 'higher is better';
+        }
+        if (bw === 'lower') {
+            return i18n().betterLower || 'lower is better';
+        }
+        if (bw === 'neutral') {
+            return i18n().betterNeutral || 'neutral';
+        }
         return null;
     }
 
@@ -227,7 +282,9 @@
         range.max = String(qmax);
         range.value = String(qmax);
         row.appendChild(range);
-        row.appendChild(el('span', 'krt-bp-recipe-end krt-bp-recipe-end-max', String(Math.round(qmax))));
+        row.appendChild(
+            el('span', 'krt-bp-recipe-end krt-bp-recipe-end-max', String(Math.round(qmax))),
+        );
         slider.appendChild(row);
 
         const out = el('div', 'krt-bp-recipe-slider-out');
@@ -252,16 +309,24 @@
     // No usable quality band to slide over: show the max-quality multiplier, else a dash.
     function buildFallback(m) {
         if (m.modifierAtMaxQuality != null) {
-            return el('span', 'krt-bp-recipe-depval', '×' + Number(m.modifierAtMaxQuality).toFixed(2));
+            return el(
+                'span',
+                'krt-bp-recipe-depval',
+                '×' + Number(m.modifierAtMaxQuality).toFixed(2),
+            );
         }
         return el('span', 'krt-bp-recipe-dash', '–');
     }
 
     /* ----------------------------------------------------------- computation */
 
-    function clamp01(t) { return t < 0 ? 0 : (t > 1 ? 1 : t); }
+    function clamp01(t) {
+        return t < 0 ? 0 : t > 1 ? 1 : t;
+    }
 
-    function lerp(a, b, t) { return a + (b - a) * t; }
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
 
     // Mirror of the admin blueprint slider math. A segmented modifier follows its ordered
     // segments — interpolated within a 'linear' segment, held constant for a stepped form
@@ -276,11 +341,15 @@
                 const b = segs[i].qualityMax;
                 const vs = segs[i].modifierAtStart;
                 const ve = segs[i].modifierAtEnd;
-                if (a == null || b == null) { continue; }
+                if (a == null || b == null) {
+                    continue;
+                }
                 if (q <= b || i === segs.length - 1) {
-                    if (stepped) { return (vs == null) ? ve : vs; }
-                    const t = (b === a) ? 0 : clamp01((q - a) / (b - a));
-                    return (vs == null || ve == null) ? vs : lerp(vs, ve, t);
+                    if (stepped) {
+                        return vs == null ? ve : vs;
+                    }
+                    const t = b === a ? 0 : clamp01((q - a) / (b - a));
+                    return vs == null || ve == null ? vs : lerp(vs, ve, t);
                 }
             }
             return null;
@@ -290,7 +359,7 @@
         const vmin = m.modifierAtMinQuality;
         const vmax = m.modifierAtMaxQuality;
         if (qmin != null && qmax != null && vmin != null && vmax != null) {
-            const tt = (qmax === qmin) ? 0 : clamp01((q - qmin) / (qmax - qmin));
+            const tt = qmax === qmin ? 0 : clamp01((q - qmin) / (qmax - qmin));
             return lerp(vmin, vmax, tt);
         }
         return null;

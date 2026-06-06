@@ -9,6 +9,9 @@
     "selector-class-pattern": null,
     "custom-property-empty-line-before": null,
     "comment-empty-line-before": null,
+    "rule-empty-line-before": null,
+    "at-rule-empty-line-before": null,
+    "declaration-empty-line-before": null,
     "no-descending-specificity": null,
     "declaration-block-single-line-max-declarations": null,
     "property-no-vendor-prefix": null
