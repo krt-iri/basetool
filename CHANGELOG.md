@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Jedes Mengenfeld für SCU-Materialien hat jetzt ein „?"-Symbol, das per Maus-Hover oder Tastaturfokus einen Hinweis einblendet:** „Eingabe in SCU. cSCU ist 0,01 SCU. µSCU ist 0,001 SCU." So ist klar, dass Bruchteile erlaubt sind. Greift in Lager-Einbuchung, Aus-/Umbuchung, Material- und Item-Auftrag, Material-Eintragung, Übergabe und Raffinerie-Einlagerung; bei Stück-Materialien bleibt der Hinweis aus.
+
+### Fixed
+
+- **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.
+
 ## [v0.3.63](https://github.com/krt-iri/basetool/releases/tag/v0.3.63) - 2026-06-06
 
 ## [v0.3.62](https://github.com/krt-iri/basetool/releases/tag/v0.3.62) - 2026-06-06

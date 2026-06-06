@@ -157,14 +157,18 @@
                     <div class="material-row" th:each="mat, stat : *{materials}">
                         <div class="form-group flex-2 mb-0">
                             <label th:text="#{orders.create.material}">Material</label>
-                            <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" required>
+                            <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" required>
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
+                                <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
                             </select>
                         </div>
                         <div class="form-group flex-1 mb-0">
-                            <label th:text="#{orders.create.amount}">Menge</label>
-                            <input type="number" th:field="*{materials[__${stat.index}__].amount}" data-testid="order-material-amount" step="0.001" min="0" required>
+                            <label>
+                                <span th:text="#{orders.create.amount}">Menge</span>
+                                <span data-role="amount-unit"></span>
+                                <th:block th:replace="~{fragments/scu-hint :: scuHint(null, true)}"></th:block>
+                            </label>
+                            <input type="number" th:field="*{materials[__${stat.index}__].amount}" data-testid="order-material-amount" data-role="material-amount" step="0.001" min="0" required>
                         </div>
                         <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
@@ -232,7 +236,7 @@
     <!-- Template for new material options -->
     <select id="material-options-template" style="display: none;">
         <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-        <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
+        <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
     </select>
 
     <!-- Template for new min-quality options (700 / Keine), cloned by addMaterialRow() -->
@@ -254,6 +258,54 @@
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
     let materialIndex = /*[[${jobOrderForm.materials.size()}]]*/ 1;
+
+    // Unit labels + SCU hint text for the quantity-type-aware material rows below.
+    const MSG_UNIT_SCU = /*[[#{material.quantity.scu}]]*/ 'SCU';
+    const MSG_UNIT_PIECE = /*[[#{material.quantity.piece}]]*/ 'Stueck';
+    const MSG_MATERIAL_LABEL = /*[[#{orders.create.material}]]*/ 'Material';
+    const MSG_AMOUNT_LABEL = /*[[#{orders.create.amount}]]*/ 'Menge';
+    const MSG_MINQUALITY_LABEL = /*[[#{orders.create.minQuality}]]*/ 'Min. Qualitaet';
+    const SCU_HINT_TEXT = /*[[#{material.scu.hint}]]*/ 'Eingabe in SCU.';
+
+    // Inline "?" SCU-hint marker for JS-built rows (the Thymeleaf fragment cannot be used here).
+    // The hint text is a trusted message constant with no HTML-special characters, so it is safe
+    // to inline without escaping. Starts hidden; refreshMaterialUnit() reveals it for SCU materials.
+    function scuHintMarkup() {
+        return '<span class="scu-hint" data-role="scu-hint" tabindex="0" role="img" aria-label="'
+            + SCU_HINT_TEXT + '" style="display:none;"><span aria-hidden="true">?</span>'
+            + '<span class="scu-hint__bubble" aria-hidden="true">' + SCU_HINT_TEXT + '</span></span>';
+    }
+
+    // Mirrors a material row's amount field to the selected material's quantity type: PIECE -> integer
+    // step + "(Stueck)" unit and no SCU hint; SCU -> 0.001 step + "(SCU)" unit + hint. Called on
+    // material change, after adding/importing a row, and once per existing row on load.
+    function refreshMaterialUnit(row) {
+        if (!row) {
+            return;
+        }
+        const sel = row.querySelector('[data-role="material-select"]');
+        const amountInput = row.querySelector('[data-role="material-amount"]');
+        const unitSpan = row.querySelector('[data-role="amount-unit"]');
+        const hint = row.querySelector('.scu-hint');
+        if (!sel || !amountInput) {
+            return;
+        }
+        const opt = sel.selectedOptions && sel.selectedOptions[0];
+        const qt = opt ? opt.getAttribute('data-quantity-type') : '';
+        if (qt === 'PIECE') {
+            amountInput.setAttribute('step', '1');
+            if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
+            if (hint) hint.style.display = 'none';
+        } else if (qt === 'SCU') {
+            amountInput.setAttribute('step', '0.001');
+            if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
+            if (hint) hint.style.display = '';
+        } else {
+            amountInput.setAttribute('step', '0.001');
+            if (unitSpan) unitSpan.textContent = '';
+            if (hint) hint.style.display = 'none';
+        }
+    }
     
     function importFromScmdb() {
         const text = document.getElementById('scmdb-import-text').value;
@@ -318,6 +370,7 @@
                     
                     select.value = materialId;
                     amountInput.value = amount;
+                    refreshMaterialUnit(targetRow);
                     
                     foundAny = true;
                 } else {
@@ -359,17 +412,21 @@
 
         row.innerHTML = `
             <div class="form-group flex-2 mb-0">
-                <select name="materials[${materialIndex}].materialId" required>${options}</select>
+                <label>${MSG_MATERIAL_LABEL}</label>
+                <select name="materials[${materialIndex}].materialId" data-role="material-select" required>${options}</select>
             </div>
             <div class="form-group flex-1 mb-0">
-                <input type="number" name="materials[${materialIndex}].amount" value="" step="0.001" min="0" required>
+                <label>${MSG_AMOUNT_LABEL} <span data-role="amount-unit"></span>${scuHintMarkup()}</label>
+                <input type="number" name="materials[${materialIndex}].amount" value="" data-role="material-amount" step="0.001" min="0" required>
             </div>
             <div class="form-group flex-1 mb-0">
+                <label>${MSG_MINQUALITY_LABEL}</label>
                 <select name="materials[${materialIndex}].minQuality">${minQualityOptions}</select>
             </div>
         `;
         
         container.appendChild(row);
+        refreshMaterialUnit(row);
         materialIndex++;
     }
 
@@ -609,6 +666,17 @@
     }
     document.querySelectorAll('input[name="orderModeToggle"]').forEach(r => r.addEventListener('change', toggleOrderMode));
     toggleOrderMode();
+
+    // Quantity-type-aware material rows: react to material changes and sync the rows present on load.
+    const materialsContainerEl = document.getElementById('materials-container');
+    if (materialsContainerEl) {
+        materialsContainerEl.addEventListener('change', e => {
+            if (e.target && e.target.matches && e.target.matches('[data-role="material-select"]')) {
+                refreshMaterialUnit(e.target.closest('.material-row'));
+            }
+        });
+        materialsContainerEl.querySelectorAll('.material-row').forEach(refreshMaterialUnit);
+    }
 
     // CSP-safe delegated bindings (replaces onclick="importFromScmdb()" and
     // onclick="addMaterialRow()" inline handlers).

@@ -394,6 +394,7 @@
                                     <span th:text="#{inventory.form.amount}">Menge</span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:text="'(' + #{material.quantity.scu} + ')'"></span>
+                                    <th:block th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:replace="~{fragments/scu-hint :: scuHint(null, false)}"></th:block>
                                 </label>
                                 <input type="number" th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" inputmode="decimal" required>
                             </div>

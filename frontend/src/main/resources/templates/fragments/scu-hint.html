@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Reusable SCU input-hint marker. Renders a small focusable "?" disc that sits
+  next to a material-quantity input whose unit is SCU. Hover or keyboard-focus
+  reveals a KRT-styled tooltip explaining the decimal scale (cSCU = 0.01 SCU,
+  microSCU = 0.001 SCU) so operators know fractional SCU values are accepted.
+  Show/hide is pure CSS - see `.scu-hint` in static/css/styles.css.
+
+  Parameters:
+    - hintId      : optional DOM id so page JS can toggle the marker for fields
+                    whose unit is only known at runtime (SCU vs PIECE). Pass null
+                    for an always-visible static hint on a field that is always SCU.
+    - startHidden : when true the marker renders with display:none so JS reveals
+                    it only once an SCU-typed material is chosen.
+
+  The tooltip text is the i18n key `material.scu.hint`; the same string is mirrored
+  onto aria-label so screen-reader users hear it on focus. The static form needs no
+  unique id, so the markup is safe to clone (e.g. the order edit-modal material rows).
+-->
+<span th:fragment="scuHint(hintId, startHidden)"
+      class="scu-hint"
+      th:id="${hintId}"
+      th:style="${startHidden} ? 'display:none;'"
+      tabindex="0"
+      role="img"
+      th:aria-label="#{material.scu.hint}">
+    <span aria-hidden="true">?</span>
+    <span class="scu-hint__bubble" aria-hidden="true"
+          th:text="#{material.scu.hint}">Eingabe in SCU. cSCU ist 0,01 SCU. &#181;SCU ist 0,001 SCU.</span>
+</span>
+</body>
+</html>
