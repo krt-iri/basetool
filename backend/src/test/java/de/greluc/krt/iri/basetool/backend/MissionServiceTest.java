@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest;
@@ -161,6 +162,58 @@ class MissionServiceTest {
     assertTrue(
         participant.getOrgUnits().isEmpty(),
         "a user with no membership must get no org-unit affiliation (no IRIDIUM fallback)");
+  }
+
+  // covers REQ-MISSION-002 — sign-up seeds the participant payout preference from the user default
+  @Test
+  void addParticipant_ShouldPreFillPayoutPreferenceFromUserDefault() {
+    UUID missionId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    user.setUsername("donator");
+    user.setDefaultPayoutPreference(PayoutPreference.DONATE);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+
+    Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
+
+    MissionParticipant participant = result.getParticipants().iterator().next();
+    assertEquals(
+        PayoutPreference.DONATE,
+        participant.getPayoutPreference(),
+        "participant payout preference must be seeded from the signing-up user's profile default");
+  }
+
+  // covers REQ-MISSION-002 — a user with no chosen default keeps the PAYOUT entity default
+  @Test
+  void addParticipant_ShouldKeepPayoutDefault_WhenUserHasNoDefault() {
+    UUID missionId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    user.setUsername("nopref");
+    // defaultPayoutPreference deliberately left null — the user never opted in.
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+
+    Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
+
+    MissionParticipant participant = result.getParticipants().iterator().next();
+    assertEquals(
+        PayoutPreference.PAYOUT,
+        participant.getPayoutPreference(),
+        "a user with no profile default keeps the PAYOUT entity default");
   }
 
   @Test

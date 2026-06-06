@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.Role;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.KeycloakUserDto;
@@ -434,6 +435,42 @@ public class UserService {
     if (displayName != null) {
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
+    return userRepository.save(user);
+  }
+
+  /**
+   * Sets the calling user's personal default payout preference — the value pre-filled into the
+   * per-participant {@code payoutPreference} at mission sign-up ({@link
+   * MissionService#addParticipant}). Mirrors {@link #updateUserDescription}'s optimistic-lock
+   * contract: a stale {@code version} surfaces as a 409. Unlike the description fields the
+   * preference is set unconditionally (the request DTO enforces {@code @NotNull}), so this never
+   * silently no-ops. Changing it is forward-only — it does not rewrite existing {@code
+   * MissionParticipant} rows.
+   *
+   * @param id the calling user's id, resolved from the JWT (never from the URL); never {@code
+   *     null}.
+   * @param preference the new default payout preference; never {@code null}.
+   * @param version the optimistic-lock version the caller last read; {@code null} bypasses the
+   *     check, matching {@link #updateUserDescription}.
+   * @return the persisted user with the updated default and bumped version.
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the user is
+   *     unknown.
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale.
+   */
+  @Transactional
+  public User updateUserDefaultPayoutPreference(
+      @NotNull UUID id, @NotNull PayoutPreference preference, @Nullable Long version) {
+    User user =
+        userRepository
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new de.greluc.krt.iri.basetool.backend.exception.NotFoundException(
+                        "User not found"));
+    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
+      throw new ObjectOptimisticLockingFailureException(User.class, id);
+    }
+    user.setDefaultPayoutPreference(preference);
     return userRepository.save(user);
   }
 

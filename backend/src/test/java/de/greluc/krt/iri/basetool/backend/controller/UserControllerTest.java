@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
@@ -342,6 +343,57 @@ class UserControllerTest {
     assertEquals(CALLER_ID, result.id());
     assertEquals("me@example.invalid", result.email());
     verify(userService).updateUserDescription(CALLER_ID, "Pilot extraordinaire", "Ace", 2L);
+  }
+
+  // ── GET/PUT /me/payout-preference ────────────────────────────────────────
+
+  @Test
+  void getMyPayoutPreference_resolvesIdFromJwt_andReturnsPreferenceAndVersion() {
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+    User me = new User();
+    me.setId(CALLER_ID);
+    me.setDefaultPayoutPreference(PayoutPreference.DONATE);
+    me.setVersion(4L);
+    when(userService.findById(CALLER_ID)).thenReturn(me);
+
+    UserController.MyPayoutPreferenceResponse result = controller.getMyPayoutPreference(jwt);
+
+    assertEquals(PayoutPreference.DONATE, result.defaultPayoutPreference());
+    assertEquals(4L, result.version());
+  }
+
+  @Test
+  void getMyPayoutPreference_returnsNullPreference_whenUserNeverChose() {
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+    User me = new User();
+    me.setId(CALLER_ID);
+    me.setVersion(1L);
+    when(userService.findById(CALLER_ID)).thenReturn(me);
+
+    UserController.MyPayoutPreferenceResponse result = controller.getMyPayoutPreference(jwt);
+
+    assertNull(
+        result.defaultPayoutPreference(), "no explicit choice surfaces as a null preference");
+  }
+
+  @Test
+  void updateMyPayoutPreference_resolvesIdFromJwt_andForwardsPreferenceAndVersion() {
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+    UserController.MyPayoutPreferenceRequest req =
+        new UserController.MyPayoutPreferenceRequest(PayoutPreference.DONATE, 2L);
+    User updated = new User();
+    updated.setId(CALLER_ID);
+    updated.setDefaultPayoutPreference(PayoutPreference.DONATE);
+    updated.setVersion(3L);
+    when(userService.updateUserDefaultPayoutPreference(CALLER_ID, PayoutPreference.DONATE, 2L))
+        .thenReturn(updated);
+
+    UserController.MyPayoutPreferenceResponse result =
+        controller.updateMyPayoutPreference(jwt, req);
+
+    assertEquals(PayoutPreference.DONATE, result.defaultPayoutPreference());
+    assertEquals(3L, result.version());
+    verify(userService).updateUserDefaultPayoutPreference(CALLER_ID, PayoutPreference.DONATE, 2L);
   }
 
   // ── PUT /me/read-announcement/{id} ──────────────────────────────────────

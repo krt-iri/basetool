@@ -764,6 +764,14 @@ public class MissionService {
       // the old, wrong IRIDIUM fallback. The caller-submitted orgUnitIds are intentionally ignored
       // for registered participants; the picker is guest-only.
       participant.setOrgUnits(resolveMembershipOrgUnits(user.getId()));
+      // REQ-MISSION-002: pre-fill the per-participant payout preference from the signing-up user's
+      // personal default. A user who never chose one keeps the entity default (PAYOUT). This is a
+      // one-time seed at sign-up — the per-mission value stays editable afterwards via
+      // updateParticipantAttributes and is NOT rewritten when the user later changes their profile
+      // default. Guests (the else branch) have no profile and keep PAYOUT.
+      if (user.getDefaultPayoutPreference() != null) {
+        participant.setPayoutPreference(user.getDefaultPayoutPreference());
+      }
     } else {
       participant.setGuestName(effectiveGuestName);
       participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
