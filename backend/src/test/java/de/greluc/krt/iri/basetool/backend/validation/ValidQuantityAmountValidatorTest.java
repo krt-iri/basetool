@@ -36,6 +36,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+// covers REQ-INV-003 (server-side validation) - see docs/specs/inv-material-quantities.md
 @ExtendWith(MockitoExtension.class)
 class ValidQuantityAmountValidatorTest {
 

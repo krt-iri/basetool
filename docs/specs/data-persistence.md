@@ -33,32 +33,13 @@ it before adding a migration.
 
 Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out.
 
-### REQ-DATA-004 — Material amounts are stored at SCU scale (≤ 3 decimals)
-
-Every persisted material amount is normalised to the SCU granularity of **0.001** — at most three
-decimal places — using commercial rounding (`RoundingMode.HALF_UP`). Rounding happens at the
-persistence boundary via a `@PrePersist`/`@PreUpdate` hook on each amount-bearing entity
-(`InventoryItem`, `JobOrderMaterial`, `MaterialClaim`, `JobOrderHandoverItem`), so the rule holds no
-matter which path produced the value: operator input, `double` arithmetic on book-out / transfer /
-handover decrements, or summed refinery yields (which can land on a binary value such as
-`37.160000000000004`). `PIECE` amounts are whole numbers, so the rounding is a harmless no-op for
-them. Positivity (`> 0`) and the `PIECE`-integer rule are enforced earlier — at the DTO boundary via
-`@ValidQuantityAmount` (inventory create/update, refinery store, job-order materials) and inline in
-the book-out / handover / claim services. This is the server-side counterpart of
-[REQ-UI-010 / REQ-UI-011](ui-design-system.md); SCU values with excess precision are rounded, not
-rejected, mirroring the frontend.
-
-**Acceptance**
-
-- [ ] An amount with more than three decimals is stored rounded HALF_UP to three (`0.0015` → `0.002`, `1.2345` → `1.235`).
-- [ ] No write path stores a material amount with more than three decimals.
-- [ ] A `0` or negative material amount is rejected on the guarded create/update endpoints.
-
-**Enforced by:** `MaterialAmountRoundingTest`, `ValidQuantityAmountValidatorTest`. **Code:**
-`backend/.../model/{InventoryItem,JobOrderMaterial,MaterialClaim,JobOrderHandoverItem}` (`roundAmountToScuScale`),
-`backend/.../validation/ValidQuantityAmountValidator`. **Issues:** PR #465.
-
 ## Out of scope
+
+**Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
+decimals rule on the amount entities, plus the `> 0` / `PIECE`-integer validation) lives in its own
+spec — [`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-003) — which owns the
+SCU/PIECE quantity rules end-to-end. It is a persistence-boundary rule, but kept with its sibling
+input rules for one place to look.
 
 Optimistic/pessimistic locking and the `…WithinTransaction` patterns — documented inline in
 `CLAUDE.md` (see the concurrency note above).

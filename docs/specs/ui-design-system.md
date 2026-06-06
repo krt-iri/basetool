@@ -119,61 +119,15 @@ Every layout change and new component works on **four** classes:
 
 - [ ] Verified at all four breakpoints; interactive targets ≥ 44px on touch classes.
 
-### REQ-UI-010 — Material-amount input: SCU quantity type
-
-Every field where a user enters an amount of an **SCU-typed** material (inventory book-in,
-book-out target + amount, material-order create + edit, material claim, handover, refinery
-store-to-inventory) accepts a **positive decimal** value with **at most three decimal
-places** — the SCU granularity is 0.001 (microSCU), so the input step is `0.001`. The
-decimal separator may be typed as **either `.` or `,`** regardless of browser locale, and
-the value is **normalised internally** to a canonical dot decimal before it leaves the
-field (a native `<input type="number">` only accepts the browser-locale separator, which is
-why these are `type="text" inputmode="decimal"`). A value typed with **more than three**
-decimal places is **rounded to three using commercial rounding (round half up)** when the
-field is committed (on blur) and again before submit. The value must be **> 0**; the one
-exception is the book-out **target stock**, which may be `0` (= "remove all") and opts out
-via `data-scu-allow-zero`.
-
-**Acceptance**
-
-- [ ] Both `0,01` and `0.01` are accepted and the form submits `0.01`.
-- [ ] An amount with > 3 decimals is rounded half up to 3 (`0.0015` → `0.002`, `1.2345` → `1.235`, `12.9995` → `13`).
-- [ ] An amount that is `0`, negative, or rounds to `0` (e.g. `0.0004`) is rejected before submit; the book-out target stock may be `0`.
-- [ ] The field carries `step="0.001"` and is `type="text" inputmode="decimal" data-scu-decimal`.
-
-**Enforced by:** _Client_ — `scu-decimal-input.js` (mode read from the live `step` attribute) +
-`InventoryPageControllerMvcTest` (render-wiring) + web-asset linting (ESLint / HTMLHint / Prettier).
-_Server_ — `@ValidQuantityAmount` rejects `≤ 0` on the inventory create/update, refinery-store and
-**job-order material** (create + edit) DTOs, and amounts are rounded HALF_UP to three decimals at
-the persistence boundary (see [REQ-DATA-004](data-persistence.md), `ValidQuantityAmountValidatorTest`,
-`MaterialAmountRoundingTest`). **Code:** `frontend/.../static/js/scu-decimal-input.js`,
-`fragments/head.html`; `backend/.../validation/ValidQuantityAmount*`,
-`backend/.../model/{InventoryItem,JobOrderMaterial,MaterialClaim,JobOrderHandoverItem}`. **Issues:**
-PR #465.
-
-### REQ-UI-011 — Material-amount input: PIECE quantity type
-
-The same fields, when the chosen material is **PIECE-typed** (Stück), accept **only positive
-whole numbers** (≥ 1). Decimal separators are **not** accepted — they are stripped as the
-user types — and fractional or non-positive values are rejected before submit. The field's
-integer mode is signalled by `step="1"`, which the quantity-type-aware page scripts set when
-a PIECE material is selected.
-
-**Acceptance**
-
-- [ ] Only digits can be entered; a typed `.` or `,` is dropped.
-- [ ] A value `< 1` (including `0`) is rejected before submit.
-
-**Enforced by:** _Client_ — `scu-decimal-input.js` (integer mode) + web-asset linting. _Server_ —
-`@ValidQuantityAmount` rejects fractional and `≤ 0` PIECE amounts on the validated DTOs, and the
-book-out / handover / claim services apply the same integer + positivity checks inline. **Code:**
-`frontend/.../static/js/scu-decimal-input.js`; `backend/.../validation/ValidQuantityAmount*`.
-**Issues:** PR #465.
-
 ## Out of scope
 
 Brand assets/logos themselves (managed in the design skill `assets/`), and the desktop SC
 Extractor's GUI design (see [`docs/DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md)).
+
+**Material-amount input fields** (SCU/PIECE precision, positivity, the `.`/`,` separator) are
+cross-cutting (inventory, orders, refinery), so their rules live in their own spec —
+[`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-001 / REQ-INV-002) — not here.
+This spec still governs how those fields *look*.
 
 ## Open questions
 

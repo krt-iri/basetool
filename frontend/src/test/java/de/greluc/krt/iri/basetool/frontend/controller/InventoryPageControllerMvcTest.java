@@ -147,8 +147,8 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-text-sell=\"Verkaufen\"")));
   }
 
-  // covers REQ-UI-010 (SCU amount input) / REQ-UI-011 (PIECE amount input) — see
-  // docs/specs/ui-design-system.md (render-wiring of the shared scu-decimal-input helper).
+  // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
+  // docs/specs/inv-material-quantities.md (render-wiring of the shared scu-decimal-input helper).
   @Test
   @WithMockUser(roles = "MEMBER")
   void viewAllInventory_ShouldRenderScuDecimalAmountFieldsAndHelper() throws Exception {
