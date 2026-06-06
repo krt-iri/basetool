@@ -547,8 +547,8 @@ of [`CLAUDE.md`](CLAUDE.md). Highlights:
 - **Brand colour** `#E77E23` (orange). Logo only in this orange, white,
   or black.
 - **Backgrounds** `#000000` / `#141414` (dark-mode aesthetic).
-- **Headlines** `Ethnocentric`, **uppercase only**, with letter-spacing
-  tweaks for the font's irregular kerning.
+- **Headlines** `Audiowide`, **uppercase only**, with display letter-spacing
+  (~0.05em) for legibility.
 - **Body** `Lato` (Light 300 standard, Bold 700 emphasis).
 - **Department colours** are semantic — Combat red `#A3000A`,
   Sub-Radar/Covert blue `#355DDC`, Research cyan `#37BBC0`, Profit
