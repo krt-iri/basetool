@@ -39,6 +39,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
@@ -508,6 +509,62 @@ class InventoryItemServiceAggregateTest {
   }
 
   // ---------------------------------------------------------------------
+  // stack identity — owning-squadron & personal dimensions split a stack
+  // ---------------------------------------------------------------------
+
+  @Nested
+  class StackIdentityTests {
+
+    @Test
+    void differentOwningSquadron_neverMergesIntoOneStack() {
+      // The owning org-unit pool is the eighth stack-key dimension: two rows identical on every
+      // other dimension but owned by different squadrons must stay separate stacks. Append-only
+      // never sums them, and group-on-read keys on owningSquadron.id(), so each keeps its own
+      // amount and single entry.
+      MaterialReferenceDto mat = newMat("Quantanium");
+      SquadronReferenceDto squadronA = newSquadron("ALPH");
+      SquadronReferenceDto squadronB = newSquadron("BRVO");
+      InventoryItemDto inA = itemWithIdentity(mat, "ARC-L1", 500, 10.0, false, squadronA);
+      InventoryItemDto inB = itemWithIdentity(mat, "ARC-L1", 500, 20.0, false, squadronB);
+
+      stubGlobalQuery(inA, inB);
+
+      List<InventoryStackDto> stacks =
+          service.getAllAggregatedInventory(null, null).get(0).stacks();
+
+      assertEquals(2, stacks.size(), "different owning squadron => two stacks, never merged");
+      assertEquals(
+          List.of(10.0, 20.0),
+          stacks.stream().map(InventoryStackDto::totalAmount).sorted().toList(),
+          "each stack keeps its own amount; nothing is summed across squadron pools");
+      assertTrue(
+          stacks.stream().allMatch(s -> s.entryCount() == 1),
+          "each squadron's row is its own single-entry stack");
+    }
+
+    @Test
+    void differentPersonalFlag_neverMergesIntoOneStack() {
+      // personal is a stack-key dimension: a private (personal=true) row and a shared
+      // (personal=false) row at the same owner/location/quality stay separate stacks. Drives the
+      // shared aggregateInventoryItems key regardless of which scoped query feeds it.
+      MaterialReferenceDto mat = newMat("Quantanium");
+      InventoryItemDto shared = itemWithIdentity(mat, "ARC-L1", 500, 10.0, false, null);
+      InventoryItemDto personal = itemWithIdentity(mat, "ARC-L1", 500, 20.0, true, null);
+
+      stubGlobalQuery(shared, personal);
+
+      List<InventoryStackDto> stacks =
+          service.getAllAggregatedInventory(null, null).get(0).stacks();
+
+      assertEquals(2, stacks.size(), "personal vs shared => two stacks, never merged");
+      assertEquals(
+          List.of(10.0, 20.0),
+          stacks.stream().map(InventoryStackDto::totalAmount).sorted().toList(),
+          "each stack keeps its own amount; personal and shared stock never combine");
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------------
 
@@ -609,6 +666,43 @@ class InventoryItemServiceAggregateTest {
   private static UUID locationId(String name) {
     return UUID.nameUUIDFromBytes(
         ("loc:" + name).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Builds an inventory DTO pinned on the two stack-key dimensions the identity tests vary — {@code
+   * personal} and {@code owningSquadron} — while reusing the location-id-from-name convention of
+   * {@link #newItem} so a shared location name keys into the same stack. User, job-order and
+   * mission associations stay null so only the varied dimension can split a stack.
+   */
+  private static InventoryItemDto itemWithIdentity(
+      MaterialReferenceDto material,
+      String locationName,
+      Integer quality,
+      Double amount,
+      Boolean personal,
+      SquadronReferenceDto owningSquadron) {
+    LocationReferenceDto loc = new LocationReferenceDto(locationId(locationName), locationName);
+    return new InventoryItemDto(
+        UUID.randomUUID(), // id
+        null, // user
+        material,
+        loc,
+        quality,
+        amount,
+        personal,
+        null,
+        null, // jobOrderId, jobOrderDisplayId
+        null,
+        null, // missionId, missionName
+        null, // note
+        owningSquadron,
+        1L, // version
+        null);
+  }
+
+  /** Distinct-id squadron reference; only the id participates in the stack key. */
+  private static SquadronReferenceDto newSquadron(String shorthand) {
+    return new SquadronReferenceDto(UUID.randomUUID(), shorthand + " Squadron", shorthand);
   }
 
   private static void assertFalse_NaN(double v) {
