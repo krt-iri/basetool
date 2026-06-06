@@ -16,9 +16,9 @@ addresses, phone numbers, or any other personal data.
 
 ## Individual signatures
 
-| Full legal name | GitHub handle | Commit email | Signed on | CLA version |
-| :--- | :--- | :--- | :--- | :--- |
-| Lucas Greuloch | [@greluc](https://github.com/greluc) | lucas.greuloch@pm.me | 2026-05-19 | 1.0 |
+| Full legal name | GitHub handle                        | Commit email         | Signed on  | CLA version |
+|:----------------|:-------------------------------------|:---------------------|:-----------|:------------|
+| Lucas Greuloch  | [@greluc](https://github.com/greluc) | lucas.greuloch@pm.me | 2026-05-19 | 1.0         |
 
 ## Entity (corporate) signatures
 
@@ -29,6 +29,7 @@ lists which entities have an active Entity CLA on file, along with the
 GitHub handles of the individual employees authorised to contribute on
 that entity's behalf.
 
-| Entity | Authorised contributors (GitHub handles) | Effective from | CLA version |
-| :--- | :--- | :--- | :--- |
-| <!-- first entity goes here --> | | | |
+| Entity                          | Authorised contributors (GitHub handles) | Effective from | CLA version |
+|:--------------------------------|:-----------------------------------------|:---------------|:------------|
+| <!-- first entity goes here --> |                                          |                |             |
+

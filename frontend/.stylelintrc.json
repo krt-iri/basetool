@@ -1,6 +1,10 @@
 {
   "extends": "stylelint-config-standard",
-  "ignoreFiles": ["build/**", "**/*.min.css", "node_modules/**"],
+  "ignoreFiles": [
+    "build/**",
+    "**/*.min.css",
+    "node_modules/**"
+  ],
   "rules": {
     "selector-class-pattern": null,
     "custom-property-empty-line-before": null,

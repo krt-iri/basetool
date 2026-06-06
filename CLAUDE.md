@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Two Spring Boot 4 modules (`backend`, `frontend`) on Java 25, PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Gradle 9 with Kotlin DSL. Dependencies are managed by [refreshVersions](https://jmfayard.github.io/refreshVersions/) — **edit `versions.properties`, not `build.gradle.kts`**. Run `./gradlew refreshVersions` to discover updates.
 
 ## Design system
+
 Befolge das Design-System unter `.claude/skills/das-kartell-design/`.
 README.md = Quelle der Wahrheit für Farben, Typo, Komponenten.
 Wichtig: Bereichsfarben nach offiziellem Manual benennen
@@ -60,12 +61,14 @@ The backend serves HTTPS with a self-signed cert (`keystore.p12`, password `chan
 ## Architecture
 
 ### Module split
+
 - **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records, MapStruct `mapper`s, `config` (security, caching, OpenAPI, rate limiting, WebClient), `integration` (UEX external API), `task` (scheduled jobs), `filter`/`interceptor` (correlation ID, deprecation headers), `annotation` (`@ApiDeprecation`).
 - **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `service.BackendApiClient` is the single seam. Persistent state across frontend restarts goes in Redis (Spring Session).
 
 The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backend never serves HTML.
 
 ### Security model
+
 - Both modules use Spring Security with Keycloak OIDC. Backend = resource server (validates JWT); frontend = OAuth2 client (browser SSO + bearer-token relay).
 - Authorization is centralized in `@PreAuthorize` annotations on services/controllers — keep checks out of business logic. Roles mapped from JWT are prefixed with `ROLE_` and uppercased. The architectural invariants here (no `SecurityContextHolder` outside the auth-helper service, every `@RestController` carries at least one `@PreAuthorize`, controllers do not return JPA entities, frontend does not depend on Spring Data JPA) are enforced as ArchUnit rules in [`backend/.../ArchitectureTest.java`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java) and [`frontend/.../ArchitectureTest.java`](frontend/src/test/java/de/greluc/krt/iri/basetool/frontend/ArchitectureTest.java) — adding a new violation will fail `./gradlew test`.
 - Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`. Hierarchy: `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`. Full matrix in `ROLES_AND_PERMISSIONS.md`.
@@ -73,10 +76,12 @@ The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backe
 - Frontend has a `BotProtectionFilter` and `SsoReAuthenticationEntryPoint`: known scanner paths return 404 directly; legitimate paths with expired sessions get a silent `prompt=none` Keycloak redirect.
 
 ### Multi-user data isolation (CRITICAL)
+
 - Every read/write must filter by JWT `sub` unless the caller has an elevated role (`ADMIN`, `OFFICER`, …). Enforce this in the service layer, not the controller.
 - For unauthenticated guests, return only the minimum required data. Sensitive fields (email, real name, internal orders/items) MUST be explicitly cleared in the controller — use a `cleanupForGuest`-style helper to prevent information disclosure.
 
 ### Multi-org-unit tenancy (CRITICAL)
+
 The system supports multiple OrgUnits in parallel — two kinds coexist under a shared `org_unit` table with a `kind` discriminator: `SQUADRON` (the legacy Staffel) and `SPECIAL_COMMAND` (SK, introduced by SPEZIALKOMMANDO_PLAN.md). The IRIDIUM Squadron sits at the canonical UUID `00000000-0000-0000-0000-000000000001`. Every staffel-scoped aggregate carries two FKs during the dual-write soak: the legacy `owning_squadron_id` plus the new `owning_org_unit_id` (kept in lockstep by JPA `@PrePersist`/`@PreUpdate`/`@PostLoad` hooks). Repository queries already read the new column; the legacy column is dropped in the destructive cleanup release.
 
 - **Org-unit scope is enforced in the service layer**, not the controller. Use [`OwnerScopeService.currentOrgUnitId()`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java) for list-endpoint filters (which now consume a three-parameter `ScopePredicate` tuple: `boolean isAdminAllScope`, `UUID activeOrgUnitId`, `Set<UUID> memberOrgUnitIds`) and `OwnerScopeService.canSee*`/`canEdit*` for `@PreAuthorize` SpEL on detail/write endpoints. Admins without an active pin get all-scope visibility; admins with a pin get the same restrictive view as a member; non-admins see the union of all their memberships unless they pin one specifically.
@@ -91,11 +96,13 @@ The system supports multiple OrgUnits in parallel — two kinds coexist under a 
 - **Active-context relay**: the frontend sends both `X-Active-Org-Unit-Id` (canonical) and the legacy `X-Active-Squadron-Id` header on every outbound WebClient call; the backend reads the new name first and falls back to the legacy. The session attribute (Redis-backed) is keyed at `iridium.activeOrgUnitId` with the legacy `iridium.activeSquadronId` mirrored for one release. Both aliases drop in the destructive cleanup release.
 
 ### Database
+
 - Schema is owned by Flyway: every change is a new `V<n>__<description>.sql` in `backend/src/main/resources/db/migration`. **Hibernate `ddl-auto` is `validate` everywhere — never set it to `update` or `create`.** Full conventions (destructive-ops two-phase rule, data-migration patterns, performance/locking, test caveats, pre-merge checklist) live in [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md) — read that before adding a migration.
 - `DataInitializer` seeds roles/permissions on startup.
 - Avoid N+1: prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections.
 
 ### Concurrency — read this before touching multi-step transactions
+
 The codebase has been bitten by optimistic-locking traps several times. The rules below exist because of real bugs that shipped.
 
 - **Optimistic locking via `@Version`** — every write DTO carries the `version` field; the frontend echoes it back; concurrent modifications surface as `ObjectOptimisticLockingFailureException` → HTTP 409. Don't strip the version from DTOs to "make it simpler."
@@ -106,9 +113,10 @@ The codebase has been bitten by optimistic-locking traps several times. The rule
   1. Inside the loop, mutate only managed entities and rely on Hibernate dirty-checking — do NOT call `repository.save(child)` explicitly.
   2. Collect the IDs of items that need a clearing bulk update in a `Set<UUID>` and run those bulk updates exactly once **after** the loop AND **after** persisting any new aggregate root.
   3. If the completion check needs the freshly persisted state, re-fetch the aggregate root once via `findById(id)` to get a managed instance with up-to-date `@Version`, then hand it to the dedicated `…WithinTransaction(...)` method.
-  Apply this rule to every bulk-update + multi-item flow (handover, booking, refinery, transfer).
+     Apply this rule to every bulk-update + multi-item flow (handover, booking, refinery, transfer).
 
 ### API conventions
+
 - **Versioned URI paths**: `/api/v1/...`. Breaking changes → new version (`/api/v2/...`). Use `@ApiDeprecation(sunset = "YYYY-MM-DD", replacement = "/api/v2/...")` on retired endpoints; `DeprecationInterceptor` emits `Deprecation` / `Sunset` / `Link` headers automatically and `OpenApiDeprecationConfig` reflects it in the OpenAPI spec.
 - **DTOs only at boundaries.** Never expose JPA entities at controller boundaries. DTOs are records. All write DTOs carry Jakarta validation annotations (`@NotBlank`, `@NotNull`, `@Min`, `@Max`, …). Use a MapStruct mapper (`@Mapper(componentModel = "spring")`) for Entity↔DTO conversion; break circular refs with `@Mapping(ignore = true)`.
 - **`@Valid`** on every `@RequestBody` for write operations (POST/PUT/PATCH).
@@ -118,6 +126,7 @@ The codebase has been bitten by optimistic-locking traps several times. The rule
 - **OpenAPI docs** — every REST endpoint must carry SpringDoc annotations (`@Operation`, `@ApiResponses`). Keep `backend/src/main/resources/api/openapi.json` in sync with controller changes.
 
 ### Frontend resilience & config
+
 - **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts).
 - **Resilience4j** wraps every backend call (Timeout, Retry, CircuitBreaker, Bulkhead). State transitions are logged via `ResilienceEventLogger` so `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT` always have a matching log line.
 - **Reactor context propagation is mandatory for any new `ThreadLocal` you want to see inside `WebClient` exchange filters.** `WebClient.exchange()` runs on a Reactor-Netty worker thread, not the servlet thread; classic `ThreadLocal` values are not copied across threads. Register a `ThreadLocalAccessor` on `ContextRegistry.getInstance()` in [`ReactorContextPropagationConfig`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/config/ReactorContextPropagationConfig.java) (which also enables `Hooks.enableAutomaticContextPropagation()` at startup). The existing accessors cover `ActiveSquadronContext` (active-OrgUnit pin → `X-Active-Org-Unit-Id` outbound header) and `CorrelationContext` (correlation id propagation). Forgetting the accessor means the holder is invisible on the worker thread and the outbound call silently drops whatever it carried.
@@ -125,6 +134,7 @@ The codebase has been bitten by optimistic-locking traps several times. The rule
 - **Type-safe configuration** — relevant `application-*.yml` settings live in `@ConfigurationProperties` classes with `@Validated` (Keycloak URIs, backend URLs, limits). Constraints: `@NotBlank`, `@URL`, `@Min`/`@Max`. Test misconfiguration during startup (`test` profile). See `*Properties` classes under `config/`.
 
 ### Logging
+
 - Both modules emit one access-log line per request and enrich every log line with MDC fields:
   - `correlationId` — from inbound `X-Correlation-Id` header (configurable via `APP_LOGGING_CORRELATION_ID_HEADER`) or generated UUID; echoed in the response header. The frontend's `WebClientLoggingFilter` propagates the same id to outbound backend calls so both modules' logs share one id per user interaction.
   - `userId` — JWT `sub`, or `anonymous`.
@@ -143,6 +153,7 @@ The app follows the "DAS KARTELL" Corporate Design Manual strictly (see `Stylegu
 - **Never** use `confirm()`, `alert()`, or any native browser dialog. Build custom KRT-styled modals/toasts.
 
 ### Responsive design (mandatory)
+
 Every layout change and new component must work across **four** device classes:
 - **Smartphone** (≤768px) and **Tablet** (768–1024px) — touch first. "Fat-finger" optimization: minimum click target 44px. Collapse multi-column grids to single-column; let wide tables scroll horizontally.
 - **Desktop** (1024–1600px) and **Ultra-wide** (1600px+) — exploit the space (permanently docked sidebars, auto-fit grids for cards/dashboards) but cap long-form text width (`max-width: 80ch` on `<p>`) for readability.

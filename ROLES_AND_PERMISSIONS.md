@@ -55,19 +55,19 @@ auf `permitAll()` gesetzt; im Backend eine explizit aufgezählte Liste von
 
 ### 1.1 Was anonyme Nutzer dürfen
 
-| Fähigkeit | Endpunkt(e) | Gate |
-| :--- | :--- | :--- |
-| **Stammdaten lesen** (Materialien, Locations, Schiffstypen, Hersteller, Refining-Methoden, Sternensysteme, Job-Typen, Frequenztypen, System-Settings, Staffel-Liste) | `GET /api/v1/{materials,locations,ship-types,manufacturers,refining-methods,star-systems,job-types,frequency-types,settings,squadrons}/**` | URL `permitAll`, kein Method-Gate |
-| **Einsätze (Missionen) durchblättern** — nur **nicht-interne** Missionen, Detailansicht inklusive | `GET /api/v1/missions`, `/search`, `/next`, `/{id}` | `@ownerScopeService.canSeeMission` (intern = unsichtbar) |
-| **Warenauftrag anlegen** (Material-Auftrag) | `POST /api/v1/orders` | `permitAll()` |
-| **Item-Auftrag anlegen** (Fertigteil-Bestellung mit auto-abgeleiteten Materialien) | `POST /api/v1/orders/items` | `permitAll()` |
-| **Bestellbaren Item-Katalog durchsuchen** | `GET /api/v1/orders/item-catalog/**` | `permitAll()` |
-| **Sich bei einem (nicht-internen) Einsatz als Gast anmelden** — mit frei wählbarem `guestName` | `POST /api/v1/missions/{id}/participants/add`, `/participants/slim` | `@ownerScopeService.canSeeMission` |
-| **Ein-/Auschecken** beim Einsatz | `POST /api/v1/missions/{id}/participants/{pid}/check-in[/slim]`, `…/check-out[/slim]` | `@missionSecurityService.canAccessParticipant` |
-| **Eigenen Gast-Teilnehmer bearbeiten** (Job-Typ, Schiff, Kommentar, Zeiten) | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]` | `canAccessParticipant` |
-| **Auszahlungsart ändern** (Auszahlungspräferenz, z. B. `DONATE`) | `PUT /api/v1/missions/{id}/participants/{pid}/payout-preference[/slim]` | `canAccessParticipant` |
-| **Eigenen Gast-Teilnehmer entfernen** | `DELETE /api/v1/missions/{id}/participants/{pid}[/slim]` | `canAccessParticipant` |
-| **Finanz-Eintrag zu einem sichtbaren Einsatz erfassen** | `POST /api/v1/finance-entries` | `@ownerScopeService.canSeeMission(#dto.missionId)` |
+| Fähigkeit                                                                                                                                                            | Endpunkt(e)                                                                                                                                | Gate                                                     |
+|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------|
+| **Stammdaten lesen** (Materialien, Locations, Schiffstypen, Hersteller, Refining-Methoden, Sternensysteme, Job-Typen, Frequenztypen, System-Settings, Staffel-Liste) | `GET /api/v1/{materials,locations,ship-types,manufacturers,refining-methods,star-systems,job-types,frequency-types,settings,squadrons}/**` | URL `permitAll`, kein Method-Gate                        |
+| **Einsätze (Missionen) durchblättern** — nur **nicht-interne** Missionen, Detailansicht inklusive                                                                    | `GET /api/v1/missions`, `/search`, `/next`, `/{id}`                                                                                        | `@ownerScopeService.canSeeMission` (intern = unsichtbar) |
+| **Warenauftrag anlegen** (Material-Auftrag)                                                                                                                          | `POST /api/v1/orders`                                                                                                                      | `permitAll()`                                            |
+| **Item-Auftrag anlegen** (Fertigteil-Bestellung mit auto-abgeleiteten Materialien)                                                                                   | `POST /api/v1/orders/items`                                                                                                                | `permitAll()`                                            |
+| **Bestellbaren Item-Katalog durchsuchen**                                                                                                                            | `GET /api/v1/orders/item-catalog/**`                                                                                                       | `permitAll()`                                            |
+| **Sich bei einem (nicht-internen) Einsatz als Gast anmelden** — mit frei wählbarem `guestName`                                                                       | `POST /api/v1/missions/{id}/participants/add`, `/participants/slim`                                                                        | `@ownerScopeService.canSeeMission`                       |
+| **Ein-/Auschecken** beim Einsatz                                                                                                                                     | `POST /api/v1/missions/{id}/participants/{pid}/check-in[/slim]`, `…/check-out[/slim]`                                                      | `@missionSecurityService.canAccessParticipant`           |
+| **Eigenen Gast-Teilnehmer bearbeiten** (Job-Typ, Schiff, Kommentar, Zeiten)                                                                                          | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                      | `canAccessParticipant`                                   |
+| **Auszahlungsart ändern** (Auszahlungspräferenz, z. B. `DONATE`)                                                                                                     | `PUT /api/v1/missions/{id}/participants/{pid}/payout-preference[/slim]`                                                                    | `canAccessParticipant`                                   |
+| **Eigenen Gast-Teilnehmer entfernen**                                                                                                                                | `DELETE /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                   | `canAccessParticipant`                                   |
+| **Finanz-Eintrag zu einem sichtbaren Einsatz erfassen**                                                                                                              | `POST /api/v1/finance-entries`                                                                                                             | `@ownerScopeService.canSeeMission(#dto.missionId)`       |
 
 **Warum die Teilnehmer-Endpunkte anonym funktionieren:** Ein **Gast-Teilnehmer
 ist nicht mit einem Benutzerkonto verknüpft** (`participant.user == null`).
@@ -123,23 +123,25 @@ und im
 mit Authorities geseedet. Zusätzlich gilt eine **Rollen-Hierarchie**.
 
 ### Rollen-Hierarchie (backend + frontend identisch)
+
 ```
 ROLE_ADMIN   > ROLE_LOGISTICIAN
 ROLE_OFFICER > ROLE_LOGISTICIAN
 ROLE_ADMIN   > ROLE_MISSION_MANAGER
 ROLE_OFFICER > ROLE_MISSION_MANAGER
 ```
+
 Admins und Officer erfüllen damit automatisch jeden `LOGISTICIAN`- und
 `MISSION_MANAGER`-Check.
 
 ### Geseedete Authorities
 
-| Rolle | Authorities (DataInitializer) |
-| :--- | :--- |
-| **Admin** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie) |
-| **Officer** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie) |
-| **Squadron Member** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ` |
-| **Guest** | *(keine — leeres Set)* |
+| Rolle               | Authorities (DataInitializer)                                                                                                                                     |
+|:--------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Admin**           | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie) |
+| **Officer**         | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie)                |
+| **Squadron Member** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`                                                                                                                     |
+| **Guest**           | *(keine — leeres Set)*                                                                                                                                            |
 
 `USER_MANAGE` bleibt aus historischen Gründen im Officer-Set, wird aber von
 keinem Endpunkt mehr geprüft (effektiv inert — alle Member-Management-Endpunkte
@@ -193,38 +195,38 @@ Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
 
 ### 3.1 Auth / Kontext
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Angemeldet sein (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Eigenes Profil / `GET /me`, aktiver OrgUnit-Kontext (`/me/active-org-unit`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Benutzerverzeichnis lesen (`/users`, `/search`, `/lookup`, `/{id}`, `/{id}/memberships`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Funktion (Gate)                                                                          | Anonym | Member | Log. | MM | Officer | Admin |
+|:-----------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Angemeldet sein (`isAuthenticated()`)                                                    |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Eigenes Profil / `GET /me`, aktiver OrgUnit-Kontext (`/me/active-org-unit`)              |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Benutzerverzeichnis lesen (`/users`, `/search`, `/lookup`, `/{id}`, `/{id}/memberships`) |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ### 3.2 Hangar & Persönliche Daten
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Hangar lesen (`HANGAR_READ`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Eigene Schiffe pflegen / Import (CCU, HangarXPLOR, Fleetyards, StarJump) (`isAuthenticated()` + Owner) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Schiffe anderer Member verwalten (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Persönliches Inventar / Persönliche Blueprints (eigene) (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Persönl. Inventar/Blueprints **anderer** verwalten (`/admin/...`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Blueprint-Verfügbarkeit der Orgeinheit lesen (`/blueprint-overview`, `canAccessBlueprintOverview`) | ❌ | ❌ | ❌¹ | ❌ | ✅ | ✅ |
+| Funktion (Gate)                                                                                        | Anonym | Member | Log. | MM | Officer | Admin |
+|:-------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Hangar lesen (`HANGAR_READ`)                                                                           |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Eigene Schiffe pflegen / Import (CCU, HangarXPLOR, Fleetyards, StarJump) (`isAuthenticated()` + Owner) |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Schiffe anderer Member verwalten (`hasRole('ADMIN')`)                                                  |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`)                                               |   ❌    |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| Persönliches Inventar / Persönliche Blueprints (eigene) (`isAuthenticated()`)                          |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Persönl. Inventar/Blueprints **anderer** verwalten (`/admin/...`, `hasRole('ADMIN')`)                  |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Blueprint-Verfügbarkeit der Orgeinheit lesen (`/blueprint-overview`, `canAccessBlueprintOverview`)     |   ❌    |   ❌    |  ❌¹  | ❌  |    ✅    |   ✅   |
 
 ¹ SK-Leads sehen die Übersicht zusätzlich **für ihre SK** (über das `is_lead`-Flag, nicht über das reine Logistician-Flag). Officer sehen nur ihre Staffel; Admins ohne Pin alle Orgeinheiten, mit Pin nur die angepinnte.
 
 ### 3.3 Lager (Inventory) & Aufträge (Job Orders)
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Lager-View ansehen (`/inventory`, Member+) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Lager bearbeiten / aus-/einbuchen (`isAuthenticated()` + `canEditInventoryItem`, Owner-Scope) | ❌ | ✅¹ | ✅ | ✅¹ | ✅ | ✅ |
-| Auftrag **anlegen** (Material- & Item-Auftrag) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`) | ❌ | ✅³ | ✅³ | ✅³ | ✅³ | ✅ |
-| Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`) | ❌ | ❌ | ✅³ | ❌ | ✅³ | ✅ |
-| Verantwortliche Einheit umsetzen (`PATCH /{id}/responsible-org-unit`) | ❌ | ❌ | ✅² | ❌ | ✅² | ✅ |
-| Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')` + `canViewJobOrders`) | ❌ | ❌ | ✅³ | ❌ | ✅³ | ✅ |
-| Auftrag **löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Funktion (Gate)                                                                                                  | Anonym | Member | Log. | MM | Officer | Admin |
+|:-----------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Lager-View ansehen (`/inventory`, Member+)                                                                       |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Lager bearbeiten / aus-/einbuchen (`isAuthenticated()` + `canEditInventoryItem`, Owner-Scope)                    |   ❌    |   ✅¹   |  ✅   | ✅¹ |    ✅    |   ✅   |
+| Auftrag **anlegen** (Material- & Item-Auftrag)                                                                   |   ✅    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                     |   ❌    |   ✅³   |  ✅³  | ✅³ |   ✅³    |   ✅   |
+| Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`) |   ❌    |   ❌    |  ✅³  | ❌  |   ✅³    |   ✅   |
+| Verantwortliche Einheit umsetzen (`PATCH /{id}/responsible-org-unit`)                                            |   ❌    |   ❌    |  ✅²  | ❌  |   ✅²    |   ✅   |
+| Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)          |   ❌    |   ❌    |  ✅³  | ❌  |   ✅³    |   ✅   |
+| Auftrag **löschen** (`hasRole('ADMIN')`)                                                                         |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Nur über das eigene Lager / die Owner-Scope-Prüfung — nicht generell.
 ² Admin frei; Staffel-Logistiker/-Officer nur **Eskalation** des eigenen
@@ -244,24 +246,24 @@ leere Liste bzw. `403` (auch bei Schreib-/Claim-Endpunkten).
 
 ### 3.4 Refinery
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Eigene Refinery-Orders lesen/anlegen (`isAuthenticated()` [+ `canSeeRefineryOrder`]) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Refinery-Order bearbeiten/löschen/lagern (`isAuthenticated()` + `canEditRefineryOrder`: Owner **oder** Logistician) | ❌ | ✅¹ | ✅ | ✅¹ | ✅ | ✅ |
-| Refinery-Orders **für andere** anlegen/verwalten (`/users/{id}`, `hasRole('LOGISTICIAN')`) | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Funktion (Gate)                                                                                                     | Anonym | Member | Log. | MM | Officer | Admin |
+|:--------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Eigene Refinery-Orders lesen/anlegen (`isAuthenticated()` [+ `canSeeRefineryOrder`])                                |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Refinery-Order bearbeiten/löschen/lagern (`isAuthenticated()` + `canEditRefineryOrder`: Owner **oder** Logistician) |   ❌    |   ✅¹   |  ✅   | ✅¹ |    ✅    |   ✅   |
+| Refinery-Orders **für andere** anlegen/verwalten (`/users/{id}`, `hasRole('LOGISTICIAN')`)                          |   ❌    |   ❌    |  ✅   | ❌  |    ✅    |   ✅   |
 
 ¹ Nur als Owner der jeweiligen Order.
 
 ### 3.5 Einsätze (Missionen)
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Nicht-interne Missionen lesen (`canSeeMission`, gast-bereinigt) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Mission **anlegen** (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Als (Gast-)Teilnehmer anmelden / ein-/auschecken / Auszahlungsart ändern / abmelden (`canAccessParticipant`) | ✅¹ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Mission **verwalten** (bearbeiten, Teilnehmer/Units/Crew/Frequenzen, Party-Lead) (`canManageMission`) | ❌ | ✅² | ✅² | ✅³ | ✅³ | ✅ |
-| Manager / Owner setzen (`canManageManagers` / `canChangeOwner`) | ❌ | ✅² | ✅² | ✅² | ✅³ | ✅ |
-| Mission **löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Funktion (Gate)                                                                                              | Anonym | Member | Log. | MM | Officer | Admin |
+|:-------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Nicht-interne Missionen lesen (`canSeeMission`, gast-bereinigt)                                              |   ✅    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Mission **anlegen** (`isAuthenticated()`)                                                                    |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Als (Gast-)Teilnehmer anmelden / ein-/auschecken / Auszahlungsart ändern / abmelden (`canAccessParticipant`) |   ✅¹   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Mission **verwalten** (bearbeiten, Teilnehmer/Units/Crew/Frequenzen, Party-Lead) (`canManageMission`)        |   ❌    |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
+| Manager / Owner setzen (`canManageManagers` / `canChangeOwner`)                                              |   ❌    |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
+| Mission **löschen** (`hasRole('ADMIN')`)                                                                     |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Anonym nur auf **unverknüpften Gast-Teilnehmern**; eingeloggte User nur auf
 ihrem eigenen verknüpften Teilnehmer. ² Nur als **Owner/Co-Manager** der Mission.
@@ -270,13 +272,13 @@ ihrem eigenen verknüpften Teilnehmer. ² Nur als **Owner/Co-Manager** der Missi
 
 ### 3.6 Operations (Einsatz-Klammer, Finanzen & Auszahlungen)
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Operations lesen (Liste/Detail/Finanzen/Auszahlungen) (`isAuthenticated()` [+ `canSeeOperation`]) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Operation anlegen/bearbeiten (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`]) | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Auszahlung als **paid-out markieren** (`hasRole('MISSION_MANAGER')` + `canEditOperation`) | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| paid-out **zurücknehmen** (zusätzlich `hasAnyRole('ADMIN','OFFICER')`) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Operation **löschen** (`hasRole('ADMIN')` + `canEditOperation`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Funktion (Gate)                                                                                   | Anonym | Member | Log. | MM | Officer | Admin |
+|:--------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Operations lesen (Liste/Detail/Finanzen/Auszahlungen) (`isAuthenticated()` [+ `canSeeOperation`]) |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Operation anlegen/bearbeiten (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])                |   ❌    |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| Auszahlung als **paid-out markieren** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)         |   ❌    |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| paid-out **zurücknehmen** (zusätzlich `hasAnyRole('ADMIN','OFFICER')`)                            |   ❌    |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| Operation **löschen** (`hasRole('ADMIN')` + `canEditOperation`)                                   |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 > Asymmetrie der Auszahlung: jeder Mission-Manager darf `paidOut=true` setzen,
 > aber nur Officer/Admin dürfen ein bestätigtes paid-out wieder auf `false`
@@ -284,13 +286,13 @@ ihrem eigenen verknüpften Teilnehmer. ² Nur als **Owner/Co-Manager** der Missi
 
 ### 3.7 Mission-Finanzen & Profit
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Finanz-Einträge einer Mission lesen (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Finanz-Eintrag **anlegen** (`canSeeMission`, gast-bereinigt) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Finanz-Eintrag bearbeiten/löschen (`canEditFinanceEntry`: Owner **oder** Officer/Admin) | ❌ | ✅¹ | ✅¹ | ✅¹ | ✅ | ✅ |
-| Profit-Kalkulation lesen (`hasAnyRole('SQUADRON_MEMBER','MEMBER','OFFICER','ADMIN')`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Material-Übersicht / Material-Collection eines Auftrags (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Funktion (Gate)                                                                         | Anonym | Member | Log. | MM | Officer | Admin |
+|:----------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Finanz-Einträge einer Mission lesen (`isAuthenticated()`)                               |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Finanz-Eintrag **anlegen** (`canSeeMission`, gast-bereinigt)                            |   ✅    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Finanz-Eintrag bearbeiten/löschen (`canEditFinanceEntry`: Owner **oder** Officer/Admin) |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |    ✅    |   ✅   |
+| Profit-Kalkulation lesen (`hasAnyRole('SQUADRON_MEMBER','MEMBER','OFFICER','ADMIN')`)   |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Material-Übersicht / Material-Collection eines Auftrags (`isAuthenticated()`)           |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ¹ Nur eigener Eintrag und nur solange weiterhin Teilnehmer der Mission.
 
@@ -311,13 +313,13 @@ Service-Schicht über den aktiven Staffel-Kontext gefiltert
   Beförderungssystem: der Menüpunkt ist ausgeblendet, jeder Listen-/Eligibility-Read
   liefert leer und ein direkter Seitenaufruf wird mit 403 blockiert (`hasPromotionReadAccess()`).
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Themenbereiche/Kategorien/Level-Inhalte/Rangvoraussetzungen lesen (`isAuthenticated()`, **nur eigene Staffel**) | ❌ | ✅¹ | ✅¹ | ✅¹ | ✅¹ | ✅² |
-| …**pflegen** (Service: Admin **oder** Officer der besitzenden Staffel) | ❌ | ❌ | ❌ | ❌ | ✅³ | ✅ |
-| Eigene Bewertungen / Eligibility ansehen (`/my`, JWT-Sub, **eigene Staffel**) | ❌ | ✅¹ | ✅¹ | ✅¹ | ✅¹ | ✅² |
-| Bewertungen/Eligibility **anderer** ansehen, Member-Liste (`hasAnyRole('ADMIN','OFFICER')`, Officer staffel-gescopt) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Promotion-Subsystem je Staffel an-/abschalten (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Funktion (Gate)                                                                                                      | Anonym | Member | Log. | MM | Officer | Admin |
+|:---------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Themenbereiche/Kategorien/Level-Inhalte/Rangvoraussetzungen lesen (`isAuthenticated()`, **nur eigene Staffel**)      |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
+| …**pflegen** (Service: Admin **oder** Officer der besitzenden Staffel)                                               |   ❌    |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
+| Eigene Bewertungen / Eligibility ansehen (`/my`, JWT-Sub, **eigene Staffel**)                                        |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
+| Bewertungen/Eligibility **anderer** ansehen, Member-Liste (`hasAnyRole('ADMIN','OFFICER')`, Officer staffel-gescopt) |   ❌    |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| Promotion-Subsystem je Staffel an-/abschalten (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)        |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Nur die **eigene Heimat-Staffel**; ein Nutzer ganz ohne Staffel (und ohne Admin-Rechte) sieht nichts — `hasPromotionReadAccess()` liefert leer, das Menü ist ausgeblendet, Direktaufruf 403.
 ² Admin: die aktiv angepinnte Staffel; im Alle-Staffeln-Modus ein „Staffel wählen"-Hinweis statt einer Vermischung.
@@ -325,16 +327,16 @@ Service-Schicht über den aktiven Staffel-Kontext gefiltert
 
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Staffel-Liste lesen | ✅¹ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| SK-Liste lesen (`isAuthenticated()`; inaktive nur Admin) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Aktiven OrgUnit-Kontext umschalten (Sidebar-Switcher) | ❌ | ✅² | ✅² | ✅² | ✅² | ✅ |
-| Staffel-Lifecycle (anlegen/umbenennen/löschen/aktivieren, `promotion-enabled`, `profit-eligible`) (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Staffel-Mitglieds-Flags setzen (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| SK-Lifecycle (anlegen/umbenennen/löschen/aktivieren, `profit-eligible`) (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| SK-**Mitglieder** verwalten (add/remove/Flags) (`@specialCommandSecurityService.canManageMembers`) | ❌ | ❌ | ❌ | ❌ | ❌³ | ✅ |
-| SK-**Lead-Flag** setzen (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Funktion (Gate)                                                                                                        | Anonym | Member | Log. | MM | Officer | Admin |
+|:-----------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Staffel-Liste lesen                                                                                                    |   ✅¹   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| SK-Liste lesen (`isAuthenticated()`; inaktive nur Admin)                                                               |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Aktiven OrgUnit-Kontext umschalten (Sidebar-Switcher)                                                                  |   ❌    |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
+| Staffel-Lifecycle (anlegen/umbenennen/löschen/aktivieren, `promotion-enabled`, `profit-eligible`) (`hasRole('ADMIN')`) |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Staffel-Mitglieds-Flags setzen (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`)                             |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| SK-Lifecycle (anlegen/umbenennen/löschen/aktivieren, `profit-eligible`) (`hasRole('ADMIN')`)                           |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| SK-**Mitglieder** verwalten (add/remove/Flags) (`@specialCommandSecurityService.canManageMembers`)                     |   ❌    |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
+| SK-**Lead-Flag** setzen (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN')`)                        |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Stammdaten-Read, anonym erlaubt. ² Nicht-Admins schalten zwischen ihren
 Mitgliedschaften; Admins zusätzlich „Alle Staffeln". ³ SK-Mitgliederverwaltung
@@ -343,18 +345,18 @@ gebunden.
 
 ### 3.10 Stammdaten, Ankündigungen, System
 
-| Funktion (Gate) | Anonym | Member | Log. | MM | Officer | Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Öffentlich** lesbare Stammdaten (Materialien, Locations, Schiffstypen, Hersteller, Sternensysteme, Refining-Methoden, Frequenz-/Job-Typen, Staffeln, System-Settings) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Angemeldet** lesbare Stammdaten (Terminals, Material-Kategorien) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Admin-only** Stammdaten – auch zum Lesen (Städte, Raumstationen, Outposts, POIs, Material-Aliase, Blueprints) (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Stammdaten **schreiben** (anlegen/ändern/löschen/Sichtbarkeit/Overrides) (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| UEX-Location-Typeahead / Blueprint-Produkt-Suche (`isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Ankündigung **lesen** (`GET /announcement`, `isAuthenticated()`) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Ankündigung **schreiben/löschen** (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Sync-Reports lesen/aufräumen (`hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| System-Setting schreiben (`PUT /settings/{key}`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Rollen-/Rechteverwaltung, Member-Attribute/Rang, Flag-Vergabe (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Funktion (Gate)                                                                                                                                                         | Anonym | Member | Log. | MM | Officer | Admin |
+|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| **Öffentlich** lesbare Stammdaten (Materialien, Locations, Schiffstypen, Hersteller, Sternensysteme, Refining-Methoden, Frequenz-/Job-Typen, Staffeln, System-Settings) |   ✅    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Angemeldet** lesbare Stammdaten (Terminals, Material-Kategorien)                                                                                                      |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Admin-only** Stammdaten – auch zum Lesen (Städte, Raumstationen, Outposts, POIs, Material-Aliase, Blueprints) (`hasRole('ADMIN')`)                                    |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Stammdaten **schreiben** (anlegen/ändern/löschen/Sichtbarkeit/Overrides) (`hasRole('ADMIN')`)                                                                           |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| UEX-Location-Typeahead / Blueprint-Produkt-Suche (`isAuthenticated()`)                                                                                                  |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Ankündigung **lesen** (`GET /announcement`, `isAuthenticated()`)                                                                                                        |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Ankündigung **schreiben/löschen** (`hasRole('ADMIN')`)                                                                                                                  |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Sync-Reports lesen/aufräumen (`hasRole('ADMIN')`)                                                                                                                       |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| System-Setting schreiben (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                    |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Rollen-/Rechteverwaltung, Member-Attribute/Rang, Flag-Vergabe (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`)                                                         |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 Welche Stammdaten anonym lesbar sind, legt allein die `permitAll`-Liste in
 `SecurityConfig` fest (siehe §1.1) — alles andere ist mindestens angemeldet,
@@ -426,3 +428,4 @@ restriktive Sicht wie ein Member.
    ein `@PreAuthorize`; staffel-gescopte Services müssen `OwnerScopeService` /
    `AuthHelperService` injizieren; Controller geben nie JPA-Entities zurück. Ein
    neuer Verstoß bricht den Build (`./gradlew test`).
+

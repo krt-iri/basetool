@@ -4,31 +4,31 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 
 ## Rollen
 
-| Rolle | Herkunft | Kurz |
-|---|---|---|
-| **Admin** | Keycloak-Rolle | Globaler Scope, umgeht alle OrgUnit-Checks. |
-| **Officer** | Keycloak-Rolle | Erbt `LOGISTICIAN` + `MISSION_MANAGER` (Hierarchie), aber **staffel-scoped** über `canEditOrgUnit(...)`. |
-| **Logistician** | Kontextuell: `org_unit_membership.is_logistician` | Lager- & Auftragsverwaltung. Flache Rolle wird vom JWT-Konverter befördert, wenn das Flag auf *irgendeiner* Mitgliedschaft `true` ist; das Per-OrgUnit-Scoping erfolgt über `OwnerScopeService`. |
-| **Einsatzleiter** (Keycloak-Rolle `Mission Manager`, Code `MISSION_MANAGER`) | Kontextuell: `org_unit_membership.is_mission_manager` | Einsatz-Verwaltung; gleiche Beförderungslogik. |
-| **SK Lead** | Kontextuell: `org_unit_membership.is_lead` (nur auf einer SK-Zeile) | Darf in *diesem einen* SK Mitglieder verwalten — sonst nichts. |
-| **Squadron Member** | Basis-User | `HANGAR_READ/WRITE`, `MISSION_READ`. Keine erhöhten Rechte. |
-| **Guest** | Unauthentifiziert | Nur lesend auf öffentliche Aggregate. |
+|                                    Rolle                                     |                              Herkunft                               |                                                                                               Kurz                                                                                               |
+|------------------------------------------------------------------------------|---------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Admin**                                                                    | Keycloak-Rolle                                                      | Globaler Scope, umgeht alle OrgUnit-Checks.                                                                                                                                                      |
+| **Officer**                                                                  | Keycloak-Rolle                                                      | Erbt `LOGISTICIAN` + `MISSION_MANAGER` (Hierarchie), aber **staffel-scoped** über `canEditOrgUnit(...)`.                                                                                         |
+| **Logistician**                                                              | Kontextuell: `org_unit_membership.is_logistician`                   | Lager- & Auftragsverwaltung. Flache Rolle wird vom JWT-Konverter befördert, wenn das Flag auf *irgendeiner* Mitgliedschaft `true` ist; das Per-OrgUnit-Scoping erfolgt über `OwnerScopeService`. |
+| **Einsatzleiter** (Keycloak-Rolle `Mission Manager`, Code `MISSION_MANAGER`) | Kontextuell: `org_unit_membership.is_mission_manager`               | Einsatz-Verwaltung; gleiche Beförderungslogik.                                                                                                                                                   |
+| **SK Lead**                                                                  | Kontextuell: `org_unit_membership.is_lead` (nur auf einer SK-Zeile) | Darf in *diesem einen* SK Mitglieder verwalten — sonst nichts.                                                                                                                                   |
+| **Squadron Member**                                                          | Basis-User                                                          | `HANGAR_READ/WRITE`, `MISSION_READ`. Keine erhöhten Rechte.                                                                                                                                      |
+| **Guest**                                                                    | Unauthentifiziert                                                   | Nur lesend auf öffentliche Aggregate.                                                                                                                                                            |
 
 **Hierarchie:** `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`.
 
 ## Rollen × Flow-Matrix (Schreib-Operationen)
 
-| Flow | Guest | Squadron Member | Logistician | Einsatzleiter | Officer | Admin |
-|---|---|---|---|---|---|---|
-| Einsatz anlegen (UC-02) | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Job Order anlegen (UC-03) | ✓ (öffentl. Formular) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Refinery Order anlegen (UC-04) | ✗ | ✓ (Owner = self) | ✓ (Owner frei wählbar) | ✓ | ✓ | ✓ |
-| Schiff in Hangar (UC-05) | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Eigenes Inventar an Job Order verknüpfen | ✗ | ✓ (nur eigenes) | ✓ (fremder Owner) | ✓ (nur eigenes) | ✓ | ✓ |
-| Job-Order-Handover (UC-06) | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ |
-| Einsatz/Operation anlegen | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ |
-| SK anlegen / umbenennen / löschen | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| SK-Mitglieder verwalten | ✗ | nur als **Lead** des SK | – | – | ✗ | ✓ |
+|                   Flow                   |         Guest         |     Squadron Member     |      Logistician       |  Einsatzleiter  | Officer | Admin |
+|------------------------------------------|-----------------------|-------------------------|------------------------|-----------------|---------|-------|
+| Einsatz anlegen (UC-02)                  | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
+| Job Order anlegen (UC-03)                | ✓ (öffentl. Formular) | ✓                       | ✓                      | ✓               | ✓       | ✓     |
+| Refinery Order anlegen (UC-04)           | ✗                     | ✓ (Owner = self)        | ✓ (Owner frei wählbar) | ✓               | ✓       | ✓     |
+| Schiff in Hangar (UC-05)                 | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
+| Eigenes Inventar an Job Order verknüpfen | ✗                     | ✓ (nur eigenes)         | ✓ (fremder Owner)      | ✓ (nur eigenes) | ✓       | ✓     |
+| Job-Order-Handover (UC-06)               | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
+| Einsatz/Operation anlegen                | ✗                     | ✗                       | ✗                      | ✓               | ✓       | ✓     |
+| SK anlegen / umbenennen / löschen        | ✗                     | ✗                       | ✗                      | ✗               | ✗       | ✓     |
+| SK-Mitglieder verwalten                  | ✗                     | nur als **Lead** des SK | –                      | –               | ✗       | ✓     |
 
 Die Gates verbatim: Einsatz `isAuthenticated()`, Job Order `permitAll()`, Refinery Order + Inventar `isAuthenticated()` (fremder Owner nur `isLogisticianOrAbove`), Handover `hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@SpecialCommandSecurityService.canManageMembers(...)`.
 

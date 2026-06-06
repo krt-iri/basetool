@@ -154,9 +154,9 @@ migrations are where things go subtly wrong.
   - run outside Flyway (manual DBA step, documented in the PR), or
   - be added with `-- ${flyway:noTransaction}` at the top of the file plus an
     explicit `CREATE INDEX CONCURRENTLY` statement.
-  Currently the codebase does not need this; if you do, see
-  [`db.DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/iri/basetool/backend/db/DatabaseIndexMigrationTest.java)
-  for how the existing test enforces what indexes ship.
+    Currently the codebase does not need this; if you do, see
+    [`db.DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/iri/basetool/backend/db/DatabaseIndexMigrationTest.java)
+    for how the existing test enforces what indexes ship.
 
 ## Tests
 
@@ -167,16 +167,20 @@ run there is an open follow-up. Until that lands:
 
 * Don't assume `./gradlew test` validated your migration. Run the dev
   Compose stack at least once before merging:
+
   ```bash
   docker compose --profile dev up -d db-backend-dev keycloak-dev redis-dev
   ./gradlew :backend:bootRun
   ```
+
   The first boot after your migration must succeed without `ddl-auto=validate`
   complaints.
+
 * If you change the schema in a way that affects Hibernate's entity mapping
   (rename a column, change a type, add a constraint), update the entity in
   the **same** commit. A migration that ships without the entity change will
   break every `bootRun` on the next pull.
+
 * If you add a column that is used by `DataInitializer`, also extend
   `BackendApplicationTests` (or a more focused integration test) to verify
   the seeded state.
@@ -204,15 +208,16 @@ comment should answer the obvious "why now?" question before they need to.
 - [ ] Filename is `V<next-unused-integer>__<snake_case>.sql`.
 - [ ] Top-of-file comment explains *why*, not just what.
 - [ ] No `DROP TABLE` / `DROP COLUMN` on data that's already in production
-      without a phase-1 stop-writing predecessor in an earlier release.
+  without a phase-1 stop-writing predecessor in an earlier release.
 - [ ] Backfill (if any) is idempotent and inside the same migration file.
 - [ ] The matching JPA entity was updated in the same commit.
 - [ ] `./gradlew :backend:bootRun` against the dev Postgres started cleanly.
 - [ ] If indexes were added, [`DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/iri/basetool/backend/db/DatabaseIndexMigrationTest.java)
-      knows about them.
+  knows about them.
 - [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
-      / `### Changed` / `### Migration` heading.
+  / `### Changed` / `### Migration` heading.
 - [ ] Version numbering passes the `Flyway Migrations` CI check (no duplicate
-      `V<n>`, new files numbered after the current tip on `main`). Run it
-      locally before pushing:
-      `FLYWAY_BASE_REF=origin/main scripts/check-flyway-migrations.sh`.
+  `V<n>`, new files numbered after the current tip on `main`). Run it
+  locally before pushing:
+  `FLYWAY_BASE_REF=origin/main scripts/check-flyway-migrations.sh`.
+

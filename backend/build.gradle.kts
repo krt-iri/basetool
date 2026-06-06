@@ -1,6 +1,5 @@
 import org.cyclonedx.Version
 
-
 plugins {
   java
   checkstyle
@@ -16,28 +15,22 @@ plugins {
 }
 
 group = "de.greluc.krt.iri.basetool"
+
 version = "0.0.1-SNAPSHOT"
+
 description = "backend"
 
 java {
-  toolchain {
-    languageVersion = JavaLanguageVersion.of(25)
-  }
+  toolchain { languageVersion = JavaLanguageVersion.of(25) }
   withSourcesJar()
 }
 
 // Lombok + the MapStruct annotation processor expose APIs we use at compile
 // time as well. Extending compileOnly from annotationProcessor lets `javac`
 // see them without dragging them onto the runtime classpath.
-configurations {
-  compileOnly {
-    extendsFrom(configurations.annotationProcessor.get())
-  }
-}
+configurations { compileOnly { extendsFrom(configurations.annotationProcessor.get()) } }
 
-repositories {
-  mavenCentral()
-}
+repositories { mavenCentral() }
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
@@ -150,13 +143,12 @@ tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   }
   dependsOn("classes")
 }
+
 tasks.named("check").configure { dependsOn("spotbugsMain") }
 
 tasks {
   javadoc {
-    options {
-      (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet")
-    }
+    options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
     destinationDir = project.file("docs/javadoc")
   }
 
@@ -169,4 +161,3 @@ tasks {
     includeBuildSystem = true
   }
 }
-

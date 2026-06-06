@@ -40,12 +40,12 @@ out privately to arrange a channel.
 This is a community-maintained project, so we cannot offer a commercial SLA,
 but we aim for the following turnaround on every report:
 
-| Step                                                     | Target              |
-| -------------------------------------------------------- | ------------------- |
-| Acknowledge receipt of the report                        | within 7 days       |
-| Initial triage and severity assessment shared with you   | within 14 days      |
-| Fix in `main` for High / Critical issues                 | within 90 days      |
-| Coordinated public disclosure after a fix is available   | within 14 days of release |
+|                          Step                          |          Target           |
+|--------------------------------------------------------|---------------------------|
+| Acknowledge receipt of the report                      | within 7 days             |
+| Initial triage and severity assessment shared with you | within 14 days            |
+| Fix in `main` for High / Critical issues               | within 90 days            |
+| Coordinated public disclosure after a fix is available | within 14 days of release |
 
 If we cannot meet one of these targets we will tell you why and propose a
 new date in the advisory thread. We will credit you in the published
@@ -57,11 +57,11 @@ Profit Basetool is currently in the `0.x` release line and under active
 development. Only the latest minor release receives security fixes; older
 `0.x` minors do not get backports.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| Latest `0.x` minor on `main` | :white_check_mark: |
-| Older `0.x` releases         | :x: (please upgrade) |
-| Container tags `:edge`, `:sha-<short>`, `:stable` | :white_check_mark: |
+|                          Version                          |                        Supported                        |
+|-----------------------------------------------------------|---------------------------------------------------------|
+| Latest `0.x` minor on `main`                              | :white_check_mark:                                      |
+| Older `0.x` releases                                      | :x: (please upgrade)                                    |
+| Container tags `:edge`, `:sha-<short>`, `:stable`         | :white_check_mark:                                      |
 | Container tags `:1`, `:1.4`, `:1.4.2`, `:latest` once cut | :white_check_mark: for the *current* major / minor only |
 
 Once the project reaches `1.0`, this table will be updated to define a clear
