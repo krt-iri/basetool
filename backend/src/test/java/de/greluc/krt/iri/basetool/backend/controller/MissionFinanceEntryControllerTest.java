@@ -52,11 +52,12 @@ import org.springframework.data.domain.Sort;
 /**
  * Pure-Mockito unit tests for {@link MissionFinanceEntryController}. The controller's split
  * URL-space (reads are mission-scoped under {@code /missions/{missionId}/finance-entries}, writes
- * are entry-scoped under {@code /finance-entries/{entryId}}) is the easy-to-regress part: a future
- * refactor that moves the create endpoint to {@code /missions/{missionId}/finance-entries} (it
- * sounds natural!) would break the deliberate {@code permitAll()} carve-out for guest participants
- * recording their own payouts. Tests pin the existing route topology by asserting each handler's
- * pass-through to its specific service method.
+ * are entry-scoped under {@code /finance-entries/{entryId}}) is the easy-to-regress part. The whole
+ * finance ledger is restricted to registered members and above (anonymous AND role-less GUEST
+ * callers are blocked); that authorization gate lives in {@code @PreAuthorize} and is covered by
+ * {@code MissionFinanceEntryControllerSecurityTest}. These tests pin the route topology and the
+ * unconditional participant-PII redaction by asserting each handler's pass-through to its specific
+ * service method.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionFinanceEntryControllerTest {
@@ -184,7 +185,7 @@ class MissionFinanceEntryControllerTest {
   }
 
   @Test
-  void createFinanceEntry_authenticatedCaller_passesDtoThroughToService() {
+  void createFinanceEntry_memberCaller_passesDtoThroughToService() {
     UUID missionId = UUID.randomUUID();
     MissionFinanceEntryCreateDto request =
         new MissionFinanceEntryCreateDto(
@@ -192,13 +193,11 @@ class MissionFinanceEntryControllerTest {
     MissionFinanceEntryDto created = entry(missionId, FinanceType.INCOME, new BigDecimal("500.00"));
     when(service.createEntry(request)).thenReturn(created);
 
-    // Non-null Jwt → controller must NOT redact, just pass the persisted DTO straight through.
-    org.springframework.security.oauth2.jwt.Jwt jwt =
-        org.springframework.security.oauth2.jwt.Jwt.withTokenValue("t")
-            .header("alg", "none")
-            .claim("sub", "tester")
-            .build();
-    MissionFinanceEntryDto result = controller.createFinanceEntry(request, jwt);
+    // The member/anonymous gate lives in @PreAuthorize (isAuthenticated + isMemberOrAbove +
+    // canSeeMission) and is exercised by MissionFinanceEntryControllerSecurityTest. At the pure
+    // pass-through level the entry carries no participant, so the unconditional H-1 redaction is a
+    // no-op and the persisted DTO comes back by identity.
+    MissionFinanceEntryDto result = controller.createFinanceEntry(request);
 
     assertThat(result).isSameAs(created);
     verify(service).createEntry(request);

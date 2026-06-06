@@ -948,13 +948,13 @@ class ArchitectureTest {
           "de.greluc.krt.iri.basetool.backend.model.dto.MissionFinanceEntryDto");
 
   /**
-   * Naming convention for helper methods that strip participant PII for anonymous callers: {@code
-   * cleanup<EntityName>ForGuest}. Examples in the codebase: {@code
-   * MissionController#cleanupMissionForGuest}, {@code …#cleanupParticipantForGuest}, {@code
-   * MissionFinanceEntryController#cleanupFinanceEntryForGuest}. The ArchUnit rule recognises any
-   * call to a method matching this pattern as a valid redaction call — so adding a new
-   * guest-reachable controller with its own entity-specific redactor (named accordingly) does not
-   * require updating this test.
+   * Naming convention for helper methods that strip participant PII for anonymous / guest callers:
+   * {@code cleanup<EntityName>ForGuest}. Examples in the codebase: {@code
+   * MissionController#cleanupMissionForGuest} (member-peer level), {@code
+   * MissionController#cleanupOutsiderMissionForGuest} (strict outsider level), {@code
+   * …#cleanupParticipantForGuest}. The ArchUnit rule recognises any call to a method matching this
+   * pattern as a valid redaction call — so adding a new guest-reachable controller with its own
+   * entity-specific redactor (named accordingly) does not require updating this test.
    *
    * @param name candidate method name
    * @return {@code true} iff {@code name} matches the {@code cleanup…ForGuest} convention

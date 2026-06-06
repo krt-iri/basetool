@@ -59,8 +59,65 @@ Every read/write filters by JWT `sub` unless the caller has an elevated role (`A
 
 For unauthenticated guests, return only the minimum required data. Sensitive fields
 (email, real name, internal orders/items) MUST be explicitly cleared in the controller via
-a `cleanupForGuest`-style helper to prevent information disclosure. (E-mail is shown only in
-a user's own profile — never elsewhere.)
+a `cleanup…ForGuest`-style helper to prevent information disclosure. (E-mail is shown only in
+a user's own profile — never elsewhere.) Mission reads have **two** redaction tiers: a
+member-peer tier (`cleanupMissionForGuest`, strips owner/managers/PII but keeps the roster
+for a fellow member) and the stricter **outsider** tier (`cleanupOutsiderMissionForGuest`)
+used for anonymous and GUEST callers — see REQ-SEC-009. The naming convention
+(`cleanup…ForGuest`) is enforced structurally by the ArchUnit rule
+`anonymousReadableMissionEndpointsMustRedactGuestPii`.
+
+### REQ-SEC-009 — Anonymous & guest-role access surface
+
+The application has a deliberately public surface so requesters and visitors can interact
+without a login. That surface is **minimal and identical for two cohorts** — *anonymous*
+callers (no JWT) and the *GUEST role* (an authenticated Keycloak user with no member or
+elevated authority). The discriminator is `AuthHelperService.isMemberOrAbove()` (true for
+`ADMIN`/`OFFICER`/`MISSION_MANAGER`/`LOGISTICIAN`/`SQUADRON_MEMBER`/`MEMBER`); its negation
+is the **"mission outsider"** predicate. A GUEST is treated exactly like an anonymous
+visitor on the mission surface — *behandle guest wie anonym bei den Einsätzen*.
+
+What a mission outsider (anonymous OR GUEST) **may** do — and nothing more:
+
+- **Orders:** create a job order only (`POST /api/v1/orders`, `/api/v1/orders/items`, plus
+  the supporting `permitAll` catalog reads). They may **not** list, view, edit or delete
+  orders. (This holds for GUEST too: a memberless account fails the profit-eligibility gate
+  `canViewJobOrders`, exactly like an anonymous caller — see `org-unit-tenancy.md`.)
+- **Missions (non-internal only):** see the mission detail in its **redacted** form, sign up
+  as a participant, and edit / check-in / check-out / delete / change-payout-preference on
+  **unlinked guest participants** (`participant.user == null`, which includes their own
+  guest entry) via `MissionSecurityService.canAccessParticipant`. Internal and past
+  (`COMPLETED`/`CANCELLED`) missions are not visible to outsiders.
+
+The redacted mission detail (`MissionController.cleanupOutsiderMissionForGuest`) **hides**
+the description, the owning organisation (`owningSquadron`), the participant roster (and with
+it every participant's payout preference + PII), the assigned units, the mission
+frequencies, and the payout/operation linkage. It keeps only the public minimum: name,
+schedule, status, calendar link, registered/checked-in counts and the public party lead.
+
+The mission **finance ledger** (`GET`/`POST /api/v1/.../finance-entries`) is the mission's
+payout view and is restricted to **registered members and above** — anonymous AND GUEST are
+blocked (create + read). Finance-entry creation is therefore no longer anonymous.
+
+**Acceptance**
+
+- [ ] Anonymous and GUEST callers can `POST /api/v1/orders` (+`/items`) but receive empty
+  list / 403 on every order read/edit/delete path.
+- [ ] A mission outsider's `GET /api/v1/missions/{id}` on a non-internal mission returns a DTO
+  with `description`, `owningSquadron`, `operation`, `owner`, `managers` null and
+  `participants`, `assignedUnits`, `frequencies` empty; internal/past → 403.
+- [ ] An outsider can add and edit an unlinked guest participant; editing a *linked*
+  participant they do not own → 403.
+- [ ] Anonymous create on `POST /api/v1/finance-entries` → 401; GUEST → 403; member → 201.
+  GUEST `GET /api/v1/missions/{id}/finance-entries` → 403.
+- [ ] `AuthHelperService.isMemberOrAbove()` is false for anonymous and GUEST, true for every
+  member/elevated role.
+
+**Enforced by:** `MissionControllerLifecycleTest`, `MissionDataLeakTest`,
+`MissionGuestAccessTest`, `MissionFinanceEntryControllerSecurityTest`, `AuthHelperServiceTest`,
+`ArchitectureTest#anonymousReadableMissionEndpointsMustRedactGuestPii` · **Code:**
+`MissionController`, `MissionFinanceEntryController`, `AuthHelperService`,
+`SecurityConfig` · **Role matrix:** [`ROLES_AND_PERMISSIONS.md` §1](../../ROLES_AND_PERMISSIONS.md)
 
 ### REQ-SEC-008 — Frontend bot protection & silent re-auth
 

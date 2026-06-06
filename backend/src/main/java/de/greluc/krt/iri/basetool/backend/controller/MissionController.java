@@ -50,7 +50,6 @@ import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.security.Principal;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -129,10 +128,10 @@ public class MissionController {
   private static final String SLIM_DEPRECATION_SUNSET = "2026-10-20";
 
   /**
-   * Paged mission list. Anonymous callers are silently restricted to {@code PLANNED}+{@code ACTIVE}
-   * non-internal missions; authenticated callers see everything.
+   * Paged mission list. Mission outsiders (anonymous callers AND authenticated but role-less {@code
+   * GUEST} accounts) are silently restricted to {@code PLANNED}+{@code ACTIVE} non-internal
+   * missions; registered members and above see everything in their scope.
    *
-   * @param principal Spring Security principal (null for guests)
    * @return paged mission list DTOs
    */
   @GetMapping
@@ -141,8 +140,7 @@ public class MissionController {
   public PageResponse<MissionListDto> getAllMissions(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort,
-      Principal principal) {
+      @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -151,7 +149,7 @@ public class MissionController {
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
     Page<MissionListDto> pageResult;
-    if (principal == null) {
+    if (!authHelperService.isMemberOrAbove()) {
       pageResult =
           missionService
               .searchMissions(null, null, null, List.of("PLANNED", "ACTIVE"), false, null, pageable)
@@ -198,16 +196,16 @@ public class MissionController {
   }
 
   /**
-   * Filtered + paged mission search. Anonymous callers are restricted to {@code PLANNED}+{@code
-   * ACTIVE} non-internal missions; an unsupported status filter from a guest returns an empty page
-   * (rather than 403) so the UI degrades silently.
+   * Filtered + paged mission search. Mission outsiders (anonymous callers AND authenticated but
+   * role-less {@code GUEST} accounts) are restricted to {@code PLANNED}+{@code ACTIVE} non-internal
+   * missions; an unsupported status filter from an outsider returns an empty page (rather than 403)
+   * so the UI degrades silently.
    *
    * @param query free-text name fragment
    * @param start lower bound on planned start time
    * @param end upper bound on planned start time
    * @param status status filter (one or more)
    * @param operationId optional operation filter
-   * @param principal Spring Security principal (null for guests)
    * @return paged mission list DTOs
    */
   @GetMapping("/search")
@@ -223,8 +221,7 @@ public class MissionController {
       @RequestParam(required = false) UUID operationId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort,
-      Principal principal) {
+      @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -232,7 +229,7 @@ public class MissionController {
             sort,
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
-    if (principal == null) {
+    if (!authHelperService.isMemberOrAbove()) {
       List<String> allowed = List.of("PLANNED", "ACTIVE");
       if (status == null || status.isEmpty()) {
         status = allowed;
@@ -257,20 +254,23 @@ public class MissionController {
   }
 
   /**
-   * Single-mission read. Guests are blocked from internal and past missions (403) and get a
-   * redacted DTO via {@link #cleanupMissionForGuest}.
+   * Single-mission read. Mission "outsiders" — anonymous callers and authenticated but role-less
+   * {@code GUEST} accounts (see {@link
+   * de.greluc.krt.iri.basetool.backend.service.AuthHelperService#isMemberOrAbove()}) — are blocked
+   * from internal and past missions (403) and get the strict redaction via {@link
+   * #cleanupOutsiderMissionForGuest}. Registered members and above see the full DTO.
    *
    * @param id mission id
-   * @param principal Spring Security principal (null for guests)
    * @return the mission DTO
    */
   @GetMapping("/{id}")
   @Operation(summary = "Get mission by ID")
   @PreAuthorize("@ownerScopeService.canSeeMission(#id)")
   @Transactional(readOnly = true)
-  public MissionDto getMissionById(@PathVariable @NotNull UUID id, Principal principal) {
+  public MissionDto getMissionById(@PathVariable @NotNull UUID id) {
     var mission = missionService.getMissionById(id);
-    if (principal == null) {
+    boolean outsider = !authHelperService.isMemberOrAbove();
+    if (outsider) {
       if (mission.getIsInternal() != null && mission.getIsInternal()) {
         throw new AccessDeniedException("Guests cannot view internal missions.");
       }
@@ -279,31 +279,31 @@ public class MissionController {
       }
     }
     var dto = missionMapper.toDto(mission);
-    if (principal == null) {
-      dto = cleanupMissionForGuest(dto);
+    if (outsider) {
+      dto = cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
 
   /**
    * Returns the next upcoming mission (or 204 when none). Internal missions are included only for
-   * authenticated callers; guests get the same redaction pass as {@link #getMissionById}.
+   * registered members and above; mission outsiders (anonymous + role-less {@code GUEST}) get the
+   * same strict redaction pass as {@link #getMissionById}.
    *
-   * @param principal Spring Security principal (null for guests)
    * @return mission DTO or 204 No Content
    */
   @GetMapping("/next")
   @Operation(summary = "Get next upcoming mission")
   @Transactional(readOnly = true)
-  public ResponseEntity<MissionDto> getNextMission(Principal principal) {
-    boolean allowInternal = principal != null;
+  public ResponseEntity<MissionDto> getNextMission() {
+    boolean outsider = !authHelperService.isMemberOrAbove();
     return missionService
-        .getNextMission(allowInternal)
+        .getNextMission(!outsider)
         .map(
             m -> {
               var dto = missionMapper.toDto(m);
-              if (principal == null) {
-                dto = cleanupMissionForGuest(dto);
+              if (outsider) {
+                dto = cleanupOutsiderMissionForGuest(dto);
               }
               return ResponseEntity.ok(dto);
             })
@@ -370,6 +370,73 @@ public class MissionController {
         // UserReferenceDto carries only the callsign tuple
         // (username/displayName/effectiveName/rank)
         // — no email or real name — so it is forwarded to guests unchanged.
+        dto.partyLeadUser(),
+        dto.partyLeadGuestName(),
+        dto.partyLeadVersion());
+  }
+
+  /**
+   * Strict redaction for mission "outsiders" — anonymous callers AND authenticated but role-less
+   * {@code GUEST} accounts (see {@link
+   * de.greluc.krt.iri.basetool.backend.service.AuthHelperService#isMemberOrAbove()}). On top of the
+   * peer-level {@link #cleanupMissionForGuest} stripping (owner/managers/internal
+   * inventory/refinery orders), this additionally hides everything an outsider must not see on the
+   * public mission surface: the <b>description</b>, the owning <b>organisation</b> ({@code
+   * owningSquadron}), the <b>participant roster</b> (and with it every participant's payout
+   * preference), the assigned <b>units</b>, the mission <b>frequencies</b> (surfaced in the
+   * "Organisation" panel next to the lead positions), and the <b>payout/operation</b> linkage.
+   * Participant, unit and frequency collections are emptied rather than nulled so server-rendered
+   * callers (the Thymeleaf frontend) can iterate them without a null check. Sub-missions are
+   * redacted recursively at the same level.
+   *
+   * <p>What stays visible: the mission name, calendar link, status, the schedule timestamps, the
+   * {@code isInternal} flag (internal missions never reach an outsider — {@code canSeeMission}
+   * gates them out), the registered/checked-in counts, and the public party-lead designation. The
+   * {@code ForGuest} suffix is required by the {@code
+   * anonymousReadableMissionEndpointsMustRedactGuestPii} ArchUnit rule, which recognises this
+   * method as a valid guest-redaction call site.
+   *
+   * @param dto the full mission DTO straight from the mapper
+   * @return a copy carrying only the minimal, non-sensitive fields an outsider may see
+   */
+  private MissionDto cleanupOutsiderMissionForGuest(MissionDto dto) {
+    Set<MissionDto> cleanedSubMissions =
+        dto.subMissions() == null
+            ? null
+            : dto.subMissions().stream()
+                .map(this::cleanupOutsiderMissionForGuest)
+                .collect(Collectors.toSet());
+
+    return new MissionDto(
+        dto.id(),
+        dto.name(),
+        null, // description — hidden from outsiders
+        dto.calendarLink(),
+        dto.status(),
+        dto.meetingTime(),
+        dto.plannedStartTime(),
+        dto.actualStartTime(),
+        dto.plannedEndTime(),
+        dto.actualEndTime(),
+        dto.isInternal(),
+        Collections.emptySet(), // participants (+ their payout preference) — hidden from outsiders
+        Collections.emptyList(), // assignedUnits — hidden from outsiders
+        Collections.emptyList(), // frequencies (shown in the "Organisation" panel) — hidden
+        cleanedSubMissions,
+        Collections.emptyList(), // inventoryEntries
+        Collections.emptyList(), // refineryOrders
+        null, // operation (payout linkage) — hidden from outsiders
+        null, // owner
+        null, // managers
+        false, // canEdit
+        false, // canManageManagers
+        dto.version(),
+        dto.coreVersion(),
+        dto.scheduleVersion(),
+        dto.flagsVersion(),
+        dto.checkedInParticipants(),
+        dto.registeredParticipants(),
+        null, // owningSquadron (organisation) — hidden from outsiders
         dto.partyLeadUser(),
         dto.partyLeadGuestName(),
         dto.partyLeadVersion());
@@ -848,8 +915,11 @@ public class MissionController {
                 request.payoutPreference(),
                 request.guestName(),
                 request.version()));
-    if (jwt == null) {
-      dto = cleanupMissionForGuest(dto);
+    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
+    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
+    // catches guest accounts (treat guest like anonymous on the mission surface).
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
+      dto = cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -881,8 +951,11 @@ public class MissionController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.checkIn(id, participantId));
-    if (jwt == null) {
-      dto = cleanupMissionForGuest(dto);
+    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
+    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
+    // catches guest accounts (treat guest like anonymous on the mission surface).
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
+      dto = cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -914,8 +987,11 @@ public class MissionController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.checkOut(id, participantId));
-    if (jwt == null) {
-      dto = cleanupMissionForGuest(dto);
+    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
+    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
+    // catches guest accounts (treat guest like anonymous on the mission surface).
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
+      dto = cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -954,8 +1030,11 @@ public class MissionController {
     MissionDto dto =
         missionMapper.toDto(
             missionService.updatePayoutPreference(id, participantId, request.preference()));
-    if (jwt == null) {
-      dto = cleanupMissionForGuest(dto);
+    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
+    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
+    // catches guest accounts (treat guest like anonymous on the mission surface).
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
+      dto = cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -1014,8 +1093,11 @@ public class MissionController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.removeParticipant(id, participantId));
-    if (jwt == null) {
-      dto = cleanupMissionForGuest(dto);
+    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
+    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
+    // catches guest accounts (treat guest like anonymous on the mission surface).
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
+      dto = cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -1133,13 +1215,18 @@ public class MissionController {
                 request.desiredJobTypeId(),
                 request.comment(),
                 request.orgUnitIds()));
-    // C-1 + H-2: every caller below Officer+ gets the peer-redacted shape — anonymous callers
-    // would otherwise see participant emails / real names; authenticated non-Logistician callers
-    // got the same leak on the legacy public endpoint until H-2. The slim variant's redaction
-    // covers the same matrix; keep both consistent so the {@code .../add} legacy path can be
-    // removed at sunset without behavioural surprises. The ArchUnit rule
-    // {@code anonymousReadableMissionEndpointsMustRedactGuestPii} keeps this from regressing.
-    if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
+    // C-1 + H-2: every caller below Officer+ gets a redacted shape — anonymous / guest callers
+    // would otherwise see participant emails / real names; authenticated non-Logistician members
+    // got the same leak on the legacy public endpoint until H-2. Two tiers:
+    //   * Outsiders (anonymous OR authenticated role-less GUEST) get the STRICT redaction — no
+    //     roster, units, description, organisation or payout (treat guest like anonymous).
+    //   * Authenticated members below Logistician keep the peer view (roster visible, PII
+    // stripped).
+    // The ArchUnit rule {@code anonymousReadableMissionEndpointsMustRedactGuestPii} keeps the
+    // outsider redaction from regressing (this method calls a cleanup…ForGuest helper).
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
+      dto = cleanupOutsiderMissionForGuest(dto);
+    } else if (!authHelperService.isLogisticianOrAbove()) {
       dto = cleanupMissionForGuest(dto);
     }
     return dto;
@@ -1709,8 +1796,9 @@ public class MissionController {
     // {@code canAccessParticipant} lets anonymous reach this endpoint reaches only guest entries
     // anyway ({@code participant.user == null}), so the redaction is a no-op for the data — but
     // calling it directly is the structural guarantee that a future mapping change which surfaces
-    // a non-null {@code UserDto} on a guest participant cannot leak through.
-    if (jwt == null) {
+    // a non-null {@code UserDto} on a guest participant cannot leak through. The role check
+    // additionally treats an authenticated role-less GUEST like an anonymous caller here.
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
       dto = cleanupParticipantForGuest(dto);
     }
     return dto;
@@ -1736,7 +1824,8 @@ public class MissionController {
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.checkIn(id, participantId);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
-    if (jwt == null) {
+    // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
       dto = cleanupParticipantForGuest(dto);
     }
     return dto;
@@ -1762,7 +1851,8 @@ public class MissionController {
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.checkOut(id, participantId);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
-    if (jwt == null) {
+    // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
       dto = cleanupParticipantForGuest(dto);
     }
     return dto;
@@ -1790,7 +1880,8 @@ public class MissionController {
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
-    if (jwt == null) {
+    // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
       dto = cleanupParticipantForGuest(dto);
     }
     return dto;
@@ -1886,7 +1977,21 @@ public class MissionController {
     // own row) need full PII. The ArchUnit rule
     // {@code anonymousReadableMissionEndpointsMustRedactGuestPii} statically enforces this for any
     // future endpoint added with the same {@code @ownerScopeService.canSeeMission(#id)} gate.
-    if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
+      // Outsiders (anonymous OR authenticated role-less GUEST) must not see the participant roster
+      // (treat guest like anonymous): return ONLY the caller's own just-added participant,
+      // PII-redacted, instead of the full list.
+      final UUID addedUserId = finalUserId;
+      final String addedGuestName = finalGuestName;
+      participants =
+          participants
+              .filter(
+                  p ->
+                      (addedUserId != null && p.user() != null && addedUserId.equals(p.user().id()))
+                          || (addedGuestName != null
+                              && addedGuestName.equalsIgnoreCase(p.guestName())))
+              .map(this::cleanupParticipantForGuest);
+    } else if (!authHelperService.isLogisticianOrAbove()) {
       participants = participants.map(this::cleanupParticipantForGuest);
     }
     return participants.toList();
