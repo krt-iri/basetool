@@ -34,16 +34,22 @@ RUN ./gradlew :frontend:dependencies --no-daemon
 
 # Quellcode kopieren und Anwendung bauen.
 # `-x test` skips the test suite; `-x checkstyleMain -x spotbugsMain
-# -x spotlessCheck -x spotlessJavaCheck` skip the static-analysis and formatting
-# verification steps that the `check` task pulls in via `build`. Those tools are
-# meant for developer / CI workflows — running them inside the production image
-# build only adds minutes and needs auxiliary files (`config/checkstyle/`) that
-# are not part of the Docker context. Spotless in particular fails the build
-# when source files were checked out with CRLF line endings (typical on a
-# Windows-developer's workstation that pushes to a Linux build host), even
-# though the byte content is otherwise identical to the LF copy in git. CI
-# runs `./gradlew check` separately on a controlled environment where format
-# enforcement is the right call.
+# -x spotlessCheck -x spotlessJavaCheck` skip the Java static-analysis and
+# formatting verification steps, and `-x lintCss -x lintHtml -x lintJs
+# -x prettierCheck` skip the Node-based web-asset linters / Prettier formatter —
+# all of which the `check` task pulls in via `build`. Those tools are meant for
+# developer / CI workflows — running them inside the production image build only
+# adds minutes and needs auxiliary files (`config/checkstyle/`, plus
+# `frontend/package.json` and the `.prettierrc.json` / `.prettierignore` / lint
+# tool configs) that are deliberately not part of the Docker context (only
+# `frontend/build.gradle.kts` and `frontend/src/` are copied). A node task whose
+# declared input files are absent fails configuration validation outright, so
+# every Node-based `check` task must be excluded here, not just the Java ones.
+# Spotless in particular fails the build when source files were checked out with
+# CRLF line endings (typical on a Windows-developer's workstation that pushes to
+# a Linux build host), even though the byte content is otherwise identical to the
+# LF copy in git. CI runs `./gradlew check` separately on a controlled
+# environment where format enforcement is the right call.
 COPY frontend/src/ frontend/src/
 # `${APP_VERSION:+...}` only expands when the build-arg was set and non-empty,
 # so a `docker build` without `--build-arg APP_VERSION=...` still works and the
@@ -58,6 +64,7 @@ RUN ./gradlew :frontend:build \
     -x lintCss \
     -x lintHtml \
     -x lintJs \
+    -x prettierCheck \
     --no-daemon
 
 # Layered JAR extrahieren. The Spring Boot Gradle plugin produces exactly one
