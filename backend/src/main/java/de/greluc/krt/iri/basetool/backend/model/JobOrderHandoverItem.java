@@ -27,6 +27,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -66,4 +68,18 @@ public class JobOrderHandoverItem extends AbstractEntity<UUID> {
 
   @Column(name = "location_name")
   private String locationName;
+
+  /**
+   * Rounds the delivered {@code amount} to SCU scale (three decimals, {@code HALF_UP}) on insert
+   * and update. The handover amount is operator-entered, so this guarantees the recorded delivery
+   * never carries more than three decimals. Unconditional — a no-op for whole {@code PIECE} amounts
+   * — to avoid lazy-loading {@link #material} on every flush.
+   *
+   * @see InventoryItem#roundToScuScale(Double)
+   */
+  @PrePersist
+  @PreUpdate
+  void roundAmountToScuScale() {
+    amount = InventoryItem.roundToScuScale(amount);
+  }
 }

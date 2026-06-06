@@ -6,6 +6,16 @@
 
 - **Jedes Mengenfeld für SCU-Materialien hat jetzt ein „?"-Symbol, das per Maus-Hover oder Tastaturfokus einen Hinweis einblendet:** „Eingabe in SCU. cSCU ist 0,01 SCU. µSCU ist 0,001 SCU." So ist klar, dass Bruchteile erlaubt sind. Greift in Lager-Einbuchung, Aus-/Umbuchung, Material- und Item-Auftrag, Material-Eintragung, Übergabe und Raffinerie-Einlagerung; bei Stück-Materialien bleibt der Hinweis aus.
 
+### Changed
+
+- **SCU-Mengen lassen sich jetzt wahlweise mit Punkt oder Komma als Dezimaltrennzeichen eingeben (z. B. `0,01` oder `0.01`); die Eingabe wird intern auf das Punktformat normalisiert.** Bisher akzeptierte das Mengenfeld je nach Browser-Sprache nur eines der beiden Zeichen. Gilt für alle SCU-Mengenfelder: Lager-Ein-/Aus-/Umbuchung, Material-Auftrag (Anlegen/Bearbeiten), Material-Eintragung, Übergabe und Raffinerie-Einlagerung.
+
+- **Mengenfelder erzwingen jetzt die Eingaberegeln des Mengentyps:** SCU-Materialien akzeptieren nur positive Werte (> 0) mit bis zu drei Nachkommastellen (Schrittweite 0,001); werden mehr Nachkommastellen eingegeben, wird kaufmännisch auf drei gerundet. Stück-Materialien akzeptieren nur positive Ganzzahlen. Der Zielbestand beim Ausbuchen darf weiterhin 0 sein.
+
+- **Diese Mengenregeln gelten jetzt auch serverseitig, nicht nur im Browser:** Material-Mengen müssen positiv (> 0) sein, und SCU-Mengen werden beim Speichern kaufmännisch auf drei Nachkommastellen gerundet (statt eine zu genaue Eingabe abzulehnen) — über alle Schreibwege inklusive Auftrag anlegen/bearbeiten, das bisher eine Menge von 0 und ungerundete Werte annahm.
+
+- **Finanzeinträge einer Mission werden jetzt nur noch als ganze aUEC-Beträge erfasst:** Das Betragsfeld akzeptiert nur Ganzzahlen (Schrittweite 1), gebrochene Eingaben werden auch serverseitig abgewiesen, und der Bearbeiten-Dialog übernimmt den gerundeten Wert. Angezeigt wurden Finanzbeträge ohnehin schon kaufmännisch auf ganze aUEC gerundet; intern bleibt für abgeleitete Summen (etwa den Raffinerie-Gewinn) die volle Genauigkeit erhalten.
+
 ### Fixed
 
 - **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.

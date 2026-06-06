@@ -124,6 +124,11 @@ Every layout change and new component works on **four** classes:
 Brand assets/logos themselves (managed in the design skill `assets/`), and the desktop SC
 Extractor's GUI design (see [`docs/DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md)).
 
+**Material-amount input fields** (SCU/PIECE precision, positivity, the `.`/`,` separator) are
+cross-cutting (inventory, orders, refinery), so their rules live in their own spec —
+[`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-001 / REQ-INV-002) — not here.
+This spec still governs how those fields *look*.
+
 ## Open questions
 
 - Should REQ-UI-008 (no native dialogs) and REQ-UI-005 (frozen hex values) get a dedicated

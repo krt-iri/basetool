@@ -47,6 +47,53 @@
         })();
     </script>
     <!--
+      Defensive stub for `window.krtScuInput`. Defined synchronously, BEFORE
+      `scu-decimal-input.js` loads, so the inline page scripts that read SCU
+      amount fields live (book-out target<->amount sync, the AJAX material claim,
+      the handover amount check) can call `.normalize(...)` / `.parse(...)` without
+      worrying about load order or a failed/cached/CSP-blocked script. The full
+      implementation in `scu-decimal-input.js` replaces this object and also
+      installs the document-level input/submit listeners that strip non-numeric
+      characters and canonicalise every field to a dot value on submit. If that
+      file never loads, these two methods still let the live readers parse a
+      comma-typed value; only the on-submit canonicalisation degrades (a stray
+      comma then surfaces as a backend validation error, not a crash).
+    -->
+    <script th:attr="nonce=${cspNonce}">
+        window.krtScuInput = window.krtScuInput || {
+            normalize: function (raw) {
+                if (raw === null || raw === undefined) {
+                    return '';
+                }
+                var s = String(raw).trim().replace(/,/g, '.');
+                if (!/[0-9]/.test(s)) {
+                    return '';
+                }
+                var dot = s.indexOf('.');
+                if (dot !== -1) {
+                    s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '');
+                }
+                return s;
+            },
+            parse: function (raw) {
+                var n = parseFloat(this.normalize(raw));
+                return isFinite(n) ? n : NaN;
+            }
+        };
+    </script>
+    <!--
+      Localised positivity messages for scu-decimal-input.js, kept on a separate
+      global so the full helper (which replaces window.krtScuInput) cannot clobber
+      them. Shown as the native constraint-validation bubble when an SCU amount is
+      not > 0, or a PIECE amount is not a whole number > 0.
+    -->
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtScuI18n = {
+            scu: /*[[#{material.scu.validation.positive}]]*/ 'Enter an SCU amount greater than 0.',
+            piece: /*[[#{material.piece.validation.positive}]]*/ 'Enter a whole number greater than 0.'
+        };
+    </script>
+    <!--
       `defer` on the utility scripts whose globals are only consumed from inside event-handler
       callbacks (escape-html, safe-url, datetime-splitter): they execute in document order AFTER
       the HTML has been parsed, so they no longer block first contentful paint.
@@ -65,7 +112,8 @@
     <script th:src="@{/js/event-delegation.js}" th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/common-handlers.js}" th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/datetime-splitter.js}" defer th:attr="nonce=${cspNonce}"></script>
-    
+    <script th:src="@{/js/scu-decimal-input.js}" defer th:attr="nonce=${cspNonce}"></script>
+
     <title th:replace="${titleContent}"></title>
     <th:block th:if="${additionalLinks != null}" th:replace="${additionalLinks}"></th:block>
 </head>

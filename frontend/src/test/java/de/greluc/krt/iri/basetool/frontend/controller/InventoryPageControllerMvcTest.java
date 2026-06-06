@@ -147,6 +147,33 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-text-sell=\"Verkaufen\"")));
   }
 
+  // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
+  // docs/specs/inv-material-quantities.md (render-wiring of the shared scu-decimal-input helper).
+  @Test
+  @WithMockUser(roles = "MEMBER")
+  void viewAllInventory_ShouldRenderScuDecimalAmountFieldsAndHelper() throws Exception {
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/all"))
+        .andExpect(status().isOk())
+        // The book-out amount/target fields are plain text+inputmode=decimal so they accept
+        // either "." or "," regardless of browser locale; the data-scu-decimal marker opts them
+        // into the shared normaliser.
+        .andExpect(content().string(containsString("data-scu-decimal")))
+        .andExpect(content().string(containsString("inputmode=\"decimal\"")))
+        // The book-out target stock legitimately accepts 0, so it opts out of the > 0 rule.
+        .andExpect(content().string(containsString("data-scu-allow-zero")))
+        // The normaliser script, its defensive inline stub, and the localised positivity
+        // messages are wired into every page's <head>.
+        .andExpect(content().string(containsString("/js/scu-decimal-input.js")))
+        .andExpect(content().string(containsString("window.krtScuInput")))
+        .andExpect(content().string(containsString("window.krtScuI18n")));
+  }
+
   @Test
   @WithMockUser(roles = "MEMBER", username = "test-user-123")
   void viewAllInventory_ShouldRenderLocalStorageAttributes() throws Exception {

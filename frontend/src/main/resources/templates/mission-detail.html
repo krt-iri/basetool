@@ -853,7 +853,7 @@
                                                     th:data-id="${entry.id}"
                                                     th:data-note="${entry.note}"
                                                     th:data-type="${entry.type}"
-                                                    th:data-amount="${entry.amount}"
+                                                    th:data-amount="${@moneyFormat.round(entry.amount)}"
                                                     th:data-version="${entry.version}"
                                                     data-trigger="mission-open-edit-finance"
                                                     th:text="#{members.edit}">Bearbeiten</button>
@@ -1285,7 +1285,7 @@
                 
                 <div class="form-group">
                     <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
-                    <input type="number" step="0.01" min="0" name="amount" th:value="*{amount}" required>
+                    <input type="number" step="1" min="0" inputmode="numeric" name="amount" th:value="*{amount}" required>
                     <div th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" class="field-error"></div>
                 </div>
                 
@@ -1317,7 +1317,7 @@
                 
                 <div class="form-group">
                     <label th:text="#{mission.finance.amount}">Betrag (aUEC)</label>
-                    <input type="number" step="0.01" min="0" name="amount" id="edit-finance-amount" required>
+                    <input type="number" step="1" min="0" inputmode="numeric" name="amount" id="edit-finance-amount" required>
                 </div>
                 
                 <div class="form-group">

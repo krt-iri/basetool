@@ -35,5 +35,11 @@ Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load f
 
 ## Out of scope
 
+**Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
+decimals rule on the amount entities, plus the `> 0` / `PIECE`-integer validation) lives in its own
+spec — [`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-003) — which owns the
+SCU/PIECE quantity rules end-to-end. It is a persistence-boundary rule, but kept with its sibling
+input rules for one place to look.
+
 Optimistic/pessimistic locking and the `…WithinTransaction` patterns — documented inline in
 `CLAUDE.md` (see the concurrency note above).

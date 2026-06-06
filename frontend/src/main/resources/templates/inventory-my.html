@@ -383,7 +383,7 @@
                     <span th:text="#{inventory.bookout.targetAmount}">Zielbestand</span>
                     <th:block th:replace="~{fragments/scu-hint :: scuHint('bookout-target-scu-hint', true)}"></th:block>
                 </label>
-                <input type="number" id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-my-amount-from-target">
+                <input type="text" inputmode="decimal" data-scu-decimal data-scu-allow-zero id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-my-amount-from-target">
             </div>
             
             <div class="form-group mb-1">
@@ -392,7 +392,7 @@
                     <th:block th:replace="~{fragments/scu-hint :: scuHint('bookout-amount-scu-hint', true)}"></th:block>
                 </label>
                 <div class="flex-gap-sm">
-                    <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-my-target-from-amount">
+                    <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-my-target-from-amount">
                     <span id="amountOfText" style="white-space: nowrap; color: var(--color-gray-2);" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
                 </div>
             </div>
@@ -949,9 +949,9 @@
         const maxAmountInput = document.getElementById('maxAmount');
         
         if (targetAmountInput && amountInput && maxAmountInput) {
-            const target = parseFloat(targetAmountInput.value);
+            const target = window.krtScuInput.parse(targetAmountInput.value);
             const max = parseFloat(maxAmountInput.value) || 0;
-            
+
             if (!isNaN(target)) {
                 const diff = Math.max(0, max - target);
                 amountInput.value = Number(diff.toFixed(3));
@@ -965,9 +965,9 @@
         const maxAmountInput = document.getElementById('maxAmount');
         
         if (targetAmountInput && amountInput && maxAmountInput) {
-            const amount = parseFloat(amountInput.value);
+            const amount = window.krtScuInput.parse(amountInput.value);
             const max = parseFloat(maxAmountInput.value) || 0;
-            
+
             if (!isNaN(amount)) {
                 const diff = Math.max(0, max - amount);
                 targetAmountInput.value = Number(diff.toFixed(3));

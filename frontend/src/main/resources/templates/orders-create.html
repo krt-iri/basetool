@@ -168,7 +168,7 @@
                                 <span data-role="amount-unit"></span>
                                 <th:block th:replace="~{fragments/scu-hint :: scuHint(null, true)}"></th:block>
                             </label>
-                            <input type="number" th:field="*{materials[__${stat.index}__].amount}" data-testid="order-material-amount" data-role="material-amount" step="0.001" min="0" required>
+                            <input type="text" inputmode="decimal" data-scu-decimal th:field="*{materials[__${stat.index}__].amount}" data-testid="order-material-amount" data-role="material-amount" step="0.001" min="0" required>
                         </div>
                         <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
@@ -417,7 +417,7 @@
             </div>
             <div class="form-group flex-1 mb-0">
                 <label>${MSG_AMOUNT_LABEL} <span data-role="amount-unit"></span>${scuHintMarkup()}</label>
-                <input type="number" name="materials[${materialIndex}].amount" value="" data-role="material-amount" step="0.001" min="0" required>
+                <input type="text" inputmode="decimal" data-scu-decimal name="materials[${materialIndex}].amount" value="" data-role="material-amount" step="0.001" min="0" required>
             </div>
             <div class="form-group flex-1 mb-0">
                 <label>${MSG_MINQUALITY_LABEL}</label>
@@ -510,7 +510,7 @@
                 </div>
                 <div class="form-group flex-1 mb-0">
                     <label>${ITEM_I18N.amount}</label>
-                    <input type="number" name="items[${idx}].amount" data-role="amount" min="1" value="${prefill.amount || 1}" required>
+                    <input type="number" step="1" name="items[${idx}].amount" data-role="amount" min="1" value="${prefill.amount || 1}" required>
                 </div>
                 <button type="button" class="btn btn-quiet-danger mb-0" data-trigger="orders-remove-item" style="white-space:nowrap;">${ITEM_I18N.remove}</button>
             </div>

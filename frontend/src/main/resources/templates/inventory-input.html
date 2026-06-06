@@ -97,7 +97,7 @@
                 
                 <div class="form-group">
                     <label for="amount">Menge <span id="amount-unit"></span><th:block th:replace="~{fragments/scu-hint :: scuHint('amount-scu-hint', true)}"></th:block></label>
-                    <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required>
+                    <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
                 </div>
                 
                 <div class="form-group">
