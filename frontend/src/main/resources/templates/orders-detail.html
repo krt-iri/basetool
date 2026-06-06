@@ -273,7 +273,18 @@
             </tr>
             </thead>
             <tbody>
-            <tr th:each="agg : ${order.aggregatedMaterials}">
+            <!-- Click a row to expand the linked-inventory drill-down — the same toggleInventory
+                 handler the MATERIAL requirement rows use. The aggregation is keyed by
+                 material+quality, but the drill-down lists every inventory item linked to the order
+                 for that material regardless of quality (mirroring the MATERIAL drill-down), so two
+                 quality buckets of one material expand the same list. -->
+            <tr th:each="agg : ${order.aggregatedMaterials}"
+                class="aggregated-material-row"
+                th:data-order-id="${order.id}"
+                th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
+                th:data-amount-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
+                data-trigger="od-toggle-inventory"
+                style="cursor: pointer;">
                 <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
                 <td>
                     <span th:if="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-good" th:text="#{orders.detail.quality.good}">Gut (700+)</span>
@@ -283,7 +294,7 @@
                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(agg.totalQuantity, 1)} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${#numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                 </td>
-                <td th:if="${showClaims}">
+                <td th:if="${showClaims}" data-claim-control>
                     <span th:if="${agg.claims == null or agg.claims.isEmpty()}" class="text-muted">&#8212;</span>
                     <span th:each="c : ${agg.claims}" class="claim-chip" style="display: inline-block; margin: 0 0.35rem 0.25rem 0;"
                           th:title="${c.claimingOrgUnit != null ? c.claimingOrgUnit.name : ''}">
@@ -292,7 +303,7 @@
                             <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn-claim-edit" data-trigger="claim-edit"
+                        <button th:if="${isLogistician}" type="button" class="btn-claim-edit" data-claim-control data-trigger="claim-edit"
                                 style="background:none;border:none;color:var(--color-primary);cursor:pointer;padding:0 0.2rem;min-height:auto;"
                                 th:title="#{orders.claim.edit}"
                                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
@@ -306,13 +317,13 @@
                                 th:data-amount="${c.amount}">&#9998;</button>
                     </span>
                 </td>
-                <td th:if="${showClaims}">
+                <td th:if="${showClaims}" data-claim-control>
                     <div class="claim-open-cell">
                         <span class="claim-open-amount" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                             <span th:case="'PIECE'" th:text="|${agg.openAmount != null ? #numbers.formatInteger(agg.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${agg.openAmount != null ? #numbers.formatDecimal(agg.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add" data-trigger="claim-add"
+                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add" data-claim-control data-trigger="claim-add"
                                 style="padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
                                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                 th:data-quality="${agg.qualityRequirement}"
@@ -328,6 +339,14 @@
             </tr>
             </tbody>
         </table>
+        </div>
+
+        <!-- Materialsammelübersicht for the item order's aggregated materials — the same per-order
+             inventory collection page the MATERIAL orders link from their handover toolbar. The
+             backend material-collection endpoint is keyed by order id alone (type-agnostic), so it
+             already lists every inventory item linked to this item order. -->
+        <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
         </div>
         </th:block>
 
