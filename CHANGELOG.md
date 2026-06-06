@@ -6,6 +6,10 @@
 
 - **Jedes Mengenfeld für SCU-Materialien hat jetzt ein „?"-Symbol, das per Maus-Hover oder Tastaturfokus einen Hinweis einblendet:** „Eingabe in SCU. cSCU ist 0,01 SCU. µSCU ist 0,001 SCU." So ist klar, dass Bruchteile erlaubt sind. Greift in Lager-Einbuchung, Aus-/Umbuchung, Material- und Item-Auftrag, Material-Eintragung, Übergabe und Raffinerie-Einlagerung; bei Stück-Materialien bleibt der Hinweis aus.
 
+### Changed
+
+- **SCU-Mengen lassen sich jetzt wahlweise mit Punkt oder Komma als Dezimaltrennzeichen eingeben (z. B. `0,01` oder `0.01`); die Eingabe wird intern auf das Punktformat normalisiert.** Bisher akzeptierte das Mengenfeld je nach Browser-Sprache nur eines der beiden Zeichen. Gilt für alle SCU-Mengenfelder: Lager-Ein-/Aus-/Umbuchung, Material-Auftrag (Anlegen/Bearbeiten), Material-Eintragung, Übergabe und Raffinerie-Einlagerung.
+
 ### Fixed
 
 - **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.
