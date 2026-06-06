@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.61](https://github.com/krt-iri/basetool/releases/tag/v0.3.61) - 2026-06-06
+
 ### Changed
 
 - **Der P4K-Katalog-Import läuft jetzt als Hintergrund-Job:** Der Upload kehrt sofort zurück und erscheint als Eintrag in einer Import-Liste, die den Status (in Warteschlange / läuft / fertig / fehlgeschlagen) anzeigt; eine fertige Vorschau lässt sich ansehen und dann anwenden, ohne die Datei erneut hochzuladen. Damit hängt die Seite nicht mehr und große Kataloge laufen nicht mehr in einen Timeout (Migration V141).
