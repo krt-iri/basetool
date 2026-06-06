@@ -119,6 +119,49 @@ Every layout change and new component works on **four** classes:
 
 - [ ] Verified at all four breakpoints; interactive targets ≥ 44px on touch classes.
 
+### REQ-UI-010 — Material-amount input: SCU quantity type
+
+Every field where a user enters an amount of an **SCU-typed** material (inventory book-in,
+book-out target + amount, material-order create + edit, material claim, handover, refinery
+store-to-inventory) accepts a **positive decimal** value with **at most three decimal
+places** — the SCU granularity is 0.001 (microSCU), so the input step is `0.001`. The
+decimal separator may be typed as **either `.` or `,`** regardless of browser locale, and
+the value is **normalised internally** to a canonical dot decimal before it leaves the
+field (a native `<input type="number">` only accepts the browser-locale separator, which is
+why these are `type="text" inputmode="decimal"`). A value typed with **more than three**
+decimal places is **rounded to three using commercial rounding (round half up)** when the
+field is committed (on blur) and again before submit. The value must be **> 0**; the one
+exception is the book-out **target stock**, which may be `0` (= "remove all") and opts out
+via `data-scu-allow-zero`.
+
+**Acceptance**
+
+- [ ] Both `0,01` and `0.01` are accepted and the form submits `0.01`.
+- [ ] An amount with > 3 decimals is rounded half up to 3 (`0.0015` → `0.002`, `1.2345` → `1.235`, `12.9995` → `13`).
+- [ ] An amount that is `0`, negative, or rounds to `0` (e.g. `0.0004`) is rejected before submit; the book-out target stock may be `0`.
+- [ ] The field carries `step="0.001"` and is `type="text" inputmode="decimal" data-scu-decimal`.
+
+**Enforced by:** `scu-decimal-input.js` (shared client helper; mode read from the live `step`
+attribute) + `InventoryPageControllerMvcTest` (render-wiring) + web-asset linting (ESLint /
+HTMLHint / Prettier). **Code:** `frontend/.../static/js/scu-decimal-input.js`,
+`fragments/head.html` (`window.krtScuI18n`). **Issues:** PR #465.
+
+### REQ-UI-011 — Material-amount input: PIECE quantity type
+
+The same fields, when the chosen material is **PIECE-typed** (Stück), accept **only positive
+whole numbers** (≥ 1). Decimal separators are **not** accepted — they are stripped as the
+user types — and fractional or non-positive values are rejected before submit. The field's
+integer mode is signalled by `step="1"`, which the quantity-type-aware page scripts set when
+a PIECE material is selected.
+
+**Acceptance**
+
+- [ ] Only digits can be entered; a typed `.` or `,` is dropped.
+- [ ] A value `< 1` (including `0`) is rejected before submit.
+
+**Enforced by:** `scu-decimal-input.js` (integer mode) + web-asset linting. **Code:**
+`frontend/.../static/js/scu-decimal-input.js`. **Issues:** PR #465.
+
 ## Out of scope
 
 Brand assets/logos themselves (managed in the design skill `assets/`), and the desktop SC
@@ -129,4 +172,8 @@ Extractor's GUI design (see [`docs/DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACT
 - Should REQ-UI-008 (no native dialogs) and REQ-UI-005 (frozen hex values) get a dedicated
   ESLint/Stylelint rule so they are gate-enforced, not review-enforced? (Promote to an ADR
   if yes.)
+- REQ-UI-010 / REQ-UI-011 are enforced at the input layer (client). Should the `> 0` and
+  three-decimal-rounding / integer rules also be enforced **server-side** (DTO validation +
+  rounding) so non-browser API clients cannot bypass them? (Currently the backend binds
+  `Double` and the DB column scale is the only server-side guard.)
 
