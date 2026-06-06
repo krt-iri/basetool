@@ -146,8 +146,9 @@ class CrossStaffelHandoverE2eTest {
           page.locator("#recipientSquadron").selectOption(STAFFEL_B_NAME);
         }
 
-        page.getByTestId("order-handover-submit").click();
-        page.waitForLoadState();
+        // Await the handover POST before re-navigating; otherwise the in-flight submit is aborted
+        // and the mutation lost (the flaky WebKit failure — see E2eSupport#awaitFormPost).
+        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-handover-submit").click());
 
         page.navigate(baseUrl + "/orders/" + jobOrderId);
         assertThat(
