@@ -510,4 +510,30 @@ class ProfileControllerTest {
     assertEquals("redirect:/profile", view);
     verify(redirectAttributes).addFlashAttribute("errorToast", "error.profile.update.failed");
   }
+
+  @Test
+  void updatePayoutPreference_validationError_rendersProfileViewWithoutBackendCall() {
+    // A binding/type-conversion error (e.g. an unparseable version) must re-render the profile
+    // view inline — keeping the BindingResult request-scoped so it never serialises through a
+    // Redis FlashMap — and must NOT issue the PUT or set a toast.
+    when(bindingResult.hasErrors()).thenReturn(true);
+    // Stub the bits the re-entrant profile() render needs.
+    when(principal.getPreferredUsername()).thenReturn("jdoe");
+    when(principal.getAttribute("rank")).thenReturn(1);
+    when(principal.getAttribute("description")).thenReturn(null);
+    when(principal.getAttribute("displayName")).thenReturn(null);
+    when(backendApiClient.<Map<String, Object>>get(
+            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenReturn(null);
+
+    ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
+
+    String view =
+        controller.updatePayoutPreference(
+            form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
+
+    assertEquals("profile", view);
+    verify(backendApiClient, never()).put(any(), any(), any());
+    verifyNoInteractions(redirectAttributes);
+  }
 }

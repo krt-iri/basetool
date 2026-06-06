@@ -138,7 +138,12 @@ public class ProfileController {
             PayoutPreference.valueOf(String.valueOf(pref.get("defaultPayoutPreference")));
       }
     } catch (Exception e) {
-      // Backend unavailable or unrecognised value — keep the PAYOUT default.
+      // Backend unavailable or unrecognised value — keep the PAYOUT default. Logged at debug
+      // (not error) because this is an optional sub-fetch on a page that still renders fine; a
+      // persistently failing endpoint then leaves a breadcrumb instead of silently hiding the
+      // user's saved preference. No PII is logged.
+      log.debug(
+          "Could not load the default payout preference; defaulting the selector to PAYOUT", e);
     }
     model.addAttribute("defaultPayoutPreference", defaultPayoutPreference);
 
