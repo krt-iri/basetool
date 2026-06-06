@@ -21,10 +21,22 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 
 import java.util.List;
 
-/** Data transfer record carrying Grouped Inventory payload. */
+/**
+ * Per-material roll-up of the Lager for the {@code /grouped} list views. Each material carries its
+ * squadron-wide totals ({@code totalAmount}, amount-weighted {@code averageQuality}, {@code
+ * maxQuality}) and the list of {@link InventoryStackDto} stacks it breaks down into — one stack per
+ * distinct stock identity (owner, location, quality, association, owner pool). The stacks in turn
+ * hold the individual append-only entries, so the UI renders Material → Stack → Entries.
+ *
+ * @param material the grouping material
+ * @param totalAmount the summed quantity across every stack of this material
+ * @param averageQuality the amount-weighted mean quality across every stack
+ * @param maxQuality the highest quality value seen across the stacks
+ * @param stacks the per-stock-identity stacks this material breaks down into
+ */
 public record GroupedInventoryDto(
     MaterialReferenceDto material,
     Double totalAmount,
     Double averageQuality,
     Integer maxQuality,
-    List<InventoryItemDto> items) {}
+    List<InventoryStackDto> stacks) {}

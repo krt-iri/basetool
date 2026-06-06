@@ -18,6 +18,11 @@ endpoints carry `@ApiDeprecation(sunset = "YYYY-MM-DD", replacement = "/api/v2/.
 `DeprecationInterceptor` emits `Deprecation` / `Sunset` / `Link` headers and
 `OpenApiDeprecationConfig` reflects it in the spec.
 
+**Carve-out — internal-only endpoints:** a `/api/v1` endpoint consumed solely by the in-repo
+frontend may change its response *shape* in place (no `/api/v2` bump) when frontend and
+backend deploy atomically and `DtoOpenApiContractTest` guards the frontend mirror against
+`openapi.json` — e.g. the inventory `/grouped` move from `items` to `stacks` (ADR-0003).
+
 ### REQ-API-002 — DTOs only at boundaries
 
 Never expose JPA entities at controller boundaries (also ArchUnit-enforced — see

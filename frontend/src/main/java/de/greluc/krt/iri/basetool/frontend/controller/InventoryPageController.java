@@ -26,6 +26,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemUpdateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
@@ -162,20 +163,21 @@ public class InventoryPageController {
    *
    * <p>The backend's {@code /grouped} endpoint returns this shape directly so the page renders an
    * outer "material" row with summary stats (total amount, average + max quality) and an inner list
-   * of the underlying inventory items for expansion.
+   * of {@link InventoryStackDto} stacks, each of which expands to the individual append-only
+   * entries (Material → Stack → Entries).
    *
    * @param material the grouping material
-   * @param totalAmount sum across all items
-   * @param averageQuality weighted average quality across all items
+   * @param totalAmount sum across all stacks of this material
+   * @param averageQuality weighted average quality across all stacks
    * @param maxQuality the highest quality value seen in the group
-   * @param items the underlying individual inventory rows
+   * @param stacks the per-stock-identity stacks this material breaks down into
    */
   public record GroupedInventoryDto(
       de.greluc.krt.iri.basetool.frontend.model.dto.MaterialReferenceDto material,
       Double totalAmount,
       Double averageQuality,
       Integer maxQuality,
-      List<InventoryItemDto> items) {}
+      List<InventoryStackDto> stacks) {}
 
   /**
    * Renders the personal inventory list ({@code /inventory/my}). Filters are URL-driven so a user
@@ -343,6 +345,157 @@ public class InventoryPageController {
       return "inventory-admin :: inventoryTableFragment";
     }
     return "inventory-admin";
+  }
+
+  /**
+   * Lazily renders one page of a personal-Lager stack's individual entries — the AJAX drill-down
+   * behind a collapsed stack on {@code /inventory/my}. The append-only Lager keeps every
+   * contribution as its own row, so the grouped view never inlines them; the browser expands a
+   * stack and this endpoint fetches that stack's entries oldest-first, paginated, from the
+   * backend's {@code /api/v1/inventory/my-inventory/stack/entries}. The stack is addressed by the
+   * stock-identity query params the grouped {@link InventoryStackDto} already exposes (a {@code
+   * null} job-order / mission / owning-org-unit selects the rows where that association is itself
+   * absent). Returns the {@code stackEntries} HTML fragment that replaces the stack's entries
+   * container.
+   *
+   * @param materialId the stack's material (from the enclosing group)
+   * @param locationId the stack's storage location
+   * @param quality the stack's quality grade, or {@code null}
+   * @param jobOrderId the stack's linked job-order id, or {@code null} for the unassigned slice
+   * @param missionId the stack's linked mission id, or {@code null} for the unassigned slice
+   * @param personal whether the stack holds the caller's private stock
+   * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
+   * @param page zero-based page index, or {@code null} for the first page
+   * @param size page size, or {@code null} for the backend default
+   * @param model Thymeleaf model populated with the entries page and association catalogs
+   * @return the {@code inventory-my :: stackEntries} fragment view name
+   */
+  @GetMapping("/my/stack/entries")
+  public String viewMyStackEntries(
+      @RequestParam @NotNull UUID materialId,
+      @RequestParam @NotNull UUID locationId,
+      @RequestParam(required = false) Integer quality,
+      @RequestParam(required = false) UUID jobOrderId,
+      @RequestParam(required = false) UUID missionId,
+      @RequestParam(required = false, defaultValue = "false") boolean personal,
+      @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      Model model) {
+    org.springframework.web.util.UriComponentsBuilder uriBuilder =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(
+                "/api/v1/inventory/my-inventory/stack/entries")
+            .queryParam("materialId", materialId)
+            .queryParam("locationId", locationId)
+            .queryParam("personal", personal);
+    if (quality != null) {
+      uriBuilder.queryParam("quality", quality);
+    }
+    if (jobOrderId != null) {
+      uriBuilder.queryParam("jobOrderId", jobOrderId);
+    }
+    if (missionId != null) {
+      uriBuilder.queryParam("missionId", missionId);
+    }
+    if (owningOrgUnitId != null) {
+      uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
+    }
+    if (page != null) {
+      uriBuilder.queryParam("page", page);
+    }
+    if (size != null) {
+      uriBuilder.queryParam("size", size);
+    }
+    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model);
+    return "fragments/inventory-stack-entries :: stackEntriesMy";
+  }
+
+  /**
+   * Squadron-wide variant of {@link #viewMyStackEntries} — the AJAX drill-down behind a collapsed
+   * stack on {@code /inventory/all}. A global stack is per-owner, so the stack key carries the
+   * owning {@code userId} in addition to the other stock-identity dimensions; the backend
+   * re-applies the same org-unit scope predicate as the grouped view, so the drill-down can never
+   * widen visibility beyond the caller's slice. The global Lager is non-personal by definition, so
+   * there is no {@code personal} param. Returns the {@code stackEntries} HTML fragment for the
+   * admin page.
+   *
+   * @param materialId the stack's material (from the enclosing group)
+   * @param userId the stack's owning user
+   * @param locationId the stack's storage location
+   * @param quality the stack's quality grade, or {@code null}
+   * @param jobOrderId the stack's linked job-order id, or {@code null} for the unassigned slice
+   * @param missionId the stack's linked mission id, or {@code null} for the unassigned slice
+   * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
+   * @param page zero-based page index, or {@code null} for the first page
+   * @param size page size, or {@code null} for the backend default
+   * @param model Thymeleaf model populated with the entries page and association catalogs
+   * @return the {@code inventory-admin :: stackEntries} fragment view name
+   */
+  @GetMapping("/all/stack/entries")
+  public String viewAllStackEntries(
+      @RequestParam @NotNull UUID materialId,
+      @RequestParam @NotNull UUID userId,
+      @RequestParam @NotNull UUID locationId,
+      @RequestParam(required = false) Integer quality,
+      @RequestParam(required = false) UUID jobOrderId,
+      @RequestParam(required = false) UUID missionId,
+      @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      Model model) {
+    org.springframework.web.util.UriComponentsBuilder uriBuilder =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(
+                "/api/v1/inventory/all/stack/entries")
+            .queryParam("materialId", materialId)
+            .queryParam("userId", userId)
+            .queryParam("locationId", locationId);
+    if (quality != null) {
+      uriBuilder.queryParam("quality", quality);
+    }
+    if (jobOrderId != null) {
+      uriBuilder.queryParam("jobOrderId", jobOrderId);
+    }
+    if (missionId != null) {
+      uriBuilder.queryParam("missionId", missionId);
+    }
+    if (owningOrgUnitId != null) {
+      uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
+    }
+    if (page != null) {
+      uriBuilder.queryParam("page", page);
+    }
+    if (size != null) {
+      uriBuilder.queryParam("size", size);
+    }
+    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model);
+    return "fragments/inventory-stack-entries :: stackEntriesAdmin";
+  }
+
+  /**
+   * Shared backend call + model population for the two stack-entries drill-down endpoints. Fetches
+   * the paginated entries page from the given backend URI and the job-order / mission catalogs the
+   * per-entry association dropdowns render. A backend failure degrades to an empty entries list
+   * plus an {@code error} flag so the fragment still renders a (empty) container instead of
+   * throwing.
+   *
+   * @param uri the fully-built backend stack-entries URI (path + query)
+   * @param model the Thymeleaf model to populate with {@code entries}, {@code entriesPage}, {@code
+   *     jobOrders} and {@code missions}
+   */
+  private void fetchStackEntriesIntoModel(@NotNull String uri, Model model) {
+    PageResponse<InventoryItemDto> p = null;
+    try {
+      p = backendApiClient.get(uri, new ParameterizedTypeReference<>() {});
+    } catch (Exception e) {
+      log.error("Failed to fetch stack entries", e);
+      model.addAttribute("error", "inventory.stack.entries.error");
+    }
+    List<InventoryItemDto> entries =
+        (p != null && p.content() != null) ? new ArrayList<>(p.content()) : new ArrayList<>();
+    model.addAttribute("entries", entries);
+    model.addAttribute("entriesPage", p);
+    model.addAttribute("jobOrders", fetchActiveJobOrders());
+    model.addAttribute("missions", fetchMissions());
   }
 
   /**

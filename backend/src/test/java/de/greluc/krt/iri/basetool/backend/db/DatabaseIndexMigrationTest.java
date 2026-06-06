@@ -97,6 +97,9 @@ class DatabaseIndexMigrationTest {
     assertIndexExists(jdbc, "job_order_handover_item", "idx_job_order_handover_item_handover_id");
     // V122: composite (terminal_id, material_id) lookup index on refinery_yield.
     assertIndexExists(jdbc, "refinery_yield", "idx_refinery_yield_terminal_material");
+    // V143: composite stack-key index backing the group-on-read GROUP BY and the lazy per-stack
+    // entries lookup (ADR-0003, REQ-INV-002).
+    assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_stack_key");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {

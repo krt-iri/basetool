@@ -19,9 +19,15 @@
 
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
-/** Data transfer record carrying Inventory Item payload. */
+/**
+ * Outbound projection of a single {@code InventoryItem} stock row. Since the Lager keeps every
+ * contribution as its own append-only row (no destructive merge), {@code createdAt} carries the
+ * row's creation instant so the UI can order the individual entries of a grouped stack oldest-first
+ * and show when each contribution was recorded.
+ */
 public record InventoryItemDto(
     UUID id,
     UserReferenceDto user,
@@ -36,4 +42,5 @@ public record InventoryItemDto(
     String missionName,
     String note,
     SquadronReferenceDto owningSquadron,
-    Long version) {}
+    Long version,
+    Instant createdAt) {}

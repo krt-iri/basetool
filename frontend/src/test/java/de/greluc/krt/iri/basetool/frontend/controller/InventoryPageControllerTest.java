@@ -205,7 +205,8 @@ class InventoryPageControllerTest {
             null,
             null,
             null,
-            1L);
+            1L,
+            null);
     when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class)))
         .thenReturn(expectedDto);
 
@@ -421,7 +422,8 @@ class InventoryPageControllerTest {
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
     InventoryItemDto updated =
         new InventoryItemDto(
-            id, null, null, null, 100, 10.0, false, null, null, null, null, "hello", null, 2L);
+            id, null, null, null, 100, 10.0, false, null, null, null, null, "hello", null, 2L,
+            null);
     when(backendApiClient.put(
             eq("/api/v1/inventory/" + id + "/note"), eq(request), eq(InventoryItemDto.class)))
         .thenReturn(updated);

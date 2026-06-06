@@ -41,8 +41,10 @@ import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemUpdateDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest;
+import de.greluc.krt.iri.basetool.backend.model.projection.InventoryStackAggregate;
 import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
@@ -216,24 +218,18 @@ public class InventoryItemService {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
-    List<InventoryItemDto> items =
-        inventoryItemRepository
-            .findUserByFilters(
-                user,
-                hasMaterials,
-                hasMaterials ? materialIds : null,
-                minQuality,
-                hasJobOrders,
-                hasJobOrders ? jobOrderIds : null,
-                hasMissions,
-                hasMissions ? missionIds : null,
-                Pageable.unpaged())
-            .getContent()
-            .stream()
-            .map(inventoryItemMapper::toDto)
-            .toList();
+    List<InventoryStackAggregate> stacks =
+        inventoryItemRepository.findUserStacks(
+            user.getId(),
+            hasMaterials,
+            hasMaterials ? materialIds : null,
+            minQuality,
+            hasJobOrders,
+            hasJobOrders ? jobOrderIds : null,
+            hasMissions,
+            hasMissions ? missionIds : null);
 
-    return aggregateInventoryItems(items);
+    return buildGroupedFromStacks(stacks);
   }
 
   /**
@@ -269,76 +265,212 @@ public class InventoryItemService {
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    List<InventoryItemDto> items =
-        inventoryItemRepository
-            .findGlobalByFilters(
-                hasMaterials,
-                hasMaterials ? materialIds : null,
-                minQuality,
-                hasJobOrders,
-                hasJobOrders ? jobOrderIds : null,
-                hasMissions,
-                hasMissions ? missionIds : null,
-                scope.adminAllScope(),
-                scope.activeOrgUnitId(),
-                scope.memberOrgUnitIds(),
-                Pageable.unpaged())
-            .getContent()
-            .stream()
-            .map(inventoryItemMapper::toDto)
-            .toList();
+    List<InventoryStackAggregate> stacks =
+        inventoryItemRepository.findGlobalStacks(
+            hasMaterials,
+            hasMaterials ? materialIds : null,
+            minQuality,
+            hasJobOrders,
+            hasJobOrders ? jobOrderIds : null,
+            hasMissions,
+            hasMissions ? missionIds : null,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds());
 
-    return aggregateInventoryItems(items);
+    return buildGroupedFromStacks(stacks);
   }
 
+  /**
+   * Assembles the Material → Stack shape the {@code /grouped} views render from the SQL-computed
+   * per-stack aggregates. Outer grouping is by material; the individual entries are no longer
+   * materialised here — append-only rows grow unboundedly per stack, so a stack's entries are
+   * loaded lazily and paginated on expand (ADR-0003, REQ-INV-002, see {@link #getMyStackEntries} /
+   * {@link #getAllStackEntries}). Each {@link InventoryStackAggregate} row is one display stack.
+   *
+   * @param aggregates the SQL-grouped per-stack rows for the current scope/filter
+   * @return the materials, each carrying its sorted stacks and material-wide totals
+   */
   private List<de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto>
-      aggregateInventoryItems(List<InventoryItemDto> items) {
-    return items.stream()
-        .collect(java.util.stream.Collectors.groupingBy(InventoryItemDto::material))
-        .entrySet()
+      buildGroupedFromStacks(List<InventoryStackAggregate> aggregates) {
+    return aggregates.stream()
+        .collect(
+            java.util.stream.Collectors.groupingBy(
+                aggregate -> aggregate.material().getId(),
+                java.util.LinkedHashMap::new,
+                java.util.stream.Collectors.toList()))
+        .values()
         .stream()
-        .map(
-            entry -> {
-              final de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto mat =
-                  entry.getKey();
-              List<InventoryItemDto> matItems = entry.getValue();
-
-              matItems.sort(
-                  java.util.Comparator.<InventoryItemDto, Integer>comparing(
-                          i -> i.quality() != null ? i.quality() : 0)
-                      .reversed()
-                      .thenComparing(
-                          i ->
-                              i.location() != null && i.location().name() != null
-                                  ? i.location().name()
-                                  : "")
-                      .thenComparing(
-                          java.util.Comparator.<InventoryItemDto, Double>comparing(
-                                  i -> i.amount() != null ? i.amount() : 0.0)
-                              .reversed()));
-
-              double totalAmount = 0.0;
-              double qualitySum = 0.0;
-              int maxQuality = 0;
-
-              for (InventoryItemDto item : matItems) {
-                double amt = item.amount() != null ? item.amount() : 0.0;
-                int qual = item.quality() != null ? item.quality() : 0;
-                totalAmount += amt;
-                qualitySum += amt * qual;
-                if (qual > maxQuality) {
-                  maxQuality = qual;
-                }
-              }
-
-              double avgQuality = totalAmount > 0 ? qualitySum / totalAmount : 0.0;
-              avgQuality = Math.round(avgQuality * 100.0) / 100.0;
-
-              return new de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto(
-                  mat, totalAmount, avgQuality, maxQuality, matItems);
-            })
+        .map(this::buildMaterialGroup)
         .sorted(java.util.Comparator.comparing(g -> g.material().name()))
         .toList();
+  }
+
+  /**
+   * Builds one material roll-up from its per-stack aggregates: the stacks (sorted quality desc,
+   * location asc, amount desc) plus the material-wide totals (summed amount, amount-weighted mean
+   * quality, max quality) accumulated from the raw {@code SUM(amount)} / {@code SUM(amount *
+   * quality)} the database returned, so the material average stays independent of per-stack
+   * rounding — identical to the previous over-the-entries computation.
+   *
+   * @param matStacks every per-stack aggregate of one material in the current scope; never empty
+   * @return the populated material group with its nested stacks
+   */
+  private de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto buildMaterialGroup(
+      List<InventoryStackAggregate> matStacks) {
+    List<InventoryStackDto> stacks = new java.util.ArrayList<>(matStacks.size());
+    de.greluc.krt.iri.basetool.backend.model.dto.MaterialReferenceDto material = null;
+    double totalAmount = 0.0;
+    double weightedQualitySum = 0.0;
+    int maxQuality = 0;
+    for (InventoryStackAggregate aggregate : matStacks) {
+      InventoryItemDto refs = mapAggregateRefs(aggregate);
+      if (material == null) {
+        material = refs.material();
+      }
+      double amt = aggregate.totalAmount() != null ? aggregate.totalAmount() : 0.0;
+      double wqs = aggregate.weightedQualitySum() != null ? aggregate.weightedQualitySum() : 0.0;
+      int mq = aggregate.maxQuality() != null ? aggregate.maxQuality() : 0;
+      double stackAvg = amt > 0 ? Math.round((wqs / amt) * 100.0) / 100.0 : 0.0;
+      stacks.add(
+          new InventoryStackDto(
+              refs.user(),
+              refs.location(),
+              refs.quality(),
+              refs.jobOrderId(),
+              refs.jobOrderDisplayId(),
+              refs.missionId(),
+              refs.missionName(),
+              refs.personal(),
+              refs.owningSquadron(),
+              amt,
+              stackAvg,
+              mq,
+              aggregate.entryCount() != null ? aggregate.entryCount().intValue() : 0));
+      totalAmount += amt;
+      weightedQualitySum += wqs;
+      if (mq > maxQuality) {
+        maxQuality = mq;
+      }
+    }
+    stacks.sort(STACK_ORDER);
+    double avgQuality =
+        totalAmount > 0 ? Math.round((weightedQualitySum / totalAmount) * 100.0) / 100.0 : 0.0;
+    return new de.greluc.krt.iri.basetool.backend.model.dto.GroupedInventoryDto(
+        material, totalAmount, avgQuality, maxQuality, stacks);
+  }
+
+  /**
+   * Projects one stack aggregate's shared identity entities through the inventory-item mapper to
+   * obtain the redaction-safe reference DTOs (user, material, location, owning squadron) and the
+   * flattened job-order / mission ids the stack DTO carries. A transient probe {@link
+   * InventoryItem} is fed to the mapper so PII redaction and the {@code owningOrgUnit ->
+   * owningSquadron} projection behave exactly as they do for a real entry — the probe is never
+   * persisted and only its identity fields are read.
+   *
+   * @param aggregate the per-stack aggregate whose shared identity to project
+   * @return an inventory-item DTO carrying only the mapped reference fields (amount/version/id
+   *     null)
+   */
+  private InventoryItemDto mapAggregateRefs(InventoryStackAggregate aggregate) {
+    InventoryItem probe = new InventoryItem();
+    probe.setUser(aggregate.user());
+    probe.setMaterial(aggregate.material());
+    probe.setLocation(aggregate.location());
+    probe.setQuality(aggregate.quality());
+    probe.setJobOrder(aggregate.jobOrder());
+    probe.setMission(aggregate.mission());
+    probe.setPersonal(aggregate.personal());
+    probe.setOwningOrgUnit(aggregate.owningOrgUnit());
+    return inventoryItemMapper.toDto(probe);
+  }
+
+  /**
+   * Lazily loads one of the caller's own stacks' entries, oldest-first, paginated — the per-stack
+   * drill-down for the "my inventory" view. Scoped to the caller ({@code userId}); the {@code
+   * personal} flag is part of the stock identity, so a private and a shared stack at the same
+   * location/quality drill down separately. {@code null} job-order / mission / owning-org-unit
+   * arguments match rows where that association is itself {@code null}.
+   *
+   * @param userId the calling owner whose stack to drill into
+   * @param materialId the stack's material
+   * @param locationId the stack's storage location
+   * @param quality the stack's quality grade, or {@code null}
+   * @param jobOrderId the stack's job-order id, or {@code null}
+   * @param missionId the stack's mission id, or {@code null}
+   * @param personal whether the stack is private stock (defaults to {@code false} when {@code
+   *     null})
+   * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
+   * @param pageable the page request (the query forces oldest-first by creation instant)
+   * @return one page of the stack's entries, oldest-first
+   */
+  public Page<InventoryItemDto> getMyStackEntries(
+      UUID userId,
+      UUID materialId,
+      UUID locationId,
+      Integer quality,
+      UUID jobOrderId,
+      UUID missionId,
+      Boolean personal,
+      UUID owningOrgUnitId,
+      Pageable pageable) {
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    return inventoryItemRepository
+        .findUserStackEntries(
+            user.getId(),
+            materialId,
+            locationId,
+            quality,
+            jobOrderId,
+            missionId,
+            personal != null ? personal : Boolean.FALSE,
+            owningOrgUnitId,
+            pageable)
+        .map(inventoryItemMapper::toDto);
+  }
+
+  /**
+   * Lazily loads one global stack's entries, oldest-first, paginated — the per-stack drill-down for
+   * the squadron-wide Lager view. The same scope predicate as the grouped view is applied so the
+   * drill-down can never widen visibility beyond the caller's org-unit slice; the stack's owner is
+   * an explicit argument because a global stack is per-owner. {@code null} job-order / mission /
+   * owning-org-unit arguments match rows where that association is itself {@code null}.
+   *
+   * @param materialId the stack's material
+   * @param userId the stack's owning user
+   * @param locationId the stack's storage location
+   * @param quality the stack's quality grade, or {@code null}
+   * @param jobOrderId the stack's job-order id, or {@code null}
+   * @param missionId the stack's mission id, or {@code null}
+   * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
+   * @param pageable the page request (the query forces oldest-first by creation instant)
+   * @return one page of the stack's entries, oldest-first
+   */
+  public Page<InventoryItemDto> getAllStackEntries(
+      UUID materialId,
+      UUID userId,
+      UUID locationId,
+      Integer quality,
+      UUID jobOrderId,
+      UUID missionId,
+      UUID owningOrgUnitId,
+      Pageable pageable) {
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return inventoryItemRepository
+        .findGlobalStackEntries(
+            materialId,
+            userId,
+            locationId,
+            quality,
+            jobOrderId,
+            missionId,
+            owningOrgUnitId,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            pageable)
+        .map(inventoryItemMapper::toDto);
   }
 
   /**
@@ -444,30 +576,14 @@ public class InventoryItemService {
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
 
-    // The owning org unit is the eighth natural-key dimension of an inventory stack. Resolve it up
-    // front (validating the picker output) so a new row only merges into a candidate that also
-    // matches on it — stock of two different org-unit pools must never collapse into one row.
+    // The owning org unit is the eighth dimension of an inventory stack's identity. Resolve it up
+    // front (validating the picker output) so the new row is stamped with the correct org-unit
+    // pool. Inventory is append-only: every create inserts its own row and is never folded into an
+    // existing stack — rows that share the stack identity are grouped only for display
+    // (group-on-read, see aggregateInventoryItems). This also removes the read-add-write race the
+    // former merge path had to guard with a pessimistic lock.
     final OrgUnit owningOrgUnit =
         ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId());
-
-    // Pessimistic write lock on the merge target so two concurrent createInventoryItem calls with
-    // the same natural key serialise on the row instead of both reading the same `amount`, both
-    // adding their delta, and the last writer clobbering the other's increment. The owning-org-unit
-    // dimension is applied as an in-memory filter on the locked candidates — see sameOwningOrgUnit
-    // and the findMatchingInventoryItemForUpdate Javadoc.
-    java.util.Optional<InventoryItem> existingItemOpt =
-        inventoryItemRepository
-            .findMatchingInventoryItemForUpdate(
-                user, material, location, dto.quality(), mission, jobOrder, isPersonal)
-            .stream()
-            .filter(candidate -> sameOwningOrgUnit(candidate.getOwningOrgUnit(), owningOrgUnit))
-            .findFirst();
-
-    if (existingItemOpt.isPresent()) {
-      InventoryItem existingItem = existingItemOpt.orElseThrow();
-      existingItem.setAmount(roundAmount(existingItem.getAmount() + dto.amount()));
-      return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
-    }
 
     InventoryItem item = new InventoryItem();
     item.setUser(user);
@@ -555,32 +671,9 @@ public class InventoryItemService {
       item.setMission(null);
     }
 
-    // Pessimistic write lock on the merge target — same race-condition reasoning as the create
-    // path; if a concurrent update mutates the merge target between our read and our write, the
-    // unguarded read would let us overwrite that update with a stale amount.
-    java.util.List<InventoryItem> existingItems =
-        inventoryItemRepository.findMatchingInventoryItemForUpdate(
-            item.getUser(),
-            item.getMaterial(),
-            item.getLocation(),
-            item.getQuality(),
-            item.getMission(),
-            item.getJobOrder(),
-            item.getPersonal());
-
-    java.util.Optional<InventoryItem> existingItemOpt =
-        existingItems.stream()
-            .filter(i -> !i.getId().equals(item.getId()))
-            .filter(i -> sameOwningOrgUnit(i.getOwningOrgUnit(), item.getOwningOrgUnit()))
-            .findFirst();
-
-    if (existingItemOpt.isPresent()) {
-      InventoryItem existingItem = existingItemOpt.orElseThrow();
-      existingItem.setAmount(roundAmount(existingItem.getAmount() + item.getAmount()));
-      inventoryItemRepository.delete(item);
-      return inventoryItemMapper.toDto(inventoryItemRepository.save(existingItem));
-    }
-
+    // Append-only: an update edits the row in place and is never folded into another matching
+    // stack.
+    // Rows that now share a stack identity are grouped only for display (group-on-read).
     return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
   }
 
@@ -638,11 +731,11 @@ public class InventoryItemService {
    * Consumes or transfers an inventory item.
    *
    * <p>The {@code type} discriminator selects: CONSUME (just decrement), TRANSFER (decrement here,
-   * then merge the moved quantity into the matching stack at the target location/owner — or create
-   * a new row when no identical stack exists there), SELL (decrement here, create a finance entry
-   * for the participant). When the post-decrement quantity is below {@link #QUANTITY_EPSILON} the
-   * row is removed entirely. Fulfills attached job-order materials when the amount delivered
-   * reaches the required quantity.
+   * then insert a new row for the moved quantity at the target location/owner — inventory is
+   * append-only, so the moved stock is never folded into an existing target stack), SELL (decrement
+   * here, create a finance entry for the participant). When the post-decrement quantity is below
+   * {@link #QUANTITY_EPSILON} the row is removed entirely. Fulfills attached job-order materials
+   * when the amount delivered reaches the required quantity.
    *
    * <p>Follows the bulk-update-after-loop concurrency pattern: collects every {@code
    * JobOrderMaterial} id that may be ready for a clearing bulk update in a {@code Set<UUID>},
@@ -721,54 +814,26 @@ public class InventoryItemService {
         throw new BadRequestException("Transfer must change either the user or the location");
       }
 
-      // Resolve the target stack's owning org unit up front — the eighth natural-key dimension — so
-      // the merge only folds into a target row of the SAME org-unit pool and a freshly created row
-      // is stamped with that pool.
+      // Resolve the target stack's owning org-unit pool up front — the eighth identity dimension —
+      // so the freshly created target row is stamped with that pool.
       final OrgUnit targetOwningOrgUnit =
           ownerScopeService.resolveOrgUnitForPickerOutputNullable(
               targetUser, dto.targetOwningOrgUnitId());
 
-      // Merge the moved quantity into an existing identical stack at the target instead of
-      // inserting a duplicate — the same natural-key merge the create path (createInventoryItem)
-      // and the refinery-store path already use. Without this, transferring stock onto a (user,
-      // location) slot that already holds an identical row (same material, quality, mission, job
-      // order, personal flag, owning org unit) silently produced a second row that the inventory
-      // view shows as a duplicate. The transfer guard above guarantees the target differs from the
-      // source in user or location, so the source row can never be its own merge target; the id
-      // filter is a defensive guard. The matched row is locked FOR UPDATE so two concurrent
-      // transfers into the same stack serialise instead of clobbering each other's increment.
-      java.util.Optional<InventoryItem> targetMatch =
-          inventoryItemRepository
-              .findMatchingInventoryItemForUpdate(
-                  targetUser,
-                  item.getMaterial(),
-                  targetLocation,
-                  item.getQuality(),
-                  item.getMission(),
-                  item.getJobOrder(),
-                  item.getPersonal())
-              .stream()
-              .filter(c -> !c.getId().equals(item.getId()))
-              .filter(c -> sameOwningOrgUnit(c.getOwningOrgUnit(), targetOwningOrgUnit))
-              .findFirst();
-      InventoryItem savedNew;
-      if (targetMatch.isPresent()) {
-        InventoryItem existingTarget = targetMatch.orElseThrow();
-        existingTarget.setAmount(roundAmount(existingTarget.getAmount() + dto.amount()));
-        savedNew = inventoryItemRepository.save(existingTarget);
-      } else {
-        InventoryItem newItem = new InventoryItem();
-        newItem.setUser(targetUser);
-        newItem.setOwningOrgUnit(targetOwningOrgUnit);
-        newItem.setMaterial(item.getMaterial());
-        newItem.setLocation(targetLocation);
-        newItem.setQuality(item.getQuality());
-        newItem.setAmount(roundAmount(dto.amount()));
-        newItem.setPersonal(item.getPersonal());
-        newItem.setJobOrder(item.getJobOrder());
-        newItem.setMission(item.getMission());
-        savedNew = inventoryItemRepository.save(newItem);
-      }
+      // Append-only: a transfer always inserts its own row at the target and is never folded into
+      // an existing identical stack there. The view collapses rows that share a stack identity for
+      // display (group-on-read), so no duplicate is visible and no read-add-write race exists.
+      InventoryItem newItem = new InventoryItem();
+      newItem.setUser(targetUser);
+      newItem.setOwningOrgUnit(targetOwningOrgUnit);
+      newItem.setMaterial(item.getMaterial());
+      newItem.setLocation(targetLocation);
+      newItem.setQuality(item.getQuality());
+      newItem.setAmount(roundAmount(dto.amount()));
+      newItem.setPersonal(item.getPersonal());
+      newItem.setJobOrder(item.getJobOrder());
+      newItem.setMission(item.getMission());
+      InventoryItem savedNew = inventoryItemRepository.save(newItem);
       if (remainingAmount <= QUANTITY_EPSILON) {
         inventoryItemRepository.delete(item);
       } else {
@@ -964,19 +1029,17 @@ public class InventoryItemService {
   }
 
   /**
-   * Null-safe identity check of two owning-org-unit references by id — the eighth merge-key
-   * dimension layered on top of {@link
-   * InventoryItemRepository#findMatchingInventoryItemForUpdate}'s seven-dimension candidate set.
-   * Two {@code null} references (ownerless-personal rows) count as the same pool; a {@code null}
-   * and a present reference never match, so stock owned by different org units never merges.
-   *
-   * @param a first owning-org-unit reference, may be {@code null}
-   * @param b second owning-org-unit reference, may be {@code null}
-   * @return {@code true} iff both are {@code null} or both reference the same org-unit id
+   * Display order of the stacks within a material: highest quality first, then location name
+   * ascending, then largest total amount first — mirrors the previous per-row ordering.
    */
-  private static boolean sameOwningOrgUnit(OrgUnit a, OrgUnit b) {
-    UUID idA = a == null ? null : a.getId();
-    UUID idB = b == null ? null : b.getId();
-    return java.util.Objects.equals(idA, idB);
-  }
+  private static final java.util.Comparator<InventoryStackDto> STACK_ORDER =
+      java.util.Comparator.<InventoryStackDto, Integer>comparing(
+              s -> s.quality() != null ? s.quality() : 0)
+          .reversed()
+          .thenComparing(
+              s -> s.location() != null && s.location().name() != null ? s.location().name() : "")
+          .thenComparing(
+              java.util.Comparator.<InventoryStackDto, Double>comparing(
+                      s -> s.totalAmount() != null ? s.totalAmount() : 0.0)
+                  .reversed());
 }

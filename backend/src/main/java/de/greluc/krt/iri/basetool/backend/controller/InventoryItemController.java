@@ -73,6 +73,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/inventory")
 @RequiredArgsConstructor
 public class InventoryItemController {
+
+  /** Default page size for a stack-entries drill-down when the caller does not specify one. */
+  private static final int STACK_ENTRIES_DEFAULT_SIZE = 20;
+
+  /** Upper bound on a stack-entries page size, clamping the per-request load. */
+  private static final int STACK_ENTRIES_MAX_SIZE = 100;
+
   private final InventoryItemService inventoryItemService;
   private final UserService userService;
   private final AuthHelperService authHelperService;
@@ -223,6 +230,109 @@ public class InventoryItemController {
           @RequestParam(required = false) List<UUID> missionIds) {
     return inventoryItemService.getAllAggregatedInventory(
         materialIds, minQuality, jobOrderIds, missionIds);
+  }
+
+  /**
+   * Lazily loads one of the caller's own stacks' entries, oldest-first and paginated — the
+   * drill-down behind a collapsed stack on the "my inventory" page. The stack is identified by the
+   * stock-identity query params the grouped view already exposes on each {@code InventoryStackDto};
+   * {@code null} job-order / mission / owning-org-unit params select the rows where that
+   * association is itself absent. Owner-scoped to the calling user (no impersonation). Append-only
+   * inventory grows unboundedly per stack, so this is the only path that materialises the
+   * individual entries.
+   *
+   * @return one page of the stack's entries, oldest-first
+   */
+  @GetMapping("/my-inventory/stack/entries")
+  @Transactional(readOnly = true)
+  public PageResponse<InventoryItemDto> getMyStackEntries(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestParam @NotNull UUID materialId,
+      @RequestParam @NotNull UUID locationId,
+      @RequestParam(required = false) Integer quality,
+      @RequestParam(required = false) UUID jobOrderId,
+      @RequestParam(required = false) UUID missionId,
+      @RequestParam(required = false, defaultValue = "false") Boolean personal,
+      @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    Page<InventoryItemDto> p =
+        inventoryItemService.getMyStackEntries(
+            userService.getUserIdFromJwt(jwt),
+            materialId,
+            locationId,
+            quality,
+            jobOrderId,
+            missionId,
+            personal,
+            owningOrgUnitId,
+            stackEntriesPageRequest(page, size));
+    return new PageResponse<>(
+        p.getContent(),
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
+
+  /**
+   * Squadron-wide variant of {@link #getMyStackEntries} — the drill-down behind a collapsed stack
+   * on the admin/logistician "global Lager" page. Includes the stack's owning {@code userId}
+   * because a global stack is per-owner; the service re-applies the same org-unit scope predicate
+   * as the grouped view, so the drill-down can never widen visibility beyond the caller's org-unit
+   * slice.
+   *
+   * @return one page of the stack's entries, oldest-first
+   */
+  @GetMapping("/all/stack/entries")
+  @Transactional(readOnly = true)
+  public PageResponse<InventoryItemDto> getAllStackEntries(
+      @RequestParam @NotNull UUID materialId,
+      @RequestParam @NotNull UUID userId,
+      @RequestParam @NotNull UUID locationId,
+      @RequestParam(required = false) Integer quality,
+      @RequestParam(required = false) UUID jobOrderId,
+      @RequestParam(required = false) UUID missionId,
+      @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    Page<InventoryItemDto> p =
+        inventoryItemService.getAllStackEntries(
+            materialId,
+            userId,
+            locationId,
+            quality,
+            jobOrderId,
+            missionId,
+            owningOrgUnitId,
+            stackEntriesPageRequest(page, size));
+    return new PageResponse<>(
+        p.getContent(),
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
+
+  /**
+   * Builds the page request for a stack-entries drill-down: a clamped page/size with no sort, so
+   * the repository's oldest-first {@code ORDER BY createdAt ASC} (the REQ-INV-002 contract) is the
+   * sole ordering. Defaults to the first page of {@code STACK_ENTRIES_DEFAULT_SIZE} and clamps the
+   * size to {@code STACK_ENTRIES_MAX_SIZE} to bound the per-request load.
+   *
+   * @param page the requested zero-based page index, or {@code null} for the first page
+   * @param size the requested page size, or {@code null} for the default
+   * @return a sortless page request with clamped page and size
+   */
+  private static Pageable stackEntriesPageRequest(Integer page, Integer size) {
+    int resolvedPage = page != null && page >= 0 ? page : 0;
+    int resolvedSize =
+        size != null && size > 0
+            ? Math.min(size, STACK_ENTRIES_MAX_SIZE)
+            : STACK_ENTRIES_DEFAULT_SIZE;
+    return org.springframework.data.domain.PageRequest.of(resolvedPage, resolvedSize);
   }
 
   /**

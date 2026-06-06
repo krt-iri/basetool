@@ -19,9 +19,13 @@
 
 package de.greluc.krt.iri.basetool.frontend.model.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
-/** Data transfer record carrying Inventory Item payload. */
+/**
+ * Frontend mirror of the backend inventory-item projection. {@code createdAt} carries the row's
+ * creation instant so the grouped-stack UI can order an append-only stack's entries oldest-first.
+ */
 public record InventoryItemDto(
     UUID id,
     UserReferenceDto user,
@@ -36,4 +40,5 @@ public record InventoryItemDto(
     String missionName,
     String note,
     SquadronReferenceDto owningSquadron,
-    Long version) {}
+    Long version,
+    Instant createdAt) {}

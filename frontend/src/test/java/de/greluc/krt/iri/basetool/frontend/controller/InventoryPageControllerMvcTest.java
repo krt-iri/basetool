@@ -31,11 +31,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.iri.basetool.frontend.controller.InventoryPageController.GroupedInventoryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -205,14 +207,18 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Regression: a refinery order assigned to a (now non-active) mission produces an inventory item
-   * whose mission is no longer returned by {@code /api/v1/missions/lookup}. The mission must still
-   * be visible in the inventory association select via a fallback {@code <option selected>} so the
-   * user can recognise the linked mission (consistent with the mission detail view).
+   * Fragment-render guard for the personal Lager's lazy stack-entries drill-down ({@code
+   * /inventory/my/stack/entries}). The append-only Lager loads a stack's entries on expand, not
+   * inline, so this is where the per-entry association select lives. Regression: a refinery order
+   * assigned to a (now non-active) mission produces an entry whose mission is no longer returned by
+   * {@code /api/v1/missions/lookup}; the mission must still appear via a fallback {@code <option
+   * selected>}. Stubs the backend stack-entries page with that entry and asserts the real {@code
+   * stackEntriesMy} fragment carries the entry row (id + formatted added-date) and the fallback
+   * option — so a Thymeleaf 500 (date formatting / stale {@code #{...}} key) fails the build.
    */
   @Test
   @WithMockUser(roles = "MEMBER", username = "test-user-123")
-  void viewMyInventory_WhenItemMissionNotInLookup_ShouldRenderFallbackOption() throws Exception {
+  void viewMyStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption() throws Exception {
     UUID itemId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -235,14 +241,139 @@ class InventoryPageControllerMvcTest {
             missionName,
             null,
             null,
-            1L);
+            1L,
+            Instant.parse("2026-02-03T10:15:30Z"));
+
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/my-inventory/stack/entries")) {
+                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/my/stack/entries")
+                .param("materialId", materialId.toString())
+                .param("locationId", locationId.toString())
+                .param("quality", "90")
+                .param("missionId", missionId.toString())
+                .param("personal", "false"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
+        .andExpect(content().string(containsString("03.02.2026")))
+        .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
+        .andExpect(content().string(containsString(missionName)))
+        .andExpect(content().string(containsString("selected=\"selected\"")));
+  }
+
+  /**
+   * Same as {@link #viewMyStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption()} for the
+   * logistician/admin stack-entries drill-down ({@code /inventory/all/stack/entries} → {@code
+   * stackEntriesAdmin} fragment), which additionally carries the owning {@code userId} in the stack
+   * key and renders the editable association dropdowns (and the archived-mission fallback option)
+   * under {@code sec:authorize}.
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
+  void viewAllStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    String missionName = "Op Sundown (archived)";
+
+    InventoryItemDto item =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            10.0,
+            false,
+            null,
+            null,
+            missionId,
+            missionName,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-01-01T00:00:00Z"));
+
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/all/stack/entries")) {
+                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/all/stack/entries")
+                .param("materialId", materialId.toString())
+                .param("userId", userId.toString())
+                .param("locationId", locationId.toString())
+                .param("quality", "90")
+                .param("missionId", missionId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
+        .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
+        .andExpect(content().string(containsString(missionName)))
+        .andExpect(content().string(containsString("selected=\"selected\"")));
+  }
+
+  /**
+   * Full-render guard for the personal Lager's collapsed Material → Stack rows. The append-only
+   * Lager no longer inlines a stack's entries, so this asserts the real {@code inventory-my} view
+   * renders (HTTP 200) the collapsed stack row — its location, entry count, the toggle trigger and
+   * the lazy {@code stack-entries-content} container ({@code data-stack-loaded="false"}) — while
+   * NOT inlining any per-entry row (no {@code data-item-id}); the entries arrive via the separate
+   * {@code /inventory/my/stack/entries} fragment (ADR-0003, REQ-INV-002). Catches a Thymeleaf 500
+   * from the new stack-key {@code th:data-*} attributes or a stale {@code #{...}} key.
+   */
+  @Test
+  @WithMockUser(roles = "MEMBER", username = "test-user-123")
+  void viewMyInventory_WithStack_ShouldRenderCollapsedStackRow() throws Exception {
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    String locationName = "Port Olisar Hangar 7";
+
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new LocationReferenceDto(locationId, locationName),
+            95,
+            jobOrderId,
+            4242,
+            null,
+            null,
+            false,
+            null,
+            12.5,
+            95.0,
+            95,
+            1);
     GroupedInventoryDto group =
         new GroupedInventoryDto(
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
-            10.0,
-            90.0,
-            90,
-            List.of(item));
+            12.5,
+            95.0,
+            95,
+            List.of(stack));
 
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenAnswer(
@@ -259,49 +390,52 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/my"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
-        .andExpect(content().string(containsString(missionName)))
-        .andExpect(content().string(containsString("selected=\"selected\"")));
+        .andExpect(content().string(containsString(locationName)))
+        .andExpect(content().string(containsString("data-trigger=\"inv-my-toggle-stack\"")))
+        .andExpect(content().string(containsString("stack-entry-count")))
+        .andExpect(content().string(containsString("data-stack-loaded=\"false\"")))
+        .andExpect(content().string(containsString("stack-entries-content")))
+        .andExpect(content().string(not(containsString("data-item-id="))));
   }
 
   /**
-   * Same regression as {@link
-   * #viewMyInventory_WhenItemMissionNotInLookup_ShouldRenderFallbackOption()} for the
-   * logistician/admin view ({@code inventory-admin.html}).
+   * Full-render guard for the admin Lager's collapsed Material → Stack rows ({@code
+   * inventory-admin.html}). Mirrors {@link
+   * #viewMyInventory_WithStack_ShouldRenderCollapsedStackRow()} for {@code /inventory/all}: one
+   * material → one stack. Asserts the real {@code inventory-admin} view renders (HTTP 200) the
+   * collapsed stack row — its location, owner, entry count and the stack-toggle trigger plus the
+   * lazy entries container — without inlining any per-entry row; entries load via {@code
+   * /inventory/all/stack/entries}. Catches a render-500 from the new stack-key {@code th:data-*}
+   * attributes or the {@code sec:authorize}-gated stack table.
    */
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
-  void viewAllInventory_WhenItemMissionNotInLookup_ShouldRenderFallbackOption() throws Exception {
-    UUID itemId = UUID.randomUUID();
+  void viewAllInventory_WithStack_ShouldRenderCollapsedStackRow() throws Exception {
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    UUID missionId = UUID.randomUUID();
-    String missionName = "Op Sundown (archived)";
+    UUID jobOrderId = UUID.randomUUID();
+    String locationName = "Everus Harbor Storage";
+    String ownerName = "Logi Owner";
 
-    InventoryItemDto item =
-        new InventoryItemDto(
-            itemId,
-            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
-            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
-            new LocationReferenceDto(locationId, "ARC-L1"),
-            90,
-            10.0,
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(userId, "owner", "Owner", ownerName, null),
+            new LocationReferenceDto(locationId, locationName),
+            80,
+            jobOrderId,
+            777,
+            null,
+            null,
             false,
             null,
-            null,
-            missionId,
-            missionName,
-            null,
-            null,
-            1L);
+            7.0,
+            80.0,
+            80,
+            1);
     GroupedInventoryDto group =
         new GroupedInventoryDto(
-            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
-            10.0,
-            90.0,
-            90,
-            List.of(item));
+            new MaterialReferenceDto(materialId, "Laranite", "SCU"), 7.0, 80.0, 80, List.of(stack));
 
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenAnswer(
@@ -318,8 +452,11 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/all"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
-        .andExpect(content().string(containsString(missionName)))
-        .andExpect(content().string(containsString("selected=\"selected\"")));
+        .andExpect(content().string(containsString(locationName)))
+        .andExpect(content().string(containsString(ownerName)))
+        .andExpect(content().string(containsString("data-trigger=\"inv-admin-toggle-stack\"")))
+        .andExpect(content().string(containsString("stack-entry-count")))
+        .andExpect(content().string(containsString("data-stack-loaded=\"false\"")))
+        .andExpect(content().string(containsString("stack-entries-content")));
   }
 }

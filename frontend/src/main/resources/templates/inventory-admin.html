@@ -226,119 +226,48 @@
                             <table class="krt-table" style="margin: 0; background: transparent; border-top: none;">
                                 <thead>
                                     <tr>
-                                        <th style="padding-left: 2rem; width: 15%;">Nutzer</th>
+                                        <th style="width: 40px;"></th>
+                                        <th style="padding-left: 0.5rem; width: 18%;" th:text="#{inventory.user}">Nutzer</th>
                                         <th th:if="${isAllSquadronsMode}" style="width: 8%;" th:text="#{inventory.owning_squadron}">Staffel</th>
-                                        <th class="w-15">Ort</th>
-                                        <th style="width: 10%;">Qualität</th>
-                                        <th style="width: 10%;">Menge</th>
-                                        <th class="w-15">Auftrag</th>
-                                        <th style="width: 20%;">Einsatz</th>
-                                        <th class="w-15" sec:authorize="hasRole('LOGISTICIAN')">Aktionen</th>
+                                        <th style="width: 25%;" th:text="#{inventory.location}">Ort</th>
+                                        <th style="width: 12%;" th:text="#{inventory.quality}">Qualität</th>
+                                        <th style="width: 20%;" th:text="#{inventory.totalAmount}">Gesamtmenge</th>
+                                        <th style="width: 12%;" th:text="#{inventory.stack.entries}">Einträge</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <tr th:each="item : ${group.items}">
-                                        <td style="padding-left: 2rem;" th:text="${item.user.effectiveName}">User</td>
+                                <!-- One tbody per stack: same stock identity (owner, location, quality,
+                                     association, owning squadron) collapsed into one row; the entries it
+                                     consists of expand below. -->
+                                <tbody th:each="stack : ${group.stacks}">
+                                    <tr class="stack-header" style="cursor: pointer;" data-trigger="inv-admin-toggle-stack"
+                                        data-stack-loaded="false"
+                                        th:data-material-id="${group.material.id}"
+                                        th:data-user-id="${stack.user.id}"
+                                        th:data-location-id="${stack.location.id}"
+                                        th:data-quality="${stack.quality}"
+                                        th:data-job-order-id="${stack.jobOrderId}"
+                                        th:data-mission-id="${stack.missionId}"
+                                        th:data-owning-org-unit-id="${stack.owningSquadron != null ? stack.owningSquadron.id : null}">
+                                        <td class="text-center"><span class="toggle-icon stack-toggle-icon" style="color: var(--color-primary); font-size: 1rem;">▶</span></td>
+                                        <td style="padding-left: 0.5rem;" th:text="${stack.user.effectiveName}">User</td>
                                         <td th:if="${isAllSquadronsMode}">
-                                            <span th:if="${item.owningSquadron != null}" class="squadron-badge"
-                                                  th:title="${item.owningSquadron.name()}"
-                                                  th:text="${item.owningSquadron.shorthand()}">IRI</span>
-                                            <span th:if="${item.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                                            <span th:if="${stack.owningSquadron != null}" class="squadron-badge"
+                                                  th:title="${stack.owningSquadron.name()}"
+                                                  th:text="${stack.owningSquadron.shorthand()}">IRI</span>
+                                            <span th:if="${stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                                         </td>
-                                        <td th:text="${item.location.name}">Ort</td>
-                                        <td th:text="${item.quality}">100</td>
-                                        <td th:switch="${item.material.quantityType}">
-                                            <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
-                                            <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
+                                        <td th:text="${stack.location.name}">Ort</td>
+                                        <td th:text="${stack.quality}">100</td>
+                                        <td th:switch="${group.material.quantityType}">
+                                            <span th:case="'PIECE'" th:text="|${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
+                                            <span th:case="*" th:text="|${stack.totalAmount != null ? #numbers.formatDecimal(stack.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
                                         </td>
-                                        <td>
-                                            <!-- Normaler Text für Nutzer ohne Rechte -->
-                                            <div sec:authorize="!hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
-                                                <span th:if="${item.jobOrderId != null}" th:text="'Auftrag #' + ${item.jobOrderDisplayId}">Zugewiesen</span>
-                                                <span th:if="${item.jobOrderId == null}" class="text-muted">-</span>
-                                            </div>
-                                            <!-- Dropdown für Logistiker/Offiziere/Admins -->
-                                            <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
-                                                <select class="association-select"
-                                                        th:data-id="${item.id}"
-                                                        th:data-material-id="${item.material.id}"
-                                                        th:data-location-id="${item.location.id}"
-                                                        th:data-quality="${item.quality}"
-                                                        th:data-amount="${item.amount}"
-                                                        th:data-personal="${item.personal}"
-                                                        th:data-version="${item.version}"
-                                                        th:data-field="jobOrderId"
-                                                        data-trigger="inv-admin-update-assoc">
-                                                    <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
-                                                    <option th:each="order : ${jobOrders}"
-                                                            th:value="${order.id}"
-                                                            th:text="'Auftrag #' + ${order.displayId}"
-                                                            th:selected="${order.id == item.jobOrderId}"
-                                                            th:if="${order.materials == null or order.materials.isEmpty() or #lists.contains(order.materials.![material.id], item.material.id)}">
-                                                    </option>
-                                                </select>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <!-- Normaler Text für Nutzer ohne Rechte -->
-                                            <div sec:authorize="!hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
-                                                <span th:if="${item.missionId != null}" th:text="${item.missionName}">Einsatz</span>
-                                                <span th:if="${item.missionId == null}" class="text-muted">-</span>
-                                            </div>
-                                            <!-- Dropdown für Logistiker/Offiziere/Admins -->
-                                            <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
-                                                <select class="association-select"
-                                                        th:data-id="${item.id}"
-                                                        th:data-material-id="${item.material.id}"
-                                                        th:data-location-id="${item.location.id}"
-                                                        th:data-quality="${item.quality}"
-                                                        th:data-amount="${item.amount}"
-                                                        th:data-personal="${item.personal}"
-                                                        th:data-version="${item.version}"
-                                                        th:data-field="missionId"
-                                                        data-trigger="inv-admin-update-assoc">
-                                                    <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
-                                                    <option th:each="mission : ${missions}"
-                                                        th:value="${mission.id}"
-                                                        th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"
-                                                        th:selected="${mission.id == item.missionId}">
-                                                    </option>
-                                                    <option th:if="${item.missionId != null and not #lists.contains(missions.![id], item.missionId)}"
-                                                            th:value="${item.missionId}"
-                                                            th:text="${item.missionName}"
-                                                            selected="selected">
-                                                    </option>
-                                                </select>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" sec:authorize="hasRole('LOGISTICIAN')">
-                                                <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
-                                                        th:data-id="${item.id}"
-                                                        th:data-amount="${item.amount}"
-                                                        th:data-version="${item.version}"
-                                                        th:data-material-id="${item.material.id}"
-                                                        th:data-quantity-type="${item.material.quantityType}"
-                                                        th:data-user-id="${item.user.id}"
-                                                        th:data-location-id="${item.location.id}"
-                                                        data-trigger="inv-admin-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
-                                                <button type="button" class="btn btn-ghost inventory-note-btn"
-                                                        style="padding: 0.2rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
-                                                        th:data-id="${item.id}"
-                                                        th:data-version="${item.version}"
-                                                        th:data-note="${item.note}"
-                                                        th:classappend="${item.note != null and !#strings.isEmpty(item.note)} ? ' has-note' : ''"
-                                                        data-trigger="inv-admin-open-note"
-                                                        th:title="${item.note != null and !#strings.isEmpty(item.note)} ? ${item.note} : #{inventory.note.add}"
-                                                        th:text="${item.note != null and !#strings.isEmpty(item.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
-                                            </div>
-                                            <div class="inventory-note-preview"
-                                                 th:if="${item.note != null and !#strings.isEmpty(item.note)}"
-                                                 th:attr="data-note-for=${item.id}"
-                                                 th:title="${item.note}"
-                                                 th:aria-label="#{inventory.note.label}">
-                                                <span class="inventory-note-label" th:text="#{inventory.note.label}">Notiz</span>
-                                                <span class="inventory-note-text" th:text="${item.note}">Notiz</span>
+                                        <td><span class="stack-entry-count" th:text="${stack.entryCount}">3</span></td>
+                                    </tr>
+                                    <tr class="stack-entries" style="display: none;">
+                                        <td th:attr="colspan=${isAllSquadronsMode} ? 7 : 6" class="p-0">
+                                            <div class="inventory-items-table-wrapper stack-entries-content">
+                                                <!-- entries lazily loaded on expand via /inventory/all/stack/entries (ADR-0003) -->
                                             </div>
                                         </td>
                                     </tr>
@@ -494,6 +423,11 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    var stackEntriesI18n = {
+        loading: /*[[#{inventory.stack.entries.loading}]]*/ 'Eintr\u00e4ge werden geladen\u2026',
+        error: /*[[#{inventory.stack.entries.error}]]*/ 'Eintr\u00e4ge konnten nicht geladen werden.'
+    };
+
     var noteI18n = {
         saved: /*[[#{inventory.note.success.saved}]]*/ 'Notiz gespeichert',
         removed: /*[[#{inventory.note.success.removed}]]*/ 'Notiz entfernt',
@@ -816,6 +750,91 @@
                 }
             }
         }
+    }
+
+    function toggleStack(row) {
+        const nextRow = row.nextElementSibling;
+        const icon = row.querySelector('.toggle-icon');
+        if (!nextRow || !nextRow.classList.contains('stack-entries')) return;
+        if (nextRow.style.display === 'none') {
+            nextRow.style.display = 'table-row';
+            if (icon) icon.textContent = '▼';
+            // Append-only Lager: a stack's entries are not inlined. Fetch them on first
+            // expand from /inventory/all/stack/entries (ADR-0003, REQ-INV-002); subsequent
+            // toggles just reveal the already-loaded rows.
+            if (row.getAttribute('data-stack-loaded') !== 'true') {
+                loadStackEntries(row, 0);
+            }
+        } else {
+            nextRow.style.display = 'none';
+            if (icon) icon.textContent = '▶';
+        }
+    }
+
+    // Builds the lazy stack-entries fetch URL from the stack-key data-attributes the server
+    // stamped on the stack-header row. A global stack is per-owner, so userId is part of the
+    // key; the global Lager is non-personal, so no personal flag is sent. An absent dimension
+    // is omitted so the backend's null-safe match selects rows where it is itself absent.
+    function buildStackEntriesUrl(headerRow, page) {
+        const params = new URLSearchParams();
+        params.set('materialId', headerRow.getAttribute('data-material-id'));
+        params.set('userId', headerRow.getAttribute('data-user-id'));
+        params.set('locationId', headerRow.getAttribute('data-location-id'));
+        const quality = headerRow.getAttribute('data-quality');
+        if (quality !== null && quality !== '') params.set('quality', quality);
+        const jobOrderId = headerRow.getAttribute('data-job-order-id');
+        if (jobOrderId) params.set('jobOrderId', jobOrderId);
+        const missionId = headerRow.getAttribute('data-mission-id');
+        if (missionId) params.set('missionId', missionId);
+        const owningOrgUnitId = headerRow.getAttribute('data-owning-org-unit-id');
+        if (owningOrgUnitId) params.set('owningOrgUnitId', owningOrgUnitId);
+        if (page != null) params.set('page', page);
+        return '/inventory/all/stack/entries?' + params.toString();
+    }
+
+    // Replaces a stack's entries container with a single status line (loading / error),
+    // built via textContent so the i18n string is never interpreted as HTML.
+    function setStackEntriesStatus(content, message, isError) {
+        content.innerHTML = '';
+        const div = document.createElement('div');
+        div.className = 'stack-entries-status';
+        if (isError) div.classList.add('hud-box-error');
+        div.style.padding = '1rem 2.5rem';
+        div.style.color = 'var(--color-gray-2)';
+        div.textContent = message;
+        content.appendChild(div);
+    }
+
+    // Fetches one page of a stack's entries and injects the server-rendered fragment. The
+    // injected rows carry the same data-trigger hooks as before, so the page's delegated
+    // krtEvents handlers (book-out, note, association) keep working without re-binding.
+    function loadStackEntries(headerRow, page) {
+        const entriesRow = headerRow.nextElementSibling;
+        if (!entriesRow) return;
+        const content = entriesRow.querySelector('.stack-entries-content');
+        if (!content) return;
+        setStackEntriesStatus(content, stackEntriesI18n.loading, false);
+        fetch(buildStackEntriesUrl(headerRow, page), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+            .then(function (html) {
+                content.innerHTML = html;
+                headerRow.setAttribute('data-stack-loaded', 'true');
+            })
+            .catch(function (e) {
+                console.error('Failed to load stack entries', e);
+                setStackEntriesStatus(content, stackEntriesI18n.error, true);
+            });
+    }
+
+    // Pagination handler: re-fetches the target page for the stack owning the clicked button
+    // and replaces the entries container in place.
+    function goToStackEntriesPage(btn) {
+        const entriesRow = btn.closest('tr.stack-entries');
+        if (!entriesRow) return;
+        const headerRow = entriesRow.previousElementSibling;
+        if (!headerRow) return;
+        const page = parseInt(btn.getAttribute('data-page'), 10);
+        loadStackEntries(headerRow, isNaN(page) ? 0 : page);
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -1280,6 +1299,8 @@
         window.krtEvents.on('change', 'inv-admin-filter', filterInventory);
         window.krtEvents.on('click', 'inv-admin-reset-filter', resetInventoryFilter);
         window.krtEvents.on('click', 'inv-admin-toggle-group', function (el) { toggleGroup(el); });
+        window.krtEvents.on('click', 'inv-admin-toggle-stack', function (el) { toggleStack(el); });
+        window.krtEvents.on('click', 'inv-admin-stack-page', function (el) { goToStackEntriesPage(el); });
         window.krtEvents.on('change', 'inv-admin-update-assoc', function (el) { updateInventoryAssociation(el); });
         window.krtEvents.on('click', 'inv-admin-bookout', function (el) {
             openBookOutModal(

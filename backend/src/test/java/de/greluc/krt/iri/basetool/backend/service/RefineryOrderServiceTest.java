@@ -72,19 +72,17 @@ import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Unit tests for {@link RefineryOrderService#storeRefineryOrder} — the bulk-update + multi-item
- * flow CLAUDE.md flags as a 409 trap. Previous coverage was 68% line / 39% branch with only a
- * single happy-path-blocked test (the "order already COMPLETED" case). This rewrite exercises every
- * branch:
+ * flow CLAUDE.md flags as a 409 trap. The Lager is append-only: every stored refinery output
+ * becomes its own brand-new {@code InventoryItem} row and is never folded into an existing
+ * identical stack, so there is no match-and-merge branch and no note-merge to exercise. This suite
+ * covers:
  *
  * <ul>
  *   <li>access-control (owner vs non-owner vs logistician bypass)
  *   <li>per-item lookups (material / location / user / job-order {@link NotFoundException}s)
  *   <li>assignee resolution (explicit user vs order-owner fallback)
- *   <li>aggregation into an existing InventoryItem vs creation of a new one (the {@code
- *       findMatchingInventoryItemForUpdate} branch)
- *   <li>note merge semantics (null preserved, blank replaced, novel appended with newline,
- *       duplicate dropped, &gt;1000 truncated)
- *   <li>note normalisation (null / blank / trimmed)
+ *   <li>always inserting a fresh InventoryItem carrying the incoming amount (rounded to SCU scale)
+ *   <li>note normalisation on the new row (trimmed value stored; null / blank stored as null)
  *   <li>{@code updateGoodOutputQuantity}: SCU vs PIECE conversion, {@code @Min(1)} clamp at zero,
  *       no-match silent skip, missing output-material guard
  *   <li>final state transition to {@link RefineryOrderStatus#COMPLETED}
@@ -312,9 +310,6 @@ class RefineryOrderServiceTest {
     @Test
     void usesOrderOwnerAsAssignee_whenItemUserIdIsNull() {
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(Collections.emptyList());
 
       refineryOrderService.storeRefineryOrder(
           OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false);
@@ -332,9 +327,6 @@ class RefineryOrderServiceTest {
 
       stubLookupsForSingleItem();
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.of(other));
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(Collections.emptyList());
 
       refineryOrderService.storeRefineryOrder(
           OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))), false);
@@ -346,18 +338,17 @@ class RefineryOrderServiceTest {
   }
 
   // ------------------------------------------------------------------
-  // Aggregation vs creation
+  // Always-insert (append-only) + note handling on the new row
   // ------------------------------------------------------------------
 
   @Nested
-  class AggregationTests {
+  class InsertTests {
 
     @Test
-    void createsNewInventoryItem_whenNoMatchExists() {
+    void alwaysInsertsNewInventoryItem() {
+      // Append-only Lager: every stored output is a fresh row carrying the incoming amount — no
+      // match-and-merge. A pre-existing identical row is irrelevant; nothing accumulates into it.
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(Collections.emptyList());
 
       refineryOrderService.storeRefineryOrder(
           OWNER_ID,
@@ -371,223 +362,29 @@ class RefineryOrderServiceTest {
       assertSame(owner, saved.getUser());
       assertSame(material, saved.getMaterial());
       assertSame(location, saved.getLocation());
-      assertEquals(50.0, saved.getAmount());
+      assertEquals(50.0, saved.getAmount(), "the new row carries the incoming amount, not a sum");
       assertEquals(500, saved.getQuality());
       assertEquals("fresh note", saved.getNote());
     }
 
     @Test
-    void incrementsExistingInventoryItem_whenMatchFound() {
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(40.0);
-      existing.setNote(null);
-
+    void roundsNewItemAmountToThreeDecimals() {
+      // The store path rounds the incoming amount to SCU scale (three decimals, HALF_UP) on the new
+      // row. 2.2 stays 2.2 — there is no summing with any pre-existing stack any more.
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
-
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, null))),
-          false);
-
-      assertEquals(50.0, existing.getAmount(), "existing amount must accumulate, not replace");
-      verify(inventoryItemRepository, times(1)).save(existing);
-    }
-
-    @Test
-    void roundsSummedAmountToThreeDecimals_whenMatchFound() {
-      // Defence in depth: summing two valid (<=3-decimal) SCU amounts as doubles yields a
-      // >3-decimal artefact (1.1 + 2.2 == 3.3000000000000003). The producer rounds at the source
-      // so the in-memory amount is already clean — independent of the @PrePersist/@PreUpdate hook,
-      // which a mocked repository never fires.
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(1.1);
-      existing.setNote(null);
-
-      stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
 
       refineryOrderService.storeRefineryOrder(
           OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(itemWithAmount(2.2, null))), false);
 
-      assertEquals(3.3, existing.getAmount(), "summed amount must be rounded to three decimals");
-      verify(inventoryItemRepository, times(1)).save(existing);
-    }
-  }
-
-  // ------------------------------------------------------------------
-  // Note merge semantics
-  // ------------------------------------------------------------------
-
-  @Nested
-  class NoteMergeTests {
-
-    @Test
-    void existingItem_nullIncomingNote_keepsExistingNote() {
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(40.0);
-      existing.setNote("keep this");
-
-      stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
-
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, null))),
-          false);
-
-      assertEquals("keep this", existing.getNote());
-    }
-
-    @Test
-    void existingItem_blankIncomingNote_keepsExistingNote() {
-      // normalizeNote() turns blank-only strings into null, so this path
-      // collapses into the null-incoming-note branch.
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(40.0);
-      existing.setNote("keep this");
-
-      stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
-
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, "   "))),
-          false);
-
-      assertEquals("keep this", existing.getNote());
-    }
-
-    @Test
-    void existingItem_nullExistingNote_replacedByIncoming() {
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(40.0);
-      existing.setNote(null);
-
-      stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
-
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, "fresh"))),
-          false);
-
-      assertEquals("fresh", existing.getNote());
-    }
-
-    @Test
-    void existingItem_blankExistingNote_replacedByIncoming() {
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(40.0);
-      existing.setNote("   ");
-
-      stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
-
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, "fresh"))),
-          false);
-
-      assertEquals("fresh", existing.getNote());
-    }
-
-    @Test
-    void existingItem_novelIncomingNote_appendedWithNewline() {
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(40.0);
-      existing.setNote("first batch");
-
-      stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
-
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, "second batch"))),
-          false);
-
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, times(1)).save(captor.capture());
       assertEquals(
-          "first batch\nsecond batch",
-          existing.getNote(),
-          "novel notes append with newline separator");
-    }
-
-    @Test
-    void existingItem_duplicateIncomingNote_doesNotDuplicate() {
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(40.0);
-      existing.setNote("first batch (urgent)");
-
-      stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
-
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, "urgent"))),
-          false);
-
-      assertEquals(
-          "first batch (urgent)",
-          existing.getNote(),
-          "existing note already contains the substring -> no append");
-    }
-
-    @Test
-    void existingItem_combinedNoteOverflowing1000Chars_isTruncated() {
-      // Existing note: 900 chars. Incoming note: 150 chars.
-      // Combined would be 900 + 1 + 150 = 1051 -> truncated to 1000.
-      String existingNote = "x".repeat(900);
-      String incomingNote = "y".repeat(150);
-      InventoryItem existing = new InventoryItem();
-      existing.setAmount(40.0);
-      existing.setNote(existingNote);
-
-      stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(List.of(existing));
-
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, incomingNote))),
-          false);
-
-      assertEquals(1000, existing.getNote().length());
-      assertTrue(
-          existing.getNote().startsWith(existingNote),
-          "the existing note must be preserved verbatim at the front");
+          2.2, captor.getValue().getAmount(), "new row amount is the rounded incoming SCU");
     }
 
     @Test
     void newItem_storesNormalizedIncomingNote() {
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(Collections.emptyList());
 
       refineryOrderService.storeRefineryOrder(
           OWNER_ID,
@@ -603,9 +400,6 @@ class RefineryOrderServiceTest {
     @Test
     void newItem_blankIncomingNote_storedAsNull() {
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(Collections.emptyList());
 
       refineryOrderService.storeRefineryOrder(
           OWNER_ID,
@@ -719,9 +513,6 @@ class RefineryOrderServiceTest {
       // Use a single item with a valid material; the storeRefineryOrder path
       // still calls updateGoodOutputQuantity, which must return on null goods.
       stubLookupsForSingleItem();
-      when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-              any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(Collections.emptyList());
 
       // Just verify it doesn't throw.
       refineryOrderService.storeRefineryOrder(
@@ -741,9 +532,6 @@ class RefineryOrderServiceTest {
   @Test
   void afterAllItemsProcessed_orderStatusIsCOMPLETED_andOrderSaved() {
     stubLookupsForSingleItem();
-    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-            any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Collections.emptyList());
 
     refineryOrderService.storeRefineryOrder(
         OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, null))), false);
@@ -755,11 +543,8 @@ class RefineryOrderServiceTest {
   @Test
   void multipleItems_allInsertedAndOrderCompletedExactlyOnce() {
     stubLookupsForSingleItem();
-    // Also stub for a second material id; we'll reuse the same material to keep
-    // the fixture light — the stub uses ArgumentMatchers.any() in this case.
-    when(inventoryItemRepository.findMatchingInventoryItemForUpdate(
-            any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Collections.emptyList());
+    // Two items reuse the same material/location to keep the fixture light; each still inserts its
+    // own row (append-only), so save() is expected exactly twice.
 
     refineryOrderService.storeRefineryOrder(
         OWNER_ID,
@@ -793,11 +578,6 @@ class RefineryOrderServiceTest {
         .when(materialRepository.findById(eq(material.getId())))
         .thenReturn(Optional.of(material));
     lenient().when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
-    lenient()
-        .when(
-            inventoryItemRepository.findMatchingInventoryItemForUpdate(
-                any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Collections.emptyList());
 
     RefineryOrderStoreItemDto dto =
         new RefineryOrderStoreItemDto(material.getId(), LOCATION_ID, 500, amount, null, null, null);
