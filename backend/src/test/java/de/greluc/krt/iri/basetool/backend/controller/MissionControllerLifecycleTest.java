@@ -71,18 +71,19 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * sub-resource endpoints + RSVP branches) do NOT touch:
  *
  * <ul>
- *   <li><b>Guest redaction</b> in {@code getMissionById} / {@code getNextMission} — {@link
- *       MissionController#cleanupMissionForGuest} is the only path that controls what leaves the
- *       API for an anonymous viewer. Pinning the redaction (owner, managers, inventory, refinery
- *       orders cleared; canEdit/canManageManagers forced to false; participant + nested user
- *       redactions; sub-mission redactions) protects the multi-user-data-isolation guarantee in
- *       CLAUDE.md.
- *   <li><b>Guest access blocks</b>: internal missions → 403, completed/cancelled missions → 403 (a
- *       past mission must not leak its participant list to a public viewer).
- *   <li><b>Anonymous list/search filtering</b> — {@code getAllMissions} / {@code searchMissions}
- *       silently restrict guests to {@code PLANNED}+{@code ACTIVE} non-internal missions. The
- *       "guest passes a forbidden status" path returns an empty page (not 403) so the UI degrades
- *       silently.
+ *   <li><b>Outsider redaction</b> in {@code getMissionById} / {@code getNextMission} — {@code
+ *       MissionController#cleanupOutsiderMissionForGuest} is the only path that controls what
+ *       leaves the API for a mission outsider (anonymous OR authenticated role-less GUEST, detected
+ *       via {@code AuthHelperService#isMemberOrAbove()}). Pinning the strict redaction
+ *       (description, owning organisation, owner, managers, operation, inventory, refinery orders
+ *       cleared; canEdit/canManageManagers forced to false; participant roster, units and
+ *       frequencies emptied) protects the multi-user-data-isolation guarantee in CLAUDE.md.
+ *   <li><b>Outsider access blocks</b>: internal missions → 403, completed/cancelled missions → 403
+ *       (a past mission must not leak its participant list to a public viewer).
+ *   <li><b>Outsider list/search filtering</b> — {@code getAllMissions} / {@code searchMissions}
+ *       silently restrict outsiders to {@code PLANNED}+{@code ACTIVE} non-internal missions. The
+ *       "outsider passes a forbidden status" path returns an empty page (not 403) so the UI
+ *       degrades silently.
  *   <li><b>Section patches</b> ({@code patchMissionCore}, {@code patchMissionSchedule}, {@code
  *       patchMissionFlags}) unpack each request record into the service's positional argument list.
  *       The argument order is the spot where a copy-paste during refactor would silently swap
@@ -216,9 +217,10 @@ class MissionControllerLifecycleTest {
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(m)).thenReturn(listDto);
+    // Registered member (or above) → full scoped search, no anonymous status restriction.
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
 
-    PageResponse<MissionListDto> result =
-        controller.getAllMissions(0, 20, null, () -> "alice"); // non-null Principal
+    PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null);
 
     assertThat(result.content()).containsExactly(listDto);
     verify(missionService)
@@ -264,13 +266,15 @@ class MissionControllerLifecycleTest {
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(m)).thenReturn(listDto);
+    // Outsider = anonymous OR authenticated role-less GUEST (isMemberOrAbove == false).
+    when(authHelperService.isMemberOrAbove()).thenReturn(false);
 
-    PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null, null);
+    PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null);
 
-    // Anonymous callers MUST be silently restricted to PLANNED+ACTIVE non-internal missions —
-    // this is the only place where the "guests do not see completed/cancelled/internal" rule is
-    // enforced on the list endpoint. Pin the exact argument shape so a refactor that "simplifies"
-    // the anonymous branch cannot silently widen the guest view.
+    // Outsiders MUST be silently restricted to PLANNED+ACTIVE non-internal missions — this is the
+    // only place where the "guests do not see completed/cancelled/internal" rule is enforced on the
+    // list endpoint. Pin the exact argument shape so a refactor that "simplifies" the outsider
+    // branch cannot silently widen the guest view.
     assertThat(result.content()).containsExactly(listDto);
     verify(missionService)
         .searchMissions(
@@ -287,17 +291,11 @@ class MissionControllerLifecycleTest {
 
   @Test
   void searchMissions_anonymous_emptyAfterFilter_returnsEmptyPageWithoutHittingService() {
+    // Outsider = anonymous OR authenticated role-less GUEST (isMemberOrAbove == false).
+    when(authHelperService.isMemberOrAbove()).thenReturn(false);
     PageResponse<MissionListDto> result =
         controller.searchMissions(
-            null,
-            null,
-            null,
-            List.of("COMPLETED"),
-            null,
-            0,
-            20,
-            null,
-            null); // guest wants COMPLETED
+            null, null, null, List.of("COMPLETED"), null, 0, 20, null); // guest wants COMPLETED
 
     // Guest passed a status that is not in the allow-list. The controller MUST return an empty
     // page (not 403, not "everything-anyway") and MUST NOT hit the service — pinning this
@@ -339,10 +337,12 @@ class MissionControllerLifecycleTest {
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(m)).thenReturn(listDto);
+    // Outsider = anonymous OR authenticated role-less GUEST (isMemberOrAbove == false).
+    when(authHelperService.isMemberOrAbove()).thenReturn(false);
 
     PageResponse<MissionListDto> result =
         controller.searchMissions(
-            null, null, null, List.of("ACTIVE", "COMPLETED"), null, 0, 20, null, null);
+            null, null, null, List.of("ACTIVE", "COMPLETED"), null, 0, 20, null);
 
     // Guest passed ["ACTIVE", "COMPLETED"]; intersection with the allow-list ["PLANNED","ACTIVE"]
     // is ["ACTIVE"]. Pin the intersection result — a refactor that swapped intersect for union
@@ -392,10 +392,12 @@ class MissionControllerLifecycleTest {
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(m)).thenReturn(listDto);
+    // Registered member (or above) → status filter passes through verbatim, internals included.
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
 
     PageResponse<MissionListDto> result =
         controller.searchMissions(
-            "foo", start, end, List.of("COMPLETED"), operationId, 0, 20, null, () -> "alice");
+            "foo", start, end, List.of("COMPLETED"), operationId, 0, 20, null);
 
     assertThat(result.content()).containsExactly(listDto);
     verify(missionService)
@@ -418,12 +420,14 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id);
     when(missionService.getMissionById(id)).thenReturn(entity);
     when(missionMapper.toDto(entity)).thenReturn(full);
+    // Registered member (or above) → not an outsider → full DTO, no redaction.
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
 
-    MissionDto result = controller.getMissionById(id, () -> "alice");
+    MissionDto result = controller.getMissionById(id);
 
-    // Authenticated caller — owner/managers/PII flow through unchanged. Pin the "isSameAs" so a
-    // future change that ALWAYS goes through cleanupMissionForGuest (e.g. as a "safety net")
-    // would surface here as a different identity.
+    // Member caller — owner/managers/PII flow through unchanged. Pin the "isSameAs" so a future
+    // change that ALWAYS goes through the outsider redaction (e.g. as a "safety net") would surface
+    // here as a different identity.
     assertThat(result).isSameAs(full);
   }
 
@@ -434,9 +438,10 @@ class MissionControllerLifecycleTest {
     internal.setIsInternal(true);
     internal.setStatus("PLANNED");
     when(missionService.getMissionById(id)).thenReturn(internal);
+    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider (anonymous or GUEST)
 
     try {
-      controller.getMissionById(id, null);
+      controller.getMissionById(id);
       org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
     } catch (AccessDeniedException expected) {
       // ok
@@ -454,9 +459,10 @@ class MissionControllerLifecycleTest {
     completed.setIsInternal(false);
     completed.setStatus("COMPLETED");
     when(missionService.getMissionById(id)).thenReturn(completed);
+    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider (anonymous or GUEST)
 
     try {
-      controller.getMissionById(id, null);
+      controller.getMissionById(id);
       org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
     } catch (AccessDeniedException expected) {
       // ok
@@ -471,9 +477,10 @@ class MissionControllerLifecycleTest {
     cancelled.setIsInternal(false);
     cancelled.setStatus("CANCELLED");
     when(missionService.getMissionById(id)).thenReturn(cancelled);
+    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider (anonymous or GUEST)
 
     try {
-      controller.getMissionById(id, null);
+      controller.getMissionById(id);
       org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
     } catch (AccessDeniedException expected) {
       // ok
@@ -482,7 +489,7 @@ class MissionControllerLifecycleTest {
   }
 
   @Test
-  void getMissionById_guest_planned_returnsRedactedDto() {
+  void getMissionById_outsider_planned_returnsStrictlyRedactedDto() {
     UUID id = UUID.randomUUID();
     Mission planned = new Mission();
     planned.setIsInternal(false);
@@ -490,45 +497,43 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id);
     when(missionService.getMissionById(id)).thenReturn(planned);
     when(missionMapper.toDto(planned)).thenReturn(full);
+    // Outsider = anonymous OR authenticated role-less GUEST → strict redaction.
+    when(authHelperService.isMemberOrAbove()).thenReturn(false);
 
-    MissionDto result = controller.getMissionById(id, null);
+    MissionDto result = controller.getMissionById(id);
 
-    // The redaction contract — every assertion here pins one PII / internal-state field that
-    // cleanupMissionForGuest is supposed to strip. Anyone changing this method MUST update the
-    // test, which is the entire point.
+    // The strict outsider-redaction contract (cleanupOutsiderMissionForGuest): every assertion here
+    // pins one thing an outsider (anonymous or GUEST) must NOT see. Anyone changing the redaction
+    // MUST update this test, which is the entire point.
     assertThat(result).isNotNull();
+    // Public minimum that stays visible.
+    assertThat(result.name()).isEqualTo("Op Foxglove");
+    assertThat(result.status()).isEqualTo("PLANNED");
+    // Hidden: description, owning organisation, owner/managers, edit flags, internal economy.
+    assertThat(result.description()).isNull();
+    assertThat(result.owningSquadron()).isNull();
     assertThat(result.owner()).isNull();
     assertThat(result.managers()).isNull();
+    assertThat(result.operation()).isNull();
     assertThat(result.canEdit()).isFalse();
     assertThat(result.canManageManagers()).isFalse();
     assertThat(result.inventoryEntries()).isEmpty();
     assertThat(result.refineryOrders()).isEmpty();
-
-    // Nested-participant redaction: the user must lose email/description/
-    // roles/permissions/announcementWatermark/joinDate. Username + displayName + rank stay
-    // (public callsign tuple).
-    MissionParticipantDto participant = result.participants().iterator().next();
-    UserDto cleanedUser = participant.user();
-    assertThat(cleanedUser.email()).isNull();
-    assertThat(cleanedUser.description()).isNull();
-    assertThat(cleanedUser.roles()).isNull();
-    assertThat(cleanedUser.permissions()).isNull();
-    assertThat(cleanedUser.lastReadAnnouncementId()).isNull();
-    assertThat(cleanedUser.joinDate()).isNull();
-    assertThat(cleanedUser.isLogistician()).isFalse();
-    assertThat(cleanedUser.isMissionManager()).isFalse();
-    assertThat(cleanedUser.username()).isEqualTo("alice");
-    assertThat(cleanedUser.displayName()).isEqualTo("Alice Display");
-    assertThat(cleanedUser.rank()).isEqualTo(12);
+    // Hidden: the whole participant roster (and with it every participant's payout preference and
+    // PII), the assigned units, and the mission frequencies (the "Organisation" panel data).
+    assertThat(result.participants()).isEmpty();
+    assertThat(result.assignedUnits()).isEmpty();
+    assertThat(result.frequencies()).isEmpty();
   }
 
   // ── GET /api/v1/missions/next (200 / 204 + redaction) ────────────────
 
   @Test
   void getNextMission_noMission_returns204() {
+    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider
     when(missionService.getNextMission(false)).thenReturn(Optional.empty());
 
-    ResponseEntity<MissionDto> response = controller.getNextMission(null);
+    ResponseEntity<MissionDto> response = controller.getNextMission();
 
     assertThat(response.getStatusCode().value()).isEqualTo(204);
     assertThat(response.getBody()).isNull();
@@ -539,14 +544,15 @@ class MissionControllerLifecycleTest {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id);
+    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider (anonymous or GUEST)
     when(missionService.getNextMission(false)).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
-    ResponseEntity<MissionDto> response = controller.getNextMission(null);
+    ResponseEntity<MissionDto> response = controller.getNextMission();
 
-    // allowInternal=false MUST be passed to the service when caller is anonymous — otherwise the
-    // service might surface an internal mission that the cleanup pass would only blank out a
-    // few fields of. Pin both the boolean AND the post-cleanup redacted owner.
+    // allowInternal=false MUST be passed to the service for an outsider — otherwise the service
+    // might surface an internal mission that the cleanup pass would only blank out a few fields of.
+    // Pin both the boolean AND the post-cleanup redacted owner.
     verify(missionService).getNextMission(false);
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isNotNull();
@@ -554,14 +560,15 @@ class MissionControllerLifecycleTest {
   }
 
   @Test
-  void getNextMission_authenticated_allowInternalIsTrue_andDtoUnchanged() {
+  void getNextMission_member_allowInternalIsTrue_andDtoUnchanged() {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id);
+    when(authHelperService.isMemberOrAbove()).thenReturn(true); // registered member or above
     when(missionService.getNextMission(true)).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
-    ResponseEntity<MissionDto> response = controller.getNextMission(() -> "alice");
+    ResponseEntity<MissionDto> response = controller.getNextMission();
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isSameAs(full);

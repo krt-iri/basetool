@@ -53,17 +53,20 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Security-focused MockMvc tests for {@link MissionFinanceEntryController#createFinanceEntry} — the
- * public create-entry endpoint that previously leaked participant PII to anonymous callers and
- * accepted writes against internal missions (audit finding C-2). The route is documented as guest-
- * callable so anonymous callers can record their own payout line; the rules pinned here are:
+ * Security-focused MockMvc tests for {@link MissionFinanceEntryController#createFinanceEntry} and
+ * the finance-read endpoints. The finance ledger is the mission's payout view and is restricted to
+ * registered members and above ({@code isMemberOrAbove}): anonymous callers AND authenticated but
+ * role-less {@code GUEST} accounts are blocked, mirroring the "treat guest like anonymous on the
+ * mission surface" rule. The rules pinned here are:
  *
  * <ul>
- *   <li>anonymous on non-internal mission → 201 with the nested user's email / real name / roles
- *       scrubbed,
- *   <li>anonymous on internal mission → 403, no service call,
- *   <li>authenticated officer → 201 with the nested participant's email stripped (H-1),
- *   <li>oversized {@code note} or out-of-range {@code amount} → 400 before the service is hit.
+ *   <li>anonymous create → 401 (URL gate requires authentication), no service call,
+ *   <li>role-less GUEST create → 403 (method gate requires a member), no service call,
+ *   <li>member / officer create on an in-scope mission → 201 with the nested participant's email
+ *       stripped (H-1),
+ *   <li>GUEST read → 403; member / officer read → 200 with participant email stripped,
+ *   <li>oversized {@code note} or out-of-range {@code amount} (member caller) → 400 before the
+ *       service is hit.
  * </ul>
  */
 @SpringBootTest
@@ -88,6 +91,13 @@ class MissionFinanceEntryControllerSecurityTest {
 
   private static SimpleGrantedAuthority member() {
     return new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER");
+  }
+
+  /**
+   * An authenticated but role-less GUEST — passes {@code isAuthenticated()} but not a member gate.
+   */
+  private static SimpleGrantedAuthority guest() {
+    return new SimpleGrantedAuthority("ROLE_GUEST");
   }
 
   /**
@@ -129,8 +139,53 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   @Test
-  void createFinanceEntry_anonymousOnPublicMission_returnsSlimAckWithoutParticipant()
-      throws Exception {
+  void createFinanceEntry_anonymous_isUnauthorized() throws Exception {
+    UUID missionId = UUID.randomUUID();
+
+    // The finance ledger is no longer anonymous: POST /api/v1/finance-entries is URL-gated to
+    // authenticated callers, so an anonymous request is rejected with 401 (the resource server's
+    // bearer entry point) before the controller or any service is reached.
+    mockMvc
+        .perform(
+            post("/api/v1/finance-entries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"missionId\":\""
+                        + missionId
+                        + "\",\"participantId\":\""
+                        + UUID.randomUUID()
+                        + "\",\"type\":\"INCOME\",\"amount\":500.00,\"note\":\"my-line\"}"))
+        .andExpect(status().isUnauthorized());
+
+    verify(financeEntryService, never()).createEntry(any());
+  }
+
+  @Test
+  void createFinanceEntry_roleLessGuest_isForbidden() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    // canSeeMission would pass for a non-internal mission, but the method gate also requires
+    // isMemberOrAbove(); a role-less GUEST is treated like an anonymous visitor and denied with 403
+    // before the service is invoked.
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+
+    mockMvc
+        .perform(
+            post("/api/v1/finance-entries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"missionId\":\""
+                        + missionId
+                        + "\",\"participantId\":\""
+                        + UUID.randomUUID()
+                        + "\",\"type\":\"INCOME\",\"amount\":500.00}")
+                .with(jwt().authorities(guest())))
+        .andExpect(status().isForbidden());
+
+    verify(financeEntryService, never()).createEntry(any());
+  }
+
+  @Test
+  void createFinanceEntry_member_returnsEntryWithParticipantEmailStripped() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
     when(financeEntryService.createEntry(any())).thenReturn(persistedEntryWithUserPii(missionId));
@@ -145,47 +200,19 @@ class MissionFinanceEntryControllerSecurityTest {
                             + missionId
                             + "\",\"participantId\":\""
                             + UUID.randomUUID()
-                            + "\",\"type\":\"INCOME\",\"amount\":500.00,\"note\":\"my-line\"}"))
+                            + "\",\"type\":\"INCOME\",\"amount\":500.00,\"note\":\"my-line\"}")
+                    .with(jwt().authorities(member())))
             .andExpect(status().isCreated())
-            // M-5: anonymous response is now a slim acknowledgement — participant is dropped
-            // entirely (no more nested user / email vector to keep clean), version is dropped
-            // (anonymous cannot update). id / missionId / type / amount / note stay so the
-            // caller has enough to confirm the persisted row.
-            .andExpect(jsonPath("$.id").exists())
-            .andExpect(jsonPath("$.missionId").value(missionId.toString()))
-            .andExpect(jsonPath("$.type").value("INCOME"))
-            .andExpect(jsonPath("$.participant").isEmpty())
+            // The public callsign confirms which line was created…
+            .andExpect(jsonPath("$.participant.user.username").value("bob.callsign"))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
+    // …but H-1: even a member must not get a peer's email back on create.
     org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob.callsign"), "anonymous slim ack must not carry the participant at all");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob@example.invalid"), "anonymous ack must not leak participant email");
-  }
-
-  @Test
-  void createFinanceEntry_anonymousOnInternalMission_isForbidden() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    // canSeeMission returns false for an anonymous caller on an internal mission — the
-    // @PreAuthorize
-    // gate denies BEFORE the service is invoked.
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
-
-    mockMvc
-        .perform(
-            post("/api/v1/finance-entries")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"missionId\":\""
-                        + missionId
-                        + "\",\"participantId\":\""
-                        + UUID.randomUUID()
-                        + "\",\"type\":\"INCOME\",\"amount\":500.00}"))
-        .andExpect(status().isForbidden());
-
-    verify(financeEntryService, never()).createEntry(any());
+        body.contains("bob@example.invalid"),
+        "member create response must not echo the participant's email");
   }
 
   @Test
@@ -236,7 +263,8 @@ class MissionFinanceEntryControllerSecurityTest {
                         + UUID.randomUUID()
                         + "\",\"type\":\"INCOME\",\"amount\":500.00,\"note\":\""
                         + oversizedNote
-                        + "\"}"))
+                        + "\"}")
+                .with(jwt().authorities(member())))
         .andExpect(status().isBadRequest());
 
     verify(financeEntryService, never()).createEntry(any());
@@ -256,7 +284,8 @@ class MissionFinanceEntryControllerSecurityTest {
                         + missionId
                         + "\",\"participantId\":\""
                         + UUID.randomUUID()
-                        + "\",\"type\":\"INCOME\",\"amount\":1000000000.01}"))
+                        + "\",\"type\":\"INCOME\",\"amount\":1000000000.01}")
+                .with(jwt().authorities(member())))
         .andExpect(status().isBadRequest());
 
     verify(financeEntryService, never()).createEntry(any());
@@ -298,6 +327,23 @@ class MissionFinanceEntryControllerSecurityTest {
         .andExpect(status().isForbidden());
 
     verify(financeEntryService, never()).calculateTotalSum(any());
+  }
+
+  @Test
+  void getFinanceEntries_roleLessGuest_isForbidden() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    // Even with canSeeMission granting visibility of a non-internal mission, a role-less GUEST is
+    // treated like an anonymous visitor on the mission's payout view: isMemberOrAbove() fails the
+    // method gate, so the ledger read is denied with 403 before the service is invoked.
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+
+    mockMvc
+        .perform(
+            get("/api/v1/missions/{id}/finance-entries", missionId)
+                .with(jwt().authorities(guest())))
+        .andExpect(status().isForbidden());
+
+    verify(financeEntryService, never()).getEntriesByMission(any(), any());
   }
 
   @Test

@@ -370,8 +370,15 @@ public class SecurityConfig {
                     // mirroring the already-permitAll /api/v1/squadrons catalog.
                     .requestMatchers(HttpMethod.GET, "/api/v1/org-units/active")
                     .permitAll()
+                    // Finance-entry creation is no longer anonymous: the method-level
+                    // @PreAuthorize on MissionFinanceEntryController#createFinanceEntry requires an
+                    // authenticated member (isMemberOrAbove), blocking anonymous AND role-less
+                    // GUEST
+                    // callers. The URL gate only has to stop being permitAll; the method gate is
+                    // the
+                    // source of truth for the member requirement.
                     .requestMatchers(HttpMethod.POST, "/api/v1/finance-entries")
-                    .permitAll()
+                    .authenticated()
                     .requestMatchers(
                         HttpMethod.PUT,
                         "/api/v1/missions/*/participants/*",

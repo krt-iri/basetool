@@ -810,7 +810,7 @@
         </div>
 
         <!-- Column 6: Finance Entries -->
-        <div class="mission-column" id="col-finance" data-panel-key="finance" th:if="${!isNew}" sec:authorize="isAuthenticated()" th:attr="data-mission-id=${mission?.id}">
+        <div class="mission-column" id="col-finance" data-panel-key="finance" th:if="${!isNew}" sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')" th:attr="data-mission-id=${mission?.id}">
             <button type="button" class="col-header" aria-expanded="true" aria-controls="col-finance-content"
                     data-panel-toggle="col-finance"
                     th:attr="aria-label=#{mission.panel.toggle.aria} + ' ' + #{mission.finances}, title=#{mission.panel.toggle.aria}">
