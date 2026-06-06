@@ -24,7 +24,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.iri.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.frontend.model.form.ProfileDescriptionForm;
+import de.greluc.krt.iri.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.List;
@@ -103,6 +105,10 @@ class ProfileControllerTest {
     when(backendApiClient.<Map<String, Object>>get(
             eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenReturn(backendUser);
+    when(backendApiClient.<Map<String, Object>>get(
+            eq("/api/v1/users/me/payout-preference"),
+            any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenReturn(Map.of("defaultPayoutPreference", "DONATE", "version", 4L));
 
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
@@ -130,6 +136,14 @@ class ProfileControllerTest {
     assertEquals("From-Backend", form.description());
     assertEquals("Backend-DN", form.displayName());
     assertEquals(4L, form.version());
+    // Default payout preference comes from its own endpoint and seeds the selector form;
+    // the form echoes the same user-row version as the description form.
+    assertEquals(PayoutPreference.DONATE, model.getAttribute("defaultPayoutPreference"));
+    ProfilePayoutPreferenceForm payoutForm =
+        (ProfilePayoutPreferenceForm) model.getAttribute("profilePayoutPreferenceForm");
+    assertNotNull(payoutForm);
+    assertEquals(PayoutPreference.DONATE, payoutForm.defaultPayoutPreference());
+    assertEquals(4L, payoutForm.version());
   }
 
   @Test
@@ -141,6 +155,10 @@ class ProfileControllerTest {
     when(backendApiClient.<Map<String, Object>>get(
             eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenThrow(new RuntimeException("backend down"));
+    when(backendApiClient.<Map<String, Object>>get(
+            eq("/api/v1/users/me/payout-preference"),
+            any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
 
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
@@ -151,6 +169,8 @@ class ProfileControllerTest {
     assertEquals(3, model.getAttribute("rank"));
     assertEquals("From-Token", model.getAttribute("description"));
     assertEquals("JD", model.getAttribute("displayName"));
+    // Payout preference falls back to PAYOUT when its endpoint is unreachable.
+    assertEquals(PayoutPreference.PAYOUT, model.getAttribute("defaultPayoutPreference"));
   }
 
   @Test
@@ -432,5 +452,88 @@ class ProfileControllerTest {
 
     assertEquals("redirect:/profile", view);
     verify(redirectAttributes).addFlashAttribute("errorToast", "error.profile.update.failed");
+  }
+
+  // ── POST /profile/payout-preference ──────────────────────────────────────
+
+  @Test
+  void updatePayoutPreference_happyPath_putsAndRedirectsWithSuccessToast() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.DONATE, 2L);
+
+    String view =
+        controller.updatePayoutPreference(
+            form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
+
+    assertEquals("redirect:/profile", view);
+
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    verify(backendApiClient)
+        .put(eq("/api/v1/users/me/payout-preference"), bodyCap.capture(), eq(Void.class));
+    Map<String, Object> body = bodyCap.getValue();
+    assertEquals("DONATE", body.get("preference"));
+    assertEquals(2L, body.get("version"));
+    verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
+  }
+
+  @Test
+  void updatePayoutPreference_optimisticLockConflict_setsConcurrencyToast() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    BackendServiceException conflict =
+        org.mockito.Mockito.spy(
+            new BackendServiceException(
+                "concurrency-conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), null));
+    org.mockito.Mockito.doReturn("concurrency-conflict").when(conflict).getProblemType();
+    doThrow(conflict)
+        .when(backendApiClient)
+        .put(eq("/api/v1/users/me/payout-preference"), any(), eq(Void.class));
+
+    ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
+    String view =
+        controller.updatePayoutPreference(
+            form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
+
+    assertEquals("redirect:/profile", view);
+    verify(redirectAttributes).addFlashAttribute("errorToast", "error.concurrency.conflict");
+  }
+
+  @Test
+  void updatePayoutPreference_genericException_setsGenericErrorToast() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    doThrow(new RuntimeException("network")).when(backendApiClient).put(any(), any(), any());
+
+    ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
+    String view =
+        controller.updatePayoutPreference(
+            form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
+
+    assertEquals("redirect:/profile", view);
+    verify(redirectAttributes).addFlashAttribute("errorToast", "error.profile.update.failed");
+  }
+
+  @Test
+  void updatePayoutPreference_validationError_rendersProfileViewWithoutBackendCall() {
+    // A binding/type-conversion error (e.g. an unparseable version) must re-render the profile
+    // view inline — keeping the BindingResult request-scoped so it never serialises through a
+    // Redis FlashMap — and must NOT issue the PUT or set a toast.
+    when(bindingResult.hasErrors()).thenReturn(true);
+    // Stub the bits the re-entrant profile() render needs.
+    when(principal.getPreferredUsername()).thenReturn("jdoe");
+    when(principal.getAttribute("rank")).thenReturn(1);
+    when(principal.getAttribute("description")).thenReturn(null);
+    when(principal.getAttribute("displayName")).thenReturn(null);
+    when(backendApiClient.<Map<String, Object>>get(
+            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenReturn(null);
+
+    ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
+
+    String view =
+        controller.updatePayoutPreference(
+            form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
+
+    assertEquals("profile", view);
+    verify(backendApiClient, never()).put(any(), any(), any());
+    verifyNoInteractions(redirectAttributes);
   }
 }

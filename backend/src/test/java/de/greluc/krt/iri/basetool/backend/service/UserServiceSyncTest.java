@@ -31,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.Role;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.KeycloakUserDto;
@@ -507,6 +508,60 @@ class UserServiceSyncTest {
       userService.updateUserDescription(USER_ID, "x", null, null);
 
       assertEquals("x", user.getDescription());
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // updateUserDefaultPayoutPreference
+  // ---------------------------------------------------------------
+
+  @Nested
+  class UpdateUserDefaultPayoutPreferenceTests {
+
+    @Test
+    void throwsNotFoundException_whenUserMissing() {
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+      assertThrows(
+          NotFoundException.class,
+          () ->
+              userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.DONATE, 1L));
+    }
+
+    @Test
+    void throwsOptimisticLockingFailure_whenVersionMismatch() {
+      User user = newUser(USER_ID, "alice");
+      user.setVersion(7L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+      assertThrows(
+          ObjectOptimisticLockingFailureException.class,
+          () ->
+              userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.DONATE, 3L));
+    }
+
+    @Test
+    void setsPreference_whenVersionMatches() {
+      User user = newUser(USER_ID, "alice");
+      user.setVersion(1L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.save(user)).thenReturn(user);
+
+      userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.DONATE, 1L);
+
+      assertEquals(PayoutPreference.DONATE, user.getDefaultPayoutPreference());
+    }
+
+    @Test
+    void nullVersion_bypassesOptimisticCheck() {
+      User user = newUser(USER_ID, "alice");
+      user.setVersion(5L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.save(user)).thenReturn(user);
+
+      userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.PAYOUT, null);
+
+      assertEquals(PayoutPreference.PAYOUT, user.getDefaultPayoutPreference());
     }
   }
 

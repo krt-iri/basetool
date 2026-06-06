@@ -21,6 +21,7 @@ package de.greluc.krt.iri.basetool.backend.controller;
 
 import de.greluc.krt.iri.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
@@ -255,6 +256,47 @@ public class UserController {
   }
 
   /**
+   * Returns the calling user's personal default payout preference and the current optimistic-lock
+   * version, backing the profile page's payout-preference selector. Derived from the JWT subject —
+   * a caller can only ever read their own. A {@code null} preference means the user has made no
+   * explicit choice yet (mission sign-up then falls back to {@code PAYOUT}, and the selector
+   * pre-selects {@code PAYOUT}).
+   *
+   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
+   * @return the current default payout preference (possibly {@code null}) plus the user-row
+   *     version.
+   */
+  @GetMapping("/me/payout-preference")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public MyPayoutPreferenceResponse getMyPayoutPreference(@AuthenticationPrincipal Jwt jwt) {
+    de.greluc.krt.iri.basetool.backend.model.User me =
+        userService.findById(userService.getUserIdFromJwt(jwt));
+    return new MyPayoutPreferenceResponse(me.getDefaultPayoutPreference(), me.getVersion());
+  }
+
+  /**
+   * Sets the calling user's personal default payout preference. The JWT identifies the row — no
+   * impersonation possible. Carries the optimistic-lock version so a concurrent edit surfaces as a
+   * 409 instead of a silent overwrite. The new value only pre-fills future mission sign-ups; it
+   * does not rewrite existing participations.
+   *
+   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
+   * @param request the new preference plus the expected version.
+   * @return the persisted preference and the new version.
+   */
+  @PutMapping("/me/payout-preference")
+  @PreAuthorize("isAuthenticated()")
+  public MyPayoutPreferenceResponse updateMyPayoutPreference(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestBody @jakarta.validation.Valid MyPayoutPreferenceRequest request) {
+    de.greluc.krt.iri.basetool.backend.model.User me =
+        userService.updateUserDefaultPayoutPreference(
+            userService.getUserIdFromJwt(jwt), request.preference(), request.version());
+    return new MyPayoutPreferenceResponse(me.getDefaultPayoutPreference(), me.getVersion());
+  }
+
+  /**
    * Records that the calling user has read the given announcement (clears the unread badge).
    *
    * @param announcementId announcement just read
@@ -394,6 +436,30 @@ public class UserController {
     private String displayName;
     @jakarta.validation.constraints.NotNull private Long version;
   }
+
+  /**
+   * Response for {@link #getMyPayoutPreference} / {@link #updateMyPayoutPreference}: the user's
+   * current default payout preference (or {@code null} when never chosen) plus the user-row
+   * optimistic-lock version the selector echoes back on save.
+   *
+   * @param defaultPayoutPreference the stored default, or {@code null} for "no explicit choice".
+   * @param version the user row's current {@code @Version}.
+   */
+  public record MyPayoutPreferenceResponse(
+      @org.jetbrains.annotations.Nullable PayoutPreference defaultPayoutPreference, Long version) {}
+
+  /**
+   * Body for {@link #updateMyPayoutPreference}: the new default payout preference and the expected
+   * optimistic-lock version. The preference is {@code @NotNull} — the profile selector always posts
+   * a concrete {@code PAYOUT} / {@code DONATE} (a user wanting the implicit default simply picks
+   * {@code PAYOUT}); there is no API path that clears it back to {@code null}.
+   *
+   * @param preference the new default payout preference; never {@code null}.
+   * @param version the {@code @Version} of the user row the caller last read; never {@code null}.
+   */
+  public record MyPayoutPreferenceRequest(
+      @jakarta.validation.constraints.NotNull PayoutPreference preference,
+      @jakarta.validation.constraints.NotNull Long version) {}
 
   /**
    * Strips the non-email PII that a peer (non-Officer, non-Admin) does not need to see. Officers

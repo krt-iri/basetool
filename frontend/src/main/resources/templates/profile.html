@@ -90,6 +90,22 @@
                     </div>
                 </form>
             </div>
+            <div class="profile-row" style="align-items: flex-start;">
+                <span class="profile-label" th:text="#{profile.payout.preference}" style="padding-top: 0.5rem;">Default Payout Preference</span>
+                <form th:action="@{/profile/payout-preference}" method="post" class="flex-1" th:object="${profilePayoutPreferenceForm}">
+                    <input type="hidden" name="version" th:field="*{version}">
+                    <div class="mb-1">
+                        <select th:field="*{defaultPayoutPreference}" th:aria-label="#{profile.payout.preference}" style="width: 100%; max-width: 400px; padding: 0.5rem;">
+                            <option th:value="PAYOUT" th:text="#{mission.payout.preference.payout}">Payout</option>
+                            <option th:value="DONATE" th:text="#{mission.payout.preference.donate}">Donate</option>
+                        </select>
+                        <p th:text="#{profile.payout.preference.hint}" style="font-size: 0.8rem; color: var(--color-gray-2); margin-top: 0.5rem;">Pre-selected at every mission sign-up. You can still change it per mission.</p>
+                    </div>
+                    <div class="mt-1">
+                        <button type="submit" class="btn btn--cta" th:text="#{profile.payout.save}">Save Payout Preference</button>
+                    </div>
+                </form>
+            </div>
         </div>
         
         <div class="mt-2-flex-gap">
