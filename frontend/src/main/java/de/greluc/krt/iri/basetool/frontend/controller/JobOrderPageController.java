@@ -407,7 +407,7 @@ public class JobOrderPageController {
       model.addAttribute("jobOrderItemForm", itemForm);
     }
     model.addAttribute("materials", fetchMaterials());
-    model.addAttribute("orderableItems", fetchOrderableItems());
+    model.addAttribute("hasOrderableItems", hasOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
     addOwnerPickerOptions(model);
     // Anonymous guests have no org-unit context; default the responsible (processing) picker to the
@@ -545,7 +545,7 @@ public class JobOrderPageController {
     model.addAttribute("editOrderId", id);
     model.addAttribute("editItems", buildEditItems(order));
     model.addAttribute("materials", fetchMaterials());
-    model.addAttribute("orderableItems", fetchOrderableItems());
+    model.addAttribute("hasOrderableItems", hasOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
     addOwnerPickerOptions(model);
     return "orders-create";
@@ -580,6 +580,9 @@ public class JobOrderPageController {
       }
       java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
       entry.put("gameItemId", line.gameItem() != null ? line.gameItem().id().toString() : null);
+      // The item picker now loads its options on demand, so the saved item's name must travel with
+      // the prefill to seed the combobox's displayed label (the id alone would render blank).
+      entry.put("gameItemName", line.gameItem() != null ? line.gameItem().name() : null);
       entry.put("blueprintId", line.blueprint() != null ? line.blueprint().id().toString() : null);
       entry.put("amount", line.amount() != null ? line.amount() : 1);
       entry.put(
@@ -699,6 +702,32 @@ public class JobOrderPageController {
     } catch (Exception e) {
       log.error("Failed to derive materials for blueprint {}", blueprintId, e);
       return null;
+    }
+  }
+
+  /**
+   * JSON proxy for the item-order picker's live search: looks up orderable items by a free-text
+   * term and returns the matching references (capped server-side at 25). Replaces preloading the
+   * first N items and filtering client-side, which silently hid every item past the alphabetical
+   * cap once the catalog outgrew it. Public for parity with the anonymous create form; the term
+   * rides as a URI variable so spaces and quotes survive the frontend&rarr;backend hop intact.
+   *
+   * @param q the case-insensitive item-name search term ({@code null} / blank = first page)
+   * @return up to 25 matching orderable item references, or an empty list on failure
+   */
+  @GetMapping("/item-search")
+  @ResponseBody
+  public List<GameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
+    try {
+      PageResponse<GameItemReferenceDto> page =
+          backendApiClient.getPublic(
+              "/api/v1/orders/item-catalog?search={q}&size=25&sort=name,asc",
+              new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {},
+              q == null ? "" : q);
+      return page != null && page.content() != null ? page.content() : List.of();
+    } catch (Exception e) {
+      log.error("Failed to search orderable items", e);
+      return List.of();
     }
   }
 
@@ -1269,25 +1298,28 @@ public class JobOrderPageController {
   }
 
   /**
-   * Fetches the orderable items (blueprint outputs with a resolvable material) for the item-order
-   * create picker, sorted by name. Cached as static reference data.
+   * Probes whether the backend has at least one orderable item (a blueprint output with a
+   * resolvable material). The item-order form needs only this existence flag at render time — to
+   * choose between the picker and the "no orderable items" banner — because the picker itself now
+   * searches the catalog live ({@code GET /orders/item-search}) instead of preloading every item. A
+   * {@code size=1} probe stays cheap regardless of catalog size; a backend hiccup fails open
+   * (assume items exist) so a transient blip never hides the live-search picker behind the empty
+   * banner.
    *
-   * @return the orderable item references, or an empty list on failure
+   * @return {@code true} when at least one orderable item exists (or the probe could not decide)
    */
-  private List<GameItemReferenceDto> fetchOrderableItems() {
+  private boolean hasOrderableItems() {
     try {
       PageResponse<GameItemReferenceDto> page =
           backendApiClient.getCached(
-              "/api/v1/orders/item-catalog?size=1000&sort=name,asc",
+              "/api/v1/orders/item-catalog?size=1&sort=name,asc",
               new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {},
               true);
-      if (page != null && page.content() != null) {
-        return new ArrayList<>(page.content());
-      }
+      return page == null || page.content() == null || !page.content().isEmpty();
     } catch (Exception e) {
-      log.error("Failed to fetch orderable items", e);
+      log.error("Failed to probe orderable items", e);
+      return true;
     }
-    return new ArrayList<>();
   }
 
   /**

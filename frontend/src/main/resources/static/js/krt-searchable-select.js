@@ -80,11 +80,15 @@
      * call once per control; a no-op on a non-select or an already-enhanced one.
      *
      * @param {HTMLSelectElement} select the select to upgrade
-     * @param {Object} [config] optional text/behaviour overrides; each also has a
+     * @param {Object} [config] optional text/behaviour overrides; each text key also has a
      *     `data-combobox-*` attribute fallback on the select:
      *     `placeholder`, `noResultsText`, `hintText` (shown when the result list
-     *     is capped), `invalidText` (custom validity for unmatched text) and
-     *     `maxResults` (render cap, default 50).
+     *     is capped), `invalidText` (custom validity for unmatched text),
+     *     `loadingText` (shown while a remote fetch is in flight), `maxResults`
+     *     (render cap, default 50) and `remoteSource` — an optional
+     *     `(query) => Promise<Array<{value,label}>>` that, when supplied, makes the
+     *     combobox fetch its options from the backend on demand (debounced) instead
+     *     of filtering a preloaded static list (no data-attribute fallback).
      */
     function krtSearchableSelect(select, config) {
         if (!select || select.tagName !== 'SELECT') {
@@ -100,13 +104,19 @@
         const texts = {
             noResults: opts.noResultsText || data.comboboxNoResults || 'No matches',
             hint: opts.hintText || data.comboboxHint || '',
-            invalid: opts.invalidText || data.comboboxInvalid || ''
+            invalid: opts.invalidText || data.comboboxInvalid || '',
+            loading: opts.loadingText || data.comboboxLoading || ''
         };
+        // Optional remote (backend-backed) option source: a function (query) -> Promise<[{value,
+        // label}]>. When supplied the combobox fetches its options on demand instead of filtering a
+        // preloaded static list, so it scales to catalogues far larger than one page can hold.
+        const remoteSource = (typeof opts.remoteSource === 'function') ? opts.remoteSource : null;
         const maxResults = Math.max(
             1, parseInt(opts.maxResults || data.comboboxMax || '50', 10) || 50);
 
-        // Harvest the option set; the empty-value option (if any) seeds the placeholder.
-        const items = [];
+        // Harvest the option set; the empty-value option (if any) seeds the placeholder. In remote
+        // mode only a seeded preselected option is harvested (edit mode); the rest arrives per fetch.
+        let items = [];
         let placeholder = opts.placeholder || data.comboboxPlaceholder || '';
         Array.prototype.forEach.call(select.options, function (option) {
             if (option.value === '') {
@@ -188,6 +198,8 @@
         // ---- per-instance state + behaviour ---------------------------------
         let rendered = [];
         let activeIndex = -1;
+        let remoteSeq = 0;
+        let remoteTimer = null;
 
         function isOpen() {
             return listbox.hidden === false;
@@ -228,11 +240,15 @@
             rendered = [];
             activeIndex = -1;
 
-            const matches = q
-                ? items.filter(function (it) {
-                    return it.label.toLowerCase().indexOf(q) !== -1;
-                })
-                : items.slice();
+            // Remote mode: the backend already filtered to the query, so render the fetched set
+            // as-is (highlighting still keys off the typed term); local mode filters in place.
+            const matches = remoteSource
+                ? items.slice()
+                : (q
+                    ? items.filter(function (it) {
+                        return it.label.toLowerCase().indexOf(q) !== -1;
+                    })
+                    : items.slice());
             const truncated = matches.length > maxResults;
 
             matches.slice(0, maxResults).forEach(function (it, idx) {
@@ -267,16 +283,59 @@
             }
         }
 
-        function open(query) {
-            renderOptions(query);
-            listbox.hidden = false;
-            input.setAttribute('aria-expanded', 'true');
+        function highlightCommitted() {
             const selIdx = rendered.findIndex(function (r) {
                 return r.value === hidden.value;
             });
             if (selIdx >= 0) {
                 setActive(selIdx);
             }
+        }
+
+        function open(query) {
+            renderOptions(query);
+            listbox.hidden = false;
+            input.setAttribute('aria-expanded', 'true');
+            highlightCommitted();
+        }
+
+        // Renders a transient "loading" row while a remote fetch is in flight.
+        function renderLoading() {
+            listbox.textContent = '';
+            rendered = [];
+            activeIndex = -1;
+            listbox.appendChild(noticeRow(texts.loading || texts.hint || ''));
+        }
+
+        // Remote mode: fetch the option set for `query` from the backend, then render it. A
+        // monotonic token drops a slow earlier response so it cannot overwrite a newer query.
+        function loadRemote(query) {
+            const token = ++remoteSeq;
+            Promise.resolve(remoteSource(query)).then(function (list) {
+                if (token !== remoteSeq || !isOpen()) {
+                    return;
+                }
+                items = Array.isArray(list) ? list.slice() : [];
+                renderOptions(query);
+                highlightCommitted();
+            }).catch(function () {
+                if (token !== remoteSeq || !isOpen()) {
+                    return;
+                }
+                items = [];
+                renderOptions(query);
+            });
+        }
+
+        // Opens the popup in remote mode: shows a loading row at once, then debounces the fetch.
+        function openRemote(query, delay) {
+            renderLoading();
+            listbox.hidden = false;
+            input.setAttribute('aria-expanded', 'true');
+            window.clearTimeout(remoteTimer);
+            remoteTimer = window.setTimeout(function () {
+                loadRemote(query);
+            }, delay || 0);
         }
 
         function close() {
@@ -337,13 +396,19 @@
         input.addEventListener('click', function () {
             if (isOpen()) {
                 close();
+            } else if (remoteSource) {
+                openRemote('', 0);
             } else {
                 open('');
             }
         });
 
         input.addEventListener('input', function () {
-            open(input.value);
+            if (remoteSource) {
+                openRemote(input.value, 250);
+            } else {
+                open(input.value);
+            }
             reconcile();
         });
 
@@ -352,10 +417,14 @@
                 case 'ArrowDown':
                     event.preventDefault();
                     if (!isOpen()) {
-                        // Opening lands on the committed row (set by open()), else the first.
-                        open('');
-                        if (activeIndex < 0) {
-                            setActive(0);
+                        if (remoteSource) {
+                            openRemote('', 0);
+                        } else {
+                            // Opening lands on the committed row (set by open()), else the first.
+                            open('');
+                            if (activeIndex < 0) {
+                                setActive(0);
+                            }
                         }
                     } else {
                         setActive(activeIndex + 1 >= rendered.length ? 0 : activeIndex + 1);
@@ -364,9 +433,13 @@
                 case 'ArrowUp':
                     event.preventDefault();
                     if (!isOpen()) {
-                        open('');
-                        if (activeIndex < 0) {
-                            setActive(rendered.length - 1);
+                        if (remoteSource) {
+                            openRemote('', 0);
+                        } else {
+                            open('');
+                            if (activeIndex < 0) {
+                                setActive(rendered.length - 1);
+                            }
                         }
                     } else {
                         setActive(activeIndex - 1 < 0 ? rendered.length - 1 : activeIndex - 1);

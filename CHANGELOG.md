@@ -6,6 +6,10 @@
 
 - **Bei Item-Aufträgen bietet die Tabelle der aggregierten Materialien jetzt dieselben Funktionen wie bei Material-Aufträgen:** Ein Klick auf eine Materialzeile klappt die verknüpften Lagereinträge auf (mit Besitzer, Staffel, Standort, Qualität, Menge und – für Logistiker – dem Trennen-Button), und ein neuer Button „Materialsammelübersicht" öffnet die auftragsweite Lagerübersicht.
 
+### Fixed
+
+- **Im Item-Auftrag sind wieder alle bestellbaren Items im Auswahlfeld auffindbar — auch alphabetisch späte wie „P8-SC SMG" oder „P6-LR Sniper Rifle".** Das durchsuchbare Item-Dropdown lud bisher nur die ersten 1000 Items (alphabetisch) und filterte allein im Browser; sobald der Katalog darüber hinauswuchs, fehlten alle späteren Items in Auswahl und Suche, und beim Bearbeiten bestehender Aufträge blieb deren Item-Feld leer. Das Feld durchsucht jetzt live den gesamten Katalog direkt im Backend.
+
 ## [v0.3.61](https://github.com/krt-iri/basetool/releases/tag/v0.3.61) - 2026-06-06
 
 ### Changed

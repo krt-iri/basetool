@@ -32,8 +32,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.CreateJobOrderItemRequestDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
@@ -176,5 +179,50 @@ class JobOrderPageControllerItemEditMvcTest {
             eq("/api/v1/orders/" + id + "/items"),
             any(CreateJobOrderItemRequestDto.class),
             eq(JobOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void editForm_itemOrderWithLine_inlinesSavedItemNameForPicker() throws Exception {
+    UUID id = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID blueprintId = UUID.randomUUID();
+    JobOrderItemDto line =
+        new JobOrderItemDto(
+            UUID.randomUUID(),
+            new GameItemReferenceDto(gameItemId, "P8-SC SMG", "WEAPON"),
+            new BlueprintReferenceDto(blueprintId, "P8-SC SMG", "BP_CRAFT_behr_smg_ballistic_01"),
+            5,
+            0,
+            null,
+            List.of(),
+            1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            id,
+            7,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "ITEM",
+            List.of(),
+            List.of(line),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L);
+    doReturn(order).when(backendApiClient).get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
+
+    // The saved item's name must reach the page (inlined into window.EDIT_ITEMS) so the now
+    // load-on-demand item picker shows it as the selected option without a search round-trip.
+    mockMvc
+        .perform(get("/orders/" + id + "/items/edit"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("P8-SC SMG")));
   }
 }
