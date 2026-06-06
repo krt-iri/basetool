@@ -96,7 +96,7 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="amount">Menge <span id="amount-unit"></span></label>
+                    <label for="amount">Menge <span id="amount-unit"></span><th:block th:replace="~{fragments/scu-hint :: scuHint('amount-scu-hint', true)}"></th:block></label>
                     <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required>
                 </div>
                 
@@ -155,19 +155,23 @@
     function updateAmountFieldForMaterial(selectElement) {
         const amountInput = document.getElementById('amount');
         const unitSpan = document.getElementById('amount-unit');
+        const scuHint = document.getElementById('amount-scu-hint');
         if (!amountInput || !selectElement.selectedOptions || selectElement.selectedOptions.length === 0) return;
-        
+
         const qtType = selectElement.selectedOptions[0].getAttribute('data-quantity-type');
-        
+
         if (qtType === 'PIECE') {
             amountInput.setAttribute('step', '1');
             unitSpan.textContent = '([[#{material.quantity.piece}]])';
+            if (scuHint) scuHint.style.display = 'none';
         } else if (qtType === 'SCU') {
             amountInput.setAttribute('step', '0.001');
             unitSpan.textContent = '([[#{material.quantity.scu}]])';
+            if (scuHint) scuHint.style.display = '';
         } else {
             amountInput.setAttribute('step', '0.001');
             unitSpan.textContent = '';
+            if (scuHint) scuHint.style.display = 'none';
         }
     }
 

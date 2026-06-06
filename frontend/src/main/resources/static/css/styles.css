@@ -2942,3 +2942,94 @@ textarea:focus-visible,
 .mission-unit-box.unit-color-21 { background-color: rgb(140  40 160 / 8%); }
 .mission-unit-box.unit-color-22 { background-color: rgb( 20 120  80 / 8%); }
 .mission-unit-box.unit-color-23 { background-color: rgb(200 100  40 / 8%); }
+
+
+/* ==========================================================================
+   SCU Input Hint - an inline "?" disc shown next to every material-quantity
+   input whose unit is SCU. Hover or keyboard-focus reveals a HUD tooltip
+   explaining the decimal scale (cSCU = 0.01 SCU, microSCU = 0.001 SCU) so
+   operators know fractional SCU values are accepted. Pure-CSS show/hide; the
+   `scu-hint` Thymeleaf fragment renders the markup. Conditional SCU/PIECE
+   fields render the marker hidden and their page JS reveals it only when the
+   selected material is SCU-typed.
+   ========================================================================== */
+.scu-hint {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    margin-left: 0.35rem;
+    border: 1px solid var(--color-gray-2);
+    border-radius: 50%;
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    font-weight: var(--fw-bold);
+    line-height: 1;
+    text-transform: none;
+    vertical-align: middle;
+    cursor: help;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.scu-hint:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.scu-hint:focus-visible {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* The tooltip body floats above the disc, centred on it, and never intercepts
+   the pointer so it cannot block the input beneath. z-index sits above the
+   modal layer (3000) so hints inside book-out / claim / handover modals win. */
+.scu-hint__bubble {
+    position: absolute;
+    bottom: calc(100% + 0.5rem);
+    left: 50%;
+    z-index: 4000;
+    width: max-content;
+    max-width: min(17rem, 78vw);
+    padding: var(--space-2) 0.6rem;
+    transform: translateX(-50%);
+    background: rgb(0 0 0 / 95%);
+    border: 1px solid var(--color-primary);
+    box-shadow: 0 0 10px rgb(231 126 35 / 30%);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    font-weight: var(--fw-regular);
+    line-height: 1.4;
+    letter-spacing: normal;
+    text-align: left;
+    text-transform: none;
+    white-space: normal;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.scu-hint:hover .scu-hint__bubble,
+.scu-hint:focus .scu-hint__bubble,
+.scu-hint:focus-within .scu-hint__bubble {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Down-pointing arrow that ties the bubble to its disc. */
+.scu-hint__bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    border: 0.3rem solid transparent;
+    border-top-color: var(--color-primary);
+    transform: translateX(-50%);
+}

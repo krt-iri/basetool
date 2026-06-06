@@ -379,12 +379,18 @@
             <input type="hidden" id="maxAmount" th:field="*{maxAmount}">
             
             <div class="form-group mb-1">
-                <label for="targetAmount" class="form-label" th:text="#{inventory.bookout.targetAmount}">Zielbestand</label>
+                <label for="targetAmount" class="form-label">
+                    <span th:text="#{inventory.bookout.targetAmount}">Zielbestand</span>
+                    <th:block th:replace="~{fragments/scu-hint :: scuHint('bookout-target-scu-hint', true)}"></th:block>
+                </label>
                 <input type="number" id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-my-amount-from-target">
             </div>
             
             <div class="form-group mb-1">
-                <label for="amount" class="form-label" th:text="#{inventory.bookout.amount}">Menge ausbuchen</label>
+                <label for="amount" class="form-label">
+                    <span th:text="#{inventory.bookout.amount}">Menge ausbuchen</span>
+                    <th:block th:replace="~{fragments/scu-hint :: scuHint('bookout-amount-scu-hint', true)}"></th:block>
+                </label>
                 <div class="flex-gap-sm">
                     <input type="number" id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-my-target-from-amount">
                     <span id="amountOfText" style="white-space: nowrap; color: var(--color-gray-2);" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
@@ -1065,6 +1071,7 @@
         
         const amountInput = document.getElementById('amount');
         const targetAmountInput = document.getElementById('targetAmount');
+        const isScu = quantityType !== 'PIECE';
         if (quantityType === 'PIECE') {
             amountInput.setAttribute('step', '1');
             targetAmountInput.setAttribute('step', '1');
@@ -1072,6 +1079,10 @@
             amountInput.setAttribute('step', '0.001');
             targetAmountInput.setAttribute('step', '0.001');
         }
+        const targetScuHint = document.getElementById('bookout-target-scu-hint');
+        const amountScuHint = document.getElementById('bookout-amount-scu-hint');
+        if (targetScuHint) targetScuHint.style.display = isScu ? '' : 'none';
+        if (amountScuHint) amountScuHint.style.display = isScu ? '' : 'none';
         
         amountInput.value = amount;
         document.getElementById('amount').max = amount;
