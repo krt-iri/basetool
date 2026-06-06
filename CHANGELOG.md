@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bei Item-Aufträgen bietet die Tabelle der aggregierten Materialien jetzt dieselben Funktionen wie bei Material-Aufträgen:** Ein Klick auf eine Materialzeile klappt die verknüpften Lagereinträge auf (mit Besitzer, Staffel, Standort, Qualität, Menge und – für Logistiker – dem Trennen-Button), und ein neuer Button „Materialsammelübersicht" öffnet die auftragsweite Lagerübersicht.
+
 ## [v0.3.61](https://github.com/krt-iri/basetool/releases/tag/v0.3.61) - 2026-06-06
 
 ### Changed

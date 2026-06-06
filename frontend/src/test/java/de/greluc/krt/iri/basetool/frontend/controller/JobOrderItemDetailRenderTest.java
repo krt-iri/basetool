@@ -186,10 +186,13 @@ class JobOrderItemDetailRenderTest {
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);
 
-    // When
+    // When (German render so the negative stock-column assertion below is locale-stable).
     MvcResult result =
         mockMvc
-            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -219,12 +222,105 @@ class JobOrderItemDetailRenderTest {
         .as("unresolved item is listed inside the banner")
         .isGreaterThan(bannerIndex);
 
-    // Then: no MATERIAL-only requirement row renders for an item order. The clickable drill-down
-    // rows carry data-material-id; the always-present JS handler references od-toggle-inventory, so
-    // assert on the row attribute the MATERIAL branch would have emitted instead.
+    // Then: the aggregated-material rows are now clickable linked-inventory drill-downs (the same
+    // toggleInventory handler the MATERIAL requirement rows use), carrying the material id the AJAX
+    // endpoint needs; and the Materialsammelübersicht link renders for the aggregated view.
     assertThat(html)
-        .as("material requirement rows are gated out")
-        .doesNotContain("data-material-id=");
+        .as("aggregated rows are clickable inventory drill-downs")
+        .contains("aggregated-material-row");
+    assertThat(html)
+        .as("aggregated drill-down rows carry the material id")
+        .contains("data-material-id=");
+    assertThat(html)
+        .as("material-collection link renders for the item order")
+        .contains("/material-collection");
+
+    // Then: the MATERIAL requirement table is still gated out for item orders — assert on its
+    // unique
+    // 'Im Lager' stock column header, which is absent from both the aggregated table and the
+    // always-rendered edit modal. Relies on the German render selected via Accept-Language above.
+    assertThat(html).as("material requirement table gated out").doesNotContain("Im Lager");
+  }
+
+  @Test
+  void itemOrderDetail_AggregatedRows_AreDrilldownsAndGuardClaimControls() throws Exception {
+    // Given: a public SK item order — the aggregated material carries openAmount + a claim, so the
+    // claim columns render. The aggregated rows must become clickable inventory drill-downs while
+    // the claim controls inside them carry data-claim-control, so a claim click does not also
+    // trigger the row drill-down (the two delegated click listeners fire independently).
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    MaterialDto agricium = material("Agricium", "SCU");
+
+    ClaimDto claim =
+        new ClaimDto(
+            UUID.randomUUID(),
+            new SquadronReferenceDto(UUID.randomUUID(), "Alpha Flight", "ALF"),
+            6.0,
+            null,
+            Instant.now(),
+            1L);
+    JobOrderItemDto line =
+        new JobOrderItemDto(
+            UUID.randomUUID(),
+            new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+            new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
+            3,
+            0,
+            null,
+            List.of(new JobOrderItemMaterialDto(UUID.randomUUID(), agricium, 12.0, "NONE", 1L)),
+            1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            11,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "ITEM",
+            List.of(),
+            List.of(line),
+            List.of(new AggregatedMaterialDto(agricium, "NONE", 12.0, List.of(claim), 6.0)),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L);
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    // When
+    String html =
+        mockMvc
+            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: the aggregated row is a clickable drill-down carrying exactly the attributes the shared
+    // toggleInventory handler reads (order id, material id, amount type, and the toggle trigger).
+    assertThat(html).as("clickable drill-down class").contains("aggregated-material-row");
+    assertThat(html)
+        .as("drill-down trigger on the row")
+        .contains("data-trigger=\"od-toggle-inventory\"");
+    assertThat(html)
+        .as("drill-down material id")
+        .contains("data-material-id=\"" + agricium.id() + "\"");
+    assertThat(html).as("drill-down order id").contains("data-order-id=\"" + orderId + "\"");
+    assertThat(html).as("drill-down amount type").contains("data-amount-type=\"SCU\"");
+
+    // Then: the claim controls inside the row carry data-claim-control so the row drill-down is
+    // suppressed when a claim button (rather than a plain cell) is clicked.
+    assertThat(html).as("claim controls guard the drill-down").contains("data-claim-control");
+
+    // Then: the Materialsammelübersicht link targets the per-order material-collection page.
+    assertThat(html)
+        .as("material-collection link")
+        .contains("/orders/" + orderId + "/material-collection");
   }
 
   @Test
