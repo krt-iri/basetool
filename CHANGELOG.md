@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.63](https://github.com/krt-iri/basetool/releases/tag/v0.3.63) - 2026-06-06
+
 ## [v0.3.62](https://github.com/krt-iri/basetool/releases/tag/v0.3.62) - 2026-06-06
 
 ### Added
