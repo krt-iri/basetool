@@ -105,14 +105,16 @@
             noResults: opts.noResultsText || data.comboboxNoResults || 'No matches',
             hint: opts.hintText || data.comboboxHint || '',
             invalid: opts.invalidText || data.comboboxInvalid || '',
-            loading: opts.loadingText || data.comboboxLoading || ''
+            loading: opts.loadingText || data.comboboxLoading || '',
         };
         // Optional remote (backend-backed) option source: a function (query) -> Promise<[{value,
         // label}]>. When supplied the combobox fetches its options on demand instead of filtering a
         // preloaded static list, so it scales to catalogues far larger than one page can hold.
-        const remoteSource = (typeof opts.remoteSource === 'function') ? opts.remoteSource : null;
+        const remoteSource = typeof opts.remoteSource === 'function' ? opts.remoteSource : null;
         const maxResults = Math.max(
-            1, parseInt(opts.maxResults || data.comboboxMax || '50', 10) || 50);
+            1,
+            parseInt(opts.maxResults || data.comboboxMax || '50', 10) || 50,
+        );
 
         // Harvest the option set; the empty-value option (if any) seeds the placeholder. In remote
         // mode only a seeded preselected option is harvested (edit mode); the rest arrives per fetch.
@@ -128,7 +130,7 @@
             items.push({ value: option.value, label: option.textContent.trim() });
         });
 
-        const uid = 'krt-cb-' + (++comboboxSeq);
+        const uid = 'krt-cb-' + ++comboboxSeq;
         const listboxId = uid + '-list';
 
         const wrapper = document.createElement('div');
@@ -244,11 +246,11 @@
             // as-is (highlighting still keys off the typed term); local mode filters in place.
             const matches = remoteSource
                 ? items.slice()
-                : (q
-                    ? items.filter(function (it) {
+                : q
+                  ? items.filter(function (it) {
                         return it.label.toLowerCase().indexOf(q) !== -1;
                     })
-                    : items.slice());
+                  : items.slice();
             const truncated = matches.length > maxResults;
 
             matches.slice(0, maxResults).forEach(function (it, idx) {
@@ -311,20 +313,22 @@
         // monotonic token drops a slow earlier response so it cannot overwrite a newer query.
         function loadRemote(query) {
             const token = ++remoteSeq;
-            Promise.resolve(remoteSource(query)).then(function (list) {
-                if (token !== remoteSeq || !isOpen()) {
-                    return;
-                }
-                items = Array.isArray(list) ? list.slice() : [];
-                renderOptions(query);
-                highlightCommitted();
-            }).catch(function () {
-                if (token !== remoteSeq || !isOpen()) {
-                    return;
-                }
-                items = [];
-                renderOptions(query);
-            });
+            Promise.resolve(remoteSource(query))
+                .then(function (list) {
+                    if (token !== remoteSeq || !isOpen()) {
+                        return;
+                    }
+                    items = Array.isArray(list) ? list.slice() : [];
+                    renderOptions(query);
+                    highlightCommitted();
+                })
+                .catch(function () {
+                    if (token !== remoteSeq || !isOpen()) {
+                        return;
+                    }
+                    items = [];
+                    renderOptions(query);
+                });
         }
 
         // Opens the popup in remote mode: shows a loading row at once, then debounces the fetch.
@@ -497,4 +501,4 @@
     }
 
     window.krtSearchableSelect = krtSearchableSelect;
-}());
+})();

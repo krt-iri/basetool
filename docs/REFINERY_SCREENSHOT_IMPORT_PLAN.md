@@ -1,5 +1,7 @@
 # Refinery Screenshot Import — Master Implementation Plan
 
+> **Doc type:** Forward plan for epic #439 (not yet built). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md); freeze it as a historical plan and point to the living truth once it ships.
+>
 > **Status:** Approved as the plan; **implementation NOT yet started**. Do not write feature code until the repository owner explicitly approves the phase you are about to build.
 > **GitHub epic:** [krt-iri/basetool#439](https://github.com/krt-iri/basetool/issues/439) · **Sub-issues:** #433 (Phase 0), #434 (Phase 1), #435 (Phase 2), #436 (Phase 3), #437 (Phase 4 — deferred), #438 (Phase 5 — deferred).
 > **Last updated:** 2026-06-05.

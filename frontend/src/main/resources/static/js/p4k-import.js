@@ -31,11 +31,17 @@
     let applyTargetId = null;
     let pollTimer = null;
 
-    function $(id) { return document.getElementById(id); }
+    function $(id) {
+        return document.getElementById(id);
+    }
 
-    function i18n() { return window.krtP4kImportI18n || {}; }
+    function i18n() {
+        return window.krtP4kImportI18n || {};
+    }
 
-    function jobsUrl() { return (window.krtP4kImportEndpoints || {}).jobs || '/admin/p4k-import/jobs'; }
+    function jobsUrl() {
+        return (window.krtP4kImportEndpoints || {}).jobs || '/admin/p4k-import/jobs';
+    }
 
     // Escape HTML meta-characters before any value is written via innerHTML. Implemented as a
     // self-contained replace chain (not a delegate to window.escapeHtml) so it is an unconditional,
@@ -60,7 +66,8 @@
     }
 
     function toastError() {
-        if (window.showFrontendErrorToast) window.showFrontendErrorToast(i18n().error || 'Import failed.');
+        if (window.showFrontendErrorToast)
+            window.showFrontendErrorToast(i18n().error || 'Import failed.');
     }
 
     function toastOk(msg) {
@@ -95,7 +102,9 @@
 
     /* ------------------------------------------------------------------ upload */
 
-    function pickFile() { if (fileInput) fileInput.click(); }
+    function pickFile() {
+        if (fileInput) fileInput.click();
+    }
 
     function selectedFile() {
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) return null;
@@ -117,7 +126,8 @@
     function upload() {
         const file = selectedFile();
         if (!file) {
-            if (window.showFrontendErrorToast) window.showFrontendErrorToast(i18n().pickFirst || 'Please choose a file first.');
+            if (window.showFrontendErrorToast)
+                window.showFrontendErrorToast(i18n().pickFirst || 'Please choose a file first.');
             return;
         }
         const fd = new FormData();
@@ -126,17 +136,26 @@
         fetch(jobsUrl(), {
             method: 'POST',
             credentials: 'same-origin',
-            headers: csrfHeaders({ 'Accept': 'application/json' }),
-            body: fd
+            headers: csrfHeaders({ Accept: 'application/json' }),
+            body: fd,
         })
-            .then(function (resp) { return resp.ok ? resp.json() : null; })
+            .then(function (resp) {
+                return resp.ok ? resp.json() : null;
+            })
             .then(function (job) {
-                if (!job) { if (uploadBtn) uploadBtn.disabled = false; toastError(); return; }
+                if (!job) {
+                    if (uploadBtn) uploadBtn.disabled = false;
+                    toastError();
+                    return;
+                }
                 toastOk(i18n().toastUploaded || 'Catalog uploaded.');
                 resetFile();
                 loadJobs();
             })
-            .catch(function () { if (uploadBtn) uploadBtn.disabled = false; toastError(); });
+            .catch(function () {
+                if (uploadBtn) uploadBtn.disabled = false;
+                toastError();
+            });
     }
 
     /* -------------------------------------------------------------- job list */
@@ -145,19 +164,25 @@
         fetch(jobsUrl(), {
             method: 'GET',
             credentials: 'same-origin',
-            headers: { 'Accept': 'application/json' }
+            headers: { Accept: 'application/json' },
         })
-            .then(function (resp) { return resp.ok ? resp.json() : null; })
+            .then(function (resp) {
+                return resp.ok ? resp.json() : null;
+            })
             .then(function (jobs) {
                 if (!Array.isArray(jobs)) return;
                 lastJobs = jobs;
                 renderJobs(jobs);
                 pollControl(jobs);
             })
-            .catch(function () { /* transient; the next poll (or a manual action) retries */ });
+            .catch(function () {
+                /* transient; the next poll (or a manual action) retries */
+            });
     }
 
-    function isActive(job) { return !!job && (job.status === 'PENDING' || job.status === 'RUNNING'); }
+    function isActive(job) {
+        return !!job && (job.status === 'PENDING' || job.status === 'RUNNING');
+    }
 
     function pollControl(jobs) {
         const anyActive = jobs.some(isActive);
@@ -173,21 +198,28 @@
         if (!jobsBody) return;
         if (jobsEmptyEl) jobsEmptyEl.hidden = jobs.length > 0;
         let html = '';
-        jobs.forEach(function (job) { html += renderJobRow(job); });
+        jobs.forEach(function (job) {
+            html += renderJobRow(job);
+        });
         jobsBody.innerHTML = html;
     }
 
     function kindLabel(job) {
-        return job.kind === 'APPLY' ? (i18n().kindApply || 'Apply') : (i18n().kindPreview || 'Preview');
+        return job.kind === 'APPLY' ? i18n().kindApply || 'Apply' : i18n().kindPreview || 'Preview';
     }
 
     function statusLabel(job) {
         switch (job.status) {
-            case 'PENDING': return i18n().statusPending || 'Queued';
-            case 'RUNNING': return i18n().statusRunning || 'Running';
-            case 'SUCCEEDED': return i18n().statusSucceeded || 'Done';
-            case 'FAILED': return i18n().statusFailed || 'Failed';
-            default: return job.status || '';
+            case 'PENDING':
+                return i18n().statusPending || 'Queued';
+            case 'RUNNING':
+                return i18n().statusRunning || 'Running';
+            case 'SUCCEEDED':
+                return i18n().statusSucceeded || 'Done';
+            case 'FAILED':
+                return i18n().statusFailed || 'Failed';
+            default:
+                return job.status || '';
         }
     }
 
@@ -199,42 +231,77 @@
 
     function createdTotal(result) {
         if (!result) return 0;
-        const blocks = [result.manufacturers, result.items, result.ships, result.commodities, result.blueprints];
+        const blocks = [
+            result.manufacturers,
+            result.items,
+            result.ships,
+            result.commodities,
+            result.blueprints,
+        ];
         let sum = 0;
-        blocks.forEach(function (c) { if (c && typeof c.created === 'number') sum += c.created; });
+        blocks.forEach(function (c) {
+            if (c && typeof c.created === 'number') sum += c.created;
+        });
         return sum;
     }
 
     function summaryText(job) {
-        if (job.status === 'FAILED') return job.errorMessage || (i18n().statusFailed || 'Failed');
-        if (job.status === 'SUCCEEDED') return String(createdTotal(job.result)) + ' ' + (i18n().colCreated || 'Created');
+        if (job.status === 'FAILED') return job.errorMessage || i18n().statusFailed || 'Failed';
+        if (job.status === 'SUCCEEDED')
+            return String(createdTotal(job.result)) + ' ' + (i18n().colCreated || 'Created');
         return i18n().summaryRunning || 'Processing...';
     }
 
     function actionsHtml(job) {
         if (job.status !== 'SUCCEEDED') return '';
-        let html = '<button type="button" class="btn btn-ghost" data-action="view" data-job-id="'
-            + esc(job.id) + '">' + esc(i18n().actionView || 'Details') + '</button>';
+        let html =
+            '<button type="button" class="btn btn-ghost" data-action="view" data-job-id="' +
+            esc(job.id) +
+            '">' +
+            esc(i18n().actionView || 'Details') +
+            '</button>';
         if (job.kind === 'PREVIEW') {
-            html += ' <button type="button" class="btn btn--cta" data-action="apply" data-job-id="'
-                + esc(job.id) + '">' + esc(i18n().actionApply || 'Apply') + '</button>';
+            html +=
+                ' <button type="button" class="btn btn--cta" data-action="apply" data-job-id="' +
+                esc(job.id) +
+                '">' +
+                esc(i18n().actionApply || 'Apply') +
+                '</button>';
         }
         return html;
     }
 
     function renderJobRow(job) {
-        return '<tr>'
-            + '<td>' + esc(fmtTime(job.createdAt)) + '</td>'
-            + '<td>' + esc(kindLabel(job)) + '</td>'
-            + '<td>' + esc(statusLabel(job)) + '</td>'
-            + '<td>' + esc(job.sourceFilename || '') + '</td>'
-            + '<td>' + esc(summaryText(job)) + '</td>'
-            + '<td>' + actionsHtml(job) + '</td>'
-            + '</tr>';
+        return (
+            '<tr>' +
+            '<td>' +
+            esc(fmtTime(job.createdAt)) +
+            '</td>' +
+            '<td>' +
+            esc(kindLabel(job)) +
+            '</td>' +
+            '<td>' +
+            esc(statusLabel(job)) +
+            '</td>' +
+            '<td>' +
+            esc(job.sourceFilename || '') +
+            '</td>' +
+            '<td>' +
+            esc(summaryText(job)) +
+            '</td>' +
+            '<td>' +
+            actionsHtml(job) +
+            '</td>' +
+            '</tr>'
+        );
     }
 
     function findJob(id) {
-        return lastJobs.find(function (j) { return j && j.id === id; }) || null;
+        return (
+            lastJobs.find(function (j) {
+                return j && j.id === id;
+            }) || null
+        );
     }
 
     function onJobsClick(e) {
@@ -260,25 +327,35 @@
         }
     }
 
-    function closeDetails() { if (resultsEl) resultsEl.hidden = true; }
+    function closeDetails() {
+        if (resultsEl) resultsEl.hidden = true;
+    }
 
     function renderResult(result) {
         const modeEl = $('krt-p4k-mode');
-        if (modeEl) modeEl.textContent = result.dryRun ? (i18n().modeDryRun || 'Preview') : (i18n().modeApplied || 'Applied');
+        if (modeEl)
+            modeEl.textContent = result.dryRun
+                ? i18n().modeDryRun || 'Preview'
+                : i18n().modeApplied || 'Applied';
         const seedingEl = $('krt-p4k-seeding');
-        if (seedingEl) seedingEl.textContent = result.seedingEnabled ? (i18n().seedingOn || 'on') : (i18n().seedingOff || 'off');
+        if (seedingEl)
+            seedingEl.textContent = result.seedingEnabled
+                ? i18n().seedingOn || 'on'
+                : i18n().seedingOff || 'off';
 
         const rows = [
             [i18n().rowManufacturers || 'Manufacturers', result.manufacturers],
             [i18n().rowItems || 'Items', result.items],
             [i18n().rowShips || 'Ships', result.ships],
             [i18n().rowCommodities || 'Commodities', result.commodities],
-            [i18n().rowBlueprints || 'Blueprints', result.blueprints]
+            [i18n().rowBlueprints || 'Blueprints', result.blueprints],
         ];
         const body = $('krt-p4k-rows');
         if (body) {
             let html = '';
-            rows.forEach(function (pair) { html += renderCountRow(pair[0], pair[1]); });
+            rows.forEach(function (pair) {
+                html += renderCountRow(pair[0], pair[1]);
+            });
             body.innerHTML = html;
         }
 
@@ -300,18 +377,36 @@
 
     function renderCountRow(label, counts) {
         const c = counts || {};
-        return '<tr>'
-            + '<th scope="row">' + esc(label) + '</th>'
-            + '<td>' + num(c.matched) + '</td>'
-            + '<td>' + num(c.uuidBackfilled) + '</td>'
-            + '<td>' + num(c.uuidConflicts) + '</td>'
-            + '<td>' + num(c.enriched) + '</td>'
-            + '<td>' + num(c.created) + '</td>'
-            + '<td>' + num(c.unmatched) + '</td>'
-            + '</tr>';
+        return (
+            '<tr>' +
+            '<th scope="row">' +
+            esc(label) +
+            '</th>' +
+            '<td>' +
+            num(c.matched) +
+            '</td>' +
+            '<td>' +
+            num(c.uuidBackfilled) +
+            '</td>' +
+            '<td>' +
+            num(c.uuidConflicts) +
+            '</td>' +
+            '<td>' +
+            num(c.enriched) +
+            '</td>' +
+            '<td>' +
+            num(c.created) +
+            '</td>' +
+            '<td>' +
+            num(c.unmatched) +
+            '</td>' +
+            '</tr>'
+        );
     }
 
-    function num(v) { return esc(v == null ? 0 : v); }
+    function num(v) {
+        return esc(v == null ? 0 : v);
+    }
 
     /* ----------------------------------------------------------------- apply */
 
@@ -335,23 +430,36 @@
     function confirmApply() {
         if (!applyTargetId) return;
         const seed = !!(seedEl && seedEl.checked);
-        const url = jobsUrl() + '/' + encodeURIComponent(applyTargetId) + '/apply?seedNew=' + (seed ? 'true' : 'false');
+        const url =
+            jobsUrl() +
+            '/' +
+            encodeURIComponent(applyTargetId) +
+            '/apply?seedNew=' +
+            (seed ? 'true' : 'false');
         if (applyConfirmBtn) applyConfirmBtn.disabled = true;
         fetch(url, {
             method: 'POST',
             credentials: 'same-origin',
-            headers: csrfHeaders({ 'Accept': 'application/json' })
+            headers: csrfHeaders({ Accept: 'application/json' }),
         })
-            .then(function (resp) { return resp.ok ? resp.json() : null; })
+            .then(function (resp) {
+                return resp.ok ? resp.json() : null;
+            })
             .then(function (job) {
                 if (applyConfirmBtn) applyConfirmBtn.disabled = false;
-                if (!job) { toastError(); return; }
+                if (!job) {
+                    toastError();
+                    return;
+                }
                 toastOk(i18n().toastApplyStarted || 'Apply started.');
                 if (applyPanelEl) applyPanelEl.hidden = true;
                 applyTargetId = null;
                 loadJobs();
             })
-            .catch(function () { if (applyConfirmBtn) applyConfirmBtn.disabled = false; toastError(); });
+            .catch(function () {
+                if (applyConfirmBtn) applyConfirmBtn.disabled = false;
+                toastError();
+            });
     }
 
     if (document.readyState === 'loading') {

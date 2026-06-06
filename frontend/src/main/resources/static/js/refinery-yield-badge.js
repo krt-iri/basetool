@@ -17,7 +17,7 @@
 
     let state = {
         yieldByMaterialId: {},
-        helpText: ''
+        helpText: '',
     };
 
     /**
@@ -73,16 +73,16 @@
         if (!indexMatch) return;
         let rowIndex = indexMatch[1];
         let materialId = inputMaterialSelect.value;
-        let bonus = (materialId && state.yieldByMaterialId)
-            ? state.yieldByMaterialId[materialId]
-            : undefined;
+        let bonus =
+            materialId && state.yieldByMaterialId ? state.yieldByMaterialId[materialId] : undefined;
         setBadge(rowIndex, bonus);
     }
 
     /** Re-renders every row's badge against the current map. */
     function refreshAll() {
-        document.querySelectorAll('select[id^="inputMaterialId_"]')
-            .forEach(function (sel) { refreshFor(sel); });
+        document.querySelectorAll('select[id^="inputMaterialId_"]').forEach(function (sel) {
+            refreshFor(sel);
+        });
     }
 
     /**
@@ -98,11 +98,16 @@
             refreshAll();
             return Promise.resolve();
         }
-        return fetch(
-            '/refinery-orders/locations/' + encodeURIComponent(locationId) + '/yields',
-            { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
-            .then(function (resp) { return resp.ok ? resp.json() : {}; })
-            .catch(function () { return {}; })
+        return fetch('/refinery-orders/locations/' + encodeURIComponent(locationId) + '/yields', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then(function (resp) {
+                return resp.ok ? resp.json() : {};
+            })
+            .catch(function () {
+                return {};
+            })
             .then(function (map) {
                 state.yieldByMaterialId = map || {};
                 refreshAll();
@@ -114,6 +119,6 @@
         setBadge: setBadge,
         refreshFor: refreshFor,
         refreshAll: refreshAll,
-        onLocationChange: onLocationChange
+        onLocationChange: onLocationChange,
     };
 })();

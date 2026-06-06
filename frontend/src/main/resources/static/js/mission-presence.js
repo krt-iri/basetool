@@ -35,13 +35,19 @@
 
     function i18n(key, fallback) {
         const dict = window.MISSION_PRESENCE_I18N || {};
-        return (dict[key] != null && dict[key] !== '') ? dict[key] : (fallback || key);
+        return dict[key] != null && dict[key] !== '' ? dict[key] : fallback || key;
     }
 
     function buildSocketUrl(missionId) {
         const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        return proto + '://' + window.location.host
-            + '/ws/missions/' + encodeURIComponent(missionId) + '/presence';
+        return (
+            proto +
+            '://' +
+            window.location.host +
+            '/ws/missions/' +
+            encodeURIComponent(missionId) +
+            '/presence'
+        );
     }
 
     function MissionPresence(missionId, currentUserId) {
@@ -78,7 +84,11 @@
             this.heartbeatTimer = null;
         }
         if (this.socket) {
-            try { this.socket.close(); } catch (_e) { /* swallow */ }
+            try {
+                this.socket.close();
+            } catch (_e) {
+                /* swallow */
+            }
             this.socket = null;
         }
     };
@@ -106,7 +116,11 @@
         };
         socket.onmessage = function (ev) {
             let msg;
-            try { msg = JSON.parse(ev.data); } catch (_e) { return; }
+            try {
+                msg = JSON.parse(ev.data);
+            } catch (_e) {
+                return;
+            }
             if (msg && msg.type === 'presence' && msg.sections) {
                 self.lastState = msg.sections;
                 self._render();
@@ -136,7 +150,11 @@
 
     MissionPresence.prototype._send = function (payload) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            try { this.socket.send(JSON.stringify(payload)); } catch (_e) { /* drop */ }
+            try {
+                this.socket.send(JSON.stringify(payload));
+            } catch (_e) {
+                /* drop */
+            }
         }
     };
 
@@ -229,7 +247,8 @@
                 indicator = document.createElement('span');
                 indicator.className = 'krt-presence-indicator';
                 indicator.setAttribute('aria-hidden', 'false');
-                indicator.appendChild(document.createElement('span')).className = 'krt-presence-dot';
+                indicator.appendChild(document.createElement('span')).className =
+                    'krt-presence-dot';
                 const label = document.createElement('span');
                 label.className = 'krt-presence-count';
                 indicator.appendChild(label);
@@ -240,7 +259,11 @@
             if (label) {
                 label.textContent = String(editors.length);
             }
-            const names = editors.map(function (e) { return e.displayName || ''; }).filter(Boolean);
+            const names = editors
+                .map(function (e) {
+                    return e.displayName || '';
+                })
+                .filter(Boolean);
             let tooltip;
             if (editors.length === 1) {
                 tooltip = i18n('mission.presence.editing.solo', 'wird gerade bearbeitet von');

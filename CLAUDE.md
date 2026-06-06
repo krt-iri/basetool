@@ -6,12 +6,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Two Spring Boot 4 modules (`backend`, `frontend`) on Java 25, PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Gradle 9 with Kotlin DSL. Dependencies are managed by [refreshVersions](https://jmfayard.github.io/refreshVersions/) — **edit `versions.properties`, not `build.gradle.kts`**. Run `./gradlew refreshVersions` to discover updates.
 
-## Design system
+## Requirements, specs & decisions (binding)
 
-Befolge das Design-System unter `.claude/skills/das-kartell-design/`.
-README.md = Quelle der Wahrheit für Farben, Typo, Komponenten.
-Wichtig: Bereichsfarben nach offiziellem Manual benennen
-(#A3000A = Sub-Radar, #355DDC = Forschung, #37BBC0 = Raumüberlegenheit).
+Durable requirements are **first-class and binding** — they live as docs-as-code, not in
+this file: canonical specs in [`docs/specs/`](docs/specs/INDEX.md) (registry + conventions
+in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
+[`docs/adr/`](docs/adr/README.md). The role matrix stays in
+[`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md).
+
+- **Every change to the project updates the requirements in the same PR** — add a new
+  `REQ-<AREA>-NNN` or adapt the existing one(s) it touches. Code and spec move together; a
+  behaviour change with no matching spec change is incomplete.
+- **Every architecturally significant or design decision is recorded as an ADR**
+  ([`docs/adr/README.md`](docs/adr/README.md)) before or with the change that implements it.
+- **Requirements must always be honoured.** Code must not silently contradict a
+  requirement. If a change *must* violate or override one, it needs **prior approval by the
+  repository owner (@greluc)** AND the requirement must be **amended first** — never diverge
+  from a spec and leave it stale. When in doubt, stop and ask.
+- **Plan documents** (`docs/*_PLAN.md`, `docs/DESIGN_*.md`) carry a `Doc type:` header
+  marking them *living spec* or *historical plan*; freeze a plan and point it at the living
+  truth once it ships.
+
+## Frontend / UI & design system
+
+The UI is a **binding requirement**: follow the DAS KARTELL design system. The rules —
+brand colours, Audiowide/Lato typography, the authoritative department colours, the
+square-first sci-fi HUD style, "no native browser dialogs", and the four responsive device
+classes — live in [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md). The
+visual source of truth is the design skill at
+[`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md)
+(README.md = Quelle der Wahrheit für Farben, Typografie, Komponenten).
 
 ## Build, run, test
 
@@ -67,39 +91,17 @@ The backend serves HTTPS with a self-signed cert (`keystore.p12`, password `chan
 
 The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backend never serves HTML.
 
-### Security model
+### Security & access control
 
-- Both modules use Spring Security with Keycloak OIDC. Backend = resource server (validates JWT); frontend = OAuth2 client (browser SSO + bearer-token relay).
-- Authorization is centralized in `@PreAuthorize` annotations on services/controllers — keep checks out of business logic. Roles mapped from JWT are prefixed with `ROLE_` and uppercased. The architectural invariants here (no `SecurityContextHolder` outside the auth-helper service, every `@RestController` carries at least one `@PreAuthorize`, controllers do not return JPA entities, frontend does not depend on Spring Data JPA) are enforced as ArchUnit rules in [`backend/.../ArchitectureTest.java`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java) and [`frontend/.../ArchitectureTest.java`](frontend/src/test/java/de/greluc/krt/iri/basetool/frontend/ArchitectureTest.java) — adding a new violation will fail `./gradlew test`.
-- Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`. Hierarchy: `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`. Full matrix in `ROLES_AND_PERMISSIONS.md`.
-- `LOGISTICIAN` and `MISSION_MANAGER` are granted contextually via `is_logistician` / `is_mission_manager` flags on `org_unit_membership` rows. A user with the flag set on *any* of their OrgUnit memberships (Staffel or SK) receives the flat authority via `CustomJwtGrantedAuthoritiesConverter`; per-OrgUnit scoping is then enforced by `@PreAuthorize` SpEL against `OwnerScopeService.canEditOrgUnit(...)`. **An SK `is_lead` membership also grants `LOGISTICIAN` *and* `MISSION_MANAGER` (flat + contextual `LOGISTICIAN@skId` / `MISSION_MANAGER@skId`) on that SK** — a lead outranks both roles within its SK, mirroring admin ⊇ everything and Officer ⊇ logistician + mission manager of their own squadron (so SK leads e.g. manage any material claim on their SK's orders without a separate `is_logistician` flag). Legacy `app_user.is_logistician` / `is_mission_manager` columns are read as a fallback only for users without any membership row (pre-V98-backfill edge case); they are dropped in the destructive cleanup release.
-- Frontend has a `BotProtectionFilter` and `SsoReAuthenticationEntryPoint`: known scanner paths return 404 directly; legitimate paths with expired sessions get a silent `prompt=none` Keycloak redirect.
-
-### Multi-user data isolation (CRITICAL)
-
-- Every read/write must filter by JWT `sub` unless the caller has an elevated role (`ADMIN`, `OFFICER`, …). Enforce this in the service layer, not the controller.
-- For unauthenticated guests, return only the minimum required data. Sensitive fields (email, real name, internal orders/items) MUST be explicitly cleared in the controller — use a `cleanupForGuest`-style helper to prevent information disclosure.
+Moved to [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md) (`REQ-SEC-*`): Keycloak OIDC topology (backend resource server, frontend OAuth2 client), `@PreAuthorize`-centralised authorization, the ArchUnit-enforced invariants ([`ArchitectureTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)), the role hierarchy ([`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)), contextual LOGISTICIAN/MISSION_MANAGER + SK-lead grants, per-`sub` multi-user data isolation, and guest field redaction.
 
 ### Multi-org-unit tenancy (CRITICAL)
 
-The system supports multiple OrgUnits in parallel — two kinds coexist under a shared `org_unit` table with a `kind` discriminator: `SQUADRON` (the legacy Staffel) and `SPECIAL_COMMAND` (SK, introduced by SPEZIALKOMMANDO_PLAN.md). The IRIDIUM Squadron sits at the canonical UUID `00000000-0000-0000-0000-000000000001`. Every staffel-scoped aggregate carries two FKs during the dual-write soak: the legacy `owning_squadron_id` plus the new `owning_org_unit_id` (kept in lockstep by JPA `@PrePersist`/`@PreUpdate`/`@PostLoad` hooks). Repository queries already read the new column; the legacy column is dropped in the destructive cleanup release.
-
-- **Org-unit scope is enforced in the service layer**, not the controller. Use [`OwnerScopeService.currentOrgUnitId()`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java) for list-endpoint filters (which now consume a three-parameter `ScopePredicate` tuple: `boolean isAdminAllScope`, `UUID activeOrgUnitId`, `Set<UUID> memberOrgUnitIds`) and `OwnerScopeService.canSee*`/`canEdit*` for `@PreAuthorize` SpEL on detail/write endpoints. Admins without an active pin get all-scope visibility; admins with a pin get the same restrictive view as a member; non-admins see the union of all their memberships unless they pin one specifically.
-- **Aggregate scope kinds:**
-  - *Strict-staffel* (org-unit-scoped, no cross-staffel escape): `Ship`, `InventoryItem` (direct Lager-View), `RefineryOrder`, `Operation`. Direct CRUD and list endpoints filter by `owning_org_unit_id`; detail endpoints gate on `canSee*`/`canEdit*` from `OwnerScopeService`.
-  - *Cross-staffel-with-public-escape*: `Mission`. Visible to other OrgUnits iff `is_internal = false`; editable only by the owning OrgUnit + admins. The repository's `searchMissions` enforces this via the `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false` clause.
-  - *Conditionally staffel-scoped* (visibility driven by the responsible OrgUnit's `kind`, Phase 3 / #343): `JobOrder` + linked `JobOrderMaterial` + `JobOrderHandover`. Job Order carries two OrgUnit refs: `responsible_org_unit_id` (the **processing** unit — a *profit-eligible* squadron or SK; governs visibility; editable only via the dedicated reassignment endpoint `PATCH /api/v1/orders/{id}/responsible-org-unit`) and `requesting_org_unit_id` (the **customer**/Auftraggeber — any active OrgUnit, no profit restriction; does NOT grant visibility). The retired `creating_org_unit_id` is gone (unmapped, dropped in the cleanup release). **Visibility:** responsible = SK → public to all squadrons (the central SK queue is a shared workspace); responsible = Squadron → private to that squadron + admins. The requester does NOT see a private order. The list query (`findScopedJobOrders`) consumes the `ScopePredicate` triple plus the SK-public escape `TYPE(responsibleOrgUnit) = SpecialCommand`; detail/write endpoints gate on `OwnerScopeService.canSee*/canEditJobOrder`. SK-order *edits* are governed by the role gate (LOGISTICIAN+) not by squadron scope, so any profit squadron's logistician can contribute to the shared SK queue. Inventory items linked to a job order via `job_order_id` surface cross-OrgUnit inside the order's UI even when they belong to a different OrgUnit's stock, but they NEVER leak into a foreign OrgUnit's Lager-View (split repository methods enforce this — `findGlobalByFilters` is gated, `findByJobOrderIdOrdered` is not).
-- **At create time, stamp the OrgUnit** on the entity via the central resolver [`OwnerScopeService.resolveSquadronForPickerOutput(targetUser, pickerOutputOrgUnitId)`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java) — never read `user.getSquadron()` directly. The resolver enforces the SPEZIALKOMMANDO_PLAN.md §5.5.1 matrix: 0 memberships → 400; 1 + no picker output → auto-stamp; 1 + valid picker output → honoured; 1 + foreign picker output → 400; >1 + no picker output → 400 (force explicit choice); >1 + valid picker output → honoured. SK selection currently 400s because the legacy `owning_squadron_id` is still NOT NULL — lifts in the destructive cleanup release. For Job Order, the create path uses its own resolvers (not this matrix): `responsible_org_unit_id` must resolve to a *profit-eligible* OrgUnit (or, for guest creations, the configured intake SK from system setting `job_order.intake_special_command_id`) and is mutable only via the reassignment endpoint; `requesting_org_unit_id` accepts any OrgUnit and is freely editable.
-- **Admin area is admin-only** (post-Phase-4 lockdown), with one carve-out. Stammdaten (Cities, Materials, ShipTypes, Locations, UEX, etc.), user-management endpoints (role flags, rank, attribute patches), announcement writes, system settings, and **SK lifecycle** (`/admin/special-commands` create / rename / delete) are all `@PreAuthorize("hasRole('ADMIN')")`. SK **member management** (add / remove / flag-toggle on `is_logistician` / `is_mission_manager`) is open to ADMIN or to a user with `is_lead = true` on that specific SK — gated by `SpecialCommandSecurityService.canManageMembers(scId, authentication)`. The Lead-toggle endpoint itself stays ADMIN-only so a Lead cannot self-escalate. The **promotion-system maintenance** (Themenbereiche / Bewertungsverwaltung / Rangvoraussetzungen) is re-opened to OFFICER under an org-unit-scope gate: an Officer of Squadron X may manage X's criteria via `canEditSquadron(topic.owningSquadron.id)`. Admins can additionally **toggle the entire promotion subsystem per Squadron** via `PATCH /api/v1/squadrons/{id}/promotion-enabled` (page: `/admin/settings`) — `OwnerScopeService.isPromotionFeatureEnabledForCurrentScope()` short-circuits every promotion service to empty / 403 when the flag is OFF on the caller's effective squadron. **Admin pin awareness**: an admin without an active pin (all-scopes mode) keeps the promotion menu visible so they can re-enable a locked-out squadron; an admin pinned to a squadron honours that squadron's flag so the pinned view matches what a member would see. To re-enable a locked-out squadron after pinning it, clear the pin (back to all-scopes) or navigate directly to `/admin/settings`, which is not gated by this check. **SKs can never participate in the promotion subsystem** — the V97 CHECK `kind = 'SQUADRON' OR is_promotion_enabled = FALSE` and the V101 trigger `guard_promotion_topic_owner_kind` enforce this at the DB layer; the `SpecialCommand` JPA entity constructor + setter override block it at the app layer; ArchUnit rule `promotionTopicOwningSquadronMustStayTypedSquadronNotOrgUnit` blocks it at the type layer.
-- **ArchUnit guard `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`** in [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java) breaks the build if a service from the staffel-scoped whitelist stops injecting `AuthHelperService` / `OwnerScopeService`. Update the whitelist when you add a new staffel-scoped aggregate. The companion rule `noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities` prevents re-introducing the legacy `@JoinColumn(name = "squadron_id")` on a new entity (only `User.squadron` + `MissionParticipant.squadron` are grandfathered).
-- **MDC field `orgUnitId`** is emitted by [`CorrelationIdFilter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/logging/CorrelationIdFilter.java) on every request alongside `correlationId` and `userId`; the legacy `squadronId` field is emitted in parallel for one release for log-pipeline migration. Logback patterns must include `%X{orgUnitId}` to keep audit trails intact.
-- **Active-context relay**: the frontend sends both `X-Active-Org-Unit-Id` (canonical) and the legacy `X-Active-Squadron-Id` header on every outbound WebClient call; the backend reads the new name first and falls back to the legacy. The session attribute (Redis-backed) is keyed at `iridium.activeOrgUnitId` with the legacy `iridium.activeSquadronId` mirrored for one release. Both aliases drop in the destructive cleanup release.
+Moved to [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`): the two OrgUnit kinds (`SQUADRON` / `SPECIAL_COMMAND`) + dual-write soak, service-layer scope via [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java) (the `ScopePredicate` triple + admin-pin semantics), the aggregate scope kinds (strict-staffel / `Mission` public-escape / `JobOrder` SK-public queue), the create-time stamping matrix, the admin-area + promotion carve-outs, the ArchUnit guards, the `orgUnitId` MDC field, and the active-context relay headers.
 
 ### Database
 
-- Schema is owned by Flyway: every change is a new `V<n>__<description>.sql` in `backend/src/main/resources/db/migration`. **Hibernate `ddl-auto` is `validate` everywhere — never set it to `update` or `create`.** Full conventions (destructive-ops two-phase rule, data-migration patterns, performance/locking, test caveats, pre-merge checklist) live in [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md) — read that before adding a migration.
-- `DataInitializer` seeds roles/permissions on startup.
-- Avoid N+1: prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections.
+Moved to [`docs/specs/data-persistence.md`](docs/specs/data-persistence.md) (`REQ-DATA-*`): Flyway owns the schema (`V<n>__*.sql`, `ddl-auto = validate` everywhere — conventions in [`db/migration/README.md`](backend/src/main/resources/db/migration/README.md)), `DataInitializer` seeding, and the no-N+1 rule. **The concurrency / optimistic-locking rules stay inline below — they are agent-critical.**
 
 ### Concurrency — read this before touching multi-step transactions
 
@@ -117,13 +119,7 @@ The codebase has been bitten by optimistic-locking traps several times. The rule
 
 ### API conventions
 
-- **Versioned URI paths**: `/api/v1/...`. Breaking changes → new version (`/api/v2/...`). Use `@ApiDeprecation(sunset = "YYYY-MM-DD", replacement = "/api/v2/...")` on retired endpoints; `DeprecationInterceptor` emits `Deprecation` / `Sunset` / `Link` headers automatically and `OpenApiDeprecationConfig` reflects it in the OpenAPI spec.
-- **DTOs only at boundaries.** Never expose JPA entities at controller boundaries. DTOs are records. All write DTOs carry Jakarta validation annotations (`@NotBlank`, `@NotNull`, `@Min`, `@Max`, …). Use a MapStruct mapper (`@Mapper(componentModel = "spring")`) for Entity↔DTO conversion; break circular refs with `@Mapping(ignore = true)`.
-- **`@Valid`** on every `@RequestBody` for write operations (POST/PUT/PATCH).
-- **Errors** — RFC 7807 `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`. Validation errors add an `errors` object (field → message). Extend `GlobalExceptionHandler` rather than throwing into the void; problem-type URIs come from `AppProblemProperties`, not hardcoded strings. Document the format in OpenAPI; keep frontend error display in sync.
-- **Pagination & sorting** — all list endpoints take Spring's `Pageable` and return a `PageResponse` wrapper (total elements, pages, current page). **Whitelist allowed sort fields** in the service — never pass user input directly to `Sort` (unstable sorting + information disclosure risk).
-- **All times in UTC** — store/process as `Instant` or `OffsetDateTime`. Convert to the user's local timezone in the display layer only. Write serialization tests for timezone behavior.
-- **OpenAPI docs** — every REST endpoint must carry SpringDoc annotations (`@Operation`, `@ApiResponses`). Keep `backend/src/main/resources/api/openapi.json` in sync with controller changes.
+Moved to [`docs/specs/api-conventions.md`](docs/specs/api-conventions.md) (`REQ-API-*`): versioned `/api/v1` paths + `@ApiDeprecation`, DTO-only boundaries with MapStruct + Jakarta validation, `@Valid` on writes, RFC 7807 `problem+json` errors, `Pageable`/`PageResponse` with whitelisted sort fields, UTC time, and SpringDoc/`openapi.json` upkeep.
 
 ### Frontend resilience & config
 
@@ -135,28 +131,7 @@ The codebase has been bitten by optimistic-locking traps several times. The rule
 
 ### Logging
 
-- Both modules emit one access-log line per request and enrich every log line with MDC fields:
-  - `correlationId` — from inbound `X-Correlation-Id` header (configurable via `APP_LOGGING_CORRELATION_ID_HEADER`) or generated UUID; echoed in the response header. The frontend's `WebClientLoggingFilter` propagates the same id to outbound backend calls so both modules' logs share one id per user interaction.
-  - `userId` — JWT `sub`, or `anonymous`.
-- In `prod`, a `LogstashEncoder` JSON appender writes `logs/{backend,frontend}.json`; errors split into `*-error.log` for fast triage. Configurable via `APP_LOGGING_*` env vars.
-- **Never log names, emails, or tokens.**
-
-## Frontend / UI rules
-
-The app follows the "DAS KARTELL" Corporate Design Manual strictly (see `Styleguide.md`):
-- **Primary brand color** `#E77E23` (orange). The logo only appears in this orange, white, or black.
-- **Backgrounds**: `#000000` / `#141414` (dark mode aesthetic).
-- **Headlines**: `Ethnocentric`, **uppercase only**, optical kerning (the font has irregular kerning — apply letter-spacing tweaks for readability).
-- **Body**: `Lato` (Light 300 standard, Bold 700 emphasis), clean sans-serif fallback.
-- **Visual style**: sci-fi / space organization / technical HUD; geometric shapes (rings, triangles), thin technical markers for content containers.
-- **Department colors are semantic** — use them for the right context (Combat red `#A3000A`, Sub-Radar/Covert blue `#355DDC`, Research cyan `#37BBC0`, Profit green `#239E33`, Search & Rescue yellow `#FFD23F`, Marine Corps purple `#7A5E96`).
-- **Never** use `confirm()`, `alert()`, or any native browser dialog. Build custom KRT-styled modals/toasts.
-
-### Responsive design (mandatory)
-
-Every layout change and new component must work across **four** device classes:
-- **Smartphone** (≤768px) and **Tablet** (768–1024px) — touch first. "Fat-finger" optimization: minimum click target 44px. Collapse multi-column grids to single-column; let wide tables scroll horizontally.
-- **Desktop** (1024–1600px) and **Ultra-wide** (1600px+) — exploit the space (permanently docked sidebars, auto-fit grids for cards/dashboards) but cap long-form text width (`max-width: 80ch` on `<p>`) for readability.
+Moved to [`docs/specs/observability.md`](docs/specs/observability.md) (`REQ-OBS-*`): one access-log line per request, MDC enrichment (`correlationId`, `userId`, `orgUnitId`) with cross-module correlation-id propagation, the prod `LogstashEncoder` JSON appender, and the unconditional **never log names, emails, or tokens** rule.
 
 ## i18n
 

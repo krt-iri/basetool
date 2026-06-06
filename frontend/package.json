@@ -2,19 +2,22 @@
   "name": "basetool-frontend-lint",
   "version": "0.0.0",
   "private": true,
-  "description": "Lint tooling for the frontend module's static web assets (HTML templates, CSS, JS). Not a runtime dependency — invoked only by the Gradle lintHtml/lintCss/lintJs tasks.",
+  "description": "Lint + format tooling for the frontend module's static web assets (HTML templates, CSS, JS). Not a runtime dependency — invoked only by the Gradle lint* / prettier* tasks.",
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
     "lint:css": "stylelint \"src/main/resources/static/css/**/*.css\"",
     "lint:html": "htmlhint \"src/main/resources/templates/**/*.html\"",
-    "lint:js": "eslint \"src/main/resources/static/js/**/*.js\""
+    "lint:js": "eslint \"src/main/resources/static/js/**/*.js\"",
+    "format": "prettier --write \"src/main/resources/static/css/**/*.css\" \"src/main/resources/static/js/**/*.js\"",
+    "format:check": "prettier --check \"src/main/resources/static/css/**/*.css\" \"src/main/resources/static/js/**/*.js\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "eslint": "^10.4.0",
     "globals": "^17.6.0",
     "htmlhint": "^1.9.2",
+    "prettier": "^3.4.2",
     "stylelint": "^17.12.0",
     "stylelint-config-standard": "^40.0.0"
   }

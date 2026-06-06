@@ -1,48 +1,48 @@
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener('DOMContentLoaded', function () {
     if (window.__unsavedChangesInitialized) return;
     window.__unsavedChangesInitialized = true;
 
     let isDirty = false;
     let targetUrl = null;
 
-    const modal = document.getElementById("unsaved-changes-modal");
-    const leaveBtn = document.getElementById("unsaved-leave-btn");
-    const stayBtn = document.getElementById("unsaved-stay-btn");
+    const modal = document.getElementById('unsaved-changes-modal');
+    const leaveBtn = document.getElementById('unsaved-leave-btn');
+    const stayBtn = document.getElementById('unsaved-stay-btn');
 
     // Track input changes
-    document.addEventListener("input", function (e) {
-        let form = e.target.closest("form");
-        if (form && !form.classList.contains("no-track")) {
+    document.addEventListener('input', function (e) {
+        let form = e.target.closest('form');
+        if (form && !form.classList.contains('no-track')) {
             isDirty = true;
         }
     });
 
-    document.addEventListener("change", function (e) {
-        let form = e.target.closest("form");
-        if (form && !form.classList.contains("no-track")) {
+    document.addEventListener('change', function (e) {
+        let form = e.target.closest('form');
+        if (form && !form.classList.contains('no-track')) {
             isDirty = true;
         }
     });
 
     // Expose reset function globally
-    window.resetUnsavedChanges = function() {
+    window.resetUnsavedChanges = function () {
         isDirty = false;
     };
 
     // Clear dirty flag on form submit
-    document.addEventListener("submit", function () {
+    document.addEventListener('submit', function () {
         isDirty = false;
     });
 
     // Intercept internal link clicks
-    document.addEventListener("click", function (event) {
-        let a = event.target.closest("a");
-        
+    document.addEventListener('click', function (event) {
+        let a = event.target.closest('a');
+
         if (!a || !a.href) return;
-        
+
         // Exclude specific links that don't trigger normal navigation
-        let href = a.getAttribute("href");
-        if (!href || href === "#" || href.startsWith("#") || a.target === "_blank") {
+        let href = a.getAttribute('href');
+        if (!href || href === '#' || href.startsWith('#') || a.target === '_blank') {
             return;
         }
         // CodeQL js/incomplete-url-scheme-check: reject any URL scheme that can
@@ -53,8 +53,8 @@ document.addEventListener("DOMContentLoaded", function () {
         // "vbscript:" / "http:" / "https:" / ...), which avoids the
         // case-sensitivity and trim issues that a plain startsWith comparison
         // on `a.href` has.
-        const protocol = (a.protocol || "").toLowerCase();
-        if (protocol === "javascript:" || protocol === "data:" || protocol === "vbscript:") {
+        const protocol = (a.protocol || '').toLowerCase();
+        if (protocol === 'javascript:' || protocol === 'data:' || protocol === 'vbscript:') {
             return;
         }
 
@@ -65,22 +65,22 @@ document.addEventListener("DOMContentLoaded", function () {
             targetUrl = a.href;
 
             if (modal) {
-                modal.style.display = "flex";
+                modal.style.display = 'flex';
             }
         }
     });
 
     if (stayBtn) {
-        stayBtn.addEventListener("click", function () {
-            if (modal) modal.style.display = "none";
+        stayBtn.addEventListener('click', function () {
+            if (modal) modal.style.display = 'none';
             targetUrl = null;
         });
     }
 
     if (leaveBtn) {
-        leaveBtn.addEventListener("click", function () {
+        leaveBtn.addEventListener('click', function () {
             isDirty = false;
-            window.removeEventListener("beforeunload", beforeUnloadHandler);
+            window.removeEventListener('beforeunload', beforeUnloadHandler);
             if (targetUrl) {
                 window.location.href = targetUrl;
             }
@@ -88,9 +88,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (modal) {
-        window.addEventListener("click", function (event) {
+        window.addEventListener('click', function (event) {
             if (event.target === modal) {
-                modal.style.display = "none";
+                modal.style.display = 'none';
                 targetUrl = null;
             }
         });
@@ -102,7 +102,7 @@ document.addEventListener("DOMContentLoaded", function () {
             event.returnValue = ''; // Trigger native browser dialog
         }
     };
-    
+
     // Externe Navigation abfangen (Reload, Tab close, etc.)
-    window.addEventListener("beforeunload", beforeUnloadHandler);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
 });
