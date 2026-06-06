@@ -340,14 +340,6 @@
             </tbody>
         </table>
         </div>
-
-        <!-- Materialsammelübersicht for the item order's aggregated materials — the same per-order
-             inventory collection page the MATERIAL orders link from their handover toolbar. The
-             backend material-collection endpoint is keyed by order id alone (type-agnostic), so it
-             already lists every inventory item linked to this item order. -->
-        <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
-        </div>
         </th:block>
 
         <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
@@ -449,8 +441,14 @@
         <th:block th:if="${order.type == 'ITEM'}">
         <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
 
-        <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:if="${hasOutstandingItemLines}" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button type="button" class="btn btn-outline" style="min-height: 44px;" th:text="#{orders.detail.itemHandover}" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal">Item-Übergabe protokollieren</button>
+        <!-- Handover toolbar — mirrors the MATERIAL handover toolbar by sitting the
+             Materialsammelübersicht link next to the handover button. The toolbar itself always
+             renders for logisticians so the collection link stays reachable even after every item is
+             delivered; only the handover button is gated on outstanding lines (it hides once the
+             order is fully delivered). -->
+        <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn-outline" style="min-height: 44px;" th:text="#{orders.detail.itemHandover}" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal">Item-Übergabe protokollieren</button>
+            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost" style="min-height: 44px; display: inline-flex; align-items: center;" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
         </div>
         <p sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:unless="${hasOutstandingItemLines}" class="text-muted" style="margin-top: 1rem;" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
 
