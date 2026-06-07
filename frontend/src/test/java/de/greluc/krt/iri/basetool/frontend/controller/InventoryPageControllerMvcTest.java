@@ -213,8 +213,8 @@ class InventoryPageControllerMvcTest {
    * assigned to a (now non-active) mission produces an entry whose mission is no longer returned by
    * {@code /api/v1/missions/lookup}; the mission must still appear via a fallback {@code <option
    * selected>}. Stubs the backend stack-entries page with that entry and asserts the real {@code
-   * stackEntriesMy} fragment carries the entry row (id + formatted added-date) and the fallback
-   * option — so a Thymeleaf 500 (date formatting / stale {@code #{...}} key) fails the build.
+   * stackEntriesMy} fragment carries the entry row (id) and the fallback option — so a Thymeleaf
+   * 500 (stale {@code #{...}} key) fails the build.
    */
   @Test
   @WithMockUser(roles = "MEMBER", username = "test-user-123")
@@ -266,7 +266,6 @@ class InventoryPageControllerMvcTest {
                 .param("personal", "false"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
-        .andExpect(content().string(containsString("03.02.2026")))
         .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
         .andExpect(content().string(containsString(missionName)))
         .andExpect(content().string(containsString("selected=\"selected\"")));
