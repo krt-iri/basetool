@@ -375,6 +375,44 @@ public final class BackendSeeder {
   }
 
   /**
+   * Creates a non-personal inventory item linked to <em>neither</em> a job order <em>nor</em> a
+   * mission via {@code POST /api/v1/inventory} and returns its id — the overwhelmingly common Lager
+   * case (plain squadron stock). Because the seeding user is an IRIDIUM member, create-time stamping
+   * sets the item's {@code owningOrgUnit} to IRIDIUM while {@code jobOrder} and {@code mission} stay
+   * {@code null}. This is exactly the row shape the group-on-read stack queries ({@code
+   * findGlobalStacks} / {@code findUserStacks}) must still surface: a constructor-expression
+   * projection over those nullable associations renders an implicit inner join that silently drops
+   * such rows (REQ-INV-002), so this seeder backs the {@code InventoryStackViewE2eTest} regression.
+   *
+   * @param username the Keycloak username of the test user (must be an org-unit member)
+   * @param password the Keycloak password of the test user
+   * @param materialId the id of the material the item holds
+   * @param locationId the id of the storage location of the item
+   * @param quality the quality of the held material ({@code 0..1000})
+   * @param amount the amount held
+   * @return the created inventory item's id
+   */
+  public String createInventoryItem(
+      String username,
+      String password,
+      String materialId,
+      String locationId,
+      int quality,
+      double amount) {
+    String body =
+        "{\"materialId\":\""
+            + materialId
+            + "\",\"locationId\":\""
+            + locationId
+            + "\",\"quality\":"
+            + quality
+            + ",\"amount\":"
+            + amount
+            + ",\"personal\":false}";
+    return seedEntity(username, password, "/api/v1/inventory", body);
+  }
+
+  /**
    * Creates a Mission via {@code POST /api/v1/missions} as the given user and returns its id, so
    * cross-Staffel visibility flows have a mission owned by the caller's Staffel. {@code
    * owningOrgUnitId} is omitted, so the resolver auto-stamps the caller's home Staffel (the caller

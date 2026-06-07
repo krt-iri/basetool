@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-07.
 > **Owner area:** INV · **Related ADRs:** ADR-0003
 
 # Inventory Lager — append-only entries & group-on-read
@@ -49,9 +49,14 @@ removed.
 ### REQ-INV-002 — Group-on-read display: Material → Stack
 
 The grouped Lager views (`/inventory/my`, `/inventory/all`) present each material as a group
-whose stacks are computed **in SQL** (a `GROUP BY` over the stock identity) at read time. Each
-stack shows the summed amount, the amount-weighted mean quality, the max quality and the entry
-count. The grouped response carries **only** the collapsed stack rows — it does **not** inline
+whose stacks are computed **in SQL** (a `GROUP BY` over the stock identity) at read time. Three
+stock-identity dimensions — `jobOrder`, `mission` and `owningOrgUnit` — are nullable, so the
+grouping query **left-joins** them and groups on the join aliases: a stack whose rows carry no job
+order and no mission (the common case for plain Lager stock), or a personal stack with no owning
+org-unit, must still surface. (A constructor-expression projection over a nullable to-one otherwise
+renders an implicit inner join that silently drops every such stack — the regression that emptied
+both grouped views in v0.4.0.) Each stack shows the summed amount, the amount-weighted mean
+quality, the max quality and the entry count. The grouped response carries **only** the collapsed stack rows — it does **not** inline
 the underlying entries (those are loaded on demand, see REQ-INV-005). The UI renders two server
 levels — material group → stack row — and a stack row expands to fetch its entries. The
 per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchanged.
@@ -61,11 +66,15 @@ per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchange
 - [ ] Rows sharing the stock identity appear as one stack row with the correct summed amount,
   amount-weighted mean quality and entry count.
 - [ ] Rows differing in any stock-identity dimension appear as separate stacks.
+- [ ] A stack whose nullable stock-identity dimensions are absent — a non-personal stack with no
+  job order and no mission, or a personal stack with no owning org-unit — still appears in the
+  grouped view; a `null` in a nullable dimension never hides the stack.
 - [ ] The grouped response contains no per-entry rows (entries are lazy — REQ-INV-005).
 - [ ] Both grouped pages render the collapsed stack rows without error.
 
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
-`InventoryPageControllerMvcTest` · **Code:** `InventoryItemService#buildGroupedFromStacks`,
+`InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest` · **Code:**
+`InventoryItemService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
 `InventoryStackDto`, `GroupedInventoryDto`, `inventory-my.html`, `inventory-admin.html` ·
 **Issues:** #466

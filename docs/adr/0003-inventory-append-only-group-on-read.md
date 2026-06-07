@@ -46,6 +46,12 @@ this version.
   oldest-first, backed by the composite `idx_inventory_item_stack_key` index (Flyway `V143`).
   This keeps the grouped read O(stacks) rather than O(rows) and bounds the per-expand load
   (REQ-INV-005).
+- The natural key spans three **nullable** dimensions (`jobOrder`, `mission`, `owningOrgUnit`), so
+  the grouping query must `LEFT JOIN` them and group on the join aliases. A constructor-expression
+  projection that selects/groups a nullable to-one *directly* renders an implicit **inner** join,
+  which silently drops every stack where that association is `null` — i.e. almost all plain Lager
+  stock (most items belong to no job order and no mission). That regression emptied both grouped
+  views in v0.4.0; it is pinned against the real schema by `InventoryItemStackQueryDataTest`.
 - A new response DTO (`InventoryStackDto`, entries not inlined), a `createdAt` field on
   `InventoryItemDto`, a two-level grouped page plus a lazy entries fragment
   (`fragments/inventory-stack-entries.html`) were introduced; the frontend mirrors and
