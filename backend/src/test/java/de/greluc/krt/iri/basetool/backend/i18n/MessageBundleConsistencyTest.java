@@ -38,8 +38,9 @@ import org.junit.jupiter.api.Test;
  * Static lint of the backend message bundles. A user-visible string added to one locale but not the
  * other otherwise surfaces only as a raw {@code error.some.key} at render time; a literal umlaut in
  * the German bundle breaks the project's {@code \\uXXXX} encoding rule; a key declared twice
- * silently shadows its earlier value; and a key missing from the no-locale default bundle falls
- * back to its raw key for any locale that is neither {@code de} nor {@code en}. All four are pinned
+ * silently shadows its earlier value; a key missing from the no-locale default bundle falls back to
+ * its raw key for any locale that is neither {@code de} nor {@code en}; and a default value that
+ * drifts from its German counterpart renders stale text for such a locale. All of these are pinned
  * here so they fail the build instead of production. Reads the source files under {@code
  * src/main/resources} directly (the Gradle {@code Test} task runs with the module directory as its
  * working directory) so the assertions see the exact committed bytes, not the processed classpath
@@ -148,20 +149,56 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Parses the declared property keys of a bundle via {@link Properties#load(Reader)}, which
-   * handles comments, {@code =}/{@code :}/space separators, line continuations and escapes
-   * correctly.
+   * Asserts that the no-locale default bundle resolves every key to the same value as the German
+   * bundle. The default bundle is the German fallback, so it must mirror {@code messages_de}; a
+   * drift means a locale that is neither {@code de} nor {@code en} renders stale or wrong-language
+   * text.
+   *
+   * @throws IOException if a bundle cannot be read from disk
+   */
+  @Test
+  void defaultBundleMirrorsGermanValues() throws IOException {
+    Properties defaultProps = load(DEFAULT);
+    Properties deProps = load(DE);
+    List<String> mismatches = new ArrayList<>();
+    for (String key : new TreeSet<>(deProps.stringPropertyNames())) {
+      String defaultValue = defaultProps.getProperty(key);
+      if (defaultValue == null || !defaultValue.equals(deProps.getProperty(key))) {
+        mismatches.add(key);
+      }
+    }
+    assertThat(mismatches)
+        .as("keys whose default-bundle value differs from the German bundle")
+        .isEmpty();
+  }
+
+  /**
+   * Returns the declared property keys of a bundle in stable sorted order, parsed via {@link
+   * #load(Path)} (which handles comments, {@code =}/{@code :}/space separators, line continuations
+   * and escapes correctly).
    *
    * @param path the bundle to read
    * @return the bundle's keys in stable sorted order
    * @throws IOException if the bundle cannot be read
    */
   private static Set<String> keysOf(Path path) throws IOException {
+    return new TreeSet<>(load(path).stringPropertyNames());
+  }
+
+  /**
+   * Loads a bundle via {@link Properties#load(Reader)}, exposing the resolved (unescaped) values so
+   * callers can compare them across bundles.
+   *
+   * @param path the bundle to read
+   * @return the parsed properties
+   * @throws IOException if the bundle cannot be read
+   */
+  private static Properties load(Path path) throws IOException {
     Properties properties = new Properties();
     try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
       properties.load(reader);
     }
-    return new TreeSet<>(properties.stringPropertyNames());
+    return properties;
   }
 
   /**
