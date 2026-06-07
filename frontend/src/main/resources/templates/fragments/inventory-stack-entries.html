@@ -25,111 +25,103 @@
     <div th:if="${error}" class="hud-box hud-box-error" style="margin: 0.5rem 2.5rem;">
         <p th:text="#{__${error}__}">Fehler</p>
     </div>
-    <table class="krt-table stack-entries-table" style="margin: 0; background: transparent; border-top: none;">
-        <thead>
-            <tr>
-                <th class="item-checkbox-cell" style="padding-left: 2.5rem; width: 5%;"></th>
-                <th style="width: 15%;" th:text="#{inventory.amount}">Menge</th>
-                <th style="width: 20%;" th:text="#{inventory.order}">Auftrag</th>
-                <th style="width: 20%;" th:text="#{inventory.mission}">Einsatz</th>
-                <th style="width: 40%;" th:text="#{inventory.actions}">Aktionen</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="entry : ${entries}" th:data-item-id="${entry.id}">
-                <td class="item-checkbox-cell" style="padding-left: 2.5rem;">
-                    <input type="checkbox" class="item-checkbox inventory-item-checkbox"
-                           th:data-id="${entry.id}"
-                           th:data-material-id="${entry.material.id}"
-                           data-trigger="inv-my-update-bulk-state">
-                </td>
-                <td th:switch="${entry.material.quantityType}">
-                    <span th:case="'PIECE'" th:text="|${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
-                    <span th:case="*" th:text="|${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
-                </td>
-                <td>
-                    <select class="association-select"
-                            th:data-id="${entry.id}"
-                            th:data-material-id="${entry.material.id}"
-                            th:data-location-id="${entry.location.id}"
-                            th:data-quality="${entry.quality}"
-                            th:data-amount="${entry.amount}"
-                            th:data-personal="${entry.personal}"
-                            th:data-version="${entry.version}"
-                            th:data-field="jobOrderId"
-                            data-trigger="inv-my-update-assoc">
-                        <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
-                        <option th:each="order : ${jobOrders}"
-                                th:value="${order.id}"
-                                th:text="'Auftrag #' + ${order.displayId}"
-                                th:selected="${order.id == entry.jobOrderId}"
-                                th:if="${order.materials == null or order.materials.isEmpty() or #lists.contains(order.materials.![material.id], entry.material.id)}">
-                        </option>
-                    </select>
-                </td>
-                <td>
-                    <select class="association-select"
-                            th:data-id="${entry.id}"
-                            th:data-material-id="${entry.material.id}"
-                            th:data-location-id="${entry.location.id}"
-                            th:data-quality="${entry.quality}"
-                            th:data-amount="${entry.amount}"
-                            th:data-personal="${entry.personal}"
-                            th:data-version="${entry.version}"
-                            th:data-field="missionId"
-                            data-trigger="inv-my-update-assoc">
-                        <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
-                        <option th:each="mission : ${missions}"
-                                th:value="${mission.id}"
-                                th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"
-                                th:selected="${mission.id == entry.missionId}">
-                        </option>
-                        <option th:if="${entry.missionId != null and not #lists.contains(missions.![id], entry.missionId)}"
-                                th:value="${entry.missionId}"
-                                th:text="${entry.missionName}"
-                                selected="selected">
-                        </option>
-                    </select>
-                </td>
-                <td>
-                    <div style="display: flex; gap: 0.75rem; align-items: flex-start; flex-wrap: wrap;">
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 0 0 auto;">
-                            <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
-                                    th:data-id="${entry.id}"
-                                    th:data-amount="${entry.amount}"
-                                    th:data-version="${entry.version}"
-                                    th:data-material-id="${entry.material.id}"
-                                    th:data-quantity-type="${entry.material.quantityType}"
-                                    th:data-user-id="${entry.user.id}"
-                                    th:data-location-id="${entry.location.id}"
-                                    data-trigger="inv-my-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
-                            <button type="button" class="btn btn-ghost inventory-note-btn"
-                                    style="padding: 0.2rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
-                                    th:data-id="${entry.id}"
-                                    th:data-version="${entry.version}"
-                                    th:data-note="${entry.note}"
-                                    th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? ' has-note' : ''"
-                                    data-trigger="inv-my-open-note"
-                                    th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
-                                    th:text="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
-                        </div>
-                        <div class="inventory-note-preview"
-                             style="margin-top: 0; flex: 1 1 12rem; min-width: 0;"
-                             th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
-                             th:attr="data-note-for=${entry.id}"
-                             th:title="${entry.note}"
-                             th:aria-label="#{inventory.note.label}">
-                            <span class="inventory-note-label" th:text="#{inventory.note.label}">Notiz</span>
-                            <span class="inventory-note-text" th:text="${entry.note}">Notiz</span>
-                        </div>
+    <!-- Tree-table leaf rows injected into the stack's .stack-entries-content. No repeated
+         column header; the per-entry bulk checkbox + Auftrag/Einsatz selects sit in
+         .tree-leaf-main, amount + actions stay column-aligned, and a note renders only when
+         present as its own indented .tree-note row. All data-* hooks (bulk select, version
+         sync, book-out, note) are preserved verbatim. -->
+    <th:block th:each="entry : ${entries}">
+        <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
+            <div class="tree-leaf-main">
+                <input type="checkbox" class="item-checkbox inventory-item-checkbox"
+                       th:data-id="${entry.id}"
+                       th:data-material-id="${entry.material.id}"
+                       data-trigger="inv-my-update-bulk-state">
+                <span class="tree-leaf-tag" th:text="#{inventory.tree.entry}">Eintrag</span>
+                <div class="tree-fieldset">
+                    <div class="tree-field">
+                        <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
+                        <select class="association-select"
+                                th:data-id="${entry.id}"
+                                th:data-material-id="${entry.material.id}"
+                                th:data-location-id="${entry.location.id}"
+                                th:data-quality="${entry.quality}"
+                                th:data-amount="${entry.amount}"
+                                th:data-personal="${entry.personal}"
+                                th:data-version="${entry.version}"
+                                th:data-field="jobOrderId"
+                                data-trigger="inv-my-update-assoc">
+                            <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
+                            <option th:each="order : ${jobOrders}"
+                                    th:value="${order.id}"
+                                    th:text="'Auftrag #' + ${order.displayId}"
+                                    th:selected="${order.id == entry.jobOrderId}"
+                                    th:if="${order.materials == null or order.materials.isEmpty() or #lists.contains(order.materials.![material.id], entry.material.id)}">
+                            </option>
+                        </select>
                     </div>
-                </td>
-            </tr>
-            <tr th:if="${#lists.isEmpty(entries)}">
-                <td colspan="5" class="text-center text-muted" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</td>
-            </tr>
-        </tbody>
-    </table>
+                    <div class="tree-field">
+                        <span class="tree-field-cap" th:text="#{inventory.tree.field.mission}">Einsatz</span>
+                        <select class="association-select"
+                                th:data-id="${entry.id}"
+                                th:data-material-id="${entry.material.id}"
+                                th:data-location-id="${entry.location.id}"
+                                th:data-quality="${entry.quality}"
+                                th:data-amount="${entry.amount}"
+                                th:data-personal="${entry.personal}"
+                                th:data-version="${entry.version}"
+                                th:data-field="missionId"
+                                data-trigger="inv-my-update-assoc">
+                            <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
+                            <option th:each="mission : ${missions}"
+                                    th:value="${mission.id}"
+                                    th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"
+                                    th:selected="${mission.id == entry.missionId}">
+                            </option>
+                            <option th:if="${entry.missionId != null and not #lists.contains(missions.![id], entry.missionId)}"
+                                    th:value="${entry.missionId}"
+                                    th:text="${entry.missionName}"
+                                    selected="selected">
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-cell tree-cell--num tree-amount" th:switch="${entry.material.quantityType}">
+                <span th:case="'PIECE'"><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
+            </div>
+            <div class="tree-cell tree-cell--actions">
+                <button type="button" class="btn btn-outline btn-xs"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-version="${entry.version}"
+                        th:data-material-id="${entry.material.id}"
+                        th:data-quantity-type="${entry.material.quantityType}"
+                        th:data-user-id="${entry.user.id}"
+                        th:data-location-id="${entry.location.id}"
+                        data-trigger="inv-my-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
+                <button type="button" class="btn btn-xs inventory-note-btn"
+                        th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"
+                        th:data-id="${entry.id}"
+                        th:data-version="${entry.version}"
+                        th:data-note="${entry.note}"
+                        data-trigger="inv-my-open-note"
+                        th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
+                        th:text="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
+            </div>
+        </div>
+        <div class="tree-note" th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
+             th:attr="data-note-for=${entry.id}" th:title="${entry.note}" th:aria-label="#{inventory.note.label}">
+            <div class="tree-note-box">
+                <span class="tree-note-label" th:text="#{inventory.note.label}">Notiz</span>
+                <span class="tree-note-text inventory-note-text" th:text="${entry.note}">Notiz</span>
+            </div>
+        </div>
+    </th:block>
+    <div class="tree-row" th:if="${#lists.isEmpty(entries)}">
+        <div class="tree-cell text-muted" style="grid-column: 1 / -1; padding-left: 3rem;" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
+    </div>
     <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination"
          style="display: flex; gap: 0.75rem; align-items: center; padding: 0.5rem 2.5rem;">
         <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;"
