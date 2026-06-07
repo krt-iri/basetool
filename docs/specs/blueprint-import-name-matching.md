@@ -61,7 +61,7 @@ The correction is applied identically on the P4K seed path (`P4kImportService.ma
 which also writes `output_name`) for consistency. It touches **only** `output_name` — never the
 resolved `output_item`/`game_item` name. The seeded set are the two confirmed CIG bugs:
 
-| `scwiki_key`                                    | wrong `output_name` | corrected (in-game) name |
+|                  `scwiki_key`                   | wrong `output_name` | corrected (in-game) name |
 |-------------------------------------------------|---------------------|--------------------------|
 | `BP_CRAFT_qrt_specialist_heavy_arms_01_01_13`   | `Antium Helmet Jet` | `Antium Arms Maroon`     |
 | `BP_CRAFT_qrt_specialist_heavy_helmet_01_01_12` | `Antium Core Jet`   | `Antium Helmet Jet`      |
@@ -73,10 +73,10 @@ of known upstream bugs that need the correct name in code review, not a runtime-
 
 - [ ] The correction fires (stores `correctedName`) when the registered wrong name is present.
 - [ ] It passes the upstream value through when CIG fixed/changed the name (different/correct
-      incoming name) and for any unregistered `scwiki_key`.
+  incoming name) and for any unregistered `scwiki_key`.
 - [ ] The guard is normalization-insensitive (differing case/spacing still corrects).
 - [ ] A `BLUEPRINT_NAME_OVERRIDE_OBSOLETE` event is emitted when a registered key is seen but its
-      wrong name is gone.
+  wrong name is gone.
 - [ ] The two seed entries above are present.
 
 **Enforced by:** `BlueprintOutputNameOverridesTest`, `ScWikiBlueprintSyncServiceTest`,
