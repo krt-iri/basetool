@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.iri.basetool.backend.config.ScWikiProperties;
@@ -46,6 +47,7 @@ import de.greluc.krt.iri.basetool.backend.model.scwiki.BlueprintRequirementModif
 import de.greluc.krt.iri.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.service.BlueprintNameNormalizer;
 import de.greluc.krt.iri.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
 import java.util.List;
@@ -87,6 +89,7 @@ class ScWikiBlueprintSyncServiceTest {
             aliasService,
             gameItemRepository,
             syncReportService,
+            new BlueprintOutputNameOverrides(new BlueprintNameNormalizer()),
             self);
     lenient().when(self.getObject()).thenReturn(service);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
@@ -383,7 +386,146 @@ class ScWikiBlueprintSyncServiceTest {
     verify(blueprintRepository).markScwikiDeleted(any(), any());
   }
 
+  // ─── #327 curated CIG-mislabel output-name override (REQ-INV-007) ──────────
+
+  private static final String ARMS_KEY = "BP_CRAFT_qrt_specialist_heavy_arms_01_01_13";
+  private static final String HELMET_KEY = "BP_CRAFT_qrt_specialist_heavy_helmet_01_01_12";
+
+  @Test
+  void syncBlueprints_correctsBothSeededCigMislabels_inOneRun() {
+    // Given both confirmed mislabeled blueprints arrive with their known-wrong output names.
+    ScWikiBlueprintDto arms =
+        blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Helmet Jet");
+    ScWikiBlueprintDto helmet =
+        blueprintWithKeyAndName(UUID.randomUUID(), HELMET_KEY, "Antium Core Jet");
+    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints")))
+        .thenReturn(List.of(arms, helmet));
+    when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When the sync runs.
+    service.syncBlueprints();
+
+    // Then each blueprint is persisted with its in-game-correct name, and nothing is reported
+    // obsolete (the guards fired).
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository, times(2)).save(saved.capture());
+    assertEquals(2, saved.getAllValues().size());
+    for (Blueprint bp : saved.getAllValues()) {
+      if (ARMS_KEY.equals(bp.getScwikiKey())) {
+        assertEquals("Antium Arms Maroon", bp.getOutputName());
+      } else if (HELMET_KEY.equals(bp.getScwikiKey())) {
+        assertEquals("Antium Helmet Jet", bp.getOutputName());
+      } else {
+        fail("unexpected scwiki_key " + bp.getScwikiKey());
+      }
+    }
+    verify(syncReportService, never())
+        .logScwikiEvent(
+            any(), eq(SyncEventType.BLUEPRINT_NAME_OVERRIDE_OBSOLETE), any(), any(), any(), any());
+  }
+
+  @Test
+  void syncBlueprints_correctionIsNormalizationInsensitive() {
+    // Given the wrong name arrives with different case and whitespace.
+    ScWikiBlueprintDto dto =
+        blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "  antium   HELMET jet ");
+    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When the sync runs.
+    service.syncBlueprints();
+
+    // Then the normalizer folds the differences and the correction still applies.
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository).save(saved.capture());
+    assertEquals("Antium Arms Maroon", saved.getValue().getOutputName());
+  }
+
+  @Test
+  void syncBlueprints_passesThroughOutputName_whenIncomingIsNotTheWrongName() {
+    // Given CIG fixed the name (the feed now sends the in-game-correct name for the same key).
+    ScWikiBlueprintDto dto =
+        blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Arms Maroon");
+    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When the sync runs.
+    service.syncBlueprints();
+
+    // Then the upstream value is persisted unchanged (the guard did not fire).
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository).save(saved.capture());
+    assertEquals("Antium Arms Maroon", saved.getValue().getOutputName());
+  }
+
+  @Test
+  void syncBlueprints_passesThroughOutputName_forUnrelatedKey() {
+    // Given an unrelated key whose name happens to equal a wrong name registered under another key.
+    ScWikiBlueprintDto dto =
+        blueprintWithKeyAndName(UUID.randomUUID(), "BP_CRAFT_unrelated_01", "Antium Helmet Jet");
+    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When the sync runs.
+    service.syncBlueprints();
+
+    // Then nothing is corrected and no obsolescence event is emitted (the key is not registered).
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository).save(saved.capture());
+    assertEquals("Antium Helmet Jet", saved.getValue().getOutputName());
+    verify(syncReportService, never())
+        .logScwikiEvent(
+            any(), eq(SyncEventType.BLUEPRINT_NAME_OVERRIDE_OBSOLETE), any(), any(), any(), any());
+  }
+
+  @Test
+  void syncBlueprints_emitsObsoleteEvent_whenOverrideKeySeenButWrongNameGone() {
+    // Given a registered override key is still in the feed but CIG changed its name away from the
+    // expected wrong name (here: to the already-correct name) — the guard no longer fires.
+    ScWikiBlueprintDto dto =
+        blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Arms Maroon");
+    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When the sync runs.
+    service.syncBlueprints();
+
+    // Then a BLUEPRINT_NAME_OVERRIDE_OBSOLETE event is emitted so an operator removes the entry.
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.BLUEPRINT_NAME_OVERRIDE_OBSOLETE),
+            eq("blueprint"),
+            isNull(),
+            eq("Antium Arms Maroon"),
+            any());
+  }
+
   // ─── helpers ────────────────────────────────────────────────────────────
+
+  private ScWikiBlueprintDto blueprintWithKeyAndName(UUID uuid, String key, String outputName) {
+    return new ScWikiBlueprintDto(
+        uuid,
+        key,
+        null,
+        outputName,
+        null,
+        540,
+        false,
+        "4.8.0-LIVE",
+        0,
+        0,
+        List.of(),
+        List.of(),
+        null,
+        null,
+        null);
+  }
 
   private ScWikiBlueprintDto blueprint(
       UUID outputUuid,

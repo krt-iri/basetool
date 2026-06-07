@@ -28,6 +28,8 @@
 
 - **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.
 
+- **Der Bauplan-Import erkennt wieder Baupläne, deren englischer Name in den Spieldaten (CIG) falsch hinterlegt ist:** Bekannte Falschbezeichnungen werden beim SC-Wiki-Abgleich auf den echten Spielnamen korrigiert (z. B. „Antium Arms Maroon" statt „Antium Helmet Jet"), sodass diese Baupläne beim Import wieder zugeordnet werden. Die Korrektur greift nur, solange der falsche Name vorliegt, und wird automatisch hinfällig, sobald CIG ihn behebt (Meldung im Sync-Bericht).
+
 ## [v0.3.63](https://github.com/krt-iri/basetool/releases/tag/v0.3.63) - 2026-06-06
 
 ## [v0.3.62](https://github.com/krt-iri/basetool/releases/tag/v0.3.62) - 2026-06-06

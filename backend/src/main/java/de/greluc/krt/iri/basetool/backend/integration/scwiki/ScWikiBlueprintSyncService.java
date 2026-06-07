@@ -48,7 +48,9 @@ import de.greluc.krt.iri.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -111,6 +113,13 @@ public class ScWikiBlueprintSyncService {
   private final SyncReportService syncReportService;
 
   /**
+   * Curated corrections for CIG-mislabeled blueprint {@code output_name}s (#327), applied — guarded
+   * and self-healing — immediately before each {@code output_name} is persisted. See {@link
+   * BlueprintOutputNameOverrides}.
+   */
+  private final BlueprintOutputNameOverrides outputNameOverrides;
+
+  /**
    * Self-reference, resolved lazily so the per-blueprint DB writes can be invoked through the
    * Spring proxy. Calling a {@code @Transactional(REQUIRES_NEW)} method via {@code this} is
    * self-invocation and silently skips the new transaction (the CLAUDE.md self-invocation trap);
@@ -151,6 +160,12 @@ public class ScWikiBlueprintSyncService {
     int processed = 0;
     int unresolvedLines = 0;
     int detailMisses = 0;
+    // #327 curated output-name override bookkeeping. overrideKeysSeen maps each override-bearing
+    // scwiki_key the feed carried this run to the upstream output_name observed for it;
+    // overrideKeysFired holds the keys whose guard actually matched. A key seen but not fired means
+    // CIG changed the wrong name and the override is obsolete (reported after the loop).
+    Map<String, String> overrideKeysSeen = new LinkedHashMap<>();
+    Set<String> overrideKeysFired = new HashSet<>();
 
     for (ScWikiBlueprintDto listDto : fetched) {
       if (listDto.uuid() == null) {
@@ -172,6 +187,14 @@ public class ScWikiBlueprintSyncService {
           detailMisses++;
         }
         ScWikiBlueprintDto dto = detail != null ? detail : listDto;
+        // Override bookkeeping (the correction itself is applied inside the upsert): record the key
+        // as seen and, if the guard matches, as fired, so an obsolete override can be reported.
+        if (outputNameOverrides.isRegistered(dto.key())) {
+          overrideKeysSeen.put(dto.key(), dto.outputName());
+          if (outputNameOverrides.fires(dto.key(), dto.outputName())) {
+            overrideKeysFired.add(dto.key());
+          }
+        }
         unresolvedLines +=
             self.getObject().upsertBlueprintWithinTransaction(listDto.uuid(), dto, runId, now);
         processed++;
@@ -186,13 +209,19 @@ public class ScWikiBlueprintSyncService {
         log.info("Marked {} blueprint row(s) scwiki_deleted (no longer in Wiki feed)", marked);
       }
     }
+    int obsoleteOverrides =
+        self.getObject()
+            .reportObsoleteOverridesWithinTransaction(runId, overrideKeysSeen, overrideKeysFired);
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki blueprint sync: {} blueprints upserted, {} unresolved ingredient"
-            + " line(s), {} detail fetch miss(es).",
+            + " line(s), {} detail fetch miss(es), {} output-name override(s) applied, {} obsolete"
+            + " override(s) reported.",
         processed,
         unresolvedLines,
-        detailMisses);
+        detailMisses,
+        overrideKeysFired.size(),
+        obsoleteOverrides);
   }
 
   /**
@@ -221,7 +250,9 @@ public class ScWikiBlueprintSyncService {
     Blueprint bp = blueprintRepository.findByScwikiUuid(scwikiUuid).orElseGet(Blueprint::new);
     bp.setScwikiUuid(scwikiUuid);
     bp.setScwikiKey(dto.key());
-    bp.setOutputName(dto.outputName());
+    // #327: correct known CIG-mislabeled output names before persisting. Guarded + self-healing —
+    // the upstream value passes through untouched unless it matches a registered wrong name.
+    bp.setOutputName(outputNameOverrides.correct(dto.key(), dto.outputName()));
     bp.setCategoryUuid(dto.categoryUuid());
     bp.setCraftTimeSeconds(dto.craftTimeSeconds());
     bp.setIsAvailableByDefault(Boolean.TRUE.equals(dto.isAvailableByDefault()));
@@ -259,6 +290,56 @@ public class ScWikiBlueprintSyncService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public int markBlueprintOrphansWithinTransaction(Set<UUID> seenScwikiUuids, Instant now) {
     return blueprintRepository.markScwikiDeleted(seenScwikiUuids, now);
+  }
+
+  /**
+   * Emits a {@link SyncEventType#BLUEPRINT_NAME_OVERRIDE_OBSOLETE} event for every curated
+   * output-name override whose {@code scwiki_key} the feed carried this run but whose guard did not
+   * fire — i.e. CIG changed the wrong name, so the override is obsolete and should be removed from
+   * {@link BlueprintOutputNameOverrides}. Runs in its own {@code REQUIRES_NEW} transaction (invoked
+   * through the {@link #self} proxy) because the enclosing loop is non-transactional and {@link
+   * SyncReportService}'s write methods are designed to run inside the caller's transaction.
+   *
+   * @param runId the current run id stamped on each emitted event
+   * @param seenOverrideKeyToIncomingName each override-bearing {@code scwiki_key} seen this run,
+   *     mapped to the upstream {@code output_name} observed for it (for the report detail)
+   * @param firedOverrideKeys the override keys whose guard actually matched (not obsolete)
+   * @return the number of obsolete-override events emitted
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int reportObsoleteOverridesWithinTransaction(
+      UUID runId,
+      Map<String, String> seenOverrideKeyToIncomingName,
+      Set<String> firedOverrideKeys) {
+    int obsolete = 0;
+    for (Map.Entry<String, String> entry : seenOverrideKeyToIncomingName.entrySet()) {
+      String key = entry.getKey();
+      if (firedOverrideKeys.contains(key)) {
+        continue;
+      }
+      var override = outputNameOverrides.findByKey(key);
+      if (override.isEmpty()) {
+        continue;
+      }
+      String currentUpstream = entry.getValue();
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.BLUEPRINT_NAME_OVERRIDE_OBSOLETE,
+          "blueprint",
+          null,
+          override.get().correctedName(),
+          "Curated output-name override for scwiki_key '"
+              + key
+              + "' is obsolete: the feed now sends '"
+              + (currentUpstream == null ? "<null>" : currentUpstream)
+              + "', which no longer matches the expected wrong name '"
+              + override.get().expectedWrongName()
+              + "' (intended correction -> '"
+              + override.get().correctedName()
+              + "'). CIG appears to have changed the name; remove the override entry.");
+      obsolete++;
+    }
+    return obsolete;
   }
 
   /**

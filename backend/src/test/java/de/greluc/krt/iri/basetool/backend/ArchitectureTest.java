@@ -1441,6 +1441,19 @@ class ArchitectureTest {
   }
 
   /**
+   * Pure-helper classes under {@code integration.scwiki} that legitimately do NOT inject {@code
+   * ScWikiClient}: they encode SC-Wiki-sourced domain knowledge as code maps rather than making any
+   * HTTP call, so they have no client dependency to wire. {@code BlueprintOutputNameOverrides}
+   * (#327) is the curated map of CIG-mislabeled blueprint output names — conceptually part of the
+   * blueprint sync that consumes it, kept in the package next to it (there is no {@code
+   * service.scwiki} package to move it to). Extend this set only for a stateless, HTTP-free helper
+   * that genuinely belongs beside the sync services; anything that talks to the Wiki must inject
+   * the client like the rest.
+   */
+  private static final Set<String> SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES =
+      Set.of("BlueprintOutputNameOverrides");
+
+  /**
    * SC_WIKI_SYNC_PLAN.md §3.4 / R1 guard: every class in the {@code integration.scwiki} package
    * MUST depend on {@code ScWikiClient}. The rule keeps the package focused on classes that
    * interact with the SC Wiki HTTP API — a helper / DTO / scheduler that does not consult the
@@ -1448,7 +1461,10 @@ class ArchitectureTest {
    *
    * <p>{@code ScWikiClient} itself is exempt: it IS the dependency target. Future sync services
    * ({@code ScWikiCommoditySyncService}, {@code ScWikiBlueprintSyncService}, …) added in R3+
-   * inherit the requirement automatically.
+   * inherit the requirement automatically. Stateless pure-helper beans that encode SC-Wiki domain
+   * knowledge without making any HTTP call are also exempt via {@link
+   * #SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES} (e.g. {@code BlueprintOutputNameOverrides},
+   * #327).
    *
    * <p>Modelled on {@link #staffelScopedServicesMustWireOwnerScopeOrAuthHelper}: walks the declared
    * fields of each candidate class and checks the raw-type FQN for the client.
@@ -1469,6 +1485,13 @@ class ArchitectureTest {
                 // the rule targets the top-level sync beans that actually talk to the Wiki, not
                 // their inner value holders.
                 if (javaClass.getEnclosingClass().isPresent()) {
+                  return;
+                }
+                // Skip curated pure-helper beans that encode SC-Wiki domain knowledge but make no
+                // HTTP call (see SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES) — they have no client
+                // dependency to inject and belong beside the sync services that consume them.
+                if (SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES.contains(
+                    javaClass.getSimpleName())) {
                   return;
                 }
                 boolean injectsClient =

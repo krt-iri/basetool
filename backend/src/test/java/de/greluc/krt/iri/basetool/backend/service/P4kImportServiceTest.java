@@ -30,6 +30,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.integration.scwiki.BlueprintOutputNameOverrides;
 import de.greluc.krt.iri.basetool.backend.model.GameItem;
 import de.greluc.krt.iri.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.iri.basetool.backend.model.Manufacturer;
@@ -89,7 +90,8 @@ class P4kImportServiceTest {
             manufacturerRepository,
             materialRepository,
             blueprintRepository,
-            syncReportService);
+            syncReportService,
+            new BlueprintOutputNameOverrides(new BlueprintNameNormalizer()));
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
@@ -395,6 +397,37 @@ class P4kImportServiceTest {
     assertEquals(0, result.ingredientsResolved());
     // The resolver never queried the material repo for an already-resolved line.
     verify(materialRepository, never()).findByScwikiUuid(resourceUuid);
+  }
+
+  @Test
+  void blueprint_seedPathAppliesCigMislabelOutputNameOverride() {
+    // Given an unmatched, seedable blueprint whose produced item carries the CIG-mislabeled name
+    // (#327): the seed path writes output_name from the produced item, so it must apply the same
+    // guarded override the SC Wiki sync uses. Covers REQ-INV-007 (P4K consistency wiring).
+    UUID bpGuid = UUID.randomUUID();
+    UUID producedGuid = UUID.randomUUID();
+    GameItem produced = new GameItem();
+    produced.setName("Antium Core Jet"); // the known-wrong name for the helmet blueprint key
+    produced.setExternalUuid(producedGuid);
+    when(gameItemRepository.findByExternalUuid(producedGuid)).thenReturn(Optional.of(produced));
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    String json =
+        "{\"blueprints\":[{\"guid\":\""
+            + bpGuid
+            + "\",\"key\":\"BP_CRAFT_qrt_specialist_heavy_helmet_01_01_12\",\"producedItemGuid\":\""
+            + producedGuid
+            + "\"}]}";
+
+    // When the catalog is applied with seeding enabled.
+    P4kImportResultDto result = service.applyImport(upload(json), true);
+
+    // Then the seeded blueprint stores the in-game-correct name, not the produced item's wrong
+    // name.
+    assertEquals(1, result.blueprints().created());
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository).save(saved.capture());
+    assertEquals("Antium Helmet Jet", saved.getValue().getOutputName());
   }
 
   // ──────────────────────────────── preview makes no writes ──

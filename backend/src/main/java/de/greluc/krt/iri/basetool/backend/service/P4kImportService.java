@@ -27,6 +27,7 @@ import de.greluc.krt.iri.basetool.backend.dto.p4k.P4kItemDto;
 import de.greluc.krt.iri.basetool.backend.dto.p4k.P4kManufacturerDto;
 import de.greluc.krt.iri.basetool.backend.dto.p4k.P4kShipDto;
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.iri.basetool.backend.integration.scwiki.BlueprintOutputNameOverrides;
 import de.greluc.krt.iri.basetool.backend.model.GameItem;
 import de.greluc.krt.iri.basetool.backend.model.GameItemKind;
 import de.greluc.krt.iri.basetool.backend.model.GameItemSourceSystem;
@@ -149,6 +150,13 @@ public class P4kImportService {
   private final MaterialRepository materialRepository;
   private final BlueprintRepository blueprintRepository;
   private final SyncReportService syncReportService;
+
+  /**
+   * Curated corrections for CIG-mislabeled blueprint {@code output_name}s (#327). The seed path
+   * writes {@code output_name} from the produced item's name, so it applies the same guarded
+   * override the SC Wiki sync uses, for consistency. See {@link BlueprintOutputNameOverrides}.
+   */
+  private final BlueprintOutputNameOverrides outputNameOverrides;
 
   /**
    * Previews a P4K catalog import: parses the upload and computes every reconciliation action —
@@ -934,7 +942,9 @@ public class P4kImportService {
       GameItem produced = resolveProducedItem(dto.producedItemGuid());
       blueprint.setOutputItem(produced);
       if (produced != null) {
-        blueprint.setOutputName(produced.getName());
+        // #327: apply the same guarded CIG-mislabel correction the SC Wiki sync uses, for
+        // consistency on seeded rows (a no-op unless the produced name matches a known wrong name).
+        blueprint.setOutputName(outputNameOverrides.correct(dto.key(), produced.getName()));
       }
       blueprint.setCraftTimeSeconds(dto.craftTimeSeconds());
       blueprint.setP4kUuid(guid);
