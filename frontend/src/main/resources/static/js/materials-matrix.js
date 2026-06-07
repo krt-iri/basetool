@@ -57,6 +57,8 @@
 
     const BUFFER = 8; // extra rows rendered above and below the viewport
     const collapsed = {}; // kind -> true when its rows are hidden
+    const GROUP_PREF_KEY = 'materials_matrix_group_by_category';
+    let grouped = true; // false -> one flat, alphabetically sorted row list with no category headers
 
     let rowHeight = 0; // measured from the first rendered row (uniform via CSS)
     let calibrated = false;
@@ -135,6 +137,24 @@
         return !!(el && el.checked);
     }
 
+    // Per-browser persistence of the category-grouping preference (guarded so privacy modes that
+    // throw on storage access degrade to the default grouped view instead of breaking the page).
+    function readGroupPref() {
+        try {
+            return localStorage.getItem(GROUP_PREF_KEY);
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    function writeGroupPref(value) {
+        try {
+            localStorage.setItem(GROUP_PREF_KEY, value);
+        } catch (_e) {
+            /* storage unavailable */
+        }
+    }
+
     function applyFilters() {
         if (!grid) {
             return;
@@ -175,6 +195,25 @@
 
     function buildFlat(groups) {
         flat = [];
+        if (!grouped) {
+            // Flat mode: merge every category's rows into one list, sort alphabetically by
+            // material name, and emit only material rows (no category header rows).
+            const rows = [];
+            groups.forEach(function (g) {
+                for (let i = 0; i < g.rows.length; i++) {
+                    rows.push(g.rows[i]);
+                }
+            });
+            rows.sort(function (a, b) {
+                return String(a.materialName).localeCompare(String(b.materialName), undefined, {
+                    sensitivity: 'base',
+                });
+            });
+            rows.forEach(function (r) {
+                flat.push({ type: 'row', row: r, kind: null });
+            });
+            return;
+        }
         groups.forEach(function (g) {
             flat.push({ type: 'kind', kind: g.kind });
             if (!collapsed[g.kind]) {
@@ -517,6 +556,23 @@
                 b.addEventListener('change', scheduleApply);
             },
         );
+
+        // Category-grouping toggle: switch between category-grouped header rows and a single
+        // flat, alphabetically sorted row list. Restore the saved preference into `grouped`
+        // before the initial render, then re-apply (and persist) on every change.
+        const groupBox = document.getElementById('filterGroupByCategory');
+        if (groupBox) {
+            const pref = readGroupPref();
+            if (pref !== null) {
+                groupBox.checked = pref === '1';
+            }
+            grouped = groupBox.checked;
+            groupBox.addEventListener('change', function () {
+                grouped = groupBox.checked;
+                writeGroupPref(grouped ? '1' : '0');
+                applyFilters();
+            });
+        }
 
         // Category collapse / expand (delegated to the virtual <tbody>).
         body.addEventListener('click', function (ev) {
