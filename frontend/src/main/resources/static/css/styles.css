@@ -449,6 +449,275 @@ tbody tr:nth-child(even):hover {
     background-color: var(--color-gray-3);
 }
 
+/* ------------------------------------------------------------------ TREE TABLE
+ * Dense, hierarchical tree table for nested data (inventory:
+ * Material -> Nutzer/Stack -> Eintrag). Replaces deeply-nested <table>s that
+ * each repeat their own <thead>: ONE sticky header (.tree-head) for the whole
+ * tree, depth shown by INDENTATION + left rails (never repeated column heads).
+ * Every row is a CSS-grid .tree-row sharing one column template (--tree-cols)
+ * so values stay aligned across depths. Ported from the design system
+ * (das-kartell-design/krt-components.css -> .tree-table); see its README
+ * "Tree table (nested data)" + proposals/inventory-table-readability.html.
+ */
+.tree-table {
+    border: var(--border-hairline);
+    background-color: var(--color-bg-dark-gray);
+}
+
+.tree-row {
+    display: grid;
+    grid-template-columns: var(
+        --tree-cols,
+        minmax(210px, 1.5fr) minmax(220px, 1.7fr) 132px 124px 172px
+    );
+    align-items: center;
+    border-bottom: var(--border-hairline);
+}
+
+.tree-row:last-child {
+    border-bottom: none;
+}
+
+.tree-cell {
+    min-width: 0;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.86rem;
+}
+
+.tree-cell--num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Left gutter keeps the amount column and the action buttons from colliding. */
+.tree-cell--actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    padding-left: 1.5rem;
+}
+
+/* Sticky single header for the whole tree. */
+.tree-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.tree-head .tree-cell {
+    color: var(--color-gray-1);
+    background-color: var(--color-surface-input);
+    border-bottom: var(--border-heading);
+    font-size: 0.74rem;
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+/* Name cell + disclosure chevron. */
+.tree-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.tree-name .tree-label {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.tree-chevron {
+    flex: none;
+    width: 14px;
+    color: var(--color-primary);
+    font-size: 0.7rem;
+    transition: transform 0.15s ease;
+}
+
+.tree-chevron[aria-expanded='true'],
+.tree-chevron.is-open {
+    transform: rotate(90deg);
+}
+
+/* Depth levels - indentation + rails. The orange bar marks the top group only. */
+.tree-row--group {
+    background-color: var(--color-surface-input);
+    border-left: 4px solid var(--color-primary);
+}
+
+.tree-row--group .tree-label {
+    color: var(--color-white);
+    font-size: 0.95rem;
+    font-weight: var(--fw-bold);
+    text-transform: none;
+}
+
+.tree-row--mid {
+    border-left: 4px solid transparent;
+    box-shadow: inset 18px 0 0 -17px var(--color-gray-2);
+}
+
+.tree-row--mid .tree-name {
+    padding-left: 1.5rem;
+}
+
+.tree-row--mid .tree-label {
+    color: var(--color-gray-1);
+    font-weight: var(--fw-bold);
+}
+
+.tree-row--mid:hover {
+    background-color: rgb(255 255 255 / 2.5%);
+}
+
+.tree-row--leaf {
+    background-color: rgb(0 0 0 / 35%);
+    border-left: 4px solid transparent;
+}
+
+.tree-row--leaf .tree-name {
+    padding-left: 3rem;
+}
+
+/* Leaf main area spans the freed-up name+context+quality columns so inline
+   controls (Auftrag/Einsatz selects) get real width for long labels, while the
+   amount + actions stay column-aligned. */
+.tree-leaf-main {
+    display: flex;
+    grid-column: 1 / 4;
+    align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
+    padding: 0.4rem 0.8rem 0.4rem 3rem;
+}
+
+.tree-leaf-main .tree-leaf-tag {
+    flex: none;
+    color: var(--color-gray-2);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.tree-fieldset {
+    display: flex;
+    flex: 1;
+    gap: 0.85rem;
+    min-width: 0;
+}
+
+.tree-field {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.tree-field .tree-field-cap {
+    color: var(--color-gray-2);
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+}
+
+.tree-field select,
+.tree-field input {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Quality gauge (0-1000): number above a thin orange bar. */
+.tree-gauge {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    width: 100%;
+}
+
+.tree-gauge .tree-gauge-val {
+    font-variant-numeric: tabular-nums;
+}
+
+.tree-gauge .tree-gauge-val .tree-gauge-max {
+    color: var(--color-gray-2);
+    font-size: 0.74rem;
+}
+
+.tree-gauge .tree-gauge-track {
+    position: relative;
+    width: 64px;
+    height: 3px;
+    background-color: var(--color-gray-3);
+}
+
+.tree-gauge .tree-gauge-track > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    background-color: var(--color-primary);
+}
+
+/* Amount: bright value + dimmed unit. */
+.tree-amount {
+    color: var(--color-white);
+    font-variant-numeric: tabular-nums;
+}
+
+.tree-amount .tree-unit {
+    color: var(--color-gray-2);
+    font-size: 0.74rem;
+}
+
+/* Note: rendered ONLY when a note exists. Indented annotation block with room
+   for the full text (~80ch), orange label + surface box. */
+.tree-note {
+    background-color: rgb(0 0 0 / 35%);
+    border-bottom: var(--border-hairline);
+}
+
+.tree-note-box {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    margin: 0 0.8rem 0.55rem 3rem;
+    padding: 0.5rem 0.8rem;
+    background-color: var(--color-surface-input);
+    border: var(--border-hairline);
+    border-left: 3px solid var(--color-primary);
+}
+
+.tree-note-box .tree-note-label {
+    flex: none;
+    color: var(--color-primary);
+    font-size: 0.6rem;
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+}
+
+.tree-note-box .tree-note-text {
+    max-width: 80ch;
+    color: var(--color-gray-1);
+    font-size: 0.84rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+/* Compact action button for dense tree-table rows. */
+.btn-xs {
+    min-height: 32px;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.68rem;
+}
+
 /*
  * SK-order claim tables (orders-detail): the open-amount and its "Eintragen"
  * action share one flex row so every button's left edge lines up down the

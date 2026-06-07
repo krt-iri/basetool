@@ -216,87 +216,84 @@
 
         <div class="overflow-x-auto" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
-            <table class="krt-table" id="inventoryTable" th:data-user-id="${#authentication.name}">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;"></th>
-                        <th th:text="#{inventory.material}">Material</th>
-                        <th th:text="#{inventory.avgQuality}">Ø Qualität</th>
-                        <th th:text="#{inventory.maxQuality}">Max. Qualität</th>
-                        <th th:text="#{inventory.totalAmount}">Gesamtmenge</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody th:each="group : ${groupedItems}">
-                    <tr class="group-header" style="cursor: pointer; background-color: rgba(255,255,255,0.05);" data-trigger="inv-my-toggle-group" th:data-material-id="${group.material.id}">
-                        <td class="text-center"><span class="toggle-icon" style="color: var(--color-primary); font-size: 1.2rem;">▶</span></td>
-                        <td th:text="${group.material.name}" style="font-weight: bold; color: var(--color-gray-1);">Material</td>
-                        <td th:text="${group.averageQuality != null ? #numbers.formatDecimal(group.averageQuality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">95.50</td>
-                        <td th:text="${group.maxQuality}">100</td>
-                        <td th:switch="${group.material.quantityType}">
-                            <span th:case="'PIECE'" th:text="|${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
-                            <span th:case="*" th:text="|${group.totalAmount != null ? #numbers.formatDecimal(group.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
-                        </td>
-                        <td></td>
-                    </tr>
-                    <tr class="group-items" style="display: none;">
-                        <td colspan="6" class="p-0">
-                            <div class="inventory-items-table-wrapper">
-                            <table class="krt-table" style="margin: 0; background: transparent; border-top: none;">
-                                <thead>
-                                    <tr>
-                                        <th class="item-checkbox-cell" style="padding-left: 2rem; width: 5%;">
-                                            <input type="checkbox" class="item-checkbox group-select-all"
-                                                   th:data-material-id="${group.material.id}"
-                                                   title="#{inventory.bulk.checkout.select.all}"
-                                                   data-trigger="inv-my-toggle-group-cb">
-                                        </th>
-                                        <th style="padding-left: 0.5rem; width: 35%;" th:text="#{inventory.location}">Ort</th>
-                                        <th style="width: 15%;" th:text="#{inventory.quality}">Qualität</th>
-                                        <th style="width: 25%;" th:text="#{inventory.totalAmount}">Gesamtmenge</th>
-                                        <th style="width: 20%;" th:text="#{inventory.stack.entries}">Einträge</th>
-                                    </tr>
-                                </thead>
-                                <!-- One tbody per stack: same stock identity (location, quality, association,
-                                     owner pool) collapsed into one row; the entries it consists of expand below. -->
-                                <tbody th:each="stack : ${group.stacks}">
-                                    <tr class="stack-header" style="cursor: pointer;" data-trigger="inv-my-toggle-stack"
-                                        data-stack-loaded="false"
-                                        th:data-material-id="${group.material.id}"
-                                        th:data-location-id="${stack.location.id}"
-                                        th:data-quality="${stack.quality}"
-                                        th:data-job-order-id="${stack.jobOrderId}"
-                                        th:data-mission-id="${stack.missionId}"
-                                        th:data-personal="${stack.personal}"
-                                        th:data-owning-org-unit-id="${stack.owningSquadron != null ? stack.owningSquadron.id : null}">
-                                        <td class="text-center"><span class="toggle-icon stack-toggle-icon" style="color: var(--color-primary); font-size: 1rem;">▶</span></td>
-                                        <td style="padding-left: 0.5rem;" th:text="${stack.location.name}">Ort</td>
-                                        <td th:text="${stack.quality}">100</td>
-                                        <td th:switch="${group.material.quantityType}">
-                                            <span th:case="'PIECE'" th:text="|${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
-                                            <span th:case="*" th:text="|${stack.totalAmount != null ? #numbers.formatDecimal(stack.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
-                                        </td>
-                                        <td><span class="stack-entry-count" th:text="${stack.entryCount}">3</span></td>
-                                    </tr>
-                                    <tr class="stack-entries" style="display: none;">
-                                        <td colspan="5" class="p-0">
-                                            <div class="inventory-items-table-wrapper stack-entries-content">
-                                                <!-- entries lazily loaded on expand via /inventory/my/stack/entries (ADR-0003) -->
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+            <!-- Consolidated tree table (das-kartell-design .tree-table): one sticky header
+                 for all depths; Material -> Standort/Stack -> Eintrag shown by indentation +
+                 rails instead of three repeated <thead> sets. The per-material bulk select-all
+                 moves into the material row's action cell; per-entry checkboxes live in the
+                 lazy-loaded leaf rows. Stack-key data-attributes, lazy-load hooks and the
+                 delegated data-trigger handlers are preserved verbatim. -->
+            <div class="tree-table" id="inventoryTable" style="--tree-cols: minmax(200px, 1.4fr) minmax(220px, 1.7fr) 132px 124px 168px;" th:data-user-id="${#authentication.name}">
+                <div class="tree-row tree-head">
+                    <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
+                    <div class="tree-cell" th:text="#{inventory.tree.context}">Kontext / Zuordnung</div>
+                    <div class="tree-cell tree-cell--num" th:text="#{inventory.quality}">Qualität</div>
+                    <div class="tree-cell tree-cell--num" th:text="#{inventory.amount}">Menge</div>
+                    <div class="tree-cell" style="text-align: right;" th:text="#{inventory.tree.action}">Aktion</div>
+                </div>
+
+                <div class="tree-group" th:each="group : ${groupedItems}">
+                    <div class="tree-row tree-row--group" style="cursor: pointer;" data-trigger="inv-my-toggle-group" th:data-material-id="${group.material.id}">
+                        <div class="tree-cell tree-name">
+                            <span class="tree-chevron toggle-icon">▶</span>
+                            <span class="tree-label" th:text="${group.material.name}">Material</span>
+                        </div>
+                        <div class="tree-cell" style="color: var(--color-gray-2);" th:text="${#lists.size(group.stacks) == 1} ? #{inventory.tree.stackCount.one} : #{inventory.tree.stackCount.many(${#lists.size(group.stacks)})}">5 Stacks</div>
+                        <div class="tree-cell tree-cell--num">
+                            <span class="tree-gauge">
+                                <span class="tree-gauge-val" th:if="${group.averageQuality != null}"><span th:text="${#numbers.formatInteger(group.averageQuality, 1)}">639</span> <span class="tree-gauge-max" th:text="|/ ${group.maxQuality}|">/ 796</span></span>
+                                <span class="tree-gauge-val" th:if="${group.averageQuality == null}">0</span>
+                                <span class="tree-gauge-track"><span th:style="|width: ${group.averageQuality != null ? group.averageQuality.intValue() / 10 : 0}%|"></span></span>
+                            </span>
+                        </div>
+                        <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
+                            <span th:case="'PIECE'"><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                            <span th:case="*"><span th:text="${group.totalAmount != null ? #numbers.formatDecimal(group.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
+                        </div>
+                        <div class="tree-cell" style="display: flex; justify-content: flex-end; align-items: center;">
+                            <input type="checkbox" class="item-checkbox group-select-all" th:data-material-id="${group.material.id}" th:title="#{inventory.bulk.checkout.select.all}" data-trigger="inv-my-toggle-group-cb">
+                        </div>
+                    </div>
+
+                    <div class="tree-group-items" style="display: none;">
+                        <div th:each="stack : ${group.stacks}">
+                            <div class="tree-row tree-row--mid stack-header" style="cursor: pointer;" data-trigger="inv-my-toggle-stack"
+                                 data-stack-loaded="false"
+                                 th:data-material-id="${group.material.id}"
+                                 th:data-location-id="${stack.location.id}"
+                                 th:data-quality="${stack.quality}"
+                                 th:data-job-order-id="${stack.jobOrderId}"
+                                 th:data-mission-id="${stack.missionId}"
+                                 th:data-personal="${stack.personal}"
+                                 th:data-owning-org-unit-id="${stack.owningSquadron != null ? stack.owningSquadron.id : null}">
+                                <div class="tree-cell tree-name">
+                                    <span class="tree-chevron toggle-icon stack-toggle-icon">▶</span>
+                                    <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
+                                </div>
+                                <div class="tree-cell"></div>
+                                <div class="tree-cell tree-cell--num">
+                                    <span class="tree-gauge"><span class="tree-gauge-val" th:text="${stack.quality}">796</span><span class="tree-gauge-track"><span th:style="|width: ${stack.quality != null ? stack.quality / 10 : 0}%|"></span></span></span>
+                                </div>
+                                <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
+                                    <span th:case="'PIECE'"><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                                    <span th:case="*"><span th:text="${stack.totalAmount != null ? #numbers.formatDecimal(stack.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
+                                </div>
+                                <div class="tree-cell tree-cell--num" style="color: var(--color-gray-2); font-size: 0.78rem;">
+                                    <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
+                                </div>
                             </div>
-                        </td>
-                    </tr>
-                </tbody>
-                <tbody th:if="${#lists.isEmpty(groupedItems)}">
-                    <tr>
-                        <td colspan="7" class="text-center text-muted" th:text="#{inventory.empty}">Du hast noch nichts eingelagert.</td>
-                    </tr>
-                </tbody>
-            </table>
+                            <div class="tree-stack-entries" style="display: none;">
+                                <div class="stack-entries-content">
+                                    <!-- entries lazily loaded on expand via /inventory/my/stack/entries (ADR-0003) -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tree-row" th:if="${#lists.isEmpty(groupedItems)}">
+                    <div class="tree-cell text-muted" style="grid-column: 1 / -1; text-align: center;" th:text="#{inventory.empty}">Du hast noch nichts eingelagert.</div>
+                </div>
+            </div>
             </div>
         </div>
     </div>
@@ -834,16 +831,16 @@
         const nextRow = row.nextElementSibling;
         const icon = row.querySelector('.toggle-icon');
         const materialId = row.getAttribute('data-material-id');
-        const table = row.closest('table');
+        const table = row.closest('.tree-table');
         const userId = table ? table.getAttribute('data-user-id') : 'unknown';
         const storageKey = 'expanded_rows_lager_' + userId;
 
-        if (nextRow && nextRow.classList.contains('group-items')) {
+        if (nextRow && nextRow.classList.contains('tree-group-items')) {
             let expandedRows = [];
             try { expandedRows = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch(e) { console.warn('LocalStorage error', e); }
             
             if (nextRow.style.display === 'none') {
-                nextRow.style.display = 'table-row';
+                nextRow.style.display = 'block';
                 icon.textContent = '▼';
                 if (materialId && !expandedRows.includes(materialId)) {
                     expandedRows.push(materialId);
@@ -863,9 +860,9 @@
     function toggleStack(row) {
         const nextRow = row.nextElementSibling;
         const icon = row.querySelector('.toggle-icon');
-        if (!nextRow || !nextRow.classList.contains('stack-entries')) return;
+        if (!nextRow || !nextRow.classList.contains('tree-stack-entries')) return;
         if (nextRow.style.display === 'none') {
-            nextRow.style.display = 'table-row';
+            nextRow.style.display = 'block';
             if (icon) icon.textContent = '▼';
             // Append-only Lager: a stack's entries are not inlined. Fetch them on first
             // expand from /inventory/my/stack/entries (ADR-0003, REQ-INV-002); subsequent
@@ -939,7 +936,7 @@
     // Pagination handler: re-fetches the target page for the stack owning the clicked
     // button and replaces the entries container in place.
     function goToStackEntriesPage(btn) {
-        const entriesRow = btn.closest('tr.stack-entries');
+        const entriesRow = btn.closest('.tree-stack-entries');
         if (!entriesRow) return;
         const headerRow = entriesRow.previousElementSibling;
         if (!headerRow) return;
@@ -956,13 +953,13 @@
                 let expandedRows = [];
                 try { expandedRows = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch(e) {}
                 if (expandedRows.length > 0) {
-                    document.querySelectorAll('.group-header').forEach(function(row) {
+                    document.querySelectorAll('.tree-row--group').forEach(function(row) {
                         const materialId = row.getAttribute('data-material-id');
                         if (materialId && expandedRows.includes(materialId)) {
                             const nextRow = row.nextElementSibling;
                             const icon = row.querySelector('.toggle-icon');
-                            if (nextRow && nextRow.classList.contains('group-items')) {
-                                nextRow.style.display = 'table-row';
+                            if (nextRow && nextRow.classList.contains('tree-group-items')) {
+                                nextRow.style.display = 'block';
                                 icon.textContent = '▼';
                             }
                         }
@@ -1211,7 +1208,7 @@
         const personal = selectElement.getAttribute('data-personal') === 'true';
         
         // Finde das andere select (jobOrderId/missionId), da wir beide Werte senden müssen oder null
-        const tr = selectElement.closest('tr');
+        const tr = selectElement.closest('.tree-row');
         const allSelects = tr.querySelectorAll('.association-select');
         let jobOrderId = null;
         let missionId = null;

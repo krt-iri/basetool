@@ -177,7 +177,24 @@ public class InventoryPageController {
       Double totalAmount,
       Double averageQuality,
       Integer maxQuality,
-      List<InventoryStackDto> stacks) {}
+      List<InventoryStackDto> stacks) {
+
+    /**
+     * Counts the distinct owning users across this material's stacks, for the grouped Lager row's
+     * context line ("{n} Nutzer / {m} Stacks").
+     *
+     * @return the number of distinct users owning at least one stack of this material
+     */
+    public int userCount() {
+      return (int)
+          stacks.stream()
+              .map(InventoryStackDto::user)
+              .filter(java.util.Objects::nonNull)
+              .map(u -> u.id())
+              .distinct()
+              .count();
+    }
+  }
 
   /**
    * Renders the personal inventory list ({@code /inventory/my}). Filters are URL-driven so a user

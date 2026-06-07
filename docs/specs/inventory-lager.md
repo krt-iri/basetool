@@ -58,7 +58,11 @@ renders an implicit inner join that silently drops every such stack — the regr
 both grouped views in v0.4.0.) Each stack shows the summed amount, the amount-weighted mean
 quality, the max quality and the entry count. The grouped response carries **only** the collapsed stack rows — it does **not** inline
 the underlying entries (those are loaded on demand, see REQ-INV-005). The UI renders two server
-levels — material group → stack row — and a stack row expands to fetch its entries. The
+levels — material group → stack row — and a stack row expands to fetch its entries. Both grouped pages present these two levels (plus the lazy
+entry rows) as a single design-system **tree-table** (`das-kartell-design` → `.tree-table`):
+one sticky column header for all depths, depth shown by indentation + left rails rather than a
+repeated per-level header, right-aligned tabular numbers with a 0-1000 quality gauge, and a note
+rendered only when an entry has one. The
 per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchanged.
 
 **Acceptance**

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **„Mein Lager" und „Globales Lager" zeigen die verschachtelte Material → Nutzer/Stack → Eintrag-Liste jetzt als eine zusammenhängende Baum-Tabelle statt dreier gestapelter Tabellen mit je eigener Kopfzeile.** Ein einziger, mitlaufender Spaltenkopf, klare Einrückung pro Ebene, rechtsbündige Zahlen mit Qualitäts-Balken (0–1000), Auftrag/Einsatz als breite beschriftete Felder und eine Notiz, die nur erscheint, wenn eine hinterlegt ist, machen die Bestände dichter und leichter vergleichbar. Funktion (Lazy-Load, Filter, Aus-/Umbuchung, Massenausbuchung, Notizen) bleibt unverändert.
+
 ### Fixed
 
 - **Im Admin-Terminal wurde bei unbekanntem UEX-Wert in der deutschen Oberfläche „2013" statt des Gedankenstrichs „–" angezeigt; das ist korrigiert.**
