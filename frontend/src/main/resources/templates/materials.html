@@ -62,6 +62,18 @@
             font-family: var(--font-body);
             box-sizing: border-box;
         }
+
+        .materials-grouping-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.5rem 0 1.5rem;
+        }
+        .materials-grouping-toggle label {
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
     </style>
     </th:block>
 </head>
@@ -107,32 +119,39 @@
             </datalist>
         </div>
 
-        <div th:each="entry : ${materialsByKind}" class="kind-group mt-1-5">
-            <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-surface-input); padding: 0.5rem 1rem;" data-trigger="materials-toggle-kind">
-                <h2 style="margin: 0; font-family: var(--font-headline); font-size: 1.2rem; color: var(--color-primary);" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
-                <span class="toggle-icon" style="color: var(--color-primary); font-weight: bold; font-size: 1.5rem;">+</span>
-            </div>
-            
-            <div class="grid-auto-cards materialsGrid" style="margin-top: 1rem; display: none;">
-                <a th:href="@{/materials/{id}(id=${mat.id})}" th:each="mat : ${entry.value}" class="hud-box material-card">
-                    <h3 class="material-title">
-                        <span th:if="${mat.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat.isVolatileQt == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat.isVolatileTime == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat.name}">Material Name</span>
-                    </h3>
-                    
-                    <div class="price-info">
-                        <div>
-                            <div class="price-label" th:text="#{materials.minPriceBuy}">Min. Einkaufspreis</div>
-                            <div class="price-value" th:text="${mat.minPriceBuy != null ? #numbers.formatInteger(mat.minPriceBuy, 1, 'POINT') + ' aUEC' : '-'}">-</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div class="price-label" th:text="#{materials.maxPriceSell}">Max. Verkaufspreis</div>
-                            <div class="price-value" th:text="${mat.maxPriceSell != null ? #numbers.formatInteger(mat.maxPriceSell, 1, 'POINT') + ' aUEC' : '-'}">-</div>
-                        </div>
-                    </div>
-                </a>
+        <!--/*
+          View toggle: checked groups materials under the admin-defined categories (the accordion
+          in #materialsGrouped); unchecked hides the category grouping and shows every material in
+          one flat, alphabetically sorted grid (#materialsFlat). Pure presentation preference,
+          persisted per browser in localStorage by the script below (mirrors the sidebar-section
+          persistence pattern). Both views render the same card from fragments/material-card.html.
+        */-->
+        <div class="materials-grouping-toggle">
+            <input type="checkbox" id="groupByCategory" data-trigger="materials-toggle-grouping" checked>
+            <label for="groupByCategory" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>
+        </div>
+
+        <div id="materialsGrouped">
+            <div th:each="entry : ${materialsByKind}" class="kind-group mt-1-5">
+                <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-surface-input); padding: 0.5rem 1rem;" data-trigger="materials-toggle-kind">
+                    <h2 style="margin: 0; font-family: var(--font-headline); font-size: 1.2rem; color: var(--color-primary);" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
+                    <span class="toggle-icon" style="color: var(--color-primary); font-weight: bold; font-size: 1.5rem;">+</span>
+                </div>
+
+                <div class="grid-auto-cards materialsGrid" style="margin-top: 1rem; display: none;">
+                    <th:block th:each="mat : ${entry.value}">
+                        <div th:replace="~{fragments/material-card :: materialCard(${mat})}"></div>
+                    </th:block>
+                </div>
             </div>
         </div>
-        
+
+        <div id="materialsFlat" class="grid-auto-cards mt-1-5" style="display: none;">
+            <th:block th:each="mat : ${materials}">
+                <div th:replace="~{fragments/material-card :: materialCard(${mat})}"></div>
+            </th:block>
+        </div>
+
         <div id="noResultsMsg" style="display: none; text-align: center; color: var(--color-gray-2); margin-top: 2rem;" th:text="#{materials.list.noResults}">
             Keine Materialien gefunden.
         </div>
@@ -152,7 +171,52 @@
             : [];
         const inp = document.getElementById("materialFilter");
         if (inp) krtAutocomplete(inp, materialNames);
+
+        // Restore the saved grouping preference and show the matching view.
+        initGroupingView();
     });
+
+    // Per-browser persistence of the grouping preference (guarded so privacy modes that
+    // throw on storage access degrade to the default grouped view instead of breaking).
+    var GROUP_PREF_KEY = 'materials_group_by_category';
+    function readGroupPref() {
+        try { return localStorage.getItem(GROUP_PREF_KEY); } catch (e) { return null; }
+    }
+    function writeGroupPref(value) {
+        try { localStorage.setItem(GROUP_PREF_KEY, value); } catch (e) { /* storage unavailable */ }
+    }
+
+    function isGroupedMode() {
+        var box = document.getElementById("groupByCategory");
+        return !box || box.checked;
+    }
+
+    // Show #materialsGrouped (accordion) or #materialsFlat (flat alphabetical grid) to match the
+    // toggle, then re-apply the current text filter to whichever view is now visible.
+    function applyGroupingView() {
+        var grouped = isGroupedMode();
+        var groupedEl = document.getElementById("materialsGrouped");
+        var flatEl = document.getElementById("materialsFlat");
+        if (groupedEl) groupedEl.style.display = grouped ? "" : "none";
+        if (flatEl) flatEl.style.display = grouped ? "none" : "grid";
+        filterMaterials();
+    }
+
+    function initGroupingView() {
+        var box = document.getElementById("groupByCategory");
+        if (box) {
+            var pref = readGroupPref();
+            if (pref !== null) {
+                box.checked = pref === "1";
+            }
+        }
+        applyGroupingView();
+    }
+
+    function onToggleGrouping() {
+        writeGroupPref(isGroupedMode() ? "1" : "0");
+        applyGroupingView();
+    }
 
     function toggleKindGroup(element) {
         var content = element.nextElementSibling;
@@ -166,9 +230,23 @@
         }
     }
 
+    // Applies the text filter to whichever view is active and toggles the no-results message.
     function filterMaterials() {
         var input = document.getElementById("materialFilter");
-        var filter = input.value.toUpperCase();
+        var filter = (input ? input.value : "").toUpperCase();
+        var totalVisibleCount = isGroupedMode()
+            ? filterGroupedView(filter)
+            : filterFlatView(filter);
+
+        var noResults = document.getElementById("noResultsMsg");
+        if (noResults) {
+            noResults.style.display = totalVisibleCount === 0 ? "block" : "none";
+        }
+    }
+
+    // Category-grouped view: filter cards within each .kind-group, hide empty groups, and
+    // auto-expand the surviving groups while a filter is active. Returns the visible-card count.
+    function filterGroupedView(filter) {
         var groups = document.getElementsByClassName("kind-group");
         var totalVisibleCount = 0;
 
@@ -187,15 +265,15 @@
                     } else {
                         cards[i].style.display = "none";
                     }
-                }       
+                }
             }
-            
+
             if (visibleInGroup === 0) {
                 group.style.display = "none";
             } else {
                 group.style.display = "";
                 totalVisibleCount += visibleInGroup;
-                
+
                 // If filtering is active, auto-expand groups
                 var content = group.querySelector('.materialsGrid');
                 var icon = group.querySelector('.toggle-icon');
@@ -205,13 +283,28 @@
                 }
             }
         }
-        
-        var noResults = document.getElementById("noResultsMsg");
-        if(totalVisibleCount === 0) {
-            noResults.style.display = "block";
-        } else {
-            noResults.style.display = "none";
+        return totalVisibleCount;
+    }
+
+    // Flat view: filter the single #materialsFlat grid of all cards. Returns the visible-card count.
+    function filterFlatView(filter) {
+        var container = document.getElementById("materialsFlat");
+        if (!container) {
+            return 0;
         }
+        var cards = container.getElementsByClassName("material-card");
+        var visibleCount = 0;
+        for (var i = 0; i < cards.length; i++) {
+            var title = cards[i].getElementsByClassName("material-title")[0];
+            var txtValue = title ? (title.textContent || title.innerText) : "";
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                cards[i].style.display = "";
+                visibleCount++;
+            } else {
+                cards[i].style.display = "none";
+            }
+        }
+        return visibleCount;
     }
 
     // CSP-safe delegated bindings (replace the historical onkeyup="filterMaterials()" and
@@ -219,6 +312,7 @@
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('keyup', 'materials-filter', filterMaterials);
         window.krtEvents.on('click', 'materials-toggle-kind', function (el) { toggleKindGroup(el); });
+        window.krtEvents.on('change', 'materials-toggle-grouping', onToggleGrouping);
     }
 </script>
 </body>

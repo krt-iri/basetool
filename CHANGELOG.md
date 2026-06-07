@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Auf den Handelsseiten „Materialien" und „Material-Übersicht" lässt sich die Gruppierung nach den von Admins angelegten Kategorien per Schalter „Nach Kategorie gruppieren" abschalten.** Ohne Gruppierung erscheinen alle Materialien in der normalen alphabetischen Sortierung der Seite; die Auswahl wird pro Browser gespeichert und lässt sich jederzeit wieder umschalten.
+
 - **Im Profil lässt sich jetzt eine persönliche Standard-Auszahlungsart (Auszahlen oder Spenden) festlegen, die bei jeder Einsatz-Anmeldung vorausgewählt wird.** Wer immer spendet (oder immer auszahlt), muss das nicht mehr in jedem Einsatz einzeln umstellen; die Auswahl pro Einsatz bleibt änderbar und bestehende Teilnahmen ändern sich nicht (Migration V142).
 
 - **Jedes Mengenfeld für SCU-Materialien hat jetzt ein „?"-Symbol, das per Maus-Hover oder Tastaturfokus einen Hinweis einblendet:** „Eingabe in SCU. cSCU ist 0,01 SCU. µSCU ist 0,001 SCU." So ist klar, dass Bruchteile erlaubt sind. Greift in Lager-Einbuchung, Aus-/Umbuchung, Material- und Item-Auftrag, Material-Eintragung, Übergabe und Raffinerie-Einlagerung; bei Stück-Materialien bleibt der Hinweis aus.
