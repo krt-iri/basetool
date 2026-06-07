@@ -386,7 +386,7 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessPublicMission_isVisibleToEveryone() {
-      // #472: an ownerless leadership ("Bereichsleitung") mission carries no owning OrgUnit. When
+      // An ownerless leadership ("Bereichsleitung") mission carries no owning OrgUnit. When
       // public (not internal) it is visible to everyone, anonymous visitors included — the default
       // the create flow stamps for a membershipless leadership owner.
       UUID missionId = UUID.randomUUID();
@@ -455,8 +455,7 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessMission_passesPerRowEditCheck() {
-      // #472: an ownerless leadership mission has no owning OrgUnit to scope against, so the
-      // per-row
+      // An ownerless leadership mission has no owning OrgUnit to scope against, so the per-row
       // canEditMission check is a no-op (true). The real write restriction is then
       // MissionSecurityService.canManageMission's role/owner gate (see MissionSecurityServiceTest).
       UUID missionId = UUID.randomUUID();

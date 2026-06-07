@@ -391,7 +391,7 @@ class MissionServiceTest {
 
   @Test
   void createMission_membershiplessLeadershipOwner_stampsNullOwningOrgUnit() {
-    // #472: a "Bereichsleitung" user belongs to no Staffel/SK but may plan org-wide missions. The
+    // A "Bereichsleitung" user belongs to no Staffel/SK but may plan org-wide missions. The
     // nullable picker resolver returns null for such a membershipless owner (instead of 400ing), so
     // the mission persists ownerless — attributable through its owner and public unless internal.
     User caller = new User();

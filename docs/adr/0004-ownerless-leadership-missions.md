@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-07
 - **Deciders:** Repository owner (@greluc)
-- **Related:** spec [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003/004/009` · [`security-and-access.md`](../specs/security-and-access.md) · [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md) §3.5 · issue #472
+- **Related:** spec [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003/004/009` · [`security-and-access.md`](../specs/security-and-access.md) · [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md) §3.5 · direct production report (no tracking issue)
 
 ## Context
 
@@ -19,7 +19,7 @@ has leadership roles ("Bereichsleitung") that sit **above** every Staffel and SK
 belong to no OrgUnit. Such a user is authenticated and carries the `officer` role, so the mission
 create endpoint (`isAuthenticated()`) admits them — but the create **service** routed through the
 *strict* `resolveOrgUnitForPickerOutput`, which 400s a membershipless user. Result: a real
-production report (#472) of a leadership user unable to create any mission. The requirement is that
+production report of a leadership user unable to create any mission. The requirement is that
 such a user can create a mission that is public by default and hidden when marked internal.
 
 ## Decision

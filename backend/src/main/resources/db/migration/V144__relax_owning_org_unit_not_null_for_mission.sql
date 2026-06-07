@@ -1,5 +1,5 @@
 -- =============================================================================
--- Ownerless leadership missions (#472 follow-up) — DROP NOT NULL on
+-- Ownerless leadership missions — DROP NOT NULL on
 -- `mission.owning_org_unit_id`.
 --
 -- Context: V99/V102 tightened `owning_org_unit_id` to NOT NULL on every
