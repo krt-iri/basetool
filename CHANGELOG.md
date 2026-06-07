@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Im Admin-Terminal wurde bei unbekanntem UEX-Wert in der deutschen Oberfläche „2013" statt des Gedankenstrichs „–" angezeigt; das ist korrigiert.**
+
 ## [v0.4.2](https://github.com/krt-iri/basetool/releases/tag/v0.4.2) - 2026-06-07
 
 ### Changed
