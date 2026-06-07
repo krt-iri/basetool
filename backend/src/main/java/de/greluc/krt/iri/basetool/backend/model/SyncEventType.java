@@ -98,5 +98,16 @@ public enum SyncEventType {
    * filter). Inserted as {@code source_systems = P4K} (items / ships / materials) so it is clearly
    * attributable and reviewable; the game DCB is the upstream source the live game itself reads.
    */
-  CREATED_FROM_P4K
+  CREATED_FROM_P4K,
+
+  /**
+   * Wiki blueprint sync (#327): a curated {@code blueprint.output_name} correction (see {@code
+   * BlueprintOutputNameOverrides}) is registered for a {@code scwiki_key} that the feed still
+   * carries this run, but its {@code expectedWrongName} no longer matches the incoming name — so
+   * the guarded override did <em>not</em> fire. That means CIG (and the SC Wiki mirror) changed the
+   * upstream name, the override is obsolete, and an operator should delete its entry. Emitted once
+   * per obsolete override per run; the {@code detail} carries the key, the now-current upstream
+   * name, and the name the override expected.
+   */
+  BLUEPRINT_NAME_OVERRIDE_OBSOLETE
 }
