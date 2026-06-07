@@ -1,6 +1,6 @@
 ---
 name: release-notes
-description: Use this skill to write user-facing release notes / "Was ist neu" / Änderungsübersicht / Patch Notes / Update-Ankündigung for the Profit Basetool app, starting from a given point in time (a date, a git tag like v0.3.40, a release, or a commit). It turns the technical German CHANGELOG.md and git history into friendly, non-technical release notes for the squadron's normal members, grouped into Neu / Verbesserungen / Fehlerbehebungen. As part of the same run it also tidies CHANGELOG.md itself: entries still sitting under `[Unreleased]` that have already shipped under a git tag (`vX.Y.Z`) are moved into that tag's own dated section. Trigger this whenever the user wants to communicate recent changes to end users — e.g. "schreib Release Notes seit v0.3.40", "was ist neu seit dem 15.05 für die Nutzer", "fasse die letzten Änderungen für die Mitglieder zusammen", "Update-Ankündigung für die letzten zwei Wochen" — even when they don't say the words "release notes". When the user gives no start point at all, the skill automatically resumes from where the last release notes ended, using a local, git-ignored progress marker (.release-notes-state.json) so nobody has to remember the last covered point.
+description: Use this skill to write user-facing release notes / "Was ist neu" / Änderungsübersicht / Patch Notes / Update-Ankündigung for the Profit Basetool app, starting from a given point in time (a date, a git tag like v0.3.40, a release, or a commit). It turns the technical German CHANGELOG.md and git history into friendly, non-technical release notes for the squadron's normal members, grouped into Neu / Verbesserungen / Fehlerbehebungen. As part of the same run it also tidies CHANGELOG.md itself: entries still sitting under `[Unreleased]` that have already shipped under a git tag (`vX.Y.Z`) are moved into that tag's own dated section. Trigger this whenever the user wants to communicate recent changes to end users — e.g. "schreib Release Notes seit v0.3.40", "was ist neu seit dem 15.05 für die Nutzer", "fasse die letzten Änderungen für die Mitglieder zusammen", "Update-Ankündigung für die letzten zwei Wochen" — even when they don't say the words "release notes". When the user gives no start point at all, the skill automatically resumes from where the last release notes ended, using a local progress marker (.release-notes-state.json) kept in the shared git directory so it is shared across all worktrees and nobody has to remember the last covered point.
 user-invocable: true
 ---
 
@@ -36,9 +36,13 @@ entsprechend:
 - **Commit-SHA** → Bereich `<sha>..HEAD`.
 
 Optional: ein **Endpunkt** (Standard = jetzt / `HEAD`; akzeptiert dieselben Formen
-wie der Startpunkt — Datum, Datum mit Uhrzeit oder Ref) und ein **Versions-Label**
-für die optionale Unterzeile (z. B. die geplante neue Versionsnummer). Der Titel
-selbst ist immer das Datums-Fenster (siehe Ausgabeformat), unabhängig vom Label.
+wie der Startpunkt — Datum, Datum mit Uhrzeit oder Ref). Eine **Versions-Unterzeile**
+steht **immer** unter dem Titel — standardmäßig mit der *aktuellen released Version*
+(dem neuesten `vX.Y.Z`-Tag am Fenster-Ende), die das Hilfsskript als
+`SUGGESTED SUBTITLE` fertig ausgibt. Nennt der Nutzer ausdrücklich ein eigenes
+**Versions-Label** (z. B. eine noch ungetaggte geplante Nummer), nimm dieses statt
+des erkannten Tags. Der Titel selbst bleibt immer das Datums-Fenster (siehe
+Ausgabeformat), unabhängig vom Label.
 
 **Fehlt der Startpunkt komplett, ist das der Normalfall** — und du musst nicht
 nachfragen: Der Skill setzt automatisch dort fort, wo die letzten Release Notes
@@ -51,14 +55,22 @@ rate nicht. Das Hilfsskript sagt dir von selbst, welcher der beiden Fälle vorli
 ## Automatisches Fortschritts-Tracking (lokal, nie committet)
 
 Damit niemand sich merken muss, bis wohin die letzten Release Notes gingen, merkt
-sich der Skill das selbst — in einer **lokalen** Datei `.release-notes-state.json`
-im Repo-Wurzelverzeichnis. Sie hält den Commit fest, bis zu dem zuletzt Notes
-erstellt wurden, dazu das neueste darin enthaltene Release-Tag und dessen Datum.
+sich der Skill das selbst — in einer **lokalen** Datei `.release-notes-state.json`.
+Sie liegt im **gemeinsamen Git-Verzeichnis** (`git rev-parse --git-common-dir`,
+also `.git/.release-notes-state.json`) und hält den Commit fest, bis zu dem zuletzt
+Notes erstellt wurden, dazu das neueste darin enthaltene Release-Tag und dessen
+Datum.
 
-- **Die Datei wird nie eingecheckt.** Sie steht in `.gitignore`, und jedes
-  Schreiben trägt den Eintrag erneut ein und prüft per git, dass die Datei
-  wirklich ignoriert wird. Es ist reines lokales Tracking — beliebig löschbar, geht
-  nie ins Repo.
+- **Ein Marker für alle Worktrees.** Das gemeinsame Git-Verzeichnis ist aus dem
+  Haupt-Checkout *und* aus jedem `git worktree` dieselbe Stelle und liegt außerhalb
+  jedes Arbeitsbaums — der Marker wird also über alle Worktrees geteilt und kann nie
+  committet werden. **Das ist der entscheidende Punkt:** Jede `/release-notes`-Sitzung
+  läuft hier in einem frischen Wegwerf-Worktree, und git-ignorierte Dateien wandern
+  *nicht* zwischen Worktrees. Läge der Marker wie früher im Wurzelverzeichnis des
+  Arbeitsbaums, sähe ihn der nächste Lauf nie — genau dieser Fehler ließ das
+  Fortsetzen stillschweigend scheitern. (Nur falls sich das Git-Verzeichnis nicht auflösen lässt,
+  fällt der Skill auf das Wurzelverzeichnis + `.gitignore`-Eintrag zurück.) Reines
+  lokales Tracking — beliebig löschbar, geht nie ins Repo.
 - **Gelesen wird automatisch:** Läuft `gather_changes.py` ohne `--since`, nimmt es
   den gespeicherten Commit als Startpunkt (`<Commit>..HEAD`) und blendet im
   Changelog genau die Release-Abschnitte ein, die nach diesem Punkt geschnitten
@@ -255,6 +267,12 @@ Hilfsskript gibt diesen Titel oben als `SUGGESTED TITLE` bereits fertig aus —
 übernimm ihn wörtlich (nicht „01.06.-02.06." o. Ä., nicht ohne Pfeil, nicht mit
 Jahr).
 
+**Direkt darunter steht immer die Versions-Unterzeile** (die zweite nicht-leere
+Zeile) in der Form `_Version <Version> · Stand <TT.MM.JJJJ>_` — das Hilfsskript gibt
+sie als `SUGGESTED SUBTITLE` ebenfalls fertig aus. Standard-`<Version>` ist die
+aktuelle released Version (neuestes `vX.Y.Z`-Tag am Fenster-Ende). Details siehe
+»Verbindliche Stil- und Formatregeln«.
+
 ### Verbindliche Stil- und Formatregeln
 
 Damit jede Release Note **immer gleich aussieht**, gelten diese Format-Vorgaben
@@ -267,9 +285,14 @@ fest — nicht von Lauf zu Lauf abweichen:
   umbenennen). **Keine H3 oder tiefer.** Eine lange Rubrik wird nicht über weitere
   Überschriften untergliedert, sondern über die fett gesetzten Schlagwörter der
   Punkte — so bleibt die Größenhierarchie in jeder Note identisch.
-- **Optionale Unterzeile:** direkt unter dem Titel eine **kursive** Zeile
-  `_Version <Label> · Stand <TT.MM.JJJJ>_`. Nur wenn ein Versions-Label vorliegt,
-  sonst komplett weglassen (keine leere Platzhalterzeile).
+- **Pflicht-Unterzeile (Version):** direkt unter dem Titel steht **immer** eine
+  **kursive** Zeile `_Version <Version> · Stand <TT.MM.JJJJ>_`. `<Version>` ist die
+  aktuelle released Version (das neueste `vX.Y.Z`-Tag am Fenster-Ende), `Stand` das
+  Datum der letzten enthaltenen Änderung (mit Jahr). Übernimm sie wörtlich aus der
+  `SUGGESTED SUBTITLE`-Zeile des Hilfsskripts; nur wenn der Nutzer ein eigenes Label
+  vorgibt, ersetzt dieses die Version. Niemals die Zeile weglassen — nur falls das
+  Repository noch gar kein Release-Tag hat, ausnahmsweise die geplante Version
+  eintragen.
 - **Highlights = Fließtext-Absatz, kein Aufzählungspunkt.** Unter `## Highlights`
   steht ein kurzer Absatz aus 1–3 ganzen Sätzen, der die größten Neuerungen nennt;
   die wichtigsten Bereiche darin **fett**. Nur bei längeren Notes (Faustregel: ab
@@ -294,7 +317,7 @@ fest — nicht von Lauf zu Lauf abweichen:
 ```markdown
 # Release Notes (TT.MM. → TT.MM.)
 
-_Version <Label> · Stand <TT.MM.JJJJ>_   <!-- optionale Unterzeile, nur falls ein Versions-Label vorliegt -->
+_Version <aktuelle released Version, z. B. v0.4.0> · Stand <TT.MM.JJJJ>_   <!-- Pflicht: immer 2. Zeile; Wortlaut aus SUGGESTED SUBTITLE -->
 
 ## Highlights
 <Kurzer Fließtext-Absatz, kein Aufzählungspunkt: 1–3 ganze Sätze zu den größten Neuerungen, wichtigste Bereiche **fett** — nur bei längeren Notes.>
@@ -385,8 +408,9 @@ python .claude/skills/release-notes/scripts/track_release_notes.py --set
   überschreiben, etwa nach einem absichtlichen History-Rewrite.
 - **Gab es nichts Neues** (Schritt 1 meldete „nothing new"), ist kein `--set` nötig
   — der Marker bleibt, wo er ist.
-- Die `.release-notes-state.json` **nie committen** — sie ist und bleibt lokal
-  (`.gitignore` sorgt dafür, der Schritt prüft es zusätzlich).
+- Die `.release-notes-state.json` **nie committen** — sie liegt im gemeinsamen
+  Git-Verzeichnis (`git rev-parse --git-common-dir`), also außerhalb jedes
+  Arbeitsbaums, und ist damit über alle Worktrees geteilt und unkommittierbar.
 
 ## Best Practices für Release Notes (Leitlinien mit Begründung)
 
@@ -415,8 +439,9 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 8. **Handlungsbedarf klar benennen.** Falls der Nutzer etwas tun muss (neu
    importieren, neu anmelden, Cache leeren) oder eine sichtbare Einschränkung
    bleibt (z. B. „Preise laufen bis zu 10 Min. nach"), sag es ausdrücklich und früh.
-9. **Versions-Label und Datum** gehören in den Kopf — Notes ohne Bezugspunkt sind
-   wertlos.
+9. **Version und Datum** gehören **immer** in den Kopf (die kursive Pflicht-Unterzeile
+   unter dem Titel) — Notes ohne Bezugspunkt sind wertlos. Standard ist die aktuelle
+   released Version; nur ein ausdrücklich genanntes Label ersetzt sie.
 10. **Keine internen Referenzen.** Keine PR-/Issue-Nummern, Dateinamen,
     Migrations-IDs, API-Pfade oder Branch-Namen im Nutzertext.
 
@@ -426,6 +451,7 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 - [ ] Nur nutzersichtbare Punkte; alle „Rendering unverändert"/intern-Einträge raus.
 - [ ] Kein Jargon mehr: keine Pfade, `V###`, Framework-Namen, HTTP-Codes, PR-Nummern.
 - [ ] Erste Zeile = Titel „Release Notes (TT.MM. → TT.MM.)" mit korrektem Fenster.
+- [ ] Zweite Zeile = kursive Pflicht-Unterzeile „_Version <aktuelle released Version> · Stand <TT.MM.JJJJ>_" (Wortlaut aus SUGGESTED SUBTITLE).
 - [ ] Drei Rubriken, Wichtigstes zuerst, verwandte Punkte gebündelt.
 - [ ] Einheitliches Format (verbindliche Stil- und Formatregeln): genau eine H1,
       Rubriken als H2 (keine H3+), Highlights als Fließtext-Absatz, jeder Punkt als
@@ -437,5 +463,6 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 - [ ] CHANGELOG nachgeführt (Schritt 6): Probelauf geprüft, dann `--write`; veröffentlichte
       `[Unreleased]`-Einträge stehen unter ihrem `## [vX.Y.Z]`-Abschnitt, `git diff` gesichtet.
 - [ ] Fortschrittsmarker fortgeschrieben (Schritt 7): nach fertigen Notes
-      `track_release_notes.py --set` ausgeführt; `.release-notes-state.json` ist git-ignored
-      und wird nicht committet. (Bei „nothing new" entfällt das Setzen.)
+      `track_release_notes.py --set` ausgeführt; `.release-notes-state.json` liegt im
+      gemeinsamen Git-Verzeichnis (über alle Worktrees geteilt) und wird nie committet.
+      (Bei „nothing new" entfällt das Setzen.)

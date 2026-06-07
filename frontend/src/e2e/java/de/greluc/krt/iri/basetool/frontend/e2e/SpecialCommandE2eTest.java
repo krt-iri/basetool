@@ -108,8 +108,10 @@ class SpecialCommandE2eTest {
         E2eSupport.clickSubmitClearingFooter(page.locator("#sc-form button[type='submit']"));
         page.waitForLoadState();
         // Re-load the list fresh (as the other create flows do); asserting on the post-submit page
-        // directly proved flaky. Match the new SK by its table row, not a bare text locator.
-        page.navigate(baseUrl + "/admin/special-commands");
+        // directly proved flaky. Match the new SK by its table row, not a bare text locator. Via
+        // the retry helper — WebKit can abort this post-submit GET (HTTP/2 INTERNAL_ERROR). See
+        // E2eSupport#navigate.
+        E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
         assertThat(
                 page.locator("tbody tr").filter(new Locator.FilterOptions().setHasText(SK_UI_NAME)))

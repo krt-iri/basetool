@@ -137,8 +137,10 @@ class JobOrderHandoverE2eTest {
         // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
         E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-handover-submit").click());
 
-        // The recorded handover must appear in the order's handover table.
-        page.navigate(baseUrl + "/orders/" + jobOrderId);
+        // The recorded handover must appear in the order's handover table. The post-submit GET goes
+        // through the retry helper — WebKit can abort it (HTTP/2 INTERNAL_ERROR) even after the
+        // redirect settled. See E2eSupport#navigate.
+        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
         assertThat(
                 page.getByTestId("order-handover-row")
                     .filter(new Locator.FilterOptions().setHasText("E2E Recipient")))

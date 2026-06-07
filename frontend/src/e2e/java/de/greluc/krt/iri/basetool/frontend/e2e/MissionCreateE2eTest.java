@@ -115,7 +115,9 @@ class MissionCreateE2eTest {
         page.waitForLoadState();
 
         // Back on the list, the freshly created mission must be present (auto-waiting assertion).
-        page.navigate(baseUrl + "/missions");
+        // Post-submit GET via the retry helper — WebKit can abort it (HTTP/2 INTERNAL_ERROR) even
+        // after the redirect settled. See E2eSupport#navigate.
+        E2eSupport.navigate(page, baseUrl + "/missions");
         assertThat(
                 page.getByTestId("mission-row")
                     .filter(new Locator.FilterOptions().setHasText(missionName)))
