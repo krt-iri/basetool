@@ -376,31 +376,30 @@ public class MissionController {
   }
 
   /**
-   * Strict redaction for mission "outsiders" — anonymous callers AND authenticated but role-less
-   * {@code GUEST} accounts (see {@link
-   * de.greluc.krt.iri.basetool.backend.service.AuthHelperService#isMemberOrAbove()}). On top of the
-   * peer-level {@link #cleanupMissionForGuest} stripping (owner/managers/internal
-   * inventory/refinery orders), this additionally hides everything an outsider must not see on the
-   * public mission surface: the <b>description</b>, the owning <b>organisation</b> ({@code
-   * owningSquadron}), the <b>participant roster</b> (and with it every participant's payout
-   * preference), the assigned <b>units</b>, the mission <b>frequencies</b> (surfaced in the
-   * "Organisation" panel next to the lead positions), and the <b>payout/operation</b> linkage.
-   * Participant, unit and frequency collections are emptied rather than nulled so server-rendered
-   * callers (the Thymeleaf frontend) can iterate them without a null check. Sub-missions are
-   * redacted recursively at the same level.
+   * Redaction for mission "outsiders" — anonymous callers AND authenticated but role-less {@code
+   * GUEST} accounts (see {@link
+   * de.greluc.krt.iri.basetool.backend.service.AuthHelperService#isMemberOrAbove()}). It applies
+   * the member-peer {@link #cleanupMissionForGuest} pass (owner / managers / internal inventory /
+   * refinery orders cleared, participant PII stripped to the public callsign tuple) and
+   * additionally hides only the free-text <b>description</b>.
    *
-   * <p>What stays visible: the mission name, calendar link, status, the schedule timestamps, the
-   * {@code isInternal} flag (internal missions never reach an outsider — {@code canSeeMission}
-   * gates them out), the registered/checked-in counts, and the public party-lead designation. The
-   * {@code ForGuest} suffix is required by the {@code
-   * anonymousReadableMissionEndpointsMustRedactGuestPii} ArchUnit rule, which recognises this
-   * method as a valid guest-redaction call site.
+   * <p>By explicit product decision an outsider <b>does</b> see — on a non-internal mission — the
+   * owning <b>organisation</b> ({@code owningSquadron}), the <b>participant roster</b> with each
+   * participant's <b>payout preference</b> (PII removed by the peer pass), the assigned
+   * <b>units</b> and the mission <b>frequencies</b>. The only things kept from an outsider beyond
+   * the member-peer redaction are the description (here) and the finance ledger (the {@code
+   * /finance-entries} endpoints stay member-only — they are a separate surface, not part of this
+   * DTO). Sub-missions are redacted recursively at the same outsider level so their descriptions
+   * are hidden too. The {@code ForGuest} suffix + the delegated {@link #cleanupMissionForGuest}
+   * call satisfy the {@code anonymousReadableMissionEndpointsMustRedactGuestPii} ArchUnit rule.
    *
    * @param dto the full mission DTO straight from the mapper
-   * @return a copy carrying only the minimal, non-sensitive fields an outsider may see
+   * @return a copy with participant PII + owner/managers/internal economy stripped and the
+   *     description hidden, but organisation, roster, units, frequencies and payout preference kept
    */
   private MissionDto cleanupOutsiderMissionForGuest(MissionDto dto) {
-    Set<MissionDto> cleanedSubMissions =
+    MissionDto peer = cleanupMissionForGuest(dto);
+    Set<MissionDto> outsiderSubMissions =
         dto.subMissions() == null
             ? null
             : dto.subMissions().stream()
@@ -408,38 +407,38 @@ public class MissionController {
                 .collect(Collectors.toSet());
 
     return new MissionDto(
-        dto.id(),
-        dto.name(),
-        null, // description — hidden from outsiders
-        dto.calendarLink(),
-        dto.status(),
-        dto.meetingTime(),
-        dto.plannedStartTime(),
-        dto.actualStartTime(),
-        dto.plannedEndTime(),
-        dto.actualEndTime(),
-        dto.isInternal(),
-        Collections.emptySet(), // participants (+ their payout preference) — hidden from outsiders
-        Collections.emptyList(), // assignedUnits — hidden from outsiders
-        Collections.emptyList(), // frequencies (shown in the "Organisation" panel) — hidden
-        cleanedSubMissions,
-        Collections.emptyList(), // inventoryEntries
-        Collections.emptyList(), // refineryOrders
-        null, // operation (payout linkage) — hidden from outsiders
-        null, // owner
-        null, // managers
-        false, // canEdit
-        false, // canManageManagers
-        dto.version(),
-        dto.coreVersion(),
-        dto.scheduleVersion(),
-        dto.flagsVersion(),
-        dto.checkedInParticipants(),
-        dto.registeredParticipants(),
-        null, // owningSquadron (organisation) — hidden from outsiders
-        dto.partyLeadUser(),
-        dto.partyLeadGuestName(),
-        dto.partyLeadVersion());
+        peer.id(),
+        peer.name(),
+        null, // description — the only field hidden on top of the member-peer redaction
+        peer.calendarLink(),
+        peer.status(),
+        peer.meetingTime(),
+        peer.plannedStartTime(),
+        peer.actualStartTime(),
+        peer.plannedEndTime(),
+        peer.actualEndTime(),
+        peer.isInternal(),
+        peer.participants(), // roster kept (PII already stripped by the peer pass)
+        peer.assignedUnits(), // units kept
+        peer.frequencies(), // frequencies kept
+        outsiderSubMissions,
+        peer.inventoryEntries(), // already empty
+        peer.refineryOrders(), // already empty
+        peer.operation(),
+        peer.owner(), // already null
+        peer.managers(), // already null
+        peer.canEdit(), // already false
+        peer.canManageManagers(), // already false
+        peer.version(),
+        peer.coreVersion(),
+        peer.scheduleVersion(),
+        peer.flagsVersion(),
+        peer.checkedInParticipants(),
+        peer.registeredParticipants(),
+        peer.owningSquadron(), // organisation kept
+        peer.partyLeadUser(),
+        peer.partyLeadGuestName(),
+        peer.partyLeadVersion());
   }
 
   /**
@@ -1971,27 +1970,14 @@ public class MissionController {
             request.orgUnitIds());
     java.util.stream.Stream<MissionParticipantDto> participants =
         mission.getParticipants().stream().map(missionMapper::toDto);
-    // C-1 (anonymous) + H-5 (authenticated non-Officer): every caller below Officer+ gets the
-    // peer-redacted user shape. The mission roster UI works fine with the slim fields (callsign,
-    // displayName, rank); only Officer / Admin (moderation) and {@code /users/me} (the caller's
-    // own row) need full PII. The ArchUnit rule
+    // C-1 (anonymous + guest) + H-5 (authenticated non-Officer): every caller below Logistician+
+    // gets the peer-redacted user shape — outsiders (anonymous / role-less GUEST) and
+    // non-privileged
+    // members alike see the full roster but only the public callsign tuple (username, displayName,
+    // rank), never email / real name. The ArchUnit rule
     // {@code anonymousReadableMissionEndpointsMustRedactGuestPii} statically enforces this for any
     // future endpoint added with the same {@code @ownerScopeService.canSeeMission(#id)} gate.
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      // Outsiders (anonymous OR authenticated role-less GUEST) must not see the participant roster
-      // (treat guest like anonymous): return ONLY the caller's own just-added participant,
-      // PII-redacted, instead of the full list.
-      final UUID addedUserId = finalUserId;
-      final String addedGuestName = finalGuestName;
-      participants =
-          participants
-              .filter(
-                  p ->
-                      (addedUserId != null && p.user() != null && addedUserId.equals(p.user().id()))
-                          || (addedGuestName != null
-                              && addedGuestName.equalsIgnoreCase(p.guestName())))
-              .map(this::cleanupParticipantForGuest);
-    } else if (!authHelperService.isLogisticianOrAbove()) {
+    if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
       participants = participants.map(this::cleanupParticipantForGuest);
     }
     return participants.toList();

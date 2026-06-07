@@ -55,18 +55,18 @@ auf `permitAll()` gesetzt; im Backend eine explizit aufgezählte Liste von
 
 ### 1.1 Was anonyme Nutzer dürfen
 
-| Fähigkeit                                                                                                                                                                                               | Endpunkt(e)                                                                                                                                | Gate                                                     |
-|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------|
-| **Stammdaten lesen** (Materialien, Locations, Schiffstypen, Hersteller, Refining-Methoden, Sternensysteme, Job-Typen, Frequenztypen, System-Settings, Staffel-Liste)                                    | `GET /api/v1/{materials,locations,ship-types,manufacturers,refining-methods,star-systems,job-types,frequency-types,settings,squadrons}/**` | URL `permitAll`, kein Method-Gate                        |
-| **Einsätze (Missionen) durchblättern** — nur **nicht-interne** Missionen, Detailansicht **redigiert** (ohne Beschreibung, Organisation, Teilnehmerliste, Einheiten, Frequenzen, Auszahlung; siehe §1.3) | `GET /api/v1/missions`, `/search`, `/next`, `/{id}`                                                                                        | `@ownerScopeService.canSeeMission` (intern = unsichtbar) |
-| **Warenauftrag anlegen** (Material-Auftrag)                                                                                                                                                             | `POST /api/v1/orders`                                                                                                                      | `permitAll()`                                            |
-| **Item-Auftrag anlegen** (Fertigteil-Bestellung mit auto-abgeleiteten Materialien)                                                                                                                      | `POST /api/v1/orders/items`                                                                                                                | `permitAll()`                                            |
-| **Bestellbaren Item-Katalog durchsuchen**                                                                                                                                                               | `GET /api/v1/orders/item-catalog/**`                                                                                                       | `permitAll()`                                            |
-| **Sich bei einem (nicht-internen) Einsatz als Gast anmelden** — mit frei wählbarem `guestName`                                                                                                          | `POST /api/v1/missions/{id}/participants/add`, `/participants/slim`                                                                        | `@ownerScopeService.canSeeMission`                       |
-| **Ein-/Auschecken** beim Einsatz                                                                                                                                                                        | `POST /api/v1/missions/{id}/participants/{pid}/check-in[/slim]`, `…/check-out[/slim]`                                                      | `@missionSecurityService.canAccessParticipant`           |
-| **Eigenen Gast-Teilnehmer bearbeiten** (Job-Typ, Schiff, Kommentar, Zeiten)                                                                                                                             | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                      | `canAccessParticipant`                                   |
-| **Auszahlungsart ändern** (Auszahlungspräferenz, z. B. `DONATE`)                                                                                                                                        | `PUT /api/v1/missions/{id}/participants/{pid}/payout-preference[/slim]`                                                                    | `canAccessParticipant`                                   |
-| **Eigenen Gast-Teilnehmer entfernen**                                                                                                                                                                   | `DELETE /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                   | `canAccessParticipant`                                   |
+| Fähigkeit                                                                                                                                                                                                                  | Endpunkt(e)                                                                                                                                | Gate                                                     |
+|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------|
+| **Stammdaten lesen** (Materialien, Locations, Schiffstypen, Hersteller, Refining-Methoden, Sternensysteme, Job-Typen, Frequenztypen, System-Settings, Staffel-Liste)                                                       | `GET /api/v1/{materials,locations,ship-types,manufacturers,refining-methods,star-systems,job-types,frequency-types,settings,squadrons}/**` | URL `permitAll`, kein Method-Gate                        |
+| **Einsätze (Missionen) durchblättern** — nur **nicht-interne** Missionen, Detailansicht **redigiert** (ohne Beschreibung + PII; Organisation, Teilnehmerliste, Einheiten, Frequenzen, Auszahlungsart sichtbar; siehe §1.3) | `GET /api/v1/missions`, `/search`, `/next`, `/{id}`                                                                                        | `@ownerScopeService.canSeeMission` (intern = unsichtbar) |
+| **Warenauftrag anlegen** (Material-Auftrag)                                                                                                                                                                                | `POST /api/v1/orders`                                                                                                                      | `permitAll()`                                            |
+| **Item-Auftrag anlegen** (Fertigteil-Bestellung mit auto-abgeleiteten Materialien)                                                                                                                                         | `POST /api/v1/orders/items`                                                                                                                | `permitAll()`                                            |
+| **Bestellbaren Item-Katalog durchsuchen**                                                                                                                                                                                  | `GET /api/v1/orders/item-catalog/**`                                                                                                       | `permitAll()`                                            |
+| **Sich bei einem (nicht-internen) Einsatz als Gast anmelden** — mit frei wählbarem `guestName`                                                                                                                             | `POST /api/v1/missions/{id}/participants/add`, `/participants/slim`                                                                        | `@ownerScopeService.canSeeMission`                       |
+| **Ein-/Auschecken** beim Einsatz                                                                                                                                                                                           | `POST /api/v1/missions/{id}/participants/{pid}/check-in[/slim]`, `…/check-out[/slim]`                                                      | `@missionSecurityService.canAccessParticipant`           |
+| **Eigenen Gast-Teilnehmer bearbeiten** (Job-Typ, Schiff, Kommentar, Zeiten)                                                                                                                                                | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                      | `canAccessParticipant`                                   |
+| **Auszahlungsart ändern** (Auszahlungspräferenz, z. B. `DONATE`)                                                                                                                                                           | `PUT /api/v1/missions/{id}/participants/{pid}/payout-preference[/slim]`                                                                    | `canAccessParticipant`                                   |
+| **Eigenen Gast-Teilnehmer entfernen**                                                                                                                                                                                      | `DELETE /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                   | `canAccessParticipant`                                   |
 
 **Warum die Teilnehmer-Endpunkte anonym funktionieren:** Ein **Gast-Teilnehmer
 ist nicht mit einem Benutzerkonto verknüpft** (`participant.user == null`).
@@ -96,10 +96,11 @@ So landet jeder Gast-Auftrag in einer definierten SK-Warteschlange statt im Nich
   verlangt Mitglied-oder-höher (`isMemberOrAbove`). Anonym → `401`, ein eingeloggter
   **Guest** → `403` (siehe „Anonym ≈ Rolle Guest" unten). Das Anlegen von Finanz-Einträgen
   ist damit **nicht mehr anonym**.
-- **Beschreibung, Organisation, Teilnehmerliste, Einheiten, Frequenzen und Auszahlung eines
-  Einsatzes sehen** — diese Detail-Sektionen werden in der öffentlichen Mission-Antwort
-  serverseitig entfernt (§1.3). Anmelden + den eigenen Gast-Teilnehmer pflegen bleibt
-  möglich, die Roster-/Auszahlungssicht nicht.
+- **Die Beschreibung eines Einsatzes sehen** — die Freitext-Beschreibung wird in der
+  öffentlichen Mission-Antwort serverseitig entfernt (§1.3). Organisation, Teilnehmerliste
+  (ohne PII), Einheiten, Frequenzen und Auszahlungsart bleiben dagegen sichtbar.
+- **Teilnehmer-PII sehen** (E-Mail, Realname) — wird in jeder Outsider-Antwort entfernt;
+  sichtbar bleibt nur das öffentliche Callsign (username/displayName/Rang).
 - **Material-Claims, Refinery, Hangar, Lager, Persönliches Inventar/Blueprints,
   Benutzerverzeichnis, Promotion-System, Admin-Bereich** — alles angemeldet
   bzw. rollen-gegated.
@@ -114,10 +115,11 @@ in **zwei Stufen** bereinigt:
   werden geleert und bei Teilnehmern E-Mail, Realname und Rollen entfernt — die Roster-Sicht
   bleibt aber erhalten.
 - **Outsider** (`cleanupOutsiderMissionForGuest`) — für **anonyme UND Guest**-Aufrufer
-  (`isMemberOrAbove() == false`): zusätzlich werden **Beschreibung, Organisation
-  (`owningSquadron`), Teilnehmerliste, Einheiten, Frequenzen und die Auszahlung/Operation**
-  entfernt. Sichtbar bleibt nur das öffentliche Minimum: Name, Zeitplan, Status,
-  Kalenderlink, Teilnehmerzähler und der öffentliche Partyleiter. Interne und vergangene
+  (`isMemberOrAbove() == false`): wie Mitglied-Peer, **zusätzlich nur die Beschreibung**
+  entfernt. Sichtbar bleiben (auf nicht-internen Einsätzen) Organisation (`owningSquadron`),
+  Teilnehmerliste (PII-bereinigt) inkl. Auszahlungsart, Einheiten und Frequenzen — plus Name,
+  Zeitplan, Status, Kalenderlink, Teilnehmerzähler und Partyleiter. Das Finanz-Ledger
+  (`/finance-entries`) ist eine eigene Fläche und bleibt Mitglied-only. Interne und vergangene
   (`COMPLETED`/`CANCELLED`) Missionen sind für Outsider gar nicht sichtbar (`403`).
 
 **Namen, E-Mails und Tokens landen nie in einer Outsider-Antwort.** Die Namenskonvention
@@ -290,9 +292,9 @@ leere Liste bzw. `403` (auch bei Schreib-/Claim-Endpunkten).
 ihrem eigenen verknüpften Teilnehmer. ² Nur als **Owner/Co-Manager** der Mission.
 ³ Mission-Manager/Officer zusätzlich nur im eigenen Staffel-Scope
 (`canEditMission`). ⁴ Outsider (anonym **und** rollenloser Guest, `isMemberOrAbove() == false`)
-sehen nur die redigierte Detailsicht: ohne Beschreibung, Organisation, Teilnehmerliste,
-Einheiten, Frequenzen und Auszahlung (§1.3); ein Guest wird hier wie ein anonymer Besucher
-behandelt.
+sehen die Detailsicht ohne Beschreibung + PII; Organisation, Teilnehmerliste, Einheiten,
+Frequenzen und Auszahlungsart bleiben sichtbar (§1.3). Das Finanz-Ledger bleibt Mitglied-only,
+und ein Guest wird hier wie ein anonymer Besucher behandelt.
 
 ### 3.6 Operations (Einsatz-Klammer, Finanzen & Auszahlungen)
 

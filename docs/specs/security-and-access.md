@@ -62,8 +62,9 @@ For unauthenticated guests, return only the minimum required data. Sensitive fie
 a `cleanup…ForGuest`-style helper to prevent information disclosure. (E-mail is shown only in
 a user's own profile — never elsewhere.) Mission reads have **two** redaction tiers: a
 member-peer tier (`cleanupMissionForGuest`, strips owner/managers/PII but keeps the roster
-for a fellow member) and the stricter **outsider** tier (`cleanupOutsiderMissionForGuest`)
-used for anonymous and GUEST callers — see REQ-SEC-009. The naming convention
+for a fellow member) and the **outsider** tier (`cleanupOutsiderMissionForGuest` = the
+member-peer redaction plus the free-text description hidden) used for anonymous and GUEST
+callers — see REQ-SEC-009. The naming convention
 (`cleanup…ForGuest`) is enforced structurally by the ArchUnit rule
 `anonymousReadableMissionEndpointsMustRedactGuestPii`.
 
@@ -89,23 +90,29 @@ What a mission outsider (anonymous OR GUEST) **may** do — and nothing more:
   guest entry) via `MissionSecurityService.canAccessParticipant`. Internal and past
   (`COMPLETED`/`CANCELLED`) missions are not visible to outsiders.
 
-The redacted mission detail (`MissionController.cleanupOutsiderMissionForGuest`) **hides**
-the description, the owning organisation (`owningSquadron`), the participant roster (and with
-it every participant's payout preference + PII), the assigned units, the mission
-frequencies, and the payout/operation linkage. It keeps only the public minimum: name,
-schedule, status, calendar link, registered/checked-in counts and the public party lead.
+The outsider mission detail (`MissionController.cleanupOutsiderMissionForGuest`) applies the
+member-peer redaction (participant PII stripped to the public callsign tuple
+username/displayName/rank; owner, managers and internal inventory/refinery cleared) and
+**additionally hides only the free-text `description`**. By explicit product decision an
+outsider **does** see, on a non-internal mission, the owning **organisation**
+(`owningSquadron`), the **participant roster** (PII-stripped) with each participant's
+**payout preference**, the assigned **units** and the mission **frequencies**. PII (email,
+real name) is never included — that is a non-negotiable invariant regardless of which fields
+are shown.
 
-The mission **finance ledger** (`GET`/`POST /api/v1/.../finance-entries`) is the mission's
-payout view and is restricted to **registered members and above** — anonymous AND GUEST are
-blocked (create + read). Finance-entry creation is therefore no longer anonymous.
+The mission **finance ledger** (`GET`/`POST /api/v1/.../finance-entries`) is a separate
+surface — the per-participant payout *preference* above is not the ledger — and stays
+restricted to **registered members and above**: anonymous AND GUEST are blocked (create +
+read). Finance-entry creation is therefore no longer anonymous.
 
 **Acceptance**
 
 - [ ] Anonymous and GUEST callers can `POST /api/v1/orders` (+`/items`) but receive empty
   list / 403 on every order read/edit/delete path.
 - [ ] A mission outsider's `GET /api/v1/missions/{id}` on a non-internal mission returns a DTO
-  with `description`, `owningSquadron`, `operation`, `owner`, `managers` null and
-  `participants`, `assignedUnits`, `frequencies` empty; internal/past → 403.
+  with `description`, `owner`, `managers` null and internal inventory/refinery empty, but WITH
+  the participant roster (PII stripped — no email/roles), `owningSquadron`, `assignedUnits` and
+  `frequencies` present; internal/past → 403.
 - [ ] An outsider can add and edit an unlinked guest participant; editing a *linked*
   participant they do not own → 403.
 - [ ] Anonymous create on `POST /api/v1/finance-entries` → 401; GUEST → 403; member → 201.

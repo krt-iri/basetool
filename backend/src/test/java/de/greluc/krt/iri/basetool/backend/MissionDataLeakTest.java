@@ -70,6 +70,7 @@ public class MissionDataLeakTest {
     publicMission.setName("Public Mission");
     publicMission.setStatus("PLANNED");
     publicMission.setIsInternal(false);
+    publicMission.setDescription("secret briefing");
 
     MissionParticipant participant = new MissionParticipant();
     participant.setMission(publicMission);
@@ -80,46 +81,48 @@ public class MissionDataLeakTest {
   }
 
   @Test
-  void testMissionDetail_Anonymous_ShouldNotLeakParticipantRosterOrPii() throws Exception {
-    // Outsider redaction now hides the participant roster entirely (and with it any nested user
-    // PII), so neither the participant's username nor email may appear anywhere in the response.
+  void testMissionDetail_Anonymous_SeesRosterWithoutPii() throws Exception {
+    // Outsiders DO see the participant roster on a non-internal mission now, but PII (email / real
+    // name) is always stripped — only the public callsign tuple survives.
     String body =
         mockMvc
             .perform(get("/api/v1/missions/" + publicMission.getId()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.participants").isEmpty())
+            .andExpect(jsonPath("$.participants[0].user.username").value("leaked_user"))
+            .andExpect(jsonPath("$.participants[0].user.email").value(nullValue()))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
     org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("leaked_user"), "outsider must not see the participant roster at all");
-    org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("secret@leaked.org"), "outsider must never receive a participant email");
   }
 
   // A role-less GUEST is treated exactly like an anonymous visitor on the mission surface
-  // (isMemberOrAbove() == false → same strict outsider redaction). That equivalence is proven
-  // without the fragile full-stack synthetic-JWT path here: AuthHelperServiceTest pins GUEST →
+  // (isMemberOrAbove() == false → same outsider redaction). That equivalence is proven without the
+  // fragile full-stack synthetic-JWT path here: AuthHelperServiceTest pins GUEST →
   // isMemberOrAbove() == false, MissionControllerLifecycleTest pins isMemberOrAbove() == false →
-  // strict redaction, and MissionFinanceEntryControllerSecurityTest pins the GUEST → 403 finance
-  // gate over the full security wiring.
+  // the outsider redaction, and MissionFinanceEntryControllerSecurityTest pins the GUEST → 403
+  // finance gate over the full security wiring.
 
   @Test
-  void testMissionDetail_Anonymous_ShouldNotLeakMissionInternals() throws Exception {
-    // The strict outsider view hides description, owning organisation, units, frequencies and the
-    // payout/operation linkage, and clears internal inventory / refinery orders.
-    mockMvc
-        .perform(get("/api/v1/missions/" + publicMission.getId()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.name").value("Public Mission"))
-        .andExpect(jsonPath("$.description").value(nullValue()))
-        .andExpect(jsonPath("$.owningSquadron").value(nullValue()))
-        .andExpect(jsonPath("$.owner").value(nullValue()))
-        .andExpect(jsonPath("$.operation").value(nullValue()))
-        .andExpect(jsonPath("$.assignedUnits").isEmpty())
-        .andExpect(jsonPath("$.frequencies").isEmpty())
-        .andExpect(jsonPath("$.refineryOrders").isEmpty())
-        .andExpect(jsonPath("$.inventoryEntries").isEmpty());
+  void testMissionDetail_Anonymous_HidesDescriptionAndInternalEconomy() throws Exception {
+    // On top of the PII stripping, an outsider sees neither the free-text description nor the
+    // internal economy (inventory / refinery) nor the owner; the mission name stays visible.
+    String body =
+        mockMvc
+            .perform(get("/api/v1/missions/" + publicMission.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Public Mission"))
+            .andExpect(jsonPath("$.description").value(nullValue()))
+            .andExpect(jsonPath("$.owner").value(nullValue()))
+            .andExpect(jsonPath("$.refineryOrders").isEmpty())
+            .andExpect(jsonPath("$.inventoryEntries").isEmpty())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("secret briefing"), "outsider must not see the mission description");
   }
 }
