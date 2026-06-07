@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -36,11 +37,13 @@ import org.junit.jupiter.api.Test;
 /**
  * Static lint of the frontend message bundles. A user-visible string added to one locale but not
  * the other otherwise surfaces only as a raw {@code operation.some.key} at render time; a literal
- * umlaut in the German bundle breaks the project's {@code \\uXXXX} encoding rule. Both are pinned
- * here so they fail the build instead of production. Reads the source files under {@code
- * src/main/resources} directly (the Gradle {@code Test} task runs with the module directory as its
- * working directory) so the assertions see the exact committed bytes, not the processed classpath
- * copy.
+ * umlaut in the German bundle breaks the project's {@code \\uXXXX} encoding rule; a key declared
+ * twice silently shadows its earlier value (how the 2026-05-11 backfill duplicates went unnoticed);
+ * and a key missing from the no-locale default bundle falls back to its raw key for any locale that
+ * is neither {@code de} nor {@code en}. All four are pinned here so they fail the build instead of
+ * production. Reads the source files under {@code src/main/resources} directly (the Gradle {@code
+ * Test} task runs with the module directory as its working directory) so the assertions see the
+ * exact committed bytes, not the processed classpath copy.
  */
 class MessageBundleConsistencyTest {
 
@@ -49,6 +52,9 @@ class MessageBundleConsistencyTest {
 
   /** English locale bundle under the module's main resources. */
   private static final Path EN = Path.of("src/main/resources/messages_en.properties");
+
+  /** Default (no-locale) fallback bundle under the module's main resources. */
+  private static final Path DEFAULT = Path.of("src/main/resources/messages.properties");
 
   /**
    * The seven German umlaut characters that CLAUDE.md requires to be written as {@code \\uXXXX}
@@ -98,6 +104,51 @@ class MessageBundleConsistencyTest {
   }
 
   /**
+   * Asserts that no bundle declares the same key twice. {@link Properties#load(Reader)} silently
+   * keeps the last value of a repeated key, which is how the 2026-05-11 backfill left dozens of
+   * duplicate declarations per bundle undetected; this reads the raw lines so a re-introduced
+   * duplicate fails the build.
+   *
+   * @throws IOException if a bundle cannot be read from disk
+   */
+  @Test
+  void noBundleDeclaresDuplicateKeys() throws IOException {
+    assertThat(duplicateKeys(DEFAULT))
+        .as("duplicate keys in the default bundle (messages.properties)")
+        .isEmpty();
+    assertThat(duplicateKeys(DE)).as("duplicate keys in messages_de.properties").isEmpty();
+    assertThat(duplicateKeys(EN)).as("duplicate keys in messages_en.properties").isEmpty();
+  }
+
+  /**
+   * Asserts that the no-locale default bundle declares every key present in the German and English
+   * bundles, and declares no key absent from both. A key missing from {@code messages.properties}
+   * falls back to its raw {@code some.key} for any locale that is neither {@code de} nor {@code
+   * en}.
+   *
+   * @throws IOException if a bundle cannot be read from disk
+   */
+  @Test
+  void defaultBundleDeclaresEveryLocaleKey() throws IOException {
+    Set<String> defaultKeys = keysOf(DEFAULT);
+    Set<String> deKeys = keysOf(DE);
+    Set<String> enKeys = keysOf(EN);
+
+    assertThat(difference(deKeys, defaultKeys))
+        .as("keys in DE but missing from the default bundle (messages.properties)")
+        .isEmpty();
+    assertThat(difference(enKeys, defaultKeys))
+        .as("keys in EN but missing from the default bundle (messages.properties)")
+        .isEmpty();
+
+    Set<String> localeKeys = new TreeSet<>(deKeys);
+    localeKeys.addAll(enKeys);
+    assertThat(difference(defaultKeys, localeKeys))
+        .as("keys in the default bundle that exist in neither locale bundle")
+        .isEmpty();
+  }
+
+  /**
    * Parses the declared property keys of a bundle via {@link Properties#load(Reader)}, which
    * handles comments, {@code =}/{@code :}/space separators, line continuations and escapes
    * correctly.
@@ -126,5 +177,79 @@ class MessageBundleConsistencyTest {
     Set<String> result = new TreeSet<>(left);
     result.removeAll(right);
     return result;
+  }
+
+  /**
+   * Collects keys declared more than once in a bundle. Unlike {@link Properties#load(Reader)} --
+   * which silently keeps the last value of a repeated key and so hides duplicates -- this walks the
+   * raw physical lines (honouring line continuations and {@code #}/{@code !} comment lines) and
+   * records every key whose declaration is seen a second time.
+   *
+   * @param path the bundle to scan
+   * @return the duplicated keys in first-seen order (empty when every key is unique)
+   * @throws IOException if the bundle cannot be read
+   */
+  private static List<String> duplicateKeys(Path path) throws IOException {
+    List<String> duplicates = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
+    boolean inContinuation = false;
+    for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
+      if (inContinuation) {
+        inContinuation = continuesToNextLine(line);
+        continue;
+      }
+      String stripped = line.stripLeading();
+      if (stripped.isEmpty() || stripped.charAt(0) == '#' || stripped.charAt(0) == '!') {
+        inContinuation = false;
+        continue;
+      }
+      String key = parseKey(stripped);
+      if (!key.isEmpty() && !seen.add(key)) {
+        duplicates.add(key);
+      }
+      inContinuation = continuesToNextLine(line);
+    }
+    return duplicates;
+  }
+
+  /**
+   * Reports whether a physical line continues onto the next via a trailing run of an odd number of
+   * backslashes, matching {@code java.util.Properties} line-continuation semantics.
+   *
+   * @param line the physical line to inspect
+   * @return {@code true} if the following physical line continues this logical line
+   */
+  private static boolean continuesToNextLine(String line) {
+    int backslashes = 0;
+    for (int i = line.length() - 1; i >= 0 && line.charAt(i) == '\\'; i--) {
+      backslashes++;
+    }
+    return (backslashes & 1) == 1;
+  }
+
+  /**
+   * Extracts the key of a property declaration: everything up to the first unescaped {@code =},
+   * {@code :} or whitespace separator, matching {@code java.util.Properties} key parsing for the
+   * flat single-line declarations these bundles use.
+   *
+   * @param stripped the property line with leading whitespace already removed
+   * @return the declared key (empty when the line carries no key)
+   */
+  private static String parseKey(String stripped) {
+    StringBuilder key = new StringBuilder();
+    for (int i = 0; i < stripped.length(); i++) {
+      char c = stripped.charAt(i);
+      if (c == '\\') {
+        if (i + 1 < stripped.length()) {
+          key.append(c).append(stripped.charAt(++i));
+        }
+        continue;
+      }
+      if (c == '=' || c == ':' || c == ' ' || c == '\t' || c == '\f') {
+        break;
+      }
+      key.append(c);
+    }
+    return key.toString();
   }
 }
