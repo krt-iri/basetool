@@ -231,14 +231,14 @@ class MissionServiceTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), pageable))
+            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), false, pageable))
         .thenReturn(Page.empty());
 
     missionService.searchMissions(query, start, end, null, null, null, pageable);
 
     verify(missionRepository)
         .searchMissions(
-            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), pageable);
+            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), false, pageable);
   }
 
   @Test
@@ -377,7 +377,7 @@ class MissionServiceTest {
     caller.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutput(caller, null)).thenReturn(home);
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(home);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
@@ -390,13 +390,44 @@ class MissionServiceTest {
   }
 
   @Test
+  void createMission_membershiplessLeadershipOwner_stampsNullOwningOrgUnit() {
+    // A "Bereichsleitung" user belongs to no Staffel/SK but may plan org-wide missions. The
+    // nullable picker resolver returns null for such a membershipless owner (instead of 400ing), so
+    // the mission persists ownerless — attributable through its owner and public unless internal.
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
+
+    Mission saved =
+        missionService.createMission(
+            new de.greluc.krt.iri.basetool.backend.model.dto.request.CreateMissionRequest(
+                "Bereichsleitung-Einsatz",
+                null,
+                null,
+                "PLANNED",
+                null,
+                null,
+                null,
+                false,
+                null,
+                null));
+
+    assertNull(saved.getOwningOrgUnit(), "membershipless leadership owner → ownerless mission");
+    assertEquals(caller, saved.getOwner());
+  }
+
+  @Test
   void createMission_fallsBackToCurrentSquadronScopeWhenNoOwnerResolved() {
     Squadron scopeSquadron = new Squadron();
     scopeSquadron.setId(UUID.randomUUID());
 
     // R5.d.d branch flip: the fallback fires when getCurrentUser() returns empty, not when the
-    // owner has no home Staffel. An authenticated owner without a home Staffel now flows through
-    // OwnerScopeService.resolveSquadronForPickerOutput and inherits whatever that returns.
+    // owner has no home Staffel. An authenticated owner without any membership now flows through
+    // OwnerScopeService.resolveOrgUnitForPickerOutputNullable and resolves to a null (ownerless)
+    // owner — see createMission_membershiplessLeadershipOwner_stampsNullOwningOrgUnit.
     when(userService.getCurrentUser()).thenReturn(Optional.empty());
     when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.of(scopeSquadron));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -417,7 +448,7 @@ class MissionServiceTest {
     picked.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutput(caller, picked.getId()))
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, picked.getId()))
         .thenReturn(picked);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 

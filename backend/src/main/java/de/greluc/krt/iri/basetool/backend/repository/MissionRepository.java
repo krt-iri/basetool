@@ -53,13 +53,19 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * mission; a specific {@code activeOrgUnitId} narrows to that OrgUnit's missions; the non-admin
    * path passes the union of memberships. Cross-staffel public missions ({@code isInternal=false})
    * remain visible regardless of scope — so a member from one OrgUnit can still see other OrgUnits'
-   * public missions in the typeahead.
+   * public missions in the typeahead. An <em>ownerless</em> mission ({@code owningOrgUnit IS NULL}
+   * — a leadership / "Bereichsleitung" mission) is surfaced through the {@code isInternal = false}
+   * branch when public, and to organisation members-or-above (the {@code viewerIsMemberOrAbove}
+   * flag) when internal.
    *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
    *     — disables the scope filter entirely.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
    *     admins and anonymous callers.
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member or above
+   *     (not an anonymous / guest outsider); lets the caller see <em>internal</em> ownerless
+   *     leadership missions, which carry no owning OrgUnit to scope against.
    * @param cutoff inclusive lower bound on {@code plannedStartTime} for {@code COMPLETED} / {@code
    *     CANCELLED} missions; {@code PLANNED} / {@code ACTIVE} missions are returned regardless of
    *     it.
@@ -75,11 +81,13 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
           + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
           + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
           + "  OR m.isInternal = false"
+          + "  OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
           + " ) ORDER BY m.plannedStartTime DESC NULLS LAST, m.name ASC")
   List<de.greluc.krt.iri.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
       @Param("cutoff") Instant cutoff);
 
   /**
@@ -117,11 +125,13 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * planned start ascending; the {@code @EntityGraph} pre-loads participants and assigned units to
    * avoid N+1 when the caller renders the result list.
    *
-   * <p>Multi-tenant access control: {@code scopeSquadronId} gates which missions the caller may
-   * see. When {@code null}, no scope restriction applies (admin "all squadrons" mode). When
-   * non-null, the result is restricted to missions owned by that squadron PLUS any non-internal
-   * mission of any other squadron (MULTI_SQUADRON_PLAN.md section 1: non-internal missions are
-   * visible cross-staffel).
+   * <p>Multi-tenant access control via the org-unit scope-predicate triple ({@code isAdminAllScope}
+   * / {@code activeOrgUnitId} / {@code memberOrgUnitIds}): admin all-scope sees everything, a
+   * pinned {@code activeOrgUnitId} narrows to that OrgUnit, and the non-admin path passes the
+   * membership union. Non-internal missions of any OrgUnit stay visible cross-staffel (the public
+   * escape). Ownerless leadership missions ({@code owningOrgUnit IS NULL}) follow the same
+   * public/internal split — public to all; internal only to organisation members-or-above (the
+   * {@code viewerIsMemberOrAbove} flag). See MULTI_SQUADRON_PLAN.md section 1.
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
@@ -130,6 +140,7 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
           + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
           + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
           + "  OR m.isInternal = false"
+          + "  OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
           + " ) AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%')) AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >="
@@ -146,7 +157,8 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("operationId") UUID operationId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove);
 
   /**
    * Paged variant of {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID, UUID)} -
@@ -172,6 +184,7 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
           + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
           + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
           + "  OR m.isInternal = false"
+          + "  OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
           + " ) AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%')) AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >="
@@ -188,6 +201,7 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
       Pageable pageable);
 
   /**

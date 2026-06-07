@@ -79,7 +79,7 @@ class MissionRepositoryLookupOrderingTest {
 
     Set<UUID> mine = Set.of(newestId, middleId, oldestId, undatedId);
     List<MissionReferenceDto> result =
-        missionRepository.findAllActiveReference(true, null, Set.of(), CUTOFF);
+        missionRepository.findAllActiveReference(true, null, Set.of(), true, CUTOFF);
 
     List<UUID> mineInResultOrder =
         result.stream().map(MissionReferenceDto::id).filter(mine::contains).toList();

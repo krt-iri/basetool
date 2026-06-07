@@ -154,7 +154,11 @@ public class MissionService {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Instant terminalCutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
     return missionRepository.findAllActiveReference(
-        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), terminalCutoff);
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        authHelperService.isMemberOrAbove(),
+        terminalCutoff);
   }
 
   /**
@@ -192,6 +196,7 @@ public class MissionService {
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds(),
+        authHelperService.isMemberOrAbove(),
         pageable);
   }
 
@@ -257,9 +262,14 @@ public class MissionService {
     if (mission.getOwner() != null) {
       // R5.d.d: owner present → route through the shared picker resolver, which honours an
       // explicit owningOrgUnitId from the form if the caller is a member of that org unit, and
-      // falls back to the owner's home Staffel when the field is null.
+      // falls back to the owner's home Staffel when the field is null. The *nullable* resolver is
+      // used so a membershipless leadership user ("Bereichsleitung", who belongs to no Staffel/SK
+      // but may plan org-wide missions) resolves to a null owner instead of a 400 — the resulting
+      // ownerless mission is attributable through its owner and scoped by the mission visibility
+      // rules (public unless internal). See OwnerScopeService.resolveOrgUnitForPickerOutputNullable
+      // and V144.
       mission.setOwningOrgUnit(
-          ownerScopeService.resolveOrgUnitForPickerOutput(
+          ownerScopeService.resolveOrgUnitForPickerOutputNullable(
               mission.getOwner(), request.owningOrgUnitId()));
     } else {
       // No authenticated owner (admin in "all squadrons" mode or anonymous fallback) — the

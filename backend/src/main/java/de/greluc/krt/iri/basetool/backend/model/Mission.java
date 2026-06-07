@@ -193,18 +193,32 @@ public class Mission extends AbstractEntity<UUID> {
   private Set<User> managers = new HashSet<>();
 
   /**
-   * Org-unit owner of this mission. Set at creation time from the caller's active org-unit context
-   * (via {@code OwnerScopeService.resolveOrgUnitForPickerOutput}) and immutable afterwards. Gates
-   * read/write access together with {@link #isInternal}: non-internal missions are visible across
-   * org units, internal ones are restricted to the owning org unit and admins.
+   * Org-unit owner of this mission, or {@code null} for an <em>ownerless leadership mission</em>.
+   * Set at creation time from the caller's active org-unit context (via {@code
+   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}) and immutable afterwards. Gates
+   * read/write access together with {@link #isInternal}:
+   *
+   * <ul>
+   *   <li><b>Org-owned</b> (non-null): non-internal missions are visible across org units, internal
+   *       ones are restricted to the owning org unit and admins.
+   *   <li><b>Ownerless</b> (null): created by a user who belongs to no OrgUnit but is allowed to
+   *       plan org-wide missions (organisation leadership / "Bereichsleitung", which sits above
+   *       every Staffel and SK). Such a mission is attributable through its {@link #owner}. A
+   *       non-internal ownerless mission is visible to everyone (the public default); an internal
+   *       one is visible to organisation members-or-above. Editing follows the usual
+   *       mission-management gate (elevated roles, owner, co-managers, admins), minus the
+   *       squadron-scope narrowing. See {@code OwnerScopeService.canSeeMission} / {@code
+   *       canEditMission}.
+   * </ul>
    *
    * <p>R9 Step 2 dropped the legacy {@code owningSquadron} mirror field together with the
    * {@code @PrePersist} / {@code @PreUpdate} / {@code @PostLoad} {@code syncOwnerFields()}
-   * lifecycle hook; V100 drops the matching {@code owning_squadron_id} column. {@code nullable =
-   * false} reflects V99's NOT NULL tightening on the new column.
+   * lifecycle hook; V100 drops the matching {@code owning_squadron_id} column. V99 first tightened
+   * the new column to NOT NULL; V144 relaxed it again so an ownerless mission can persist
+   * (mirroring the V132 relaxation for ship / refinery order / inventory item).
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owning_org_unit_id", nullable = false)
+  @JoinColumn(name = "owning_org_unit_id")
   @OptimisticLock(excluded = true)
   private OrgUnit owningOrgUnit;
 }

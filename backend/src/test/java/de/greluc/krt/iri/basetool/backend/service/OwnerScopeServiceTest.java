@@ -385,12 +385,40 @@ class OwnerScopeServiceTest {
     }
 
     @Test
-    void missionWithNullOwningSquadron_isVisibleToEveryone() {
+    void ownerlessPublicMission_isVisibleToEveryone() {
+      // An ownerless leadership ("Bereichsleitung") mission carries no owning OrgUnit. When
+      // public (not internal) it is visible to everyone, anonymous visitors included — the default
+      // the create flow stamps for a membershipless leadership owner.
       UUID missionId = UUID.randomUUID();
-      Mission mission = newMission(missionId, null, true);
+      Mission mission = newMission(missionId, null, false);
       when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
       assertTrue(service.canSeeMission(missionId));
+    }
+
+    @Test
+    void ownerlessInternalMission_isVisibleToMembersOrAbove() {
+      // An internal ownerless mission is "internal to the whole organisation": visible to any
+      // member-or-above — the membershipless analogue of a Staffel-internal mission being visible
+      // to its Staffel.
+      UUID missionId = UUID.randomUUID();
+      Mission mission = newMission(missionId, null, true);
+      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(authHelper.isMemberOrAbove()).thenReturn(true);
+
+      assertTrue(service.canSeeMission(missionId));
+    }
+
+    @Test
+    void ownerlessInternalMission_isHiddenFromOutsiders() {
+      // A guest / anonymous outsider (isMemberOrAbove() == false) must not see an internal
+      // ownerless mission, mirroring how internal Staffel missions stay hidden from outsiders.
+      UUID missionId = UUID.randomUUID();
+      Mission mission = newMission(missionId, null, true);
+      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(authHelper.isMemberOrAbove()).thenReturn(false);
+
+      assertFalse(service.canSeeMission(missionId));
     }
 
     @Test
@@ -421,6 +449,18 @@ class OwnerScopeServiceTest {
       Mission mission = newMission(missionId, squadronA, true);
       when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
+
+      assertTrue(service.canEditMission(missionId));
+    }
+
+    @Test
+    void ownerlessMission_passesPerRowEditCheck() {
+      // An ownerless leadership mission has no owning OrgUnit to scope against, so the per-row
+      // canEditMission check is a no-op (true). The real write restriction is then
+      // MissionSecurityService.canManageMission's role/owner gate (see MissionSecurityServiceTest).
+      UUID missionId = UUID.randomUUID();
+      Mission mission = newMission(missionId, null, false);
+      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
       assertTrue(service.canEditMission(missionId));
     }
