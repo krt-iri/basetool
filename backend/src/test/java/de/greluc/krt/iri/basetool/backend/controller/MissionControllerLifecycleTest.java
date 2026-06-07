@@ -74,10 +74,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *   <li><b>Outsider redaction</b> in {@code getMissionById} / {@code getNextMission} — {@code
  *       MissionController#cleanupOutsiderMissionForGuest} is the only path that controls what
  *       leaves the API for a mission outsider (anonymous OR authenticated role-less GUEST, detected
- *       via {@code AuthHelperService#isMemberOrAbove()}). Pinning the strict redaction
- *       (description, owning organisation, owner, managers, operation, inventory, refinery orders
- *       cleared; canEdit/canManageManagers forced to false; participant roster, units and
- *       frequencies emptied) protects the multi-user-data-isolation guarantee in CLAUDE.md.
+ *       via {@code AuthHelperService#isMemberOrAbove()}). Pinning the outsider redaction (the
+ *       free-text description hidden, participant PII stripped to the public callsign tuple, and
+ *       owner / managers / internal inventory+refinery cleared, while organisation, the participant
+ *       roster, units, frequencies and per-participant payout preference stay visible) protects the
+ *       multi-user-data-isolation guarantee in CLAUDE.md.
  *   <li><b>Outsider access blocks</b>: internal missions → 403, completed/cancelled missions → 403
  *       (a past mission must not leak its participant list to a public viewer).
  *   <li><b>Outsider list/search filtering</b> — {@code getAllMissions} / {@code searchMissions}
@@ -489,7 +490,7 @@ class MissionControllerLifecycleTest {
   }
 
   @Test
-  void getMissionById_outsider_planned_returnsStrictlyRedactedDto() {
+  void getMissionById_outsider_planned_keepsRosterButHidesDescriptionAndPii() {
     UUID id = UUID.randomUUID();
     Mission planned = new Mission();
     planned.setIsInternal(false);
@@ -497,33 +498,36 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id);
     when(missionService.getMissionById(id)).thenReturn(planned);
     when(missionMapper.toDto(planned)).thenReturn(full);
-    // Outsider = anonymous OR authenticated role-less GUEST → strict redaction.
+    // Outsider = anonymous OR authenticated role-less GUEST.
     when(authHelperService.isMemberOrAbove()).thenReturn(false);
 
     MissionDto result = controller.getMissionById(id);
 
-    // The strict outsider-redaction contract (cleanupOutsiderMissionForGuest): every assertion here
-    // pins one thing an outsider (anonymous or GUEST) must NOT see. Anyone changing the redaction
-    // MUST update this test, which is the entire point.
+    // Outsider redaction (cleanupOutsiderMissionForGuest): on top of the member-peer redaction the
+    // ONLY field hidden is the free-text description. Organisation, the participant roster, units,
+    // frequencies and the per-participant payout preference stay visible (explicit product
+    // decision); participant PII and owner / managers / internal economy are still stripped, and
+    // the
+    // finance ledger stays member-only on its own endpoints.
     assertThat(result).isNotNull();
-    // Public minimum that stays visible.
     assertThat(result.name()).isEqualTo("Op Foxglove");
     assertThat(result.status()).isEqualTo("PLANNED");
-    // Hidden: description, owning organisation, owner/managers, edit flags, internal economy.
+    // The only field hidden from outsiders beyond the peer redaction.
     assertThat(result.description()).isNull();
-    assertThat(result.owningSquadron()).isNull();
+    // Still stripped: owner / managers / edit flags / internal economy.
     assertThat(result.owner()).isNull();
     assertThat(result.managers()).isNull();
-    assertThat(result.operation()).isNull();
     assertThat(result.canEdit()).isFalse();
     assertThat(result.canManageManagers()).isFalse();
     assertThat(result.inventoryEntries()).isEmpty();
     assertThat(result.refineryOrders()).isEmpty();
-    // Hidden: the whole participant roster (and with it every participant's payout preference and
-    // PII), the assigned units, and the mission frequencies (the "Organisation" panel data).
-    assertThat(result.participants()).isEmpty();
-    assertThat(result.assignedUnits()).isEmpty();
-    assertThat(result.frequencies()).isEmpty();
+    // The participant roster IS visible to outsiders — but PII is stripped to the public callsign
+    // tuple (username / displayName / rank), never email or roles.
+    assertThat(result.participants()).hasSize(1);
+    UserDto rosterUser = result.participants().iterator().next().user();
+    assertThat(rosterUser.username()).isEqualTo("alice");
+    assertThat(rosterUser.email()).isNull();
+    assertThat(rosterUser.roles()).isNull();
   }
 
   // ── GET /api/v1/missions/next (200 / 204 + redaction) ────────────────

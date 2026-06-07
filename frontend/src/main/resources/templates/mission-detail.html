@@ -311,7 +311,7 @@
                 <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
             </div>
             
-            <div class="form-group" sec:authorize="isAuthenticated()">
+            <div class="form-group" sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
                 <label th:text="#{mission.description}">Description</label>
                 <textarea name="description" rows="5" th:text="*{description}"
                           th:disabled="${!isNew and !mission.canEdit}"></textarea>
