@@ -39,9 +39,9 @@ matrix's material/system/loading-dock/auto-load filters keep working in both vie
 **Acceptance**
 
 - [ ] On both pages the toggle defaults to grouped; unchecking it hides the category
-      headers and renders one flat, name-sorted list; re-checking restores the grouping.
+  headers and renders one flat, name-sorted list; re-checking restores the grouping.
 - [ ] The preference survives navigation and reload within the same browser, and the two
-      pages keep their own independent preference.
+  pages keep their own independent preference.
 - [ ] With `localStorage` unavailable the page still renders and behaves as grouped.
 - [ ] Both views render the same material card / row (no data difference between views).
 
@@ -65,3 +65,4 @@ matrix's material/system/loading-dock/auto-load filters keep working in both vie
 - Should the preference move to a server-side user setting so it follows the user across
   devices? Deferred — `localStorage` matches every other UI-state preference in the app
   today. Promote to an ADR if cross-device sync is ever requested.
+
