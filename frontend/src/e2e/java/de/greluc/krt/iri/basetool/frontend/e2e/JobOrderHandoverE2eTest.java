@@ -133,8 +133,9 @@ class JobOrderHandoverE2eTest {
         page.locator("#handover-modal .time-part").fill("12:00");
         page.locator("#recipientHandle").fill("E2E Recipient");
 
-        page.getByTestId("order-handover-submit").click();
-        page.waitForLoadState();
+        // Wait for the full post-submit redirect to settle before navigating, else WebKit aborts
+        // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
+        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-handover-submit").click());
 
         // The recorded handover must appear in the order's handover table.
         page.navigate(baseUrl + "/orders/" + jobOrderId);

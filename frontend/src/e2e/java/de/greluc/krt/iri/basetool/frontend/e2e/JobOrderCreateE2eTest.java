@@ -112,8 +112,9 @@ class JobOrderCreateE2eTest {
         // Select whatever material the (frontend-cached) dropdown offers — see setUp().
         page.getByTestId("order-material-select").selectOption(new SelectOption().setIndex(1));
         page.getByTestId("order-material-amount").fill("100");
-        page.getByTestId("order-submit").click();
-        page.waitForLoadState();
+        // Wait for the full post-submit redirect to settle before navigating, else WebKit aborts
+        // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
+        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-submit").click());
 
         // The created order must appear in the list (fresh ephemeral DB => exactly one).
         page.navigate(baseUrl + "/orders");
