@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.0](https://github.com/krt-iri/basetool/releases/tag/v0.4.0) - 2026-06-07
+
 ### Added
 
 - **Auf den Handelsseiten „Materialien" und „Material-Übersicht" lässt sich die Gruppierung nach den von Admins angelegten Kategorien per Schalter „Nach Kategorie gruppieren" abschalten.** Ohne Gruppierung erscheinen alle Materialien in der normalen alphabetischen Sortierung der Seite; die Auswahl wird pro Browser gespeichert und lässt sich jederzeit wieder umschalten.
