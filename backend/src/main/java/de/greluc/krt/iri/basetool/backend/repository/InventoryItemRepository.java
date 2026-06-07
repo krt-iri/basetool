@@ -175,9 +175,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.projection.InventoryStackAggregate("
-          + "i.material, i.user, i.location, i.quality, i.jobOrder, i.mission, i.personal,"
-          + " i.owningOrgUnit, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *"
+          + "i.material, i.user, i.location, i.quality, jo, m, i.personal,"
+          + " oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *"
           + " COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i"
+          + " LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou"
           + " WHERE i.personal = false AND ("
           + "  :isAdminAllScope = true"
           + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
@@ -186,7 +187,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
           + " NULL AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS"
           + " NOT NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,"
-          + " i.quality, i.jobOrder, i.mission, i.personal, i.owningOrgUnit")
+          + " i.quality, jo, m, i.personal, oou")
   List<InventoryStackAggregate> findGlobalStacks(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
@@ -207,15 +208,16 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       "SELECT new de.greluc.krt.iri.basetool.backend.model.projection.InventoryStackAggregate("
-          + "i.material, i.user, i.location, i.quality, i.jobOrder, i.mission, i.personal,"
-          + " i.owningOrgUnit, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *"
+          + "i.material, i.user, i.location, i.quality, jo, m, i.personal,"
+          + " oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *"
           + " COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i"
+          + " LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou"
           + " WHERE i.user.id = :userId"
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL"
           + " OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL"
           + " AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT"
           + " NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,"
-          + " i.quality, i.jobOrder, i.mission, i.personal, i.owningOrgUnit")
+          + " i.quality, jo, m, i.personal, oou")
   List<InventoryStackAggregate> findUserStacks(
       @Param("userId") UUID userId,
       @Param("hasMaterials") boolean hasMaterials,
