@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.1](https://github.com/krt-iri/basetool/releases/tag/v0.4.1) - 2026-06-07
+
 ### Fixed
 
 - **„Globales Lager" und „Mein Lager" zeigen wieder alle Bestände an, nicht nur die mit Auftrags- oder Einsatzbezug.** Mit der neuen gruppierten Lageransicht (v0.4.0) fielen Einträge ohne Auftrag, Einsatz bzw. Orgeinheit aus der Stapelübersicht heraus, sodass die Seite trotz vorhandener Bestände „Keine Einträge gefunden" meldete; jetzt erscheinen alle Stapel.
