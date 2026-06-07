@@ -3,9 +3,11 @@
 
 Run this once a batch of release notes has actually been written, so the next
 ``/release-notes`` run with no start point resumes from exactly where these notes
-ended. The pointer is stored in ``.release-notes-state.json`` at the repo root and
-is force-added to ``.gitignore`` on every write -- it is purely local tracking and
-is never committed (see ``release_state.py`` for the storage details).
+ended. The pointer is stored in ``.release-notes-state.json`` inside the shared git
+directory (``git rev-parse --git-common-dir``), so one pointer is shared across all
+worktrees and can never be committed -- it is purely local tracking (see
+``release_state.py`` for the storage details, including the working-tree-root
+fallback).
 
 The pointer only ever moves *forward*: ``--set`` refuses to record an endpoint
 that is not a descendant of the current pointer (which would make the next resume
@@ -37,16 +39,18 @@ def show(repo: str) -> None:
     covered = (state or {}).get("last_covered") or {}
     if not covered.get("sha"):
         print(f"No release-notes pointer yet ({st.STATE_FILENAME} absent).")
+        print(f"  looked in : {st.state_path(repo)}")
         print("The next no-argument /release-notes run will ask for a start point;")
         print("running --set after writing those notes creates the pointer.")
         return
     tag = covered.get("tag") or "(no release tag yet)"
     print(f"Release-notes pointer ({st.STATE_FILENAME}):")
+    print(f"  file            : {st.state_path(repo)}")
     print(f"  covered through : {covered.get('sha', '?')[:12]}  ({covered.get('date', '?')})")
     print(f"  newest release  : {tag}")
     print(f"  marked as       : {covered.get('ref', '?')}")
     print(f"  updated at      : {(state or {}).get('updated_at', '?')}")
-    print(f"  git-ignored now : {'yes' if st.verify_ignored(repo) else 'NO -- run --set to fix'}")
+    print(f"  commit-safe now : {'yes' if st.verify_ignored(repo) else 'NO -- run --set to fix'}")
 
 
 def do_set(repo: str, ref: str, force: bool) -> int:
@@ -79,11 +83,15 @@ def do_set(repo: str, ref: str, force: bool) -> int:
     where = tag or f"{sha[:12]} ({date})"
     print(f"Release-notes pointer set: notes now tracked as covered through {where}.")
     print(f"  file        : {result['path']}")
-    print(f"  .gitignore  : {result['gitignore']} (entry {st.GITIGNORE_ENTRY})")
-    if result["ignored"]:
-        print("  git status  : confirmed ignored -- it will not be committed.")
+    if result["location"] == "git-common-dir":
+        print("  storage     : shared git dir (git rev-parse --git-common-dir) -- "
+              "shared by every worktree, never committed")
     else:
-        print("  git status  : WARNING -- git does NOT ignore it yet; check .gitignore.",
+        print(f"  .gitignore  : {result['gitignore']} (entry {st.GITIGNORE_ENTRY})")
+    if result["ignored"]:
+        print("  commit-safe : yes -- the pointer cannot be committed.")
+    else:
+        print("  commit-safe : WARNING -- not protected from commits; check .gitignore.",
               file=sys.stderr)
     return 0
 

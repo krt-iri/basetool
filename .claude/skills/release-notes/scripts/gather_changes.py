@@ -266,6 +266,58 @@ def suggested_title(log: str, since: str) -> str:
     return f"Release Notes ({left} → {ddmm(dates[-1])})"
 
 
+def ddmmyyyy(value: str) -> str:
+    """Convert ``YYYY-MM-DD`` (with any trailing time) to the German ``DD.MM.YYYY``.
+
+    Used for the ``Stand`` date in the mandatory version subtitle. Like :func:`ddmm`
+    it reads only the leading 10-character date, so a start/end carrying a time still
+    yields a clean calendar date.
+    """
+    parts = value[:10].split("-")
+    return f"{parts[2]}.{parts[1]}.{parts[0]}" if len(parts) == 3 else value
+
+
+def window_end_commit(repo: str, until: str) -> str:
+    """Resolve the window's end into a commit-ish for ``git tag --merged``.
+
+    ``until`` may be a ref/SHA (used as-is), ``HEAD``/empty (→ ``HEAD``), or a
+    date/date+time -- in which case the last commit up to that moment is resolved, so
+    the "current released version" is computed as of the window end, not as of now.
+    """
+    bound = as_git_date(until, end=True)
+    if bound is None:
+        return until or "HEAD"
+    return run_git(repo, ["rev-list", "-1", f"--until={bound}", "HEAD"]).strip() or "HEAD"
+
+
+def newest_release_tag(repo: str, until: str) -> str | None:
+    """Return the highest ``vN.N.N`` tag reachable at the window end, or ``None``.
+
+    This is the *current released version* the notes belong to -- the newest
+    well-formed release tag merged into the window-end commit. Typo tags (``v.0.1``,
+    ``v-0.2.3``) are ignored. ``None`` means the repo has no release tag yet.
+    """
+    out = run_git(repo, ["tag", "--merged", window_end_commit(repo, until)])
+    tags = [t for t in out.split() if t.startswith("v") and version_ref_key(t)]
+    return max(tags, key=version_ref_key) if tags else None
+
+
+def suggested_subtitle(repo: str, until: str, log: str) -> str | None:
+    """Build the mandatory italic version subtitle, or ``None`` if it cannot.
+
+    Form: ``_Version <current released version> · Stand <DD.MM.YYYY>_``. The version
+    is :func:`newest_release_tag` at the window end; ``Stand`` is the date of the last
+    change in range (the same date the title's right bound uses), carrying the year.
+    Both inputs must exist -- an empty window or a tag-less repo yields ``None`` and
+    the caller falls back to a planned-version hint.
+    """
+    dates = sorted(line.split("\t")[1] for line in log.splitlines() if line.count("\t") >= 2)
+    tag = newest_release_tag(repo, until)
+    if not dates or not tag:
+        return None
+    return f"_Version {tag} · Stand {ddmmyyyy(dates[-1])}_"
+
+
 # Path (relative to the repo root) the model copies to advance the pointer; kept
 # in sync with the command shown in SKILL.md so the reminder is paste-ready.
 TRACK_CMD = ".claude/skills/release-notes/scripts/track_release_notes.py"
@@ -306,6 +358,7 @@ def resolve_since(repo: str, arg_since: str | None, state):
         sys.stderr.write(
             "no start point given and no local tracking pointer yet "
             f"({state.STATE_FILENAME} absent).\n"
+            f"  looked in: {state.state_path(repo)}\n"
             "  -> Ask the user once for a start point (date or tag) and re-run with "
             "--since,\n"
             f"     then create the pointer after writing the notes:  python {TRACK_CMD} --set\n")
@@ -360,6 +413,12 @@ def main() -> None:
     print("=" * 78)
     print(f"RELEASE-NOTES SOURCE DIGEST   since={shown_since}  until={args.until}")
     print(f"SUGGESTED TITLE (use verbatim as the H1): {suggested_title(log, since)}")
+    subtitle = suggested_subtitle(repo, args.until, log)
+    if subtitle:
+        print(f"SUGGESTED SUBTITLE (mandatory 2nd line, use verbatim): {subtitle}")
+    elif log:
+        print("SUGGESTED SUBTITLE: no release tag reachable at the window end -- use the "
+              "planned next version, e.g. _Version vX.Y.Z · Stand DD.MM.YYYY_")
     if resumed:
         print(f"RESUMED from local pointer {state.STATE_FILENAME}: {anchor_desc}")
     print("=" * 78)
@@ -387,7 +446,8 @@ def main() -> None:
 
     print("\n" + "-" * 78)
     print("REMINDER: once the notes are written (and the changelog reconciled), advance the")
-    print("local, git-ignored tracking pointer so the next no-argument run resumes from here:")
+    print("local tracking pointer (kept in the shared git dir, never committed) so the next")
+    print("no-argument run resumes from here:")
     print(f"   python {TRACK_CMD} --set")
 
 
