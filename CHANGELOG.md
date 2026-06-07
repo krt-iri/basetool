@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.2](https://github.com/krt-iri/basetool/releases/tag/v0.4.2) - 2026-06-07
+
 ### Changed
 
 - **In „Mein Lager" und „Globales Lager" zeigt die aufgeklappte Eintragsliste die Spalte „Hinzugefügt" nicht mehr; stattdessen stehen die Schaltflächen (Ausbuchen, Notiz) und die Notizvorschau nebeneinander, sodass die Eintragszeilen flacher und übersichtlicher sind.**
