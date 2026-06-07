@@ -120,8 +120,10 @@ class RefineryOrderCreateE2eTest {
         // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
         E2eSupport.awaitFormPost(page, () -> page.getByTestId("refinery-submit").click());
 
-        // The created order must appear in the list (fresh ephemeral DB => exactly one).
-        page.navigate(baseUrl + "/refinery-orders");
+        // The created order must appear in the list (fresh ephemeral DB => exactly one). Route the
+        // post-submit GET through the retry helper: WebKit can still abort it (HTTP/2
+        // INTERNAL_ERROR) even after the redirect settled — see E2eSupport#navigate.
+        E2eSupport.navigate(page, baseUrl + "/refinery-orders");
         // 20 s, not the 5 s default: the post-submit list render is slow on WebKit under CI load.
         assertThat(page.getByTestId("refinery-order-row").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));

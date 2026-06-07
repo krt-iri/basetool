@@ -102,8 +102,10 @@ class HangarAddShipE2eTest {
         E2eSupport.clickSubmitClearingFooter(page.getByTestId("hangar-ship-submit"));
         page.waitForLoadState();
 
-        // Back on the hangar, the new ship row must show the selected ship type.
-        page.navigate(baseUrl + "/hangar");
+        // Back on the hangar, the new ship row must show the selected ship type. Post-submit GET
+        // via the retry helper — WebKit can abort it (HTTP/2 INTERNAL_ERROR) even after the
+        // redirect settled. See E2eSupport#navigate.
+        E2eSupport.navigate(page, baseUrl + "/hangar");
         assertThat(
                 page.getByTestId("hangar-ship-row")
                     .filter(new Locator.FilterOptions().setHasText("E2E Ship Type")))

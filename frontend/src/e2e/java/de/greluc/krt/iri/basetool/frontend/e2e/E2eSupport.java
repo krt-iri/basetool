@@ -25,6 +25,7 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.Request;
 import com.microsoft.playwright.TimeoutError;
 import java.io.IOException;
@@ -55,6 +56,39 @@ final class E2eSupport {
    * budget.
    */
   private static final int LOGIN_MAX_ATTEMPTS = 3;
+
+  /**
+   * Total attempts for {@link #navigate} before a navigation abort is allowed to propagate. Mirrors
+   * {@link #LOGIN_MAX_ATTEMPTS}: attempts {@code 1..N-1} retry a transient abort, the {@code N}-th
+   * runs uncaught so a persistent failure still surfaces with its real error. Three bounds the rare
+   * WebKit-abort retry loop; since the retry fires only on the abort path it never extends a
+   * healthy run.
+   */
+  private static final int NAVIGATE_MAX_ATTEMPTS = 3;
+
+  /**
+   * Settle pause, in milliseconds, between a transient navigation abort and the retry. It gives the
+   * reset HTTP/2 stream time to tear down so the re-issued GET opens a fresh one. Kept short
+   * because the WebKit {@code INTERNAL_ERROR} reset clears almost immediately, and it only ever
+   * runs on the abort path.
+   */
+  private static final int NAVIGATE_RETRY_BACKOFF_MILLIS = 500;
+
+  /**
+   * Lowercase substrings that mark a {@code page.navigate(...)} failure as a transient connection
+   * reset of the navigation request rather than a genuine page failure (see {@link
+   * #isTransientNavigationAbort}): WebKit's HTTP/2 {@code INTERNAL_ERROR} and its {@code
+   * frameAbortedNavigation} wrapper, Firefox's {@code NS_BINDING_ABORTED}, Chromium's {@code
+   * net::ERR_ABORTED}, and Playwright's own "Navigation interrupted by another one". Deliberately
+   * narrow so only a genuine abort is retried and every real error propagates unmasked.
+   */
+  private static final List<String> NAVIGATION_ABORT_SIGNATURES =
+      List.of(
+          "internal_error",
+          "frameabortednavigation",
+          "ns_binding_aborted",
+          "err_aborted",
+          "interrupted");
 
   private E2eSupport() {}
 
@@ -346,6 +380,79 @@ final class E2eSupport {
         },
         new Page.WaitForResponseOptions().setTimeout(15_000),
         submitAction);
+  }
+
+  /**
+   * Navigates to {@code url}, retrying up to {@link #NAVIGATE_MAX_ATTEMPTS} times when the
+   * navigation request is aborted by a transient, engine-level connection reset rather than the
+   * target page genuinely failing.
+   *
+   * <p>This hardens the post-submit list re-load that several flows perform immediately after
+   * {@link #awaitFormPost} / {@link #clickSubmitClearingFooter}. {@code awaitFormPost} already
+   * blocks until the submit's Post/Redirect/Get has fully settled — so the mutation is safe and no
+   * submit navigation is in flight — but the very next {@code navigate(...)} still issues a fresh
+   * GET on a connection WebKit has, under CI load, been seen to tear down mid-flight. WebKit
+   * surfaces that aborted main-frame navigation as {@code HTTP/2 Error: INTERNAL_ERROR} ({@code
+   * frameAbortedNavigation}), thrown as a {@link PlaywrightException} (concretely a {@code
+   * DriverException}). The reset is transient — a brief settle plus a fresh GET succeeds — so
+   * {@link #isTransientNavigationAbort} gates the retry to exactly those abort signatures and lets
+   * every other failure (a real 4xx/5xx document, a timeout, a wrong URL) propagate immediately and
+   * unmasked. The final attempt runs uncaught, so a persistent abort still fails the test with the
+   * genuine Playwright error.
+   *
+   * @param page the page to navigate
+   * @param url the absolute URL to load
+   * @throws PlaywrightException if every attempt is aborted, or on the first non-transient
+   *     navigation failure
+   */
+  static void navigate(Page page, String url) {
+    // Attempts 1..N-1 retry a transient abort; the final attempt (below the loop) runs uncaught,
+    // so a persistent failure propagates with its real error — mirrors login()/attemptLogin.
+    for (int attempt = 1; attempt < NAVIGATE_MAX_ATTEMPTS; attempt++) {
+      try {
+        page.navigate(url);
+        return;
+      } catch (PlaywrightException abort) {
+        if (!isTransientNavigationAbort(abort)) {
+          throw abort;
+        }
+        System.out.printf(
+            "[E2E][navigate] attempt %d/%d to %s aborted (%s); settling then retrying%n",
+            attempt,
+            NAVIGATE_MAX_ATTEMPTS,
+            url,
+            String.valueOf(abort.getMessage()).lines().findFirst().orElse("navigation aborted"));
+      }
+      // Let the reset HTTP/2 stream tear down and the page fall back to its prior, already-loaded
+      // document before re-issuing the GET. The settle runs between attempts, outside the catch, so
+      // it can never mask the abort it follows.
+      page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
+      page.waitForLoadState();
+    }
+    page.navigate(url);
+  }
+
+  /**
+   * Reports whether a {@link PlaywrightException} from {@code page.navigate(...)} is a transient,
+   * retryable abort of the navigation request itself — as opposed to a genuine failure of the
+   * target page. It matches only the engine-specific abort signatures in {@link
+   * #NAVIGATION_ABORT_SIGNATURES} (WebKit's {@code INTERNAL_ERROR} / {@code
+   * frameAbortedNavigation}, Firefox's {@code NS_BINDING_ABORTED}, Chromium's {@code ERR_ABORTED},
+   * and Playwright's "Navigation interrupted by another one"). A timeout, a 4xx/5xx, a DNS error or
+   * any other navigation failure carries none of these, so it is reported non-transient and {@link
+   * #navigate} lets it propagate unmasked.
+   *
+   * @param error the exception thrown by {@code page.navigate(...)}
+   * @return {@code true} if the message carries a known transient-abort signature; {@code false}
+   *     otherwise, including when the message is {@code null}
+   */
+  private static boolean isTransientNavigationAbort(PlaywrightException error) {
+    String message = error.getMessage();
+    if (message == null) {
+      return false;
+    }
+    String lower = message.toLowerCase(Locale.ROOT);
+    return NAVIGATION_ABORT_SIGNATURES.stream().anyMatch(lower::contains);
   }
 
   /**

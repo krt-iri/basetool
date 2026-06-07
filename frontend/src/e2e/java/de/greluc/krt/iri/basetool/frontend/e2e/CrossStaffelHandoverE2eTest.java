@@ -150,7 +150,9 @@ class CrossStaffelHandoverE2eTest {
         // and the mutation lost (the flaky WebKit failure — see E2eSupport#awaitFormPost).
         E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-handover-submit").click());
 
-        page.navigate(baseUrl + "/orders/" + jobOrderId);
+        // Post-submit GET via the retry helper — WebKit can abort it (HTTP/2 INTERNAL_ERROR) even
+        // after the redirect settled. See E2eSupport#navigate.
+        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
         assertThat(
                 page.getByTestId("order-handover-row")
                     .filter(new Locator.FilterOptions().setHasText("E2E CrossStaffel Recipient")))
