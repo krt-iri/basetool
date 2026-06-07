@@ -122,7 +122,10 @@ org-unit selects the rows where that association is itself absent), returned **o
 `idx_inventory_item_stack_key` on the inventory natural key backs both the grouped `GROUP BY`
 and the per-stack entries lookup. The `/all` drill-down re-applies the same org-unit scope
 predicate as the grouped view; the `/my` drill-down is owner-scoped from the JWT (no
-impersonation). Per-entry actions (REQ-INV-003) operate on the fetched rows unchanged.
+impersonation). Per-entry actions (REQ-INV-003) operate on the fetched rows unchanged. Each
+drill-down row shows the entry's amount, its job-order / mission association and the per-entry
+actions (book-out, note), with the note preview rendered beside the action buttons rather than
+below them; `createdAt` is the entries' ordering key, not a displayed column.
 
 **Acceptance**
 

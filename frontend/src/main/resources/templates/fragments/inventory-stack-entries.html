@@ -29,11 +29,10 @@
         <thead>
             <tr>
                 <th class="item-checkbox-cell" style="padding-left: 2.5rem; width: 5%;"></th>
-                <th style="width: 22%;" th:text="#{inventory.entry.addedAt}">Hinzugefügt</th>
                 <th style="width: 15%;" th:text="#{inventory.amount}">Menge</th>
                 <th style="width: 20%;" th:text="#{inventory.order}">Auftrag</th>
                 <th style="width: 20%;" th:text="#{inventory.mission}">Einsatz</th>
-                <th style="width: 18%;" th:text="#{inventory.actions}">Aktionen</th>
+                <th style="width: 40%;" th:text="#{inventory.actions}">Aktionen</th>
             </tr>
         </thead>
         <tbody>
@@ -44,7 +43,6 @@
                            th:data-material-id="${entry.material.id}"
                            data-trigger="inv-my-update-bulk-state">
                 </td>
-                <td th:text="${entry.createdAt != null ? #temporals.format(entry.createdAt.atZone(T(java.time.ZoneOffset).UTC), #messages.msg('format.date')) : ''}">01.01.2026</td>
                 <td th:switch="${entry.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
                     <span th:case="*" th:text="|${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
@@ -94,38 +92,41 @@
                     </select>
                 </td>
                 <td>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
-                                th:data-id="${entry.id}"
-                                th:data-amount="${entry.amount}"
-                                th:data-version="${entry.version}"
-                                th:data-material-id="${entry.material.id}"
-                                th:data-quantity-type="${entry.material.quantityType}"
-                                th:data-user-id="${entry.user.id}"
-                                th:data-location-id="${entry.location.id}"
-                                data-trigger="inv-my-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
-                        <button type="button" class="btn btn-ghost inventory-note-btn"
-                                style="padding: 0.2rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
-                                th:data-id="${entry.id}"
-                                th:data-version="${entry.version}"
-                                th:data-note="${entry.note}"
-                                th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? ' has-note' : ''"
-                                data-trigger="inv-my-open-note"
-                                th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
-                                th:text="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
-                    </div>
-                    <div class="inventory-note-preview"
-                         th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
-                         th:attr="data-note-for=${entry.id}"
-                         th:title="${entry.note}"
-                         th:aria-label="#{inventory.note.label}">
-                        <span class="inventory-note-label" th:text="#{inventory.note.label}">Notiz</span>
-                        <span class="inventory-note-text" th:text="${entry.note}">Notiz</span>
+                    <div style="display: flex; gap: 0.75rem; align-items: flex-start; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 0 0 auto;">
+                            <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
+                                    th:data-id="${entry.id}"
+                                    th:data-amount="${entry.amount}"
+                                    th:data-version="${entry.version}"
+                                    th:data-material-id="${entry.material.id}"
+                                    th:data-quantity-type="${entry.material.quantityType}"
+                                    th:data-user-id="${entry.user.id}"
+                                    th:data-location-id="${entry.location.id}"
+                                    data-trigger="inv-my-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
+                            <button type="button" class="btn btn-ghost inventory-note-btn"
+                                    style="padding: 0.2rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
+                                    th:data-id="${entry.id}"
+                                    th:data-version="${entry.version}"
+                                    th:data-note="${entry.note}"
+                                    th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? ' has-note' : ''"
+                                    data-trigger="inv-my-open-note"
+                                    th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
+                                    th:text="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
+                        </div>
+                        <div class="inventory-note-preview"
+                             style="margin-top: 0; flex: 1 1 12rem; min-width: 0;"
+                             th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
+                             th:attr="data-note-for=${entry.id}"
+                             th:title="${entry.note}"
+                             th:aria-label="#{inventory.note.label}">
+                            <span class="inventory-note-label" th:text="#{inventory.note.label}">Notiz</span>
+                            <span class="inventory-note-text" th:text="${entry.note}">Notiz</span>
+                        </div>
                     </div>
                 </td>
             </tr>
             <tr th:if="${#lists.isEmpty(entries)}">
-                <td colspan="6" class="text-center text-muted" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</td>
+                <td colspan="5" class="text-center text-muted" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</td>
             </tr>
         </tbody>
     </table>
@@ -154,17 +155,15 @@
     <table class="krt-table stack-entries-table" style="margin: 0; background: transparent; border-top: none;">
         <thead>
             <tr>
-                <th style="padding-left: 2.5rem; width: 22%;" th:text="#{inventory.entry.addedAt}">Hinzugefügt</th>
-                <th style="width: 15%;" th:text="#{inventory.amount}">Menge</th>
+                <th style="padding-left: 2.5rem; width: 15%;" th:text="#{inventory.amount}">Menge</th>
                 <th style="width: 22%;" th:text="#{inventory.order}">Auftrag</th>
                 <th style="width: 22%;" th:text="#{inventory.mission}">Einsatz</th>
-                <th style="width: 19%;" sec:authorize="hasRole('LOGISTICIAN')" th:text="#{inventory.actions}">Aktionen</th>
+                <th style="width: 41%;" sec:authorize="hasRole('LOGISTICIAN')" th:text="#{inventory.actions}">Aktionen</th>
             </tr>
         </thead>
         <tbody>
             <tr th:each="entry : ${entries}" th:data-item-id="${entry.id}">
-                <td style="padding-left: 2.5rem;" th:text="${entry.createdAt != null ? #temporals.format(entry.createdAt.atZone(T(java.time.ZoneOffset).UTC), #messages.msg('format.date')) : ''}">01.01.2026</td>
-                <td th:switch="${entry.material.quantityType}">
+                <td style="padding-left: 2.5rem;" th:switch="${entry.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
                     <span th:case="*" th:text="|${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
                 </td>
@@ -229,38 +228,41 @@
                     </div>
                 </td>
                 <td sec:authorize="hasRole('LOGISTICIAN')">
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
-                                th:data-id="${entry.id}"
-                                th:data-amount="${entry.amount}"
-                                th:data-version="${entry.version}"
-                                th:data-material-id="${entry.material.id}"
-                                th:data-quantity-type="${entry.material.quantityType}"
-                                th:data-user-id="${entry.user.id}"
-                                th:data-location-id="${entry.location.id}"
-                                data-trigger="inv-admin-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
-                        <button type="button" class="btn btn-ghost inventory-note-btn"
-                                style="padding: 0.2rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
-                                th:data-id="${entry.id}"
-                                th:data-version="${entry.version}"
-                                th:data-note="${entry.note}"
-                                th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? ' has-note' : ''"
-                                data-trigger="inv-admin-open-note"
-                                th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
-                                th:text="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
-                    </div>
-                    <div class="inventory-note-preview"
-                         th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
-                         th:attr="data-note-for=${entry.id}"
-                         th:title="${entry.note}"
-                         th:aria-label="#{inventory.note.label}">
-                        <span class="inventory-note-label" th:text="#{inventory.note.label}">Notiz</span>
-                        <span class="inventory-note-text" th:text="${entry.note}">Notiz</span>
+                    <div style="display: flex; gap: 0.75rem; align-items: flex-start; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 0 0 auto;">
+                            <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;"
+                                    th:data-id="${entry.id}"
+                                    th:data-amount="${entry.amount}"
+                                    th:data-version="${entry.version}"
+                                    th:data-material-id="${entry.material.id}"
+                                    th:data-quantity-type="${entry.material.quantityType}"
+                                    th:data-user-id="${entry.user.id}"
+                                    th:data-location-id="${entry.location.id}"
+                                    data-trigger="inv-admin-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
+                            <button type="button" class="btn btn-ghost inventory-note-btn"
+                                    style="padding: 0.2rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
+                                    th:data-id="${entry.id}"
+                                    th:data-version="${entry.version}"
+                                    th:data-note="${entry.note}"
+                                    th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? ' has-note' : ''"
+                                    data-trigger="inv-admin-open-note"
+                                    th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
+                                    th:text="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
+                        </div>
+                        <div class="inventory-note-preview"
+                             style="margin-top: 0; flex: 1 1 12rem; min-width: 0;"
+                             th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
+                             th:attr="data-note-for=${entry.id}"
+                             th:title="${entry.note}"
+                             th:aria-label="#{inventory.note.label}">
+                            <span class="inventory-note-label" th:text="#{inventory.note.label}">Notiz</span>
+                            <span class="inventory-note-text" th:text="${entry.note}">Notiz</span>
+                        </div>
                     </div>
                 </td>
             </tr>
             <tr th:if="${#lists.isEmpty(entries)}">
-                <td colspan="5" class="text-center text-muted" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</td>
+                <td colspan="4" class="text-center text-muted" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</td>
             </tr>
         </tbody>
     </table>
