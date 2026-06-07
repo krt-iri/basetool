@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.64](https://github.com/krt-iri/basetool/releases/tag/v0.3.64) - 2026-06-07
+
 ### Added
 
 - **Im Profil lässt sich jetzt eine persönliche Standard-Auszahlungsart (Auszahlen oder Spenden) festlegen, die bei jeder Einsatz-Anmeldung vorausgewählt wird.** Wer immer spendet (oder immer auszahlt), muss das nicht mehr in jedem Einsatz einzeln umstellen; die Auswahl pro Einsatz bleibt änderbar und bestehende Teilnahmen ändern sich nicht (Migration V142).
