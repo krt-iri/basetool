@@ -1,0 +1,36 @@
+-- =============================================================================
+-- Ownerless leadership missions (#472 follow-up) — DROP NOT NULL on
+-- `mission.owning_org_unit_id`.
+--
+-- Context: V99/V102 tightened `owning_org_unit_id` to NOT NULL on every
+-- staffel-scoped aggregate, which made
+-- `OwnerScopeService.resolveOrgUnitForPickerOutput` (it 400s a user with zero
+-- org-unit memberships) a hard create-time gate. V132 then relaxed the column
+-- for the three personal aggregates (ship, refinery_order, inventory_item) and
+-- explicitly left mission/operation/job_order NOT NULL, on the premise that
+-- those three "have no per-user owner column to fall back on".
+--
+-- That premise is only true for operation and job_order. `mission` DOES carry a
+-- per-user owner column (`mission.owner_id`, the creator). An organisation has
+-- leadership roles ("Bereichsleitung") that sit ABOVE every Staffel and SK and
+-- therefore belong to no OrgUnit, yet must be able to plan org-wide missions. A
+-- mission such a leader creates is fully attributable to its `owner_id`, so —
+-- exactly like the three personal aggregates — a NULL `owning_org_unit_id` is a
+-- legitimate, attributable state ("ownerless mission"). The application now
+-- stamps NULL (instead of 400ing) when a membershipless user creates a mission,
+-- and layers the mission visibility rules on top: a public ownerless mission is
+-- visible to everyone, an internal one only to organisation members-or-above
+-- (`OwnerScopeService.canSeeMission` / `canEditMission`).
+--
+-- operation / job_order stay NOT NULL: they are org-owned by construction with
+-- no creator-owner fallback.
+--
+-- Non-destructive: DROP NOT NULL only relaxes a constraint (catalog-only, no
+-- table rewrite, no data loss) and is a no-op if the column is already nullable.
+-- Existing rows keep their populated owner. Rollback would re-tighten via
+-- `ALTER COLUMN owning_org_unit_id SET NOT NULL`, which fails only if an
+-- ownerless mission has since been created — backfill those from the owner's
+-- membership (or delete them) before re-tightening.
+-- =============================================================================
+
+ALTER TABLE mission ALTER COLUMN owning_org_unit_id DROP NOT NULL;

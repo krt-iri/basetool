@@ -30,6 +30,8 @@
 
 - **Der Bauplan-Import erkennt wieder Baupläne, deren englischer Name in den Spieldaten (CIG) falsch hinterlegt ist:** Bekannte Falschbezeichnungen werden beim SC-Wiki-Abgleich auf den echten Spielnamen korrigiert (z. B. „Antium Arms Maroon" statt „Antium Helmet Jet"), sodass diese Baupläne beim Import wieder zugeordnet werden. Die Korrektur greift nur, solange der falsche Name vorliegt, und wird automatisch hinfällig, sobald CIG ihn behebt (Meldung im Sync-Bericht).
 
+- **Mitglieder der Bereichsleitung (ohne eigene Staffel/SK) können wieder Einsätze anlegen:** Wer keiner Orgeinheit angehört, aber org-weit planen darf, bekam beim Anlegen bisher einen Fehler. Solche Einsätze werden jetzt ohne Orgeinheit gespeichert und sind standardmäßig für alle sichtbar; als „intern" markiert sehen sie nur angemeldete Mitglieder (Migration V144).
+
 ## [v0.3.63](https://github.com/krt-iri/basetool/releases/tag/v0.3.63) - 2026-06-06
 
 ## [v0.3.62](https://github.com/krt-iri/basetool/releases/tag/v0.3.62) - 2026-06-06
