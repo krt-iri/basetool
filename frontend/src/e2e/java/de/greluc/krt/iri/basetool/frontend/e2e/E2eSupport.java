@@ -25,6 +25,7 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Request;
 import com.microsoft.playwright.TimeoutError;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -279,9 +280,10 @@ final class E2eSupport {
    * {@code eval}), then performs a normal, trusted click that submits with full validation,
    * consistently across Chromium, Firefox and WebKit.
    *
-   * <p>The click is wrapped in {@link #awaitFormPost} so the method only returns once the form's
-   * POST navigation has been answered by the server — see that method for why a bare click would
-   * otherwise let a follow-up {@code navigate(...)} abort the in-flight submit on WebKit.
+   * <p>The click is wrapped in {@link #awaitFormPost} so the method only returns once the
+   * post-submit navigation (including the redirect it triggers) has settled — see that method for
+   * why a bare click would otherwise let a follow-up {@code navigate(...)} abort the in-flight
+   * submit on WebKit.
    *
    * @param submit the submit control (a {@code <button type="submit">}) to click
    */
@@ -294,33 +296,54 @@ final class E2eSupport {
   }
 
   /**
-   * Runs a submit action that triggers a full-page form POST and blocks until the browser has
-   * received the server's response to that POST navigation, so the submit cannot be dropped by what
-   * follows it.
+   * Runs a submit action that triggers a full-page form POST and blocks until the resulting
+   * navigation — <em>including the redirect the POST triggers</em> — has fully settled, so the
+   * submit and the page it lands on cannot be dropped by whatever the test does next.
    *
    * <p>Playwright's {@code locator.click()} returns once the click is dispatched — it does NOT wait
-   * for any navigation the click starts. The old pattern ({@code click()} then {@code
-   * waitForLoadState()}) was therefore racy: when the POST navigation had not yet committed, {@code
-   * waitForLoadState()} saw the still-current form document (already in the {@code load} state) and
-   * resolved immediately, and the test's next {@code navigate(...)} (or context close) aborted the
-   * in-flight POST. The mutation was silently lost and the expected row never appeared. WebKit,
-   * slower under CI load, lost this race intermittently while Chromium and Firefox usually
-   * committed the POST in time — the cause of the flaky, engine-specific "row not visible" failures
-   * across the mission-create, hangar-add-ship and cross-Staffel-handover flows.
+   * for any navigation the click starts. The original pattern ({@code click()} then {@code
+   * waitForLoadState()}) was racy: when the POST had not yet committed, {@code waitForLoadState()}
+   * saw the still-current form document (already in the {@code load} state) and resolved
+   * immediately, so the test's next {@code navigate(...)} aborted the in-flight POST and the
+   * mutation was silently lost — the flaky, engine-specific "row not visible" failures.
    *
-   * <p>Waiting for the POST navigation's response removes the race deterministically: the app's
-   * form handlers complete the backend mutation before issuing their {@code 3xx} redirect, so once
-   * the response is in hand the mutation has provably landed and any subsequent navigation is safe.
-   * The predicate matches only the top-level form submit ({@code isNavigationRequest} excludes
-   * XHR/WebSocket/beacon POSTs).
+   * <p>Waiting only for the POST's own {@code 3xx} response (an earlier, incomplete fix) is also
+   * insufficient: the browser then follows that redirect with a GET for the post-submit document,
+   * and a {@code navigate(...)} fired while that GET is still in flight aborts it. WebKit surfaces
+   * the aborted navigation as {@code HTTP/2 Error: INTERNAL_ERROR} ({@code frameAbortedNavigation})
+   * — the failure this method now guards against.
    *
-   * @param page the page whose main-frame POST navigation to await
+   * <p>So this waits for the <strong>settled</strong> post-submit document response: the redirect
+   * target's GET (the normal Post/Redirect/Get path), or — defensively — a non-{@code 3xx} POST
+   * document for a submit that renders its own page without redirecting (which keeps the wait from
+   * hanging for a redirect that never comes). Either way the backend mutation has provably landed
+   * and no navigation is in flight, so any subsequent {@code navigate(...)} is safe. The {@code
+   * isNavigationRequest} and {@code document} guards restrict the match to the top-level
+   * navigation, excluding XHR/WebSocket/beacon and subresource requests.
+   *
+   * @param page the page whose main-frame post-submit navigation to await
    * @param submitAction the action (typically a submit-button click) that starts the form POST
    */
   static void awaitFormPost(Page page, Runnable submitAction) {
     page.waitForResponse(
-        response ->
-            "POST".equals(response.request().method()) && response.request().isNavigationRequest(),
+        response -> {
+          Request request = response.request();
+          if (!request.isNavigationRequest() || !"document".equals(request.resourceType())) {
+            return false;
+          }
+          // Post/Redirect/Get happy path: the app answers the POST with a 3xx and the browser
+          // follows it with a GET for the post-submit document. Waiting for that GET's response —
+          // not the POST's 3xx — means the redirect has fully committed, so the caller's next
+          // navigate(...) has no in-flight redirect GET to abort.
+          if ("GET".equals(request.method())) {
+            return true;
+          }
+          // Defensive: a submit that renders its own document (no redirect) settles on the POST
+          // response itself, so accept any non-3xx POST document too rather than hang waiting for
+          // a redirect that will never arrive.
+          int status = response.status();
+          return "POST".equals(request.method()) && (status < 300 || status >= 400);
+        },
         new Page.WaitForResponseOptions().setTimeout(15_000),
         submitAction);
   }
