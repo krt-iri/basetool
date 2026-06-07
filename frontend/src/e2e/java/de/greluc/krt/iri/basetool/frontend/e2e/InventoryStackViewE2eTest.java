@@ -42,13 +42,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * mission} / {@code owningOrgUnit} associations as whole entities, which rendered implicit INNER
  * joins and silently dropped every stack missing those links. The result: {@code /inventory/all}
  * (and {@code /inventory/my}) showed "Keine Einträge gefunden" even though the per-material
- * aggregate page ({@code /inventory}) still listed the stock. This test seeds exactly such a row via
- * the backend API and asserts the material surfaces as a group row in the grouped UI — the data-only
- * counterpart is {@code InventoryItemStackQueryDataTest}.
+ * aggregate page ({@code /inventory}) still listed the stock. This test seeds exactly such a row
+ * via the backend API and asserts the material surfaces as a group row in the grouped UI — the
+ * data-only counterpart is {@code InventoryItemStackQueryDataTest}.
  *
  * <p>The assertion targets the group-header row by its {@code data-material-id} (only emitted when
- * {@code groupedItems} is non-empty) rather than the material name, because the name also appears in
- * the filter dropdown and would match even when the grouped table is empty.
+ * {@code groupedItems} is non-empty) rather than the material name, because the name also appears
+ * in the filter dropdown and would match even when the grouped table is empty.
  */
 @Tag("e2e")
 class InventoryStackViewE2eTest {
@@ -95,8 +95,8 @@ class InventoryStackViewE2eTest {
   }
 
   /**
-   * Loads {@code /inventory/all} and asserts the seeded, unlinked stock surfaces as a material group
-   * row — i.e. the grouped view is not empty for stock that carries no job order / mission.
+   * Loads {@code /inventory/all} and asserts the seeded, unlinked stock surfaces as a material
+   * group row — i.e. the grouped view is not empty for stock that carries no job order / mission.
    */
   @Test
   void groupedGlobalInventoryShowsStockWithoutJobOrderOrMission() {

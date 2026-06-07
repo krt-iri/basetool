@@ -377,12 +377,13 @@ public final class BackendSeeder {
   /**
    * Creates a non-personal inventory item linked to <em>neither</em> a job order <em>nor</em> a
    * mission via {@code POST /api/v1/inventory} and returns its id — the overwhelmingly common Lager
-   * case (plain squadron stock). Because the seeding user is an IRIDIUM member, create-time stamping
-   * sets the item's {@code owningOrgUnit} to IRIDIUM while {@code jobOrder} and {@code mission} stay
-   * {@code null}. This is exactly the row shape the group-on-read stack queries ({@code
-   * findGlobalStacks} / {@code findUserStacks}) must still surface: a constructor-expression
-   * projection over those nullable associations renders an implicit inner join that silently drops
-   * such rows (REQ-INV-002), so this seeder backs the {@code InventoryStackViewE2eTest} regression.
+   * case (plain squadron stock). Because the seeding user is an IRIDIUM member, create-time
+   * stamping sets the item's {@code owningOrgUnit} to IRIDIUM while {@code jobOrder} and {@code
+   * mission} stay {@code null}. This is exactly the row shape the group-on-read stack queries
+   * ({@code findGlobalStacks} / {@code findUserStacks}) must still surface: a
+   * constructor-expression projection over those nullable associations renders an implicit inner
+   * join that silently drops such rows (REQ-INV-002), so this seeder backs the {@code
+   * InventoryStackViewE2eTest} regression.
    *
    * @param username the Keycloak username of the test user (must be an org-unit member)
    * @param password the Keycloak password of the test user

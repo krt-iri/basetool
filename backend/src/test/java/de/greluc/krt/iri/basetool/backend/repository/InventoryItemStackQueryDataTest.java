@@ -28,6 +28,8 @@ import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.projection.InventoryStackAggregate;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -35,7 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Data-level regression coverage for the group-on-read stack queries ({@link
@@ -43,17 +45,24 @@ import org.springframework.transaction.support.TransactionTemplate;
  * ADR-0003, REQ-INV-002) against the real Postgres test schema (Testcontainers + Flyway via the
  * {@code test} profile).
  *
- * <p>The sibling {@code InventoryItemStackQueryTest} only smoke-tests these queries against an empty
- * table, so it cannot catch the trap this test pins down: the projection selects and groups the
- * <em>nullable</em> associations {@code jobOrder}, {@code mission} and {@code owningOrgUnit} as whole
- * entities. A naive constructor-expression projection over a nullable to-one renders an implicit
- * INNER JOIN, which silently drops every row where that association is {@code null} — i.e. the vast
- * majority of real Lager stock (most items belong to no job order and no mission). That made {@code
- * /inventory/all} and {@code /inventory/my} show "no entries" even though the aggregated overview
- * listed the very same material. These tests seed exactly such rows and assert they still surface.
+ * <p>The sibling {@code InventoryItemStackQueryTest} only smoke-tests these queries against an
+ * empty table, so it cannot catch the trap this test pins down: the projection selects and groups
+ * the <em>nullable</em> associations {@code jobOrder}, {@code mission} and {@code owningOrgUnit} as
+ * whole entities. A naive constructor-expression projection over a nullable to-one renders an
+ * implicit INNER JOIN, which silently drops every row where that association is {@code null} — i.e.
+ * the vast majority of real Lager stock (most items belong to no job order and no mission). That
+ * made {@code /inventory/all} and {@code /inventory/my} show "no entries" even though the
+ * aggregated overview listed the very same material. These tests seed exactly such rows and assert
+ * they still surface.
+ *
+ * <p>The class is {@link Transactional} so each method rolls back: the seeded rows must never
+ * commit to the shared Testcontainers database, otherwise the sibling empty-table smoke test (and
+ * any other unscoped query) would observe this fixture. The query still sees the rows because they
+ * are flushed within the test transaction before the read.
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@Transactional
 class InventoryItemStackQueryDataTest {
 
   @Autowired private InventoryItemRepository inventoryItemRepository;
@@ -61,7 +70,8 @@ class InventoryItemStackQueryDataTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private SquadronRepository squadronRepository;
-  @Autowired private TransactionTemplate transactionTemplate;
+
+  @PersistenceContext private EntityManager entityManager;
 
   /**
    * A squadron-owned, non-personal item that is linked to neither a job order nor a mission (the
@@ -71,38 +81,34 @@ class InventoryItemStackQueryDataTest {
    */
   @Test
   void findGlobalStacks_includesNonPersonalItemWithoutJobOrderOrMission() {
-    UUID materialId =
-        transactionTemplate.execute(
-            status -> {
-              User user = new User();
-              user.setId(UUID.randomUUID());
-              user.setUsername("u-" + UUID.randomUUID());
-              userRepository.save(user);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(user);
 
-              Location location = new Location();
-              location.setName("Hub-" + UUID.randomUUID());
-              location = locationRepository.save(location);
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
 
-              Material material = new Material();
-              material.setName("Quantanium-" + UUID.randomUUID());
-              material.setType(MaterialType.RAW);
-              material = materialRepository.save(material);
+    Material material = new Material();
+    material.setName("Quantanium-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
 
-              InventoryItem inv = new InventoryItem();
-              inv.setUser(user);
-              inv.setLocation(location);
-              inv.setMaterial(material);
-              inv.setQuality(800);
-              inv.setAmount(100.0);
-              inv.setPersonal(false);
-              inv.setJobOrder(null);
-              inv.setMission(null);
-              inv.setOwningOrgUnit(
-                  squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
-              inventoryItemRepository.save(inv);
-              return material.getId();
-            });
+    InventoryItem inv = new InventoryItem();
+    inv.setUser(user);
+    inv.setLocation(location);
+    inv.setMaterial(material);
+    inv.setQuality(800);
+    inv.setAmount(100.0);
+    inv.setPersonal(false);
+    inv.setJobOrder(null);
+    inv.setMission(null);
+    inv.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
+    inventoryItemRepository.save(inv);
+    entityManager.flush();
 
+    UUID materialId = material.getId();
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findGlobalStacks(
             true, List.of(materialId), null, false, null, false, null, true, null, Set.of());
@@ -119,53 +125,48 @@ class InventoryItemStackQueryDataTest {
   /**
    * A personal item is, by the inventory invariants, never linked to a job order or mission and may
    * have a {@code null} owning org unit (ownerless personal). It must still surface in the owner's
-   * grouped "my inventory" view; the same implicit-join trap on {@code jobOrder} / {@code mission} /
-   * {@code owningOrgUnit} would otherwise hide every personal stack.
+   * grouped "my inventory" view; the same implicit-join trap on {@code jobOrder} / {@code mission}
+   * / {@code owningOrgUnit} would otherwise hide every personal stack.
    */
   @Test
   void findUserStacks_includesPersonalItemWithoutAssociations() {
-    UUID[] ids = new UUID[2];
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          User user = new User();
-          user.setId(UUID.randomUUID());
-          user.setUsername("u-" + UUID.randomUUID());
-          userRepository.save(user);
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(user);
 
-          Location location = new Location();
-          location.setName("Hub-" + UUID.randomUUID());
-          location = locationRepository.save(location);
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
 
-          Material material = new Material();
-          material.setName("Astatine-" + UUID.randomUUID());
-          material.setType(MaterialType.RAW);
-          material = materialRepository.save(material);
+    Material material = new Material();
+    material.setName("Astatine-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
 
-          InventoryItem inv = new InventoryItem();
-          inv.setUser(user);
-          inv.setLocation(location);
-          inv.setMaterial(material);
-          inv.setQuality(500);
-          inv.setAmount(42.0);
-          inv.setPersonal(true);
-          inv.setJobOrder(null);
-          inv.setMission(null);
-          inv.setOwningOrgUnit(null);
-          inventoryItemRepository.save(inv);
-          ids[0] = user.getId();
-          ids[1] = material.getId();
-        });
+    InventoryItem inv = new InventoryItem();
+    inv.setUser(user);
+    inv.setLocation(location);
+    inv.setMaterial(material);
+    inv.setQuality(500);
+    inv.setAmount(42.0);
+    inv.setPersonal(true);
+    inv.setJobOrder(null);
+    inv.setMission(null);
+    inv.setOwningOrgUnit(null);
+    inventoryItemRepository.save(inv);
+    entityManager.flush();
 
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findUserStacks(
-            ids[0], false, null, null, false, null, false, null);
+            user.getId(), false, null, null, false, null, false, null);
 
     assertThat(stacks)
         .as(
             "a personal item with null jobOrder/mission/owningOrgUnit must still appear in the"
                 + " owner's grouped inventory view")
         .hasSize(1);
-    assertThat(stacks.get(0).material().getId()).isEqualTo(ids[1]);
+    assertThat(stacks.get(0).material().getId()).isEqualTo(material.getId());
     assertThat(stacks.get(0).totalAmount()).isEqualTo(42.0);
   }
 }
