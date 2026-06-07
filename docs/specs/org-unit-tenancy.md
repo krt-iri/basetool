@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-07.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -39,7 +39,9 @@ non-admins see the union of their memberships unless they pin one.
   widens this scope.
 - **Cross-staffel with public escape:** `Mission` — visible to other OrgUnits iff
   `is_internal = false`; editable only by the owning OrgUnit + admins (`searchMissions`
-  enforces `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false`).
+  enforces `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false`). A mission may
+  also be **ownerless** (`owning_org_unit_id IS NULL`, V144) — a leadership / "Bereichsleitung"
+  mission created by a user who belongs to no OrgUnit; see REQ-ORG-009.
 - **Conditionally staffel-scoped** (visibility driven by the responsible OrgUnit's `kind`,
 
   # 343): `JobOrder` + linked `JobOrderMaterial` + `JobOrderHandover`. Job Order carries
@@ -56,12 +58,19 @@ non-admins see the union of their memberships unless they pin one.
 
 ### REQ-ORG-004 — Create-time OrgUnit stamping
 
-Stamp the OrgUnit via the central resolver `OwnerScopeService.resolveSquadronForPickerOutput(targetUser, pickerOutputOrgUnitId)`
-— never read `user.getSquadron()` directly. Matrix: 0 memberships → 400; 1 + no picker
-output → auto-stamp; 1 + valid → honoured; 1 + foreign → 400; >1 + no output → 400 (force
-choice); >1 + valid → honoured. (SK selection currently 400s while legacy
-`owning_squadron_id` is NOT NULL; lifts in the cleanup release.) Job Order uses its own
-resolvers: `responsible_org_unit_id` must be profit-eligible (or the configured intake SK
+Stamp the OrgUnit via the central picker resolvers on `OwnerScopeService` — never read
+`user.getSquadron()` directly. Two variants share the §5.5.1 picker matrix (1 + no output →
+auto-stamp; 1 + valid → honoured; 1 + foreign → 400; >1 + no output → 400 (force choice); >1 +
+valid → honoured) and differ only on the **0-membership** row:
+
+- `resolveOrgUnitForPickerOutput` (strict) → **400** for a membershipless user. Used by
+  aggregates that are org-owned by construction with no creator-owner fallback (`Operation`).
+- `resolveOrgUnitForPickerOutputNullable` → **null** (ownerless) for a membershipless user who
+  supplied no picker output; a non-null *foreign* pick still 400s. Used by the owner-carrying
+  aggregates that may legitimately exist without an OrgUnit: `Ship`, `RefineryOrder`,
+  `InventoryItem` (V132) and `Mission` (V144 — see REQ-ORG-009).
+
+Job Order uses its own resolvers: `responsible_org_unit_id` must be profit-eligible (or the configured intake SK
 from system setting `job_order.intake_special_command_id` for guest creations);
 `requesting_org_unit_id` accepts any OrgUnit and is freely editable.
 
@@ -101,3 +110,25 @@ The frontend sends `X-Active-Org-Unit-Id` (canonical) + legacy `X-Active-Squadro
 every outbound call; the backend reads the new name first. Session attribute (Redis-backed)
 is `iridium.activeOrgUnitId` with legacy `iridium.activeSquadronId` mirrored for one release.
 Both aliases drop in the cleanup release.
+
+### REQ-ORG-009 — Ownerless leadership ("Bereichsleitung") missions
+
+Organisation leadership sits above every Staffel and SK and belongs to no OrgUnit, yet must be
+able to plan org-wide missions. A mission created by such a membershipless user is stamped
+`owning_org_unit_id = NULL` (V144 relaxed the NOT NULL; the row stays attributable through
+`mission.owner_id`) instead of being rejected with 400. Visibility layers on top of the
+`owning_org_unit IS NULL` state, mirroring the Staffel-internal rule with the whole organisation
+as the owning scope:
+
+- **Public** (`is_internal = false`) → visible to everyone, anonymous visitors included (the
+  create-time default).
+- **Internal** (`is_internal = true`) → visible to organisation members-or-above
+  (`AuthHelperService.isMemberOrAbove()`), hidden from guests/anonymous.
+
+Editing follows the normal mission-management gate: `OwnerScopeService.canEditMission` is a no-op
+(returns `true`) for an ownerless mission, so `MissionSecurityService.canManageMission` decides via
+its usual elevated-role-or-owner/manager check (owner, co-managers, mission-managers/officers,
+admins) — the same path as a normal mission, minus the squadron-scope narrowing. The list queries
+(`searchMissions`, `findAllActiveReference`) carry a `viewerIsMemberOrAbove` flag so an internal
+ownerless mission surfaces in the lists of members-or-above. Only `Mission` gains this carve-out;
+`Operation` and `JobOrder` stay NOT NULL (org-owned by construction, no creator-owner fallback).

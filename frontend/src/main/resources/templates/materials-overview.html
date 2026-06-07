@@ -84,6 +84,16 @@
                 <input type="checkbox" id="filterAutoLoad" class="mtx-bool-filter">
                 <label for="filterAutoLoad" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.hasAutoLoad}">Hat Auto Load</label>
             </div>
+            <!--
+              Category-grouping toggle. Checked (default) groups material rows under the
+              admin-defined category header rows; unchecked drops the headers and shows every
+              material in one flat, alphabetically sorted list. Handled entirely in
+              /js/materials-matrix.js and persisted per browser in localStorage.
+            -->
+            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; max-width: max-content;">
+                <input type="checkbox" id="filterGroupByCategory" checked>
+                <label for="filterGroupByCategory" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>
+            </div>
         </div>
 
         <!--

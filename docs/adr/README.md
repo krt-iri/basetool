@@ -41,4 +41,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0001](0001-frontend-confidential-oauth2-client.md) | Frontend as a confidential OAuth2 client (PKCE + secret)                              | Accepted — implementation pending |
 | [0002](0002-whole-number-amounts.md)                | Whole-number amounts: value-based validation, reject-not-round, display-only rounding | Accepted                          |
 | [0003](0003-inventory-append-only-group-on-read.md) | Inventory: append-only entries with group-on-read display                             | Accepted                          |
+| [0004](0004-ownerless-leadership-missions.md)       | Ownerless leadership ("Bereichsleitung") missions                                     | Accepted                          |
 

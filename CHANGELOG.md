@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+## [v0.4.0](https://github.com/krt-iri/basetool/releases/tag/v0.4.0) - 2026-06-07
+
 ### Added
+
+- **Auf den Handelsseiten „Materialien" und „Material-Übersicht" lässt sich die Gruppierung nach den von Admins angelegten Kategorien per Schalter „Nach Kategorie gruppieren" abschalten.** Ohne Gruppierung erscheinen alle Materialien in der normalen alphabetischen Sortierung der Seite; die Auswahl wird pro Browser gespeichert und lässt sich jederzeit wieder umschalten.
 
 - **Im Profil lässt sich jetzt eine persönliche Standard-Auszahlungsart (Auszahlen oder Spenden) festlegen, die bei jeder Einsatz-Anmeldung vorausgewählt wird.** Wer immer spendet (oder immer auszahlt), muss das nicht mehr in jedem Einsatz einzeln umstellen; die Auswahl pro Einsatz bleibt änderbar und bestehende Teilnahmen ändern sich nicht (Migration V142).
 
@@ -29,6 +33,8 @@
 - **Die Mengenfelder beim Auftrag anlegen, Auftrag bearbeiten und bei der Materialübergabe richten sich jetzt nach dem gewählten Material:** Stück-Materialien erlauben nur noch ganze Zahlen (Schrittweite 1, Einheit „Stück"), SCU-Materialien Nachkommastellen samt SCU-Hinweis. Bisher waren diese Felder immer auf SCU/Dezimal eingestellt, sodass eine Nachkomma-Eingabe für Stück-Materialien erst der Server ablehnte.
 
 - **Der Bauplan-Import erkennt wieder Baupläne, deren englischer Name in den Spieldaten (CIG) falsch hinterlegt ist:** Bekannte Falschbezeichnungen werden beim SC-Wiki-Abgleich auf den echten Spielnamen korrigiert (z. B. „Antium Arms Maroon" statt „Antium Helmet Jet"), sodass diese Baupläne beim Import wieder zugeordnet werden. Die Korrektur greift nur, solange der falsche Name vorliegt, und wird automatisch hinfällig, sobald CIG ihn behebt (Meldung im Sync-Bericht).
+
+- **Mitglieder der Bereichsleitung (ohne eigene Staffel/SK) können wieder Einsätze anlegen:** Wer keiner Orgeinheit angehört, aber org-weit planen darf, bekam beim Anlegen bisher einen Fehler. Solche Einsätze werden jetzt ohne Orgeinheit gespeichert und sind standardmäßig für alle sichtbar; als „intern" markiert sehen sie nur angemeldete Mitglieder (Migration V144).
 
 ## [v0.3.63](https://github.com/krt-iri/basetool/releases/tag/v0.3.63) - 2026-06-06
 

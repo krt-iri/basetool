@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
@@ -115,6 +116,16 @@ class MaterialsPageControllerMvcTest {
         .andExpect(
             content()
                 .string(containsString("window.krtEvents.on('click', 'materials-toggle-kind'")))
+        // The category-grouping view toggle and both views (grouped accordion + flat grid) must
+        // render. The flat grid materialises the shared material-card fragment, so a broken
+        // fragment reference would 500 the render before any of these strings appear.
+        .andExpect(content().string(containsString("data-trigger=\"materials-toggle-grouping\"")))
+        .andExpect(content().string(containsString("id=\"materialsGrouped\"")))
+        .andExpect(content().string(containsString("id=\"materialsFlat\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString("window.krtEvents.on('change', 'materials-toggle-grouping'")))
         // Rendering must not abort mid-stream. A truncated response stops at the substituted
         // expression value (e.g. ["Aluminum"]) and never emits the closing </body></html> pair.
         .andExpect(content().string(containsString("</body>")))
@@ -123,6 +134,28 @@ class MaterialsPageControllerMvcTest {
         // an option — that's the data source the surrounding script now reads from.
         .andExpect(content().string(containsString("<datalist id=\"materialNames-data\">")))
         .andExpect(content().string(containsString("<option value=\"Aluminum\">")));
+  }
+
+  /**
+   * The matrix-overview shell ({@code GET /materials/overview}) must render the category-grouping
+   * toggle checkbox. The flat-vs-grouped switch itself is applied client-side by {@code
+   * /js/materials-matrix.js}; this test only pins that the control the script binds to is present
+   * in the shipped shell.
+   */
+  @Test
+  @WithMockUser
+  void getMatrixOverview_rendersGroupByCategoryToggle() throws Exception {
+    PageResponse<MaterialMatrixItemDto> emptyPage =
+        new PageResponse<>(List.of(), 0, 100000, 0, 0, List.of());
+    when(backendApiClient.getCached(
+            eq("/api/v1/materials/matrix?size=100000"), any(ParameterizedTypeReference.class)))
+        .thenReturn(emptyPage);
+
+    mockMvc
+        .perform(get("/materials/overview"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"filterGroupByCategory\"")))
+        .andExpect(content().string(containsString("</html>")));
   }
 
   /**

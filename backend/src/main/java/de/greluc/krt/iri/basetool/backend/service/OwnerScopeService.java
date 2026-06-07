@@ -838,13 +838,25 @@ public class OwnerScopeService {
   }
 
   /**
-   * Per-row visibility check shared by {@link #canSeeMission(UUID)} and its parent-chain walk: a
-   * mission is visible iff its owning squadron is null (unscoped, legacy rows), the caller may see
-   * that owning squadron, or the mission is explicitly non-internal.
+   * Per-row visibility check shared by {@link #canSeeMission(UUID)} and its parent-chain walk.
+   *
+   * <ul>
+   *   <li><b>Ownerless mission</b> ({@code owningOrgUnit == null}, a leadership / "Bereichsleitung"
+   *       mission created by a user who belongs to no OrgUnit): visible to everyone when
+   *       non-internal (the public default), and to organisation members-or-above ({@link
+   *       AuthHelperService#isMemberOrAbove()}, which reaches admins) when internal. An internal
+   *       ownerless mission is thus hidden from guests and anonymous visitors — the membershipless
+   *       analogue of a Staffel-internal mission being visible to that Staffel.
+   *   <li><b>Org-owned mission</b>: visible if the caller may see the owning org unit, or the
+   *       mission is explicitly non-internal (the cross-staffel public escape).
+   * </ul>
    */
   private boolean canSeeMissionRow(Mission m) {
     if (m.getOwningOrgUnit() == null) {
-      return true;
+      if (!Boolean.TRUE.equals(m.getIsInternal())) {
+        return true;
+      }
+      return authHelper.isMemberOrAbove();
     }
     if (canSeeSquadron(m.getOwningOrgUnit().getId())) {
       return true;
@@ -857,6 +869,13 @@ public class OwnerScopeService {
    * owning-squadron check — {@link #canSeeMission(UUID)}'s public-mission escape clause does NOT
    * apply to write operations (editing/finalising is the owning squadron's prerogative).
    * Non-existent ids return {@code false}.
+   *
+   * <p>An <b>ownerless mission</b> ({@code owningOrgUnit == null} — a leadership /
+   * "Bereichsleitung" mission) has no owning org unit to scope against, so this per-row check is a
+   * no-op and returns {@code true}; the effective write gate is then {@code
+   * MissionSecurityService.canManageMission}'s usual elevated-role-or-owner/manager check (owner,
+   * co-managers, mission-managers/officers, admins) — the same path as a normal mission, minus the
+   * squadron-scope narrowing.
    *
    * @param missionId mission to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the mission.

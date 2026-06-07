@@ -95,6 +95,7 @@ class MissionServiceLifecycleTest {
   @Mock private OperationRepository operationRepository;
   @Mock private UserService userService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AuthHelperService authHelperService;
 
   @InjectMocks private MissionService service;
 
@@ -465,7 +466,11 @@ class MissionServiceLifecycleTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
     when(missionRepository.findAllActiveReference(
-            eq(true), isNull(), eq(java.util.Set.of()), any(java.time.Instant.class)))
+            eq(true),
+            isNull(),
+            eq(java.util.Set.of()),
+            org.mockito.ArgumentMatchers.anyBoolean(),
+            any(java.time.Instant.class)))
         .thenReturn(java.util.List.of());
 
     assertNotNull(service.findAllActiveReference());
@@ -473,7 +478,12 @@ class MissionServiceLifecycleTest {
     ArgumentCaptor<java.time.Instant> cutoffCaptor =
         ArgumentCaptor.forClass(java.time.Instant.class);
     verify(missionRepository)
-        .findAllActiveReference(eq(true), isNull(), eq(java.util.Set.of()), cutoffCaptor.capture());
+        .findAllActiveReference(
+            eq(true),
+            isNull(),
+            eq(java.util.Set.of()),
+            org.mockito.ArgumentMatchers.anyBoolean(),
+            cutoffCaptor.capture());
     // The COMPLETED / CANCELLED visibility window is the last three months; allow a small skew for
     // the clock tick between the service computing the cut-off and this assertion.
     java.time.Instant expected =
@@ -489,14 +499,22 @@ class MissionServiceLifecycleTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, squadronId, java.util.Set.of()));
     when(missionRepository.findAllActiveReference(
-            eq(false), eq(squadronId), eq(java.util.Set.of()), any(java.time.Instant.class)))
+            eq(false),
+            eq(squadronId),
+            eq(java.util.Set.of()),
+            org.mockito.ArgumentMatchers.anyBoolean(),
+            any(java.time.Instant.class)))
         .thenReturn(java.util.List.of());
 
     service.findAllActiveReference();
 
     verify(missionRepository)
         .findAllActiveReference(
-            eq(false), eq(squadronId), eq(java.util.Set.of()), any(java.time.Instant.class));
+            eq(false),
+            eq(squadronId),
+            eq(java.util.Set.of()),
+            org.mockito.ArgumentMatchers.anyBoolean(),
+            any(java.time.Instant.class));
   }
 
   // ---------------------------------------------------------------

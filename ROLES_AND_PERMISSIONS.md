@@ -296,6 +296,16 @@ sehen die Detailsicht ohne Beschreibung + PII; Organisation, Teilnehmerliste, Ei
 Frequenzen und Auszahlungsart bleiben sichtbar (§1.3). Das Finanz-Ledger bleibt Mitglied-only,
 und ein Guest wird hier wie ein anonymer Besucher behandelt.
 
+> **Einsatz ohne Orgeinheit (Bereichsleitung).** „Mission anlegen" ist `isAuthenticated()` — das
+> schließt einen angemeldeten Nutzer **ohne** Staffel-/SK-Mitgliedschaft ein (z. B. die den SKs und
+> Staffeln übergeordnete Bereichsleitung). Sein Einsatz wird **ownerless** angelegt
+> (`owning_org_unit_id = NULL`, V144) statt mit `400` abgelehnt und bleibt über `mission.owner_id`
+> zurechenbar. Sichtbarkeit: **nicht intern → für alle sichtbar** (auch anonym); **intern → nur für
+> Mitglieder-oder-höher** (`isMemberOrAbove()`), für Gäste/Anonyme unsichtbar. Bearbeiten folgt dem
+> üblichen Mission-Management-Gate (Owner, Co-Manager, Mission-Manager/Officer, Admins), ohne
+> Staffel-Scope-Einengung. Details: REQ-ORG-009 in
+> [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md).
+
 ### 3.6 Operations (Einsatz-Klammer, Finanzen & Auszahlungen)
 
 | Funktion (Gate)                                                                                   | Anonym | Member | Log. | MM | Officer | Admin |
