@@ -116,8 +116,9 @@ class RefineryOrderCreateE2eTest {
         // Both the input and the expected output quantity of the goods row are required.
         page.locator("#inputQuantity_0").fill("100");
         page.locator("#outputQuantity_0").fill("100");
-        page.getByTestId("refinery-submit").click();
-        page.waitForLoadState();
+        // Wait for the full post-submit redirect to settle before navigating, else WebKit aborts
+        // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
+        E2eSupport.awaitFormPost(page, () -> page.getByTestId("refinery-submit").click());
 
         // The created order must appear in the list (fresh ephemeral DB => exactly one).
         page.navigate(baseUrl + "/refinery-orders");
