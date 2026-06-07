@@ -46,9 +46,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * via the backend API and asserts the material surfaces as a group row in the grouped UI — the
  * data-only counterpart is {@code InventoryItemStackQueryDataTest}.
  *
- * <p>The assertion targets the group-header row by its {@code data-material-id} (only emitted when
- * {@code groupedItems} is non-empty) rather than the material name, because the name also appears
- * in the filter dropdown and would match even when the grouped table is empty.
+ * <p>The assertion targets the material's {@code div.tree-row--group} row in the consolidated
+ * {@code .tree-table} (rebuilt as a CSS tree table in #484) by its {@code data-material-id}. The
+ * {@code tree-row--group} class qualifier is load-bearing: the same {@code data-material-id} is
+ * also stamped on the collapsed (hidden) child {@code tree-row--mid} stack rows, so a bare
+ * attribute selector could resolve to a hidden element. The attribute is emitted only for non-empty
+ * groups, so it still cannot match the material name in the filter dropdown nor an empty grouped
+ * table.
  */
 @Tag("e2e")
 class InventoryStackViewE2eTest {
@@ -112,9 +116,9 @@ class InventoryStackViewE2eTest {
         page.navigate(baseUrl + "/inventory/all");
         page.waitForLoadState();
         // Before the LEFT-JOIN fix the grouped table came back empty ("Keine Einträge gefunden"),
-        // so no group-header row existed; the seeded material's group row must now be present.
+        // so no group row existed; the seeded material's tree-row--group must now be present.
         // 20 s, not the 5 s default: the grouped render is slow on WebKit under CI load.
-        assertThat(page.locator("tr.group-header[data-material-id='" + materialId + "']"))
+        assertThat(page.locator("div.tree-row--group[data-material-id='" + materialId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "inventory-stack-view");
