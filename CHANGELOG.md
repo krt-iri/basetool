@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.3](https://github.com/krt-iri/basetool/releases/tag/v0.4.3) - 2026-06-07
+
 ### Changed
 
 - **„Mein Lager" und „Globales Lager" zeigen die verschachtelte Material → Nutzer/Stack → Eintrag-Liste jetzt als eine zusammenhängende Baum-Tabelle statt dreier gestapelter Tabellen mit je eigener Kopfzeile.** Ein einziger, mitlaufender Spaltenkopf, klare Einrückung pro Ebene, rechtsbündige Zahlen mit Qualitäts-Balken (0–1000), Auftrag/Einsatz als breite beschriftete Felder und eine Notiz, die nur erscheint, wenn eine hinterlegt ist, machen die Bestände dichter und leichter vergleichbar. Funktion (Lazy-Load, Filter, Aus-/Umbuchung, Massenausbuchung, Notizen) bleibt unverändert.
