@@ -232,10 +232,15 @@ and "works in the IDE" is not a passing state.
 
 The [CI workflow](.github/workflows/ci.yml) runs `./gradlew build --continue`
 on every PR and push to `main`. That includes Checkstyle, SpotBugs, the
-full JUnit suite, the JaCoCo coverage report, and the CycloneDX SBOMs.
-Reports are uploaded as workflow artefacts so reviewers can download
-them when investigating a failure. **CI must be green before a PR
-merges** — there is no "rerun until it passes" allowance.
+full JUnit suite, and the JaCoCo coverage report. Reports are uploaded as
+workflow artefacts so reviewers can download them when investigating a
+failure. **CI must be green before a PR merges** — there is no "rerun
+until it passes" allowance.
+
+The CycloneDX SBOMs are a release artefact, not a build output: they are
+regenerated and committed only by the
+[release-prepare workflow](.github/workflows/release-prepare.yml) (or on
+demand via `./gradlew :<module>:cyclonedxBom`), never by `./gradlew build`.
 
 In addition, [CodeQL](.github/workflows/codeql.yml) and an OWASP
 [dependency check](.github/workflows/dependency-check.yml) run on a
