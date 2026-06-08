@@ -1989,6 +1989,11 @@ input[type='radio']:focus {
     height: 1.1em;
 }
 
+/* First/last page buttons stack two chevrons; pull the second tight to the first. */
+.pagination .page-btn .krt-icon + .krt-icon {
+    margin-left: -0.4em;
+}
+
 .pagination .page-btn:hover {
     border-color: var(--color-primary);
     color: var(--color-primary);
