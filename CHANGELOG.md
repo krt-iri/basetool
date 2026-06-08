@@ -10,6 +10,8 @@
 
 - **Fehlermeldungen auf den Keycloak-Seiten (Anmeldung, Passwort, Konto) erscheinen jetzt im selben helleren, besser lesbaren Rotton wie in der App.** Rote Feldrahmen und der rote Schimmer ungültiger Felder bleiben im kräftigen Rot — so wirkt der Auftritt über App und SSO hinweg einheitlich und der Fehlertext ist auf Schwarz gut lesbar.
 
+- **In der Einsatz-Detailansicht werden Einheiten-Namen jetzt in hellem Weiß statt Orange dargestellt.** Orange bleibt konsequent Aktionen und Identität vorbehalten, reine Datenwerte erscheinen neutral-hell.
+
 ### Added
 
 - **Die Oberfläche respektiert jetzt die System-Einstellung „Bewegung reduzieren":** Animationen wie das Einfahren der Seitenleiste oder das Einblenden von Hinweis-Toasts werden dann praktisch abgeschaltet.
