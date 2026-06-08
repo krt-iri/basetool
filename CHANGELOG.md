@@ -8,6 +8,8 @@
 
 - **Die Seitennavigation beim Blättern durch Listen (Einsätze, Operationen, Mitglieder, Lager) nutzt jetzt einheitliche quadratische Schaltflächen mit Pfeil-Symbolen statt der «‹›»-Zeichen.** Die Schaltflächen am Anfang/Ende sind, wenn man schon auf der ersten bzw. letzten Seite ist, jetzt wirklich deaktiviert (nicht nur ausgegraut) und werden für Screenreader korrekt ausgezeichnet.
 
+- **Fehlermeldungen auf den Keycloak-Seiten (Anmeldung, Passwort, Konto) erscheinen jetzt im selben helleren, besser lesbaren Rotton wie in der App.** Rote Feldrahmen und der rote Schimmer ungültiger Felder bleiben im kräftigen Rot — so wirkt der Auftritt über App und SSO hinweg einheitlich und der Fehlertext ist auf Schwarz gut lesbar.
+
 ### Added
 
 - **Die Oberfläche respektiert jetzt die System-Einstellung „Bewegung reduzieren":** Animationen wie das Einfahren der Seitenleiste oder das Einblenden von Hinweis-Toasts werden dann praktisch abgeschaltet.
