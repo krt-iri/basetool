@@ -1383,7 +1383,12 @@ class MissionPageControllerMvcTest {
                                     .claim("preferred_username", "member1"))))
         .andExpect(status().isOk())
         .andExpect(
-            content().string(containsString("class=\"btn btn-ghost edit-participant-btn\"")));
+            // The participant edit action is now an icon button (gained `btn-icon`). Assert the
+            // full class attribute of the rendered button — the bare `edit-participant-btn` marker
+            // also appears in the page's inline JS (querySelectorAll), so it cannot tell
+            // "button rendered" apart from "script present".
+            content()
+                .string(containsString("class=\"btn btn-ghost btn-icon edit-participant-btn\"")));
   }
 
   @Test
@@ -1496,7 +1501,12 @@ class MissionPageControllerMvcTest {
                                     .claim("preferred_username", "member2"))))
         .andExpect(status().isOk())
         .andExpect(
-            content().string(not(containsString("class=\"btn btn-ghost edit-participant-btn\""))));
+            // The participant edit action gained `btn-icon`; assert the full rendered class
+            // attribute. The bare `edit-participant-btn` marker also appears in the page's inline
+            // JS, so `not(contains(marker))` would false-fail even when the button is absent.
+            content()
+                .string(
+                    not(containsString("class=\"btn btn-ghost btn-icon edit-participant-btn\""))));
   }
 
   // --- Unassigned participants AJAX endpoint ------------------------------
