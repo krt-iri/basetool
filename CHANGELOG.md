@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Auftragsliste unter „Raffinerie" blendet die Spalte „Status" aus, damit „Ort", „Einsatz" und „Materialien" mehr Platz bekommen.** Nach Status filtern lässt sich weiterhin über die Filterleiste oberhalb der Tabelle.
+
 ## [v0.4.5](https://github.com/krt-iri/basetool/releases/tag/v0.4.5) - 2026-06-08
 
 ### Added
