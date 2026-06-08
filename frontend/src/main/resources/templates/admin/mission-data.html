@@ -85,17 +85,17 @@
                         <td th:text="${sq.shorthand}">Kürzel</td>
                         <td th:text="${sq.description}">Desc</td>
                         <td class="flex-gap-xs">
-                            <button class="btn btn-ghost edit-squadron-btn" 
+                            <button class="btn btn-ghost btn-icon edit-squadron-btn"
                                     th:data-action="@{/admin/mission-data/squadrons/{id}/update(id=${sq.id})}"
-                                    th:data-id="${sq.id}" 
-                                    th:data-name="${sq.name}" 
+                                    th:data-id="${sq.id}"
+                                    th:data-name="${sq.name}"
                                     th:data-shorthand="${sq.shorthand}"
                                     th:data-desc="${sq.description}"
                                     th:data-version="${sq.version}"
-                                    th:text="#{members.edit}">Edit</button>
-                            <button th:if="${sq.active}" type="button" class="btn btn-quiet-danger delete-btn" 
-                                    th:data-action="@{/admin/mission-data/squadrons/{id}/delete(id=${sq.id})}" 
-                                    th:text="#{info.delete}">Delete</button>
+                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button th:if="${sq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
+                                    th:data-action="@{/admin/mission-data/squadrons/{id}/delete(id=${sq.id})}"
+                                    th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             <form th:if="${!sq.active}" sec:authorize="hasRole('ADMIN')" th:action="@{/admin/mission-data/squadrons/{id}/activate(id=${sq.id})}" method="post" class="m-0">
                                 <button type="submit" class="btn btn-ghost" th:text="#{admin.squadron.activate}">Aktivieren</button>
                             </form>
@@ -145,18 +145,18 @@
                         <td th:text="${job.isLeadershipRole ? 'Ja' : 'Nein'}">Leadership</td>
                         <td th:text="${job.description}">Desc</td>
                         <td class="flex-gap-xs">
-                            <button class="btn btn-ghost edit-jobtype-btn" 
+                            <button class="btn btn-ghost btn-icon edit-jobtype-btn"
                                     th:data-action="@{/admin/mission-data/job-types/{id}/update(id=${job.id})}"
-                                    th:data-id="${job.id}" 
-                                    th:data-name="${job.name}" 
+                                    th:data-id="${job.id}"
+                                    th:data-name="${job.name}"
                                     th:data-archetype="${job.archetype}"
                                     th:data-leadership="${job.isLeadershipRole}"
                                     th:data-desc="${job.description}"
                                     th:data-version="${job.version}"
-                                    th:text="#{members.edit}">Edit</button>
-                            <button th:if="${job.active}" type="button" class="btn btn-quiet-danger delete-btn" 
-                                    th:data-action="@{/admin/mission-data/job-types/{id}/delete(id=${job.id})}" 
-                                    th:text="#{info.delete}">Delete</button>
+                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button th:if="${job.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
+                                    th:data-action="@{/admin/mission-data/job-types/{id}/delete(id=${job.id})}"
+                                    th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             <form th:if="${!job.active}" sec:authorize="hasRole('ADMIN')" th:action="@{/admin/mission-data/job-types/{id}/activate(id=${job.id})}" method="post" class="m-0">
                                 <button type="submit" class="btn btn-ghost" th:text="#{admin.job_type.activate}">Aktivieren</button>
                             </form>
@@ -204,16 +204,16 @@
                         </td>
                         <td th:text="${freq.description}">Desc</td>
                         <td class="flex-gap-xs">
-                            <button class="btn btn-ghost edit-freqtype-btn" 
+                            <button class="btn btn-ghost btn-icon edit-freqtype-btn"
                                     th:data-action="@{/admin/mission-data/frequency-types/{id}/update(id=${freq.id})}"
-                                    th:data-id="${freq.id}" 
-                                    th:data-name="${freq.name}" 
+                                    th:data-id="${freq.id}"
+                                    th:data-name="${freq.name}"
                                     th:data-desc="${freq.description}"
                                     th:data-version="${freq.version}"
-                                    th:text="#{members.edit}">Edit</button>
-                            <button th:if="${freq.active}" type="button" class="btn btn-quiet-danger delete-btn" 
-                                    th:data-action="@{/admin/mission-data/frequency-types/{id}/delete(id=${freq.id})}" 
-                                    th:text="#{info.delete}">Delete</button>
+                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button th:if="${freq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
+                                    th:data-action="@{/admin/mission-data/frequency-types/{id}/delete(id=${freq.id})}"
+                                    th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             <form th:if="${!freq.active}" sec:authorize="hasRole('ADMIN')" th:action="@{/admin/mission-data/frequency-types/{id}/activate(id=${freq.id})}" method="post" class="m-0">
                                 <button type="submit" class="btn btn-ghost" th:text="#{admin.job_type.activate}">Aktivieren</button>
                             </form>
@@ -247,7 +247,7 @@
                     <textarea name="description" id="sq-desc" rows="3" th:text="*{description}"></textarea>
                     <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
                 </div>
-                <button type="submit" class="btn btn--cta" th:text="#{members.save}">Speichern</button>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
             </form>
         </div>
     </div>
@@ -284,7 +284,7 @@
                     <textarea name="description" id="jt-desc" rows="3" th:text="*{description}"></textarea>
                     <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
                 </div>
-                <button type="submit" class="btn btn--cta" th:text="#{members.save}">Speichern</button>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
             </form>
         </div>
     </div>
@@ -306,7 +306,7 @@
                     <textarea name="description" id="ft-desc" rows="3" th:text="*{description}"></textarea>
                     <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
                 </div>
-                <button type="submit" class="btn btn--cta" th:text="#{members.save}">Speichern</button>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
             </form>
         </div>
     </div>

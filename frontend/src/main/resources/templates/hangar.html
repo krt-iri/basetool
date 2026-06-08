@@ -230,16 +230,16 @@
                             <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                         </td>
                         <td class="flex-gap-xs">
-                            <button class="btn btn-ghost edit-ship-btn"
+                            <button class="btn btn-ghost btn-icon edit-ship-btn"
                                     th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
-                                    th:data-id="${ship.id}" 
-                                    th:data-name="${ship.name}" 
+                                    th:data-id="${ship.id}"
+                                    th:data-name="${ship.name}"
                                     th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
                                     th:data-ins="${ship?.insurance}"
                                     th:data-loc="${ship.location != null ? ship.location.id : ''}"
                                     th:data-fitted="${ship.fitted}"
                                     th:data-version="${ship.version}"
-                                    th:text="#{hangar.ship.edit}">Bearbeiten</button>
+                                    th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(myShips)}">
@@ -306,8 +306,8 @@
                 <!-- R5.d.f owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 <div style="display: flex; justify-content: space-between;">
-                    <button type="submit" class="btn btn--cta" data-testid="hangar-ship-submit" th:text="#{hangar.ship.save}">Speichern</button>
-                    <button type="button" id="modal-delete-btn" class="btn btn-quiet-danger" style="display: none;" th:text="#{hangar.ship.delete}">Löschen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="hangar-ship-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{hangar.ship.save}">Speichern</span></button>
+                    <button type="button" id="modal-delete-btn" class="btn btn-quiet-danger" style="display: none;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.ship.delete}">Löschen</span></button>
                 </div>
             </form>
         </div>
@@ -336,9 +336,8 @@
             <div class="delete-all-row">
                 <p th:text="#{hangar.delete_all.description}">Alle eigenen Schiffe aus dem Hangar entfernen.</p>
                 <button id="delete-all-ships-btn" class="btn btn-quiet-danger" type="button"
-                        th:text="#{hangar.delete_all.btn}"
                         th:data-error-failed="#{hangar.delete_all.error.failed}"
-                        th:data-success="#{hangar.delete_all.success}">Alle Schiffe löschen</button>
+                        th:data-success="#{hangar.delete_all.success}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.delete_all.btn}">Alle Schiffe löschen</span></button>
             </div>
         </div>
     </div>

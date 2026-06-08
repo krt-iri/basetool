@@ -112,19 +112,21 @@
                         <td class="krt-pi-note" th:text="${bp.note}">Notiz</td>
                         <td>
                             <div class="krt-pi-actions">
-                                <button type="button" class="btn btn-ghost"
+                                <button type="button" class="btn btn-ghost btn-icon"
                                         data-trigger="bp-open-edit"
                                         th:attr="data-id=${bp.id},
                                                  data-version=${bp.version},
                                                  data-name=${bp.productName},
                                                  data-note=${bp.note},
                                                  data-acquired-at=${bp.acquiredAt}"
-                                        th:text="#{personalInventory.blueprints.action.editNote}">Notiz bearbeiten</button>
-                                <button type="button" class="btn btn-quiet-danger"
+                                        th:title="#{personalInventory.blueprints.action.editNote}"
+                                        th:aria-label="#{personalInventory.blueprints.action.editNote}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                <button type="button" class="btn btn-quiet-danger btn-icon"
                                         data-trigger="bp-open-delete"
                                         th:attr="data-id=${bp.id},
                                                  data-name=${bp.productName}"
-                                        th:text="#{personalInventory.blueprints.action.remove}">Entfernen</button>
+                                        th:title="#{personalInventory.blueprints.action.remove}"
+                                        th:aria-label="#{personalInventory.blueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             </div>
                         </td>
                     </tr>
@@ -156,7 +158,7 @@
                 <textarea id="krt-bp-edit-note" name="note" maxlength="2000" rows="4"></textarea>
             </div>
             <div class="krt-pi-modal-actions">
-                <button type="submit" class="btn btn--cta" th:text="#{personalInventory.action.save}">Speichern</button>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
                 <button type="button" class="btn btn-ghost" data-trigger="bp-close-edit" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             </div>
         </form>

@@ -119,6 +119,28 @@ Every layout change and new component works on **four** classes:
 
 - [ ] Verified at all four breakpoints; interactive targets ≥ 44px on touch classes.
 
+### REQ-UI-010 — Standard action-button icons
+
+The recurring CRUD actions use one fixed glyph from the in-house sprite (`fragments/icons.html`
+in the app, `ui_kits/basetool/icons.jsx` in the design system): **delete / remove →
+`krt-icon-trash`**, **edit → `krt-icon-edit`**, **save → `krt-icon-save`** (inventory book-out →
+`krt-icon-bookout`). In **dense rows** (table / tree / compact action clusters) they render as
+**icon-only** `.btn-icon` squares carrying their label in `title` + `aria-label`; in **forms and
+dialogs** they render as **icon + text** (the glyph prepended before the label, which stays in a
+`<span th:text>`). Decorative button glyphs set `pointer-events: none` (via `.btn .krt-icon`) so a
+click always lands on the host `<button>` / `<a>`, never the inner `<svg>`. Danger styling
+(`btn-quiet-danger` / `btn-outline-danger`) and existing `data-*` hooks are preserved. Mode toggles
+whose label flips with state (e.g. the org-chart edit toggle) keep their text label.
+
+**Acceptance**
+
+- [ ] Delete / edit / save buttons use the matching sprite glyph; dense-row instances are icon-only
+  with an accessible name in `aria-label` / `title`, form / dialog instances keep a visible label.
+- [ ] Clicking the glyph triggers the button's action (no dead clicks on the inner `<svg>`).
+
+**Enforced by:** code/design review · **Code:** `fragments/icons.html`, `static/css/styles.css`
+(`.btn-icon`, `.btn .krt-icon`), the per-feature templates.
+
 ## Out of scope
 
 Brand assets/logos themselves (managed in the design skill `assets/`), and the desktop SC

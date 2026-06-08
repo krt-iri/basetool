@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-07.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-08.
 > **Owner area:** INV · **Related ADRs:** ADR-0003
 
 # Inventory Lager — append-only entries & group-on-read
@@ -129,7 +129,11 @@ predicate as the grouped view; the `/my` drill-down is owner-scoped from the JWT
 impersonation). Per-entry actions (REQ-INV-003) operate on the fetched rows unchanged. Each
 drill-down row shows the entry's amount, its job-order / mission association and the per-entry
 actions (book-out, note), with the note preview rendered beside the action buttons rather than
-below them; `createdAt` is the entries' ordering key, not a displayed column.
+below them; `createdAt` is the entries' ordering key, not a displayed column. Both per-entry
+actions are compact icon buttons (book-out = outbound arrow, note = pencil; their labels carried in
+`aria-label` / `title`) so the dense action column never crowds — or overlaps — the amount beside
+it; on tablet-width and narrower (≤ 1024px) the amount and actions reflow onto their own line
+beneath the Auftrag/Einsatz controls.
 
 **Acceptance**
 
@@ -137,13 +141,17 @@ below them; `createdAt` is the entries' ordering key, not a displayed column.
 - [ ] A requested page size above 100 is clamped to 100; an absent page/size yields the first 20.
 - [ ] The drill-down never returns rows outside the caller's org-unit / owner scope.
 - [ ] Expanding a stack on either grouped page fetches and renders its entries without error.
+- [ ] At any viewport width the per-entry amount and action buttons never overlap; the book-out and
+  note actions are icon buttons and, on tablet-width and narrower (≤ 1024px), amount + actions reflow
+  onto their own line beneath the Auftrag/Einsatz controls.
 
 **Enforced by:** `InventoryItemStackQueryTest`, `InventoryItemControllerTest`,
 `InventoryPageControllerMvcTest`, `DatabaseIndexMigrationTest` · **Code:**
 `InventoryItemController#getMyStackEntries` / `#getAllStackEntries`,
 `InventoryItemRepository#findUserStackEntries` / `#findGlobalStackEntries`,
 `InventoryPageController#viewMyStackEntries` / `#viewAllStackEntries`,
-`fragments/inventory-stack-entries.html`, `V143__add_inventory_item_stack_key_index.sql` ·
+`fragments/inventory-stack-entries.html`, `static/css/styles.css` (`.tree-row--leaf`, `.btn-icon`),
+`inventory-my.html` / `inventory-admin.html` (note-button DOM sync), `V143__add_inventory_item_stack_key_index.sql` ·
 **Issues:** #466
 
 ## Out of scope

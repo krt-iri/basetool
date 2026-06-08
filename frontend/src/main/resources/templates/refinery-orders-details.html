@@ -296,7 +296,7 @@
                     <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-bg-dark-gray); margin-bottom: 1rem;">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
-                            <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn" data-trigger="rod-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:text="#{refineryorder.form.material.remove}">Entfernen</button>
+                            <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon" data-trigger="rod-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
 
                         <div class="material-row">
@@ -355,7 +355,7 @@
 
             <div style="margin-top: 2rem; display: flex; gap: 1rem; align-items: center;">
                 <th:block th:if="${canEdit}">
-                    <button type="submit" form="refineryOrderMainForm" class="btn btn--cta" th:text="#{orders.create.save}">Speichern</button>
+                    <button type="submit" form="refineryOrderMainForm" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
                 </th:block>
                 <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
                     <button type="button" class="btn btn-outline" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
@@ -433,7 +433,7 @@
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-                    <button type="submit" class="btn btn--cta" th:text="#{orders.create.save}">Speichern</button>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
                     <button type="button" class="btn btn-ghost" data-trigger="rod-close-store" th:text="#{orders.create.cancel}">Abbrechen</button>
                 </div>
             </form>
@@ -628,10 +628,15 @@
             if (header) {
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
-                removeBtn.className = 'btn btn-secondary remove-btn';
+                removeBtn.className = 'btn btn-quiet-danger remove-btn btn-icon';
                 removeBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.8rem;';
                 removeBtn.setAttribute('data-trigger', 'rod-remove-material');
-                removeBtn.innerText = MATERIAL_REMOVE_LABEL;
+                // Icon-only trash button, matching the server-rendered remove button in the
+                // material-entry header. Label moves to title/aria-label; the SVG references the
+                // sprite injected by the sidebar.
+                removeBtn.setAttribute('title', MATERIAL_REMOVE_LABEL);
+                removeBtn.setAttribute('aria-label', MATERIAL_REMOVE_LABEL);
+                removeBtn.innerHTML = '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
                 header.appendChild(removeBtn);
             }
         }
@@ -856,7 +861,14 @@
             var btn = el.querySelector('button[type=submit]');
             if (btn) {
                 btn.disabled = true;
-                btn.innerText = 'WIRD GESPEICHERT...';
+                // Relabel only the text <span> so the leading <svg> save icon survives;
+                // overwriting btn.innerText would wipe the icon out of the icon+text button.
+                var btnLabel = btn.querySelector('span');
+                if (btnLabel) {
+                    btnLabel.textContent = 'WIRD GESPEICHERT...';
+                } else {
+                    btn.innerText = 'WIRD GESPEICHERT...';
+                }
             }
         });
     }

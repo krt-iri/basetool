@@ -121,7 +121,7 @@
                                     <input type="checkbox" class="role-checkbox" name="isMissionManager" value="true" th:checked="${m.isMissionManager()}">
                                     <span th:text="#{admin.specialcommands.members.role.mission_manager}">Einsatzleiter</span>
                                 </label>
-                                <button type="submit" class="btn btn-ghost" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" th:text="#{members.save}">Speichern</button>
+                                <button type="submit" class="btn btn-ghost btn-icon" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" th:title="#{members.save}" th:aria-label="#{members.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                             </form>
                         </td>
                         <td>
@@ -138,9 +138,9 @@
                         <td>
                             <form th:action="@{/admin/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
                                   method="post" style="margin: 0; display: inline;">
-                                <button type="submit" class="btn btn-quiet-danger delete-btn"
+                                <button type="submit" class="btn btn-quiet-danger delete-btn btn-icon"
                                         th:data-action="@{/admin/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
-                                        th:text="#{admin.specialcommands.members.remove}">Entfernen</button>
+                                        th:title="#{admin.specialcommands.members.remove}" th:aria-label="#{admin.specialcommands.members.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             </form>
                         </td>
                     </tr>

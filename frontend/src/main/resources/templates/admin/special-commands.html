@@ -92,17 +92,17 @@
                             <td class="flex-gap-xs">
                                 <a th:href="@{/admin/special-commands/{id}(id=${sc.id})}" class="btn btn-ghost"
                                    th:text="#{admin.specialcommands.members.manage}">Mitglieder verwalten</a>
-                                <button class="btn btn-ghost edit-sc-btn"
+                                <button class="btn btn-ghost btn-icon edit-sc-btn"
                                         th:data-action="@{/admin/special-commands/{id}/update(id=${sc.id})}"
                                         th:data-id="${sc.id}"
                                         th:data-name="${sc.name}"
                                         th:data-shorthand="${sc.shorthand}"
                                         th:data-desc="${sc.description}"
                                         th:data-version="${sc.version}"
-                                        th:text="#{members.edit}">Bearbeiten</button>
-                                <button th:if="${sc.active}" type="button" class="btn btn-quiet-danger delete-btn"
+                                        th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                <button th:if="${sc.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                         th:data-action="@{/admin/special-commands/{id}/delete(id=${sc.id})}"
-                                        th:text="#{info.delete}">Löschen</button>
+                                        th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 <form th:if="${!sc.active}" th:action="@{/admin/special-commands/{id}/activate(id=${sc.id})}" method="post" class="m-0">
                                     <button type="submit" class="btn btn-ghost" th:text="#{admin.specialcommands.activate}">Aktivieren</button>
                                 </form>
@@ -137,7 +137,7 @@
                 <textarea name="description" id="sc-desc" rows="3" th:text="*{description}"></textarea>
                 <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
             </div>
-            <button type="submit" class="btn btn--cta" th:text="#{members.save}">Speichern</button>
+            <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
         </form>
     </div>
 </div>

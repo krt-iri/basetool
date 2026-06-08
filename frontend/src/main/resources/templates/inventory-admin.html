@@ -398,8 +398,8 @@
             <div id="noteModalCounter" style="text-align: right; color: var(--color-gray-2); font-size: 0.8rem;">0 / 1000</div>
         </div>
         <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button type="button" class="btn btn--cta" data-trigger="inv-admin-save-note" th:text="#{inventory.note.save}">Speichern</button>
-            <button type="button" class="btn btn-quiet-danger" data-trigger="inv-admin-remove-note" th:text="#{inventory.note.remove}">Entfernen</button>
+            <button type="button" class="btn btn--cta" data-trigger="inv-admin-save-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{inventory.note.save}">Speichern</span></button>
+            <button type="button" class="btn btn-quiet-danger" data-trigger="inv-admin-remove-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{inventory.note.remove}">Entfernen</span></button>
             <button type="button" class="btn btn-ghost" style="min-height: 44px; margin-left: auto;" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
         </div>
     </div>
@@ -519,9 +519,14 @@
                     }
                     document.querySelectorAll('button.inventory-note-btn[data-id="' + id + '"]').forEach(function (b) {
                         b.setAttribute('data-note', isEmpty ? '' : (updated && updated.note != null ? updated.note : trimmed));
-                        b.textContent = isEmpty ? noteI18n.add : noteI18n.edit;
+                        // Icon button: keep the glyph; update only the accessible name, the
+                        // tooltip and the has-note/outline highlight (never overwrite textContent,
+                        // which would wipe the SVG icon).
+                        b.setAttribute('aria-label', isEmpty ? noteI18n.add : noteI18n.edit);
                         b.title = isEmpty ? noteI18n.add : (updated && updated.note ? updated.note : trimmed);
-                        if (isEmpty) b.classList.remove('has-note'); else b.classList.add('has-note');
+                        b.classList.toggle('has-note', !isEmpty);
+                        b.classList.toggle('btn-outline', !isEmpty);
+                        b.classList.toggle('btn-ghost', isEmpty);
                     });
                     document.querySelectorAll('[data-note-for="' + id + '"]').forEach(function (p) {
                         if (isEmpty) {

@@ -130,7 +130,7 @@
                             <td>
                                 <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" style="display:inline;"
                                       data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}">
-                                    <button type="submit" class="btn btn-quiet-danger" th:text="#{general.delete}">Löschen</button>
+                                    <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </form>
                             </td>
                         </tr>

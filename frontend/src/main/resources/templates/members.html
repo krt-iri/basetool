@@ -98,12 +98,12 @@
                     </td>
                     <td>
                         <div class="flex-gap-xs">
-                            <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn btn-ghost" th:text="#{members.edit}">Bearbeiten</a>
+                            <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn btn-ghost btn-icon" th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></a>
                             <button th:if="${!user.inKeycloak}" sec:authorize="hasRole('ADMIN')"
-                                    class="btn btn-quiet-danger"
+                                    class="btn btn-quiet-danger btn-icon"
                                     th:data-user-id="${user.id}"
                                     data-trigger="members-delete-user"
-                                    th:text="#{members.delete}">Löschen</button>
+                                    th:title="#{members.delete}" th:aria-label="#{members.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
                     </td>
                 </tr>

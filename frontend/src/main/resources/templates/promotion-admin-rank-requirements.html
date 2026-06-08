@@ -130,10 +130,11 @@
                     </span>
                     <div class="pa-group-actions">
                         <button type="button"
-                                class="btn btn-outline-danger pa-btn-tiny"
+                                class="btn btn-outline-danger pa-btn-tiny btn-icon"
                                 data-trigger="ar-delete-group"
                                 th:attr="data-ar-from-rank=${entry.value[0].fromRank},data-ar-to-rank=${entry.value[0].toRank}"
-                                th:text="#{promotion.admin.ranks.delete.group}">Alle löschen</button>
+                                th:title="#{promotion.admin.ranks.delete.group}"
+                                th:aria-label="#{promotion.admin.ranks.delete.group}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     </div>
                 </div>
                 <div class="rank-table-wrapper" style="overflow-x:auto;">
@@ -165,7 +166,7 @@
                                 <td th:text="${req.description} ?: '-'">-</td>
                                 <td class="pa-actions-cell" style="white-space:nowrap;">
                                     <div class="flex-gap-xs">
-                                        <button class="btn btn-ghost pa-btn-tiny"
+                                        <button class="btn btn-ghost pa-btn-tiny btn-icon"
                                                 data-trigger="ar-open-edit"
                                                 th:attr="data-ar-id=${req.id},
                                                          data-ar-from=${req.fromRank},
@@ -176,11 +177,13 @@
                                                          data-ar-count=${req.requiredCount},
                                                          data-ar-description=${req.description} ?: '',
                                                          data-ar-version=${req.version}"
-                                                th:text="#{promotion.admin.ranks.edit}">Bearbeiten</button>
-                                        <button class="btn btn-quiet-danger pa-btn-tiny"
+                                                th:title="#{promotion.admin.ranks.edit}"
+                                                th:aria-label="#{promotion.admin.ranks.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                        <button class="btn btn-quiet-danger pa-btn-tiny btn-icon"
                                                 data-trigger="ar-open-delete"
                                                 th:attr="data-ar-id=${req.id}"
-                                                th:text="#{promotion.admin.ranks.delete}">Löschen</button>
+                                                th:title="#{promotion.admin.ranks.delete}"
+                                                th:aria-label="#{promotion.admin.ranks.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                     </div>
                                 </td>
                             </tr>
@@ -311,7 +314,7 @@
         </div>
         <div class="modal-actions">
             <button class="btn btn-ghost" data-trigger="ar-close-edit" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn--cta" data-trigger="ar-submit-edit" th:text="#{promotion.admin.ranks.edit}">Speichern</button>
+            <button class="btn btn--cta" data-trigger="ar-submit-edit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.ranks.edit}">Speichern</span></button>
         </div>
     </div>
 </div>
