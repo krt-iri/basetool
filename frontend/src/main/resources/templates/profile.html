@@ -2,31 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{profile.title} + ' - ' + ${appTitle}">User Profile - Profit Basetool</title>
-    <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .profile-details {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-        .profile-row {
-            display: flex;
-            border-bottom: 1px solid var(--color-gray-3);
-            padding-bottom: 0.5rem;
-        }
-        .profile-label {
-            font-family: var(--font-body);
-            width: 200px;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-        }
-        .profile-value {
-            color: var(--color-gray-1);
-            font-size: 1.1rem;
-        }
-    </style>
-    </th:block>
+    <th:block th:fragment="extraLinks"></th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -50,64 +26,62 @@
     </div>
 
     <div class="hud-box mt-2">
-        <div class="profile-details">
-            <div class="profile-row">
-                <span class="profile-label" th:text="#{profile.username}">Username</span>
-                <span class="profile-value" th:text="${username}">username</span>
-            </div>
-            <div class="profile-row">
-                <span class="profile-label" th:text="#{profile.email}">Email</span>
-                <span class="profile-value" th:text="${email}">email@example.com</span>
-            </div>
-            <div class="profile-row" th:if="${rank}">
-                <span class="profile-label" th:text="#{profile.rank}">Rank</span>
-                <span class="profile-value" th:text="${rank}">10</span>
-            </div>
-            <div class="profile-row" th:if="${joinDate}">
-                <span class="profile-label" th:text="#{member.join_date}">Beitrittsdatum</span>
-                <span class="profile-value" th:text="${#temporals.format(joinDate, 'dd.MM.yyyy')}">01.01.2020</span>
-            </div>
-            <div class="profile-row" th:if="${monthsInSquadron != null}">
-                <span class="profile-label" th:text="#{member.months_in_squadron}">Monate bei der Staffel</span>
-                <span class="profile-value" th:text="${monthsInSquadron}">0</span>
-            </div>
-            <div class="profile-row" style="align-items: flex-start;">
-                <span class="profile-label" th:text="#{profile.custom_data}" style="padding-top: 0.5rem;">Custom Data</span>
-                <form th:action="@{/profile/description}" method="post" class="flex-1" th:object="${profileDescriptionForm}">
+        <dl class="kv-list kv-ruled">
+            <dt th:text="#{profile.username}">Username</dt>
+            <dd th:text="${username}">username</dd>
+
+            <dt th:text="#{profile.email}">Email</dt>
+            <dd th:text="${email}">email@example.com</dd>
+
+            <th:block th:if="${rank}">
+                <dt th:text="#{profile.rank}">Rank</dt>
+                <dd th:text="${rank}">10</dd>
+            </th:block>
+            <th:block th:if="${joinDate}">
+                <dt th:text="#{member.join_date}">Beitrittsdatum</dt>
+                <dd th:text="${#temporals.format(joinDate, 'dd.MM.yyyy')}">01.01.2020</dd>
+            </th:block>
+            <th:block th:if="${monthsInSquadron != null}">
+                <dt th:text="#{member.months_in_squadron}">Monate bei der Staffel</dt>
+                <dd th:text="${monthsInSquadron}">0</dd>
+            </th:block>
+
+            <dt class="kv-row-self-start" th:text="#{profile.custom_data}">Custom Data</dt>
+            <dd>
+                <form th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}">
                     <input type="hidden" name="version" th:field="*{version}">
-                    <div class="mb-1">
-                        <label for="displayName" class="profile-label" style="display: block; margin-bottom: 0.5rem;" th:text="#{profile.display_name}">Display Name</label>
-                        <input type="text" id="displayName" name="displayName" th:field="*{displayName}" style="width: 100%; max-width: 400px; padding: 0.5rem;" />
-                        <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" style="color:var(--color-danger); font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                    <div class="form-group">
+                        <label for="displayName" class="form-label" th:text="#{profile.display_name}">Display Name</label>
+                        <input type="text" id="displayName" name="displayName" th:field="*{displayName}" class="w-full"
+                               th:classappend="${#fields.hasErrors('displayName')} ? 'input-error'" />
+                        <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" class="field-error"></div>
                     </div>
-                    <div>
-                        <label for="description" class="profile-label" style="display: block; margin-bottom: 0.5rem;" th:text="#{profile.description}">Description</label>
-                        <textarea id="description" name="description" rows="5" th:text="*{description}"></textarea>
-                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" style="color:var(--color-danger); font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                    <div class="form-group">
+                        <label for="description" class="form-label" th:text="#{profile.description}">Description</label>
+                        <textarea id="description" name="description" rows="5" th:text="*{description}" class="w-full"
+                                  th:classappend="${#fields.hasErrors('description')} ? 'input-error'"></textarea>
+                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
                     </div>
-                    <div class="mt-1">
-                        <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.save_custom_data}">Save</span></button>
-                    </div>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.save_custom_data}">Save</span></button>
                 </form>
-            </div>
-            <div class="profile-row" style="align-items: flex-start;">
-                <span class="profile-label" th:text="#{profile.payout.preference}" style="padding-top: 0.5rem;">Default Payout Preference</span>
-                <form th:action="@{/profile/payout-preference}" method="post" class="flex-1" th:object="${profilePayoutPreferenceForm}">
+            </dd>
+
+            <dt class="kv-row-self-start" th:text="#{profile.payout.preference}">Default Payout Preference</dt>
+            <dd>
+                <form th:action="@{/profile/payout-preference}" method="post" th:object="${profilePayoutPreferenceForm}">
                     <input type="hidden" name="version" th:field="*{version}">
-                    <div class="mb-1">
-                        <select th:field="*{defaultPayoutPreference}" th:aria-label="#{profile.payout.preference}" style="width: 100%; max-width: 400px; padding: 0.5rem;">
+                    <div class="form-group">
+                        <select th:field="*{defaultPayoutPreference}" th:aria-label="#{profile.payout.preference}" class="w-full">
                             <option th:value="PAYOUT" th:text="#{mission.payout.preference.payout}">Payout</option>
                             <option th:value="DONATE" th:text="#{mission.payout.preference.donate}">Donate</option>
                         </select>
-                        <p th:text="#{profile.payout.preference.hint}" style="font-size: 0.8rem; color: var(--color-gray-2); margin-top: 0.5rem;">Pre-selected at every mission sign-up. You can still change it per mission.</p>
+                        <p th:text="#{profile.payout.preference.hint}" class="form-hint">Pre-selected at every mission sign-up. You can still change it per mission.</p>
                     </div>
-                    <div class="mt-1">
-                        <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.payout.save}">Save Payout Preference</span></button>
-                    </div>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.payout.save}">Save Payout Preference</span></button>
                 </form>
-            </div>
-        </div>
-        
+            </dd>
+        </dl>
+
         <div class="mt-2-flex-gap">
             <a th:href="${keycloakAccountUrl}" class="btn btn-outline" target="_blank" th:text="#{profile.edit_link}">Edit in Keycloak</a>
             <a th:href="@{/}" class="btn btn-ghost" th:text="#{profile.back}">Back</a>

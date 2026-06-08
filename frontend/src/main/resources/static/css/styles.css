@@ -1385,6 +1385,15 @@ label:has(+ [required])::after {
     box-shadow: 0 0 5px rgb(163 0 10 / 40%);
 }
 
+/* Small muted help text under a form control (replaces ad-hoc inline
+   `font-size: 0.8rem; color: var(--color-gray-2)` styles). */
+.form-hint {
+    color: var(--color-gray-2);
+    font-size: var(--fs-xs);
+    margin-top: var(--space-2);
+    max-width: var(--measure);
+}
+
 /* Layout Utility Classes */
 .mt-1 {
     margin-top: var(--space-4);
@@ -2058,6 +2067,12 @@ input[type='radio']:focus {
 /* Full-width row (e.g. a description spanning both columns). */
 .kv-list .kv-row-wide {
     grid-column: 1 / -1;
+}
+
+/* A label whose value is a tall block (a form / textarea) aligns to the top
+   instead of the shared baseline. */
+.kv-list .kv-row-self-start {
+    align-self: start;
 }
 
 /* Hairline separators between rows. */
