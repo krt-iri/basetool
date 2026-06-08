@@ -213,7 +213,7 @@ jobs:
           provenance: mode=max
           # Attach an SPDX SBOM of every package shipped in the image as an
           # OCI attestation. This is image-scope; the CycloneDX BOM produced
-          # by `./gradlew cyclonedxBom` in the main CI workflow is
+          # by `./gradlew cyclonedxBom` in the release-prepare workflow is
           # Java-only, the buildx SBOM also covers the Alpine + JRE layers.
           sbom: true
 

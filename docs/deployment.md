@@ -231,6 +231,9 @@ live.
 Releases are cut through a two-phase, PR-based GitHub Actions flow — there is
 **no** hand-pushed git tag and no tag is ever force-moved. Tidying the CHANGELOG
 and regenerating the CycloneDX SBOMs happens automatically as part of the run.
+The SBOMs are a **release-only** artefact: an ordinary `./gradlew build` (local
+or CI) never regenerates them, so the committed `*/docs/*-bom.{json,xml}` only
+ever change through this flow (or a deliberate `./gradlew :<module>:cyclonedxBom`).
 
 **Phase 1 — prepare.** Trigger *Actions → Release · Prepare → Run workflow* and
 enter the version **without** the leading `v` (e.g. `1.4.3`). Off `main` the

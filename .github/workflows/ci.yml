@@ -49,10 +49,6 @@ jobs:
       - name: Build, run tests and lint
         run: ./gradlew build --continue --stacktrace
 
-      - name: Generate CycloneDX SBOMs
-        if: success()
-        run: ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom
-
       - name: Upload JUnit test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -90,14 +86,3 @@ jobs:
           path: '**/build/reports/spotbugs/**'
           retention-days: 14
           if-no-files-found: ignore
-
-      - name: Upload CycloneDX SBOMs
-        if: success()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: sboms
-          path: |
-            backend/docs/*-bom.*
-            frontend/docs/*-bom.*
-          retention-days: 30
-          if-no-files-found: warn

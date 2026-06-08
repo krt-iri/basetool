@@ -388,6 +388,27 @@ subprojects {
       }
     }
   }
+
+  // CycloneDX SBOM generation is a RELEASE-ONLY concern, deliberately kept out of
+  // the everyday build. The cyclonedx-gradle plugin (3.x) wires each SBOM output
+  // file as an artifact `builtBy(cyclonedxDirectBom)`, which pulls the task into
+  // `assemble` (hence `build`); out of the box a plain `./gradlew build` therefore
+  // regenerates the committed `<module>/docs/*-bom.*` on every run and churns the
+  // working tree for output nobody consumes outside a release. The SBOMs are
+  // produced only by the release-prepare workflow (which commits the refreshed
+  // copies) and on demand via `./gradlew :<module>:cyclonedxBom`. So gate both
+  // tasks on whether a cyclonedx task was explicitly named on the command line:
+  // when it was not, `enabled = false` makes them SKIP — a disabled task never
+  // runs its action, so an ordinary build leaves the committed SBOMs untouched —
+  // while an explicit `cyclonedxBom` / `cyclonedxDirectBom` invocation (release or
+  // manual) re-enables them. `enabled` has a single writer here, so the guarantee
+  // holds regardless of plugin/Gradle configuration order.
+  plugins.withId("org.cyclonedx.bom") {
+    val sbomExplicitlyRequested =
+      gradle.startParameter.taskNames.any { it.substringAfterLast(':').startsWith("cyclonedx") }
+    tasks.named("cyclonedxDirectBom").configure { enabled = sbomExplicitlyRequested }
+    tasks.named("cyclonedxBom").configure { enabled = sbomExplicitlyRequested }
+  }
 }
 
 // OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.2. Aggregates over

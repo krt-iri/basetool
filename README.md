@@ -524,9 +524,14 @@ never depends on Spring Data JPA). Adding a violation fails `./gradlew test`.
 ./gradlew :backend:checkstyleMain :backend:spotbugsMain      # backend lint only
 ./gradlew :frontend:checkstyleMain :frontend:spotbugsMain    # frontend lint only
 ./gradlew spotlessApply                                      # auto-format Java sources (run before every push)
-./gradlew :backend:cyclonedxBom                              # SBOM into backend/docs/
-./gradlew :frontend:cyclonedxBom                             # SBOM into frontend/docs/
+./gradlew :backend:cyclonedxBom                              # SBOM on demand into backend/docs/
+./gradlew :frontend:cyclonedxBom                             # SBOM on demand into frontend/docs/
 ```
+
+The two `cyclonedxBom` commands generate the SBOM **on demand** — it is not part
+of `build` or `check`. The committed `<module>/docs/*-bom.*` files are a release
+artifact, refreshed automatically by the release workflow; run these only to
+inspect the SBOM locally.
 
 Reports land under `<module>/build/reports/{checkstyle,spotbugs}/main.{html,xml}`.
 Checkstyle runs with `maxWarnings = 0` and Spotless is wired into `check`
