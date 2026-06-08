@@ -88,6 +88,19 @@ values exactly:
 Status hues reuse Bereichsfarben values by appearance: danger `#A3000A`, success
 `#239E33`, warning `#FFD23F`, info `#355DDC`. Treat them as status, not as the department.
 
+**Accessible text tints.** The canonical danger/info/success hues are dark on the black
+canvas (danger ≈ 2.3:1, info ≈ 3.6:1) and fail WCAG AA as small text. When a semantic
+colour is the **text itself** (inline validation messages, status labels, price up/down),
+use the lightened tints — `--color-danger-text` `#F2564B`, `--color-info-text` `#6C93EF`,
+`--color-success-text` `#2EBC3D` (all ≥ 5:1 on black). Keep the canonical hues for fills,
+borders and the brand Bereichsfarben tags. An invalid field additionally takes a red
+hairline (`.input-error`) beside its `.field-error` message.
+
+**Acceptance**
+
+- [ ] Semantic colour used as small text uses the matching `*-text` tint, not the dark
+  canonical hue; the canonical hues stay on fills/borders/tags.
+
 ### REQ-UI-007 — Visual style: square-first sci-fi HUD
 
 Sci-fi / space-organisation / technical-HUD aesthetic: geometric shapes (rings,

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Status-, Fehler- und Preistexte nutzen jetzt hellere, kontrastreichere Farbtöne und sind auf dem dunklen Hintergrund deutlich besser lesbar.** Die kräftigen Status- und Gefahrfarben bleiben Flächen, Rahmen und Bereichs-Tags vorbehalten; ein ungültiges Eingabefeld bekommt zusätzlich einen roten Rahmen neben der Fehlermeldung.
+
+### Added
+
+- **Die Oberfläche respektiert jetzt die System-Einstellung „Bewegung reduzieren":** Animationen wie das Einfahren der Seitenleiste oder das Einblenden von Hinweis-Toasts werden dann praktisch abgeschaltet.
+
 ## [v0.4.4](https://github.com/krt-iri/basetool/releases/tag/v0.4.4) - 2026-06-08
 
 ### Changed
