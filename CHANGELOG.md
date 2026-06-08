@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.4](https://github.com/krt-iri/basetool/releases/tag/v0.4.4) - 2026-06-08
+
 ### Changed
 
 - **Aktions-Schaltflächen (Löschen, Bearbeiten, Speichern) tragen jetzt app-weit einheitliche Symbole.** In dichten Tabellen- und Listenzeilen erscheinen sie als reine Symbol-Schaltflächen (Bedeutung per Tooltip/Vorlesehilfe), in Formularen und Dialogen als Symbol mit Text. Das spart Platz und macht gleichartige Aktionen auf einen Blick erkennbar: Löschen nutzt einen Mülleimer, Bearbeiten einen Stift, Speichern eine Diskette.
