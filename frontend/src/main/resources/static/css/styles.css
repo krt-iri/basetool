@@ -489,9 +489,12 @@ tbody tr:nth-child(even):hover {
     font-variant-numeric: tabular-nums;
 }
 
-/* Left gutter keeps the amount column and the action buttons from colliding. */
+/* Left gutter keeps the amount column and the action buttons from colliding;
+   flex-wrap is a safety net so an unexpectedly wide action set wraps onto a
+   second line instead of overflowing left across the right-aligned amount. */
 .tree-cell--actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 0.4rem;
     padding-left: 1.5rem;
@@ -716,6 +719,56 @@ tbody tr:nth-child(even):hover {
     min-height: 32px;
     padding: 0.25rem 0.55rem;
     font-size: 0.68rem;
+}
+
+/* Icon-only square action button: keeps a dense action column from crowding the
+   value beside it (e.g. the per-entry "Notiz" button in the Lager tree table).
+   The accessible name comes from aria-label/title; the glyph is decorative
+   (aria-hidden). Pair with .btn-xs for the 32px dense-row size. */
+.btn-icon {
+    gap: 0;
+    padding: 0.25rem;
+    min-width: 32px;
+}
+
+.btn-icon .krt-icon {
+    width: 1.05rem;
+    height: 1.05rem;
+}
+
+/* Decorative button glyphs must never intercept clicks: a click on the icon has
+   to land on the host <button>/<a>, not the inner <svg>/<use>. Without this, an
+   icon-only action whose JS matches on event.target (rather than closest()) would
+   silently do nothing when the user hits the glyph. */
+.btn .krt-icon {
+    pointer-events: none;
+}
+
+/* Tablet and below (REQ-UI-009 device classes): collapse the leaf row's
+   multi-column grid so the amount and per-entry actions reflow onto their own
+   line beneath the wide Auftrag/Einsatz controls, instead of competing with
+   them for a sliver of width and overlapping the value column. The
+   group/mid/head rows keep the shared --tree-cols template (wide tables scroll
+   horizontally per the design system). */
+@media (width <= 1024px) {
+    .tree-row--leaf {
+        grid-template-columns: 1fr auto;
+        row-gap: 0.2rem;
+    }
+
+    .tree-row--leaf .tree-leaf-main {
+        grid-column: 1 / -1;
+    }
+
+    .tree-row--leaf .tree-amount {
+        grid-column: 1;
+        padding-left: 3rem;
+        text-align: left;
+    }
+
+    .tree-row--leaf .tree-cell--actions {
+        grid-column: 2;
+    }
 }
 
 /*

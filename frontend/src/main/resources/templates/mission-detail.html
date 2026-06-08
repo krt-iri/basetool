@@ -433,8 +433,8 @@
                 </div>
                 <!-- Buttons Box inside Details Column -->
                 <div class="hud-box" style="display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
-                    <button th:if="${!isNew}" sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger delete-mission-btn" style="margin-right: auto;" th:data-action="@{/missions/{id}/delete(id=${mission.id})}" th:text="#{info.delete}">Delete</button>
-                    <button th:if="${isNew or mission.canEdit}" type="submit" form="mission-form" class="btn btn--cta" th:text="#{mission.save}">Save</button>
+                    <button th:if="${!isNew}" sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger delete-mission-btn" style="margin-right: auto;" th:data-action="@{/missions/{id}/delete(id=${mission.id})}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{info.delete}">Delete</span></button>
+                    <button th:if="${isNew or mission.canEdit}" type="submit" form="mission-form" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{mission.save}">Save</span></button>
                     <a th:href="@{/missions}" class="btn btn-ghost" th:text="#{profile.back}">Back</a>
                 </div>
 
@@ -459,7 +459,7 @@
                                            th:placeholder="#{mission.party_lead.placeholder}">
                                     <div id="party-lead-search-results" class="autocomplete-items"></div>
                                 </div>
-                                <button type="submit" class="btn btn-ghost" th:text="#{general.save}">Speichern</button>
+                                <button type="submit" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
                                 <button type="button" class="btn btn-quiet-danger" id="party-lead-clear-btn" th:text="#{mission.party_lead.clear}">Entfernen</button>
                             </form>
                         </div>
@@ -481,7 +481,7 @@
                                     <option value="" th:text="#{mission.owner.select}">-- Neuen Besitzer wählen --</option>
                                     <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.effectiveName}" th:selected="${mission.owner != null and u.id == mission.owner.id}"></option>
                                 </select>
-                                <button type="button" class="btn btn-ghost" data-trigger="mission-change-owner" th:text="#{general.save}">Speichern</button>
+                                <button type="button" class="btn btn-ghost" data-trigger="mission-change-owner"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
                             </div>
                         </div>
                     </div>
@@ -548,11 +548,11 @@
                                       th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
                                       th:style="${f != null ? 'color: var(--color-white); font-weight: bold; font-family: var(--font-mono); font-variant-numeric: tabular-nums; background: var(--color-surface-input); padding: 0.2rem 0.5rem; border-radius: var(--radius-none);' : 'display:none;'}">123.45</span>
 
-                                <button th:if="${!isNew and mission.canEdit}" class="btn btn-sm btn-ghost set-freq-btn"
+                                <button th:if="${!isNew and mission.canEdit}" class="btn btn-sm btn-ghost btn-icon set-freq-btn"
                                         th:data-action="@{/missions/{id}/frequencies/ajax(id=${mission.id})}"
                                         th:data-type-id="${freqType.id}"
                                         th:data-current-value="${f != null ? f.value : ''}"
-                                        th:text="#{members.edit}">Edit</button>
+                                        th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                             </div>
                         </div>
                     </div>
@@ -619,7 +619,7 @@
                             <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime != null and p?.endTime == null}" class="participant-action-form" data-participant-action="check-out" th:data-participant-id="${p?.id}">
                                 <button type="submit" class="btn btn-ghost" th:text="#{mission.participant.checkout}">Check-Out</button>
                             </form>
-                            <button type="button" class="btn btn-ghost edit-participant-btn"
+                            <button type="button" class="btn btn-ghost btn-icon edit-participant-btn"
                                     th:data-participant-id="${p?.id}"
                                     th:data-action="@{/missions/{id}/participants/{pId}/update(id=${mission.id}, pId=${p?.id})}"
                                     th:data-job="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.id : ''}"
@@ -633,13 +633,13 @@
                                     th:data-end-time="${p?.endTime}"
                                     th:data-start-time-formatted="${p?.startTimeFormatted}"
                                     th:data-end-time-formatted="${p?.endTimeFormatted}"
-                                    th:text="#{members.edit}">Edit</button>
-                            
-                            <button type="button" class="btn btn-quiet-danger delete-participant-btn"
+                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+
+                            <button type="button" class="btn btn-quiet-danger btn-icon delete-participant-btn"
                                     th:data-action="@{/missions/{id}/participants/{pId}/delete(id=${mission.id}, pId=${p?.id})}"
                                     th:data-participant-id="${p?.id}"
                                     data-sub-section="participant"
-                                    th:text="#{info.delete}">Delete</button>
+                                    th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
                     </td>
                 </tr>
@@ -688,7 +688,7 @@
                                     th:data-action-ajax="@{/missions/{id}/units/{uId}/crew/ajax(id=${mission.id}, uId=${unit.id})}"
                                     th:text="#{mission.unit.assign_crew}">Crew zuweisen</button>
                             <button th:if="${mission.canEdit}"
-                                    class="btn btn-ghost edit-unit-btn"
+                                    class="btn btn-ghost btn-icon edit-unit-btn"
                                     th:data-action="@{/missions/{id}/units/{uId}/update(id=${mission.id}, uId=${unit.id})}"
                                     th:data-unit-id="${unit.id}"
                                     th:data-name="${unit.name}"
@@ -696,12 +696,12 @@
                                     th:data-ship="${unit.ship != null ? unit.ship.id : ''}"
                                     th:data-frequency="${unit.frequency}"
                                     th:data-hvu="${unit.highValueUnit}"
-                                    th:text="#{members.edit}">Edit</button>
-                            <button th:if="${mission.canEdit}" type="button" class="btn btn-quiet-danger delete-unit-btn"
+                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button th:if="${mission.canEdit}" type="button" class="btn btn-quiet-danger btn-icon delete-unit-btn"
                                     th:data-action="@{/missions/{id}/units/{uId}/delete(id=${mission.id}, uId=${unit.id})}"
                                     th:data-unit-id="${unit.id}"
                                     data-sub-section="unit"
-                                    th:text="#{info.delete}">Delete</button>
+                                    th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
                     </div>
                     
@@ -734,20 +734,20 @@
                                     </td>
                                     <td th:if="${mission.canEdit}" style="text-align: right;">
                                         <div class="flex-gap-xs" style="justify-content: flex-end;">
-                                            <button type="button" class="btn btn-ghost edit-crew-btn"
+                                            <button type="button" class="btn btn-ghost btn-icon edit-crew-btn"
                                                     th:data-action="@{/missions/{id}/units/{uId}/crew/{cId}/update(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
                                                     th:data-action-ajax="@{/missions/{id}/units/{uId}/crew/{cId}/ajax(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
                                                     th:data-unit-id="${unit.id}"
                                                     th:data-crew-id="${c.id}"
                                                     th:data-jobs="${c.jobTypes != null ? #strings.listJoin(c.jobTypes.![id], ',') : ''}"
-                                                    th:text="#{members.edit}">Edit</button>
-                                            <button type="button" class="btn btn-quiet-danger delete-crew-btn"
+                                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                            <button type="button" class="btn btn-quiet-danger btn-icon delete-crew-btn"
                                                     th:data-action="@{/missions/{id}/units/{uId}/crew/{cId}/delete(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
                                                     th:data-action-ajax="@{/missions/{id}/units/{uId}/crew/{cId}/ajax(id=${mission.id}, uId=${unit.id}, cId=${c.id})}"
                                                     th:data-unit-id="${unit.id}"
                                                     th:data-crew-id="${c.id}"
                                                     data-sub-section="crew"
-                                                    th:text="#{info.delete}">Delete</button>
+                                                    th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -849,17 +849,17 @@
                                     <td sec:authorize="isAuthenticated()">
                                         <div class="flex-gap-xs">
                                             <!-- Edit button -->
-                                            <button type="button" class="btn btn-ghost edit-finance-btn"
+                                            <button type="button" class="btn btn-ghost btn-icon edit-finance-btn"
                                                     th:data-id="${entry.id}"
                                                     th:data-note="${entry.note}"
                                                     th:data-type="${entry.type}"
                                                     th:data-amount="${@moneyFormat.round(entry.amount)}"
                                                     th:data-version="${entry.version}"
                                                     data-trigger="mission-open-edit-finance"
-                                                    th:text="#{members.edit}">Bearbeiten</button>
-                                            
+                                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+
                                             <!-- Delete button -->
-                                            <button type="button" class="btn btn-quiet-danger delete-finance-btn" th:attr="data-action=@{/missions/{id}/finance-entries/{entryId}/delete(id=${mission.id}, entryId=${entry.id})}" th:text="#{info.delete}">Löschen</button>
+                                            <button type="button" class="btn btn-quiet-danger btn-icon delete-finance-btn" th:attr="data-action=@{/missions/{id}/finance-entries/{entryId}/delete(id=${mission.id}, entryId=${entry.id})}" th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1027,8 +1027,8 @@
                     <textarea name="comment" rows="3" th:text="*{comment}"></textarea>
                     <div th:if="${#fields.hasErrors('comment')}" th:errors="*{comment}" class="field-error"></div>
                 </div>
-                
-                <button type="submit" class="btn btn--cta" th:text="#{members.save}">Speichern</button>
+
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
             </form>
         </div>
     </div>

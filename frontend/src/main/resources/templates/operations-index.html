@@ -123,9 +123,9 @@
                             <td class="op-desc" th:text="${op.description}">Description</td>
                             <td class="op-action">
                                 <a class="btn btn-ghost" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
-                                <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger" th:text="#{general.delete}"
+                                <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"
                                         th:data-id="${op.id}"
-                                        data-trigger="operations-open-delete">Delete</button>
+                                        data-trigger="operations-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             </td>
                         </tr>
                     </tbody>
@@ -166,7 +166,7 @@
                 <!-- R5.d.e owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
                 <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn btn--cta" th:text="#{general.save}">Save</button>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Save</span></button>
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="create-operation-modal" th:text="#{general.cancel}">Cancel</button>
                 </div>
             </form>

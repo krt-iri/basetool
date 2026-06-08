@@ -77,7 +77,7 @@
                     <td class="krt-pi-note" th:text="${item.note}">Notiz</td>
                     <td>
                         <div class="krt-pi-actions">
-                            <button type="button" class="btn btn-ghost"
+                            <button type="button" class="btn btn-ghost btn-icon"
                                     data-trigger="pi-open-edit"
                                     th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/update'},
                                              data-id=${item.id},
@@ -88,12 +88,14 @@
                                              data-location-uex-id=${item.locationUexId},
                                              data-location-type=${item.locationType?.name()},
                                              data-location-name=${item.locationName}"
-                                    th:text="#{personalInventory.action.edit}">Bearbeiten</button>
-                            <button type="button" class="btn btn-quiet-danger"
+                                    th:title="#{personalInventory.action.edit}"
+                                    th:aria-label="#{personalInventory.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button type="button" class="btn btn-quiet-danger btn-icon"
                                     data-trigger="pi-open-delete"
                                     th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/delete'},
                                              data-name=${item.name}"
-                                    th:text="#{personalInventory.action.delete}">Loeschen</button>
+                                    th:title="#{personalInventory.action.delete}"
+                                    th:aria-label="#{personalInventory.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
                     </td>
                 </tr>
@@ -151,7 +153,7 @@
             </div>
 
             <div class="krt-pi-modal-actions">
-                <button type="submit" class="btn btn--cta" th:text="#{personalInventory.action.save}">Speichern</button>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
                 <button type="button" class="btn btn-ghost" data-trigger="pi-close-modal" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             </div>
         </form>

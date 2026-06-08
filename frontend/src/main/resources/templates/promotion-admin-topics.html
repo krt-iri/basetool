@@ -115,8 +115,7 @@
             </span>
             <button type="button"
                     class="btn btn--cta pa-btn-tiny"
-                    data-trigger="pa-save-all"
-                    th:text="#{promotion.admin.topics.save.all}">Alle speichern</button>
+                    data-trigger="pa-save-all"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.save.all}">Alle speichern</span></button>
             <button type="button"
                     class="btn btn-ghost pa-btn-tiny"
                     data-trigger="pa-discard-all"
@@ -167,18 +166,20 @@
                     </span>
                 </span>
                 <div class="admin-actions">
-                    <button class="btn btn-ghost pa-btn-tiny"
+                    <button class="btn btn-ghost pa-btn-tiny btn-icon"
                             data-trigger="pa-edit-topic"
                             th:attr="data-pa-id=${topic.id},
                                      data-pa-name=${topic.name},
                                      data-pa-description=${topic.description},
                                      data-pa-sort=${topic.sortOrder},
                                      data-pa-version=${topic.version}"
-                            th:text="#{promotion.admin.topics.edit}">Bearbeiten</button>
-                    <button class="btn btn-quiet-danger pa-btn-tiny"
+                            th:title="#{promotion.admin.topics.edit}"
+                            th:aria-label="#{promotion.admin.topics.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                    <button class="btn btn-quiet-danger pa-btn-tiny btn-icon"
                             data-trigger="pa-delete-topic"
                             th:attr="data-pa-id=${topic.id},data-pa-name=${topic.name}"
-                            th:text="#{promotion.admin.topics.delete}">Löschen</button>
+                            th:title="#{promotion.admin.topics.delete}"
+                            th:aria-label="#{promotion.admin.topics.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     <button class="btn btn-ghost pa-btn-tiny"
                             data-trigger="pa-open-create-category"
                             th:attr="data-pa-topic-id=${topic.id}"
@@ -212,7 +213,7 @@
                             </span>
                             <span class="category-summary-name" th:text="${cat.name}">Kategorie</span>
                             <div class="admin-actions">
-                                <button class="btn btn-ghost pa-btn-tiny"
+                                <button class="btn btn-ghost pa-btn-tiny btn-icon"
                                         data-trigger="pa-edit-category"
                                         th:attr="data-pa-id=${cat.id},
                                                  data-pa-name=${cat.name},
@@ -220,11 +221,13 @@
                                                  data-pa-sort=${cat.sortOrder},
                                                  data-pa-version=${cat.version},
                                                  data-pa-topic-id=${topic.id}"
-                                        th:text="#{promotion.admin.topics.edit}">Bearbeiten</button>
-                                <button class="btn btn-quiet-danger pa-btn-tiny"
+                                        th:title="#{promotion.admin.topics.edit}"
+                                        th:aria-label="#{promotion.admin.topics.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                <button class="btn btn-quiet-danger pa-btn-tiny btn-icon"
                                         data-trigger="pa-delete-category"
                                         th:attr="data-pa-id=${cat.id},data-pa-name=${cat.name}"
-                                        th:text="#{promotion.admin.topics.delete}">Löschen</button>
+                                        th:title="#{promotion.admin.topics.delete}"
+                                        th:aria-label="#{promotion.admin.topics.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             </div>
                         </summary>
                         <div class="pa-category-body">
@@ -243,9 +246,10 @@
                                               th:text="${lc != null ? lc.description : ''}"
                                               rows="2"
                                               maxlength="2000"></textarea>
-                                    <button class="btn btn-ghost pa-level-save"
+                                    <button class="btn btn-ghost pa-level-save btn-icon"
                                             data-trigger="pa-save-level-content"
-                                            th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
+                                            th:title="#{promotion.admin.levelcontent.save}"
+                                            th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                                 </div>
                                 <!-- Stufe B -->
                                 <div class="pa-level-row"
@@ -261,9 +265,10 @@
                                               th:text="${lc != null ? lc.description : ''}"
                                               rows="2"
                                               maxlength="2000"></textarea>
-                                    <button class="btn btn-ghost pa-level-save"
+                                    <button class="btn btn-ghost pa-level-save btn-icon"
                                             data-trigger="pa-save-level-content"
-                                            th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
+                                            th:title="#{promotion.admin.levelcontent.save}"
+                                            th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                                 </div>
                                 <!-- Stufe C -->
                                 <div class="pa-level-row"
@@ -279,9 +284,10 @@
                                               th:text="${lc != null ? lc.description : ''}"
                                               rows="2"
                                               maxlength="2000"></textarea>
-                                    <button class="btn btn-ghost pa-level-save"
+                                    <button class="btn btn-ghost pa-level-save btn-icon"
                                             data-trigger="pa-save-level-content"
-                                            th:text="#{promotion.admin.levelcontent.save}">Speichern</button>
+                                            th:title="#{promotion.admin.levelcontent.save}"
+                                            th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                                 </div>
                             </th:block>
                         </div>
@@ -337,7 +343,7 @@
         </div>
         <div class="modal-actions">
             <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn--cta" data-trigger="pa-update-topic" th:text="#{promotion.admin.topics.edit}">Speichern</button>
+            <button class="btn btn--cta" data-trigger="pa-update-topic"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>
     </div>
 </div>
@@ -387,7 +393,7 @@
         </div>
         <div class="modal-actions">
             <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn--cta" data-trigger="pa-update-category" th:text="#{promotion.admin.topics.edit}">Speichern</button>
+            <button class="btn btn--cta" data-trigger="pa-update-category"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>
     </div>
 </div>

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Aktions-Schaltflächen (Löschen, Bearbeiten, Speichern) tragen jetzt app-weit einheitliche Symbole.** In dichten Tabellen- und Listenzeilen erscheinen sie als reine Symbol-Schaltflächen (Bedeutung per Tooltip/Vorlesehilfe), in Formularen und Dialogen als Symbol mit Text. Das spart Platz und macht gleichartige Aktionen auf einen Blick erkennbar: Löschen nutzt einen Mülleimer, Bearbeiten einen Stift, Speichern eine Diskette.
+
+### Fixed
+
+- **In „Mein Lager" und „Globales Lager" überlagerten sich in der aufgeklappten Eintragszeile die Mengenangabe und der Ausbuchen-Button, wenn das Fenster schmaler war (z. B. die linke Hälfte eines 4K-Monitors).** Die Aktions-Schaltflächen je Eintrag sind jetzt kompakte Symbole — „Ausbuchen" ein Heraus-Pfeil, „Notiz" ein Stift (Bedeutung per Tooltip/Vorlesehilfe) — und ab Tablet-Breite (≤ 1024px) rutschen Menge und Schaltflächen unter die Auftrag/Einsatz-Felder, sodass sich nichts mehr überdeckt.
+
 ## [v0.4.3](https://github.com/krt-iri/basetool/releases/tag/v0.4.3) - 2026-06-07
 
 ### Changed

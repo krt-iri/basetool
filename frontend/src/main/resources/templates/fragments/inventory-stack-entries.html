@@ -92,7 +92,7 @@
                 <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
             </div>
             <div class="tree-cell tree-cell--actions">
-                <button type="button" class="btn btn-outline btn-xs"
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -100,15 +100,20 @@
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
-                        data-trigger="inv-my-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
-                <button type="button" class="btn btn-xs inventory-note-btn"
+                        data-trigger="inv-my-bookout"
+                        th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
+                </button>
+                <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
                         th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
                         th:data-note="${entry.note}"
                         data-trigger="inv-my-open-note"
                         th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
-                        th:text="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
+                        th:aria-label="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
+                </button>
             </div>
         </div>
         <div class="tree-note" th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
@@ -217,7 +222,7 @@
                 <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
             </div>
             <div class="tree-cell tree-cell--actions" sec:authorize="hasRole('LOGISTICIAN')">
-                <button type="button" class="btn btn-outline btn-xs"
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -225,15 +230,20 @@
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
-                        data-trigger="inv-admin-bookout" th:text="#{inventory.bookout.btn}">Ausbuchen</button>
-                <button type="button" class="btn btn-xs inventory-note-btn"
+                        data-trigger="inv-admin-bookout"
+                        th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
+                </button>
+                <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
                         th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
                         th:data-note="${entry.note}"
                         data-trigger="inv-admin-open-note"
                         th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
-                        th:text="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">Notiz</button>
+                        th:aria-label="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
+                </button>
             </div>
         </div>
         <div class="tree-note" th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"

@@ -25,15 +25,14 @@
         <h1 th:text="#{orders.detail.title}">Auftrag Details</h1>
         <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
-            <button sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.type != 'ITEM'}" type="button" class="btn btn-outline" th:text="#{orders.detail.edit}" data-trigger="open-modal-display" data-modal-id="edit-modal">Bearbeiten</button>
+            <button sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.type != 'ITEM'}" type="button" class="btn btn-outline" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
             <!-- Item orders are edited on the reused create form; only while no item-handover has
                  been recorded (afterwards the lines are frozen). -->
             <a sec:authorize="hasRole('LOGISTICIAN')"
                th:if="${order.type == 'ITEM' and (order.itemHandovers == null or order.itemHandovers.isEmpty())}"
-               th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-outline"
-               th:text="#{orders.detail.edit.items}">Items bearbeiten</a>
+               th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-outline"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
             <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
-                <button type="submit" class="btn btn-quiet-danger" th:text="#{orders.detail.delete}">Löschen</button>
+                <button type="submit" class="btn btn-quiet-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{orders.detail.delete}">Löschen</span></button>
             </form>
         </div>
     </div>
@@ -574,7 +573,7 @@
                         <input type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
                     </div>
                     <div>
-                        <button type="button" class="btn btn-quiet-danger remove-material-btn" style="padding: 0.5rem;" th:text="#{orders.detail.material.remove}">Entfernen</button>
+                        <button type="button" class="btn btn-quiet-danger btn-icon remove-material-btn" style="padding: 0.5rem;" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     </div>
                 </div>
             </div>
@@ -583,7 +582,7 @@
 
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
                 <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="edit-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
-                <button type="submit" class="btn btn--cta" th:text="#{orders.detail.save}">Speichern</button>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
             </div>
         </form>
     </div>
@@ -643,7 +642,7 @@
         <div style="display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; margin-top: 1.5rem;">
             <button type="button" id="claim-withdraw-btn" class="btn btn-outline-danger" style="display: none; min-height: 44px;" data-trigger="claim-withdraw" th:text="#{orders.claim.withdraw}">Zurückziehen</button>
             <button type="button" class="btn btn-ghost" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="claim-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
-            <button type="button" id="claim-submit-btn" class="btn btn--cta" style="min-height: 44px;" data-trigger="claim-submit" th:text="#{orders.claim.submit}">Speichern</button>
+            <button type="button" id="claim-submit-btn" class="btn btn--cta" style="min-height: 44px;" data-trigger="claim-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.claim.submit}">Speichern</span></button>
         </div>
     </div>
 </div>
@@ -690,7 +689,7 @@
                         th:text="#{orders.handover.report.preview}"
                         th:data-order-id="${order.id}"
                         data-trigger="od-preview-handover">Vorschau als PDF</button>
-                <button type="submit" class="btn btn--cta" data-testid="order-handover-submit" th:text="#{orders.detail.save}">Speichern</button>
+                <button type="submit" class="btn btn--cta" data-testid="order-handover-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
             </div>
         </form>
     </div>
@@ -746,7 +745,7 @@
 
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
                 <button type="button" class="btn btn-ghost" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="item-handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
-                <button type="submit" class="btn btn--cta" style="min-height: 44px;" data-testid="item-handover-submit" th:text="#{orders.detail.save}">Speichern</button>
+                <button type="submit" class="btn btn--cta" style="min-height: 44px;" data-testid="item-handover-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
             </div>
         </form>
     </div>
@@ -824,7 +823,7 @@
                 <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${index}].amount" min="0.001" required class="w-full">
             </div>
             <div>
-                <button type="button" class="btn btn-quiet-danger" style="padding: 0.5rem;" data-trigger="od-remove-handover-row">Entfernen</button>
+                <button type="button" class="btn btn-quiet-danger btn-icon" style="padding: 0.5rem;" data-trigger="od-remove-handover-row" title="Entfernen" aria-label="Entfernen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
             </div>
         `;
         const sel = row.querySelector('select');
@@ -1044,8 +1043,9 @@
             materialsContainer.querySelectorAll('.material-row').forEach(refreshEditMaterialUnit);
 
             materialsContainer.addEventListener('click', (e) => {
-                if (e.target.classList.contains('remove-material-btn')) {
-                    const row = e.target.closest('.material-row');
+                const removeBtn = e.target.closest && e.target.closest('.remove-material-btn');
+                if (removeBtn) {
+                    const row = removeBtn.closest('.material-row');
                     if (materialsContainer.querySelectorAll('.material-row').length > 1) {
                         document.getElementById('material-delete-confirm-modal').style.display = 'flex';
                         window.materialRowToDelete = row;
