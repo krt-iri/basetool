@@ -71,6 +71,11 @@
     /* Semantic tokens — REQUIRED so validation errors render red, not the brand
        orange. Keep these values identical with login/krt-login-v3.css :root. */
     --color-danger: #A3000A;
+    /* Accessible danger as TEXT — the canonical #A3000A is ~2.3:1 on black and
+       fails WCAG as small text; use this lighter tint when the colour IS the
+       error text. Keep #A3000A for borders/blooms/fills. Mirror of frontend
+       styles.css --color-danger-text. Keep identical with login :root. */
+    --color-danger-text: #F2564B;
     --color-success: #239E33;
     --color-warning: #FFD23F;
     --color-info: #355DDC;
@@ -334,7 +339,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .pf-c-alert.pf-m-danger .pf-c-alert__title,
 .pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__title,
 .pf-v6-c-alert.pf-m-danger .pf-v6-c-alert__title {
-    color: var(--color-danger) !important;
+    color: var(--color-danger-text) !important;
 }
 
 /* Invalid fields get a red bottom border + red glow (overriding the orange focus). */

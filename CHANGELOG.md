@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Status-, Fehler- und Preistexte nutzen jetzt hellere, kontrastreichere Farbtöne und sind auf dem dunklen Hintergrund deutlich besser lesbar.** Die kräftigen Status- und Gefahrfarben bleiben Flächen, Rahmen und Bereichs-Tags vorbehalten; ein ungültiges Eingabefeld bekommt zusätzlich einen roten Rahmen neben der Fehlermeldung.
+
+- **Die Seitennavigation beim Blättern durch Listen (Einsätze, Operationen, Mitglieder, Lager) nutzt jetzt einheitliche quadratische Schaltflächen mit Pfeil-Symbolen statt der «‹›»-Zeichen.** Die Schaltflächen am Anfang/Ende sind, wenn man schon auf der ersten bzw. letzten Seite ist, jetzt wirklich deaktiviert (nicht nur ausgegraut) und werden für Screenreader korrekt ausgezeichnet.
+
+- **Fehlermeldungen auf den Keycloak-Seiten (Anmeldung, Passwort, Konto) erscheinen jetzt im selben helleren, besser lesbaren Rotton wie in der App.** Rote Feldrahmen und der rote Schimmer ungültiger Felder bleiben im kräftigen Rot — so wirkt der Auftritt über App und SSO hinweg einheitlich und der Fehlertext ist auf Schwarz gut lesbar.
+
+- **In der Einsatz-Detailansicht werden Einheiten-Namen jetzt in hellem Weiß statt Orange dargestellt.** Orange bleibt konsequent Aktionen und Identität vorbehalten, reine Datenwerte erscheinen neutral-hell.
+
+### Added
+
+- **Die Oberfläche respektiert jetzt die System-Einstellung „Bewegung reduzieren":** Animationen wie das Einfahren der Seitenleiste oder das Einblenden von Hinweis-Toasts werden dann praktisch abgeschaltet.
+
 ## [v0.4.4](https://github.com/krt-iri/basetool/releases/tag/v0.4.4) - 2026-06-08
 
 ### Changed

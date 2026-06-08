@@ -674,7 +674,7 @@
                         <div class="flex-gap-sm">
                             <div style="cursor: pointer;" th:data-target="'unit-content-' + ${unit.id}" data-trigger="mission-toggle-unit" th:title="#{general.toggle}">
                                 <span class="unit-toggle-icon" style="display:inline-block; width:1em; color:var(--color-primary); font-weight:bold;">-</span>
-                                <strong th:text="${unit.name}" style="color: var(--color-primary); font-family: var(--font-body);">Unit Name</strong>
+                                <strong th:text="${unit.name}" style="color: var(--data-fg); font-family: var(--font-body);">Unit Name</strong>
                                 <span th:if="${unit.shipType != null}" th:text="' - ' + ${unit.shipType.name}" style="color: var(--color-gray-1); margin-left: 0.25rem;"> - ShipType</span>
                                 <span th:if="${unit.ship != null and unit.ship.owner != null}" th:text="${' (' + unit.ship.owner.effectiveName + ')'}" style="color: var(--color-gray-2); font-size: 0.9rem;">(Owner)</span>
                                 <span th:if="${unit.highValueUnit}" style="color: var(--color-accent-light); margin-left: 0.5rem;">[HVU]</span>

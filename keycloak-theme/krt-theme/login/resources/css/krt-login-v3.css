@@ -75,6 +75,11 @@
        brand orange. Mirror of frontend styles.css. Keep these values identical
        with account/krt-account-v3.css :root (token-sync rule). */
     --color-danger: #A3000A;
+    /* Accessible danger as TEXT — the canonical #A3000A is ~2.3:1 on black and
+       fails WCAG as small text; use this lighter tint when the colour IS the
+       error text. Keep #A3000A for borders/blooms/fills. Mirror of frontend
+       styles.css --color-danger-text. Keep identical with account :root. */
+    --color-danger-text: #F2564B;
     --color-success: #239E33;
     --color-warning: #FFD23F;
     --color-info: #355DDC;
@@ -530,7 +535,7 @@ input[type="checkbox"]:checked::after,
 }
 
 .krt-error-message {
-    color: var(--color-danger) !important;
+    color: var(--color-danger-text) !important;
     font-size: 0.85em !important;
     display: block;
     margin-top: 5px;
@@ -559,7 +564,7 @@ input[type="checkbox"]:checked::after,
 .pf-c-alert.pf-m-danger .pf-c-alert__title,
 .pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__title,
 .pf-v6-c-alert.pf-m-danger .pf-v6-c-alert__title {
-    color: var(--color-danger) !important;
+    color: var(--color-danger-text) !important;
 }
 
 /* Invalid fields get a red bottom border + red glow (overriding the orange focus). */
