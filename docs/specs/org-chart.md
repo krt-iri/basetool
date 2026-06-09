@@ -26,7 +26,9 @@ rename / vacate / remove) is gated to `ROLE_ADMIN` at the controller.
 - [ ] `GET /api/v1/org-chart` succeeds for any authenticated caller and is forbidden to none of them.
 - [ ] Every write endpoint under `/api/v1/org-chart/positions` requires `ROLE_ADMIN`.
 
-**Enforced by:** `OrgChartControllerTest`, `SecurityTest` · **Code:** `OrgChartController` · **Issues:** —
+**Enforced by:** `OrgChartControllerTest`, `SecurityTest`, and the e2e spec
+`OrgChartPositionCrudE2eTest` (drives create / rename / assign / reassign / vacate / remove through
+the inline editor as an admin) · **Code:** `OrgChartController` · **Issues:** —
 
 ### REQ-ORG-011 — A Kommando(gruppe) carries an independently fillable *and* vacatable Kommandoleiter
 
@@ -49,8 +51,10 @@ rank — removing such a person-centric position is REQ-ORG-012 instead.
 
 **Enforced by:** `OrgChartServiceTest` (`vacateCommandLeader_*`,
 `createPosition_commandLeadWithoutUser_*`, `updatePosition_assignLeaderToLeaderlessKommando_persists`),
-`OrgChartPageControllerTest` (`vacateLeader_*`) · **Code:** `OrgChartService#vacateCommandLeader`,
-`OrgChartController#vacateCommandLeader` · **Issues:** —
+`OrgChartPageControllerTest` (`vacateLeader_*`), and the e2e spec
+`OrgChartPositionCrudE2eTest#createsAssignsVacatesAndRemovesACommandLeader` (drives assign → vacate
+through the UI and asserts the Kommandogruppe survives) · **Code:**
+`OrgChartService#vacateCommandLeader`, `OrgChartController#vacateCommandLeader` · **Issues:** —
 
 ### REQ-ORG-012 — Removing a Kommando cascades; vacating its leader does not
 
@@ -67,7 +71,9 @@ to clear the seat.
   Kommandoleiter".
 
 **Enforced by:** `OrgChartServiceTest` (`deletePosition_present_deletes`), migration `V136`
-(`parent_id … ON DELETE CASCADE`) · **Code:** `OrgChartService#deletePosition` · **Issues:** —
+(`parent_id … ON DELETE CASCADE`), and the e2e spec `OrgChartPositionCrudE2eTest` (removes a Kommando
+through the inline editor's confirm dialog) · **Code:** `OrgChartService#deletePosition` ·
+**Issues:** —
 
 ### REQ-ORG-013 — The org chart is keyboard-operable and screen-reader-navigable
 
@@ -100,10 +106,12 @@ preserves the chart's horizontal scroll and the page's vertical scroll across th
 - [ ] Keyboard focus on a node is a visible outline, not only the hero bloom.
 
 **Enforced by:** `OrgChartPageRenderTest` (asserts the rendered tree roles, the `aria-level`s,
-the `aria-pressed` toggle and the edit-mode hint). The interactive behaviours (roving focus,
-arrow-key navigation, the modal focus-trap / Esc, scroll restoration) are JavaScript and
-verified manually — candidates for the Playwright `e2e` suite, not the template-render unit
-tests. **Code:** `org-chart.html` (inline tree-nav + dialog JS), `org-chart.css`,
+the `aria-pressed` toggle and the edit-mode hint) and the Playwright e2e spec
+`OrgChartKeyboardA11yE2eTest`, which drives the interactive, JavaScript-only behaviours: the
+roving tabindex + arrow-key / Home/End navigation, the modal focus-trap / Esc / focus-return,
+and the horizontal-scroll restoration across a successful edit (`@Tag("e2e")`, so it runs on the
+ephemeral stack and is gated on the `e2e` PR label — see `.github/workflows/e2e.yml`).
+**Code:** `org-chart.html` (inline tree-nav + dialog JS), `org-chart.css`,
 `fragments/org-chart-node.html` · **Issues:** —
 
 ## Out of scope
