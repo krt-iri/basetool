@@ -848,12 +848,19 @@
                                     <td th:text="${entry.note}">Notiz</td>
                                     <td sec:authorize="isAuthenticated()">
                                         <div class="flex-gap-xs">
-                                            <!-- Edit button -->
+                                            <!-- Edit button. The rounded amount is bound via th:with
+                                                 (an unrestricted expression context) and only the
+                                                 resulting variable is read in th:data-amount: Thymeleaf
+                                                 3.1 evaluates default/unknown attributes (th:data-*) in
+                                                 a restricted context where @bean references like
+                                                 @moneyFormat are forbidden, so calling the bean directly
+                                                 in th:data-amount throws and 500s the whole page. -->
                                             <button type="button" class="btn btn-ghost btn-icon edit-finance-btn"
+                                                    th:with="financeEditAmount=${@moneyFormat.round(entry.amount)}"
                                                     th:data-id="${entry.id}"
                                                     th:data-note="${entry.note}"
                                                     th:data-type="${entry.type}"
-                                                    th:data-amount="${@moneyFormat.round(entry.amount)}"
+                                                    th:data-amount="${financeEditAmount}"
                                                     th:data-version="${entry.version}"
                                                     data-trigger="mission-open-edit-finance"
                                                     th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>

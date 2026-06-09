@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Das Anlegen eines Finanzeintrags (Einnahme/Ausgabe) bei einem Einsatz und das anschließende Öffnen der Einsatz-Detailseite führen nicht mehr zu einem Fehler (HTTP 500).** Sobald ein Einsatz mindestens einen Finanzeintrag besaß, ließ sich die Detailseite nicht mehr laden; die Finanztabelle samt Bearbeiten-Schaltfläche wird jetzt wieder korrekt angezeigt.
+
 ## [v0.4.6](https://github.com/krt-iri/basetool/releases/tag/v0.4.6) - 2026-06-09
 
 ### Changed
