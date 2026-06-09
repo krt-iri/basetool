@@ -37,8 +37,14 @@
 
     <div class="oc-toolbar" sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}">
         <button type="button" class="btn btn-outline" data-trigger="oc-toggle-edit"
-                th:text="#{orgChart.edit}">Bearbeiten</button>
+                aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
     </div>
+
+    <!-- Edit-mode legend: hidden until the toolbar toggle turns editing on (oc-edit-hint--on),
+         so the cloud of dashed "+" affordances has context. Admins only, like the toolbar. -->
+    <div id="oc-edit-hint" class="oc-edit-hint" role="note"
+         sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}"
+         th:text="#{orgChart.editHint}">Bearbeiten aktiv: Positionen zuweisen, umbenennen oder entfernen.</div>
 
     <div id="oc-chart" class="oc-chart" th:if="${orgChart != null}" th:with="area=${orgChart.areaLeadership()}">
 
@@ -324,6 +330,7 @@
     (function () {
         'use strict';
         const chart = document.getElementById('oc-chart');
+        const editHint = document.getElementById('oc-edit-hint');
         const modal = document.getElementById('oc-modal');
         const modalContent = modal ? modal.querySelector('.modal-content') : null;
         let lastTrigger = null;
@@ -607,9 +614,13 @@
                     return;
                 }
                 const editing = chart.classList.toggle('editing');
+                btn.setAttribute('aria-pressed', editing ? 'true' : 'false');
                 btn.textContent = editing
                     ? /*[[#{orgChart.editDone}]]*/ 'Done editing'
                     : /*[[#{orgChart.edit}]]*/ 'Edit';
+                if (editHint) {
+                    editHint.classList.toggle('oc-edit-hint--on', editing);
+                }
             });
 
             window.krtEvents.on('click', 'oc-add', function (btn) {

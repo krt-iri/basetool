@@ -202,6 +202,16 @@ main.oc-page .oc-toolbar {
     box-shadow: var(--glow-primary);
 }
 
+/* Keyboard focus inside the tree is a SHARP outline with an offset — deliberately
+   distinct from the hero's soft orange bloom (box-shadow) above, so a focused node
+   never reads the same as the always-glowing Bereichsleiter. Covers the roving
+   treeitems and the inline edit / remove / add controls (none of which the global
+   focus rule reaches); :focus-visible keeps it off mouse interactions. */
+.oc-tree :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 /* Vacant slot: a subtle filled box + readable italic label so the seat reads
    clearly (not the old near-invisible grey-on-transparent); the dashed frame
    still signals "empty". */
@@ -354,6 +364,27 @@ main.oc-page .oc-toolbar {
     display: flex;
     justify-content: flex-end;
     margin-bottom: 1rem;
+}
+
+/* Edit-mode legend: a quiet info line shown only while the inline editor is on
+   (toggled with the toolbar button + .oc-edit-hint--on). Reuses the .alert grammar —
+   tint fill + a 4px left rule — in the brand orange, since editing is an admin/action
+   context and there is no .alert-info variant to lean on. Capped + centred like the
+   toolbar above the full-bleed chart. */
+.oc-edit-hint {
+    display: none;
+    max-width: var(--content-max);
+    margin: 0 auto 1rem;
+    padding: 0.6rem 0.9rem;
+    background: rgb(231 126 35 / 8%);
+    border: 1px solid var(--color-gray-3);
+    border-left: 4px solid var(--color-primary);
+    color: var(--color-gray-1);
+    font-size: 0.85rem;
+}
+
+.oc-edit-hint--on {
+    display: block;
 }
 
 .oc-modal-close {
