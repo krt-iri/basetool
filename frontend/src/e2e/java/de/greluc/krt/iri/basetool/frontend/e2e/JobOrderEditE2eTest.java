@@ -121,10 +121,16 @@ class JobOrderEditE2eTest {
         page.locator("#edit-modal input[name='materials[0].amount']").fill("250");
         page.locator("#edit-modal #edit-comment").fill(comment);
 
-        // Full-page form POST + redirect: await it fully so the mutation has provably landed before
-        // the backend read-back below — see E2eSupport#awaitFormPost.
-        E2eSupport.awaitFormPost(
-            page, () -> page.locator("#edit-modal button[type='submit']").click());
+        // Wait for the update POST's own response (a 3xx, emitted once the backend PUT has
+        // committed) before the read-back. Targeting that response — rather than the settled
+        // redirect GET (awaitFormPost) — avoids a WebKit-only flake where the post-redirect
+        // navigation does not settle within the timeout under CI load; the API read-back needs only
+        // the commit, not the re-rendered page.
+        page.waitForResponse(
+            response ->
+                response.url().contains("/orders/" + jobOrderId + "/update")
+                    && "POST".equals(response.request().method()),
+            () -> page.locator("#edit-modal button[type='submit']").click());
 
         JsonObject order =
             JsonParser.parseString(
