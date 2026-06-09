@@ -6,6 +6,12 @@
 
 - **Die Auftragsliste unter „Raffinerie" blendet die Spalte „Status" aus, damit „Ort", „Einsatz" und „Materialien" mehr Platz bekommen.** Nach Status filtern lässt sich weiterhin über die Filterleiste oberhalb der Tabelle.
 
+### Fixed
+
+- **Mitglieder der Bereichsleitung (ohne Staffel-Zugehörigkeit) können jetzt Operationen anlegen.** Bisher schlug das Anlegen mit einer Fehlermeldung fehl, weil jede Operation zwingend einer Staffel gehören musste. Solche organisationsweiten „Bereichsleitungs-Operationen" sind staffellos und für alle Mitglieder (und höher) sichtbar, für Gäste hingegen nicht.
+
+- **Operationen sind jetzt zusätzlich für alle Teilnehmenden der zugeordneten Einsätze sichtbar (außer nicht angemeldete Besucher).** Wer an einem Einsatz einer Operation teilgenommen hat, sieht die Operation und seine Auszahlung jetzt auch dann, wenn sie einer anderen Staffel gehört oder staffellos ist.
+
 ## [v0.4.5](https://github.com/krt-iri/basetool/releases/tag/v0.4.5) - 2026-06-08
 
 ### Added

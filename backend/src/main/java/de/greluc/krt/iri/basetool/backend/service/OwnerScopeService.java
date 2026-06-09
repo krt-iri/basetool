@@ -1122,8 +1122,21 @@ public class OwnerScopeService {
   }
 
   /**
-   * {@code true} iff the current principal may read operation {@code operationId}. Strict
-   * owning-squadron check. Non-existent ids return {@code false}.
+   * {@code true} iff the current principal may read operation {@code operationId}. Visible when
+   * <em>any</em> of these holds:
+   *
+   * <ul>
+   *   <li>the owning-squadron scope check passes (org-owned operation in the caller's scope);
+   *   <li>the operation is an <em>ownerless leadership operation</em> ({@code owningOrgUnit ==
+   *       null}, V145) and the caller is a member-or-above — operations have no public escape, so
+   *       an ownerless operation is the org-wide analogue of a Staffel-internal operation, hidden
+   *       from guests/anonymous (REQ-ORG-009);
+   *   <li>the caller <em>participated</em> in one of the operation's linked missions (#500) — any
+   *       authenticated participant may view the operation and their payout regardless of its
+   *       owning OrgUnit. Anonymous callers never match (no {@code currentUserId}).
+   * </ul>
+   *
+   * <p>Non-existent ids return {@code false}.
    *
    * @param operationId operation to inspect; never {@code null}.
    * @return {@code true} iff the caller may read the operation.
@@ -1131,13 +1144,40 @@ public class OwnerScopeService {
   public boolean canSeeOperation(@NotNull UUID operationId) {
     return operationRepository
         .findById(operationId)
-        .map(o -> o.getOwningOrgUnit() == null || canSeeSquadron(o.getOwningOrgUnit().getId()))
+        .map(
+            o -> {
+              boolean scopeVisible =
+                  o.getOwningOrgUnit() == null
+                      ? authHelper.isMemberOrAbove()
+                      : canSeeSquadron(o.getOwningOrgUnit().getId());
+              return scopeVisible || participatedInOperation(operationId);
+            })
+        .orElse(false);
+  }
+
+  /**
+   * {@code true} iff the current (authenticated) caller participated in one of the operation's
+   * linked missions (#500). Backs the participant-visibility escape of {@link
+   * #canSeeOperation(UUID)}; an anonymous caller (no {@code currentUserId}) never participates.
+   *
+   * @param operationId the operation to test; never {@code null}.
+   * @return {@code true} iff the caller is a participant of one of the operation's missions.
+   */
+  private boolean participatedInOperation(@NotNull UUID operationId) {
+    return authHelper
+        .currentUserId()
+        .map(uid -> operationRepository.existsParticipantUserInOperation(operationId, uid))
         .orElse(false);
   }
 
   /**
    * {@code true} iff the current principal may edit operation {@code operationId}. Strict
-   * owning-squadron check. Non-existent ids return {@code false}.
+   * owning-squadron check for org-owned operations; for an <em>ownerless leadership operation</em>
+   * ({@code owningOrgUnit == null}, V145) the per-row check is a no-op (returns {@code true}) — the
+   * real write restriction is the controller's role gate ({@code hasRole('MISSION_MANAGER')} on
+   * update, {@code hasRole('ADMIN')} on delete), so an org-wide leadership operation is editable by
+   * any mission manager and deletable by any admin (REQ-ORG-009). Non-existent ids return {@code
+   * false}.
    *
    * @param operationId operation to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the operation.

@@ -129,6 +129,7 @@ public class OperationService {
   private final UserService userService;
   private final SystemSettingService systemSettingService;
   private final OwnerScopeService ownerScopeService;
+  private final AuthHelperService authHelperService;
 
   /**
    * Returns paged operation list.
@@ -139,7 +140,12 @@ public class OperationService {
   public Page<Operation> getAllOperations(@NotNull Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return operationRepository.findAllScoped(
-        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        authHelperService.isMemberOrAbove(),
+        authHelperService.currentUserId().orElse(null),
+        pageable);
   }
 
   /**
@@ -185,6 +191,8 @@ public class OperationService {
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds(),
+        authHelperService.isMemberOrAbove(),
+        authHelperService.currentUserId().orElse(null),
         pageable);
   }
 
@@ -201,7 +209,11 @@ public class OperationService {
       findAllReference() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return operationRepository.findAllReferenceScoped(
-        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        authHelperService.isMemberOrAbove(),
+        authHelperService.currentUserId().orElse(null));
   }
 
   /**
@@ -244,15 +256,19 @@ public class OperationService {
    *
    * <ul>
    *   <li>Caller resolved AND {@code owningOrgUnitId} provided → resolver validates the picked org
-   *       unit against the caller's memberships and stamps the corresponding Staffel (rejecting
-   *       Spezialkommando selections with {@code BadRequestException} until the cleanup release
-   *       lifts the NOT NULL on {@code owning_squadron_id}).
+   *       unit against the caller's memberships and stamps it (rejecting a foreign pick with {@code
+   *       BadRequestException}).
    *   <li>Caller resolved AND {@code owningOrgUnitId} is {@code null} → resolver falls back to the
-   *       caller's home Staffel via the single SQUADRON-kind row in {@code org_unit_membership}.
-   *       Functionally identical to the legacy "stamp from active scope" path for the common
-   *       single-membership case.
+   *       caller's single membership. Functionally identical to the legacy "stamp from active
+   *       scope" path for the common single-membership case.
+   *   <li>Caller resolved with <strong>no</strong> OrgUnit membership AND no picker output →
+   *       <em>ownerless leadership operation</em> (#500): the nullable resolver returns {@code
+   *       null} instead of 400ing, so organisation leadership ("Bereichsleitung", a member of no
+   *       Staffel/SK) can plan org-wide operations. The resulting ownerless operation is visible to
+   *       organisation members-or-above (operations have no public escape; see REQ-ORG-009 and
+   *       {@link OwnerScopeService#resolveOrgUnitForPickerOutputNullable}).
    *   <li>No authenticated caller (admin in "all squadrons" mode, anonymous fallback) → preserve
-   *       the historical {@code OwnerScopeService.currentSquadron()} path. The picker UUID, if
+   *       the historical {@code OwnerScopeService.currentOrgUnit()} path. The picker UUID, if
    *       supplied, cannot be membership-validated without a user, so it is ignored.
    * </ul>
    *
@@ -268,7 +284,7 @@ public class OperationService {
       User caller = userService.getCurrentUser().orElse(null);
       if (caller != null) {
         operation.setOwningOrgUnit(
-            ownerScopeService.resolveOrgUnitForPickerOutput(caller, owningOrgUnitId));
+            ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, owningOrgUnitId));
       } else {
         ownerScopeService.currentOrgUnit().ifPresent(operation::setOwningOrgUnit);
       }

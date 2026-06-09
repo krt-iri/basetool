@@ -1,0 +1,43 @@
+-- =============================================================================
+-- Ownerless leadership operations (#500) — DROP NOT NULL on
+-- `operation.owning_org_unit_id`.
+--
+-- Context: V99/V102 tightened `owning_org_unit_id` to NOT NULL on every
+-- staffel-scoped aggregate, which made
+-- `OwnerScopeService.resolveOrgUnitForPickerOutput` (it 400s a user with zero
+-- org-unit memberships) a hard create-time gate. V132 relaxed the column for the
+-- three personal aggregates (ship, refinery_order, inventory_item) and V144 for
+-- `mission`; both explicitly left `operation` NOT NULL on the premise that it is
+-- "org-owned by construction with no creator-owner fallback".
+--
+-- That premise still holds literally — `operation` has no per-user owner column
+-- — but it blocks a real workflow: organisation leadership ("Bereichsleitung")
+-- sits ABOVE every Staffel and SK and belongs to no OrgUnit, yet must be able to
+-- plan org-wide operations (a production report, #500). We therefore extend the
+-- mission carve-out (REQ-ORG-009) to `operation`, with two operation-specific
+-- differences from `mission`:
+--   1. No creator-owner column. An ownerless operation is attributable only as
+--      an organisation-wide leadership operation (audited via `created_at` /
+--      `updated_at`); there is no `owner_id` fallback to point at.
+--   2. No public escape. Operations carry no `is_internal` flag and are never
+--      anonymous-visible. An ownerless operation is therefore the org-wide
+--      analogue of a Staffel-internal operation: visible to organisation
+--      members-or-above (`AuthHelperService.isMemberOrAbove()`), hidden from
+--      guests/anonymous. See `OwnerScopeService.canSeeOperation` and the
+--      `viewerIsMemberOrAbove` branch in `OperationRepository`.
+-- The application now stamps NULL (instead of 400ing) when a membershipless user
+-- creates an operation (`OperationService.createOperation` routes through
+-- `resolveOrgUnitForPickerOutputNullable`).
+--
+-- job_order stays NOT NULL: it is org-owned by construction and has no
+-- ownerless-leadership use case.
+--
+-- Non-destructive: DROP NOT NULL only relaxes a constraint (catalog-only, no
+-- table rewrite, no data loss) and is a no-op if the column is already nullable.
+-- Existing rows keep their populated owner. Rollback would re-tighten via
+-- `ALTER COLUMN owning_org_unit_id SET NOT NULL`, which fails only if an
+-- ownerless operation has since been created — backfill those from a Staffel (or
+-- delete them) before re-tightening.
+-- =============================================================================
+
+ALTER TABLE operation ALTER COLUMN owning_org_unit_id DROP NOT NULL;
