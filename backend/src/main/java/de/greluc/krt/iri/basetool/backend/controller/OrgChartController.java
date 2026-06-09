@@ -39,6 +39,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -145,6 +146,37 @@ public class OrgChartController {
   public OrgChartPositionDto updatePosition(
       @PathVariable @NotNull UUID id, @RequestBody @Valid OrgChartPositionUpdateRequest request) {
     return orgChartService.updatePosition(id, request);
+  }
+
+  /**
+   * Vacates a Kommando's Kommandoleiter — clears the holder while keeping the Kommando, its name,
+   * its Stv. and its Ensigns. Distinct from {@link #deletePosition}, which removes the whole
+   * Kommando. The optimistic-lock version travels as a query parameter. ADMIN-only.
+   *
+   * @param id the Kommando ({@code COMMAND_LEAD}) position id.
+   * @param version the optimistic-lock version the client last saw.
+   * @return the updated, now-leaderless Kommando with the bumped version.
+   */
+  @DeleteMapping("/positions/{id}/leader")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Vacate a Kommando's Kommandoleiter",
+      description =
+          "Clears the Kommandoleiter (holder) of a Kommando (COMMAND_LEAD) while keeping the"
+              + " Kommando, its name, its Stv. Kommandoleiter and its Ensigns. This is how a"
+              + " Kommando outlives a departing leader instead of being deleted and rebuilt;"
+              + " removing the whole Kommando is the position DELETE. Rejects any non-COMMAND_LEAD"
+              + " rank, whose holder is mandatory — remove that position instead. ADMIN-only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Kommandoleiter vacated; the Kommando stays."),
+    @ApiResponse(responseCode = "400", description = "The position is not a Kommando."),
+    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(responseCode = "404", description = "No position matches the given id."),
+    @ApiResponse(responseCode = "409", description = "Optimistic-lock conflict (stale version).")
+  })
+  public OrgChartPositionDto vacateCommandLeader(
+      @PathVariable @NotNull UUID id, @RequestParam("version") long version) {
+    return orgChartService.vacateCommandLeader(id, version);
   }
 
   /**
