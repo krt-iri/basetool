@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-09.
 > **Owner area:** MISSION / ORDERS / INV · **Related ADRs:**
 > [ADR-0002](../adr/0002-whole-number-amounts.md)
 
@@ -31,7 +31,12 @@ amount.
 
 - **Input** — the add and edit finance modals use `<input type="number" step="1" inputmode="numeric">`
   (no `step="0.01"`); the edit modal pre-fills the HALF_UP-rounded whole value, never the raw stored
-  decimal. Server-side, a **value-based** `@WholeNumber` constraint on the create **and** update DTOs
+  decimal. That pre-filled `data-amount` must bind the rounded value through `th:with` and read only
+  the resulting variable — Thymeleaf 3.1 evaluates default/unknown attributes (`th:data-*`) in a
+  **restricted** expression context that forbids `@bean` references, so calling `@moneyFormat.round(…)`
+  directly inside `th:data-amount` throws a `TemplateProcessingException` and 500s the whole
+  mission-detail page for any mission that owns at least one finance entry. Server-side, a
+  **value-based** `@WholeNumber` constraint on the create **and** update DTOs
   (mirrored on the frontend form) rejects a genuinely fractional amount (`500.5`) while accepting any
   whole value regardless of representation (`500`, `500.00`) — so a non-browser client cannot bypass
   the rule, yet a whole amount sent with trailing zeros is not spuriously refused. This mirrors the
@@ -51,9 +56,11 @@ amount.
 - [ ] A fractional amount sent to the create/update endpoint is rejected (`@WholeNumber`); a whole amount (incl. `500.00`) and `0` are accepted; a negative amount is rejected.
 - [ ] Every displayed finance amount/total is a whole number rounded HALF_UP (`0.5 → 1`, `2.5 → 3`).
 - [ ] A mission total that folds in fractional refinery profit keeps full precision internally and is rounded only at display.
+- [ ] The edit-finance button's `data-amount` pre-fill renders without a Thymeleaf restricted-context error when a mission owns ≥ 1 finance entry (regression: the rounded value is bound via `th:with`, not by calling `@moneyFormat` inside `th:data-*`).
 
 **Enforced by:** `MissionFinanceEntryValidationTest`, `MissionFinanceEntryFormValidationTest`,
-`MoneyFormatTest`. **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
+`MoneyFormatTest`,
+`MissionPageControllerMvcTest#missionDetail_WithFinanceEntry_ShouldRenderEditButtonWithoutTemplateError`. **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
 (`@Digits`), `frontend/.../model/form/MissionFinanceEntryForm` (`@Digits`),
 `frontend/.../view/MoneyFormat`, `templates/mission-detail.html`, `templates/operation-detail.html`.
 **Issues:** PR #465.

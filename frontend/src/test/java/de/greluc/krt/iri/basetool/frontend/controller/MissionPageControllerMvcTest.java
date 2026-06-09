@@ -1869,4 +1869,132 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"" + assignedShipId + "\"")))
         .andExpect(content().string(not(containsString("value=\"" + strayShipId + "\""))));
   }
+
+  /**
+   * Reproducer for the "creating a finance entry 500s the mission detail page" bug (live log:
+   * {@code TemplateProcessingException ... mission-detail line 856} right after a finance entry is
+   * persisted).
+   *
+   * <p>The {@code th:each="entry : ${financeEntries}"} loop renders an edit button whose rounded
+   * amount used to be produced by {@code th:data-amount="${@moneyFormat.round(entry.amount)}"}.
+   * Thymeleaf 3.1 evaluates default/unknown attributes (such as {@code th:data-*}) in a restricted
+   * expression context where {@code @bean} references are forbidden, so the call threw and every
+   * render of a mission that owned at least one finance entry returned HTTP 500. The fix binds the
+   * rounded value via {@code th:with} (an unrestricted context) and only reads the resulting local
+   * variable in {@code th:data-amount}.
+   *
+   * <p>The earlier render tests all pass an empty finance list, so the loop body never executed and
+   * the bug slipped through; this test populates exactly one entry. {@code ROLE_OFFICER} is granted
+   * via {@code oidcLogin()} because the finance ledger is only fetched for member-or-above OIDC
+   * principals.
+   */
+  @Test
+  void missionDetail_WithFinanceEntry_ShouldRenderEditButtonWithoutTemplateError()
+      throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID entryId = UUID.randomUUID();
+
+    // 1234.5 exercises the HALF_UP rounding the bean applies (-> 1235), and the raw integer (no
+    // thousands separator) is what the edit modal expects in the number input.
+    de.greluc.krt.iri.basetool.frontend.model.dto.MissionFinanceEntryDto entry =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.MissionFinanceEntryDto(
+            entryId,
+            missionId,
+            null, // no participant -> the "Nutzer" cell renders "-"
+            "Salvage income",
+            de.greluc.krt.iri.basetool.frontend.model.dto.FinanceType.INCOME,
+            new java.math.BigDecimal("1234.5"),
+            1L);
+    de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<
+            de.greluc.krt.iri.basetool.frontend.model.dto.MissionFinanceEntryDto>
+        financesPage =
+            new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
+                List.of(entry), 0, 1, 1, 1, Collections.emptyList());
+
+    MissionDto mission =
+        new MissionDto(
+            missionId,
+            "Finance Mission",
+            null,
+            null,
+            "RUNNING",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            null,
+            null,
+            Collections.emptySet(),
+            true,
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            0,
+            0,
+            null,
+            null,
+            null,
+            0L);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
+            Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
+    // Broad stubs first so unrelated detail-page fetches never NPE; specific overrides win below.
+    when(backendApiClient.getCached(
+            anyString(),
+            any(ParameterizedTypeReference.class),
+            org.mockito.ArgumentMatchers.anyBoolean()))
+        .thenReturn(emptyPage);
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), any(Class.class), eq(false))).thenReturn(null);
+    // An authenticated OIDC principal fetches the mission with the public flag = false.
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(mission);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries?size=1000"),
+            any(ParameterizedTypeReference.class),
+            eq(false)))
+        .thenReturn(financesPage);
+    // Return a real (empty) List for the refinery-orders fetch so it is not assigned the broad
+    // PageResponse stub (which would ClassCastException inside the finance try-block).
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/mission/" + missionId),
+            any(ParameterizedTypeReference.class),
+            eq(false)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/missions/" + missionId)
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.oidcLogin()
+                        .authorities(
+                            new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "ROLE_OFFICER"))
+                        .idToken(
+                            token ->
+                                token
+                                    .subject(UUID.randomUUID().toString())
+                                    .claim("preferred_username", "officer1"))))
+        // Before the fix this threw TemplateProcessingException -> HTTP 500 here.
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail"))
+        // The rounded amount is rendered as a raw integer data attribute (HALF_UP: 1234.5 -> 1235).
+        .andExpect(content().string(containsString("data-amount=\"1235\"")));
+  }
 }
