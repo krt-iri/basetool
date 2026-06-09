@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:c6220f4f-7e73-43e5-8179-27afee77d227" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:f291687b-3bb4-4d7d-b013-8ca112163013" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-06-08T11:57:07Z</timestamp>
+    <timestamp>2026-06-09T16:32:49Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-iri/basetool/actions/runs/27135923540</url>
+          <url>https://github.com/krt-iri/basetool/actions/runs/27220772827</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-iri/basetool</url>
@@ -981,27 +981,27 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.4.0?type=jar">
       <group>com.squareup.okhttp3</group>
       <name>mockwebserver3</name>
-      <version>5.3.2</version>
+      <version>5.4.0</version>
       <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
       <hashes>
-        <hash alg="MD5">7e054031640bcd6da7ec0948b8c3acda</hash>
-        <hash alg="SHA-1">b759ca96141cdd58291dea97211864f621e4c7bd</hash>
-        <hash alg="SHA-256">53a6e024ecc2b3f45d04d085161c6c10526a344b80bf3f0d4e6a13c33c183998</hash>
-        <hash alg="SHA-512">5f0cdec3ee67aeff87c4a5953e1afe87a8619ca8765daa4e58a8787ee9c2b625c8b34c9721ecc6c814d8dcb12452ef2818ebe184985102f1e30f20966cbb5b17</hash>
-        <hash alg="SHA-384">7c41343fea8789ee648f55db7be054346dadead895fce8830aa8b7d0280c65cfd41d847b58b83ce38f838abc9ba203a0</hash>
-        <hash alg="SHA3-384">10f04dfdd4e463ae01eef7649774964a6468596f243b517050ea8197981f3a8f50adee55311054cf52e7a566a15b285d</hash>
-        <hash alg="SHA3-256">8c0e166cabdc473fede2b1cc199d2f24534ec0796945749f411bb47cf6ba7d0e</hash>
-        <hash alg="SHA3-512">bbdf663d8a902a66541bdd1e923ae37c54da78f9a9d04409b57dc701a29970550c736c5816f1aaab626f821f5fbdd4f1644fc618f65d1122de023bd2fc552e37</hash>
+        <hash alg="MD5">5e86f87c6700d1980e82219b34586674</hash>
+        <hash alg="SHA-1">a12e1d58d550f8ecc8edd6709ffb810589acffed</hash>
+        <hash alg="SHA-256">e1e1d51a57567d6db834f93d98831ab10bb0220b91a67580894d9ab36cc9f065</hash>
+        <hash alg="SHA-512">b083c3d0f5ec3e50b68e6b3d2a9036016276efabada5a6d83fd254f5ddbdb8d6363ec5b9a9780b245ea70c9c2ce63bb264f11afd61d6a7cbfc58747d56b57a12</hash>
+        <hash alg="SHA-384">921807331ff888b03e02c736cfb5144301498a4389b9fb92bc9f7ab949dff1ee4489e48be7071b082e2e0d143e53947b</hash>
+        <hash alg="SHA3-384">7e1f521c69b22930285e4c004c047580c975ac90f3ce34b85cb95e53a34f5d9d5719d13c563ba5e5b1c9d7e12084cdee</hash>
+        <hash alg="SHA3-256">40cb075128c6433541a1082938e0362512b4b9d13f2b01f917e03b014f9d2d58</hash>
+        <hash alg="SHA3-512">635b0913269576b7820539c5ec20b2c7380b435e7a3f90b61b3990c2b96b660c96fe55b509deaf72001de73a923824b6c063e6b2394a6c8773914757d8ea4793</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar</purl>
+      <purl>pkg:maven/com.squareup.okhttp3/mockwebserver3@5.4.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -1012,27 +1012,27 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar">
       <group>com.squareup.okhttp3</group>
       <name>mockwebserver</name>
-      <version>5.3.2</version>
+      <version>5.4.0</version>
       <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
       <hashes>
-        <hash alg="MD5">6e47978c1f3d50bae09398b948d4a487</hash>
-        <hash alg="SHA-1">58f89e39ed9f68a9cb12e4da6de64848b177e727</hash>
-        <hash alg="SHA-256">6164a5783acb87278f42ef0581d2de222bd6bcc00a2e833611b2eddf0c7b8669</hash>
-        <hash alg="SHA-512">ccd255932ecffc3d218bda9e269233da1b8fe993bb6ca768ba8c46749d099672906001e71ed024b95c0b744d868a2e415dba598bbf69fac23402d6e116066df6</hash>
-        <hash alg="SHA-384">a0784689ddbf8dbde98d49550d6dd107e7b5b03bb7c5153b617bbed4464fecb3311519b461eab46a662d9ad5fb298935</hash>
-        <hash alg="SHA3-384">9e7f56470bceb0f19b4117ea52a9898f3cb965a8d357e2272f8bebb60bc2856d6684fd96cd64168a56c844a1b0aaa438</hash>
-        <hash alg="SHA3-256">a41d4afaea1d92b87764042ce008ac03946bb1ca47b9ca8ef2e3cd9170cb80e9</hash>
-        <hash alg="SHA3-512">5970c714e12ed125e62211565749064ced25fbda4672247c4600261fdefa9a8c3e2f99ab94b83e197603450ab5470470908dbd5e72e24e7aba9ccb20b90d4bf1</hash>
+        <hash alg="MD5">fddae2a0631539032759a65d7dca66db</hash>
+        <hash alg="SHA-1">a54f047a793c0d613ab89f6463d6c4642a641770</hash>
+        <hash alg="SHA-256">64bcf0a79c42213bb3380939727d3cd6028ba3dbfcb9df14019650107e60a87f</hash>
+        <hash alg="SHA-512">8cad4cf476f9d300b5651c48e1606011aa196dc9bf979a4fc46d7f7ee38d6217ee1df50c2bbaed7851b4f6124c100859022c4443aaa1697954306b69d66b78ae</hash>
+        <hash alg="SHA-384">2985911ceb2989bb9c6f1d2d503cbb968fee81bdb344c92eed6c3ec5275e4ccde1dc8980470cb3ab675f4f3c60dc55a6</hash>
+        <hash alg="SHA3-384">f8ef3efc75d3c50e43f5a1c1842a68f55a6de8de9c9c5547c022154b38dc20fdb5097adf1a4f352432b506f3d4bf523c</hash>
+        <hash alg="SHA3-256">a4f1f7c68fff99cad1013ed6991b25cf284949bca820266ce448cba976235c54</hash>
+        <hash alg="SHA3-512">44647a04b4328c44f6d169c9b084d1071f533a6c95ca3ff5e0971ae41862aaa51f8c8a14bab0a2f98c84b953443fc28eee015c8990a338819a588e3c98e1e639</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar</purl>
+      <purl>pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -1043,27 +1043,27 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar">
       <group>com.squareup.okhttp3</group>
       <name>okhttp-jvm</name>
-      <version>5.3.2</version>
+      <version>5.4.0</version>
       <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
       <hashes>
-        <hash alg="MD5">827a887aa959c1f1d6b12f3345df2484</hash>
-        <hash alg="SHA-1">f31e8de27feebe1e56d6c9d354a0986b65be0e1d</hash>
-        <hash alg="SHA-256">c771f48075b763f6c322055e21129a94b7de4c1faf3f8f58ace320b0c9517a30</hash>
-        <hash alg="SHA-512">302cba8ec649ecb20512b4878b9f347645cdeada2001e7469363b21ca251bbb05c00e48e426449a88780f0ec25c672f214112b101d8dfd059b5275999ab48768</hash>
-        <hash alg="SHA-384">a2bc92e52d8e1b2b9be40b0955828313f32a4276717bf7e1cace0aefa3bf5fad17997e409aeca7f68f335c9d975f1073</hash>
-        <hash alg="SHA3-384">e585ea8e1ffbd6599654b5f7e9b1210ff972799f5019420652a0215b7dde6660b3a15e56b39d4702b42e307b3040b5d1</hash>
-        <hash alg="SHA3-256">4737bb453c46672bef36c86ea7292a46f9552caaccfd7e6799bb9b3c508c4467</hash>
-        <hash alg="SHA3-512">08ed5b2a6449ca0b8cced909bc2ded5cf20314b5bf8f8b094ed8641c5dd90e6b738fc66c917dd0eafbcf1e51497ba05ca154cc3d6fb4832a0ebc350a35c26abe</hash>
+        <hash alg="MD5">f79f61c92f5dc7fd399b7e36731b7b9e</hash>
+        <hash alg="SHA-1">e1fae6fccaae70e60b31153c6a7680306a86ed31</hash>
+        <hash alg="SHA-256">b15e605ca0a4b12c62ea7f657dad413c236c947e875854767349cdbe20df473c</hash>
+        <hash alg="SHA-512">2b5da32a14319d78ebb62067011dd0f4533ae95652d153e84f9803fab55cb1eedc8a3aaa189efa5ebacdc7e52b8618c08dd20e82e73e91305dc12038ca8e1e76</hash>
+        <hash alg="SHA-384">5725efe5dd02576a36cf67e9e50db1bc04840ff121e19de8b2ce22efbc879a4dcd0372421d7c4642648580b4bf96a77d</hash>
+        <hash alg="SHA3-384">99bdc556b02f827c8613af5198956f4b139676f36fbd08f05fcaf2f28cf518739e1284d1cf7b37b1e35a159e057f0707</hash>
+        <hash alg="SHA3-256">ebda7d4c3befb6937738e34a158c185066d3e4fa184d068c4f2424ec5285435d</hash>
+        <hash alg="SHA3-512">da2a72208f4c3c826d98ed1229804f05561a95ff88fd3841a8095cb711c6491138afbbac3036e0f1121d8d75bb4d2e9b516df074f597e51c558240f03f1b6dec</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar</purl>
+      <purl>pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -1074,17 +1074,17 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom">
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom">
       <group>com.squareup.okhttp3</group>
       <name>okhttp</name>
-      <version>5.3.2</version>
+      <version>5.4.0</version>
       <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom</purl>
+      <purl>pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -1095,27 +1095,27 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar">
       <group>com.squareup.okio</group>
       <name>okio-jvm</name>
-      <version>3.16.4</version>
+      <version>3.17.0</version>
       <description>A modern I/O library for Android, Java, and Kotlin Multiplatform.</description>
       <hashes>
-        <hash alg="MD5">34d866f45bb2a65bf601cde52b72d096</hash>
-        <hash alg="SHA-1">ceb794cf0bbf8d0d20f49aa91ce20db7fd77675d</hash>
-        <hash alg="SHA-256">2196b993cd34dbbd919e7e01f57a4781b58bee80f86106163e287c20343a96a7</hash>
-        <hash alg="SHA-512">1a7158538ae341b8a61fe7292506e12ca6063c5a51a1c122d0e934164395c7da585dc31b26ed88a993c47aeca89f6a854042c67a4bc7d771d35a0ece6c4dbde0</hash>
-        <hash alg="SHA-384">37949576947630aba9caf7b24ffb00677f4b21b29a98543a0a66043340d20bb42128419d2bebc4b2f2b93569f35f9ada</hash>
-        <hash alg="SHA3-384">32830517d7f960b4c86229f5347e40033658999029162aad0f273636640ed8b7130689de57277aaff169ac9f227885be</hash>
-        <hash alg="SHA3-256">3f65833b5d5128064f885b68da6a3955667cf4c31a098da08431561949fe398b</hash>
-        <hash alg="SHA3-512">ee404499bb148b817e575c22049cb5487531605413bf38edf8fd2cecf0d15f899de42e37d7dafa5dc8bc5493e24b7a976c2bc14c42d6d7056af410bd72513ad3</hash>
+        <hash alg="MD5">96ad357689fd2841747aec56e94a7162</hash>
+        <hash alg="SHA-1">a12d684ec0df9541b3869ae60a4a5257fd3613df</hash>
+        <hash alg="SHA-256">3b13dcc3e1573047c2d507fc4f7fcb0bb0cbcd9d395da21d20e09406e2cd6a73</hash>
+        <hash alg="SHA-512">2da2e240fb11ee254554bd59b94d4f9545078f69182a56cb528cb3228e42b8cd8e7a6547ed81d198f105413ff03e111f42a903ff092c4c3a0c3b46433ad10921</hash>
+        <hash alg="SHA-384">ef53c6670e1819033ce2be6a4396795f693ba8d0d73a0e6507f5cd0baae7eaa9c6f1a0138482550e7a13cc2182af8e83</hash>
+        <hash alg="SHA3-384">20d14db69ea7e8d692111057f7daecd595eccc56585550b18d042b1374cbf9edfcf1a24e8c1a2955e90341927bbd986b</hash>
+        <hash alg="SHA3-256">fca6940c1a89a0951559cbb3a9aef63cdfff96ca0aaf2ef8b8847ef1d52e52a8</hash>
+        <hash alg="SHA3-512">21fc1f60c7f201b85649e3eb5a56ad376f49e0d18dedd3d64c8bfdb6180c58a8fbb8cddf4411b6bea271908dfa09f7bf46d8bf138ca134bae38b8450d1ab478d</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar</purl>
+      <purl>pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -1126,17 +1126,17 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.squareup.okio/okio@3.16.4?type=pom">
+    <component type="library" bom-ref="pkg:maven/com.squareup.okio/okio@3.17.0?type=pom">
       <group>com.squareup.okio</group>
       <name>okio</name>
-      <version>3.16.4</version>
+      <version>3.17.0</version>
       <description>A modern I/O library for Android, Java, and Kotlin Multiplatform.</description>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.squareup.okio/okio@3.16.4?type=pom</purl>
+      <purl>pkg:maven/com.squareup.okio/okio@3.17.0?type=pom</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -9127,28 +9127,29 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.reflections/reflections@0.10.2?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-simple@2.0.17?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar">
-      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom"/>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.4.0?type=jar">
+      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom"/>
       <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar">
-      <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar"/>
-      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom"/>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar">
+      <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver3@5.4.0?type=jar"/>
+      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom"/>
+      <dependency ref="pkg:maven/com.squareup.okio/okio@3.17.0?type=pom"/>
       <dependency ref="pkg:maven/junit/junit@4.13.2?type=jar"/>
       <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar">
-      <dependency ref="pkg:maven/com.squareup.okio/okio@3.16.4?type=pom"/>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar">
+      <dependency ref="pkg:maven/com.squareup.okio/okio@3.17.0?type=pom"/>
       <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom">
-      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar"/>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom">
+      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar">
+    <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar">
       <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.squareup.okio/okio@3.16.4?type=pom">
-      <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar"/>
+    <dependency ref="pkg:maven/com.squareup.okio/okio@3.17.0?type=pom">
+      <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar">
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.17?type=jar"/>
@@ -9167,7 +9168,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar"/>
       <dependency ref="pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar"/>
       <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar"/>
-      <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar"/>
+      <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar"/>
       <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar"/>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar"/>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar"/>
