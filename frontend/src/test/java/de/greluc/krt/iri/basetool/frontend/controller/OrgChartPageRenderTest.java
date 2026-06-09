@@ -103,6 +103,8 @@ class OrgChartPageRenderTest {
     assertThat(html)
         .as("vacant Bereichsleiter placeholder, not an NPE")
         .contains("oc-node--vacant");
+    assertThat(html).as("chart exposes an ARIA tree").contains("role=\"tree\"");
+    assertThat(html).as("vacant Bereichsleiter is a level-1 treeitem").contains("aria-level=\"1\"");
   }
 
   @Test
@@ -143,6 +145,12 @@ class OrgChartPageRenderTest {
     assertThat(html)
         .as("admin assign-Staffelleiter affordance")
         .contains("data-position-type=\"SQUADRON_LEAD\"");
+    assertThat(html).as("child rows are ARIA groups").contains("role=\"group\"");
+    assertThat(html).as("boxes are ARIA treeitems").contains("role=\"treeitem\"");
+    assertThat(html).as("unit box sits at level 2").contains("aria-level=\"2\"");
+    assertThat(html).as("vacant Staffelleiter sits at level 3").contains("aria-level=\"3\"");
+    assertThat(html).as("edit toggle exposes its pressed state").contains("aria-pressed=\"false\"");
+    assertThat(html).as("edit-mode hint rendered (hidden until editing)").contains("oc-edit-hint");
   }
 
   @Test
@@ -191,5 +199,8 @@ class OrgChartPageRenderTest {
     assertThat(html).as("vacant Kommandoleiter placeholder").contains("oc-node--vacant");
     assertThat(html).as("child Stv. node rendered via ocNode").contains("Deputy");
     assertThat(html).as("child Ensign node rendered via ocNode").contains("Ensign");
+    assertThat(html).as("command head is a level-4 treeitem").contains("aria-level=\"4\"");
+    assertThat(html).as("vacant Kommandoleiter sits at level 5").contains("aria-level=\"5\"");
+    assertThat(html).as("child Stv./Ensign nodes sit at level 6").contains("aria-level=\"6\"");
   }
 }
