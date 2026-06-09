@@ -6,17 +6,18 @@ Für Aufbau, Cross-Browser-Matrix und CI-Workflows der E2E-Suite siehe den Testi
 
 ## Übersicht
 
-|                     ID                      |              Use Case               |   Tag   |          Testklasse          |
-|---------------------------------------------|-------------------------------------|---------|------------------------------|
-| [UC-01](UC-01-login.md)                     | Login via Keycloak                  | `e2e`   | `LoginSmokeE2eTest`          |
-| [UC-02](UC-02-mission-anlegen.md)           | Einsatz anlegen                     | `e2e`   | `MissionCreateE2eTest`       |
-| [UC-03](UC-03-job-order-anlegen.md)         | Job Order anlegen                   | `e2e`   | `JobOrderCreateE2eTest`      |
-| [UC-04](UC-04-refinery-order-anlegen.md)    | Refinery Order anlegen              | `e2e`   | `RefineryOrderCreateE2eTest` |
-| [UC-05](UC-05-hangar-schiff-hinzufuegen.md) | Schiff zum Hangar hinzufügen        | `e2e`   | `HangarAddShipE2eTest`       |
-| [UC-06](UC-06-job-order-handover.md)        | Job-Order-Handover protokollieren   | `e2e`   | `JobOrderHandoverE2eTest`    |
-| [UC-07](UC-07-kernseiten-smoke.md)          | Kernseiten-Smoke (nicht-destruktiv) | `smoke` | `CorePagesSmokeE2eTest`      |
+|                     ID                      |                     Use Case                     |   Tag   |          Testklasse          |
+|---------------------------------------------|--------------------------------------------------|---------|------------------------------|
+| [UC-01](UC-01-login.md)                     | Login via Keycloak                               | `e2e`   | `LoginSmokeE2eTest`          |
+| [UC-02](UC-02-mission-anlegen.md)           | Einsatz anlegen                                  | `e2e`   | `MissionCreateE2eTest`       |
+| [UC-03](UC-03-job-order-anlegen.md)         | Job Order anlegen                                | `e2e`   | `JobOrderCreateE2eTest`      |
+| [UC-04](UC-04-refinery-order-anlegen.md)    | Refinery Order anlegen                           | `e2e`   | `RefineryOrderCreateE2eTest` |
+| [UC-05](UC-05-hangar-schiff-hinzufuegen.md) | Schiff zum Hangar hinzufügen                     | `e2e`   | `HangarAddShipE2eTest`       |
+| [UC-06](UC-06-job-order-handover.md)        | Job-Order-Handover protokollieren                | `e2e`   | `JobOrderHandoverE2eTest`    |
+| [UC-13](UC-13-inventar-operationen.md)      | Inventar: Ein-/Aus-/Umbuchen, Verkauf, Zuweisung | `e2e`   | `InventoryOperationsE2eTest` |
+| [UC-07](UC-07-kernseiten-smoke.md)          | Kernseiten-Smoke (nicht-destruktiv)              | `smoke` | `CorePagesSmokeE2eTest`      |
 
-UC-01 bis UC-07 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied).
+UC-01 bis UC-07 sowie UC-13 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied).
 
 ### Rollen & staffel-/SK-übergreifend
 
@@ -30,6 +31,7 @@ Die folgenden Dokumente erweitern die Grund-Flows um **Rollen** (Offizier, einfa
 | [UC-10](UC-10-mission-staffel-uebergreifend.md)   | Öffentlicher Einsatz mit Teilnehmern aus anderer Staffel                                                                            | `PublicMissionCrossStaffelE2eTest` |
 | [UC-11](UC-11-sk-spezialkommando.md)              | Spezialkommando (SK) als OrgUnit (Lifecycle, Mitglieder, aktuelle Grenzen)                                                          | `SpecialCommandE2eTest`            |
 | [UC-12](UC-12-anonymer-auftrag.md)                | Anonymer Auftrag: Gast wählt Auftraggeber (alle) & bearbeitende Einheit (nur profit-fähige, Eingangs-SK vorbelegt), Material + Item | `AnonymousJobOrderE2eTest`         |
+| [UC-14](UC-14-inventar-mandanten-scope.md)        | Inventar-Mandanten-Scope: Sicht/Anlage/Edit über Staffel-, SK-, beide und keine Zugehörigkeit + Admin-Pin + Gast                    | `InventoryTenancyE2eTest`          |
 
 > **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel** (nicht staffel-übergreifend). Die staffel-übergreifende Zusammenarbeit läuft über öffentliche Einsätze (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
 

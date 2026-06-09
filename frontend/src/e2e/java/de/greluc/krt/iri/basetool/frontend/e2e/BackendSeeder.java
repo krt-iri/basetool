@@ -257,6 +257,46 @@ public final class BackendSeeder {
   }
 
   /**
+   * Resolves the id of an existing {@code Location} by its (unique) name via {@code GET
+   * /api/v1/locations/lookup}, so a test can anchor an inventory row at a location it did NOT
+   * create itself — notably the bootstrap catalog location {@code E2E Refinery Hub}, which (unlike
+   * a freshly {@link #createLocation}d one) is guaranteed to be present in the frontend's 10-minute
+   * locations-lookup cache and therefore preselectable in the book-out transfer dropdown.
+   *
+   * @param username the Keycloak username of the (authenticated) test user
+   * @param password the Keycloak password of the test user
+   * @param name the exact location name to match
+   * @return the matching location's id, or {@code null} if no location carries that name
+   */
+  public String findLocationIdByName(String username, String password, String name) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/locations/lookup"))
+              .header("Authorization", "Bearer " + token)
+              .GET()
+              .build();
+      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+      if (response.statusCode() != 200) {
+        throw new IllegalStateException("Locations lookup failed: HTTP " + response.statusCode());
+      }
+      for (JsonElement element : JsonParser.parseString(response.body()).getAsJsonArray()) {
+        JsonObject location = element.getAsJsonObject();
+        if (location.has("name")
+            && !location.get("name").isJsonNull()
+            && name.equals(location.get("name").getAsString())) {
+          return location.get("id").getAsString();
+        }
+      }
+      return null;
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.findLocationIdByName failed", e);
+    }
+  }
+
+  /**
    * Creates a {@code RefiningMethod} the create form's method dropdown can select.
    *
    * @param username admin username
@@ -732,6 +772,254 @@ public final class BackendSeeder {
       return gameItemId.toString();
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.seedOrderableItem failed", e);
+    }
+  }
+
+  /**
+   * Makes a material sellable by seeding a {@code terminal} plus a {@code material_price} row that
+   * lists the terminal with a positive sell price, directly over JDBC. The book-out modal enables
+   * its "Verkauf" (SELL) radio only when {@code GET /api/v1/materials/{id}/terminals} returns a
+   * non-empty list, and that endpoint joins {@code material_price} to {@code terminal} filtering on
+   * {@code statusSell = true OR priceSell > 0} (both set here). Terminal/price rows are normally
+   * UEX-synced and not creatable via the admin REST API on a fresh DB, hence the direct insert —
+   * mirroring {@link #seedOrderableItem}. The backend stores the chosen terminal name as a free
+   * string (no FK validation on book-out), so this is purely the UI-enabling precondition.
+   *
+   * <p>Idempotency note: a fresh random {@code terminal_id} is used per call, so repeated calls for
+   * the same material never trip the {@code material_price (material_id, terminal_id)} unique
+   * constraint; {@code id_terminal} is left {@code null} (its unique index permits many nulls).
+   * Local-stack only (JDBC to the ephemeral Postgres).
+   *
+   * @param materialId the id of the material to make sellable (a terminal offers to buy it)
+   * @return the seeded terminal's display name (the value the SELL dropdown option carries)
+   */
+  public String seedSellableTerminal(String materialId) {
+    UUID terminalId = UUID.randomUUID();
+    UUID priceId = UUID.randomUUID();
+    String terminalName = "E2E Sell Terminal";
+    try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
+      try (PreparedStatement ps =
+          connection.prepareStatement(
+              "INSERT INTO terminal (id, name, hidden) VALUES (?, ?, false)"
+                  + " ON CONFLICT DO NOTHING")) {
+        ps.setObject(1, terminalId);
+        ps.setString(2, terminalName);
+        ps.executeUpdate();
+      }
+      try (PreparedStatement ps =
+          connection.prepareStatement(
+              "INSERT INTO material_price (id, material_id, terminal_id, price_sell, status_sell)"
+                  + " VALUES (?, ?, ?, 500, true) ON CONFLICT DO NOTHING")) {
+        ps.setObject(1, priceId);
+        ps.setObject(2, UUID.fromString(materialId));
+        ps.setObject(3, terminalId);
+        ps.executeUpdate();
+      }
+      return terminalName;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.seedSellableTerminal failed", e);
+    }
+  }
+
+  /**
+   * Adds the given user to a Spezialkommando (SK) via {@code POST
+   * /api/v1/special-commands/{id}/members/{userId}} (admin-only here), creating an {@code
+   * org_unit_membership} row of kind {@code SPECIAL_COMMAND} with all role flags initially false.
+   * Independent of any squadron membership — a user may hold an SK membership with no squadron — so
+   * this is how multi-tenancy tests build the SK-only and squadron-plus-SK viewer profiles. A 409
+   * (already a member) is treated as success so the call is safe to repeat.
+   *
+   * @param adminUser an admin Keycloak username (the endpoint gates on ADMIN or SK-lead)
+   * @param adminPassword the admin password
+   * @param specialCommandId the SK OrgUnit id to add the user to
+   * @param targetUserId the app_user id to add (must be materialised — see {@link #getUserId})
+   */
+  public void addSpecialCommandMember(
+      String adminUser, String adminPassword, String specialCommandId, String targetUserId) {
+    try {
+      String token = passwordGrant(adminUser, adminPassword);
+      HttpRequest request =
+          HttpRequest.newBuilder(
+                  URI.create(
+                      BACKEND_BASE_URL
+                          + "/api/v1/special-commands/"
+                          + specialCommandId
+                          + "/members/"
+                          + targetUserId))
+              .header("Authorization", "Bearer " + token)
+              .POST(HttpRequest.BodyPublishers.noBody())
+              .build();
+      int status = http.send(request, BodyHandlers.ofString()).statusCode();
+      if (status != 409 && (status < 200 || status >= 300)) {
+        throw new IllegalStateException("SK member add failed: HTTP " + status);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.addSpecialCommandMember failed", e);
+    }
+  }
+
+  /**
+   * Creates a non-personal inventory item and explicitly stamps its owning OrgUnit via the {@code
+   * owningOrgUnitId} picker field, returning its id. Needed when the creating user belongs to more
+   * than one OrgUnit (squadron + SK), where the create endpoint refuses to auto-stamp and demands
+   * an explicit pick; the picked OrgUnit must be one of the user's memberships or the backend 400s.
+   *
+   * @param username the Keycloak username of the creating user (a member of {@code
+   *     owningOrgUnitId})
+   * @param password the Keycloak password of the creating user
+   * @param materialId the id of the material the item holds
+   * @param locationId the id of the storage location of the item
+   * @param quality the quality of the held material ({@code 0..1000})
+   * @param amount the amount held
+   * @param owningOrgUnitId the OrgUnit (squadron or SK) to stamp as the item's owner
+   * @return the created inventory item's id
+   */
+  public String createInventoryItemOwnedBy(
+      String username,
+      String password,
+      String materialId,
+      String locationId,
+      int quality,
+      double amount,
+      String owningOrgUnitId) {
+    String body =
+        "{\"materialId\":\""
+            + materialId
+            + "\",\"locationId\":\""
+            + locationId
+            + "\",\"quality\":"
+            + quality
+            + ",\"amount\":"
+            + amount
+            + ",\"personal\":false,\"owningOrgUnitId\":\""
+            + owningOrgUnitId
+            + "\"}";
+    return seedEntity(username, password, "/api/v1/inventory", body);
+  }
+
+  /**
+   * Attempts {@code POST /api/v1/inventory} and returns the HTTP status WITHOUT throwing, so a test
+   * can assert the create-time OrgUnit-stamping matrix (REQ-ORG-004): a membershipless user with no
+   * pick succeeds as ownerless; a single-membership user auto-stamps; a multi-membership user with
+   * no pick is rejected (400, forced choice); and any foreign pick is rejected (400). A {@code
+   * null} {@code owningOrgUnitId} is sent as a JSON {@code null} (the no-pick case).
+   *
+   * @param username the Keycloak username of the creating user
+   * @param password the Keycloak password of the creating user
+   * @param materialId the id of the material the item would hold
+   * @param locationId the id of the storage location
+   * @param quality the quality ({@code 0..1000})
+   * @param amount the amount
+   * @param owningOrgUnitId the picked owner OrgUnit id, or {@code null} for the no-pick case
+   * @return the HTTP status code of the create attempt
+   */
+  public int attemptCreateInventoryStatus(
+      String username,
+      String password,
+      String materialId,
+      String locationId,
+      int quality,
+      double amount,
+      String owningOrgUnitId) {
+    try {
+      String token = passwordGrant(username, password);
+      String ownerJson = owningOrgUnitId == null ? "null" : "\"" + owningOrgUnitId + "\"";
+      String body =
+          "{\"materialId\":\""
+              + materialId
+              + "\",\"locationId\":\""
+              + locationId
+              + "\",\"quality\":"
+              + quality
+              + ",\"amount\":"
+              + amount
+              + ",\"personal\":false,\"owningOrgUnitId\":"
+              + ownerJson
+              + "}";
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/inventory"))
+              .header("Authorization", "Bearer " + token)
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
+      return http.send(request, BodyHandlers.ofString()).statusCode();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.attemptCreateInventoryStatus failed", e);
+    }
+  }
+
+  /**
+   * Attempts {@code POST /api/v1/inventory/{id}/book-out} (a plain DISCARD) and returns the HTTP
+   * status WITHOUT throwing, so a test can assert the edit gate: a viewer outside the item's owning
+   * OrgUnit scope is rejected with 403 ({@code canEditInventoryItem}), while an in-scope owner
+   * succeeds. The body carries only the amount, the DISCARD type and the optimistic-lock version;
+   * for the 403 path the {@code @PreAuthorize} gate fires before the version is even consulted.
+   *
+   * @param username the Keycloak username of the acting user
+   * @param password the Keycloak password of the acting user
+   * @param itemId the inventory item id to attempt to book out
+   * @param amount the amount to discard
+   * @param version the optimistic-lock version last known for the item
+   * @return the HTTP status code of the book-out attempt
+   */
+  public int attemptBookOutStatus(
+      String username, String password, String itemId, double amount, long version) {
+    try {
+      String token = passwordGrant(username, password);
+      String body = "{\"amount\":" + amount + ",\"type\":\"DISCARD\",\"version\":" + version + "}";
+      HttpRequest request =
+          HttpRequest.newBuilder(
+                  URI.create(BACKEND_BASE_URL + "/api/v1/inventory/" + itemId + "/book-out"))
+              .header("Authorization", "Bearer " + token)
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
+      return http.send(request, BodyHandlers.ofString()).statusCode();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.attemptBookOutStatus failed", e);
+    }
+  }
+
+  /**
+   * Issues an authenticated {@code GET} carrying the {@code X-Active-Org-Unit-Id} pin header and
+   * returns the raw response body, so a test can assert the admin-pin scope behaviour
+   * (REQ-ORG-008): an admin who pins one OrgUnit is scoped to that unit exactly like a member,
+   * instead of seeing everything. The backend reads this header as the active pin. Throws on a
+   * non-2xx status.
+   *
+   * @param username the Keycloak username to authenticate as
+   * @param password the Keycloak password
+   * @param path the backend path beginning with {@code /}
+   * @param activeOrgUnitId the OrgUnit id to pin via the {@code X-Active-Org-Unit-Id} header
+   * @return the raw response body
+   */
+  public String getBodyWithActiveOrgUnit(
+      String username, String password, String path, String activeOrgUnitId) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + path))
+              .header("Authorization", "Bearer " + token)
+              .header("X-Active-Org-Unit-Id", activeOrgUnitId)
+              .GET()
+              .build();
+      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        throw new IllegalStateException(
+            "GET "
+                + path
+                + " (pinned) failed: HTTP "
+                + response.statusCode()
+                + " "
+                + response.body());
+      }
+      return response.body();
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.getBodyWithActiveOrgUnit failed", e);
     }
   }
 
