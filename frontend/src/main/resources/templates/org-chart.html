@@ -554,8 +554,14 @@
             fetch(url, opts).then(function (resp) {
                 if (resp.ok) {
                     window.showFrontendSuccessToast(/*[[#{orgChart.toast.saved}]]*/ 'Saved');
-                    closeModal();
+                    // Capture the chart's horizontal scroll BEFORE closeModal(): closeModal()
+                    // returns focus to the triggering control, and focus() scrolls that control
+                    // into view — under the reflow from hiding the dialog and clearing inert on
+                    // <main> the browser can briefly judge it off-screen and reset chart.scrollLeft
+                    // to 0, which would then be the saved (and wrongly restored) value. Saving
+                    // first records the user's real offset, immune to that focus-driven reset.
                     saveScrollState();
+                    closeModal();
                     setTimeout(function () {
                         window.location.reload();
                     }, 400);

@@ -51,8 +51,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * than re-asserting on the reloaded detail page: that avoids both a second post-submit navigation
  * (which WebKit can abort under CI load — HTTP/2 {@code INTERNAL_ERROR}) and the strict-mode
  * ambiguity that the comment text shows in two places on the reloaded page (the display span and
- * the modal's pre-filled textarea). The UI still drove the change end to end; the read-back just
- * proves it landed.
+ * the modal's pre-filled textarea). The read-back is <em>polled</em> until it reflects the new
+ * amount rather than being gated on the submit's own POST/navigation event, which WebKit likewise
+ * drops intermittently under CI load. The UI still drove the change end to end; the polled
+ * read-back just proves it landed.
  */
 @Tag("e2e")
 class JobOrderEditE2eTest {
@@ -63,6 +65,12 @@ class JobOrderEditE2eTest {
   private static final String USERNAME = System.getProperty("e2e.username", "test-admin");
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
+
+  /** Maximum order read-back polls awaiting the edit to commit (~15 s at the backoff below). */
+  private static final int EDIT_POLL_ATTEMPTS = 30;
+
+  /** Backoff between order read-back polls, in milliseconds. */
+  private static final int EDIT_POLL_BACKOFF_MILLIS = 500;
 
   private static Playwright playwright;
   private static Browser browser;
@@ -121,21 +129,15 @@ class JobOrderEditE2eTest {
         page.locator("#edit-modal input[name='materials[0].amount']").fill("250");
         page.locator("#edit-modal #edit-comment").fill(comment);
 
-        // Wait for the update POST's own response (a 3xx, emitted once the backend PUT has
-        // committed) before the read-back. Targeting that response — rather than the settled
-        // redirect GET (awaitFormPost) — avoids a WebKit-only flake where the post-redirect
-        // navigation does not settle within the timeout under CI load; the API read-back needs only
-        // the commit, not the re-rendered page.
-        page.waitForResponse(
-            response ->
-                response.url().contains("/orders/" + jobOrderId + "/update")
-                    && "POST".equals(response.request().method()),
-            () -> page.locator("#edit-modal button[type='submit']").click());
+        page.locator("#edit-modal button[type='submit']").click();
 
-        JsonObject order =
-            JsonParser.parseString(
-                    new BackendSeeder().getBody(USERNAME, PASSWORD, "/api/v1/orders/" + jobOrderId))
-                .getAsJsonObject();
+        // Verify by polling the backend read-back instead of gating on the submit's own browser
+        // event. The edit is a full-page POST -> redirect -> GET, and under CI load WebKit drops
+        // both the navigation-settled event (awaitFormPost) and the POST response event
+        // (waitForResponse, 30 s timeout) even though the write committed. Polling the order until
+        // it reflects the new amount decouples the assertion from that flaky event; a click that
+        // never posted leaves the amount unchanged, so the poll still fails the test.
+        JsonObject order = awaitMaterialAmount(page, jobOrderId, 250.0);
         assertEquals(
             250.0,
             order.getAsJsonArray("materials").get(0).getAsJsonObject().get("amount").getAsDouble(),
@@ -148,5 +150,35 @@ class JobOrderEditE2eTest {
         throw failure;
       }
     }
+  }
+
+  /**
+   * Polls the order read-back ({@code GET /api/v1/orders/{id}}) until its first material's amount
+   * reaches {@code expectedAmount}, then returns that order JSON. Used in place of waiting on the
+   * edit submit's POST/navigation event, which WebKit drops intermittently under CI load. The first
+   * read happens immediately; each subsequent read backs off by {@link #EDIT_POLL_BACKOFF_MILLIS},
+   * up to {@link #EDIT_POLL_ATTEMPTS} reads. On timeout the last-seen order is returned so the
+   * caller's assertions report the actual persisted amount rather than a poll-internal error.
+   *
+   * @param page the page, used only to pace the poll via {@code waitForTimeout}
+   * @param orderId the order to read back
+   * @param expectedAmount the first-material amount that signals the edit committed
+   * @return the order JSON once it reflects {@code expectedAmount}, or the last read on timeout
+   */
+  private static JsonObject awaitMaterialAmount(Page page, String orderId, double expectedAmount) {
+    BackendSeeder seeder = new BackendSeeder();
+    JsonObject order = null;
+    for (int attempt = 1; attempt <= EDIT_POLL_ATTEMPTS; attempt++) {
+      order =
+          JsonParser.parseString(seeder.getBody(USERNAME, PASSWORD, "/api/v1/orders/" + orderId))
+              .getAsJsonObject();
+      double amount =
+          order.getAsJsonArray("materials").get(0).getAsJsonObject().get("amount").getAsDouble();
+      if (Math.abs(amount - expectedAmount) < 0.001) {
+        return order;
+      }
+      page.waitForTimeout(EDIT_POLL_BACKOFF_MILLIS);
+    }
+    return order;
   }
 }

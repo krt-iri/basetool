@@ -16,10 +16,6 @@ plugins {
   // below), so neither the developer machine nor the CI runner needs a
   // pre-installed Node — consistent with the "only the Gradle wrapper" rule.
   id("com.github.node-gradle.node") version "7.1.0"
-  // Flaky-test retry for the browser e2e suite — scoped (in the e2eTest task below) to retry ONLY
-  // the timing-sensitive org-chart scroll-preservation flow. Everything else still fails on its
-  // first failure, so this is targeted flake-tolerance, not blanket masking.
-  id("org.gradle.test-retry") version "1.6.2"
 }
 
 description = "frontend"
@@ -358,16 +354,6 @@ tasks.register<Test>("e2eTest") {
     "Runs the destructive Playwright e2e flows against an isolated stack (JUnit tag: e2e)."
   playwrightSuiteConfig()
   useJUnitPlatform { includeTags("e2e") }
-  // OrgChartKeyboardA11yE2eTest's scroll-preservation case is timing-sensitive against the shared
-  // ephemeral chart's layout + reload under CI load (it has flaked several distinct ways as sibling
-  // suites grow the all-Staffeln chart). Retry ONLY that class — the filter keeps every other e2e
-  // test failing hard on the first failure, so this is targeted flake-tolerance, not blanket
-  // masking.
-  retry {
-    maxRetries.set(2)
-    failOnPassedAfterRetry.set(false)
-    filter { includeClasses.add("*OrgChartKeyboardA11yE2eTest") }
-  }
 }
 
 // Non-destructive login + core-page checks; target-agnostic, safe to run against staging.
