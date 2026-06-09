@@ -22,15 +22,18 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 |------------------------------------------|-----------------------|-------------------------|------------------------|-----------------|---------|-------|
 | Einsatz anlegen (UC-02)                  | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
 | Job Order anlegen (UC-03)                | ✓ (öffentl. Formular) | ✓                       | ✓                      | ✓               | ✓       | ✓     |
+| Job Order bearbeiten (UC-13)             | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
+| Job-Order-Status ändern (UC-14)          | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
 | Refinery Order anlegen (UC-04)           | ✗                     | ✓ (Owner = self)        | ✓ (Owner frei wählbar) | ✓               | ✓       | ✓     |
 | Schiff in Hangar (UC-05)                 | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
 | Eigenes Inventar an Job Order verknüpfen | ✗                     | ✓ (nur eigenes)         | ✓ (fremder Owner)      | ✓ (nur eigenes) | ✓       | ✓     |
 | Job-Order-Handover (UC-06)               | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
+| Job Order / Item-Order löschen           | ✗                     | ✗                       | ✗                      | ✗               | ✗       | ✓     |
 | Einsatz/Operation anlegen                | ✗                     | ✗                       | ✗                      | ✓               | ✓       | ✓     |
 | SK anlegen / umbenennen / löschen        | ✗                     | ✗                       | ✗                      | ✗               | ✗       | ✓     |
 | SK-Mitglieder verwalten                  | ✗                     | nur als **Lead** des SK | –                      | –               | ✗       | ✓     |
 
-Die Gates verbatim: Einsatz `isAuthenticated()`, Job Order `permitAll()`, Refinery Order + Inventar `isAuthenticated()` (fremder Owner nur `isLogisticianOrAbove`), Handover `hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@SpecialCommandSecurityService.canManageMembers(...)`.
+Die Gates verbatim: Einsatz `isAuthenticated()`, Job Order `permitAll()`, Refinery Order + Inventar `isAuthenticated()` (fremder Owner nur `isLogisticianOrAbove`), Handover `hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')`, Job Order bearbeiten/Status `hasRole('LOGISTICIAN')` (+ `canEditJobOrder`), Job Order löschen `hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@SpecialCommandSecurityService.canManageMembers(...)`.
 
 ## Mandanten-Scope-Modell
 
@@ -38,7 +41,7 @@ Der Scope wird **im Service-Layer** durchgesetzt (`OwnerScopeService`), nicht im
 
 - **Strict-Staffel** (kein staffel-übergreifender Zugriff): `Ship`, `InventoryItem` (direkte Lager-View), `RefineryOrder`, **`Operation`**. Listen filtern auf `owning_org_unit_id`; Detail-/Schreibendpunkte gaten über `canSee*`/`canEdit*`.
 - **Cross-Staffel mit Public-Escape**: `Mission` (Einsatz). Für andere OrgUnits sichtbar, *wenn* `is_internal = false`; editierbar nur durch die besitzende OrgUnit + Admins. → UC-10.
-- **Cross-Staffel-Workspace**: `JobOrder` + verknüpfte `JobOrderMaterial` + `JobOrderHandover`. **Kein OrgUnit-Filter beim Zugriff** — jeder mit Rolle/Berechtigung darf lesen/bearbeiten. → UC-08, UC-09.
+- **Bedingt staffel-scoped (Sichtbarkeit über `responsibleOrgUnit.kind`, REQ-ORG-003)**: `JobOrder` + verknüpfte `JobOrderMaterial` + `JobOrderHandover`. Responsible = SK → **öffentlich** für alle profit-eligible Mitglieder (geteilte SK-Warteschlange); Responsible = Staffel → **privat** für diese Staffel + Admins. Vorgeschaltet ist das Profit-Gate (`canViewJobOrders`: Admin oder mindestens eine profit-eligible Mitgliedschaft). SK-Auftrags-*Edits* laufen über das Rollen-Gate (LOGISTICIAN+), nicht über den Staffel-Scope. Verknüpftes Inventar ist im Auftrags-Kontext cross-OrgUnit sichtbar (`findByJobOrderIdOrdered`, ungegated), leakt aber nie in eine fremde Lager-View. → UC-08, UC-09, UC-16.
 
 > **Wichtig (Korrektur einer häufigen Annahme):** **Einsätze/Operationen und Refinery Orders sind strict-staffel, NICHT staffel-übergreifend.** Die staffel-übergreifende Zusammenarbeit läuft über **öffentliche Einsätze** (Teilnehmer aus anderen Staffeln, UC-10) und über den **Job-Order-Workspace** inkl. Handover (UC-08/UC-09) — nicht über Operationen oder Refinery Orders.
 

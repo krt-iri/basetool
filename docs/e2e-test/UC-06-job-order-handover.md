@@ -33,7 +33,10 @@ Der User öffnet das Handover-Modal auf der Auftragsdetailseite `/orders/{id}`.
 
 ## Erwartetes Ergebnis
 
-Die Übergabe erscheint in der Handover-Tabelle des Auftrags als `order-handover-row` mit dem Empfänger.
+- Die Übergabe erscheint in der Handover-Tabelle des Auftrags als `order-handover-row` mit dem Empfänger.
+- **Ausbuchung aus dem Lager:** Die übergebene Menge wird vom verknüpften Lagereintrag abgezogen (bei voller Entnahme wird die Zeile gelöscht) und die offene Menge des `JobOrderMaterial` entsprechend reduziert. Der Test prüft das **pro Eintrag** über die Auftrags-Inventarsicht (`GET /api/v1/orders/{id}/materials/{matId}/inventory`, ungegated `findByJobOrderIdOrdered`):
+  - **Ein Lagereintrag:** 100 → bei Übergabe von 40 bleibt 60.
+  - **Mehrere Lagereinträge in einer Übergabe:** 100 (−40 → 60) und 60 (−30 → 30) werden **je einzeln** in ihrer jeweiligen Menge ausgebucht, nicht gepoolt.
 
 ## Sonderfälle & Lehren
 
@@ -42,4 +45,6 @@ Die Übergabe erscheint in der Handover-Tabelle des Auftrags als `order-handover
 - **Strikte CSP:** `page.waitForFunction(String)` wird im Seitenkontext per `eval` ausgeführt und von der CSP (`script-src` ohne `unsafe-eval`) geblockt. Stattdessen auf Netzwerk-Antworten / DOM-Zustände warten.
 - **`responsibleOrgUnitId` + Profit-Eligibility:** `POST /api/v1/orders` verlangt ein `responsibleOrgUnitId`, das auf eine **profit-eligible** Einheit auflöst (sonst 400; `creatingSquadronId` ist entfallen). Der Stack-Bootstrap schaltet IRIDIUM einmalig profit-eligible (vor dem ersten Seitenaufruf, der den Squadron-Katalog-Cache füllt); `createJobOrder` setzt IRIDIUM als responsible + requesting.
 - Übergabezeit nutzt denselben `datetime-split-group`-Mechanismus wie UC-02, hier aber ohne Race (das Modal öffnet lange nach dem Page-Load) und mit `data-validate-not-past='false'`.
+- **Nur MATERIAL-Übergaben buchen Lager aus:** Item-Übergaben ([UC-15](UC-15-item-order-handover.md)) erhöhen nur die `deliveredAmount` der Bestellpositionen und rühren das Lager nicht an (`order.type != 'ITEM'`-Gate auf dem Material-Übergabe-Block). Die Ausbuchungs-Prüfung gehört daher zum Material-Flow.
+- **Kein Auto-Complete in den Ausbuchungs-Fällen:** Die Ausbuchungs-Aufträge fragen mehr an, als übergeben wird (200 vs. ≤ 100), damit der Auftrag nicht vollständig erfüllt wird — eine Komplettierung würde die verbleibenden Lagereinträge vom Auftrag trennen (Unlink) und sie aus der Auftrags-Inventarsicht entfernen, was die Pro-Eintrag-Assertion unterlaufen würde.
 

@@ -23,7 +23,7 @@ Der User öffnet das Job-Order-Anlegen-Formular `/orders/create`.
 ## Hauptablauf
 
 1. Navigiere zu `/orders/create`.
-2. Wähle die anfragende OrgUnit (`#requestingOrgUnitId` → IRIDIUM).
+2. Wähle die **bearbeitende** Einheit (`#responsibleOrgUnitId` → IRIDIUM; nur profit-eligible) und die **anfragende** Einheit (`#requestingOrgUnitId` → IRIDIUM).
 3. Fülle den Kontakt-Handle (`#handle`).
 4. Wähle in der Materialzeile das Material (`order-material-select`) und die Menge (`order-material-amount`).
 5. Submit über `order-submit`.
@@ -34,6 +34,6 @@ Der Auftrag erscheint in der Liste unter `/orders` als `order-row`.
 
 ## Sonderfälle & Lehren
 
-- **Cross-Staffel-Workspace:** Job Orders haben **keinen** OrgUnit-Scope-Filter beim Zugriff — jeder mit Rolle/Berechtigung darf lesen/bearbeiten. Das `requestingOrgUnitId`-Dropdown wird aus den Mitgliedschaften des Aufrufers befüllt.
+- **Sichtbarkeit über die bearbeitende Einheit (REQ-ORG-003):** Job Orders sind bedingt staffel-scoped — Responsible = SK → öffentlich, Responsible = Staffel → privat für diese Staffel + Admins (siehe [UC-16](UC-16-job-order-mandanten-sichtbarkeit.md)). Das Anlegen selbst ist `permitAll`; beide Owner-Dropdowns werden aus dem aktiven Org-Unit-Katalog befüllt, das Responsible-Dropdown nur mit profit-eligible Einheiten.
 - Das Material-Dropdown ist auf `isJobOrder=true` gefiltert; deshalb wird ein eigens geseedetes Job-Order-Material gewählt.
 
