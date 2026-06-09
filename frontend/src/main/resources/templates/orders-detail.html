@@ -505,7 +505,11 @@
             <div class="form-group mb-1">
                 <label for="requestingOrgUnitId" th:text="#{orders.detail.requesting}" class="form-label">Auftraggeber</label>
                 <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required class="w-full">
-                    <option value="" disabled selected th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                    <!-- No hardcoded `selected`: th:field selects the bound org unit, and a second
+                         `selected` on this placeholder would make WebKit keep the placeholder (see
+                         the material-select note below), blanking this required field when editing an
+                         existing order. -->
+                    <option value="" disabled th:text="#{orders.create.select}">-- Bitte wählen --</option>
                     <optgroup th:if="${requestingHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
                         <option th:each="o : ${requestingOptions}"
                                 th:if="${o.kind() == 'SQUADRON'}"
@@ -553,7 +557,14 @@
                     <div>
                         <label th:text="#{orders.material.name}" class="form-label-sm">Material</label>
                         <select th:field="*{materials[__${stat.index}__].materialId}" data-role="material-select" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
-                            <option value="" disabled selected>-- Material wählen --</option>
+                            <!-- No hardcoded `selected` here: th:field marks the bound material's
+                                 option selected, and a second hardcoded `selected` on this
+                                 placeholder makes two options "selected" at once. WebKit/Safari then
+                                 keeps THIS (first) one, so an existing order opens with the material
+                                 blank and the required-field check blocks saving; Chromium/Firefox
+                                 pick the last and hide it. Letting th:field own the selection keeps
+                                 the placeholder shown only when no material is bound (new rows). -->
+                            <option value="" disabled>-- Material wählen --</option>
                             <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
                         </select>
                     </div>

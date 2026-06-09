@@ -317,10 +317,13 @@ class OrgChartPositionCrudE2eTest {
   private static void awaitReload(Page page, Runnable action) {
     page.evaluate("() => { window.__ocReloadPending = true; }");
     action.run();
+    // 30 s, not 15 s: the post-save reload re-renders the entire org chart, which on the shared
+    // ephemeral stack keeps growing as sibling suites seed Staffeln/SKs into it. Under CI load that
+    // full re-render has overrun a 15 s budget.
     page.waitForFunction(
         "() => window.__ocReloadPending === undefined",
         null,
-        new Page.WaitForFunctionOptions().setTimeout(15_000));
+        new Page.WaitForFunctionOptions().setTimeout(30_000));
     page.waitForLoadState();
   }
 
