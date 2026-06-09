@@ -1,0 +1,353 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.iri.basetool.frontend.e2e;
+
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
+import java.nio.file.Path;
+import java.util.List;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+
+/**
+ * Functional CRUD flows for the inline org-chart editor ({@code /org-chart}), driven as the seeded
+ * ADMIN user so the editor affordances render. Complements {@code OrgChartKeyboardA11yE2eTest}
+ * (which covers the keyboard/ARIA behaviour) by exercising the create / edit / delete lifecycle of
+ * actual positions through the UI — the descriptive-chart, ADMIN-edited contract (REQ-ORG-010), the
+ * "a Kommando outlives its Kommandoleiter" rule (REQ-ORG-011) and the cascading remove
+ * (REQ-ORG-012):
+ *
+ * <ol>
+ *   <li>{@link #createsRenamesAndDeletesAKommando()} — create a leaderless Kommando(gruppe), rename
+ *       it, then remove it; no holder needed.
+ *   <li>{@link #createsAssignsVacatesAndRemovesACommandLeader()} — create a Kommando, assign (and,
+ *       when a second user exists, reassign) its Kommandoleiter, vacate the seat (the group must
+ *       survive), then remove the whole group.
+ * </ol>
+ *
+ * <p>Both tests are <strong>hermetic against the per-Staffel Kommando cap</strong>: each first
+ * deletes any pre-existing Kommando on the IRIDIUM Staffel (a sibling test — the scroll case in the
+ * a11y suite — may leave up to the cap of four), so a create never trips {@code
+ * problem.org_chart.command_limit}. They assert holder changes by <em>structure</em> (the vacate
+ * affordance's presence, the reassign control's {@code data-user-id}) rather than by the holder's
+ * rendered display name, which need not resolve to a stable string; the Kommando <em>name</em> is a
+ * test-supplied literal and so is asserted directly.
+ *
+ * <p>Tagged {@code @Tag("e2e")} (not {@code smoke}): these mutate org-chart data, so they must run
+ * only against the ephemeral, disposable stack.
+ */
+@Tag("e2e")
+class OrgChartPositionCrudE2eTest {
+
+  /** Provisions (or, in staging mode, targets) the stack for the whole run. */
+  @RegisterExtension static final E2eStackExtension STACK = new E2eStackExtension();
+
+  private static final String USERNAME = System.getProperty("e2e.username", "test-admin");
+  private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
+
+  /** The always-present "Kommandogruppe hinzufügen" add affordance on the first Staffel. */
+  private static final String ADD_COMMAND_BUTTON =
+      "[data-trigger='oc-add'][data-position-type='COMMAND_LEAD'][data-needs-name='true']";
+
+  /** The "Kommandoleiter zuweisen" add affordance shown under a leaderless Kommando. */
+  private static final String ASSIGN_LEAD_BUTTON = ".oc-add[data-trigger='oc-reassign']";
+
+  /** The reassign (pencil) control on a Kommando that already has a Kommandoleiter. */
+  private static final String REASSIGN_LEAD_ICON = ".oc-icon-btn[data-trigger='oc-reassign']";
+
+  /** The vacate (clear-holder) control; present only while a Kommandoleiter is assigned. */
+  private static final String VACATE_LEAD_BUTTON = "[data-trigger='oc-vacate']";
+
+  /** The remove control on a Kommando group header. */
+  private static final String COMMAND_REMOVE_BUTTON = ".oc-command-head [data-trigger='oc-remove']";
+
+  private static Playwright playwright;
+  private static Browser browser;
+  private static Path storageState;
+
+  /** Launches the browser and captures one authenticated ADMIN session reused across the tests. */
+  @BeforeAll
+  static void setUp() {
+    playwright = Playwright.create();
+    browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
+    storageState =
+        E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
+  }
+
+  /** Releases the browser and the Playwright driver process. */
+  @AfterAll
+  static void tearDown() {
+    if (browser != null) {
+      browser.close();
+    }
+    if (playwright != null) {
+      playwright.close();
+    }
+  }
+
+  /**
+   * Creates a leaderless Kommando(gruppe), renames it, then removes it — the create / edit / delete
+   * lifecycle of a position that needs no holder. Asserts the group header reflects each step.
+   */
+  @Test
+  void createsRenamesAndDeletesAKommando() {
+    try (BrowserContext context = authedContext()) {
+      Page page = context.newPage();
+      try {
+        page.navigate(STACK.baseUrl() + "/org-chart");
+        clearAllKommandos(page);
+
+        // CREATE
+        createLeaderlessKommando(page, "E2E CRUD Alpha");
+        enterEditMode(page);
+        assertThat(commandHeadNamed(page, "E2E CRUD Alpha")).isVisible();
+
+        // EDIT — rename
+        page.locator(".oc-command-head [data-trigger='oc-rename']").first().click();
+        assertThat(page.locator("#oc-modal")).isVisible();
+        page.locator("#oc-name").fill("E2E CRUD Bravo");
+        submitModalAndAwaitReload(page);
+        enterEditMode(page);
+        assertThat(commandHeadNamed(page, "E2E CRUD Bravo")).isVisible();
+        assertThat(commandHeadNamed(page, "E2E CRUD Alpha")).hasCount(0);
+
+        // DELETE
+        confirmAndAwaitReload(page, page.locator(COMMAND_REMOVE_BUTTON).first());
+        assertThat(commandHeadNamed(page, "E2E CRUD Bravo")).hasCount(0);
+        assertThat(page.locator(".oc-command-head")).hasCount(0);
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-chart-crud-kommando");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Creates a Kommando, assigns its Kommandoleiter (and reassigns it when a second user is
+   * available), vacates the seat — asserting the Kommando(gruppe) survives the vacate, per
+   * REQ-ORG-011 — then removes the whole group. Holder changes are asserted structurally (the
+   * vacate affordance and the reassign control's {@code data-user-id}), not by display name.
+   */
+  @Test
+  void createsAssignsVacatesAndRemovesACommandLeader() {
+    try (BrowserContext context = authedContext()) {
+      Page page = context.newPage();
+      try {
+        page.navigate(STACK.baseUrl() + "/org-chart");
+        clearAllKommandos(page);
+
+        createLeaderlessKommando(page, "E2E CRUD Lead");
+        enterEditMode(page);
+        // A freshly created Kommando is leaderless: it offers the assign affordance, not a vacate.
+        assertThat(page.locator(ASSIGN_LEAD_BUTTON)).isVisible();
+        assertThat(page.locator(VACATE_LEAD_BUTTON)).hasCount(0);
+
+        List<String> userIds = assignableUserIds(page);
+        assertTrue(!userIds.isEmpty(), "the editor's user picker must offer at least one user");
+
+        // EDIT — assign a Kommandoleiter (assigning a holder to a leaderless Kommando is a
+        // reassign).
+        page.locator(ASSIGN_LEAD_BUTTON).first().click();
+        assertThat(page.locator("#oc-modal")).isVisible();
+        page.locator("#oc-user").selectOption(userIds.get(0));
+        submitModalAndAwaitReload(page);
+        enterEditMode(page);
+        // The seat is now filled: a vacate affordance appears and the reassign control carries the
+        // assigned user's id.
+        assertThat(page.locator(VACATE_LEAD_BUTTON)).isVisible();
+        assertThat(page.locator(REASSIGN_LEAD_ICON).first())
+            .hasAttribute("data-user-id", userIds.get(0));
+
+        // EDIT — reassign to a different user, when the realm provides a second one.
+        if (userIds.size() >= 2) {
+          page.locator(REASSIGN_LEAD_ICON).first().click();
+          assertThat(page.locator("#oc-modal")).isVisible();
+          page.locator("#oc-user").selectOption(userIds.get(1));
+          submitModalAndAwaitReload(page);
+          enterEditMode(page);
+          assertThat(page.locator(REASSIGN_LEAD_ICON).first())
+              .hasAttribute("data-user-id", userIds.get(1));
+        }
+
+        // EDIT — vacate the Kommandoleiter: the holder is cleared but the Kommando(gruppe) stays.
+        confirmAndAwaitReload(page, page.locator(VACATE_LEAD_BUTTON).first());
+        enterEditMode(page);
+        assertThat(commandHeadNamed(page, "E2E CRUD Lead")).isVisible();
+        assertThat(page.locator(VACATE_LEAD_BUTTON)).hasCount(0);
+        assertThat(page.locator(ASSIGN_LEAD_BUTTON)).isVisible();
+
+        // DELETE — remove the whole Kommando(gruppe).
+        confirmAndAwaitReload(page, page.locator(COMMAND_REMOVE_BUTTON).first());
+        assertThat(commandHeadNamed(page, "E2E CRUD Lead")).hasCount(0);
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-chart-crud-leader");
+        throw failure;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------- helpers --
+
+  /**
+   * Opens a new authenticated browser context with HTTPS errors ignored (the stack uses a
+   * self-signed certificate) and the reused ADMIN storage state.
+   *
+   * @return a fresh, authenticated browser context
+   */
+  private static BrowserContext authedContext() {
+    return browser.newContext(
+        new Browser.NewContextOptions()
+            .setIgnoreHTTPSErrors(true)
+            .setStorageStatePath(storageState));
+  }
+
+  /**
+   * Turns the inline editor on (idempotently), so the dashed add affordances and the per-node
+   * action controls become visible. After a reload the toggle is off again, hence the guard.
+   *
+   * @param page the page showing the org chart
+   */
+  private static void enterEditMode(Page page) {
+    Locator toggle = page.locator("[data-trigger='oc-toggle-edit']");
+    toggle.waitFor();
+    if (!"true".equals(toggle.getAttribute("aria-pressed"))) {
+      toggle.click();
+    }
+    assertThat(page.locator("#oc-chart.editing")).hasCount(1);
+  }
+
+  /**
+   * Removes every existing Kommando on the first Staffel so a subsequent create cannot trip the
+   * per-Staffel cap. A sibling test may leave Kommandos behind; this resets the chart to a known,
+   * Kommando-free baseline. Bounded well above the cap of four as a runaway guard.
+   *
+   * @param page the page showing the org chart
+   */
+  private static void clearAllKommandos(Page page) {
+    for (int i = 0; i < 8; i++) {
+      enterEditMode(page);
+      Locator removes = page.locator(COMMAND_REMOVE_BUTTON);
+      if (removes.count() == 0) {
+        return;
+      }
+      confirmAndAwaitReload(page, removes.first());
+    }
+  }
+
+  /**
+   * Creates a single leaderless Kommando(gruppe) with the given name on the first Staffel through
+   * the inline editor and blocks until the post-save reload has settled. The holder is left empty
+   * (a {@code COMMAND_LEAD} is the one rank that may be created vacant).
+   *
+   * @param page the page showing the org chart
+   * @param name the Kommando name to enter
+   */
+  private static void createLeaderlessKommando(Page page, String name) {
+    enterEditMode(page);
+    page.locator(ADD_COMMAND_BUTTON).first().click();
+    assertThat(page.locator("#oc-modal")).isVisible();
+    page.locator("#oc-name").fill(name);
+    submitModalAndAwaitReload(page);
+  }
+
+  /**
+   * Clicks the editor dialog's submit button and blocks until the resulting full-page reload has
+   * settled (see {@link #awaitReload(Page, Runnable)}).
+   *
+   * @param page the page whose dialog to submit
+   */
+  private static void submitModalAndAwaitReload(Page page) {
+    Locator submit = page.locator("#oc-modal [data-trigger='oc-modal-submit']");
+    awaitReload(page, submit::click);
+  }
+
+  /**
+   * Clicks a control that raises the KRT confirmation dialog (remove / vacate), accepts it, and
+   * blocks until the resulting full-page reload has settled. The confirm overlay is created
+   * synchronously by the trigger's click handler, so its OK button is available immediately after.
+   *
+   * @param page the page showing the org chart
+   * @param trigger the control that opens the confirm dialog
+   */
+  private static void confirmAndAwaitReload(Page page, Locator trigger) {
+    awaitReload(
+        page,
+        () -> {
+          trigger.click();
+          page.locator(".krt-confirm-overlay .krt-confirm-ok").click();
+        });
+  }
+
+  /**
+   * Runs an action that triggers the editor's "save then full-page reload" path and blocks until
+   * the reload has fully loaded. A window-scoped sentinel set on the current document disappears
+   * with it, so waiting for the sentinel to vanish proves the new document is committed; the
+   * subsequent load-state wait guarantees its end-of-body script has run before the caller inspects
+   * anything.
+   *
+   * @param page the page that will reload
+   * @param action the action that starts the save (and the reload it triggers)
+   */
+  private static void awaitReload(Page page, Runnable action) {
+    page.evaluate("() => { window.__ocReloadPending = true; }");
+    action.run();
+    page.waitForFunction(
+        "() => window.__ocReloadPending === undefined",
+        null,
+        new Page.WaitForFunctionOptions().setTimeout(15_000));
+    page.waitForLoadState();
+  }
+
+  /**
+   * The user ids the editor's holder picker offers (every {@code #oc-user} option with a non-empty
+   * value, i.e. excluding the "-- please choose --" placeholder). Read straight from the DOM, which
+   * the server renders at page load, so it needs no open dialog.
+   *
+   * @param page the page showing the org chart
+   * @return the assignable user ids, in document order; possibly empty
+   */
+  @SuppressWarnings("unchecked")
+  private static List<String> assignableUserIds(Page page) {
+    return (List<String>)
+        page.evaluate(
+            "() => Array.from(document.querySelectorAll('#oc-user option'))"
+                + ".map(o => o.value).filter(v => v)");
+  }
+
+  /**
+   * Locates a Kommando group header carrying the given name.
+   *
+   * @param page the page showing the org chart
+   * @param name the Kommando name to match
+   * @return a locator for the matching {@code .oc-command-name} element(s)
+   */
+  private static Locator commandHeadNamed(Page page, String name) {
+    return page.locator(".oc-command-name", new Page.LocatorOptions().setHasText(name));
+  }
+}
