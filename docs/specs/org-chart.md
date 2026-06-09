@@ -26,7 +26,9 @@ rename / vacate / remove) is gated to `ROLE_ADMIN` at the controller.
 - [ ] `GET /api/v1/org-chart` succeeds for any authenticated caller and is forbidden to none of them.
 - [ ] Every write endpoint under `/api/v1/org-chart/positions` requires `ROLE_ADMIN`.
 
-**Enforced by:** `OrgChartControllerTest`, `SecurityTest` · **Code:** `OrgChartController` · **Issues:** —
+**Enforced by:** `OrgChartControllerTest`, `SecurityTest`, and the e2e spec
+`OrgChartPositionCrudE2eTest` (drives create / rename / assign / reassign / vacate / remove through
+the inline editor as an admin) · **Code:** `OrgChartController` · **Issues:** —
 
 ### REQ-ORG-011 — A Kommando(gruppe) carries an independently fillable *and* vacatable Kommandoleiter
 
@@ -49,8 +51,10 @@ rank — removing such a person-centric position is REQ-ORG-012 instead.
 
 **Enforced by:** `OrgChartServiceTest` (`vacateCommandLeader_*`,
 `createPosition_commandLeadWithoutUser_*`, `updatePosition_assignLeaderToLeaderlessKommando_persists`),
-`OrgChartPageControllerTest` (`vacateLeader_*`) · **Code:** `OrgChartService#vacateCommandLeader`,
-`OrgChartController#vacateCommandLeader` · **Issues:** —
+`OrgChartPageControllerTest` (`vacateLeader_*`), and the e2e spec
+`OrgChartPositionCrudE2eTest#createsAssignsVacatesAndRemovesACommandLeader` (drives assign → vacate
+through the UI and asserts the Kommandogruppe survives) · **Code:**
+`OrgChartService#vacateCommandLeader`, `OrgChartController#vacateCommandLeader` · **Issues:** —
 
 ### REQ-ORG-012 — Removing a Kommando cascades; vacating its leader does not
 
@@ -67,7 +71,9 @@ to clear the seat.
   Kommandoleiter".
 
 **Enforced by:** `OrgChartServiceTest` (`deletePosition_present_deletes`), migration `V136`
-(`parent_id … ON DELETE CASCADE`) · **Code:** `OrgChartService#deletePosition` · **Issues:** —
+(`parent_id … ON DELETE CASCADE`), and the e2e spec `OrgChartPositionCrudE2eTest` (removes a Kommando
+through the inline editor's confirm dialog) · **Code:** `OrgChartService#deletePosition` ·
+**Issues:** —
 
 ### REQ-ORG-013 — The org chart is keyboard-operable and screen-reader-navigable
 
