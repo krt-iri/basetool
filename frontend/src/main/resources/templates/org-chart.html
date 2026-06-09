@@ -325,6 +325,8 @@
         'use strict';
         const chart = document.getElementById('oc-chart');
         const modal = document.getElementById('oc-modal');
+        const modalContent = modal ? modal.querySelector('.modal-content') : null;
+        let lastTrigger = null;
 
         function csrfHeaders() {
             const headers = {'Content-Type': 'application/json', 'Accept': 'application/json'};
@@ -349,9 +351,16 @@
         }
 
         function closeModal() {
-            if (modal) {
-                modal.style.display = 'none';
+            if (!modal) {
+                return;
             }
+            setBackgroundInert(false);
+            modal.style.display = 'none';
+            // Return focus to the control that opened the dialog (captured on open).
+            if (lastTrigger && typeof lastTrigger.focus === 'function') {
+                lastTrigger.focus();
+            }
+            lastTrigger = null;
         }
 
         function setHidden(id, hidden) {
@@ -359,6 +368,40 @@
             if (el) {
                 el.style.display = hidden ? 'none' : '';
             }
+        }
+
+        // While the dialog is open, take the page chrome (header, sidebar, and the
+        // chart itself inside <main>) out of the tab order and hide it from assistive
+        // tech, so Tab and the screen-reader cursor stay inside the dialog.
+        function setBackgroundInert(inert) {
+            const regions = ['header', 'main', '#sidebar', '#sidebar-overlay', '#squadron-context-chip'];
+            regions.forEach(function (sel) {
+                const el = document.querySelector(sel);
+                if (!el) {
+                    return;
+                }
+                if (inert) {
+                    el.setAttribute('inert', '');
+                    el.setAttribute('aria-hidden', 'true');
+                } else {
+                    el.removeAttribute('inert');
+                    el.removeAttribute('aria-hidden');
+                }
+            });
+        }
+
+        // The visible, focusable controls inside the dialog, in DOM order — drives the
+        // Tab/Shift+Tab focus trap. Hidden field groups (display:none) have no client
+        // rects and are skipped, as are the hidden <input> state fields.
+        function modalFocusable() {
+            if (!modalContent) {
+                return [];
+            }
+            const selector = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+            return Array.prototype.slice.call(modalContent.querySelectorAll(selector))
+                .filter(function (el) {
+                    return el.getClientRects().length > 0;
+                });
         }
 
         function openModal(mode, ctx) {
@@ -429,6 +472,8 @@
             if (focusEl) {
                 focusEl.focus();
             }
+            // Trap focus + hide the page behind the dialog from tab order and AT.
+            setBackgroundInert(true);
         }
 
         function send(method, url, body) {
@@ -525,6 +570,7 @@
             });
 
             window.krtEvents.on('click', 'oc-add', function (btn) {
+                lastTrigger = btn;
                 openModal('create', {
                     positionType: btn.getAttribute('data-position-type'),
                     orgUnitId: btn.getAttribute('data-org-unit-id'),
@@ -535,11 +581,13 @@
                 });
             });
 
-            window.krtEvents.on('click', 'oc-add-staff', function () {
+            window.krtEvents.on('click', 'oc-add-staff', function (btn) {
+                lastTrigger = btn;
                 openModal('create', {staffChoice: true});
             });
 
             window.krtEvents.on('click', 'oc-reassign', function (btn) {
+                lastTrigger = btn;
                 openModal('reassign', {
                     positionId: btn.getAttribute('data-position-id'),
                     version: btn.getAttribute('data-version'),
@@ -549,6 +597,7 @@
             });
 
             window.krtEvents.on('click', 'oc-rename', function (btn) {
+                lastTrigger = btn;
                 openModal('rename', {
                     positionId: btn.getAttribute('data-position-id'),
                     version: btn.getAttribute('data-version'),
@@ -592,6 +641,30 @@
             modal.addEventListener('click', function (event) {
                 if (event.target === modal) {
                     closeModal();
+                }
+            });
+            // Esc closes the dialog; Tab/Shift+Tab cycle focus within .modal-content.
+            modal.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeModal();
+                    return;
+                }
+                if (event.key !== 'Tab') {
+                    return;
+                }
+                const focusables = modalFocusable();
+                if (!focusables.length) {
+                    return;
+                }
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
                 }
             });
         }
