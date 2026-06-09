@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Multi-org-unit tenancy matrix for refinery orders (UC-17, REQ-ORG-002/003/004): who may SEE,
+ * Multi-org-unit tenancy matrix for refinery orders (UC-21, REQ-ORG-002/003/004): who may SEE,
  * CREATE, EDIT and STORE a refinery order across every membership profile. Refinery is a
  * <em>strict-staffel</em> aggregate (REQ-ORG-003) — an order is scoped to its {@code
  * owning_org_unit_id} pool and never escapes it, not even via a public mission it is linked to

@@ -1,8 +1,8 @@
-# UC-17 — Refinery Order: Mandanten-Scope (wer sieht/erstellt/bearbeitet/lagert ein)
+# UC-21 — Refinery Order: Mandanten-Scope (wer sieht/erstellt/bearbeitet/lagert ein)
 
 |                |                                                                                                                                       |
 |----------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-17                                                                                                                                 |
+| **ID**         | UC-21                                                                                                                                 |
 | **Tag**        | `e2e`                                                                                                                                 |
 | **Testklasse** | [`RefineryOrderTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/RefineryOrderTenancyE2eTest.java) |
 
@@ -50,6 +50,6 @@ Zusätzlich abgedeckt:
 - **SK-Mitgliedschaften kumulieren über die sequenziell laufenden Schwester-Suites** (ein einmal hinzugefügtes SK-Mitglied wird nie entfernt). Die Suite fasst daher `test-sk` **nicht** an — eine Schwester-Suite (`InventoryTenancyE2eTest`) verlässt sich auf dessen Einzel-SK-Mitgliedschaft — und repräsentiert den SK-Pool über `test-both` (Mitglied der suite-eigenen SK X). `test-member` (nur IRIDIUM), `test-both` (Mehrfach) und `test-none` (keine) sind die verlässlich eindeutigen Profile; jeder Create übergibt eine **explizite** OrgUnit-Auswahl, wo die Mitgliedschaftszahl des Aufrufers sonst mehrdeutig wäre.
 - **`owningOrgUnit.id` liest die FK-Spalte direkt** (ManyToOne, kein Join) — ein eigentümerloser Auftrag (`NULL`-FK) fällt im All-Scope-Zweig des Admins **nicht** aus dem Ergebnis, wird aber für Mitglieder via `IN (:memberOrgUnitIds)` ausgefiltert. Sichtbarkeit identisch zur Inventar-Mandanten-Sicht (UC-14).
 - **Admin-Pin verengt** auf die gepinnte OrgUnit (`adminAllScope = false`); damit lässt sich auch der gescopte Einsatz-Roll-up (BAC-004) ohne Mutation eines Logistician-Flags prüfen.
-- **Optimistic-Lock vor Owner-Check:** der Owner-Gate-Fall sendet bewusst die **aktuelle** `version`, damit der Versions-Check passiert und der Eigentümer-Check (403) feuert (vgl. den 409-Fall in UC-16).
+- **Optimistic-Lock vor Owner-Check:** der Owner-Gate-Fall sendet bewusst die **aktuelle** `version`, damit der Versions-Check passiert und der Eigentümer-Check (403) feuert (vgl. den 409-Fall in UC-20).
 - **Verifikation via API.** Aufträge werden über ihre Id in den Listen-Payloads erkannt (volle UUID, kein Substring-Risiko); gegen die gescopten Endpunkte als verschiedene Nutzer zu assertieren ist die etablierte, race-freie Methode für Tenancy-Grenzen (vgl. UC-08/UC-14).
 

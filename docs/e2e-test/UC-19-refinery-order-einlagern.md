@@ -1,8 +1,8 @@
-# UC-15 — Refinery Order einlagern (in das Lager überführen)
+# UC-19 — Refinery Order einlagern (in das Lager überführen)
 
 |                |                                                                                                                                   |
 |----------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-15                                                                                                                             |
+| **ID**         | UC-19                                                                                                                             |
 | **Tag**        | `e2e`                                                                                                                             |
 | **Testklasse** | [`RefineryOrderStoreE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/RefineryOrderStoreE2eTest.java) |
 
@@ -41,6 +41,6 @@ API-Edges (rein über die REST-API): erneutes Einlagern eines bereits `COMPLETED
 - **Modal ist vorbefüllt.** Menge (Output-Units ÷ 100 → SCU), Qualität, Ziel-Location (= Auftrags-Location) und Mitglied (= aktueller Nutzer) sind alle vorbelegt; der Happy Path ist „Modal öffnen → absenden", ohne ein Pflichtfeld nachzutragen.
 - **Status-Guard ist asymmetrisch.** `storeRefineryOrder` lehnt nur einen bereits `COMPLETED`-Auftrag ab (400) — ein `OPEN`/`IN_PROGRESS`/`CANCELED`-Auftrag ist einlagerbar. Genau `COMPLETED` ist die Doppel-Einlagerungs-Sperre.
 - **Output-Material = Eingangsmaterial** für ein manuelles RAW ohne `refinedMaterial`; deshalb verifiziert der Test das Lager über die Material-Id des Eingangsmaterials.
-- **Stempelung auf die OrgUnit des Empfängers** (nicht des Auftrags) — siehe UC-17; dieser Flow nutzt durchgehend `test-admin`/IRIDIUM, sodass Auftrag und Empfänger denselben Pool teilen.
+- **Stempelung auf die OrgUnit des Empfängers** (nicht des Auftrags) — siehe UC-21; dieser Flow nutzt durchgehend `test-admin`/IRIDIUM, sodass Auftrag und Empfänger denselben Pool teilen.
 - **UI treiben, API verifizieren.** Die gruppierte Lager-Ansicht lädt lazy; gegen die gescopten Endpunkte zu assertieren ist die etablierte, race-freie Methode (vgl. UC-13/UC-14).
 

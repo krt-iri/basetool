@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Storing ("einlagern") a refinery order's refined output into the Lager (UC-15) — the completion
+ * Storing ("einlagern") a refinery order's refined output into the Lager (UC-19) — the completion
  * half of the refinery lifecycle. The store dialog on the order-detail page turns each output good
  * into an append-only {@code InventoryItem} (REQ-INV-001) and flips the order to {@code COMPLETED};
  * the resulting row is stamped onto the assignee's owning org unit (REQ-ORG-004).

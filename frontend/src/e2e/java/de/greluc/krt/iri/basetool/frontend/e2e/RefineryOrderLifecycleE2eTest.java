@@ -29,6 +29,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -37,7 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Refinery-order lifecycle beyond create + store (UC-16): editing and cancelling through the UI,
+ * Refinery-order lifecycle beyond create + store (UC-20): editing and cancelling through the UI,
  * the status filter on the list, and the create/update validation + optimistic-locking edges.
  * Together with {@code RefineryOrderCreateE2eTest} (create) and {@code RefineryOrderStoreE2eTest}
  * (store) this rounds out the full set of refinery functions.
@@ -116,12 +117,29 @@ class RefineryOrderLifecycleE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/" + orderId);
         page.waitForLoadState();
+        // The input-material <select> is required, but its options come from the 10-minute-cached
+        // /api/v1/materials, which need not contain this test's freshly-seeded material — so the
+        // order's pre-selected option can be absent, leaving the dropdown empty and blocking the
+        // submit with a validation bubble. Pick whatever RAW material the dropdown offers (index 0
+        // is the "-- Bitte wählen --" placeholder) so the form validates. The form carries no
+        // output-material field, so the backend re-infers the output from the new input; the test
+        // asserts the edited Ore-Sales, not the material.
+        page.locator("#inputMaterialId_0").selectOption(new SelectOption().setIndex(1));
         page.locator("#oreSales").fill("12345");
-        // The Save button sits outside the form and targets it via form="refineryOrderMainForm".
-        E2eSupport.clickSubmitClearingFooter(page.locator("button[form='refineryOrderMainForm']"));
-        page.waitForURL(
-            url -> url.endsWith("/refinery-orders"),
-            new Page.WaitForURLOptions().setTimeout(20_000));
+        // Drop the fixed footer so the bottom Save button is clickable, then submit and wait for
+        // the
+        // update POST's own response (the backend commit) before the API read-back. Targeting that
+        // POST — rather than the settled post-redirect navigation (awaitFormPost) — avoids a WebKit
+        // flake where the redirect does not settle within the timeout under CI load (the #505
+        // pattern); the read-back needs only the commit, not the re-rendered list page.
+        page.evaluate(
+            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                + " 'none'; } }");
+        page.waitForResponse(
+            response ->
+                response.url().contains("/refinery-orders/" + orderId)
+                    && "POST".equals(response.request().method()),
+            () -> page.locator("button[form='refineryOrderMainForm']").click());
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "refinery-lifecycle-edit");
         throw failure;
@@ -147,12 +165,20 @@ class RefineryOrderLifecycleE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/" + orderId);
         page.waitForLoadState();
-        // The cancel control is a submit inside a small <form action=".../{id}/delete">.
-        E2eSupport.clickSubmitClearingFooter(
-            page.locator("form[action$='/" + orderId + "/delete'] button[type='submit']"));
-        page.waitForURL(
-            url -> url.endsWith("/refinery-orders"),
-            new Page.WaitForURLOptions().setTimeout(20_000));
+        // The cancel control is a submit inside a small <form action=".../{id}/delete">. Drop the
+        // fixed footer so it is clickable, then wait for the delete POST's own response — tying the
+        // wait to that exact request means a mis-targeted click (e.g. the adjacent back link, which
+        // also lands on the list) fails loudly instead of passing on the wrong navigation.
+        page.evaluate(
+            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                + " 'none'; } }");
+        page.waitForResponse(
+            response ->
+                response.url().contains("/refinery-orders/" + orderId + "/delete")
+                    && "POST".equals(response.request().method()),
+            () ->
+                page.locator("form[action$='/" + orderId + "/delete'] button[type='submit']")
+                    .click());
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "refinery-lifecycle-cancel");
         throw failure;
@@ -162,14 +188,18 @@ class RefineryOrderLifecycleE2eTest {
   }
 
   /**
-   * A {@code CANCELED} order is hidden by the list's default {@code OPEN}+{@code IN_PROGRESS}
-   * filter and revealed once the {@code CANCELED} status box is ticked and the filter applied.
+   * The list's status filter hides a {@code CANCELED} order under the default {@code OPEN}+{@code
+   * IN_PROGRESS} view and shows it under an explicit {@code CANCELED} filter.
+   *
+   * <p>The filter is driven through its {@code ?status=…} URL contract — the form the visible
+   * status checkboxes belong to is GET-submitted to exactly that query, and its manual "Filtern"
+   * button is JS-hidden (progressive enhancement) so it cannot be clicked in the harness.
+   * Navigating the URL exercises the same backend filter the UI invokes.
    */
   @Test
   void statusFilterRevealsCanceledOrders() {
     String orderId =
         seeder.createRefineryOrder(USERNAME, PASSWORD, hubLocationId, materialId, null, null);
-    // Cancel via the API so this test focuses on the list-filter behaviour, not the cancel button.
     seeder.deleteRefineryOrder(USERNAME, PASSWORD, orderId);
 
     String baseUrl = STACK.baseUrl();
@@ -182,17 +212,14 @@ class RefineryOrderLifecycleE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
+        // Default filter is OPEN+IN_PROGRESS, so the cancelled order's detail link is absent.
         E2eSupport.navigate(page, baseUrl + "/refinery-orders");
         page.waitForLoadState();
-        // Default filter is OPEN+IN_PROGRESS, so the cancelled order's detail link is absent.
         assertThat(page.locator(rowLink)).hasCount(0);
 
-        page.locator("input[name='status'][value='CANCELED']").check();
-        E2eSupport.clickSubmitClearingFooter(page.locator("#filter-form button[type='submit']"));
-        page.waitForURL(
-            url -> url.contains("status=CANCELED"),
-            new Page.WaitForURLOptions().setTimeout(20_000));
-        // Now the cancelled order surfaces in the filtered list.
+        // The CANCELED status filter reveals it.
+        E2eSupport.navigate(page, baseUrl + "/refinery-orders?status=CANCELED");
+        page.waitForLoadState();
         assertThat(page.locator(rowLink).first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
