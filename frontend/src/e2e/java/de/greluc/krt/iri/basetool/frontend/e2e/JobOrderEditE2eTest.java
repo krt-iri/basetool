@@ -19,13 +19,14 @@
 
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
@@ -42,15 +43,16 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * and posts to {@code POST /orders/{id}/update}; the controller relays it to {@code PUT
  * /api/v1/orders/{id}} (also LOGISTICIAN-gated). The modal is pre-populated by the page controller
  * from the loaded order — its material rows, handle and comment — so the test only mutates the
- * material amount and the comment, then asserts both round-trip onto the reloaded detail page. The
- * actor is {@code test-admin}: Admin reaches {@code LOGISTICIAN} through the role hierarchy, so the
- * modal renders for it without a contextual logistician grant.
+ * material amount and the comment, then asserts both round-trip. The actor is {@code test-admin}:
+ * Admin reaches {@code LOGISTICIAN} through the role hierarchy, so the modal renders for it without
+ * a contextual logistician grant.
  *
- * <p>The seeded order requests an SCU material at amount {@code 100.0}; the edit raises it to
- * {@code 250}, which the detail "Benötigt" cell renders as {@code 250.000} (three-decimal SCU
- * formatting). Asserting the row contains {@code 250} is locale-robust (the original {@code 100}
- * and the {@code 0} stock never produce that substring), and the unique comment string is a second,
- * text-based proof the write landed.
+ * <p>Verification reads the order back through the backend ({@code GET /api/v1/orders/{id}}) rather
+ * than re-asserting on the reloaded detail page: that avoids both a second post-submit navigation
+ * (which WebKit can abort under CI load — HTTP/2 {@code INTERNAL_ERROR}) and the strict-mode
+ * ambiguity that the comment text shows in two places on the reloaded page (the display span and
+ * the modal's pre-filled textarea). The UI still drove the change end to end; the read-back just
+ * proves it landed.
  */
 @Tag("e2e")
 class JobOrderEditE2eTest {
@@ -97,7 +99,7 @@ class JobOrderEditE2eTest {
 
   /**
    * Opens the edit modal, raises the material amount to {@code 250} and sets a unique comment,
-   * submits, and asserts both the new amount and the comment appear on the reloaded detail page.
+   * submits, and asserts both the new amount and the comment via a backend read-back.
    */
   @Test
   void editsAMaterialOrderThroughTheModal() {
@@ -119,20 +121,22 @@ class JobOrderEditE2eTest {
         page.locator("#edit-modal input[name='materials[0].amount']").fill("250");
         page.locator("#edit-modal #edit-comment").fill(comment);
 
-        // Full-page form POST + redirect: await it fully before navigating, else WebKit aborts the
-        // in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
+        // Full-page form POST + redirect: await it fully so the mutation has provably landed before
+        // the backend read-back below — see E2eSupport#awaitFormPost.
         E2eSupport.awaitFormPost(
             page, () -> page.locator("#edit-modal button[type='submit']").click());
 
-        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
-        // The material "Benötigt" cell now reads 250.000 SCU; asserting the row holds 250 is
-        // locale-robust (the prior 100 and the 0 stock never yield that substring).
-        assertThat(page.locator(".material-row").first())
-            .containsText("250", new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
-        // The comment now appears twice — the detail-page display span and the edit modal's
-        // pre-filled textarea — so scope to the first match (the displayed span) to avoid a
-        // strict-mode multiple-match.
-        assertThat(page.getByText(comment).first()).isVisible();
+        JsonObject order =
+            JsonParser.parseString(
+                    new BackendSeeder().getBody(USERNAME, PASSWORD, "/api/v1/orders/" + jobOrderId))
+                .getAsJsonObject();
+        assertEquals(
+            250.0,
+            order.getAsJsonArray("materials").get(0).getAsJsonObject().get("amount").getAsDouble(),
+            0.001,
+            "the edited material amount must persist");
+        assertEquals(
+            comment, order.get("comment").getAsString(), "the edited comment must persist");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-edit");
         throw failure;

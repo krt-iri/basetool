@@ -20,12 +20,13 @@
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,10 +50,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *       {@code od-confirm-status} click posts.
  * </ul>
  *
- * <p>On success the client reloads after ~1 s so the refreshed {@code @Version} is picked up; the
- * test instead re-navigates explicitly after each POST settles and asserts the persisted selection,
- * which also guarantees the next transition reads a current version (no stale-version 409). The
- * actor is {@code test-admin}, which reaches {@code LOGISTICIAN} through the role hierarchy.
+ * <p>Verification is read back through the backend ({@code GET /api/v1/orders/{id}}) rather than
+ * the post-submit dropdown: the client reloads ~1 s after a successful change, so asserting on the
+ * reloaded {@code #status-select} races that reload under CI load. Reading the persisted status
+ * directly is deterministic and still proves the UI drove the change end to end. The terminal step
+ * additionally waits for the warning modal to be shown before confirming, so the confirm never
+ * out-races the modal. The actor is {@code test-admin}, which reaches {@code LOGISTICIAN} through
+ * the role hierarchy.
  */
 @Tag("e2e")
 class JobOrderStatusE2eTest {
@@ -99,8 +103,8 @@ class JobOrderStatusE2eTest {
 
   /**
    * Selects {@code IN_PROGRESS} (immediate AJAX post), then {@code COMPLETED} (confirmed through
-   * the terminal-transition warning modal), re-navigating after each post settles and asserting the
-   * dropdown reflects the persisted status.
+   * the terminal-transition warning modal), and asserts the persisted status after each via a
+   * backend read-back.
    */
   @Test
   void walksAnOrderFromOpenToInProgressToCompleted() {
@@ -121,24 +125,38 @@ class JobOrderStatusE2eTest {
             response ->
                 response.url().contains("/status") && "POST".equals(response.request().method()),
             () -> page.locator("#status-select").selectOption("IN_PROGRESS"));
-        E2eSupport.navigate(page, detailUrl);
-        assertThat(page.locator("#status-select"))
-            .hasValue("IN_PROGRESS", new LocatorAssertions.HasValueOptions().setTimeout(20_000));
+        assertEquals(
+            "IN_PROGRESS", persistedStatus(), "status persists after the in-progress change");
 
-        // IN_PROGRESS -> COMPLETED: a terminal target opens the warning modal first; only the
-        // confirm click posts (and unlinks the order's inventory).
+        // Reload so the dropdown carries the refreshed @Version for the terminal transition.
+        E2eSupport.navigate(page, detailUrl);
+
+        // IN_PROGRESS -> COMPLETED: a terminal target opens the warning modal first; wait until it
+        // is
+        // shown before confirming, so the confirm click never out-races the modal. Only that click
+        // posts (and unlinks the order's inventory).
         page.locator("#status-select").selectOption("COMPLETED");
+        assertThat(page.locator("#status-warning-modal")).isVisible();
         page.waitForResponse(
             response ->
                 response.url().contains("/status") && "POST".equals(response.request().method()),
             () -> page.locator("[data-trigger='od-confirm-status']").click());
-        E2eSupport.navigate(page, detailUrl);
-        assertThat(page.locator("#status-select"))
-            .hasValue("COMPLETED", new LocatorAssertions.HasValueOptions().setTimeout(20_000));
+        assertEquals("COMPLETED", persistedStatus(), "status persists after the completing change");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-status");
         throw failure;
       }
     }
+  }
+
+  /**
+   * Reads the order's persisted status straight from the backend ({@code GET /api/v1/orders/{id}}),
+   * so the assertion does not race the client's post-change page reload.
+   *
+   * @return the order's current {@code status} value
+   */
+  private static String persistedStatus() {
+    String body = new BackendSeeder().getBody(USERNAME, PASSWORD, "/api/v1/orders/" + jobOrderId);
+    return JsonParser.parseString(body).getAsJsonObject().get("status").getAsString();
   }
 }
