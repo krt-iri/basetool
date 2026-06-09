@@ -329,6 +329,306 @@ public final class BackendSeeder {
   }
 
   /**
+   * Creates a refinery order via {@code POST /api/v1/refinery-orders} owned by the caller and
+   * returns its id, so the refinery store / lifecycle / tenancy flows have a persisted order to
+   * drive against without round-tripping the create UI each time. The order targets the given
+   * refinery-hosting location (the catalog-seeded {@code E2E Refinery Hub}) with a single goods row
+   * over the given manual RAW input material — fixed input/output quantities of {@code 100} units
+   * (so the store dialog pre-fills {@code 1.00 SCU}) and quality {@code 750}. The input material
+   * has no refined counterpart, so the backend stamps the output material equal to the input, which
+   * is therefore also the material of every row the store flow later inserts into the Lager.
+   *
+   * @param username the Keycloak username of the order owner (must be an org-unit member, or the
+   *     order lands ownerless)
+   * @param password the Keycloak password of the order owner
+   * @param locationId the id of the refinery-hosting location the order runs at
+   * @param inputMaterialId the id of the manual RAW input material of the single goods row
+   * @param owningOrgUnitId the R5.d owner-picker output: the OrgUnit to stamp the order onto, or
+   *     {@code null} to auto-stamp the owner's single membership (or leave it ownerless)
+   * @param missionId the id of a mission to link the order to, or {@code null} for no mission
+   * @return the created refinery order's id
+   */
+  public String createRefineryOrder(
+      String username,
+      String password,
+      String locationId,
+      String inputMaterialId,
+      String owningOrgUnitId,
+      String missionId) {
+    String missionJson = missionId == null ? "" : ",\"mission\":{\"id\":\"" + missionId + "\"}";
+    String owningJson =
+        owningOrgUnitId == null ? "" : ",\"owningOrgUnitId\":\"" + owningOrgUnitId + "\"";
+    String body =
+        "{\"location\":{\"id\":\""
+            + locationId
+            + "\",\"hidden\":false,\"homeLocation\":false}"
+            + missionJson
+            + ",\"status\":\"OPEN\",\"goods\":[{\"inputMaterial\":{\"id\":\""
+            + inputMaterialId
+            + "\"},\"inputQuantity\":100,\"outputQuantity\":100,\"quality\":750}]"
+            + owningJson
+            + "}";
+    return seedEntity(username, password, "/api/v1/refinery-orders", body);
+  }
+
+  /**
+   * Attempts {@code POST /api/v1/refinery-orders} and returns the HTTP status WITHOUT throwing, so
+   * a test can assert the create-time OrgUnit-stamping matrix (REQ-ORG-004) and the create-time
+   * validation edges: a single-membership user auto-stamps; a membershipless user yields an
+   * ownerless order; a multi-membership user with no pick is rejected (400); any foreign pick is
+   * rejected (400); a non-refinery location is rejected (400); and an empty goods list is rejected
+   * (400). Passing a {@code null} {@code inputMaterialId} sends an empty goods array to exercise
+   * the {@code @NotEmpty} constraint; a {@code null} {@code owningOrgUnitId} sends no picker
+   * output.
+   *
+   * @param username the Keycloak username of the creating user
+   * @param password the Keycloak password of the creating user
+   * @param locationId the id of the location the order would run at (a non-refinery location
+   *     triggers the 400)
+   * @param inputMaterialId the manual RAW input material id, or {@code null} to send empty goods
+   * @param owningOrgUnitId the picked owner OrgUnit id, or {@code null} for the no-pick case
+   * @return the HTTP status code of the create attempt
+   */
+  public int attemptCreateRefineryOrderStatus(
+      String username,
+      String password,
+      String locationId,
+      String inputMaterialId,
+      String owningOrgUnitId) {
+    String goodsJson =
+        inputMaterialId == null
+            ? "[]"
+            : "[{\"inputMaterial\":{\"id\":\""
+                + inputMaterialId
+                + "\"},\"inputQuantity\":100,\"outputQuantity\":100,\"quality\":750}]";
+    String owningJson =
+        owningOrgUnitId == null ? "" : ",\"owningOrgUnitId\":\"" + owningOrgUnitId + "\"";
+    String body =
+        "{\"location\":{\"id\":\""
+            + locationId
+            + "\",\"hidden\":false,\"homeLocation\":false},\"status\":\"OPEN\",\"goods\":"
+            + goodsJson
+            + owningJson
+            + "}";
+    try {
+      return postStatus(passwordGrant(username, password), "/api/v1/refinery-orders", body);
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.attemptCreateRefineryOrderStatus failed", e);
+    }
+  }
+
+  /**
+   * Reads the optimistic-lock {@code version} of a refinery order as the given user, so a test can
+   * drive the 409 conflict (send a stale version) or the owner gate (send the current version so
+   * the version check passes and the owner check fires). The caller must be allowed to see the
+   * order (same org-unit scope, owner, or admin) or the backend 403s and this throws.
+   *
+   * @param username the Keycloak username of the (in-scope) reader
+   * @param password the Keycloak password of the reader
+   * @param orderId the refinery order id
+   * @return the order's current {@code @Version} value
+   */
+  public long getRefineryOrderVersion(String username, String password, String orderId) {
+    try {
+      return getJson("/api/v1/refinery-orders/" + orderId, passwordGrant(username, password))
+          .get("version")
+          .getAsLong();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.getRefineryOrderVersion failed", e);
+    }
+  }
+
+  /**
+   * Attempts {@code PUT /api/v1/refinery-orders/{id}} carrying the given optimistic-lock version
+   * and returns the HTTP status WITHOUT throwing, so a test can assert the update edges: a stale
+   * version surfaces as 409 (the version check runs first), while a non-owner non-logistician
+   * caller sending the <em>current</em> version is rejected by the service owner gate with 403. The
+   * body re-sends the order's location + a single goods row (the service replaces the goods
+   * wholesale) and flips the status to {@code IN_PROGRESS}.
+   *
+   * @param username the Keycloak username of the acting user
+   * @param password the Keycloak password of the acting user
+   * @param orderId the refinery order id to update
+   * @param locationId the id of the refinery-hosting location to re-send
+   * @param inputMaterialId the id of the manual RAW input material to re-send
+   * @param version the optimistic-lock version to submit (current → passes; stale → 409)
+   * @return the HTTP status code of the update attempt
+   */
+  public int attemptUpdateRefineryOrderStatus(
+      String username,
+      String password,
+      String orderId,
+      String locationId,
+      String inputMaterialId,
+      long version) {
+    String body =
+        "{\"id\":\""
+            + orderId
+            + "\",\"location\":{\"id\":\""
+            + locationId
+            + "\",\"hidden\":false,\"homeLocation\":false},\"status\":\"IN_PROGRESS\","
+            + "\"goods\":[{\"inputMaterial\":{\"id\":\""
+            + inputMaterialId
+            + "\"},\"inputQuantity\":100,\"outputQuantity\":100,\"quality\":750}],\"version\":"
+            + version
+            + "}";
+    try {
+      return put(passwordGrant(username, password), "/api/v1/refinery-orders/" + orderId, body);
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.attemptUpdateRefineryOrderStatus failed", e);
+    }
+  }
+
+  /**
+   * Stores (einlagert) a refinery order's output into the Lager via {@code POST
+   * /api/v1/refinery-orders/{id}/store} and throws on a non-2xx status, so a test can seed an
+   * already-completed order or drive the store as a chosen assignee. The single store item carries
+   * the output material, the target location, the quality and the amount; an optional {@code
+   * assigneeUserId} redirects the resulting {@code InventoryItem} to another member (the stored row
+   * is then stamped with that assignee's owning org unit), and an optional {@code note} is
+   * propagated to the inventory row (REQ-INV-001).
+   *
+   * @param username the Keycloak username of the acting user (owner, logistician or admin)
+   * @param password the Keycloak password of the acting user
+   * @param orderId the refinery order id to store
+   * @param materialId the output material id to store (equals the input material for a manual RAW)
+   * @param locationId the storage location id of the resulting inventory row
+   * @param quality the quality of the stored material ({@code 0..1000})
+   * @param amount the stored amount (overrides the order's calculated output)
+   * @param assigneeUserId the user to credit the stored row to, or {@code null} for the order owner
+   * @param note the note to attach to the resulting inventory row, or {@code null} for none
+   */
+  public void storeRefineryOrder(
+      String username,
+      String password,
+      String orderId,
+      String materialId,
+      String locationId,
+      int quality,
+      double amount,
+      String assigneeUserId,
+      String note) {
+    int status =
+        attemptStoreRefineryOrderStatus(
+            username,
+            password,
+            orderId,
+            materialId,
+            locationId,
+            quality,
+            amount,
+            assigneeUserId,
+            note);
+    if (status < 200 || status >= 300) {
+      throw new IllegalStateException("Refinery store failed: HTTP " + status);
+    }
+  }
+
+  /**
+   * Attempts {@code POST /api/v1/refinery-orders/{id}/store} and returns the HTTP status WITHOUT
+   * throwing, so a test can assert the store edges: re-storing an already-{@code COMPLETED} order
+   * is rejected (400), a viewer outside the order's owning OrgUnit scope is rejected by the {@code
+   * canEditRefineryOrder} gate (403), and storing to a multi-membership assignee with no per-output
+   * picker is rejected (400). The item shape mirrors {@link #storeRefineryOrder}.
+   *
+   * @param username the Keycloak username of the acting user
+   * @param password the Keycloak password of the acting user
+   * @param orderId the refinery order id to store
+   * @param materialId the output material id to store
+   * @param locationId the storage location id
+   * @param quality the quality of the stored material ({@code 0..1000})
+   * @param amount the stored amount
+   * @param assigneeUserId the user to credit the stored row to, or {@code null} for the order owner
+   * @param note the note to attach to the resulting inventory row, or {@code null} for none
+   * @return the HTTP status code of the store attempt
+   */
+  public int attemptStoreRefineryOrderStatus(
+      String username,
+      String password,
+      String orderId,
+      String materialId,
+      String locationId,
+      int quality,
+      double amount,
+      String assigneeUserId,
+      String note) {
+    String userJson = assigneeUserId == null ? "" : ",\"userId\":\"" + assigneeUserId + "\"";
+    String noteJson = note == null ? "" : ",\"note\":\"" + note + "\"";
+    String body =
+        "{\"items\":[{\"materialId\":\""
+            + materialId
+            + "\",\"locationId\":\""
+            + locationId
+            + "\",\"quality\":"
+            + quality
+            + ",\"amount\":"
+            + amount
+            + userJson
+            + noteJson
+            + "}]}";
+    try {
+      return postStatus(
+          passwordGrant(username, password), "/api/v1/refinery-orders/" + orderId + "/store", body);
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.attemptStoreRefineryOrderStatus failed", e);
+    }
+  }
+
+  /**
+   * Cancels (soft-deletes) a refinery order via {@code DELETE /api/v1/refinery-orders/{id}} as the
+   * given user and throws on a non-2xx status, so a test can drive an order to {@code CANCELED}
+   * without the detail-page cancel button. The caller must own the order or be a logistician/admin.
+   *
+   * @param username the Keycloak username of the acting user
+   * @param password the Keycloak password of the acting user
+   * @param orderId the refinery order id to cancel
+   */
+  public void deleteRefineryOrder(String username, String password, String orderId) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(
+                  URI.create(BACKEND_BASE_URL + "/api/v1/refinery-orders/" + orderId))
+              .header("Authorization", "Bearer " + token)
+              .DELETE()
+              .build();
+      int status = http.send(request, BodyHandlers.ofString()).statusCode();
+      if (status < 200 || status >= 300) {
+        throw new IllegalStateException("Refinery cancel failed: HTTP " + status);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.deleteRefineryOrder failed", e);
+    }
+  }
+
+  /**
+   * Issues an authenticated {@code GET} as the given user and returns the HTTP status WITHOUT
+   * throwing, so a test can assert a read gate directly — notably the strict-staffel refinery read
+   * gate where a foreign-scope viewer must be rejected with 403 on {@code GET
+   * /api/v1/refinery-orders/{id}}.
+   *
+   * @param username the Keycloak username to authenticate as
+   * @param password the Keycloak password
+   * @param path the backend path beginning with {@code /}
+   * @return the HTTP status code of the GET
+   */
+  public int attemptGetStatus(String username, String password, String path) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + path))
+              .header("Authorization", "Bearer " + token)
+              .GET()
+              .build();
+      return http.send(request, BodyHandlers.ofString()).statusCode();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.attemptGetStatus(" + path + ") failed", e);
+    }
+  }
+
+  /**
    * Creates a Job Order via {@code POST /api/v1/orders} with a single material line and returns its
    * id, so the handover flow has an order to record a handover against. The material line's {@code
    * minQuality} must be at least 700 ({@code CreateJobOrderMaterialDto} constraint).
@@ -1229,6 +1529,27 @@ public final class BackendSeeder {
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build();
+    return http.send(request, BodyHandlers.ofString()).statusCode();
+  }
+
+  /**
+   * Issues an authenticated {@code POST} and returns the HTTP status, so the {@code attempt*}
+   * create / store probes can assert a 4xx without the 2xx-or-throw behaviour of {@link
+   * #seedEntity}.
+   *
+   * @param token bearer token
+   * @param path backend path beginning with {@code /}
+   * @param jsonBody the JSON request body
+   * @return the HTTP status code
+   * @throws Exception on transport failure
+   */
+  private int postStatus(String token, String path, String jsonBody) throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + path))
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build();
     return http.send(request, BodyHandlers.ofString()).statusCode();
   }
