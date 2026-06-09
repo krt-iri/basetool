@@ -46,15 +46,17 @@
             <span class="oc-caption-title" th:text="#{orgChart.area.title}">Bereichsleitung</span>
         </div>
 
-        <div class="oc-tree">
+        <div class="oc-tree" role="tree" th:aria-label="#{orgChart.title}">
             <!-- Leadership spine: Bereichsleiter, then the Stab entries, then the units fan -->
             <div class="oc-col">
 
                 <!-- Bereichsleiter (hero) or vacant -->
                 <th:block th:if="${area.lead() != null}">
-                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${area.lead()})}"></th:block>
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${area.lead()}, 1)}"></th:block>
                 </th:block>
-                <div th:if="${area.lead() == null}" class="oc-node oc-node--vacant">
+                <div th:if="${area.lead() == null}" class="oc-node oc-node--vacant"
+                     role="treeitem" tabindex="-1" aria-level="1"
+                     th:aria-label="#{orgChart.rank.AREA_LEAD} + ', ' + #{orgChart.vacant}">
                     <span class="oc-node-rank" th:text="#{orgChart.rank.AREA_LEAD}">Bereichsleiter</span>
                     <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
                 </div>
@@ -67,11 +69,11 @@
                      Bereichsleiter (the area level has no Commander) -->
                 <th:block th:each="n : ${area.coordinators()}">
                     <div class="oc-v"></div>
-                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n})}"></th:block>
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
                 </th:block>
                 <th:block th:each="n : ${area.operators()}">
                     <div class="oc-v"></div>
-                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n})}"></th:block>
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
                 </th:block>
 
                 <!-- one button to add a Stab member (Koordinator/Operator; the modal picks the type) -->
@@ -80,13 +82,14 @@
 
                 <!-- Tier 2: Staffeln + Spezialkommandos fan out under the Bereichsleitung.
                      oc-fan--units widens the gap between OrgUnits vs. tiles inside one. -->
-                <ul class="oc-fan oc-fan--units"
+                <ul class="oc-fan oc-fan--units" role="group"
                     th:if="${!#lists.isEmpty(orgChart.squadrons()) or !#lists.isEmpty(orgChart.specialCommands())}">
 
                     <!-- Staffeln -->
                     <li th:each="sq : ${orgChart.squadrons()}">
                         <div class="oc-col">
-                            <div class="oc-unit-box">
+                            <div class="oc-unit-box" role="treeitem" tabindex="-1" aria-level="2"
+                                 th:aria-label="#{orgChart.a11y.squadron(${sq.name()})}">
                                 <span class="sh" th:text="${sq.shorthand()}">IRI</span>
                                 <span class="nm" th:text="${sq.name()}">IRIDIUM</span>
                             </div>
@@ -94,9 +97,11 @@
 
                             <!-- Staffelleiter or vacant -->
                             <th:block th:if="${sq.lead() != null}">
-                                <th:block th:replace="~{fragments/org-chart-node :: ocNode(${sq.lead()})}"></th:block>
+                                <th:block th:replace="~{fragments/org-chart-node :: ocNode(${sq.lead()}, 3)}"></th:block>
                             </th:block>
-                            <div th:if="${sq.lead() == null}" class="oc-node oc-node--vacant">
+                            <div th:if="${sq.lead() == null}" class="oc-node oc-node--vacant"
+                                 role="treeitem" tabindex="-1" aria-level="3"
+                                 th:aria-label="#{orgChart.rank.SQUADRON_LEAD} + ', ' + #{orgChart.vacant}">
                                 <span class="oc-node-rank" th:text="#{orgChart.rank.SQUADRON_LEAD}">Staffelleiter</span>
                                 <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
                             </div>
@@ -107,14 +112,16 @@
                                     th:text="#{orgChart.add.squadronLead}">Staffelleiter zuweisen</button>
 
                             <!-- Kommandos + direct Ensigns fan out under the Staffelleiter -->
-                            <ul class="oc-fan"
+                            <ul class="oc-fan" role="group"
                                 th:if="${!#lists.isEmpty(sq.commands()) or !#lists.isEmpty(sq.directEnsigns())}">
 
                                 <!-- Kommando(gruppe): named header, its Kommandoleiter (may be vacant),
                                      then the Stv. + Ensigns chained underneath -->
                                 <li th:each="cmd : ${sq.commands()}">
                                     <div class="oc-col">
-                                        <div class="oc-node oc-command-head">
+                                        <div class="oc-node oc-command-head" role="treeitem" tabindex="-1"
+                                             aria-level="4"
+                                             th:aria-label="#{orgChart.command.tag} + ', ' + ${cmd.name() != null ? cmd.name() : #messages.msg('orgChart.command.unnamed')}">
                                             <span class="oc-node-rank" th:text="#{orgChart.command.tag}">Kommandogruppe</span>
                                             <span class="oc-command-name" th:if="${cmd.name() != null}"
                                                   th:text="${cmd.name()}">Alpha</span>
@@ -146,7 +153,8 @@
                                         <div class="oc-v"></div>
 
                                         <th:block th:if="${cmd.leaderUserId() != null}">
-                                            <div class="oc-node">
+                                            <div class="oc-node" role="treeitem" tabindex="-1" aria-level="5"
+                                                 th:aria-label="#{orgChart.rank.COMMAND_LEAD} + ', ' + ${cmd.leaderUserName()}">
                                                 <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
                                                 <span class="oc-node-name" th:text="${cmd.leaderUserName()}">Name</span>
                                                 <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
@@ -172,7 +180,9 @@
                                                 </div>
                                             </div>
                                         </th:block>
-                                        <div th:if="${cmd.leaderUserId() == null}" class="oc-node oc-node--vacant">
+                                        <div th:if="${cmd.leaderUserId() == null}" class="oc-node oc-node--vacant"
+                                             role="treeitem" tabindex="-1" aria-level="5"
+                                             th:aria-label="#{orgChart.rank.COMMAND_LEAD} + ', ' + #{orgChart.vacant}">
                                             <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
                                             <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
                                         </div>
@@ -186,11 +196,11 @@
                                         <!-- Stv. then Ensigns: chained under the Kommandoleiter -->
                                         <th:block th:if="${cmd.deputy() != null}">
                                             <div class="oc-v"></div>
-                                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${cmd.deputy()})}"></th:block>
+                                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${cmd.deputy()}, 6)}"></th:block>
                                         </th:block>
                                         <th:block th:each="e : ${cmd.ensigns()}">
                                             <div class="oc-v"></div>
-                                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e})}"></th:block>
+                                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e}, 6)}"></th:block>
                                         </th:block>
 
                                         <button th:if="${cmd.deputy() == null}" type="button" class="oc-add"
@@ -212,7 +222,7 @@
                                 <!-- Ensigns reporting straight to the Staffelleiter -->
                                 <li th:each="e : ${sq.directEnsigns()}">
                                     <div class="oc-col">
-                                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e})}"></th:block>
+                                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e}, 4)}"></th:block>
                                     </div>
                                 </li>
                             </ul>
@@ -234,14 +244,15 @@
                     <!-- Spezialkommandos: 1-2 SK-Leiter side by side under the unit box -->
                     <li th:each="sk : ${orgChart.specialCommands()}">
                         <div class="oc-col">
-                            <div class="oc-unit-box oc-unit-box--sk">
+                            <div class="oc-unit-box oc-unit-box--sk" role="treeitem" tabindex="-1" aria-level="2"
+                                 th:aria-label="#{orgChart.a11y.sk(${sk.name()})}">
                                 <span class="sh" th:text="${sk.shorthand()}">BRV</span>
                                 <span class="nm" th:text="${sk.name()}">Bravo</span>
                             </div>
-                            <ul class="oc-fan" th:if="${!#lists.isEmpty(sk.commanders())}">
+                            <ul class="oc-fan" role="group" th:if="${!#lists.isEmpty(sk.commanders())}">
                                 <li th:each="c : ${sk.commanders()}">
                                     <div class="oc-col">
-                                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${c})}"></th:block>
+                                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${c}, 3)}"></th:block>
                                     </div>
                                 </li>
                             </ul>
@@ -581,6 +592,132 @@
             modal.addEventListener('click', function (event) {
                 if (event.target === modal) {
                     closeModal();
+                }
+            });
+        }
+
+        // ---- Tree keyboard navigation (ARIA roving tabindex) -------------------
+        // The chart is an ARIA tree: every box is a role="treeitem" carrying its
+        // depth in aria-level (1 = Bereichsleiter … 6 = Stv./Ensign in a Kommando).
+        // The DOM is a CSS-drawn flat pre-order list — boxes are siblings joined by
+        // connector divs, not physically nested — so parent/child/sibling are derived
+        // purely from aria-level over the flattened treeitem order. Exactly one
+        // treeitem is tabbable at a time; the arrow keys move focus and preserve that
+        // invariant (↑/↓ between siblings, ←/→ between levels, Home/End to the ends).
+        const tree = chart ? chart.querySelector('.oc-tree') : null;
+        if (tree) {
+            const treeItems = function () {
+                return Array.prototype.slice.call(
+                    tree.querySelectorAll('[role="treeitem"]'));
+            };
+            const levelOf = function (el) {
+                return parseInt(el.getAttribute('aria-level'), 10) || 1;
+            };
+
+            // Initial roving state: the first item is tabbable, the rest are reachable
+            // only via the arrow keys. A treeitem whose next item in document order is
+            // one level deeper has children, so it is marked aria-expanded (the tree is
+            // always-expanded — there is no collapse affordance).
+            const initial = treeItems();
+            initial.forEach(function (el, i) {
+                el.setAttribute('tabindex', i === 0 ? '0' : '-1');
+                const next = initial[i + 1];
+                if (next && levelOf(next) > levelOf(el)) {
+                    el.setAttribute('aria-expanded', 'true');
+                }
+            });
+
+            const focusItem = function (el) {
+                if (!el) {
+                    return;
+                }
+                treeItems().forEach(function (n) {
+                    n.setAttribute('tabindex', n === el ? '0' : '-1');
+                });
+                el.focus();
+            };
+
+            // sibling = nearest item at the same level not separated by a shallower
+            // (ancestor-boundary) item; child = the immediately following deeper item;
+            // parent = the nearest preceding shallower item.
+            const nextSibling = function (list, i) {
+                const lvl = levelOf(list[i]);
+                for (let j = i + 1; j < list.length; j++) {
+                    const l = levelOf(list[j]);
+                    if (l < lvl) {
+                        return null;
+                    }
+                    if (l === lvl) {
+                        return list[j];
+                    }
+                }
+                return null;
+            };
+            const prevSibling = function (list, i) {
+                const lvl = levelOf(list[i]);
+                for (let j = i - 1; j >= 0; j--) {
+                    const l = levelOf(list[j]);
+                    if (l < lvl) {
+                        return null;
+                    }
+                    if (l === lvl) {
+                        return list[j];
+                    }
+                }
+                return null;
+            };
+            const firstChild = function (list, i) {
+                const next = list[i + 1];
+                return (next && levelOf(next) === levelOf(list[i]) + 1) ? next : null;
+            };
+            const parentOf = function (list, i) {
+                const lvl = levelOf(list[i]);
+                for (let j = i - 1; j >= 0; j--) {
+                    if (levelOf(list[j]) < lvl) {
+                        return list[j];
+                    }
+                }
+                return null;
+            };
+
+            tree.addEventListener('keydown', function (event) {
+                // Only act when a treeitem itself holds focus — never when focus is on
+                // an inner edit/remove button (those keep their native behaviour).
+                const current = event.target;
+                if (!current || current.getAttribute('role') !== 'treeitem') {
+                    return;
+                }
+                const list = treeItems();
+                const i = list.indexOf(current);
+                if (i < 0) {
+                    return;
+                }
+                let target = null;
+                switch (event.key) {
+                    case 'ArrowDown':
+                        target = nextSibling(list, i);
+                        break;
+                    case 'ArrowUp':
+                        target = prevSibling(list, i);
+                        break;
+                    case 'ArrowRight':
+                        target = firstChild(list, i);
+                        break;
+                    case 'ArrowLeft':
+                        target = parentOf(list, i);
+                        break;
+                    case 'Home':
+                        target = list[0];
+                        break;
+                    case 'End':
+                        target = list[list.length - 1];
+                        break;
+                    default:
+                        return;
+                }
+                if (target) {
+                    event.preventDefault();
+                    focusItem(target);
                 }
             });
         }
