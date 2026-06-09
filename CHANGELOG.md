@@ -6,6 +6,8 @@
 
 - **Die Auftragsliste unter „Raffinerie" blendet die Spalte „Status" aus, damit „Ort", „Einsatz" und „Materialien" mehr Platz bekommen.** Nach Status filtern lässt sich weiterhin über die Filterleiste oberhalb der Tabelle.
 
+- **Das Organigramm ist jetzt komplett per Tastatur bedienbar und für Screenreader als Baum ausgezeichnet (Rollen, Ebenen, Beschriftungen).** Pfeiltasten bewegen den Fokus zwischen Knoten und Ebenen (sichtbar als scharfer Rahmen), der Bearbeiten-Dialog schließt mit Esc, hält den Fokus fest und gibt ihn beim Schließen an den auslösenden Button zurück; im Bearbeiten-Modus erklärt eine kurze Hinweiszeile die Symbole.
+
 ### Fixed
 
 - **Mitglieder der Bereichsleitung (ohne Staffel-Zugehörigkeit) können jetzt Operationen anlegen.** Bisher schlug das Anlegen mit einer Fehlermeldung fehl, weil jede Operation zwingend einer Staffel gehören musste. Solche organisationsweiten „Bereichsleitungs-Operationen" sind staffellos und für alle Mitglieder (und höher) sichtbar, für Gäste hingegen nicht.
@@ -13,6 +15,8 @@
 - **Operationen sind jetzt zusätzlich für alle Teilnehmenden der zugeordneten Einsätze sichtbar (außer nicht angemeldete Besucher).** Wer an einem Einsatz einer Operation teilgenommen hat, sieht die Operation und seine Auszahlung jetzt auch dann, wenn sie einer anderen Staffel gehört oder staffellos ist.
 
 - **Im Organigramm lässt sich ein gesetzter Kommandoleiter jetzt entfernen, ohne die ganze Kommandogruppe zu löschen.** Wird der Posten vakant, bleibt die Kommandogruppe mit Namen, Stv. Kommandoleiter und Ensigns bestehen; ein neuer Kommandoleiter kann später zugewiesen werden.
+
+- **Im Organigramm bleibt nach dem Speichern die horizontale Scroll-Position erhalten** und springt nicht mehr an den linken Rand zurück.
 
 ## [v0.4.5](https://github.com/krt-iri/basetool/releases/tag/v0.4.5) - 2026-06-08
 

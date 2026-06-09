@@ -69,11 +69,52 @@ to clear the seat.
 **Enforced by:** `OrgChartServiceTest` (`deletePosition_present_deletes`), migration `V136`
 (`parent_id … ON DELETE CASCADE`) · **Code:** `OrgChartService#deletePosition` · **Issues:** —
 
+### REQ-ORG-013 — The org chart is keyboard-operable and screen-reader-navigable
+
+The chart conveys its hierarchy to assistive technology and is fully operable without a
+mouse. It is exposed as an ARIA **tree**: the container is `role="tree"` (labelled by the
+page title), each child row is `role="group"`, and every box — person node, unit box,
+command head, vacant seat — is a `role="treeitem"` carrying an `aria-level` that matches its
+depth in the reporting chain (1 = Bereichsleiter, 2 = Stab member / Staffel- or SK-unit box,
+3 = Staffel-/SK-Leiter, 4 = Kommandogruppe header / direct Ensign, 5 = Kommandoleiter,
+6 = Stv. Kommandoleiter / Ensign within a Kommando) and an `aria-label` of "rank, name" (or
+"rank, nicht besetzt"). Parents are `aria-expanded` (the tree never collapses).
+
+Keyboard model: a roving tabindex keeps exactly one treeitem tabbable; ↑/↓ move between
+siblings, ←/→ between levels, Home/End to the ends. Keyboard focus is a sharp outline,
+deliberately distinct from the Bereichsleiter's bloom. The inline editor's dialog traps
+focus (Tab/Shift+Tab cycle within it), closes on Esc, returns focus to the control that
+opened it, and renders the page chrome `inert` + `aria-hidden` while open. A successful edit
+preserves the chart's horizontal scroll and the page's vertical scroll across the reload
+(the editor reloads on success by design — see the concurrency notes in `CLAUDE.md`). The
+"Bearbeiten" toggle exposes its state via `aria-pressed` and reveals a legend while editing.
+
+**Acceptance**
+
+- [ ] `GET /org-chart` renders `role="tree"`, `role="group"` and `role="treeitem"` with an
+  `aria-level` per node, plus an `aria-pressed` edit toggle and the edit-mode hint.
+- [ ] Exactly one treeitem is tabbable; the arrow keys + Home/End move focus through the tree.
+- [ ] The dialog closes on Esc and returns focus to its trigger; the background is inert while
+  it is open.
+- [ ] A save keeps the scroll position (no jump to the top-left).
+- [ ] Keyboard focus on a node is a visible outline, not only the hero bloom.
+
+**Enforced by:** `OrgChartPageRenderTest` (asserts the rendered tree roles, the `aria-level`s,
+the `aria-pressed` toggle and the edit-mode hint). The interactive behaviours (roving focus,
+arrow-key navigation, the modal focus-trap / Esc, scroll restoration) are JavaScript and
+verified manually — candidates for the Playwright `e2e` suite, not the template-render unit
+tests. **Code:** `org-chart.html` (inline tree-nav + dialog JS), `org-chart.css`,
+`fragments/org-chart-node.html` · **Issues:** —
+
 ## Out of scope
 
 - The per-Staffel / per-SK cardinality caps, scope/parent consistency and one-user-per-scope rules —
   they are pinned by the `createPosition_*` tests and documented in the `OrgChartService` Javadoc.
 - Authorization semantics — the chart feeds none; see [`security-and-access.md`](security-and-access.md).
+- Raising the connector-line contrast (the lines are `--color-gray-2`, ≈ 2.8:1 on black):
+  evaluated and intentionally left as-is — the only lighter token (`gray-1`) on every line
+  reads as noise, and the design system forbids inventing an intermediate grey. The lines
+  stay calm and on-token.
 
 ## Open questions
 
