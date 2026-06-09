@@ -190,4 +190,33 @@ class OrgChartPageControllerTest {
     assertEquals(404, response.getStatusCode().value());
     assertFalse(((Map<String, Object>) response.getBody()).isEmpty());
   }
+
+  @Test
+  void vacateLeader_success_returns200AndRelaysVersion() {
+    BackendApiClient backend = mock(BackendApiClient.class);
+    OrgChartPageController controller = new OrgChartPageController(backend);
+    UUID id = UUID.randomUUID();
+
+    ResponseEntity<Object> response = controller.vacateLeader(id, 3L);
+
+    assertEquals(200, response.getStatusCode().value());
+    verify(backend).delete("/api/v1/org-chart/positions/" + id + "/leader?version=3", Void.class);
+  }
+
+  @Test
+  void vacateLeader_notCommand_relays400() {
+    BackendApiClient backend = mock(BackendApiClient.class);
+    OrgChartPageController controller = new OrgChartPageController(backend);
+    UUID id = UUID.randomUUID();
+    when(backend.delete("/api/v1/org-chart/positions/" + id + "/leader?version=3", Void.class))
+        .thenThrow(
+            new BackendServiceException(
+                "bad", null, 400, "BAD_REQUEST", null, List.of(), "Not a Kommando."));
+
+    ResponseEntity<Object> response = controller.vacateLeader(id, 3L);
+
+    assertEquals(400, response.getStatusCode().value());
+    Map<String, Object> body = assertInstanceOf(Map.class, response.getBody());
+    assertEquals("BAD_REQUEST", body.get("code"));
+  }
 }

@@ -46,6 +46,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
@@ -129,6 +130,31 @@ public class OrgChartPageController {
       return relayError("Update org-chart position failed", e);
     } catch (Exception e) {
       return unexpectedError("Update org-chart position failed", e);
+    }
+  }
+
+  /**
+   * Vacates a Kommando's Kommandoleiter — clears the holder while keeping the Kommando, its Stv.
+   * and its Ensigns. Distinct from {@link #deletePosition}, which removes the whole Kommando. The
+   * optimistic-lock version is relayed to the backend as a query parameter. ADMIN-only.
+   *
+   * @param id the Kommando ({@code COMMAND_LEAD}) position id.
+   * @param version the optimistic-lock version the client last saw.
+   * @return 200 on success, or the backend error status + body.
+   */
+  @DeleteMapping("/positions/{id}/leader/ajax")
+  @ResponseBody
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Object> vacateLeader(
+      @PathVariable @NotNull UUID id, @RequestParam("version") long version) {
+    try {
+      backendApiClient.delete(
+          "/api/v1/org-chart/positions/" + id + "/leader?version=" + version, Void.class);
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
+      return relayError("Vacate org-chart Kommandoleiter failed", e);
+    } catch (Exception e) {
+      return unexpectedError("Vacate org-chart Kommandoleiter failed", e);
     }
   }
 

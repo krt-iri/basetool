@@ -34514,6 +34514,103 @@
         }
       }
     },
+    "/api/v1/org-chart/positions/{id}/leader" : {
+      "delete" : {
+        "tags" : [ "org-chart-controller" ],
+        "summary" : "Vacate a Kommando's Kommandoleiter",
+        "description" : "Clears the Kommandoleiter (holder) of a Kommando (COMMAND_LEAD) while keeping the Kommando, its name, its Stv. Kommandoleiter and its Ensigns. This is how a Kommando outlives a departing leader instead of being deleted and rebuilt; removing the whole Kommando is the position DELETE. Rejects any non-COMMAND_LEAD rank, whose holder is mandatory — remove that position instead. ADMIN-only.",
+        "operationId" : "vacateCommandLeader",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "version",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Kommandoleiter vacated; the Kommando stays.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgChartPositionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{jobOrderId}/materials/{materialId}" : {
       "delete" : {
         "tags" : [ "Orders" ],

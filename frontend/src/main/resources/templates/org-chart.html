@@ -160,6 +160,15 @@
                                                             <use href="#krt-icon-edit"></use>
                                                         </svg>
                                                     </button>
+                                                    <button type="button" class="oc-icon-btn oc-icon-btn--danger"
+                                                            data-trigger="oc-vacate"
+                                                            th:data-position-id="${cmd.positionId()}"
+                                                            th:data-version="${cmd.version()}"
+                                                            th:title="#{orgChart.vacateLead}" th:aria-label="#{orgChart.vacateLead}">
+                                                        <svg class="krt-icon" aria-hidden="true">
+                                                            <use href="#krt-icon-trash"></use>
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             </div>
                                         </th:block>
@@ -546,6 +555,20 @@
                     if (ok) {
                         const id = encodeURIComponent(btn.getAttribute('data-position-id'));
                         send('DELETE', '/org-chart/positions/' + id + '/ajax', null);
+                    }
+                });
+            });
+
+            // Vacate just the Kommandoleiter of a Kommando: clears the holder but keeps the
+            // Kommandogruppe (and its Stv. + Ensigns) — distinct from oc-remove on the group head.
+            window.krtEvents.on('click', 'oc-vacate', function (btn) {
+                const title = /*[[#{orgChart.vacateLead.confirmTitle}]]*/ 'Remove Kommandoleiter';
+                const message = /*[[#{orgChart.vacateLead.confirm}]]*/ 'Remove this command group\'s Kommandoleiter?';
+                window.showKrtConfirm(title, message).then(function (ok) {
+                    if (ok) {
+                        const id = encodeURIComponent(btn.getAttribute('data-position-id'));
+                        const version = encodeURIComponent(btn.getAttribute('data-version'));
+                        send('DELETE', '/org-chart/positions/' + id + '/leader/ajax?version=' + version, null);
                     }
                 });
             });

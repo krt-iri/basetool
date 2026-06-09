@@ -107,6 +107,7 @@ public class OrgChartService {
   private static final String ERR_USER_ASSIGNED = "problem.org_chart.user_already_assigned";
   private static final String ERR_USER_REQUIRED = "problem.org_chart.user_required";
   private static final String ERR_NAME_NOT_ALLOWED = "problem.org_chart.name_not_allowed";
+  private static final String ERR_VACATE_NOT_COMMAND = "problem.org_chart.vacate_not_command";
 
   private final OrgChartPositionRepository positionRepository;
   private final OrgUnitRepository orgUnitRepository;
@@ -236,6 +237,39 @@ public class OrgChartService {
     if (request.sortIndex() != null) {
       position.setSortIndex(request.sortIndex());
     }
+    return mapper.toDto(positionRepository.save(position));
+  }
+
+  /**
+   * Vacates the Kommandoleiter seat of a Kommando(gruppe): clears the holder on a {@code
+   * COMMAND_LEAD} row while leaving the row itself — its name, its Stv. Kommandoleiter and its
+   * Ensigns — intact. This is the inverse of assigning a leader through {@link #updatePosition} and
+   * the reason a Kommando outlives a departing Kommandoleiter instead of having to be deleted and
+   * rebuilt. Only a {@code COMMAND_LEAD} carries a nullable holder (the {@code chk_org_chart_user}
+   * CHECK keeps every other rank's holder mandatory), so every other rank is rejected as a 400:
+   * removing such a person-centric position is {@link #deletePosition} instead. ADMIN-only at the
+   * controller.
+   *
+   * @param id the Kommando position id; never {@code null}.
+   * @param version the optimistic-lock version the client last saw; a mismatch surfaces as 409.
+   * @return the updated, now-leaderless Kommando as a flat DTO with the bumped version.
+   * @throws NotFoundException if no position matches the id.
+   * @throws BadRequestException if the position is not a {@code COMMAND_LEAD} Kommando.
+   * @throws ObjectOptimisticLockingFailureException if the supplied version is stale.
+   */
+  @Transactional
+  public OrgChartPositionDto vacateCommandLeader(@NotNull UUID id, long version) {
+    OrgChartPosition position =
+        positionRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
+    if (position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
+      throw new BadRequestException(ERR_VACATE_NOT_COMMAND);
+    }
+    if (position.getVersion() != null && !position.getVersion().equals(version)) {
+      throw new ObjectOptimisticLockingFailureException(OrgChartPosition.class, id);
+    }
+    position.setUser(null);
     return mapper.toDto(positionRepository.save(position));
   }
 

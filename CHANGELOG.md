@@ -12,6 +12,8 @@
 
 - **Operationen sind jetzt zusätzlich für alle Teilnehmenden der zugeordneten Einsätze sichtbar (außer nicht angemeldete Besucher).** Wer an einem Einsatz einer Operation teilgenommen hat, sieht die Operation und seine Auszahlung jetzt auch dann, wenn sie einer anderen Staffel gehört oder staffellos ist.
 
+- **Im Organigramm lässt sich ein gesetzter Kommandoleiter jetzt entfernen, ohne die ganze Kommandogruppe zu löschen.** Wird der Posten vakant, bleibt die Kommandogruppe mit Namen, Stv. Kommandoleiter und Ensigns bestehen; ein neuer Kommandoleiter kann später zugewiesen werden.
+
 ## [v0.4.5](https://github.com/krt-iri/basetool/releases/tag/v0.4.5) - 2026-06-08
 
 ### Added
