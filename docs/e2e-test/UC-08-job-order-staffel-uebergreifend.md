@@ -30,7 +30,7 @@ Staffel A braucht Material, das Staffel B liefern soll.
 
 ## Erwartetes Ergebnis
 
-- Der Job Order ist **A-verantwortet** (Responsible = A) und damit für A sicht-/bearbeitbar; B trägt über die ungegated Inventar-Verknüpfung bei, ohne den Auftrag sehen zu müssen (Auftrags-Sichtbarkeit nach `responsibleOrgUnit.kind`, REQ-ORG-003 / [UC-16](UC-16-job-order-mandanten-sichtbarkeit.md)).
+- Der Job Order ist **A-verantwortet** (Responsible = A) und damit für A sicht-/bearbeitbar; B trägt über die ungegated Inventar-Verknüpfung bei, ohne den Auftrag sehen zu müssen (Auftrags-Sichtbarkeit nach `responsibleOrgUnit.kind`, REQ-ORG-003 / [UC-18](UC-18-job-order-mandanten-sichtbarkeit.md)).
 - B's verknüpfter Lagereintrag erscheint **im Auftrags-Kontext** (`findByJobOrderIdOrdered`, ungegated) und zählt auf die offene Menge des `JobOrderMaterial` ein.
 - B's Lagereintrag erscheint **nicht** in der Lager-View von Staffel A (`findGlobalByFilters` bleibt gegated) — kein Datenleck.
 

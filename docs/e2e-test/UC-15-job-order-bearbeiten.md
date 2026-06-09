@@ -1,8 +1,8 @@
-# UC-13 — Job Order bearbeiten
+# UC-15 — Job Order bearbeiten
 
 |                |                                                                                                                       |
 |----------------|-----------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-13                                                                                                                 |
+| **ID**         | UC-15                                                                                                                 |
 | **Tag**        | `e2e`                                                                                                                 |
 | **Testklasse** | [`JobOrderEditE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/JobOrderEditE2eTest.java) |
 | **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md)                                                                                   |

@@ -22,8 +22,8 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 |------------------------------------------|-----------------------|-------------------------|------------------------|-----------------|---------|-------|
 | Einsatz anlegen (UC-02)                  | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
 | Job Order anlegen (UC-03)                | ✓ (öffentl. Formular) | ✓                       | ✓                      | ✓               | ✓       | ✓     |
-| Job Order bearbeiten (UC-13)             | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
-| Job-Order-Status ändern (UC-14)          | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
+| Job Order bearbeiten (UC-15)             | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
+| Job-Order-Status ändern (UC-16)          | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
 | Refinery Order anlegen (UC-04)           | ✗                     | ✓ (Owner = self)        | ✓ (Owner frei wählbar) | ✓               | ✓       | ✓     |
 | Schiff in Hangar (UC-05)                 | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
 | Eigenes Inventar an Job Order verknüpfen | ✗                     | ✓ (nur eigenes)         | ✓ (fremder Owner)      | ✓ (nur eigenes) | ✓       | ✓     |
@@ -41,7 +41,7 @@ Der Scope wird **im Service-Layer** durchgesetzt (`OwnerScopeService`), nicht im
 
 - **Strict-Staffel** (kein staffel-übergreifender Zugriff): `Ship`, `InventoryItem` (direkte Lager-View), `RefineryOrder`, **`Operation`**. Listen filtern auf `owning_org_unit_id`; Detail-/Schreibendpunkte gaten über `canSee*`/`canEdit*`.
 - **Cross-Staffel mit Public-Escape**: `Mission` (Einsatz). Für andere OrgUnits sichtbar, *wenn* `is_internal = false`; editierbar nur durch die besitzende OrgUnit + Admins. → UC-10.
-- **Bedingt staffel-scoped (Sichtbarkeit über `responsibleOrgUnit.kind`, REQ-ORG-003)**: `JobOrder` + verknüpfte `JobOrderMaterial` + `JobOrderHandover`. Responsible = SK → **öffentlich** für alle profit-eligible Mitglieder (geteilte SK-Warteschlange); Responsible = Staffel → **privat** für diese Staffel + Admins. Vorgeschaltet ist das Profit-Gate (`canViewJobOrders`: Admin oder mindestens eine profit-eligible Mitgliedschaft). SK-Auftrags-*Edits* laufen über das Rollen-Gate (LOGISTICIAN+), nicht über den Staffel-Scope. Verknüpftes Inventar ist im Auftrags-Kontext cross-OrgUnit sichtbar (`findByJobOrderIdOrdered`, ungegated), leakt aber nie in eine fremde Lager-View. → UC-08, UC-09, UC-16.
+- **Bedingt staffel-scoped (Sichtbarkeit über `responsibleOrgUnit.kind`, REQ-ORG-003)**: `JobOrder` + verknüpfte `JobOrderMaterial` + `JobOrderHandover`. Responsible = SK → **öffentlich** für alle profit-eligible Mitglieder (geteilte SK-Warteschlange); Responsible = Staffel → **privat** für diese Staffel + Admins. Vorgeschaltet ist das Profit-Gate (`canViewJobOrders`: Admin oder mindestens eine profit-eligible Mitgliedschaft). SK-Auftrags-*Edits* laufen über das Rollen-Gate (LOGISTICIAN+), nicht über den Staffel-Scope. Verknüpftes Inventar ist im Auftrags-Kontext cross-OrgUnit sichtbar (`findByJobOrderIdOrdered`, ungegated), leakt aber nie in eine fremde Lager-View. → UC-08, UC-09, UC-18.
 
 > **Wichtig (Korrektur einer häufigen Annahme):** **Einsätze/Operationen und Refinery Orders sind strict-staffel, NICHT staffel-übergreifend.** Die staffel-übergreifende Zusammenarbeit läuft über **öffentliche Einsätze** (Teilnehmer aus anderen Staffeln, UC-10) und über den **Job-Order-Workspace** inkl. Handover (UC-08/UC-09) — nicht über Operationen oder Refinery Orders.
 
@@ -59,7 +59,7 @@ Beim Anlegen wird die OrgUnit zentral gestempelt (`resolveSquadronForPickerOutpu
 
 - SK und Staffel teilen die `org_unit`-Tabelle mit `kind`-Diskriminator (`SQUADRON` / `SPECIAL_COMMAND`). SK ist also eine vollwertige OrgUnit mit Mitgliedschaften.
 - **SK-Lifecycle** (anlegen/umbenennen/löschen) ist ADMIN-only. **SK-Mitgliederverwaltung** ist offen für ADMIN oder den `is_lead`-Träger genau dieses SK (`canManageMembers`); der Lead-Toggle selbst bleibt ADMIN-only (kein Self-Escalation).
-- **SK als besitzende/anfragende OrgUnit von Aggregaten 400t aktuell** (die Legacy-Spalte `owning_squadron_id` ist noch `NOT NULL`); das hebt sich erst in der destruktiven Cleanup-Release. → relevant für UC-11.
+- **SK als besitzende OrgUnit von strict-Aggregaten ist möglich** (Inventar, Ship, Refinery Order, Mission, Operation): die Legacy-Spalte `owning_squadron_id` wurde in V102/V103 entfernt, `owning_org_unit_id` referenziert die polymorphe `org_unit`-Tabelle (und ist seit V132 für die personenbezogenen Aggregate nullable). Ein SK kann also Inventar besitzen — die `memberOrgUnitIds`-Vereinigung umfasst Staffel **und** SK. → UC-14. **Ausnahme Job Order:** ein nicht-profit-fähiges SK darf nicht die *bearbeitende* (responsible) Einheit eines Job Orders sein (400, Profit-Eligibility V128) → UC-11; als *anfragende* (requesting) Einheit ist jede OrgUnit zulässig.
 - **SK können nicht am Beförderungssubsystem teilnehmen** (DB-CHECK + Trigger + JPA-Guards).
 
 ## Cross-Staffel-Mechanik beim Inventar (Kern von UC-08/UC-09)

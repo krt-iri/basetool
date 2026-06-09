@@ -100,6 +100,36 @@
         { "type": "password", "value": "test-member-pw", "temporary": false }
       ],
       "realmRoles": ["Squadron Member"]
+    },
+    {
+      "username": "test-sk",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-sk@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-sk-pw", "temporary": false }
+      ],
+      "realmRoles": ["Squadron Member"]
+    },
+    {
+      "username": "test-none",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-none@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-none-pw", "temporary": false }
+      ],
+      "realmRoles": ["Squadron Member"]
+    },
+    {
+      "username": "test-both",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-both@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-both-pw", "temporary": false }
+      ],
+      "realmRoles": ["Squadron Member"]
     }
   ]
 }
