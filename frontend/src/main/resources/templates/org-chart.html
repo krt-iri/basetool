@@ -328,6 +328,48 @@
         const modalContent = modal ? modal.querySelector('.modal-content') : null;
         let lastTrigger = null;
 
+        // Preserve the wide chart's horizontal scroll (and the page's vertical scroll)
+        // across the full-page reload that send() runs after every successful edit, so
+        // the view does not snap back to the top-left. Saved right before the reload,
+        // restored exactly once on the next load.
+        const SCROLL_KEY = 'oc-chart.scroll';
+        function saveScrollState() {
+            try {
+                window.sessionStorage.setItem(SCROLL_KEY, JSON.stringify({
+                    x: chart ? chart.scrollLeft : 0,
+                    y: window.pageYOffset || 0
+                }));
+            } catch (e) {
+                /* storage unavailable (private mode) — fall back to a plain reload */
+            }
+        }
+        function restoreScrollState() {
+            let raw = null;
+            try {
+                raw = window.sessionStorage.getItem(SCROLL_KEY);
+                if (raw) {
+                    window.sessionStorage.removeItem(SCROLL_KEY);
+                }
+            } catch (e) {
+                return;
+            }
+            if (!raw) {
+                return;
+            }
+            try {
+                const pos = JSON.parse(raw);
+                if (chart && typeof pos.x === 'number') {
+                    chart.scrollLeft = pos.x;
+                }
+                if (typeof pos.y === 'number') {
+                    window.scrollTo(0, pos.y);
+                }
+            } catch (e) {
+                /* malformed payload — ignore */
+            }
+        }
+        restoreScrollState();
+
         function csrfHeaders() {
             const headers = {'Content-Type': 'application/json', 'Accept': 'application/json'};
             const token = document.querySelector('meta[name="_csrf"]');
@@ -485,6 +527,7 @@
                 if (resp.ok) {
                     window.showFrontendSuccessToast(/*[[#{orgChart.toast.saved}]]*/ 'Saved');
                     closeModal();
+                    saveScrollState();
                     setTimeout(function () {
                         window.location.reload();
                     }, 400);
