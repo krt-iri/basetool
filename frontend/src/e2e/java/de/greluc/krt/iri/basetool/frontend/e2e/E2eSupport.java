@@ -27,6 +27,7 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.Request;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.TimeoutError;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -402,16 +403,18 @@ final class E2eSupport {
    *
    * @param page the page to navigate
    * @param url the absolute URL to load
+   * @return the main-frame {@link Response} of the successful navigation (never {@code null} for a
+   *     document load), so callers can assert on its HTTP status — e.g. that a reopened page
+   *     renders {@code 200} rather than {@code 500}
    * @throws PlaywrightException if every attempt is aborted, or on the first non-transient
    *     navigation failure
    */
-  static void navigate(Page page, String url) {
+  static Response navigate(Page page, String url) {
     // Attempts 1..N-1 retry a transient abort; the final attempt (below the loop) runs uncaught,
     // so a persistent failure propagates with its real error — mirrors login()/attemptLogin.
     for (int attempt = 1; attempt < NAVIGATE_MAX_ATTEMPTS; attempt++) {
       try {
-        page.navigate(url);
-        return;
+        return page.navigate(url);
       } catch (PlaywrightException abort) {
         if (!isTransientNavigationAbort(abort)) {
           throw abort;
@@ -429,7 +432,7 @@ final class E2eSupport {
       page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
       page.waitForLoadState();
     }
-    page.navigate(url);
+    return page.navigate(url);
   }
 
   /**

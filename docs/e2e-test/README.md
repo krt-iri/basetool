@@ -6,23 +6,24 @@ Für Aufbau, Cross-Browser-Matrix und CI-Workflows der E2E-Suite siehe den Testi
 
 ## Übersicht
 
-|                     ID                      |                     Use Case                      |   Tag   |           Testklasse            |
-|---------------------------------------------|---------------------------------------------------|---------|---------------------------------|
-| [UC-01](UC-01-login.md)                     | Login via Keycloak                                | `e2e`   | `LoginSmokeE2eTest`             |
-| [UC-02](UC-02-mission-anlegen.md)           | Einsatz anlegen                                   | `e2e`   | `MissionCreateE2eTest`          |
-| [UC-03](UC-03-job-order-anlegen.md)         | Job Order anlegen                                 | `e2e`   | `JobOrderCreateE2eTest`         |
-| [UC-04](UC-04-refinery-order-anlegen.md)    | Refinery Order anlegen                            | `e2e`   | `RefineryOrderCreateE2eTest`    |
-| [UC-05](UC-05-hangar-schiff-hinzufuegen.md) | Schiff zum Hangar hinzufügen                      | `e2e`   | `HangarAddShipE2eTest`          |
-| [UC-06](UC-06-job-order-handover.md)        | Job-Order-Handover protokollieren                 | `e2e`   | `JobOrderHandoverE2eTest`       |
-| [UC-07](UC-07-kernseiten-smoke.md)          | Kernseiten-Smoke (nicht-destruktiv)               | `smoke` | `CorePagesSmokeE2eTest`         |
-| [UC-13](UC-13-inventar-operationen.md)      | Inventar: Ein-/Aus-/Umbuchen, Verkauf, Zuweisung  | `e2e`   | `InventoryOperationsE2eTest`    |
-| [UC-15](UC-15-job-order-bearbeiten.md)      | Job Order bearbeiten                              | `e2e`   | `JobOrderEditE2eTest`           |
-| [UC-16](UC-16-job-order-status.md)          | Job-Order-Status ändern                           | `e2e`   | `JobOrderStatusE2eTest`         |
-| [UC-17](UC-17-item-order-handover.md)       | Item-Auftrag & Item-Handover                      | `e2e`   | `JobOrderItemHandoverE2eTest`   |
-| [UC-19](UC-19-refinery-order-einlagern.md)  | Refinery Order einlagern (in das Lager)           | `e2e`   | `RefineryOrderStoreE2eTest`     |
-| [UC-20](UC-20-refinery-order-lifecycle.md)  | Refinery Order: Bearbeiten/Abbrechen/Filter/Edges | `e2e`   | `RefineryOrderLifecycleE2eTest` |
+|                     ID                      |                       Use Case                        |   Tag   |           Testklasse            |
+|---------------------------------------------|-------------------------------------------------------|---------|---------------------------------|
+| [UC-01](UC-01-login.md)                     | Login via Keycloak                                    | `e2e`   | `LoginSmokeE2eTest`             |
+| [UC-02](UC-02-mission-anlegen.md)           | Einsatz anlegen                                       | `e2e`   | `MissionCreateE2eTest`          |
+| [UC-03](UC-03-job-order-anlegen.md)         | Job Order anlegen                                     | `e2e`   | `JobOrderCreateE2eTest`         |
+| [UC-04](UC-04-refinery-order-anlegen.md)    | Refinery Order anlegen                                | `e2e`   | `RefineryOrderCreateE2eTest`    |
+| [UC-05](UC-05-hangar-schiff-hinzufuegen.md) | Schiff zum Hangar hinzufügen                          | `e2e`   | `HangarAddShipE2eTest`          |
+| [UC-06](UC-06-job-order-handover.md)        | Job-Order-Handover protokollieren                     | `e2e`   | `JobOrderHandoverE2eTest`       |
+| [UC-07](UC-07-kernseiten-smoke.md)          | Kernseiten-Smoke (nicht-destruktiv)                   | `smoke` | `CorePagesSmokeE2eTest`         |
+| [UC-13](UC-13-inventar-operationen.md)      | Inventar: Ein-/Aus-/Umbuchen, Verkauf, Zuweisung      | `e2e`   | `InventoryOperationsE2eTest`    |
+| [UC-15](UC-15-job-order-bearbeiten.md)      | Job Order bearbeiten                                  | `e2e`   | `JobOrderEditE2eTest`           |
+| [UC-16](UC-16-job-order-status.md)          | Job-Order-Status ändern                               | `e2e`   | `JobOrderStatusE2eTest`         |
+| [UC-17](UC-17-item-order-handover.md)       | Item-Auftrag & Item-Handover                          | `e2e`   | `JobOrderItemHandoverE2eTest`   |
+| [UC-19](UC-19-refinery-order-einlagern.md)  | Refinery Order einlagern (in das Lager)               | `e2e`   | `RefineryOrderStoreE2eTest`     |
+| [UC-20](UC-20-refinery-order-lifecycle.md)  | Refinery Order: Bearbeiten/Abbrechen/Filter/Edges     | `e2e`   | `RefineryOrderLifecycleE2eTest` |
+| [UC-22](UC-22-mission-finanzeintrag.md)     | Einsatz: Finanzeintrag anlegen & Detail erneut öffnen | `e2e`   | `MissionFinanceEntryE2eTest`    |
 
-UC-01 bis UC-07 sowie UC-13 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied); UC-15 bis UC-17 erweitern die Job-Order-Flows (Bearbeiten, Status-Wechsel, Item-Auftrag/Item-Handover), UC-19 und UC-20 die Refinery-Flows (Einlagern, Lifecycle/Edge Cases) — ebenfalls `@Tag("e2e")`. Zusammen mit UC-04 (Anlegen) bilden UC-19/UC-20 den vollen Refinery-Funktionsumfang ab.
+UC-01 bis UC-07 sowie UC-13 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied); UC-15 bis UC-17 erweitern die Job-Order-Flows (Bearbeiten, Status-Wechsel, Item-Auftrag/Item-Handover), UC-19 und UC-20 die Refinery-Flows (Einlagern, Lifecycle/Edge Cases), UC-22 den Einsatz-Finanzeintrag (Regressionsschutz gegen den Detail-500, wenn ein Einsatz einen Finanzeintrag besitzt) — ebenfalls `@Tag("e2e")`. Zusammen mit UC-04 (Anlegen) bilden UC-19/UC-20 den vollen Refinery-Funktionsumfang ab.
 
 ### Rollen & staffel-/SK-übergreifend
 
