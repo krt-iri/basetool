@@ -14,27 +14,31 @@ Für Aufbau, Cross-Browser-Matrix und CI-Workflows der E2E-Suite siehe den Testi
 | [UC-04](UC-04-refinery-order-anlegen.md)    | Refinery Order anlegen                            | `e2e`   | `RefineryOrderCreateE2eTest`    |
 | [UC-05](UC-05-hangar-schiff-hinzufuegen.md) | Schiff zum Hangar hinzufügen                      | `e2e`   | `HangarAddShipE2eTest`          |
 | [UC-06](UC-06-job-order-handover.md)        | Job-Order-Handover protokollieren                 | `e2e`   | `JobOrderHandoverE2eTest`       |
+| [UC-07](UC-07-kernseiten-smoke.md)          | Kernseiten-Smoke (nicht-destruktiv)               | `smoke` | `CorePagesSmokeE2eTest`         |
 | [UC-13](UC-13-inventar-operationen.md)      | Inventar: Ein-/Aus-/Umbuchen, Verkauf, Zuweisung  | `e2e`   | `InventoryOperationsE2eTest`    |
+| [UC-15](UC-15-job-order-bearbeiten.md)      | Job Order bearbeiten                              | `e2e`   | `JobOrderEditE2eTest`           |
+| [UC-16](UC-16-job-order-status.md)          | Job-Order-Status ändern                           | `e2e`   | `JobOrderStatusE2eTest`         |
+| [UC-17](UC-17-item-order-handover.md)       | Item-Auftrag & Item-Handover                      | `e2e`   | `JobOrderItemHandoverE2eTest`   |
 | [UC-19](UC-19-refinery-order-einlagern.md)  | Refinery Order einlagern (in das Lager)           | `e2e`   | `RefineryOrderStoreE2eTest`     |
 | [UC-20](UC-20-refinery-order-lifecycle.md)  | Refinery Order: Bearbeiten/Abbrechen/Filter/Edges | `e2e`   | `RefineryOrderLifecycleE2eTest` |
-| [UC-07](UC-07-kernseiten-smoke.md)          | Kernseiten-Smoke (nicht-destruktiv)               | `smoke` | `CorePagesSmokeE2eTest`         |
 
-UC-01 bis UC-07 sowie UC-13, UC-19 und UC-20 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied). UC-04/UC-19/UC-20 bilden zusammen den vollen Refinery-Funktionsumfang ab: Anlegen, Einlagern und Lifecycle/Edge Cases.
+UC-01 bis UC-07 sowie UC-13 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied); UC-15 bis UC-17 erweitern die Job-Order-Flows (Bearbeiten, Status-Wechsel, Item-Auftrag/Item-Handover), UC-19 und UC-20 die Refinery-Flows (Einlagern, Lifecycle/Edge Cases) — ebenfalls `@Tag("e2e")`. Zusammen mit UC-04 (Anlegen) bilden UC-19/UC-20 den vollen Refinery-Funktionsumfang ab.
 
 ### Rollen & staffel-/SK-übergreifend
 
 Die folgenden Dokumente erweitern die Grund-Flows um **Rollen** (Offizier, einfaches Mitglied) und **Mehr-Staffel-/SK-Szenarien** — inkl. der Fälle, in denen eine Staffel etwas anlegt und eine andere damit weiterarbeitet. Sie sind **spezifiziert und als Playwright-Tests implementiert** (`@Tag("e2e")`).
 
-|                     Dokument                      |                                                                Thema                                                                |             Testklasse             |
-|---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|------------------------------------|
-| [Rollen & Scope](rollen-und-scope.md)             | Rollen × Flow-Matrix, Mandanten-Scope-Modell, Admin-Pin, SK-Grundlagen (Referenz)                                                   | `RolePermissionsE2eTest`           |
-| [UC-08](UC-08-job-order-staffel-uebergreifend.md) | Job Order: Staffel A bestellt, Staffel B liefert (B's Inventar verknüpft)                                                           | `CrossStaffelJobOrderE2eTest`      |
-| [UC-09](UC-09-handover-staffel-uebergreifend.md)  | Handover staffel-übergreifend (Material von B, Empfänger ggf. dritte Staffel)                                                       | `CrossStaffelHandoverE2eTest`      |
-| [UC-10](UC-10-mission-staffel-uebergreifend.md)   | Öffentlicher Einsatz mit Teilnehmern aus anderer Staffel                                                                            | `PublicMissionCrossStaffelE2eTest` |
-| [UC-11](UC-11-sk-spezialkommando.md)              | Spezialkommando (SK) als OrgUnit (Lifecycle, Mitglieder, aktuelle Grenzen)                                                          | `SpecialCommandE2eTest`            |
-| [UC-12](UC-12-anonymer-auftrag.md)                | Anonymer Auftrag: Gast wählt Auftraggeber (alle) & bearbeitende Einheit (nur profit-fähige, Eingangs-SK vorbelegt), Material + Item | `AnonymousJobOrderE2eTest`         |
-| [UC-14](UC-14-inventar-mandanten-scope.md)        | Inventar-Mandanten-Scope: Sicht/Anlage/Edit über Staffel-, SK-, beide und keine Zugehörigkeit + Admin-Pin + Gast                    | `InventoryTenancyE2eTest`          |
-| [UC-21](UC-21-refinery-order-mandanten-scope.md)  | Refinery-Mandanten-Scope: Sicht/Anlage/Edit/Einlagern über Staffel-, SK-, beide und keine Zugehörigkeit + Admin-Pin + BAC-004       | `RefineryOrderTenancyE2eTest`      |
+|                      Dokument                      |                                                                Thema                                                                |             Testklasse             |
+|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|------------------------------------|
+| [Rollen & Scope](rollen-und-scope.md)              | Rollen × Flow-Matrix, Mandanten-Scope-Modell, Admin-Pin, SK-Grundlagen (Referenz); Control-Gating Handover/Edit/Delete je Rolle     | `RolePermissionsE2eTest`           |
+| [UC-08](UC-08-job-order-staffel-uebergreifend.md)  | Job Order: Staffel A bestellt, Staffel B liefert (B's Inventar verknüpft)                                                           | `CrossStaffelJobOrderE2eTest`      |
+| [UC-09](UC-09-handover-staffel-uebergreifend.md)   | Handover staffel-übergreifend (Material von B, Empfänger ggf. dritte Staffel)                                                       | `CrossStaffelHandoverE2eTest`      |
+| [UC-10](UC-10-mission-staffel-uebergreifend.md)    | Öffentlicher Einsatz mit Teilnehmern aus anderer Staffel                                                                            | `PublicMissionCrossStaffelE2eTest` |
+| [UC-11](UC-11-sk-spezialkommando.md)               | Spezialkommando (SK) als OrgUnit (Lifecycle, Mitglieder, aktuelle Grenzen)                                                          | `SpecialCommandE2eTest`            |
+| [UC-12](UC-12-anonymer-auftrag.md)                 | Anonymer Auftrag: Gast wählt Auftraggeber (alle) & bearbeitende Einheit (nur profit-fähige, Eingangs-SK vorbelegt), Material + Item | `AnonymousJobOrderE2eTest`         |
+| [UC-14](UC-14-inventar-mandanten-scope.md)         | Inventar-Mandanten-Scope: Sicht/Anlage/Edit über Staffel-, SK-, beide und keine Zugehörigkeit + Admin-Pin + Gast                    | `InventoryTenancyE2eTest`          |
+| [UC-18](UC-18-job-order-mandanten-sichtbarkeit.md) | Job Order: wer sieht was — SK-öffentliche Warteschlange vs. staffel-privat, Profit-Gate (REQ-ORG-003)                               | `JobOrderTenancyE2eTest`           |
+| [UC-21](UC-21-refinery-order-mandanten-scope.md)   | Refinery-Mandanten-Scope: Sicht/Anlage/Edit/Einlagern über Staffel-, SK-, beide und keine Zugehörigkeit + Admin-Pin + BAC-004       | `RefineryOrderTenancyE2eTest`      |
 
 > **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel** (nicht staffel-übergreifend). Die Refinery-Mandanten-Regeln (Sicht/Anlage/Edit/Einlagern, Admin-Pin, BAC-004) sind in [UC-21](UC-21-refinery-order-mandanten-scope.md) abgedeckt. Die staffel-übergreifende Zusammenarbeit läuft über öffentliche Einsätze (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
 

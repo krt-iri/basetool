@@ -63,6 +63,20 @@ services:
   # /app/logs after the CDS run, or point the training run's logs elsewhere).
   backend-dev:
     user: "0:0"
+    # Disable the backend rate limiter for the throwaway E2E stack. The limiter keys its Bucket4j
+    # buckets by client IP, but the Thymeleaf frontend reaches the backend over a server-side
+    # WebClient — it is NOT a reverse proxy forwarding X-Forwarded-For — so every test's backend
+    # traffic arrives from the single frontend-container IP and shares one bucket. The suite funnels
+    # thousands of calls through that IP within a few minutes, exhausting both the global 300/min
+    # budget AND the far tighter per-endpoint rules (/api/v1/orders and /api/v1/missions at 10/min
+    # each in application.yml). The depletion surfaces as sporadic 429s that make unrelated writes
+    # fail together in a burst — e.g. JobOrderStatus staying OPEN and the Mission-create /
+    # Org-chart-Kommando POSTs timing out in the same ~30s window. Per-IP limiting is meaningless
+    # behind one IP, and the filter is unit-tested separately, so this stack switches it off. An env
+    # var (highest Spring property precedence) overrides the dev profile docker-compose.test.yml
+    # activates; the map merges with — does not replace — the base template's environment.
+    environment:
+      APP_RATE_LIMIT_ENABLED: "false"
     # Drop the test stack's host.docker.internal -> host-gateway mapping so the Keycloak network
     # alias (above) resolves instead — the host-gateway route can't reach KC's 127.0.0.1-bound
     # published port on a Linux runner.

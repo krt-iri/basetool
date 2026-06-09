@@ -420,12 +420,15 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Tears the stack down and removes its named volumes. Best-effort: a failure here is logged but
-   * does not fail the build (the test outcome has already been decided).
+   * Captures the backend and frontend container logs (for post-mortem diagnostics), then tears the
+   * stack down and removes its named volumes. Best-effort: a failure here is logged but does not
+   * fail the build (the test outcome has already been decided).
    *
    * @param root the repository root the compose files live in
    */
   private void composeDown(Path root) {
+    captureServiceLog(root, "backend-dev", "backend");
+    captureServiceLog(root, "frontend-dev", "frontend");
     try {
       runProcess(
           root,
@@ -435,6 +438,39 @@ public final class E2eStackExtension implements BeforeAllCallback {
           DOWN_TIMEOUT);
     } catch (Exception e) {
       System.out.println("[E2E] stack teardown failed (ignored): " + e.getMessage());
+    }
+  }
+
+  /**
+   * Best-effort dump of one dev-profile service container's full log to {@code
+   * build/e2e/<label>.log} just before teardown, so a CI artifact preserves how that container
+   * handled every request — most usefully the access-log line (HTTP status + duration) for the
+   * operation a failing test was driving, which the browser-side artifacts cannot show. Un-tailed
+   * so a mid-run request is never truncated away; never throws (the test outcome is already
+   * decided).
+   *
+   * <p>The service must be named by its compose <em>service key</em> (e.g. {@code backend-dev}, not
+   * the network alias {@code backend} nor the prod-profile {@code backend} service): {@code docker
+   * compose logs} resolves service keys, and the prod-profile twins have no running container in
+   * the dev-profile e2e stack, so naming them would yield an empty log.
+   *
+   * @param root the repository root the compose files live in
+   * @param service the dev-profile compose service key to read logs from (e.g. {@code backend-dev})
+   * @param label the {@code build/e2e/<label>.log} file-name stem to write the captured log under
+   */
+  private void captureServiceLog(Path root, String service, String label) {
+    try {
+      java.util.ArrayList<String> cmd = new java.util.ArrayList<>(List.of("docker", "compose"));
+      for (String f : COMPOSE_FILES) {
+        cmd.add("-f");
+        cmd.add(f);
+      }
+      cmd.add("--profile");
+      cmd.add("dev");
+      cmd.addAll(List.of("logs", "--no-color", "--no-log-prefix", service));
+      runProcess(root, label, cmd, throwawayEnv(), Duration.ofMinutes(2));
+    } catch (Exception ignored) {
+      System.out.println("[E2E] could not capture " + label + " log: " + ignored.getMessage());
     }
   }
 

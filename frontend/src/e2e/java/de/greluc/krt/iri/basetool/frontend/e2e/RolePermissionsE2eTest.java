@@ -32,16 +32,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Role-permission flow: the Job-Order handover control on {@code orders-detail.html} is gated by
- * {@code sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"}. A plain {@code Squadron
- * Member} must NOT see it; an {@code Officer} must.
+ * Role-permission flow: the action controls on {@code orders-detail.html} are each gated by a
+ * different {@code sec:authorize} expression, so what a user sees on an order they CAN open is the
+ * UI face of the edit/delete tenancy matrix. This test pins down three of them on the seeded
+ * MATERIAL order:
  *
- * <p>This is the first flow to exercise the {@code test-member} and {@code test-officer} realm
- * users and the multi-user login pattern — one fresh Keycloak session per role, each in its own
- * browser context (the suite's {@code authenticatedStorageState} writes a single fixed path, so
- * per-user isolation uses separate contexts logging in directly instead). It relies on JUnit
- * running test classes sequentially, so the IRIDIUM home assigned here is not clobbered by a
- * cross-Staffel class.
+ * <ul>
+ *   <li><b>Handover</b> ({@code order-handover-open}) — {@code hasAnyRole('LOGISTICIAN', 'OFFICER',
+ *       'ADMIN')}: hidden from a plain Squadron Member, shown to an Officer.
+ *   <li><b>Edit</b> (the {@code edit-modal} trigger) — {@code hasRole('LOGISTICIAN')}: hidden from
+ *       a Member, shown to an Officer (and Admin, via the role hierarchy).
+ *   <li><b>Delete</b> (the {@code /delete} form) — {@code hasRole('ADMIN')}: hidden from both
+ *       Member and Officer, shown only to an Admin.
+ * </ul>
+ *
+ * <p>This is the first flow to exercise the {@code test-member}, {@code test-officer} and {@code
+ * test-admin} realm users together and the multi-user login pattern — one fresh Keycloak session
+ * per role, each in its own browser context (the suite's {@code authenticatedStorageState} writes a
+ * single fixed path, so per-user isolation uses separate contexts logging in directly instead). It
+ * relies on JUnit running test classes sequentially, so the IRIDIUM home assigned here is not
+ * clobbered by a cross-Staffel class.
  */
 @Tag("e2e")
 class RolePermissionsE2eTest {
@@ -121,6 +131,26 @@ class RolePermissionsE2eTest {
     assertHandoverControlVisibility(OFFICER_USER, OFFICER_PASSWORD, true);
   }
 
+  /** A plain Squadron Member sees neither the (LOGISTICIAN) edit nor the (ADMIN) delete control. */
+  @Test
+  void squadronMemberSeesNoEditOrDeleteControls() {
+    assertEditAndDeleteControls(MEMBER_USER, MEMBER_PASSWORD, false, false);
+  }
+
+  /** An Officer sees the LOGISTICIAN-gated edit control but not the ADMIN-gated delete control. */
+  @Test
+  void officerSeesEditButNotDeleteControl() {
+    assertEditAndDeleteControls(OFFICER_USER, OFFICER_PASSWORD, true, false);
+  }
+
+  /**
+   * An Admin sees both the edit control (via the role hierarchy) and the ADMIN-gated delete form.
+   */
+  @Test
+  void adminSeesEditAndDeleteControls() {
+    assertEditAndDeleteControls(ADMIN_USER, ADMIN_PASSWORD, true, true);
+  }
+
   /**
    * Logs in as the given user in a fresh context, opens the seeded order, and asserts whether the
    * {@code order-handover-open} control is present. {@code nav-logout} is asserted first as a
@@ -151,6 +181,50 @@ class RolePermissionsE2eTest {
         }
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "role-handover-" + user);
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Logs in as the given user in a fresh context, opens the seeded order, and asserts whether the
+   * LOGISTICIAN-gated edit-modal trigger and the ADMIN-gated delete form are rendered. As with the
+   * handover check, {@code nav-logout} is asserted first as locale-independent proof the
+   * authenticated shell rendered, so an absent control means "role-gated away", not "page failed to
+   * load". The delete control is matched by its {@code /delete} form action — the only such form on
+   * the page — and asserted on its submit button so presence implies a clickable control.
+   *
+   * @param user the Keycloak username to log in as
+   * @param password the Keycloak password
+   * @param editExpected whether the edit-modal trigger should be visible for this role
+   * @param deleteExpected whether the delete form should be visible for this role
+   */
+  private void assertEditAndDeleteControls(
+      String user, String password, boolean editExpected, boolean deleteExpected) {
+    String baseUrl = STACK.baseUrl();
+    String editTrigger = "[data-trigger='open-modal-display'][data-modal-id='edit-modal']";
+    String deleteButton = "form[action*='/delete'] button";
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, user, password);
+        page.navigate(baseUrl + "/orders/" + jobOrderId);
+        page.waitForLoadState();
+        assertThat(page.getByTestId("nav-logout")).isVisible();
+
+        if (editExpected) {
+          assertThat(page.locator(editTrigger)).isVisible();
+        } else {
+          assertThat(page.locator(editTrigger)).hasCount(0);
+        }
+        if (deleteExpected) {
+          assertThat(page.locator(deleteButton)).isVisible();
+        } else {
+          assertThat(page.locator(deleteButton)).hasCount(0);
+        }
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "role-edit-delete-" + user);
         throw failure;
       }
     }
