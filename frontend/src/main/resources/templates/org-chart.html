@@ -372,7 +372,10 @@
             // single assignment would clamp scrollLeft toward 0 and snap the view back to the left
             // edge. Once the horizontal offset settles (or the frame budget is spent) clear the key
             // and flag completion, so callers/tests can tell the restore is done.
-            let frames = 0;
+            // Give the chart up to a few seconds to finish laying out: under load a large org's
+            // chart can take well over a second, and the offset only sticks once scrollWidth is
+            // final. Time-based (not a fixed frame count) so it is robust to a throttled frame rate.
+            const deadline = performance.now() + 5000;
             function apply() {
                 if (typeof pos.y === 'number') {
                     window.scrollTo(0, pos.y);
@@ -382,14 +385,13 @@
                 }
                 const settled =
                     !chart || typeof pos.x !== 'number' || pos.x <= 0 || chart.scrollLeft === pos.x;
-                if (settled || frames >= 30) {
+                if (settled || performance.now() >= deadline) {
                     try { window.sessionStorage.removeItem(SCROLL_KEY); } catch (e) { /* ignore */ }
                     if (chart) {
                         chart.setAttribute('data-oc-scroll-restored', '1');
                     }
                     return;
                 }
-                frames++;
                 window.requestAnimationFrame(apply);
             }
             apply();

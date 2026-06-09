@@ -28,6 +28,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -268,10 +269,11 @@ class OrgChartKeyboardA11yE2eTest {
         page.locator("#oc-name").fill("E2E Renamed");
         clickAndAwaitReload(page, page.locator("#oc-modal [data-trigger='oc-modal-submit']"));
 
-        // The scroll restore re-applies across animation frames until the wide chart has laid out;
+        // The scroll restore re-applies for up to a few seconds until the wide chart has laid out;
         // wait for it to flag completion (see org-chart.html restoreScrollState) so the read below
-        // does not race the async restore.
-        assertThat(page.locator("#oc-chart[data-oc-scroll-restored]")).hasCount(1);
+        // does not race the async restore. The timeout clears the restore's own ~5 s budget.
+        assertThat(page.locator("#oc-chart[data-oc-scroll-restored]"))
+            .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(10_000));
         int restored = scrollLeft(page);
         assertTrue(
             restored > 0,
