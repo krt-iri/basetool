@@ -225,7 +225,8 @@ class InventoryOperationsE2eTest {
           page.locator("#amount").fill("42");
 
           double before = totalAmount(stacksForMaterial(pickedMaterialId));
-          E2eSupport.clickSubmitClearingFooter(page.locator("button[type='submit']"));
+          E2eSupport.clickSubmitClearingFooter(
+              page.locator("form[action$='/inventory/input'] button[type='submit']"));
           double after = totalAmount(stacksForMaterial(pickedMaterialId));
 
           assertEquals(
@@ -447,7 +448,8 @@ class InventoryOperationsE2eTest {
           page.locator("#personal").check();
           // Index 0 is the "-- Kein Einsatz --" placeholder; index 1 is the seeded mission.
           page.locator("#missionId").selectOption(new SelectOption().setIndex(1));
-          E2eSupport.clickSubmitClearingFooter(page.locator("button[type='submit']"));
+          E2eSupport.clickSubmitClearingFooter(
+              page.locator("form[action$='/inventory/input'] button[type='submit']"));
 
           // Inline re-render (no redirect): still on the input form, with a field error shown.
           assertThat(page).hasURL(Pattern.compile(".*/inventory/input.*"));

@@ -46,11 +46,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <p><b>Fixtures.</b> Five real Keycloak users carry distinct membership profiles, assigned via the
  * REST seeder: {@code test-admin} (ADMIN, IRIDIUM = Staffel A), {@code test-member} (Staffel A
- * only), {@code test-officer} (Staffel B + SK X), {@code test-sk} (SK X only), {@code test-none}
- * (no membership). One non-personal item is seeded per owner on its own material so a material maps
- * 1:1 to an owner — Staffel A, Staffel B, SK X, and an ownerless ({@code owningOrgUnit = null})
- * item recorded by the membershipless user. Items are created <em>as</em> the user homed in the
- * target unit so the create-time resolver stamps the intended owner.
+ * only), {@code test-both} (Staffel B + SK X), {@code test-sk} (SK X only), {@code test-none} (no
+ * membership). One non-personal item is seeded per owner on its own material so a material maps 1:1
+ * to an owner — Staffel A, Staffel B, SK X, and an ownerless ({@code owningOrgUnit = null}) item
+ * recorded by the membershipless user. Items are created <em>as</em> the user homed in the target
+ * unit so the create-time resolver stamps the intended owner.
  *
  * <p><b>Drive via UI, verify via API.</b> Mirroring {@code CrossStaffelJobOrderE2eTest}, the
  * visibility/stamping/edit matrix is asserted by calling the scoped backend endpoints as each user
@@ -85,8 +85,8 @@ class InventoryTenancyE2eTest {
   private static final String ADMIN_PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
   private static final String MEMBER_USER = "test-member";
   private static final String MEMBER_PASSWORD = "test-member-pw";
-  private static final String OFFICER_USER = "test-officer";
-  private static final String OFFICER_PASSWORD = "test-officer-pw";
+  private static final String BOTH_USER = "test-both";
+  private static final String BOTH_PASSWORD = "test-both-pw";
   private static final String SK_USER = "test-sk";
   private static final String SK_PASSWORD = "test-sk-pw";
   private static final String NONE_USER = "test-none";
@@ -147,11 +147,13 @@ class InventoryTenancyE2eTest {
         seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Staffel B", "ETSB");
     skXId = seeder.createSpecialCommand(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy SK X", "ETSX");
 
-    String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
-    seeder.assignStaffelMembership(
-        ADMIN_USER, ADMIN_PASSWORD, officerId, squadronBId, false, false);
-    seeder.addSpecialCommandMember(
-        ADMIN_USER, ADMIN_PASSWORD, skXId, officerId); // test-officer: Staffel B + SK X
+    // test-both gets a dedicated profile (Staffel B + SK X). A dedicated user — not the shared
+    // test-officer — so the extra SK membership never leaks into sibling suites that rely on
+    // test-officer being single-membership (e.g. mission auto-stamping in
+    // PublicMissionCrossStaffel).
+    String bothId = seeder.getUserId(BOTH_USER, BOTH_PASSWORD);
+    seeder.assignStaffelMembership(ADMIN_USER, ADMIN_PASSWORD, bothId, squadronBId, false, false);
+    seeder.addSpecialCommandMember(ADMIN_USER, ADMIN_PASSWORD, skXId, bothId);
 
     seeder.addSpecialCommandMember(
         ADMIN_USER,
@@ -173,12 +175,12 @@ class InventoryTenancyE2eTest {
     // Created AS the user homed in the target unit so the resolver stamps that owner.
     seeder.createInventoryItem(MEMBER_USER, MEMBER_PASSWORD, matAId, locId, SEED_QUALITY, 100);
     seeder.createInventoryItemOwnedBy(
-        OFFICER_USER, OFFICER_PASSWORD, matBId, locId, SEED_QUALITY, 100, squadronBId);
+        BOTH_USER, BOTH_PASSWORD, matBId, locId, SEED_QUALITY, 100, squadronBId);
     seeder.createInventoryItem(SK_USER, SK_PASSWORD, matSkId, locId, SEED_QUALITY, 100);
     seeder.createInventoryItem(NONE_USER, NONE_PASSWORD, matOwnerlessId, locId, SEED_QUALITY, 100);
     editItemId =
         seeder.createInventoryItemOwnedBy(
-            OFFICER_USER, OFFICER_PASSWORD, matEditId, locId, SEED_QUALITY, 100, squadronBId);
+            BOTH_USER, BOTH_PASSWORD, matEditId, locId, SEED_QUALITY, 100, squadronBId);
   }
 
   /** Releases the browser and the Playwright driver process. */
@@ -219,15 +221,12 @@ class InventoryTenancyE2eTest {
   /** A member of both a squadron and an SK sees the union of both pools, and nothing else. */
   @Test
   void memberOfSquadronAndSkSeesUnionOfBoth() {
-    assertTrue(
-        visibleInAll(OFFICER_USER, OFFICER_PASSWORD, matBId), "B+SK member sees Staffel B stock");
-    assertTrue(
-        visibleInAll(OFFICER_USER, OFFICER_PASSWORD, matSkId), "B+SK member sees SK X stock");
+    assertTrue(visibleInAll(BOTH_USER, BOTH_PASSWORD, matBId), "B+SK member sees Staffel B stock");
+    assertTrue(visibleInAll(BOTH_USER, BOTH_PASSWORD, matSkId), "B+SK member sees SK X stock");
     assertFalse(
-        visibleInAll(OFFICER_USER, OFFICER_PASSWORD, matAId),
-        "B+SK member must not see Staffel A stock");
+        visibleInAll(BOTH_USER, BOTH_PASSWORD, matAId), "B+SK member must not see Staffel A stock");
     assertFalse(
-        visibleInAll(OFFICER_USER, OFFICER_PASSWORD, matOwnerlessId),
+        visibleInAll(BOTH_USER, BOTH_PASSWORD, matOwnerlessId),
         "B+SK member must not see ownerless stock");
   }
 
@@ -279,7 +278,7 @@ class InventoryTenancyE2eTest {
         visibleInMy(MEMBER_USER, MEMBER_PASSWORD, matAId),
         "the A item's owner sees it in their personal view");
     assertFalse(
-        visibleInMy(OFFICER_USER, OFFICER_PASSWORD, matAId),
+        visibleInMy(BOTH_USER, BOTH_PASSWORD, matAId),
         "another user must not see the A item in their personal view");
     assertFalse(
         visibleInMy(SK_USER, SK_PASSWORD, matAId),
@@ -321,11 +320,11 @@ class InventoryTenancyE2eTest {
     // Multi-membership without a pick → forced choice → 400.
     assertEquals(
         400,
-        attemptCreate(OFFICER_USER, OFFICER_PASSWORD, null),
+        attemptCreate(BOTH_USER, BOTH_PASSWORD, null),
         "multi-membership user without a pick must be rejected");
     // Valid pick of an own membership → stamped.
     assertCreated(
-        attemptCreate(OFFICER_USER, OFFICER_PASSWORD, squadronBId),
+        attemptCreate(BOTH_USER, BOTH_PASSWORD, squadronBId),
         "multi-membership user picking an own unit succeeds");
     // Foreign picks → 400.
     assertEquals(
@@ -334,7 +333,7 @@ class InventoryTenancyE2eTest {
         "A-only member picking a foreign SK must be rejected");
     assertEquals(
         400,
-        attemptCreate(OFFICER_USER, OFFICER_PASSWORD, IRIDIUM_ID),
+        attemptCreate(BOTH_USER, BOTH_PASSWORD, IRIDIUM_ID),
         "B+SK member picking a foreign squadron must be rejected");
     assertEquals(
         400,
@@ -360,7 +359,7 @@ class InventoryTenancyE2eTest {
     // The owning unit's member (and item owner) passes the org-scope gate.
     assertNotEquals(
         403,
-        seeder.attemptBookOutStatus(OFFICER_USER, OFFICER_PASSWORD, editItemId, 1, 0),
+        seeder.attemptBookOutStatus(BOTH_USER, BOTH_PASSWORD, editItemId, 1, 0),
         "a member of the owning unit must pass the org-scope edit gate");
   }
 
@@ -398,9 +397,13 @@ class InventoryTenancyE2eTest {
       Page page = context.newPage();
       try {
         page.navigate(baseUrl + "/inventory/all");
-        // Spring Security bounces the anonymous request to the Keycloak login form.
-        assertThat(page.locator("#username"))
+        page.waitForLoadState();
+        // An anonymous request to a protected Lager page lands on the public landing page carrying
+        // the OIDC login affordance (not the Keycloak form directly), and the protected Lager table
+        // is never rendered for the guest.
+        assertThat(page.locator("a[href='/oauth2/authorization/keycloak']").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(page.locator("#inventoryTable")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "inventory-tenancy-guest");
         throw failure;

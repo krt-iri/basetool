@@ -120,6 +120,16 @@
         { "type": "password", "value": "test-none-pw", "temporary": false }
       ],
       "realmRoles": ["Squadron Member"]
+    },
+    {
+      "username": "test-both",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-both@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-both-pw", "temporary": false }
+      ],
+      "realmRoles": ["Squadron Member"]
     }
   ]
 }
