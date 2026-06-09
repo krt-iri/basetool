@@ -129,7 +129,10 @@ class JobOrderEditE2eTest {
         // locale-robust (the prior 100 and the 0 stock never yield that substring).
         assertThat(page.locator(".material-row").first())
             .containsText("250", new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
-        assertThat(page.getByText(comment)).isVisible();
+        // The comment now appears twice — the detail-page display span and the edit modal's
+        // pre-filled textarea — so scope to the first match (the displayed span) to avoid a
+        // strict-mode multiple-match.
+        assertThat(page.getByText(comment).first()).isVisible();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-edit");
         throw failure;

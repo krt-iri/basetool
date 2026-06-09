@@ -241,9 +241,14 @@ class OrgChartKeyboardA11yE2eTest {
       try {
         page.navigate(STACK.baseUrl() + "/org-chart");
 
-        // Widen the chart with leaderless Kommandos (cap is 4/Staffel) until it scrolls
-        // horizontally. Each create reloads the page, so edit mode is re-entered inside the helper.
-        for (int i = 0; i < 4 && maxScrollLeft(page) <= 0; i++) {
+        // Always create at least one leaderless Kommando (so a renameable node exists for the
+        // oc-rename step below), then keep adding — up to the 4/Staffel cap — until the chart
+        // overflows horizontally. The shared ephemeral stack may already make the all-Staffeln
+        // chart
+        // scrollable (sibling suites seed extra Staffeln/SKs into it), in which case a width-only
+        // condition would create none and leave no oc-rename control to drive. Each create reloads
+        // the page, so edit mode is re-entered inside the helper.
+        for (int i = 0; i < 4 && (i == 0 || maxScrollLeft(page) <= 0); i++) {
           createLeaderlessKommando(page, "E2E Breite " + i);
         }
         assertTrue(
