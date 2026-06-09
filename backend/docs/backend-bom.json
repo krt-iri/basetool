@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:fb39bd26-d693-455a-9dea-fd5a513b818d",
+  "serialNumber" : "urn:uuid:61a76233-a09b-49c2-87d3-2bb19cef4081",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-06-08T11:57:07Z",
+    "timestamp" : "2026-06-09T16:32:49Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-iri/basetool/actions/runs/27135923540"
+          "url" : "https://github.com/krt-iri/basetool/actions/runs/27220772827"
         },
         {
           "type" : "vcs",
@@ -2158,43 +2158,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar",
+      "bom-ref" : "pkg:maven/com.squareup.okhttp3/mockwebserver3@5.4.0?type=jar",
       "group" : "com.squareup.okhttp3",
       "name" : "mockwebserver3",
-      "version" : "5.3.2",
+      "version" : "5.4.0",
       "description" : "Square’s meticulous HTTP client for Java and Kotlin.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "7e054031640bcd6da7ec0948b8c3acda"
+          "content" : "5e86f87c6700d1980e82219b34586674"
         },
         {
           "alg" : "SHA-1",
-          "content" : "b759ca96141cdd58291dea97211864f621e4c7bd"
+          "content" : "a12e1d58d550f8ecc8edd6709ffb810589acffed"
         },
         {
           "alg" : "SHA-256",
-          "content" : "53a6e024ecc2b3f45d04d085161c6c10526a344b80bf3f0d4e6a13c33c183998"
+          "content" : "e1e1d51a57567d6db834f93d98831ab10bb0220b91a67580894d9ab36cc9f065"
         },
         {
           "alg" : "SHA-512",
-          "content" : "5f0cdec3ee67aeff87c4a5953e1afe87a8619ca8765daa4e58a8787ee9c2b625c8b34c9721ecc6c814d8dcb12452ef2818ebe184985102f1e30f20966cbb5b17"
+          "content" : "b083c3d0f5ec3e50b68e6b3d2a9036016276efabada5a6d83fd254f5ddbdb8d6363ec5b9a9780b245ea70c9c2ce63bb264f11afd61d6a7cbfc58747d56b57a12"
         },
         {
           "alg" : "SHA-384",
-          "content" : "7c41343fea8789ee648f55db7be054346dadead895fce8830aa8b7d0280c65cfd41d847b58b83ce38f838abc9ba203a0"
+          "content" : "921807331ff888b03e02c736cfb5144301498a4389b9fb92bc9f7ab949dff1ee4489e48be7071b082e2e0d143e53947b"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "10f04dfdd4e463ae01eef7649774964a6468596f243b517050ea8197981f3a8f50adee55311054cf52e7a566a15b285d"
+          "content" : "7e1f521c69b22930285e4c004c047580c975ac90f3ce34b85cb95e53a34f5d9d5719d13c563ba5e5b1c9d7e12084cdee"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "8c0e166cabdc473fede2b1cc199d2f24534ec0796945749f411bb47cf6ba7d0e"
+          "content" : "40cb075128c6433541a1082938e0362512b4b9d13f2b01f917e03b014f9d2d58"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "bbdf663d8a902a66541bdd1e923ae37c54da78f9a9d04409b57dc701a29970550c736c5816f1aaab626f821f5fbdd4f1644fc618f65d1122de023bd2fc552e37"
+          "content" : "635b0913269576b7820539c5ec20b2c7380b435e7a3f90b61b3990c2b96b660c96fe55b509deaf72001de73a923824b6c063e6b2394a6c8773914757d8ea4793"
         }
       ],
       "licenses" : [
@@ -2204,7 +2204,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar",
+      "purl" : "pkg:maven/com.squareup.okhttp3/mockwebserver3@5.4.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -2221,43 +2221,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar",
+      "bom-ref" : "pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar",
       "group" : "com.squareup.okhttp3",
       "name" : "mockwebserver",
-      "version" : "5.3.2",
+      "version" : "5.4.0",
       "description" : "Square’s meticulous HTTP client for Java and Kotlin.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "6e47978c1f3d50bae09398b948d4a487"
+          "content" : "fddae2a0631539032759a65d7dca66db"
         },
         {
           "alg" : "SHA-1",
-          "content" : "58f89e39ed9f68a9cb12e4da6de64848b177e727"
+          "content" : "a54f047a793c0d613ab89f6463d6c4642a641770"
         },
         {
           "alg" : "SHA-256",
-          "content" : "6164a5783acb87278f42ef0581d2de222bd6bcc00a2e833611b2eddf0c7b8669"
+          "content" : "64bcf0a79c42213bb3380939727d3cd6028ba3dbfcb9df14019650107e60a87f"
         },
         {
           "alg" : "SHA-512",
-          "content" : "ccd255932ecffc3d218bda9e269233da1b8fe993bb6ca768ba8c46749d099672906001e71ed024b95c0b744d868a2e415dba598bbf69fac23402d6e116066df6"
+          "content" : "8cad4cf476f9d300b5651c48e1606011aa196dc9bf979a4fc46d7f7ee38d6217ee1df50c2bbaed7851b4f6124c100859022c4443aaa1697954306b69d66b78ae"
         },
         {
           "alg" : "SHA-384",
-          "content" : "a0784689ddbf8dbde98d49550d6dd107e7b5b03bb7c5153b617bbed4464fecb3311519b461eab46a662d9ad5fb298935"
+          "content" : "2985911ceb2989bb9c6f1d2d503cbb968fee81bdb344c92eed6c3ec5275e4ccde1dc8980470cb3ab675f4f3c60dc55a6"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "9e7f56470bceb0f19b4117ea52a9898f3cb965a8d357e2272f8bebb60bc2856d6684fd96cd64168a56c844a1b0aaa438"
+          "content" : "f8ef3efc75d3c50e43f5a1c1842a68f55a6de8de9c9c5547c022154b38dc20fdb5097adf1a4f352432b506f3d4bf523c"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "a41d4afaea1d92b87764042ce008ac03946bb1ca47b9ca8ef2e3cd9170cb80e9"
+          "content" : "a4f1f7c68fff99cad1013ed6991b25cf284949bca820266ce448cba976235c54"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "5970c714e12ed125e62211565749064ced25fbda4672247c4600261fdefa9a8c3e2f99ab94b83e197603450ab5470470908dbd5e72e24e7aba9ccb20b90d4bf1"
+          "content" : "44647a04b4328c44f6d169c9b084d1071f533a6c95ca3ff5e0971ae41862aaa51f8c8a14bab0a2f98c84b953443fc28eee015c8990a338819a588e3c98e1e639"
         }
       ],
       "licenses" : [
@@ -2267,7 +2267,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar",
+      "purl" : "pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -2284,43 +2284,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar",
+      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar",
       "group" : "com.squareup.okhttp3",
       "name" : "okhttp-jvm",
-      "version" : "5.3.2",
+      "version" : "5.4.0",
       "description" : "Square’s meticulous HTTP client for Java and Kotlin.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "827a887aa959c1f1d6b12f3345df2484"
+          "content" : "f79f61c92f5dc7fd399b7e36731b7b9e"
         },
         {
           "alg" : "SHA-1",
-          "content" : "f31e8de27feebe1e56d6c9d354a0986b65be0e1d"
+          "content" : "e1fae6fccaae70e60b31153c6a7680306a86ed31"
         },
         {
           "alg" : "SHA-256",
-          "content" : "c771f48075b763f6c322055e21129a94b7de4c1faf3f8f58ace320b0c9517a30"
+          "content" : "b15e605ca0a4b12c62ea7f657dad413c236c947e875854767349cdbe20df473c"
         },
         {
           "alg" : "SHA-512",
-          "content" : "302cba8ec649ecb20512b4878b9f347645cdeada2001e7469363b21ca251bbb05c00e48e426449a88780f0ec25c672f214112b101d8dfd059b5275999ab48768"
+          "content" : "2b5da32a14319d78ebb62067011dd0f4533ae95652d153e84f9803fab55cb1eedc8a3aaa189efa5ebacdc7e52b8618c08dd20e82e73e91305dc12038ca8e1e76"
         },
         {
           "alg" : "SHA-384",
-          "content" : "a2bc92e52d8e1b2b9be40b0955828313f32a4276717bf7e1cace0aefa3bf5fad17997e409aeca7f68f335c9d975f1073"
+          "content" : "5725efe5dd02576a36cf67e9e50db1bc04840ff121e19de8b2ce22efbc879a4dcd0372421d7c4642648580b4bf96a77d"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "e585ea8e1ffbd6599654b5f7e9b1210ff972799f5019420652a0215b7dde6660b3a15e56b39d4702b42e307b3040b5d1"
+          "content" : "99bdc556b02f827c8613af5198956f4b139676f36fbd08f05fcaf2f28cf518739e1284d1cf7b37b1e35a159e057f0707"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "4737bb453c46672bef36c86ea7292a46f9552caaccfd7e6799bb9b3c508c4467"
+          "content" : "ebda7d4c3befb6937738e34a158c185066d3e4fa184d068c4f2424ec5285435d"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "08ed5b2a6449ca0b8cced909bc2ded5cf20314b5bf8f8b094ed8641c5dd90e6b738fc66c917dd0eafbcf1e51497ba05ca154cc3d6fb4832a0ebc350a35c26abe"
+          "content" : "da2a72208f4c3c826d98ed1229804f05561a95ff88fd3841a8095cb711c6491138afbbac3036e0f1121d8d75bb4d2e9b516df074f597e51c558240f03f1b6dec"
         }
       ],
       "licenses" : [
@@ -2330,7 +2330,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar",
+      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -2347,10 +2347,10 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom",
       "group" : "com.squareup.okhttp3",
       "name" : "okhttp",
-      "version" : "5.3.2",
+      "version" : "5.4.0",
       "description" : "Square’s meticulous HTTP client for Java and Kotlin.",
       "licenses" : [
         {
@@ -2359,7 +2359,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom",
       "modified" : false,
       "externalReferences" : [
         {
@@ -2376,43 +2376,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar",
+      "bom-ref" : "pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar",
       "group" : "com.squareup.okio",
       "name" : "okio-jvm",
-      "version" : "3.16.4",
+      "version" : "3.17.0",
       "description" : "A modern I/O library for Android, Java, and Kotlin Multiplatform.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "34d866f45bb2a65bf601cde52b72d096"
+          "content" : "96ad357689fd2841747aec56e94a7162"
         },
         {
           "alg" : "SHA-1",
-          "content" : "ceb794cf0bbf8d0d20f49aa91ce20db7fd77675d"
+          "content" : "a12d684ec0df9541b3869ae60a4a5257fd3613df"
         },
         {
           "alg" : "SHA-256",
-          "content" : "2196b993cd34dbbd919e7e01f57a4781b58bee80f86106163e287c20343a96a7"
+          "content" : "3b13dcc3e1573047c2d507fc4f7fcb0bb0cbcd9d395da21d20e09406e2cd6a73"
         },
         {
           "alg" : "SHA-512",
-          "content" : "1a7158538ae341b8a61fe7292506e12ca6063c5a51a1c122d0e934164395c7da585dc31b26ed88a993c47aeca89f6a854042c67a4bc7d771d35a0ece6c4dbde0"
+          "content" : "2da2e240fb11ee254554bd59b94d4f9545078f69182a56cb528cb3228e42b8cd8e7a6547ed81d198f105413ff03e111f42a903ff092c4c3a0c3b46433ad10921"
         },
         {
           "alg" : "SHA-384",
-          "content" : "37949576947630aba9caf7b24ffb00677f4b21b29a98543a0a66043340d20bb42128419d2bebc4b2f2b93569f35f9ada"
+          "content" : "ef53c6670e1819033ce2be6a4396795f693ba8d0d73a0e6507f5cd0baae7eaa9c6f1a0138482550e7a13cc2182af8e83"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "32830517d7f960b4c86229f5347e40033658999029162aad0f273636640ed8b7130689de57277aaff169ac9f227885be"
+          "content" : "20d14db69ea7e8d692111057f7daecd595eccc56585550b18d042b1374cbf9edfcf1a24e8c1a2955e90341927bbd986b"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "3f65833b5d5128064f885b68da6a3955667cf4c31a098da08431561949fe398b"
+          "content" : "fca6940c1a89a0951559cbb3a9aef63cdfff96ca0aaf2ef8b8847ef1d52e52a8"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "ee404499bb148b817e575c22049cb5487531605413bf38edf8fd2cecf0d15f899de42e37d7dafa5dc8bc5493e24b7a976c2bc14c42d6d7056af410bd72513ad3"
+          "content" : "21fc1f60c7f201b85649e3eb5a56ad376f49e0d18dedd3d64c8bfdb6180c58a8fbb8cddf4411b6bea271908dfa09f7bf46d8bf138ca134bae38b8450d1ab478d"
         }
       ],
       "licenses" : [
@@ -2422,7 +2422,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar",
+      "purl" : "pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -2439,10 +2439,10 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.squareup.okio/okio@3.16.4?type=pom",
+      "bom-ref" : "pkg:maven/com.squareup.okio/okio@3.17.0?type=pom",
       "group" : "com.squareup.okio",
       "name" : "okio",
-      "version" : "3.16.4",
+      "version" : "3.17.0",
       "description" : "A modern I/O library for Android, Java, and Kotlin Multiplatform.",
       "licenses" : [
         {
@@ -2451,7 +2451,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.squareup.okio/okio@3.16.4?type=pom",
+      "purl" : "pkg:maven/com.squareup.okio/okio@3.17.0?type=pom",
       "modified" : false,
       "externalReferences" : [
         {
@@ -7941,42 +7941,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.7.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-core",
-      "version" : "12.7.0",
+      "version" : "12.8.1",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "aa2b4c4f8b91caab764746c144ddbcd8"
+          "content" : "c1ffde20c732402ad69faf3eeda88217"
         },
         {
           "alg" : "SHA-1",
-          "content" : "08615d1b2ddd7d489b81eeb688affa3eba790599"
+          "content" : "a6f00c021c532b1bcf543104fca5c32634aa6175"
         },
         {
           "alg" : "SHA-256",
-          "content" : "b829558d02a9b7fdb424faffcb6183f392c31f2062fd7567808e80fccfa27b38"
+          "content" : "76522052ed45fdad6419138d631775bfbf304b891b0b5514c48308186d4b3e67"
         },
         {
           "alg" : "SHA-512",
-          "content" : "77f5815335a80bde330a06c0682e9b51174b11e685bf628dc619c0f438f8532771c8c9896f2ccbde44b09c2f70af50e60bde566c7332d93a79e3927d46903cbd"
+          "content" : "6568aa9bb05644a0158f3e833941701d46e1df19c5b44a20e163485d8206243d47f69215ee71b518a58d3dd400b6201dc516cce129cb465e9b3b4cb58758edaa"
         },
         {
           "alg" : "SHA-384",
-          "content" : "bdf48e289da5fe0be883fd12b16b8c20d58b1b7ccb8c33fb23d8c7600405b6cf8ad6f55184da27d574688dad475149b7"
+          "content" : "8b765a898d802026555f5c8835f29f9f47886236e458e42e28dece593b81b18dc44851aa15ce0e026eb92fed9ad79b1d"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "87ff41a80badda26954aed1b2cc779d47dc4a84a1bf831962574476e9f9e4ecb8e9bb6d3c274fd9389de1548ab303030"
+          "content" : "afc747cee021444304d051d930b481ecc5d3862c7937ac897eb74b9b13a16b04a58ebc5f6ea0b7cad257b13804e91c2c"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "1701cb165d885e423b877fb5900eb7b92a016dc777911b5ad9b30086f5a6b94c"
+          "content" : "a59e01a44f91ba78c331e527b635684cd9a78b20f15c58522c9d9d1eddbfee61"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "d30e6cb493e6de3643ea86707624c24f56e764348859b8c91ca9565de27e058334222159eeffc3f5867603440e68ad8eecb5b28f9154f679d4223736c87bf963"
+          "content" : "2c3ecb653ac5c1c14f67f71a260d955c2ddb5865e9db634b230d3983cd59178bfae1c865f8c71ec0e29d6c06693b8329b2daf340b8d5d6d7e1c4394a33fc1c5e"
         }
       ],
       "licenses" : [
@@ -7986,7 +7986,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.7.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -7997,42 +7997,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.7.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.8.1?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-database-postgresql",
-      "version" : "12.7.0",
+      "version" : "12.8.1",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "6bb1124de1b58ee8c58bb6650c71d6d0"
+          "content" : "75b79db2d884e5a3d3f0d72d8577aedc"
         },
         {
           "alg" : "SHA-1",
-          "content" : "f359162459527e84405f09e0eb39a1e1b3c9567c"
+          "content" : "ef14f0e9b900122a39d7ad1e3575bc4fb6c4459c"
         },
         {
           "alg" : "SHA-256",
-          "content" : "acf60900c1f7ef70f1e651c5333e24618c169c9225138853daae2b5ec58f269e"
+          "content" : "161470cce11a997539ad6d10fdacefd05fa1ebe0c5346f6d897e8144797d6182"
         },
         {
           "alg" : "SHA-512",
-          "content" : "8cdd1c46a72263b58b7673a8c62f975cd2232d388c729621af65aec10e4c84dce9cbc185a261e18482c55f5653b997d20223fee67eb8657b5fc18affebd41d91"
+          "content" : "4fa8f95e6bf68c37d80fff1c90c78a697a29944ba2a6bb5a86b0b6e8c08d312a5e8144f3de3cf86d67e528cf53d946f0b027c40bd49641fbe4c5fa73de915ae8"
         },
         {
           "alg" : "SHA-384",
-          "content" : "c647d176b098d6e2146391aa0d481332c25f0990d39d45734a2c23f36769a02eea93bddf72b58881ac72402563641108"
+          "content" : "0feabd623dab0602e21de24bce6d3bb33f2a919054c2800532972cb85aa7509008dea3d93fff504c8a8adec4baf8d822"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "c77edcb78f6f572bc22cee100b05aa581cac6f43f48a7fd0aa4f0db69a8e157ce118a1f9849518edb496fec13b52bce1"
+          "content" : "2af4bc8cabb85be0bb817202283fca036118a2875499c841ae5e2b6dd78f264be8acec5c5cfb208f8dd6afd3a6eee7f1"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "ecb27ddd445e3b089a28be5452560f03b0f48a67943b654cbe8284965243ae9f"
+          "content" : "bb3fc40427801542a36b7e62761d7d6e7010c9b1ecc89e58a1232adcb73cd514"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "bb24be04f9b812c9bd2db0fbb28705c53f90c09ec4ab9d997a708917812dad48d6a41e269f7b5bb861f042f99dd668b26e7558c3daacd756338ef133c2dd4a01"
+          "content" : "555874518fa44d372f72dff087fbdecaeb2d51b56fbf305f8d834ff8e39750d25779b4ed36a998cbc45c2faf2958c749063c7fe198c8fbe306e10ab1685e3aa0"
         }
       ],
       "licenses" : [
@@ -8042,7 +8042,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.7.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.8.1?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -18657,44 +18657,45 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar",
+      "ref" : "pkg:maven/com.squareup.okhttp3/mockwebserver3@5.4.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+        "pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar",
+      "ref" : "pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.squareup.okhttp3/mockwebserver3@5.3.2?type=jar",
-        "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+        "pkg:maven/com.squareup.okhttp3/mockwebserver3@5.4.0?type=jar",
+        "pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom",
+        "pkg:maven/com.squareup.okio/okio@3.17.0?type=pom",
         "pkg:maven/junit/junit@4.13.2?type=jar",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar",
+      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.squareup.okio/okio@3.16.4?type=pom",
+        "pkg:maven/com.squareup.okio/okio@3.17.0?type=pom",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom",
       "dependsOn" : [
-        "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar"
+        "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar",
+      "ref" : "pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar",
       "dependsOn" : [
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.21?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/com.squareup.okio/okio@3.16.4?type=pom",
+      "ref" : "pkg:maven/com.squareup.okio/okio@3.17.0?type=pom",
       "dependsOn" : [
-        "pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar"
+        "pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar"
       ]
     },
     {
@@ -18748,11 +18749,11 @@
         "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
         "pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar",
         "pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar",
-        "pkg:maven/com.squareup.okhttp3/mockwebserver@5.3.2?type=jar",
+        "pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar",
         "pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-core@12.7.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.7.0?type=jar",
+        "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar",
+        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.8.1?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
         "pkg:maven/org.jetbrains/annotations@26.1.0?type=jar",
@@ -19330,15 +19331,15 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.7.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar",
       "dependsOn" : [
         "pkg:maven/tools.jackson.core/jackson-databind@3.1.2?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.7.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.8.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@12.7.0?type=jar"
+        "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar"
       ]
     },
     {
