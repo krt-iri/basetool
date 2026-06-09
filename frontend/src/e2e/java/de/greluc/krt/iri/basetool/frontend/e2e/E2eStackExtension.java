@@ -426,6 +426,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * @param root the repository root the compose files live in
    */
   private void composeDown(Path root) {
+    captureBackendLog(root);
     try {
       runProcess(
           root,
@@ -435,6 +436,32 @@ public final class E2eStackExtension implements BeforeAllCallback {
           DOWN_TIMEOUT);
     } catch (Exception e) {
       System.out.println("[E2E] stack teardown failed (ignored): " + e.getMessage());
+    }
+  }
+
+  /**
+   * Best-effort dump of the backend container's full log to {@code build/e2e/backend.log} just
+   * before teardown, so a CI artifact preserves how the backend handled every request — most
+   * usefully the one access-log line (HTTP status + duration) for the operation a failing test was
+   * driving, which the browser-side artifacts cannot show. Scoped to the {@code backend} service
+   * and un-tailed so a mid-run request is never truncated away; never throws (the test outcome is
+   * already decided).
+   *
+   * @param root the repository root the compose files live in
+   */
+  private void captureBackendLog(Path root) {
+    try {
+      java.util.ArrayList<String> cmd = new java.util.ArrayList<>(List.of("docker", "compose"));
+      for (String f : COMPOSE_FILES) {
+        cmd.add("-f");
+        cmd.add(f);
+      }
+      cmd.add("--profile");
+      cmd.add("dev");
+      cmd.addAll(List.of("logs", "--no-color", "--no-log-prefix", "backend"));
+      runProcess(root, "backend", cmd, throwawayEnv(), Duration.ofMinutes(2));
+    } catch (Exception ignored) {
+      System.out.println("[E2E] could not capture backend log: " + ignored.getMessage());
     }
   }
 

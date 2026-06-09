@@ -18,8 +18,6 @@
 
 - **Im Organigramm bleibt nach dem Speichern die horizontale Scroll-Position erhalten — auch bei breiten Diagrammen mit vielen Staffeln —** und springt nicht mehr an den linken Rand zurück. Die Wiederherstellung wartet jetzt, bis das Diagramm fertig aufgebaut ist, statt zu früh auf den linken Rand zu klemmen.
 
-- **Im Auftrag-Bearbeiten-Dialog blieben in Safari/WebKit die Pflicht-Auswahlfelder „Auftraggeber" und „Material" leer**, statt mit den Werten des Auftrags vorbelegt zu sein, sodass das Speichern an der Pflichtfeldprüfung scheiterte. Beide Felder sind jetzt browserübergreifend korrekt vorausgewählt.
-
 ## [v0.4.5](https://github.com/krt-iri/basetool/releases/tag/v0.4.5) - 2026-06-08
 
 ### Added

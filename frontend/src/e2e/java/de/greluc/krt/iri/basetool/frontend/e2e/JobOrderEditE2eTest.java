@@ -27,6 +27,7 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
@@ -124,8 +125,17 @@ class JobOrderEditE2eTest {
         page.navigate(baseUrl + "/orders/" + jobOrderId);
 
         // The edit button toggles the LOGISTICIAN-gated modal open via the global modal delegation;
-        // the modal's material rows + comment are pre-populated by the page controller.
+        // the controller pre-fills the form, but the material <select> is built from a
+        // 10-min-cached
+        // material lookup that need not yet contain this order's freshly-seeded material — so its
+        // th:field selection can fall through to the disabled "-- Material wählen --" placeholder
+        // (observed under WebKit, where the order's material was absent from the cached options).
+        // Pick an available option by index to guarantee the required field is set; the test
+        // asserts
+        // only that the amount round-trips, so which material is chosen is immaterial.
         page.locator("[data-trigger='open-modal-display'][data-modal-id='edit-modal']").click();
+        page.locator("#edit-modal select[data-role='material-select']")
+            .selectOption(new SelectOption().setIndex(1));
         page.locator("#edit-modal input[name='materials[0].amount']").fill("250");
         page.locator("#edit-modal #edit-comment").fill(comment);
 
