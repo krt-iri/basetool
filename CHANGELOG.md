@@ -16,7 +16,7 @@
 
 - **Im Organigramm lässt sich ein gesetzter Kommandoleiter jetzt entfernen, ohne die ganze Kommandogruppe zu löschen.** Wird der Posten vakant, bleibt die Kommandogruppe mit Namen, Stv. Kommandoleiter und Ensigns bestehen; ein neuer Kommandoleiter kann später zugewiesen werden.
 
-- **Im Organigramm bleibt nach dem Speichern die horizontale Scroll-Position erhalten** und springt nicht mehr an den linken Rand zurück.
+- **Im Organigramm bleibt nach dem Speichern die horizontale Scroll-Position erhalten — auch bei breiten Diagrammen mit vielen Staffeln —** und springt nicht mehr an den linken Rand zurück. Die Wiederherstellung wartet jetzt, bis das Diagramm fertig aufgebaut ist, statt zu früh auf den linken Rand zu klemmen.
 
 ## [v0.4.5](https://github.com/krt-iri/basetool/releases/tag/v0.4.5) - 2026-06-08
 

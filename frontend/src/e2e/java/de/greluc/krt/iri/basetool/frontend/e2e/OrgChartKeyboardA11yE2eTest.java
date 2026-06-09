@@ -28,6 +28,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -241,9 +242,14 @@ class OrgChartKeyboardA11yE2eTest {
       try {
         page.navigate(STACK.baseUrl() + "/org-chart");
 
-        // Widen the chart with leaderless Kommandos (cap is 4/Staffel) until it scrolls
-        // horizontally. Each create reloads the page, so edit mode is re-entered inside the helper.
-        for (int i = 0; i < 4 && maxScrollLeft(page) <= 0; i++) {
+        // Always create at least one leaderless Kommando (so a renameable node exists for the
+        // oc-rename step below), then keep adding — up to the 4/Staffel cap — until the chart
+        // overflows horizontally. The shared ephemeral stack may already make the all-Staffeln
+        // chart
+        // scrollable (sibling suites seed extra Staffeln/SKs into it), in which case a width-only
+        // condition would create none and leave no oc-rename control to drive. Each create reloads
+        // the page, so edit mode is re-entered inside the helper.
+        for (int i = 0; i < 4 && (i == 0 || maxScrollLeft(page) <= 0); i++) {
           createLeaderlessKommando(page, "E2E Breite " + i);
         }
         assertTrue(
@@ -263,6 +269,11 @@ class OrgChartKeyboardA11yE2eTest {
         page.locator("#oc-name").fill("E2E Renamed");
         clickAndAwaitReload(page, page.locator("#oc-modal [data-trigger='oc-modal-submit']"));
 
+        // The scroll restore re-applies for up to a few seconds until the wide chart has laid out;
+        // wait for it to flag completion (see org-chart.html restoreScrollState) so the read below
+        // does not race the async restore. The timeout clears the restore's own ~5 s budget.
+        assertThat(page.locator("#oc-chart[data-oc-scroll-restored]"))
+            .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(10_000));
         int restored = scrollLeft(page);
         assertTrue(
             restored > 0,
@@ -340,10 +351,14 @@ class OrgChartKeyboardA11yE2eTest {
   private static void clickAndAwaitReload(Page page, Locator submit) {
     page.evaluate("() => { window.__ocReloadPending = true; }");
     submit.click();
+    // 30 s, not 15 s: the post-save reload re-renders the entire org chart, which on the shared
+    // ephemeral stack keeps growing as sibling suites seed Staffeln/SKs into it. Under CI load that
+    // full re-render has overrun a 15 s budget (the create step times out before the chart
+    // returns).
     page.waitForFunction(
         "() => window.__ocReloadPending === undefined",
         null,
-        new Page.WaitForFunctionOptions().setTimeout(15_000));
+        new Page.WaitForFunctionOptions().setTimeout(30_000));
     page.waitForLoadState();
   }
 
