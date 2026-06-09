@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-07.
-> **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-09.
+> **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
 
@@ -32,11 +32,22 @@ non-admins see the union of their memberships unless they pin one.
 ### REQ-ORG-003 — Aggregate scope kinds
 
 - **Strict-staffel** (no cross-staffel escape): `Ship`, `InventoryItem` (direct Lager-View),
-  `RefineryOrder`, `Operation`. List/CRUD filter by `owning_org_unit_id`; detail gates on
+  `RefineryOrder`. List/CRUD filter by `owning_org_unit_id`; detail gates on
   `canSee*`/`canEdit*`. `InventoryItem` rows are append-only and collapsed into display
   *stacks* only at read time (see [`inventory-lager.md`](inventory-lager.md), `REQ-INV-*`);
   the grouping is a display concern keyed within a single `owning_org_unit_id` pool and never
   widens this scope.
+- **Strict-staffel with two read-only escapes:** `Operation` — owned by a Staffel/SK and filtered
+  by `owning_org_unit_id` like the strict aggregates, but visible beyond the owning scope in two
+  cases (view only; editing stays role+scope via `canEditOperation`): (1) an **ownerless** operation
+  (`owning_org_unit_id IS NULL`, V145) is a leadership/"Bereichsleitung" operation visible to
+  organisation members-or-above (`viewerIsMemberOrAbove`; no public escape — operations are never
+  anonymous-visible); (2) any authenticated user who **participated** in one of the operation's
+  linked missions may see it (`viewerUserId` matches a `mission_participant.user_id` of a mission
+  whose `operation_id` is this operation), so participants can view the operation and their payout
+  regardless of owning Staffel. Both escapes are gated in the service layer and mirrored across the
+  three scoped queries (`findAllScoped`, `findAllReferenceScoped`, `searchOperations`) and
+  `canSeeOperation`. See REQ-ORG-009.
 - **Cross-staffel with public escape:** `Mission` — visible to other OrgUnits iff
   `is_internal = false`; editable only by the owning OrgUnit + admins (`searchMissions`
   enforces `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false`). A mission may
@@ -63,12 +74,13 @@ Stamp the OrgUnit via the central picker resolvers on `OwnerScopeService` — ne
 auto-stamp; 1 + valid → honoured; 1 + foreign → 400; >1 + no output → 400 (force choice); >1 +
 valid → honoured) and differ only on the **0-membership** row:
 
-- `resolveOrgUnitForPickerOutput` (strict) → **400** for a membershipless user. Used by
-  aggregates that are org-owned by construction with no creator-owner fallback (`Operation`).
+- `resolveOrgUnitForPickerOutput` (strict) → **400** for a membershipless user. Currently wired
+  to no aggregate — retained as the strict counterpart of the nullable resolver (`Operation`
+  moved off it in V145; `JobOrder` uses its own resolvers, see below).
 - `resolveOrgUnitForPickerOutputNullable` → **null** (ownerless) for a membershipless user who
-  supplied no picker output; a non-null *foreign* pick still 400s. Used by the owner-carrying
-  aggregates that may legitimately exist without an OrgUnit: `Ship`, `RefineryOrder`,
-  `InventoryItem` (V132) and `Mission` (V144 — see REQ-ORG-009).
+  supplied no picker output; a non-null *foreign* pick still 400s. Used by every aggregate that
+  may legitimately exist without an OrgUnit: `Ship`, `RefineryOrder`, `InventoryItem` (V132),
+  `Mission` (V144) and `Operation` (V145 — see REQ-ORG-009).
 
 Job Order uses its own resolvers: `responsible_org_unit_id` must be profit-eligible (or the configured intake SK
 from system setting `job_order.intake_special_command_id` for guest creations);
@@ -111,7 +123,7 @@ every outbound call; the backend reads the new name first. Session attribute (Re
 is `iridium.activeOrgUnitId` with legacy `iridium.activeSquadronId` mirrored for one release.
 Both aliases drop in the cleanup release.
 
-### REQ-ORG-009 — Ownerless leadership ("Bereichsleitung") missions
+### REQ-ORG-009 — Ownerless leadership ("Bereichsleitung") missions & operations
 
 Organisation leadership sits above every Staffel and SK and belongs to no OrgUnit, yet must be
 able to plan org-wide missions. A mission created by such a membershipless user is stamped
@@ -130,5 +142,29 @@ Editing follows the normal mission-management gate: `OwnerScopeService.canEditMi
 its usual elevated-role-or-owner/manager check (owner, co-managers, mission-managers/officers,
 admins) — the same path as a normal mission, minus the squadron-scope narrowing. The list queries
 (`searchMissions`, `findAllActiveReference`) carry a `viewerIsMemberOrAbove` flag so an internal
-ownerless mission surfaces in the lists of members-or-above. Only `Mission` gains this carve-out;
-`Operation` and `JobOrder` stay NOT NULL (org-owned by construction, no creator-owner fallback).
+ownerless mission surfaces in the lists of members-or-above.
+
+`Operation` gains the same carve-out (V145, #500) — `OperationService.createOperation` routes through
+`resolveOrgUnitForPickerOutputNullable` — with two differences, because an operation has no per-user
+creator column and no `is_internal` flag:
+
+- **Attribution.** An ownerless operation has no `owner_id` to point at; it is attributable only as
+  an organisation-wide leadership operation (audited via `created_at`/`updated_at`).
+- **Visibility.** Operations have no public escape, so there is no public-vs-internal split: an
+  ownerless operation is the org-wide analogue of a Staffel-internal operation — visible to
+  organisation members-or-above (`AuthHelperService.isMemberOrAbove()`), hidden from guests/anonymous.
+  `canSeeOperation` defers to `isMemberOrAbove()` on the null-owner branch, and the three scoped
+  operation queries (`findAllScoped`, `findAllReferenceScoped`, `searchOperations`) carry a
+  `viewerIsMemberOrAbove` flag so the list and the per-row detail gate stay consistent. Editing
+  follows the role gate: `canEditOperation` is a no-op for an ownerless operation, so an org-wide
+  operation is editable by any mission manager and deletable by any admin.
+- **Participation — all operations (#500).** Independently of ownership, any *authenticated* user
+  (member or guest, but never anonymous) who participated in one of an operation's linked missions
+  may see that operation — so participants can view the operation and their payout even when it is
+  owned by another Staffel or is ownerless. Implemented as a `viewerUserId` EXISTS branch on the
+  three scoped queries plus a `canSeeOperation` participant check
+  (`OperationRepository.existsParticipantUserInOperation`). This escape is view-only and never
+  grants edit.
+
+Only `Mission` and `Operation` gain this carve-out; `JobOrder` stays NOT NULL (org-owned by
+construction, no creator-owner fallback and no ownerless-leadership use case).

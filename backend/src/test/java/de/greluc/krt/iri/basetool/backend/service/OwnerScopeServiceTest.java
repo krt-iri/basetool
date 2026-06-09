@@ -755,6 +755,68 @@ class OwnerScopeServiceTest {
     }
 
     @Test
+    void ownerlessOperation_isVisibleToMembersOrAbove() {
+      // #500 / REQ-ORG-009: an ownerless leadership ("Bereichsleitung") operation carries no owning
+      // OrgUnit. Operations have no public escape, so it is visible to organisation
+      // members-or-above only — the org-wide analogue of a Staffel-internal operation.
+      UUID opId = UUID.randomUUID();
+      Operation op = new Operation();
+      op.setId(opId);
+      op.setOwningOrgUnit(null);
+      when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
+      when(authHelper.isMemberOrAbove()).thenReturn(true);
+
+      assertTrue(service.canSeeOperation(opId));
+    }
+
+    @Test
+    void ownerlessOperation_isHiddenFromGuestsAndAnonymous() {
+      // A guest / anonymous outsider (isMemberOrAbove() == false) must not see an ownerless
+      // operation, mirroring how internal Staffel operations stay hidden from outsiders.
+      UUID opId = UUID.randomUUID();
+      Operation op = new Operation();
+      op.setId(opId);
+      op.setOwningOrgUnit(null);
+      when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
+      when(authHelper.isMemberOrAbove()).thenReturn(false);
+
+      assertFalse(service.canSeeOperation(opId));
+    }
+
+    @Test
+    void ownerlessOperation_passesPerRowEditCheck() {
+      // An ownerless leadership operation has no owning OrgUnit to scope against, so the per-row
+      // canEditOperation check is a no-op (true). The real write restriction is the controller's
+      // role gate (hasRole('MISSION_MANAGER') on update, hasRole('ADMIN') on delete).
+      UUID opId = UUID.randomUUID();
+      Operation op = new Operation();
+      op.setId(opId);
+      op.setOwningOrgUnit(null);
+      when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
+
+      assertTrue(service.canEditOperation(opId));
+    }
+
+    @Test
+    void participantSeesOperationOfForeignSquadron() {
+      // #500: any authenticated user who participated in one of the operation's missions may view
+      // the operation (and their payout) even when it belongs to a Staffel they are not a member
+      // of.
+      // Participation grants view only — not edit.
+      UUID opId = UUID.randomUUID();
+      Operation op = new Operation();
+      op.setId(opId);
+      op.setOwningOrgUnit(squadronB);
+      when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
+      stubMemberInSquadronA(); // caller is a member of A, not B
+      when(operationRepository.existsParticipantUserInOperation(opId, MEMBER_USER_ID))
+          .thenReturn(true);
+
+      assertTrue(service.canSeeOperation(opId), "participant may view a foreign-Staffel operation");
+      assertFalse(service.canEditOperation(opId), "participation grants view only, not edit");
+    }
+
+    @Test
     void adminInAllSquadronsMode_seesEveryAggregate() {
       UUID orderId = UUID.randomUUID();
       RefineryOrder order = new RefineryOrder();

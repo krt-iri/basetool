@@ -83,6 +83,7 @@ class OperationServiceTest {
   @Mock private UserService userService;
   @Mock private SystemSettingService systemSettingService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AuthHelperService authHelperService;
 
   @InjectMocks private OperationService operationService;
 
@@ -125,13 +126,36 @@ class OperationServiceTest {
     UUID pickedOrgUnitId = picked.getId();
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(ownerScopeService.resolveOrgUnitForPickerOutput(caller, pickedOrgUnitId))
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, pickedOrgUnitId))
         .thenReturn(picked);
     when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Operation saved = operationService.createOperation(operation, pickedOrgUnitId);
 
     assertEquals(picked, saved.getOwningOrgUnit(), "picker output must be honoured verbatim");
+  }
+
+  @Test
+  void createOperation_membershiplessLeadershipCaller_stampsNullOwningOrgUnit() {
+    // #500 / REQ-ORG-009: organisation leadership ("Bereichsleitung") belongs to no Staffel/SK but
+    // may plan org-wide operations. The nullable picker resolver returns null for such a
+    // membershipless caller (instead of 400ing), so the operation persists ownerless — visible to
+    // organisation members-or-above (operations have no public escape).
+    Operation operation = new Operation();
+    operation.setName("Bereichsleitung-Operation");
+    operation.setStatus(OperationStatus.PLANNED);
+
+    User caller = new User();
+    caller.setId(UUID.randomUUID());
+
+    when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(caller, null)).thenReturn(null);
+    when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
+
+    Operation saved = operationService.createOperation(operation, null);
+
+    assertNull(saved.getOwningOrgUnit(), "membershipless leadership caller → ownerless operation");
+    verify(operationRepository, times(1)).save(operation);
   }
 
   @Test
@@ -165,7 +189,8 @@ class OperationServiceTest {
     Page<Operation> page = new PageImpl<>(List.of(new Operation()));
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(operationRepository.findAllScoped(true, null, Set.of(), pageable)).thenReturn(page);
+    when(operationRepository.findAllScoped(true, null, Set.of(), false, null, pageable))
+        .thenReturn(page);
 
     // When
     Page<Operation> result = operationService.getAllOperations(pageable);
@@ -192,7 +217,16 @@ class OperationServiceTest {
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
       when(operationRepository.searchOperations(
-              "alpha", null, null, requestedStatus, false, squadronId, Set.of(), pageable))
+              "alpha",
+              null,
+              null,
+              requestedStatus,
+              false,
+              squadronId,
+              Set.of(),
+              false,
+              null,
+              pageable))
           .thenReturn(new PageImpl<>(List.of(new Operation())));
 
       Page<Operation> result =
@@ -201,7 +235,16 @@ class OperationServiceTest {
       assertEquals(1, result.getTotalElements());
       verify(operationRepository, times(1))
           .searchOperations(
-              "alpha", null, null, requestedStatus, false, squadronId, Set.of(), pageable);
+              "alpha",
+              null,
+              null,
+              requestedStatus,
+              false,
+              squadronId,
+              Set.of(),
+              false,
+              null,
+              pageable);
     }
 
     @Test
@@ -214,7 +257,16 @@ class OperationServiceTest {
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
       when(operationRepository.searchOperations(
-              any(), any(), any(), statusCaptor.capture(), any(Boolean.class), any(), any(), any()))
+              any(),
+              any(),
+              any(),
+              statusCaptor.capture(),
+              any(Boolean.class),
+              any(),
+              any(),
+              any(Boolean.class),
+              any(),
+              any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       operationService.searchOperations(null, null, null, null, pageable);
@@ -235,7 +287,16 @@ class OperationServiceTest {
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
       when(operationRepository.searchOperations(
-              any(), any(), any(), statusCaptor.capture(), any(Boolean.class), any(), any(), any()))
+              any(),
+              any(),
+              any(),
+              statusCaptor.capture(),
+              any(Boolean.class),
+              any(),
+              any(),
+              any(Boolean.class),
+              any(),
+              any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       operationService.searchOperations(null, null, null, List.of(), pageable);
@@ -252,13 +313,23 @@ class OperationServiceTest {
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(operationRepository.searchOperations(
-              any(), any(), any(), any(), any(Boolean.class), any(), any(), any()))
+              any(),
+              any(),
+              any(),
+              any(),
+              any(Boolean.class),
+              any(),
+              any(),
+              any(Boolean.class),
+              any(),
+              any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       operationService.searchOperations(null, null, null, List.of("PLANNED"), pageable);
 
       verify(operationRepository, times(1))
-          .searchOperations(null, null, null, List.of("PLANNED"), true, null, Set.of(), pageable);
+          .searchOperations(
+              null, null, null, List.of("PLANNED"), true, null, Set.of(), false, null, pageable);
     }
 
     @Test
@@ -273,13 +344,23 @@ class OperationServiceTest {
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
       when(operationRepository.searchOperations(
-              any(), any(), any(), any(), any(Boolean.class), any(), any(), any()))
+              any(),
+              any(),
+              any(),
+              any(),
+              any(Boolean.class),
+              any(),
+              any(),
+              any(Boolean.class),
+              any(),
+              any()))
           .thenReturn(new PageImpl<>(List.of()));
 
       operationService.searchOperations(null, start, end, List.of("PLANNED"), pageable);
 
       verify(operationRepository, times(1))
-          .searchOperations(null, start, end, List.of("PLANNED"), true, null, Set.of(), pageable);
+          .searchOperations(
+              null, start, end, List.of("PLANNED"), true, null, Set.of(), false, null, pageable);
     }
   }
 

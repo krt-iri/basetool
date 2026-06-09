@@ -47,9 +47,25 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
 
   /**
    * Multi-tenant variant of {@link #findAll(org.springframework.data.domain.Pageable)}: returns
-   * every operation whose owning squadron matches {@code owningSquadronId}, or every operation when
-   * {@code owningSquadronId} is {@code null} (admin "all squadrons" mode). Operations are a
-   * strict-staffel aggregate.
+   * every operation whose owning OrgUnit is in the caller's scope, or every operation when {@code
+   * isAdminAllScope} is {@code true} (admin "all squadrons" mode). Operations are a strict-staffel
+   * aggregate with two read-only escapes:
+   *
+   * <ul>
+   *   <li><b>Ownerless leadership operation</b> ({@code owning_org_unit_id IS NULL}, V145) —
+   *       surfaces to organisation members-or-above via {@code viewerIsMemberOrAbove} (operations
+   *       have no public escape; see REQ-ORG-009).
+   *   <li><b>Participant escape</b> (#500) — any authenticated user who participated in one of the
+   *       operation's linked missions sees the operation regardless of owning OrgUnit, gated by a
+   *       non-null {@code viewerUserId} matching a {@code mission_participant.user_id}. Anonymous
+   *       callers ({@code viewerUserId == null}) never match.
+   * </ul>
+   *
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an authenticated organisation
+   *     member-or-above ({@code AuthHelperService.isMemberOrAbove()}); gates the ownerless branch
+   *     so guests/anonymous never see ownerless operations.
+   * @param viewerUserId the caller's user id ({@code AuthHelperService.currentUserId()}), or {@code
+   *     null} for an anonymous caller; gates the participant escape.
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @org.springframework.data.jpa.repository.Query(
@@ -57,12 +73,18 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           + "  :isAdminAllScope = true"
           + "  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)"
           + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + "  OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
+          + "  OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p"
+          + "   WHERE p.mission.operation = o AND p.user.id = :viewerUserId))"
           + " )")
   org.springframework.data.domain.Page<Operation> findAllScoped(
       @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
       @org.springframework.data.repository.query.Param("memberOrgUnitIds")
           java.util.Collection<UUID> memberOrgUnitIds,
+      @org.springframework.data.repository.query.Param("viewerIsMemberOrAbove")
+          boolean viewerIsMemberOrAbove,
+      @org.springframework.data.repository.query.Param("viewerUserId") UUID viewerUserId,
       org.springframework.data.domain.Pageable pageable);
 
   /**
@@ -77,6 +99,11 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
    *     admins and anonymous callers.
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an authenticated organisation
+   *     member-or-above; surfaces ownerless leadership operations ({@code owning_org_unit_id IS
+   *     NULL}, V145) in the picker for members-or-above only.
+   * @param viewerUserId the caller's user id, or {@code null} for an anonymous caller; surfaces
+   *     operations the caller participated in (#500) in the picker.
    * @return slim reference DTOs, sorted by name ascending
    */
   @org.springframework.data.jpa.repository.Query(
@@ -85,12 +112,18 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           + "  :isAdminAllScope = true"
           + "  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)"
           + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + "  OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
+          + "  OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p"
+          + "   WHERE p.mission.operation = o AND p.user.id = :viewerUserId))"
           + " ) ORDER BY o.name ASC")
   List<OperationReferenceDto> findAllReferenceScoped(
       @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
       @org.springframework.data.repository.query.Param("memberOrgUnitIds")
-          java.util.Collection<UUID> memberOrgUnitIds);
+          java.util.Collection<UUID> memberOrgUnitIds,
+      @org.springframework.data.repository.query.Param("viewerIsMemberOrAbove")
+          boolean viewerIsMemberOrAbove,
+      @org.springframework.data.repository.query.Param("viewerUserId") UUID viewerUserId);
 
   /**
    * Free-text + status + time-range + scope search across operations. Mirrors the contract of
@@ -110,10 +143,12 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * both aggregates and is therefore excluded whenever either bound is supplied — consistent with
    * how the missions search drops missions with a {@code null plannedStartTime}.
    *
-   * <p>Operations are a strict-staffel aggregate: a non-null {@code owningSquadronId} restricts the
-   * result to operations owned by that squadron; {@code null} means "all squadrons" (admin mode).
-   * Unlike missions, there is no cross-staffel public escape - operations of other squadrons are
-   * never visible to non-admins.
+   * <p>Operations are a strict-staffel aggregate: the scope triple restricts the result to
+   * operations owned by the caller's OrgUnit(s); {@code isAdminAllScope} means "all squadrons"
+   * (admin mode). Unlike missions, there is no cross-staffel <em>public</em> escape - an owned
+   * operation of another squadron is never visible to non-admins. The one exception is an
+   * <em>ownerless leadership operation</em> ({@code owning_org_unit_id IS NULL}, V145), which
+   * surfaces to organisation members-or-above via {@code viewerIsMemberOrAbove} (see REQ-ORG-009).
    *
    * <p>Status values are passed as strings to keep the contract consistent with the missions
    * search; the JPA layer matches them against the {@code OperationStatus} enum's string
@@ -128,6 +163,11 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an authenticated organisation
+   *     member-or-above; surfaces ownerless leadership operations ({@code owning_org_unit_id IS
+   *     NULL}, V145) for members-or-above only
+   * @param viewerUserId the caller's user id, or {@code null} for an anonymous caller; surfaces
+   *     operations the caller participated in (#500)
    * @param pageable page request
    * @return paged matching operations
    */
@@ -137,6 +177,9 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           + "  :isAdminAllScope = true"
           + "  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)"
           + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + "  OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
+          + "  OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p"
+          + "   WHERE p.mission.operation = o AND p.user.id = :viewerUserId))"
           + " ) AND (CAST(:query AS string) IS NULL OR o.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') OR CAST(o.description AS string) ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%')) AND (CAST(o.status AS string) IN (:status)) AND (CAST(:start AS"
@@ -151,5 +194,25 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
+      @Param("viewerUserId") UUID viewerUserId,
       Pageable pageable);
+
+  /**
+   * {@code true} iff the given user is a participant of at least one mission linked to the
+   * operation (#500). Backs the participant-visibility escape in {@code
+   * OwnerScopeService.canSeeOperation}: an authenticated user who flew in one of the operation's
+   * missions may view the operation (and their payout) regardless of its owning OrgUnit. Guest-name
+   * participants (no {@code user}) never match.
+   *
+   * @param operationId the operation to test; never {@code null}.
+   * @param userId the caller's user id ({@code AuthHelperService.currentUserId()} == {@code
+   *     app_user.id}); never {@code null} (the caller guards the anonymous case).
+   * @return {@code true} iff {@code userId} participated in any of the operation's missions.
+   */
+  @Query(
+      "SELECT COUNT(p) > 0 FROM MissionParticipant p WHERE p.mission.operation.id = :operationId"
+          + " AND p.user.id = :userId")
+  boolean existsParticipantUserInOperation(
+      @Param("operationId") UUID operationId, @Param("userId") UUID userId);
 }
