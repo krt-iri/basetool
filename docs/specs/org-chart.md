@@ -100,10 +100,12 @@ preserves the chart's horizontal scroll and the page's vertical scroll across th
 - [ ] Keyboard focus on a node is a visible outline, not only the hero bloom.
 
 **Enforced by:** `OrgChartPageRenderTest` (asserts the rendered tree roles, the `aria-level`s,
-the `aria-pressed` toggle and the edit-mode hint). The interactive behaviours (roving focus,
-arrow-key navigation, the modal focus-trap / Esc, scroll restoration) are JavaScript and
-verified manually — candidates for the Playwright `e2e` suite, not the template-render unit
-tests. **Code:** `org-chart.html` (inline tree-nav + dialog JS), `org-chart.css`,
+the `aria-pressed` toggle and the edit-mode hint) and the Playwright e2e spec
+`OrgChartKeyboardA11yE2eTest`, which drives the interactive, JavaScript-only behaviours: the
+roving tabindex + arrow-key / Home/End navigation, the modal focus-trap / Esc / focus-return,
+and the horizontal-scroll restoration across a successful edit (`@Tag("e2e")`, so it runs on the
+ephemeral stack and is gated on the `e2e` PR label — see `.github/workflows/e2e.yml`).
+**Code:** `org-chart.html` (inline tree-nav + dialog JS), `org-chart.css`,
 `fragments/org-chart-node.html` · **Issues:** —
 
 ## Out of scope
