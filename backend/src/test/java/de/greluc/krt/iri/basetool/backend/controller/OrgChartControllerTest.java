@@ -116,4 +116,24 @@ class OrgChartControllerTest {
     verify(orgChartService).deletePosition(id);
     verifyNoMoreInteractions(orgChartService);
   }
+
+  @Test
+  void vacateCommandLeader_delegatesIdAndVersionToService() {
+    UUID id = UUID.randomUUID();
+    OrgChartPositionDto response =
+        new OrgChartPositionDto(
+            id,
+            OrgChartPositionType.COMMAND_LEAD,
+            UUID.randomUUID(),
+            null,
+            null,
+            "Alpha",
+            null,
+            0,
+            4L);
+    when(orgChartService.vacateCommandLeader(id, 3L)).thenReturn(response);
+
+    assertSame(response, controller.vacateCommandLeader(id, 3L));
+    verify(orgChartService).vacateCommandLeader(id, 3L);
+  }
 }

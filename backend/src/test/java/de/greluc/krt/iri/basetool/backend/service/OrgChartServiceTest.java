@@ -768,6 +768,68 @@ class OrgChartServiceTest {
     verify(positionRepository, never()).delete(any());
   }
 
+  // ----------------------------------------------------------------- vacate leader --
+
+  @Test
+  void vacateCommandLeader_clearsHolderButKeepsKommando() {
+    UUID id = UUID.randomUUID();
+    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    OrgChartPosition kommando =
+        pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "lead"));
+    kommando.setId(id);
+    kommando.setVersion(2L);
+    kommando.setName("Alpha");
+    when(positionRepository.findById(id)).thenReturn(Optional.of(kommando));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto = service().vacateCommandLeader(id, 2L);
+
+    assertNull(dto.userId(), "the Kommandoleiter seat is now vacant");
+    assertEquals("Alpha", dto.name(), "the Kommandogruppe itself stays — name preserved");
+    assertNull(kommando.getUser(), "the holder is cleared on the managed entity");
+    verify(positionRepository).save(kommando);
+  }
+
+  @Test
+  void vacateCommandLeader_nonCommandRank_isRejected() {
+    UUID id = UUID.randomUUID();
+    OrgChartPosition position =
+        pos(OrgChartPositionType.AREA_COORDINATOR, null, null, user(UUID.randomUUID(), "c"));
+    position.setId(id);
+    position.setVersion(0L);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(position));
+
+    BadRequestException ex =
+        assertThrows(BadRequestException.class, () -> service().vacateCommandLeader(id, 0L));
+
+    assertTrue(ex.getMessage().contains("vacate_not_command"));
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void vacateCommandLeader_staleVersion_throwsOptimisticLock() {
+    UUID id = UUID.randomUUID();
+    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    OrgChartPosition kommando =
+        pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "lead"));
+    kommando.setId(id);
+    kommando.setVersion(3L);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(kommando));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class, () -> service().vacateCommandLeader(id, 1L));
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void vacateCommandLeader_unknownId_throwsNotFound() {
+    UUID id = UUID.randomUUID();
+    when(positionRepository.findById(id)).thenReturn(Optional.empty());
+
+    assertThrows(NotFoundException.class, () -> service().vacateCommandLeader(id, 0L));
+    verify(positionRepository, never()).save(any());
+  }
+
   // --------------------------------------------------------------------- fixtures --
 
   private static User user(UUID id, String username) {

@@ -6,10 +6,18 @@
   org-chart.html) so the reused markup is not also rendered in place. Resolves the rank label from
   the position type via the orgChart.rank.<TYPE> message key, and — for admins only — emits the
   inline reassign / remove controls that the page JS wires up via data-trigger.
+
+  Accessibility: each node renders as an ARIA role="treeitem" inside the page's role="tree". Its
+  depth in the org hierarchy is passed in via the `level` fragment argument (1 = Bereichsleiter …
+  6 = Stv./Ensign within a Kommando) and exposed as aria-level; aria-label announces "rank, name".
+  Roving tabindex + arrow-key navigation is managed by the inline page JS, so every node starts at
+  tabindex="-1".
 -->
-<div th:fragment="ocNode(node)" class="oc-node" th:if="${node != null}"
+<div th:fragment="ocNode(node, level)" class="oc-node" th:if="${node != null}"
      th:classappend="${node.positionType() == 'AREA_LEAD' ? 'oc-node--hero' : ''}"
-     th:with="rk=${'orgChart.rank.' + node.positionType()}">
+     th:with="rk=${'orgChart.rank.' + node.positionType()}"
+     role="treeitem" tabindex="-1" th:aria-level="${level}"
+     th:aria-label="#{${rk}} + ', ' + ${node.userName()}">
     <span class="oc-node-rank" th:text="#{${rk}}">Rank</span>
     <span class="oc-node-name" th:text="${node.userName()}">Name</span>
     <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
