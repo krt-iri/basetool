@@ -354,26 +354,45 @@
             let raw = null;
             try {
                 raw = window.sessionStorage.getItem(SCROLL_KEY);
-                if (raw) {
-                    window.sessionStorage.removeItem(SCROLL_KEY);
-                }
             } catch (e) {
                 return;
             }
             if (!raw) {
                 return;
             }
+            let pos;
             try {
-                const pos = JSON.parse(raw);
-                if (chart && typeof pos.x === 'number') {
-                    chart.scrollLeft = pos.x;
-                }
+                pos = JSON.parse(raw);
+            } catch (e) {
+                try { window.sessionStorage.removeItem(SCROLL_KEY); } catch (e2) { /* ignore */ }
+                return;
+            }
+            // Re-apply the saved offsets across animation frames until they stick. On a large org
+            // the chart has not finished laying out when this end-of-body script first runs, so a
+            // single assignment would clamp scrollLeft toward 0 and snap the view back to the left
+            // edge. Once the horizontal offset settles (or the frame budget is spent) clear the key
+            // and flag completion, so callers/tests can tell the restore is done.
+            let frames = 0;
+            function apply() {
                 if (typeof pos.y === 'number') {
                     window.scrollTo(0, pos.y);
                 }
-            } catch (e) {
-                /* malformed payload — ignore */
+                if (chart && typeof pos.x === 'number') {
+                    chart.scrollLeft = pos.x;
+                }
+                const settled =
+                    !chart || typeof pos.x !== 'number' || pos.x <= 0 || chart.scrollLeft === pos.x;
+                if (settled || frames >= 30) {
+                    try { window.sessionStorage.removeItem(SCROLL_KEY); } catch (e) { /* ignore */ }
+                    if (chart) {
+                        chart.setAttribute('data-oc-scroll-restored', '1');
+                    }
+                    return;
+                }
+                frames++;
+                window.requestAnimationFrame(apply);
             }
+            apply();
         }
         restoreScrollState();
 
