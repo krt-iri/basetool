@@ -365,9 +365,20 @@ jobs:
         id: inspect
         run: |
           set -eu
+          # Read the digest via the Go-template field directly (as promote.yml
+          # does) rather than `{{json .Manifest}} | jq -r '.digest'`: a newer
+          # buildx serializes that JSON with capitalized Go field names
+          # (`.Digest`), so the lowercase `.digest` jq path silently produced an
+          # empty string — which then made the sign step choke on a `…@`
+          # reference with no digest. Fail loudly on an empty digest so a future
+          # regression of the same shape is caught here, not at `cosign sign`.
           digest=$(docker buildx imagetools inspect \
             "${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}:${{ steps.meta.outputs.version }}" \
-            --format '{{json .Manifest}}' | jq -r '.digest')
+            --format '{{.Manifest.Digest}}')
+          if [ -z "$digest" ]; then
+            echo "::error::could not resolve merged manifest digest for ${{ matrix.module }}" >&2
+            exit 1
+          fi
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Install cosign
