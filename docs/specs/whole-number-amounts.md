@@ -60,7 +60,9 @@ amount.
 
 **Enforced by:** `MissionFinanceEntryValidationTest`, `MissionFinanceEntryFormValidationTest`,
 `MoneyFormatTest`,
-`MissionPageControllerMvcTest#missionDetail_WithFinanceEntry_ShouldRenderEditButtonWithoutTemplateError`. **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
+`MissionPageControllerMvcTest#missionDetail_WithFinanceEntry_ShouldRenderEditButtonWithoutTemplateError`,
+`MissionFinanceEntryE2eTest` (e2e create→view: add a finance entry, reopen the detail page, assert
+200 + the rendered `data-amount`). **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
 (`@Digits`), `frontend/.../model/form/MissionFinanceEntryForm` (`@Digits`),
 `frontend/.../view/MoneyFormat`, `templates/mission-detail.html`, `templates/operation-detail.html`.
 **Issues:** PR #465.

@@ -781,6 +781,33 @@ public final class BackendSeeder {
   }
 
   /**
+   * Adds a guest participant to a mission via {@code POST /api/v1/missions/{id}/participants/add},
+   * so the mission's finance "Neuer Eintrag" modal has a selectable entry in its {@code required}
+   * participant dropdown (a finance entry must be attributed to a participant). A free-text {@code
+   * guestName} with no {@code userId} takes the public self-signup path and is only ever linked to
+   * a registered member when it exactly matches an existing account name — so a synthetic name that
+   * no test user carries always yields a genuine guest. The endpoint answers with the full {@link
+   * de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto}, whose top-level {@code id} is the
+   * mission id {@link #seedEntity} extracts and returns.
+   *
+   * @param username the Keycloak username of the mission's creator (who can see, and thus sign up
+   *     to, their own mission)
+   * @param password the Keycloak password
+   * @param missionId the mission to add the participant to
+   * @param guestName the guest participant's display name; must not match any registered user's
+   *     name
+   * @return the mission id echoed back by the endpoint's {@code MissionDto} response
+   */
+  public String addGuestParticipant(
+      String username, String password, String missionId, String guestName) {
+    return seedEntity(
+        username,
+        password,
+        "/api/v1/missions/" + missionId + "/participants/add",
+        "{\"guestName\":\"" + guestName + "\"}");
+  }
+
+  /**
    * Attempts {@code POST /api/v1/orders} naming the given org unit as the responsible (processing)
    * unit and returns the HTTP status WITHOUT throwing, so a test can assert the documented 400 when
    * the named unit is not profit-eligible. Only profit-eligible squadrons / Spezialkommandos may
