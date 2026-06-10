@@ -30,17 +30,16 @@ import de.greluc.krt.iri.basetool.backend.model.SyncEventType;
 import de.greluc.krt.iri.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.service.MaterialExternalAliasService;
+import de.greluc.krt.iri.basetool.backend.service.MaterialNameCanonicalizer;
 import de.greluc.krt.iri.basetool.backend.service.SyncReportService;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -100,16 +99,6 @@ public class ScWikiCommoditySyncService {
           "HLX99 Hyperprocessors",
           "mobyGlass Personal Computers",
           "RS1 Odysey Spacesuits");
-
-  /** Qualifier words stripped when computing a commodity's canonical name (§8.1.1 step 4). */
-  private static final Set<String> CANONICAL_QUALIFIER_WORDS =
-      Set.of("raw", "ore", "refined", "pure", "r");
-
-  /** Matches a trailing or inline parenthetical group, e.g. {@code " (Ore)"}. */
-  private static final Pattern PARENTHETICAL = Pattern.compile("\\([^)]*\\)");
-
-  /** Matches any run of non-alphanumeric characters, used to fold names to a canonical core. */
-  private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]+");
 
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
@@ -389,25 +378,15 @@ public class ScWikiCommoditySyncService {
    * Computes a commodity's canonical core: lowercased, parenthetical suffixes removed, qualifier
    * words ({@code raw} / {@code ore} / {@code refined} / {@code pure} / {@code r}) dropped, and
    * non-alphanumeric runs folded away. {@code "Raw Silicon"}, {@code "Silicon (Raw)"} and {@code
-   * "Silicon"} all canonicalise to {@code "silicon"}.
+   * "Silicon"} all canonicalise to {@code "silicon"}. The folding itself lives in the shared {@link
+   * MaterialNameCanonicalizer} since #434 so the refinery screenshot import applies bit-identical
+   * rules; this delegate keeps the sync's historical call sites and tests stable.
    *
    * @param name the raw commodity name
    * @return the canonical core, or {@code null} for null / blank input
    */
   static String canonicalName(String name) {
-    if (!StringUtils.hasText(name)) {
-      return null;
-    }
-    String stripped = PARENTHETICAL.matcher(name.toLowerCase(Locale.ROOT)).replaceAll(" ");
-    StringBuilder core = new StringBuilder();
-    for (String word : stripped.split("\\s+")) {
-      String folded = NON_ALNUM.matcher(word).replaceAll("");
-      if (folded.isEmpty() || CANONICAL_QUALIFIER_WORDS.contains(folded)) {
-        continue;
-      }
-      core.append(folded);
-    }
-    return core.toString();
+    return MaterialNameCanonicalizer.canonicalCore(name);
   }
 
   /**

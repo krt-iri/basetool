@@ -168,6 +168,43 @@ class MaterialExternalAliasControllerTest {
         .andExpect(status().isCreated());
   }
 
+  @Test
+  void create_acceptsRefineryScreenSource() throws Exception {
+    // Given — #434 widened the source whitelist; the admin form offers REFINERY_SCREEN
+    UUID materialId = UUID.randomUUID();
+    String validBody =
+        """
+        {
+          "materialId":"%s",
+          "sourceSystem":"REFINERY_SCREEN",
+          "externalName":"UCTION SALVAGE"
+        }
+        """
+            .formatted(materialId);
+    MaterialExternalAlias persisted = new MaterialExternalAlias();
+    persisted.setId(UUID.randomUUID());
+    persisted.setVersion(0L);
+    persisted.setSourceSystem(
+        de.greluc.krt.iri.basetool.backend.model.MaterialExternalAliasSource.REFINERY_SCREEN);
+    persisted.setExternalName("UCTION SALVAGE");
+    de.greluc.krt.iri.basetool.backend.model.Material material =
+        new de.greluc.krt.iri.basetool.backend.model.Material();
+    material.setId(materialId);
+    material.setName("Construction Salvage");
+    persisted.setMaterial(material);
+    when(service.create(any())).thenReturn(persisted);
+
+    // When / Then — the @Pattern whitelist must not reject the new source
+    mockMvc
+        .perform(
+            post(BASE)
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validBody))
+        .andExpect(status().isCreated());
+  }
+
   // ─── DELETE ──────────────────────────────────────────────────────────────
 
   @Test

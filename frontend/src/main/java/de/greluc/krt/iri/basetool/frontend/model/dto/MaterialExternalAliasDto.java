@@ -35,7 +35,8 @@ import java.util.UUID;
  * @param version optimistic-lock token
  * @param materialId linked material UUID (FK)
  * @param materialName linked material name (denormalised for table rendering)
- * @param sourceSystem catalogue identifier ({@code "UEX"} or {@code "SCWIKI"})
+ * @param sourceSystem catalogue identifier ({@code "UEX"}, {@code "SCWIKI"} or {@code
+ *     "REFINERY_SCREEN"})
  * @param externalName commodity name in the external catalogue
  * @param externalKey optional external internal key
  * @param externalUuid optional external UUID

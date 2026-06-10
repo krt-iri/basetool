@@ -36,12 +36,14 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 
 ## Index
 
-|                         ADR                         |                                         Title                                         |              Status               |
-|-----------------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------|
-| [0001](0001-frontend-confidential-oauth2-client.md) | Frontend as a confidential OAuth2 client (PKCE + secret)                              | Accepted — implementation pending |
-| [0002](0002-whole-number-amounts.md)                | Whole-number amounts: value-based validation, reject-not-round, display-only rounding | Accepted                          |
-| [0003](0003-inventory-append-only-group-on-read.md) | Inventory: append-only entries with group-on-read display                             | Accepted                          |
-| [0004](0004-ownerless-leadership-missions.md)       | Ownerless leadership ("Bereichsleitung") missions                                     | Accepted                          |
-| [0005](0005-ownerless-leadership-operations.md)     | Ownerless leadership ("Bereichsleitung") operations                                   | Accepted                          |
-| [0006](0006-operation-participant-visibility.md)    | Operation visibility for mission participants                                         | Accepted                          |
+|                          ADR                          |                                         Title                                         |              Status               |
+|-------------------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------|
+| [0001](0001-frontend-confidential-oauth2-client.md)   | Frontend as a confidential OAuth2 client (PKCE + secret)                              | Accepted — implementation pending |
+| [0002](0002-whole-number-amounts.md)                  | Whole-number amounts: value-based validation, reject-not-round, display-only rounding | Accepted                          |
+| [0003](0003-inventory-append-only-group-on-read.md)   | Inventory: append-only entries with group-on-read display                             | Accepted                          |
+| [0004](0004-ownerless-leadership-missions.md)         | Ownerless leadership ("Bereichsleitung") missions                                     | Accepted                          |
+| [0005](0005-ownerless-leadership-operations.md)       | Ownerless leadership ("Bereichsleitung") operations                                   | Accepted                          |
+| [0006](0006-operation-participant-visibility.md)      | Operation visibility for mission participants                                         | Accepted                          |
+| [0007](0007-client-side-vlm-screenshot-extraction.md) | Client-side VLM screenshot extraction with manual JSON upload (epic #439)             | Accepted                          |
+| [0008](0008-refinery-extract-json-contract.md)        | `RefineryExtract` JSON as the frozen cross-repo contract                              | Accepted                          |
 

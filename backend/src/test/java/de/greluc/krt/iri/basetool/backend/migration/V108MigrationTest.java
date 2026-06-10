@@ -38,11 +38,14 @@ import org.springframework.transaction.annotation.Transactional;
  * Flyway-run time, so the seed inserts zero rows; this test asserts:
  *
  * <ul>
- *   <li>the table + columns + check constraint + case-insensitive unique index (post-V146) + index
- *       exist
+ *   <li>the table + columns + check constraint + index exist; the original V108 case-sensitive
+ *       UNIQUE constraint is gone, superseded by the V146 case-insensitive unique index (covers
+ *       REQ-REFINERY-010)
  *   <li>the seed INSERT statements are idempotent — when the test pre-populates the 6 target
- *       materials and re-runs the SELECT-driven INSERTs by hand, exactly 6 alias rows are created,
- *       all stamped {@code created_by = 'system'} and pointing at the right material
+ *       materials and re-runs the SELECT-driven INSERTs by hand (conflict target adjusted to the
+ *       post-V146 index expression), exactly 6 alias rows are created, all stamped {@code
+ *       created_by = 'system'} and pointing at the right material — and a case-variant replay
+ *       inserts nothing
  * </ul>
  */
 @SpringBootTest
@@ -80,19 +83,37 @@ class V108MigrationTest {
     assertEquals("character varying", types.get("created_by"));
   }
 
+  /**
+   * The V108 case-sensitive UNIQUE constraint was dropped by {@code
+   * V146__make_material_alias_uniqueness_case_insensitive.sql} in favour of a unique index on
+   * {@code (source_system, LOWER(external_name))} — covers REQ-REFINERY-010. This test pins both
+   * sides of that supersession plus the (unchanged) source-system CHECK constraint.
+   */
   @Test
-  void v108AddsUniqueAndCheckConstraints() {
-    // V146 dropped the original case-sensitive UNIQUE constraint and replaced it with a functional
-    // unique index on (source_system, LOWER(external_name)) — assert that case-folded index
-    // instead.
+  void v108UniqueConstraintSupersededByV146CaseInsensitiveIndex() {
     Integer uniqueCount =
+        jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM information_schema.table_constraints "
+                + "WHERE table_name = 'material_external_alias' "
+                + "AND constraint_type = 'UNIQUE' "
+                + "AND constraint_name = 'uk_material_external_alias_source_external_name'",
+            Integer.class);
+    assertEquals(
+        0,
+        uniqueCount == null ? 0 : uniqueCount,
+        "V108 case-sensitive UNIQUE constraint must be dropped by V146");
+
+    Integer caseInsensitiveUniqueIndexCount =
         jdbcTemplate.queryForObject(
             "SELECT count(*) FROM pg_indexes "
                 + "WHERE tablename = 'material_external_alias' "
-                + "AND indexname = 'uq_material_external_alias_source_lower_name'",
+                + "AND indexname = 'uq_material_external_alias_source_lower_name' "
+                + "AND indexdef LIKE 'CREATE UNIQUE INDEX%'",
             Integer.class);
     assertEquals(
-        1, uniqueCount == null ? 0 : uniqueCount, "case-insensitive unique index must exist");
+        1,
+        caseInsensitiveUniqueIndexCount == null ? 0 : caseInsensitiveUniqueIndexCount,
+        "V146 case-insensitive unique index must exist and be UNIQUE");
 
     Integer checkCount =
         jdbcTemplate.queryForObject(
@@ -119,7 +140,9 @@ class V108MigrationTest {
    * Replays the V108 seed INSERTs against a freshly-populated material set and verifies that
    * exactly 6 alias rows are created — the round-trip catches the case where the seed SQL is
    * accidentally trimmed in a future refactor (the file would still parse but the migration test
-   * catches the missing rows).
+   * catches the missing rows). The replay uses the post-V146 conflict target {@code (source_system,
+   * LOWER(external_name))} because V146 replaced the constraint V108's original {@code ON CONFLICT}
+   * clause inferred; a second, case-variant replay must insert nothing (covers REQ-REFINERY-010).
    */
   @Test
   void v108SeedInsertsCreateSixAliasRowsWhenTargetMaterialsExist() {
@@ -141,7 +164,7 @@ class V108MigrationTest {
             "SELECT count(*) FROM material_external_alias WHERE created_by = 'system'",
             Integer.class);
 
-    // Replay the six seed INSERTs.
+    // Replay the six seed INSERTs (conflict target matches the V146 case-insensitive index).
     for (String[] pair : SEED_PAIRS) {
       String wikiName = pair[0];
       String uexName = pair[1];
@@ -165,6 +188,30 @@ class V108MigrationTest {
         seededBefore + 6,
         seededAfter,
         "exactly 6 alias rows must materialise once the target materials exist");
+
+    // Case-variant replay: uppercased external names must hit the V146 case-insensitive index
+    // and insert nothing (covers REQ-REFINERY-010).
+    for (String[] pair : SEED_PAIRS) {
+      jdbcTemplate.update(
+          "INSERT INTO material_external_alias "
+              + "(id, material_id, source_system, external_name, note, created_by) "
+              + "SELECT gen_random_uuid(), m.id, 'SCWIKI', ?, "
+              + "'V108 seed replay', 'system' "
+              + "FROM material m WHERE m.name = ? "
+              + "ON CONFLICT (source_system, LOWER(external_name)) DO NOTHING",
+          pair[0].toUpperCase(java.util.Locale.ROOT),
+          pair[1]);
+    }
+
+    int seededAfterCaseVariantReplay =
+        jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM material_external_alias WHERE created_by = 'system'",
+            Integer.class);
+
+    assertEquals(
+        seededAfter,
+        seededAfterCaseVariantReplay,
+        "case-variant replay must not create additional rows");
 
     // Spot-check one resolution: the Wiki name resolves back to the UEX material we inserted.
     java.util.UUID resolvedMaterialId =

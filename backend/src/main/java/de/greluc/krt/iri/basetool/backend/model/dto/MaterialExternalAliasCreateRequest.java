@@ -33,7 +33,8 @@ import java.util.UUID;
  * (mass-assignment defence). The service stamps {@code createdBy} from the authenticated JWT.
  *
  * @param materialId UUID of the local material to link to (required)
- * @param sourceSystem catalogue identifier, must be {@code "UEX"} or {@code "SCWIKI"}
+ * @param sourceSystem catalogue identifier, must be {@code "UEX"}, {@code "SCWIKI"} or {@code
+ *     "REFINERY_SCREEN"}
  * @param externalName the external commodity name (required, max 255 chars)
  * @param externalKey optional external internal key (max 255 chars)
  * @param externalUuid optional external UUID
@@ -42,7 +43,7 @@ import java.util.UUID;
  */
 public record MaterialExternalAliasCreateRequest(
     @NotNull UUID materialId,
-    @NotBlank @Pattern(regexp = "UEX|SCWIKI") String sourceSystem,
+    @NotBlank @Pattern(regexp = "UEX|SCWIKI|REFINERY_SCREEN") String sourceSystem,
     @NotBlank @Size(max = 255) String externalName,
     @Size(max = 255) String externalKey,
     UUID externalUuid,

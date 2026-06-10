@@ -12596,6 +12596,95 @@
         }
       }
     },
+    "/api/v1/refinery-orders/import-extract" : {
+      "post" : {
+        "tags" : [ "refinery-import-controller" ],
+        "summary" : "Match a RefineryExtract JSON (desktop screenshot extraction) against master data and return a non-persisted draft for the create form.",
+        "operationId" : "importExtract",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefineryExtractDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Draft built; issues list any review flags.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RefineryImportDraftDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/promotion/topics" : {
       "get" : {
         "tags" : [ "Promotion Topics" ],
@@ -37898,7 +37987,7 @@
           "sourceSystem" : {
             "type" : "string",
             "minLength" : 1,
-            "pattern" : "UEX|SCWIKI"
+            "pattern" : "UEX|SCWIKI|REFINERY_SCREEN"
           },
           "externalName" : {
             "type" : "string",
@@ -38290,6 +38379,251 @@
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]
+      },
+      "RefineryExtractDto" : {
+        "type" : "object",
+        "properties" : {
+          "schemaVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tool" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "toolVersion" : {
+            "type" : "string",
+            "maxLength" : 50,
+            "minLength" : 0
+          },
+          "model" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "generatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "clientLanguage" : {
+            "type" : "string",
+            "maxLength" : 16,
+            "minLength" : 0
+          },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryExtractOrderDto"
+            },
+            "maxItems" : 5,
+            "minItems" : 0
+          }
+        },
+        "required" : [ "orders", "schemaVersion" ]
+      },
+      "RefineryExtractGoodDto" : {
+        "type" : "object",
+        "properties" : {
+          "rowIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "rawMaterialName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "refine" : {
+            "type" : "boolean"
+          },
+          "confidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "sourceImage" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "inputQuantity", "rawMaterialName", "refine" ]
+      },
+      "RefineryExtractImageDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "width" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "height" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "cropMode" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "RefineryExtractOrderDto" : {
+        "type" : "object",
+        "properties" : {
+          "panelType" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          },
+          "quoted" : {
+            "type" : "boolean"
+          },
+          "layoutConfidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "rawLocationName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "rawMethodName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "rawInManifestTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "rawToRefineTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9
+          },
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalYieldScu" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "sourceImages" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryExtractImageDto"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryExtractGoodDto"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          }
+        },
+        "required" : [ "goods", "panelType" ]
+      },
+      "ImportIssueDto" : {
+        "type" : "object",
+        "properties" : {
+          "field" : {
+            "type" : "string"
+          },
+          "rawValue" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string",
+            "enum" : [ "UNMATCHED_MATERIAL", "LOW_CONFIDENCE_MATERIAL", "NO_REFINED_MATERIAL", "OUT_OF_RANGE_QUALITY", "UNRESOLVED_LOCATION", "UNRESOLVED_METHOD", "SKIPPED_REFINE_OFF", "SKIPPED_ZERO_QTY", "UNQUOTED_ROW", "UNQUOTED_ORDER", "SUM_MISMATCH", "MULTIPLE_ORDERS_TRUNCATED", "UNSUPPORTED_PANEL_TYPE" ]
+          },
+          "severity" : {
+            "type" : "string",
+            "enum" : [ "BLOCKING", "WARNING", "INFO" ]
+          },
+          "confidence" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "suggestions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ImportSuggestionDto"
+            }
+          }
+        }
+      },
+      "ImportSuggestionDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "score" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "RefineryImportDraftDto" : {
+        "type" : "object",
+        "properties" : {
+          "order" : {
+            "$ref" : "#/components/schemas/RefineryOrderDto"
+          },
+          "issues" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ImportIssueDto"
+            }
+          },
+          "goodsMatched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "goodsTotal" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "rowsSkipped" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
       },
       "PromotionTopicCreateRequest" : {
         "type" : "object",
@@ -38985,7 +39319,7 @@
           "sourceSystem" : {
             "type" : "string",
             "minLength" : 1,
-            "pattern" : "UEX|SCWIKI"
+            "pattern" : "UEX|SCWIKI|REFINERY_SCREEN"
           },
           "externalName" : {
             "type" : "string",

@@ -2,7 +2,7 @@
 
 > **Doc type:** Forward plan for epic #439 (not yet built). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md); freeze it as a historical plan and point to the living truth once it ships.
 >
-> **Status:** Approved as the plan; **implementation NOT yet started**. Do not write feature code until the repository owner explicitly approves the phase you are about to build.
+> **Status:** Approved; implementation in progress (owner-approved 2026-06-10). **Phase 1 (#434) shipped** — its living requirements are `REQ-REFINERY-001..011` in [`docs/specs/refinery-screenshot-import.md`](specs/refinery-screenshot-import.md). Phases 0/2/3 pending.
 > **GitHub epic:** [krt-iri/basetool#439](https://github.com/krt-iri/basetool/issues/439) · **Sub-issues:** #433 (Phase 0), #434 (Phase 1), #435 (Phase 2), #436 (Phase 3), #437 (Phase 4 — deferred), #438 (Phase 5 — deferred).
 > **Last updated:** 2026-06-10 — plan-review amendments applied (matching algorithm, stitch/dedupe key, quoted/un-quoted panel state, classical-CV Locate, derived confidence, model pins incl. June-2026 challengers, REQ/ADR process gates). See §3.1 for the amendment summary. No resolved decision from §3 was re-opened.
 > **Example screenshots:** the owner's example refinery-order SETUP screenshots are at <https://nc.greluc.me/s/bbzFYL4PT4jkBKK> — the source material for the Phase 0 golden set and the test fixtures of Phases 1–3.

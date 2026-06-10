@@ -113,6 +113,22 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
+   * Candidate set of the refinery screenshot import's material matching (#434): every visible
+   * material the existing refinery-order create path accepts as an input — {@code type == RAW} or
+   * the admin-curated {@code isManualRawMaterial} escape hatch. The gate must mirror the create
+   * path exactly, otherwise the import drafts materials the save endpoint then rejects.
+   *
+   * @param rawType always {@link de.greluc.krt.iri.basetool.backend.model.MaterialType#RAW};
+   *     parameterized so the JPQL stays free of a hardcoded enum literal
+   * @return visible refinery-input candidates, ordered by name for deterministic matching
+   */
+  @Query(
+      "SELECT m FROM Material m WHERE m.isVisible = true"
+          + " AND (m.type = :rawType OR m.isManualRawMaterial = true) ORDER BY m.name")
+  List<Material> findRefineryInputCandidates(
+      @Param("rawType") de.greluc.krt.iri.basetool.backend.model.MaterialType rawType);
+
+  /**
    * Returns only the materials that actually have at least one price row at a non-hidden terminal -
    * useful to suppress materials with no buy/sell data in the trade UI.
    */
