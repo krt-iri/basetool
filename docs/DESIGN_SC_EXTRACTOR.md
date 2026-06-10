@@ -197,8 +197,8 @@ Input · Ausbeute (green `+`) · **Refine** toggle · **Konfidenz**. Rows below 
 or unmatched get a coloured 3px left border. **Confidence = percent + dot**, coloured
 ≥90% success / 75–90% warning / <75% danger — the percent **text** uses the
 accessible tints (`--color-*-text`, REQ-UI-006), the dot keeps the canonical hue;
-the value itself is the **derived** confidence (two-pass agreement + checksum, see
-the master plan §3.1), never the model's self-estimate. Unmatched rows render the
+the value itself is the **derived** confidence (deterministic validation + checksum,
+see the master plan §3.1 item 5), never the model's self-estimate. Unmatched rows render the
 backend's ranked `suggestions` as a pick list on the `zuordnen` action.
 Implementation note (frontend #435): no toggle/switch component exists yet in the
 design system or the basetool frontend — implement Refine as a styled checkbox or
