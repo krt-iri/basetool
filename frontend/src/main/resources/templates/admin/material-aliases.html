@@ -66,6 +66,7 @@
                     <select id="newSourceSystem" name="sourceSystem" required>
                         <option value="SCWIKI" th:text="#{admin.materialAlias.sourceSystem.scwiki}">SC Wiki</option>
                         <option value="UEX" th:text="#{admin.materialAlias.sourceSystem.uex}">UEX</option>
+                        <option value="REFINERY_SCREEN" th:text="#{admin.materialAlias.sourceSystem.refineryScreen}">Raffinerie-Bildschirm</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -152,6 +153,7 @@
                     <select id="editSourceSystem" name="sourceSystem" required>
                         <option value="SCWIKI" th:selected="${aliasToEdit.sourceSystem == 'SCWIKI'}" th:text="#{admin.materialAlias.sourceSystem.scwiki}">SC Wiki</option>
                         <option value="UEX" th:selected="${aliasToEdit.sourceSystem == 'UEX'}" th:text="#{admin.materialAlias.sourceSystem.uex}">UEX</option>
+                        <option value="REFINERY_SCREEN" th:selected="${aliasToEdit.sourceSystem == 'REFINERY_SCREEN'}" th:text="#{admin.materialAlias.sourceSystem.refineryScreen}">Raffinerie-Bildschirm</option>
                     </select>
                 </div>
                 <div class="form-group">

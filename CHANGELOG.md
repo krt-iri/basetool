@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Raffinerieaufträge können jetzt aus einem Screenshot-Extract vorbefüllt werden (Backend, Phase 1 von Epic #439).** Der neue Endpoint `POST /api/v1/refinery-orders/import-extract` nimmt das vom Desktop-Extractor erzeugte `RefineryExtract`-JSON entgegen, gleicht Materialien, Standort und Methode gegen die Stammdaten ab und liefert einen nicht gespeicherten Entwurf samt Prüfhinweisen (übersprungene/un-quotierte Zeilen, Summen-Check, Zuordnungsvorschläge) zurück. Migration V146 erweitert die Material-Alias-Tabelle um die Quelle `REFINERY_SCREEN`, die Admins unter „Material-Aliase" pflegen können.
+
 ## [v0.4.7](https://github.com/krt-iri/basetool/releases/tag/v0.4.7) - 2026-06-09
 
 ### Fixed
