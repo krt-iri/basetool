@@ -286,9 +286,11 @@ public class MissionController {
   }
 
   /**
-   * Returns the next upcoming mission (or 204 when none). Internal missions are included only for
-   * registered members and above; mission outsiders (anonymous + role-less {@code GUEST}) get the
-   * same strict redaction pass as {@link #getMissionById}.
+   * Returns the next upcoming mission (or 204 when none). Only {@code PLANNED} / {@code ACTIVE}
+   * missions are eligible — a terminal ({@code COMPLETED} / {@code CANCELLED}) mission with a
+   * future planned start is never the next mission (REQ-MISSION-003). Internal missions are
+   * included only for registered members and above; mission outsiders (anonymous + role-less {@code
+   * GUEST}) get the same strict redaction pass as {@link #getMissionById}.
    *
    * @return mission DTO or 204 No Content
    */

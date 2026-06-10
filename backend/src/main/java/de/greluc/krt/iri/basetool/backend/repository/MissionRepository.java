@@ -99,24 +99,38 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
   Optional<Mission> findById(UUID id);
 
   /**
-   * Returns the first matching {@code PlannedStartTimeAfterOrderByPlannedStartTimeAsc} (limit 1).
-   * Deliberately NOT graphed: combining the {@code limit 1} with a collection {@code @EntityGraph}
-   * ({@code participants} / {@code assignedUnits}) forces Hibernate to load the whole result set
-   * and paginate in memory (HHH90003004). Callers that need the collections re-fetch the single hit
-   * by id through the graphed {@link #findById(UUID)} — see {@code MissionService.getNextMission}.
+   * Returns the next upcoming mission (limit 1) whose {@code plannedStartTime} is after {@code
+   * date} and whose {@code status} is one of {@code statuses} — the home-page "next mission" banner
+   * passes {@code PLANNED} / {@code ACTIVE} so a {@code COMPLETED} / {@code CANCELLED} mission with
+   * a future planned start never surfaces there. Deliberately NOT graphed: combining the {@code
+   * limit 1} with a collection {@code @EntityGraph} ({@code participants} / {@code assignedUnits})
+   * forces Hibernate to load the whole result set and paginate in memory (HHH90003004). Callers
+   * that need the collections re-fetch the single hit by id through the graphed {@link
+   * #findById(UUID)} — see {@code MissionService.getNextMission}.
+   *
+   * @param date exclusive lower bound on {@code plannedStartTime}
+   * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
+   * @return the next matching mission, or empty when none upcoming
    */
-  Optional<Mission> findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(Instant date);
+  Optional<Mission> findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
+      Instant date, java.util.Collection<String> statuses);
 
   /**
-   * Returns the first matching {@code
-   * PlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc} (limit 1). Deliberately NOT
-   * graphed for the same reason as {@link
-   * #findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(Instant)} — a {@code limit 1} plus
-   * a collection {@code @EntityGraph} triggers in-memory pagination (HHH90003004); callers re-fetch
-   * the hit by id through the graphed {@link #findById(UUID)}.
+   * Guest variant of {@link
+   * #findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(Instant,
+   * java.util.Collection)} that additionally excludes internal missions ({@code isInternal =
+   * false}). Same {@code limit 1} + {@code status IN} contract and the same no-{@code @EntityGraph}
+   * rationale — a {@code limit 1} plus a collection {@code @EntityGraph} triggers in-memory
+   * pagination (HHH90003004); callers re-fetch the hit by id through the graphed {@link
+   * #findById(UUID)}.
+   *
+   * @param date exclusive lower bound on {@code plannedStartTime}
+   * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
+   * @return the next matching public mission, or empty when none upcoming
    */
-  Optional<Mission> findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(
-      Instant date);
+  Optional<Mission>
+      findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
+          Instant date, java.util.Collection<String> statuses);
 
   /**
    * Full-text + date-range + status + scope search across missions. Each parameter is optional - a

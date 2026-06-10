@@ -214,26 +214,50 @@ public class MissionService {
   }
 
   /**
+   * Statuses a mission may carry to qualify as the home-page "next mission". Only live operational
+   * missions ({@code PLANNED} / {@code ACTIVE}) are eligible — a {@code COMPLETED} or {@code
+   * CANCELLED} mission with a future planned start must never surface in the banner.
+   */
+  private static final List<String> NEXT_MISSION_STATUSES = List.of("PLANNED", "ACTIVE");
+
+  /**
    * Returns the next upcoming mission by planned-start time. Drives the home-page "next mission"
-   * banner. {@code allowInternal=true} (for authenticated callers) includes internal missions;
-   * guests see only public missions.
+   * banner. Only missions in status {@code PLANNED} or {@code ACTIVE} are considered. {@code
+   * allowInternal=true} (for authenticated callers) includes internal missions; guests see only
+   * public missions.
    *
    * @param allowInternal whether internal missions should be included
    * @return the next mission, or empty when none upcoming
    */
   public Optional<Mission> getNextMission(boolean allowInternal) {
-    Instant now = Instant.now();
-    Optional<Mission> next =
-        allowInternal
-            ? missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(now)
-            : missionRepository
-                .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(now);
+    Optional<Mission> next = findNextMissionHead(Instant.now(), allowInternal);
     // The limit-1 lookup above is intentionally not graphed — a collection fetch combined with the
     // limit forces Hibernate into in-memory pagination (HHH90003004). Re-fetch the single hit by id
     // through the graphed findById so participants / assignedUnits are eagerly loaded for the
     // mapper
     // (and the home-page guest redaction) without paginating the whole upcoming-mission set.
     return next.map(Mission::getId).flatMap(missionRepository::findById);
+  }
+
+  /**
+   * Resolves the ungraphed limit-1 head of the next-mission lookup, filtered to {@link
+   * #NEXT_MISSION_STATUSES}. Split out from {@link #getNextMission(boolean)} only so the long
+   * derived-query method names sit at a shallow enough indentation to stay within the line-length
+   * limit; it carries no behaviour of its own beyond the {@code allowInternal} branch.
+   *
+   * @param now exclusive lower bound on {@code plannedStartTime}
+   * @param allowInternal whether internal missions should be included
+   * @return the next-mission head (id-only matters; caller re-fetches through the graphed findById)
+   */
+  private Optional<Mission> findNextMissionHead(Instant now, boolean allowInternal) {
+    if (allowInternal) {
+      return missionRepository
+          .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
+              now, NEXT_MISSION_STATUSES);
+    }
+    return missionRepository
+        .findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
+            now, NEXT_MISSION_STATUSES);
   }
 
   /**
