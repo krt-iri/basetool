@@ -2789,6 +2789,105 @@ input[type='radio']:focus {
     white-space: nowrap;
 }
 
+/* ── Item-order blueprint coverage (Blaupausen-Verfuegbarkeit) ───────────────
+   Members-only panel in the item-order detail, after the Bearbeiter section:
+   which members of the responsible squadron/SK own the blueprints for the
+   ordered items, plus per-item coverage. Square-first, built on the shared
+   tokens; the coverage grid reuses the .data-table component. */
+.bp-coverage {
+    margin-top: var(--space-8);
+}
+
+.bp-coverage h3,
+.bp-coverage h4 {
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+}
+
+.bp-coverage h3 {
+    margin: 0 0 var(--space-2);
+}
+
+.bp-coverage h4 {
+    margin: var(--space-6) 0 var(--space-3);
+}
+
+.bp-coverage__subtitle {
+    max-width: var(--measure);
+    margin: 0 0 var(--space-4);
+    color: var(--color-gray-2);
+    font-size: var(--fs-sm);
+}
+
+.bp-owner-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.bp-owner {
+    padding: var(--space-3);
+    background-color: var(--color-surface-input);
+    border: var(--border-hairline);
+    border-radius: var(--radius-none);
+}
+
+.bp-owner__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+}
+
+.bp-owner__name {
+    font-weight: var(--fw-bold);
+}
+
+.bp-owner__count {
+    color: var(--color-gray-2);
+    font-size: var(--fs-xs);
+}
+
+.bp-owner__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Owned-blueprint chip — square HUD tag (cf. .subassembly-tag) kept in the
+   product's natural case + size so long item names stay legible. */
+.bp-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    font-size: var(--fs-xs);
+    line-height: 1.3;
+}
+
+.bp-coverage__empty {
+    margin: 0;
+    padding: var(--space-2) 0;
+    color: var(--color-gray-2);
+}
+
+/* Coverage gap — nobody in the unit owns this item's blueprint. Uses the
+   accessible danger text tint (REQ-UI-006) plus a text label, so the state
+   never relies on colour alone. */
+.bp-gap {
+    color: var(--color-danger-text);
+    font-weight: var(--fw-bold);
+}
+
 /* Department tag — small square chip tinted by the owning Bereichsfarbe.
    The border inherits `currentColor`, so setting the text colour to a
    department token (e.g. `color: var(--color-dept-forschung)`) tints both

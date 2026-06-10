@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
+import de.greluc.krt.iri.basetool.backend.model.JobOrder;
 import de.greluc.krt.iri.basetool.backend.model.Mission;
 import de.greluc.krt.iri.basetool.backend.model.Operation;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
@@ -348,6 +349,95 @@ class OwnerScopeServiceTest {
 
       assertFalse(service.canSeeSquadron(SQUADRON_A_ID));
       assertFalse(service.canSeeSquadron(SQUADRON_B_ID));
+    }
+  }
+
+  @Nested
+  class CanSeeJobOrderBlueprintOwnersTests {
+
+    private JobOrder orderResponsibleTo(
+        de.greluc.krt.iri.basetool.backend.model.OrgUnit responsible) {
+      return JobOrder.builder().id(UUID.randomUUID()).responsibleOrgUnit(responsible).build();
+    }
+
+    @Test
+    void member_ofResponsibleSquadron_canSee() {
+      JobOrder order = orderResponsibleTo(squadronA);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+    }
+
+    @Test
+    void nonMember_ofResponsibleSquadron_cannotSee() {
+      JobOrder order = orderResponsibleTo(squadronB);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertFalse(service.canSeeJobOrderBlueprintOwners(order.getId()));
+    }
+
+    @Test
+    void nonMember_ofResponsibleSk_cannotSee_eventThoughTheOrderItselfIsPublic() {
+      // The defining distinction from canSeeJobOrder: an SK-responsible order is publicly readable,
+      // but the named-member blueprint coverage is restricted to members of that SK. A profit
+      // member
+      // who is not in the SK is denied — there is no SK-public escape on this gate.
+      UUID skId = UUID.randomUUID();
+      SpecialCommand sk = new SpecialCommand();
+      sk.setId(skId);
+      JobOrder order = orderResponsibleTo(sk);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertFalse(service.canSeeJobOrderBlueprintOwners(order.getId()));
+    }
+
+    @Test
+    void member_ofResponsibleSk_canSee() {
+      UUID skId = UUID.randomUUID();
+      SpecialCommand sk = new SpecialCommand();
+      sk.setId(skId);
+      JobOrder order = orderResponsibleTo(sk);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(skMembership(MEMBER_USER_ID, skId)));
+
+      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+    }
+
+    @Test
+    void adminWithoutPin_canSeeAnyOrdersCoverage() {
+      JobOrder order = orderResponsibleTo(squadronB);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+    }
+
+    @Test
+    void unknownOrder_returnsFalse() {
+      UUID missing = UUID.randomUUID();
+      when(jobOrderRepository.findById(missing)).thenReturn(Optional.empty());
+
+      assertFalse(service.canSeeJobOrderBlueprintOwners(missing));
     }
   }
 

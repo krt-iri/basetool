@@ -34,6 +34,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderHandoverItemCreateDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverDto;
@@ -367,6 +368,23 @@ public class JobOrderPageController {
         model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
       }
       model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
+
+      // Item-order blueprint coverage: which members of the responsible squadron/SK own the
+      // blueprints for the ordered items. The backend gates this members-only (it returns 403 for a
+      // non-member viewing an otherwise-public SK order), so the call is isolated in its own
+      // try/catch — on any failure the section is simply omitted rather than failing the whole
+      // page.
+      if ("ITEM".equals(order.type())) {
+        try {
+          model.addAttribute(
+              "itemBlueprintOwners",
+              backendApiClient.get(
+                  "/api/v1/orders/" + id + "/item-blueprint-owners",
+                  JobOrderItemBlueprintOwnersDto.class));
+        } catch (Exception e) {
+          log.debug("Blueprint coverage unavailable for order {}: {}", id, e.getMessage());
+        }
+      }
     } catch (Exception e) {
       log.error("Failed to fetch order", e);
       log.error("Failed to load job order", e);

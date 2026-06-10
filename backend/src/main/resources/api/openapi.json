@@ -28707,6 +28707,112 @@
         }
       }
     },
+    "/api/v1/orders/{id}/item-blueprint-owners" : {
+      "get" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Get item-order blueprint coverage",
+        "description" : "Returns which members of the responsible squadron/SK own the blueprints for the order's required items. Members of the responsible org unit only.",
+        "operationId" : "getItemBlueprintOwners",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderItemBlueprintOwnersDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/lookup" : {
       "get" : {
         "tags" : [ "Orders" ],
@@ -41293,6 +41399,52 @@
             "items" : {
               "$ref" : "#/components/schemas/ClaimDto"
             }
+          }
+        }
+      },
+      "JobOrderBlueprintOwnerDto" : {
+        "type" : "object",
+        "properties" : {
+          "ownerName" : {
+            "type" : "string"
+          },
+          "ownedProductNames" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "JobOrderItemBlueprintOwnersDto" : {
+        "type" : "object",
+        "properties" : {
+          "requiredBlueprints" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderRequiredBlueprintDto"
+            }
+          },
+          "owners" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderBlueprintOwnerDto"
+            }
+          }
+        }
+      },
+      "JobOrderRequiredBlueprintDto" : {
+        "type" : "object",
+        "properties" : {
+          "productKey" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "ownerCount" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
