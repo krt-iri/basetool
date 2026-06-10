@@ -3831,3 +3831,119 @@ textarea:focus-visible,
     border-top-color: var(--color-primary);
     transform: translateX(-50%);
 }
+
+/* ------------------ Refinery screenshot import (#435): create-page review flags */
+
+.import-extract-bar {
+    margin-bottom: 1rem;
+}
+
+/* The bar's only child is the upload form — the flex row has to live there,
+   or the gap between button and help text never applies. */
+.import-extract-bar form {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.import-extract-help {
+    font-size: 0.85rem;
+}
+
+.import-issue-list {
+    margin: 0.5rem 0 0;
+    padding-left: 1.25rem;
+}
+
+.import-issue-list li {
+    margin-bottom: 0.25rem;
+}
+
+/* Accessible text tints (REQ-UI-006): canonical hues stay on fills/dots only. */
+.import-flag-danger {
+    color: var(--color-danger-text);
+}
+
+.import-flag-warning {
+    color: var(--color-warning);
+}
+
+.import-flag-info {
+    color: var(--color-info-text);
+}
+
+/* De-emphasised via the neutral body tone — an opacity fade would drop the
+   severity tints below the AA contrast headroom REQ-UI-006 chose them for. */
+.import-flag-raw {
+    color: var(--color-gray-1);
+}
+
+/* 3px left status bar on flagged goods rows; inset shadow so the inline border of
+   .material-entry keeps working without specificity fights. */
+.import-flagged-row {
+    box-shadow: inset 3px 0 0 var(--color-warning);
+}
+
+.import-row-flags {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.import-row-flag {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+}
+
+.import-flag-confidence {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* Square dot per the KRT square-first language; dot keeps the canonical hue,
+   the percent text uses the accessible tint. */
+.import-confidence-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+}
+
+.import-confidence-success {
+    color: var(--color-success-text);
+}
+
+.import-confidence-success .import-confidence-dot {
+    background-color: var(--color-success);
+}
+
+.import-confidence-warning {
+    color: var(--color-warning);
+}
+
+.import-confidence-warning .import-confidence-dot {
+    background-color: var(--color-warning);
+}
+
+.import-confidence-danger {
+    color: var(--color-danger-text);
+}
+
+.import-confidence-danger .import-confidence-dot {
+    background-color: var(--color-danger);
+}
+
+.import-suggestions {
+    display: inline-flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.import-suggestion-chip {
+    min-height: var(--touch-target);
+}

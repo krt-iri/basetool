@@ -329,6 +329,63 @@ public final class BackendSeeder {
   }
 
   /**
+   * Resolves the id of an existing material by its (unique) name via {@code GET
+   * /api/v1/materials/lookup}, mirroring {@link #findLocationIdByName(String, String, String)}.
+   *
+   * @param username the Keycloak username of the (authenticated) test user
+   * @param password the Keycloak password of the test user
+   * @param name the exact material name to match
+   * @return the matching material's id, or {@code null} if no material carries that name
+   */
+  public String findMaterialIdByName(String username, String password, String name) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/materials/lookup"))
+              .header("Authorization", "Bearer " + token)
+              .GET()
+              .build();
+      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+      if (response.statusCode() != 200) {
+        throw new IllegalStateException("Materials lookup failed: HTTP " + response.statusCode());
+      }
+      for (JsonElement element : JsonParser.parseString(response.body()).getAsJsonArray()) {
+        JsonObject material = element.getAsJsonObject();
+        if (material.has("name")
+            && !material.get("name").isJsonNull()
+            && name.equals(material.get("name").getAsString())) {
+          return material.get("id").getAsString();
+        }
+      }
+      return null;
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.findMaterialIdByName failed", e);
+    }
+  }
+
+  /**
+   * Get-or-create variant of {@link #createRefineryMaterial(String, String, String)}: returns the
+   * id of the existing material with that name, creating it only when absent.
+   *
+   * <p>Needed because the frontend caches the materials lookup for 10 minutes: the first
+   * create-page render of the suite freezes the dropdown list for every later test class, so every
+   * class that drives the refinery create form must be able to pre-seed the <em>union</em> of the
+   * dropdown materials idempotently — a blind {@code POST} would fail on the duplicate name when
+   * the sibling class seeded the material first.
+   *
+   * @param username admin username
+   * @param password admin password
+   * @param name material name
+   * @return the existing or freshly created material's id
+   */
+  public String ensureRefineryMaterial(String username, String password, String name) {
+    String existing = findMaterialIdByName(username, password, name);
+    return existing != null ? existing : createRefineryMaterial(username, password, name);
+  }
+
+  /**
    * Creates a refinery order via {@code POST /api/v1/refinery-orders} owned by the caller and
    * returns its id, so the refinery store / lifecycle / tenancy flows have a persisted order to
    * drive against without round-tripping the create UI each time. The order targets the given

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "tool": "basetool-sc-extractor",
+  "toolVersion": "0.0.0-e2e",
+  "model": "qwen3-vl:8b-instruct",
+  "generatedAt": "2026-06-10T12:00:00Z",
+  "clientLanguage": "en",
+  "orders": [
+    {
+      "panelType": "SETUP",
+      "quoted": true,
+      "layoutConfidence": 0.95,
+      "rawLocationName": "E2E REFINERY HUB",
+      "rawMethodName": "E2E REFINING METHOD",
+      "rawInManifestTotal": 400,
+      "rawToRefineTotal": 400,
+      "expenses": 1234.0,
+      "durationMinutes": 90,
+      "totalYieldScu": null,
+      "sourceImages": [
+        { "name": "e2e_frame_1.png", "width": 3840, "height": 2160, "cropMode": "manual" }
+      ],
+      "goods": [
+        {
+          "rowIndex": 0,
+          "rawMaterialName": "E2E IMPORT MATERIAL",
+          "quality": 618,
+          "inputQuantity": 250,
+          "outputQuantity": 120,
+          "refine": true,
+          "confidence": 0.97,
+          "sourceImage": "e2e_frame_1.png"
+        },
+        {
+          "rowIndex": 1,
+          "rawMaterialName": "E2E IMPRT MATERAIL",
+          "quality": 385,
+          "inputQuantity": 150,
+          "outputQuantity": 70,
+          "refine": true,
+          "confidence": 0.62,
+          "sourceImage": "e2e_frame_1.png"
+        }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
 import de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronRelayFilter;
+import de.greluc.krt.iri.basetool.frontend.logging.UserLocaleRelayFilter;
 import de.greluc.krt.iri.basetool.frontend.logging.WebClientLoggingFilter;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
@@ -83,6 +84,7 @@ public class WebClientConfig {
   private final AppHttpProperties httpProperties;
   private final WebClientLoggingFilter webClientLoggingFilter;
   private final ActiveSquadronRelayFilter activeSquadronRelayFilter;
+  private final UserLocaleRelayFilter userLocaleRelayFilter;
   private final org.springframework.core.env.Environment environment;
   private final SslBundles sslBundles;
 
@@ -289,6 +291,7 @@ public class WebClientConfig {
         .apply(oauth2Client.oauth2Configuration())
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
+        .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(
@@ -317,6 +320,7 @@ public class WebClientConfig {
         .exchangeStrategies(strategies)
         .clientConnector(connector())
         .filter(webClientLoggingFilter.correlationIdPropagation())
+        .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(
