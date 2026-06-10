@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,6 +33,7 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderType;
@@ -58,6 +60,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Coverage for {@link JobOrderService} methods that the main {@code JobOrderServiceTest} doesn't
@@ -347,12 +350,14 @@ class JobOrderServiceAssigneeAndListTest {
       User user = newUser(USER_ID);
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(jobOrderRepository.save(order)).thenReturn(order);
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
 
       service.addAssignee(JOB_ORDER_ID, USER_ID);
 
-      assertTrue(order.getAssignees().contains(user), "user must be added to the assignees set");
-      verify(jobOrderRepository).save(order);
+      assertTrue(
+          order.getAssignees().stream().anyMatch(a -> USER_ID.equals(a.getUser().getId())),
+          "user must be added as an assignee edge");
+      verify(jobOrderRepository).saveAndFlush(order);
     }
 
     @Test
@@ -361,7 +366,7 @@ class JobOrderServiceAssigneeAndListTest {
 
       assertThrows(NotFoundException.class, () -> service.addAssignee(JOB_ORDER_ID, USER_ID));
       verify(userRepository, never()).findById(any());
-      verify(jobOrderRepository, never()).save(any());
+      verify(jobOrderRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -371,27 +376,25 @@ class JobOrderServiceAssigneeAndListTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
       assertThrows(NotFoundException.class, () -> service.addAssignee(JOB_ORDER_ID, USER_ID));
-      verify(jobOrderRepository, never()).save(any());
+      verify(jobOrderRepository, never()).saveAndFlush(any());
     }
 
     @Test
     void addingExistingAssignee_isIdempotent() {
-      // The assignees collection is a Set, so adding the same user twice
-      // must not increase its size.
+      // A user is an assignee at most once per order; re-adding the same user is a no-op that
+      // skips both the user lookup and the save.
       User user = newUser(USER_ID);
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
-      order.getAssignees().add(user);
+      assigneeEdge(order, user);
 
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(jobOrderRepository.save(order)).thenReturn(order);
 
       service.addAssignee(JOB_ORDER_ID, USER_ID);
 
       assertEquals(
-          1,
-          order.getAssignees().size(),
-          "re-adding the same user must not duplicate (Set semantics)");
+          1, order.getAssignees().size(), "re-adding the same user must not duplicate the edge");
+      verify(userRepository, never()).findById(any());
+      verify(jobOrderRepository, never()).saveAndFlush(any());
     }
   }
 
@@ -406,36 +409,31 @@ class JobOrderServiceAssigneeAndListTest {
     void happyPath_removesAssigneeAndSaves() {
       User user = newUser(USER_ID);
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
-      order.getAssignees().add(user);
+      assigneeEdge(order, user);
 
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(jobOrderRepository.save(order)).thenReturn(order);
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
 
       service.removeAssignee(JOB_ORDER_ID, USER_ID);
 
       assertTrue(order.getAssignees().isEmpty());
-      verify(jobOrderRepository).save(order);
+      verify(jobOrderRepository).saveAndFlush(order);
     }
 
     @Test
     void removingNonAssignee_isANoOpButStillSaves() {
-      // Set.remove(unknown) returns false but does not throw. The current
-      // implementation does NOT specially handle this case — the save
-      // happens regardless. Locking this in so a future "throw if not
-      // already assigned" change requires conscious test updates.
-      User user = newUser(USER_ID);
+      // removeIf finds nothing but does not throw — the save happens regardless. The remove path
+      // no longer looks the user up, so an unknown id is simply a no-op.
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
-      // user is NOT in assignees
+      // no assignee for USER_ID
 
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(jobOrderRepository.save(order)).thenReturn(order);
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
 
       service.removeAssignee(JOB_ORDER_ID, USER_ID);
 
       assertTrue(order.getAssignees().isEmpty());
-      verify(jobOrderRepository).save(order);
+      verify(jobOrderRepository).saveAndFlush(order);
     }
 
     @Test
@@ -443,17 +441,84 @@ class JobOrderServiceAssigneeAndListTest {
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.empty());
 
       assertThrows(NotFoundException.class, () -> service.removeAssignee(JOB_ORDER_ID, USER_ID));
-      verify(userRepository, never()).findById(any());
+      verify(jobOrderRepository, never()).saveAndFlush(any());
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // updateAssigneeNote / deleteAssigneeNote (REQ-ORDERS-013)
+  // ---------------------------------------------------------------
+
+  @Nested
+  class AssigneeNoteTests {
+
+    @Test
+    void setNote_trimsAndFlushes() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      JobOrderAssignee edge = assigneeEdge(order, newUser(USER_ID));
+      edge.setVersion(3L);
+
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
+
+      service.updateAssigneeNote(JOB_ORDER_ID, USER_ID, "  works Friday  ", 3L);
+
+      assertEquals("works Friday", edge.getNote(), "note is stored stripped");
+      verify(jobOrderRepository).saveAndFlush(order);
     }
 
     @Test
-    void notFoundUser_throws() {
+    void setBlankNote_clearsIt() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      JobOrderAssignee edge = assigneeEdge(order, newUser(USER_ID));
+      edge.setNote("old");
+
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
+
+      service.updateAssigneeNote(JOB_ORDER_ID, USER_ID, "   ", null);
+
+      assertNull(edge.getNote(), "a blank note clears the value");
+    }
+
+    @Test
+    void deleteNote_clearsNote() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      JobOrderAssignee edge = assigneeEdge(order, newUser(USER_ID));
+      edge.setNote("old");
+      edge.setVersion(5L);
+
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
+
+      service.deleteAssigneeNote(JOB_ORDER_ID, USER_ID, 5L);
+
+      assertNull(edge.getNote());
+    }
+
+    @Test
+    void staleVersion_throwsOptimisticLock() {
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      JobOrderAssignee edge = assigneeEdge(order, newUser(USER_ID));
+      edge.setVersion(7L);
+
+      when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
+
+      assertThrows(
+          ObjectOptimisticLockingFailureException.class,
+          () -> service.updateAssigneeNote(JOB_ORDER_ID, USER_ID, "x", 3L));
+      verify(jobOrderRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void unknownAssignee_throwsNotFound() {
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
-      assertThrows(NotFoundException.class, () -> service.removeAssignee(JOB_ORDER_ID, USER_ID));
-      verify(jobOrderRepository, never()).save(any());
+      assertThrows(
+          NotFoundException.class,
+          () -> service.updateAssigneeNote(JOB_ORDER_ID, USER_ID, "x", null));
+      verify(jobOrderRepository, never()).saveAndFlush(any());
     }
   }
 
@@ -474,5 +539,14 @@ class JobOrderServiceAssigneeAndListTest {
     u.setId(id);
     u.setUsername("user-" + id);
     return u;
+  }
+
+  private JobOrderAssignee assigneeEdge(JobOrder order, User user) {
+    JobOrderAssignee edge = new JobOrderAssignee();
+    edge.setId(UUID.randomUUID());
+    edge.setUser(user);
+    edge.setVersion(0L);
+    order.addAssignee(edge);
+    return edge;
   }
 }

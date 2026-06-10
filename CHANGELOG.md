@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bearbeiter eines Auftrags können jetzt eine Notiz zu ihrem Eintrag hinterlegen** — z. B. wann sie daran arbeiten oder welchen Teil sie übernehmen. Über ein Stift-Symbol neben dem Namen öffnet sich ein Dialog zur Eingabe (max. 500 Zeichen); ist eine Notiz vorhanden, lässt sie sich über ein Lösch-Symbol wieder entfernen. Notizen sind für alle sichtbar, die den Auftrag sehen; bearbeiten darf sie nur der Bearbeiter selbst oder ein Logistiker (und höher). Ein- und Austragen sowie das Speichern der Notiz laufen jetzt ohne Neuladen der Seite.
+
 ### Fixed
 
 - **Material-Aliasse (Admin → Material-Aliasse) sind jetzt unabhängig von Groß-/Kleinschreibung eindeutig.** Bisher konnten zwei Aliasse, die sich nur in der Schreibweise unterschieden (z. B. „STILERON (ORE)" und „Stileron (Ore)"), nebeneinander existieren und ließen den SC-Wiki-Abgleich mit einem Fehler (HTTP 500) abbrechen. Eine Migration entfernt vorhandene Duplikate (die älteste Zeile bleibt erhalten); das Anlegen eines solchen Duplikats meldet jetzt einen sauberen Konflikt (HTTP 409).

@@ -50,6 +50,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "handovers.items",
         "handovers.items.material",
         "assignees",
+        "assignees.user",
         "responsibleOrgUnit",
         "requestingOrgUnit"
       })
@@ -119,6 +120,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       attributePaths = {
         "materials",
         "assignees",
+        "assignees.user",
         "handovers",
         "handovers.items",
         "responsibleOrgUnit",
@@ -157,8 +159,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Query("SELECT o FROM JobOrder o ORDER BY o.id")
   List<JobOrder> lockAllJobOrders();
 
-  /** Derived Spring-Data query - returns entities matching {@code AssigneeId}. */
-  @Query("SELECT j FROM JobOrder j JOIN j.assignees u WHERE u.id = :userId")
+  /** Returns every job order the given user is an assignee of. */
+  @Query("SELECT j FROM JobOrder j JOIN j.assignees a WHERE a.user.id = :userId")
   List<JobOrder> findByAssigneeId(@Param("userId") UUID userId);
 
   /**
