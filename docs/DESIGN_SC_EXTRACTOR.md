@@ -78,10 +78,19 @@ tokens. The desktop app already mirrors these in `ui/Theme.kt`; keep them in syn
   corner brackets (TL + BR), translucent `rgba(20,20,20,0.5)` fill.
 - **Elevation.** No soft shadows. Depth = hairlines + brackets. The only glow is the
   orange bloom on the single primary CTA and on toasts.
-- **Action hierarchy (critical).** Exactly **one** filled-orange CTA per screen
-  (`.btn--cta`). Secondary = orange outline; routine = neutral ghost (orange on
-  hover); destructive = quiet → red on hover. **Form labels are neutral grey**, data
-  values are bright white on a surface chip — orange is for action + identity only.
+- **Action hierarchy (critical).** Exactly **one** filled-orange CTA per
+  **context/panel** (`.btn--cta`; the design system's rule is "max 1 per panel",
+  REQ-UI-002 says "per context" — a screen with two independent panels may carry
+  one each, but never two competing CTAs in one context). Secondary = orange
+  outline; routine = neutral ghost (orange on hover); destructive = quiet → red on
+  hover. **Form labels are neutral grey**, data values are bright white on a
+  surface chip — orange is for action + identity only.
+- **Accessible status text (binding, REQ-UI-006).** Semantic colour used AS small
+  text on dark surfaces must use the text tints `--color-danger-text #F2564B`,
+  `--color-info-text #6C93EF`, `--color-success-text #2EBC3D` — the canonical
+  danger/info hues fail WCAG as small text on black. Fills/borders/dots keep the
+  canonical hues. This applies directly to the confidence **percent text** in the
+  review tables (§5.4): tinted text + canonical-hue dot.
 - **Iconography.** In-house 24×24, 2px-stroke line set (`currentColor`, sizes to
   1em). No emoji. Warnings use `⚠`/the warning glyph, status uses small square dots.
 - **Motion.** Restrained: 0.2s colour/background on hover; progress bars and the
@@ -143,13 +152,14 @@ between them; in the product they are driven by real detection):
 
 - **Ollama runtime card.** Endpoint + model key/value rows. States:
   - *Reachable + model present* → green "Erreichbar · Modell vorhanden · bereit."
-  - *Reachable, model missing* → warning alert with `ollama pull qwen3-vl:8b` and a
+  - *Reachable, model missing* → warning alert with `ollama pull qwen3-vl:8b-instruct` and a
     **„Laden"** CTA → switches to an inline pull **progress bar** → present.
   - *Ollama unreachable* → danger alert with a 2-step install hint
     (download from ollama.com → `ollama serve`) + a ghost **„Erneut prüfen"**.
 - **Hardware preflight card.** GPU / VRAM / RAM rows; an **auto-selected model** chip;
   a min/recommended **tier bar** (CPU · MIN 6–8GB · EMPF 10–12GB+). Below recommended
-  → warning with a **radio fallback**: low-VRAM model (`qwen3-vl:4b`) **or** CPU mode
+  → warning with a **radio fallback**: low-VRAM model (Phase-0 bake-off winner —
+  `glm-ocr` two-stage / `qwen3-vl:4b-instruct` / `gemma4:e4b-it-qat`) **or** CPU mode
   (works but slow). Above recommended → green "full accuracy".
 - **SC-running soft warning.** If `StarCitizen.exe` is detected → non-blocking warning
   ("VLM and SC share GPU/VRAM — close SC for safe extraction") + an
@@ -159,16 +169,23 @@ between them; in the product they are driven by real detection):
 
 **5.2 Bilder laden.** "1 folder = 1 order" framing. A folder bar (mono path +
 "Ordner wählen" / "+ Bilder"), then a thumbnail grid: each tile shows a resolution
-chip (e.g. `7680×4320`), the file name, a `crop` tag (`vlm` / `manuell`), and a remove
-×. A row of mini-stats (Bilder · Auftrag · Auflösung · Modell). CTA **„Extraktion
-starten"**.
+chip (e.g. `7680×4320`), the file name, a `crop` tag (`vlm` / `manuell` /
+`vorgecroppt` — pre-cropped panel images skip Locate), and a remove ×. A row of
+mini-stats (Bilder · Auftrag · Auflösung · Modell). CTA **„Extraktion starten"**.
 
-**5.3 Extraktion.** Left: overall `Bild X / N` + percent + progress, then one row per
-image with a per-image **Locate → Normalize → Read** stage track (passed = green,
-active = orange, todo = grey) — strictly **one image active at a time**. Right: an
-orange-accented **console** pane streaming stage lines (`· Normalize — …`,
-`✓ … — read`). The model chip (`qwen3-vl:8b`) sits in the header. Cancel on the left;
-**„Weiter: Review"** enables on completion.
+**5.3 Extraktion.** Left: overall `Bild X / N` + percent + progress + a per-image
+ETA from the measured hardware tier (calmer than an indeterminate spinner), then
+one row per image with a per-image **Locate → Normalize → Read** stage track
+(passed = green, active = orange, todo = grey) — strictly **one image active at a
+time**. Right: an orange-accented **console** pane streaming stage lines
+(`· Normalize — …`, `✓ … — read`). The model chip (`qwen3-vl:8b-instruct`) sits in
+the header. Cancel on the left; **„Weiter: Review"** enables on completion.
+**Un-quoted-state warning (new):** when a screenshot is detected in the GET-QUOTE
+state (YIELD column `--`, no cost/time), the image row gets an amber ⚠ state and a
+warning alert explains: "Screenshot vor GET QUOTE aufgenommen — Ausbeute/Kosten
+fehlen. Im Spiel GET QUOTE drücken und erneut aufnehmen." If **every** image is
+un-quoted, the Review CTA carries a blocking notice (export is still possible, but
+the basetool will flag the order as `UNQUOTED_ORDER`).
 
 **5.4 Review & Bestätigung** *(this visual language is shared with frontend #435)*.
 Header badges: `SETUP` panel type + `layout 92%`. A warning banner counts flagged
@@ -178,9 +195,18 @@ green ✔ (matched) or amber ⚠ (needs attention) and a left status bar; `LEVSK
 master-data name, or red `kein Treffer` chip + a `zuordnen` action) · Qualität ·
 Input · Ausbeute (green `+`) · **Refine** toggle · **Konfidenz**. Rows below threshold
 or unmatched get a coloured 3px left border. **Confidence = percent + dot**, coloured
-≥90% success / 75–90% warning / <75% danger. Below: a "stays manual — please
-complete" chip row (Besitzer default `greluc`, Mission, Sonstige Kosten, Erzverkäufe,
-Start) with the empty/uncertain ones amber. CTA **„Als JSON exportieren"**.
+≥90% success / 75–90% warning / <75% danger — the percent **text** uses the
+accessible tints (`--color-*-text`, REQ-UI-006), the dot keeps the canonical hue;
+the value itself is the **derived** confidence (two-pass agreement + checksum, see
+the master plan §3.1), never the model's self-estimate. Unmatched rows render the
+backend's ranked `suggestions` as a pick list on the `zuordnen` action.
+Implementation note (frontend #435): no toggle/switch component exists yet in the
+design system or the basetool frontend — implement Refine as a styled checkbox or
+introduce a new switch component **with an ADR + design-skill update in the same
+PR**; the frontend also lacks a global `.alert-info` variant. Below: a "stays
+manual — please complete" chip row (Besitzer default `greluc`, Mission, Sonstige
+Kosten, Erzverkäufe, Start) with the empty/uncertain ones amber. CTA **„Als JSON
+exportieren"**.
 
 **5.5 Export & Upload.** Green success alert with the written
 `RefineryExtract.json` path + a small summary. A large "Upload into the basetool"
@@ -229,15 +255,17 @@ Build the rebuilt tool to match the prototype screen-for-screen.
 - [ ] **Top-Tabs** launcher: Start · Blueprints · Refinery; per-workflow step
       stepper; Start screen = greeting + two workflow cards + fan-kit footer.
 - [ ] Blueprint workflow restyled to spec (config / running / summary), single
-      orange CTA per screen, neutral labels, KRT tables.
+      orange CTA per context/panel, neutral labels, KRT tables.
 - [ ] Refinery preflight implements every state from §5.1: Ollama
       reachable/model-present/model-missing(+pull progress)/unreachable(+install
       hint); hardware GPU/VRAM/RAM + auto-selected model + min/recommended tier bar
       + below-recommended fallback radio (low-VRAM model | CPU mode); SC-running
       soft warning + acknowledge checkbox; "one image at a time" throttle note.
-- [ ] Bilder-laden: 1 folder = 1 order, thumbnail grid with resolution + crop tags.
+- [ ] Bilder-laden: 1 folder = 1 order, thumbnail grid with resolution + crop tags
+      (vlm | manuell | vorgecroppt).
 - [ ] Extraktion: per-image Locate→Normalize→Read tracks (one active at a time) +
-      orange-accent console + model chip.
+      orange-accent console + model chip + per-image ETA; un-quoted (GET-QUOTE)
+      screenshots get an amber ⚠ row state + re-capture warning (§5.3).
 - [ ] Export screen: written-path success + manual-upload instructions + provenance.
 - [ ] DE/EN parity; comfortable density; honeycomb texture (~0.32); no native dialogs.
 - [ ] `CLAUDE.md` scope section widened from "blueprints only" to multi-workflow.
@@ -249,13 +277,19 @@ Build the rebuilt tool to match the prototype screen-for-screen.
 ### Design / UI acceptance
 - [ ] Pre-filled review form uses the §5.4 visual language: order-header cards with
       matched(✔)/needs-attention(⚠) state; goods table with Material · Match
-      (✔ name | red "no match" + assign) · Quality · Input · Yield(+) · Refine
-      toggle · **Confidence = percent + colour dot** (≥90 success / 75–90 warn /
-      <75 danger); flagged rows get a coloured left border.
+      (✔ name | red "no match" + assign with ranked suggestions) · Quality · Input ·
+      Yield(+) · Refine (styled checkbox or new switch component + ADR) ·
+      **Confidence = percent + colour dot** (≥90 success / 75–90 warn / <75 danger;
+      percent text uses the accessible `--color-*-text` tints, REQ-UI-006); flagged
+      rows get a coloured left border.
 - [ ] A banner counts flagged fields; "stays manual — please complete" items
       (owner default = uploader, mission, otherExpenses, oreSales, startedAt) are
       visually marked; SETUP panel-type + layoutConfidence badges shown.
-- [ ] Import UI mirrors the hangar ship-list import; review-before-commit enforced.
+- [ ] Error/empty states covered: not-a-JSON file, wrong schemaVersion, zero
+      matched rows, all rows un-quoted — each a KRT toast/inline alert with a
+      recovery hint.
+- [ ] Import UI mirrors the blueprint preview/apply import (hidden file input +
+      styled trigger); review-before-commit enforced.
 - [ ] KRT styling, action hierarchy (one orange CTA = confirm), DE/EN parity.
 ```
 
