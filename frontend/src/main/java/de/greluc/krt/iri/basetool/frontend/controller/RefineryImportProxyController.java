@@ -222,18 +222,25 @@ public class RefineryImportProxyController {
    * Selects the findings that anchor to a rendered form row ({@code goods[<draftIndex>].<sub>}) and
    * groups them by that index so the template can flag each row inline.
    *
+   * <p>The map is keyed by the <em>String</em> form of the index on purpose: flash attributes
+   * survive the redirect through the Redis-backed session, and the JSON session serializer ({@link
+   * de.greluc.krt.iri.basetool.frontend.config.RedisSessionConfig}) stringifies map keys — an
+   * {@code Integer}-keyed map comes back {@code String}-keyed on the next request, making every
+   * {@code containsKey(int)} lookup miss silently. The template therefore matches with {@code '' +
+   * stat.index} (covers REQ-REFINERY-015).
+   *
    * @param issues all draft findings; {@code null}-safe
-   * @return draft-row findings keyed by goods index, in encounter order
+   * @return draft-row findings keyed by the goods index's decimal string, in encounter order
    */
-  static @NotNull Map<Integer, List<ImportIssueDto>> rowIssues(List<ImportIssueDto> issues) {
-    Map<Integer, List<ImportIssueDto>> byRow = new LinkedHashMap<>();
+  static @NotNull Map<String, List<ImportIssueDto>> rowIssues(List<ImportIssueDto> issues) {
+    Map<String, List<ImportIssueDto>> byRow = new LinkedHashMap<>();
     if (issues == null) {
       return byRow;
     }
     for (ImportIssueDto issue : issues) {
       Integer row = draftRowIndex(issue);
       if (row != null) {
-        byRow.computeIfAbsent(row, k -> new ArrayList<>()).add(issue);
+        byRow.computeIfAbsent(String.valueOf(row), k -> new ArrayList<>()).add(issue);
       }
     }
     return byRow;

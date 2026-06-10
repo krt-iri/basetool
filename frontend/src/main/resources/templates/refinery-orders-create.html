@@ -342,7 +342,10 @@
                 </div>
 
                 <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry" th:classappend="${importRowIssues != null and importRowIssues.containsKey(stat.index)} ? 'import-flagged-row'" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-gray-4); margin-bottom: 1rem;">
+                    <!-- importRowIssues is keyed by the STRING form of the goods index: the flash
+                         map round-trips through the JSON Redis session, which stringifies map
+                         keys — an Integer key would silently never match after the redirect. -->
+                    <div th:each="good, stat : *{goods}" class="material-entry" th:classappend="${importRowIssues != null and importRowIssues.containsKey('' + stat.index)} ? 'import-flagged-row'" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-gray-4); margin-bottom: 1rem;">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
                             <button th:if="${stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon" data-trigger="rfc-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -351,8 +354,8 @@
                         <!-- Inline import review flags (#435): findings anchored to this draft row,
                              incl. the derived read confidence (accessible text tints, REQ-UI-006)
                              and one-click suggestion chips for unmatched/fuzzy materials. -->
-                        <div th:if="${importRowIssues != null and importRowIssues.containsKey(stat.index)}" class="import-row-flags" th:attr="data-testid='refinery-import-row-flags-' + ${stat.index}">
-                            <div th:each="rowIssue : ${importRowIssues.get(stat.index)}" class="import-row-flag"
+                        <div th:if="${importRowIssues != null and importRowIssues.containsKey('' + stat.index)}" class="import-row-flags" th:attr="data-testid='refinery-import-row-flags-' + ${stat.index}">
+                            <div th:each="rowIssue : ${importRowIssues.get('' + stat.index)}" class="import-row-flag"
                                  th:classappend="${rowIssue.severity().name() == 'BLOCKING'} ? 'import-flag-danger' : (${rowIssue.severity().name() == 'INFO'} ? 'import-flag-info' : 'import-flag-warning')">
                                 <span th:text="#{__${'refineryImport.issue.' + rowIssue.code()}__}">Hinweis</span>
                                 <span th:if="${rowIssue.rawValue() != null}" class="import-flag-raw" th:text="|(${rowIssue.rawValue()})|"></span>

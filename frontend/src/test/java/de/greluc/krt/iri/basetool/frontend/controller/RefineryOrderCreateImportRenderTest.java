@@ -154,7 +154,9 @@ class RefineryOrderCreateImportRenderTest {
                 .with(oidcLogin())
                 .flashAttr("refineryOrderForm", form)
                 .flashAttr("importIssues", List.of(unresolvedLocation))
-                .flashAttr("importRowIssues", Map.of(2, List.of(unmatched)))
+                // String key on purpose: the JSON Redis session stringifies flash-map keys, so
+                // the controller flashes (and the template matches) string-form indices.
+                .flashAttr("importRowIssues", Map.of("2", List.of(unmatched)))
                 .flashAttr("importGoodsMatched", 2)
                 .flashAttr("importGoodsTotal", 4)
                 .flashAttr("importRowsSkipped", 1))

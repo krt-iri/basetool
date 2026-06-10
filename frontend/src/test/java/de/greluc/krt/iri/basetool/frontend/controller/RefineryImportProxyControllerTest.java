@@ -154,10 +154,10 @@ class RefineryImportProxyControllerTest {
 
     // Then — issues split into row-anchored and banner findings
     @SuppressWarnings("unchecked")
-    Map<Integer, List<ImportIssueDto>> rowIssues =
-        (Map<Integer, List<ImportIssueDto>>) flash.get("importRowIssues");
-    assertThat(rowIssues).containsOnlyKeys(1);
-    assertThat(rowIssues.get(1).getFirst().code()).isEqualTo(ImportIssueCode.UNMATCHED_MATERIAL);
+    Map<String, List<ImportIssueDto>> rowIssues =
+        (Map<String, List<ImportIssueDto>>) flash.get("importRowIssues");
+    assertThat(rowIssues).containsOnlyKeys("1");
+    assertThat(rowIssues.get("1").getFirst().code()).isEqualTo(ImportIssueCode.UNMATCHED_MATERIAL);
     @SuppressWarnings("unchecked")
     List<ImportIssueDto> general = (List<ImportIssueDto>) flash.get("importIssues");
     assertThat(general)
@@ -249,7 +249,7 @@ class RefineryImportProxyControllerTest {
             null);
 
     // When
-    Map<Integer, List<ImportIssueDto>> byRow =
+    Map<String, List<ImportIssueDto>> byRow =
         RefineryImportProxyController.rowIssues(List.of(overflow));
     List<ImportIssueDto> general = RefineryImportProxyController.generalIssues(List.of(overflow));
 

@@ -67,8 +67,13 @@ class RefineryOrderCreateE2eTest {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
       // Location + refining method come from the SQL catalog seed (E2eStackExtension.seedCatalog);
-      // the input material is a manual RAW material, creatable via the admin API.
-      materialId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Refinery Material");
+      // the input material is a manual RAW material, creatable via the admin API. Get-or-create:
+      // RefineryImportE2eTest pre-seeds this material before it opens the create page, because
+      // that first render freezes the frontend's 10-minute materials-lookup cache for the suite.
+      materialId = seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Refinery Material");
+      // Mirror-seed the sibling class's material in case THIS class runs first (class order is
+      // an implementation detail) — same cache rationale, union of all dropdown materials.
+      seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Import Material");
     }
   }
 
