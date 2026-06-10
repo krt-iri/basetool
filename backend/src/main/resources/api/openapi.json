@@ -28724,7 +28724,7 @@
         } ],
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Blueprint coverage for the item order.",
             "headers" : {
               "ETag" : {
                 "description" : "Entity Tag for conditional requests",
@@ -28743,19 +28743,6 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/JobOrderItemBlueprintOwnersDto"
-                }
-              }
-            }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
                 }
               }
             }
@@ -28782,6 +28769,19 @@
           },
           "404" : {
             "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
             "content" : {
               "application/problem+json" : {
                 "schema" : {

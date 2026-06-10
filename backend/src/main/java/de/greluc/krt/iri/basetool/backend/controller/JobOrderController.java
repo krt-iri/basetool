@@ -45,6 +45,8 @@ import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -538,6 +540,14 @@ public class JobOrderController {
       description =
           "Returns which members of the responsible squadron/SK own the blueprints for the"
               + " order's required items. Members of the responsible org unit only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Blueprint coverage for the item order."),
+    @ApiResponse(responseCode = "401", description = "Authentication required."),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Caller is not a member of the order's responsible squadron/SK."),
+    @ApiResponse(responseCode = "404", description = "Job order not found.")
+  })
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrderBlueprintOwners(#id)")
   @Transactional(readOnly = true)
   public JobOrderItemBlueprintOwnersDto getItemBlueprintOwners(@PathVariable UUID id) {
