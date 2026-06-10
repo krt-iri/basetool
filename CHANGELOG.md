@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Material-Aliasse (Admin → Material-Aliasse) sind jetzt unabhängig von Groß-/Kleinschreibung eindeutig.** Bisher konnten zwei Aliasse, die sich nur in der Schreibweise unterschieden (z. B. „STILERON (ORE)" und „Stileron (Ore)"), nebeneinander existieren und ließen den SC-Wiki-Abgleich mit einem Fehler (HTTP 500) abbrechen. Eine Migration entfernt vorhandene Duplikate (die älteste Zeile bleibt erhalten); das Anlegen eines solchen Duplikats meldet jetzt einen sauberen Konflikt (HTTP 409).
+
 ## [v0.4.8](https://github.com/krt-iri/basetool/releases/tag/v0.4.8) - 2026-06-10
 
 ### Changed

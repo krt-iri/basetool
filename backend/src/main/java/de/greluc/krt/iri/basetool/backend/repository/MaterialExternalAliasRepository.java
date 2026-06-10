@@ -38,35 +38,25 @@ public interface MaterialExternalAliasRepository
     extends JpaRepository<MaterialExternalAlias, UUID> {
 
   /**
-   * Returns every alias sorted by external name (case-sensitive — the DB unique index doesn't fold
-   * case, so the table view shows exactly what the resolver will look up against).
+   * Returns every alias sorted by external name. The stored casing is preserved for display, but
+   * uniqueness is case-insensitive (V146 index on {@code (source_system, LOWER(external_name))}),
+   * so the table view never shows two case-variants of the same name.
    *
    * @return all alias rows ordered by external_name ascending
    */
   List<MaterialExternalAlias> findAllByOrderByExternalNameAsc();
 
   /**
-   * Lookup used by the R3 Wiki commodity sync's resolution chain step 2. Case-insensitive by
-   * convention: external systems sometimes carry the same name with different casing across patch
-   * versions, so the lookup tolerates the drift.
+   * Lookup used by the R3 Wiki commodity sync's resolution chain step 2 and as the service-layer
+   * pre-insert duplicate check. Case-insensitive by convention: external systems sometimes carry
+   * the same name with different casing across patch versions, so the lookup tolerates the drift.
+   * At most one row can match — the V146 unique index on {@code (source_system,
+   * LOWER(external_name))} folds case exactly like this query does (REQ-REFINERY-010).
    *
    * @param sourceSystem catalogue the alias belongs to
    * @param externalName case-insensitive external commodity name
    * @return the alias if present, empty otherwise
    */
   Optional<MaterialExternalAlias> findBySourceSystemAndExternalNameIgnoreCase(
-      MaterialExternalAliasSource sourceSystem, String externalName);
-
-  /**
-   * Strict pre-create duplicate check used by the service layer to emit a 409 Conflict before the
-   * DB unique constraint fires. Case-sensitive because the unique constraint on the DB side is
-   * exact-match — a case-only difference would be allowed by the constraint and is therefore a
-   * valid distinct alias here.
-   *
-   * @param sourceSystem catalogue the alias belongs to
-   * @param externalName exact external commodity name
-   * @return the alias if present, empty otherwise
-   */
-  Optional<MaterialExternalAlias> findBySourceSystemAndExternalName(
       MaterialExternalAliasSource sourceSystem, String externalName);
 }
