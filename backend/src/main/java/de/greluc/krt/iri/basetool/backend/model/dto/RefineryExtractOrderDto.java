@@ -62,5 +62,5 @@ public record RefineryExtractOrderDto(
     @PositiveOrZero @DecimalMax("1000000000.0") Double expenses,
     @PositiveOrZero Long durationMinutes,
     @PositiveOrZero Double totalYieldScu,
-    @Size(max = 50) @Valid List<RefineryExtractImageDto> sourceImages,
-    @NotNull @Size(max = 100) @Valid List<RefineryExtractGoodDto> goods) {}
+    @Size(max = 50) List<@NotNull @Valid RefineryExtractImageDto> sourceImages,
+    @NotNull @Size(max = 100) List<@NotNull @Valid RefineryExtractGoodDto> goods) {}

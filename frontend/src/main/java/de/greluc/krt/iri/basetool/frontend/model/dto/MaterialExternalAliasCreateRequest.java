@@ -27,7 +27,8 @@ import java.util.UUID;
  * controller. Validation lives on the backend record; the frontend only relays.
  *
  * @param materialId UUID of the local material to link to
- * @param sourceSystem catalogue identifier ({@code "UEX"} or {@code "SCWIKI"})
+ * @param sourceSystem catalogue identifier ({@code "UEX"}, {@code "SCWIKI"} or {@code
+ *     "REFINERY_SCREEN"})
  * @param externalName commodity name in the external catalogue
  * @param externalKey optional external internal key
  * @param externalUuid optional external UUID

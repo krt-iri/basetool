@@ -235,6 +235,24 @@ class RefineryImportServiceTest {
   }
 
   @Test
+  void buildDraft_ignoresAliasTargetingNonCandidateMaterial() {
+    // Given — an admin mis-curated an alias onto a REFINED material the create path rejects
+    lenient()
+        .when(
+            aliasService.resolveMaterialByAlias(
+                MaterialExternalAliasSource.REFINERY_SCREEN, "WEIRD STUFF"))
+        .thenReturn(stileronRefined);
+
+    // When
+    RefineryImportDraftDto draft = draftFor(quotedGood(0, "WEIRD STUFF"));
+
+    // Then — the alias stage must not bypass the candidate gate; the row stays unmatched
+    assertThat(draft.goodsMatched()).isZero();
+    assertThat(draft.order().goods().getFirst().inputMaterial()).isNull();
+    assertThat(issues(draft, ImportIssueCode.UNMATCHED_MATERIAL)).hasSize(1);
+  }
+
+  @Test
   void buildDraft_matchesGameUiTruncatedNameViaUniqueSuffix() {
     // Given — the game UI clipped "…Construction Salvage" to "UCTION SALVAGE" (golden set)
     RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
@@ -500,6 +518,8 @@ class RefineryImportServiceTest {
     ImportIssueDto issue = onlyIssue(draft, ImportIssueCode.NO_REFINED_MATERIAL);
     assertThat(issue.severity()).isEqualTo(ImportIssueSeverity.INFO);
     assertThat(issue.field()).isEqualTo("goods[0].outputMaterial");
+    // row-level issues carry the row's derived read confidence (REQ-REFINERY-009)
+    assertThat(issue.confidence()).isEqualTo(0.95);
   }
 
   // ─── order-level mapping (§7.1) ───────────────────────────────────────────

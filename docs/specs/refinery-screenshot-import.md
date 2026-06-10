@@ -126,9 +126,15 @@ suggestion floor.
 
 Refinery-screen aliases live in the existing `material_external_alias` table under the
 dedicated source `REFINERY_SCREEN` (V146 widened the V108 CHECK constraint). Admins
-curate them at `/admin/material-aliases`; the `(source_system, external_name)` unique
-constraint keeps resolution deterministic. No aliases are seeded by migration — entries
-come from golden-set verification (#433) and live curation.
+curate them at `/admin/material-aliases`. An alias whose target material fails the
+REQ-REFINERY-004 candidate gate is ignored by the import (logged, falls through to the
+next matching stage) — curation cannot bypass the create-path mirror. Resolution is
+deterministic as long as curated names stay unique case-insensitively: the DB unique
+constraint on `(source_system, external_name)` is case-sensitive while the lookup is
+case-insensitive (shared with the SC-Wiki sync), so admins must not create two aliases
+differing only in case; enforcing this DB-side is a tracked hardening follow-up. No
+aliases are seeded by migration — entries come from golden-set verification (#433) and
+live curation.
 
 ### REQ-REFINERY-011 — Security
 

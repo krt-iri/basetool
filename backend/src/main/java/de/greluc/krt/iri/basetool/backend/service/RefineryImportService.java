@@ -52,9 +52,11 @@ import de.greluc.krt.iri.basetool.backend.service.BlueprintProductService.Resolv
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -245,7 +247,7 @@ public class RefineryImportService {
                   match.material().getName(),
                   ImportIssueCode.NO_REFINED_MATERIAL,
                   ImportIssueSeverity.INFO,
-                  null,
+                  good.confidence(),
                   null));
         }
       } else {
@@ -443,7 +445,13 @@ public class RefineryImportService {
         canonicalIndex.computeIfAbsent(canonical, k -> new ArrayList<>()).add(candidate);
       }
     }
-    return new MatchContext(candidates, canonicalIndex, byName);
+    Set<UUID> candidateIds = new HashSet<>();
+    for (Material candidate : candidates) {
+      if (candidate.getId() != null) {
+        candidateIds.add(candidate.getId());
+      }
+    }
+    return new MatchContext(candidates, canonicalIndex, byName, candidateIds);
   }
 
   /**
@@ -470,7 +478,17 @@ public class RefineryImportService {
         materialExternalAliasService.resolveMaterialByAlias(
             MaterialExternalAliasSource.REFINERY_SCREEN, rawName);
     if (viaAlias != null) {
-      return MaterialMatch.exact(viaAlias);
+      // The alias table accepts any material, but the draft must never pre-select one the
+      // create path rejects (§7.3 candidate-gate mirror) — a mis-curated alias falls through
+      // to the remaining stages instead.
+      if (viaAlias.getId() != null && context.candidateIds().contains(viaAlias.getId())) {
+        return MaterialMatch.exact(viaAlias);
+      }
+      log.warn(
+          "Ignoring REFINERY_SCREEN alias for '{}': target material '{}' fails the"
+              + " refinery-input gate (RAW || isManualRawMaterial, visible)",
+          rawName,
+          viaAlias.getName());
     }
 
     if (canonical.length() >= MIN_PARTIAL_MATCH_LENGTH) {
@@ -580,11 +598,14 @@ public class RefineryImportService {
    * @param candidates visible {@code RAW || isManualRawMaterial} materials
    * @param canonicalIndex canonical core → candidates sharing it
    * @param byName exact display name → candidate (names are unique)
+   * @param candidateIds candidate primary keys — the alias stage validates its hit against this set
+   *     so a mis-curated alias can never bypass the create-path gate
    */
   private record MatchContext(
       List<Material> candidates,
       Map<String, List<Material>> canonicalIndex,
-      Map<String, Material> byName) {}
+      Map<String, Material> byName,
+      Set<UUID> candidateIds) {}
 
   /**
    * Detailed outcome of one material-matching run.

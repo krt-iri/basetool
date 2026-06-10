@@ -37748,7 +37748,7 @@
           "sourceSystem" : {
             "type" : "string",
             "minLength" : 1,
-            "pattern" : "UEX|SCWIKI"
+            "pattern" : "UEX|SCWIKI|REFINERY_SCREEN"
           },
           "externalName" : {
             "type" : "string",
@@ -39080,7 +39080,7 @@
           "sourceSystem" : {
             "type" : "string",
             "minLength" : 1,
-            "pattern" : "UEX|SCWIKI"
+            "pattern" : "UEX|SCWIKI|REFINERY_SCREEN"
           },
           "externalName" : {
             "type" : "string",

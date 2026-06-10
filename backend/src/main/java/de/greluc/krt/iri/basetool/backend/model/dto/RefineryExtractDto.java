@@ -55,4 +55,4 @@ public record RefineryExtractDto(
     @Size(max = 100) String model,
     Instant generatedAt,
     @Size(max = 16) String clientLanguage,
-    @NotEmpty @Size(max = 5) @Valid List<RefineryExtractOrderDto> orders) {}
+    @NotEmpty @Size(max = 5) List<@NotNull @Valid RefineryExtractOrderDto> orders) {}

@@ -33,6 +33,7 @@ import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.iri.basetool.backend.service.RefineryImportService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -176,6 +177,65 @@ class RefineryImportControllerTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(emptyOrders))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void importExtract_nullOrderElement_returns400FromBeanValidation() throws Exception {
+    // Given — Hibernate Validator skips null list elements unless the container element carries
+    // @NotNull; without it this payload would NPE in the service and surface as a 500
+    String nullElement = "{\"schemaVersion\": 1, \"orders\": [null]}";
+
+    // When / Then
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(nullElement))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void importExtract_nullGoodElement_returns400FromBeanValidation() throws Exception {
+    // Given — same guard on the goods list
+    String body =
+        "{\"schemaVersion\":1,\"orders\":[{\"panelType\":\"SETUP\",\"quoted\":true,"
+            + "\"goods\":[{\"rawMaterialName\":\"STILERON (ORE)\",\"quality\":618,"
+            + "\"inputQuantity\":957,\"outputQuantity\":448,\"refine\":true},null]}]}";
+
+    // When / Then
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void importExtract_tooManyOrders_returns400FromSizeCap() throws Exception {
+    // Given — the defensive @Size(max = 5) cap on orders
+    String order =
+        """
+        { "panelType": "SETUP", "quoted": true, "goods": [] }\
+        """;
+    String sixOrders =
+        "{\"schemaVersion\": 1, \"orders\": ["
+            + String.join(",", Collections.nCopies(6, order))
+            + "]}";
+
+    // When / Then
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(sixOrders))
         .andExpect(status().isBadRequest());
   }
 
