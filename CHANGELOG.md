@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **In der Materialsammelübersicht eines Auftrags lösen das Setzen oder Entfernen des „Geliefert"-Häkchens sowie der Besitzer- und Standortwechsel keine Fehlermeldung mehr aus.** Diese Aktionen schickten kein CSRF-Token mit und wurden serverseitig mit HTTP 403 abgewiesen; das Token wird jetzt wie auf den übrigen Seiten mitgeschickt.
+
 ### Added
 
 - **Die Detailansicht eines Item-Auftrags zeigt jetzt unter „Blaupausen-Verfügbarkeit" (direkt nach den Bearbeitern), welche Mitglieder der bearbeitenden Staffel/SK die Blaupausen für die geforderten Items besitzen** — je Person mit der Liste der vorhandenen Blaupausen und einer Abdeckungsübersicht je Item (Items, die niemand bauen kann, werden markiert). Diese Information ist nur für Mitglieder der bearbeitenden Staffel/SK (und Admins) sichtbar.
