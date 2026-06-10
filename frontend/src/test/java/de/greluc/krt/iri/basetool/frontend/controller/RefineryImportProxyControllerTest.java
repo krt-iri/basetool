@@ -236,6 +236,29 @@ class RefineryImportProxyControllerTest {
   }
 
   @Test
+  void rowIssues_indexBeyondIntRange_treatedAsUnanchoredInsteadOfThrowing() {
+    // Given — a crafted/corrupt field path whose digits overflow Integer (regex \d+ accepts any
+    // length); Integer.valueOf would throw NumberFormatException without the guard
+    ImportIssueDto overflow =
+        new ImportIssueDto(
+            "goods[99999999999999999999].inputMaterial",
+            "STILERON (ORE)",
+            ImportIssueCode.UNMATCHED_MATERIAL,
+            ImportIssueSeverity.WARNING,
+            null,
+            null);
+
+    // When
+    Map<Integer, List<ImportIssueDto>> byRow =
+        RefineryImportProxyController.rowIssues(List.of(overflow));
+    List<ImportIssueDto> general = RefineryImportProxyController.generalIssues(List.of(overflow));
+
+    // Then — the finding falls through to the banner list instead of aborting the import
+    assertThat(byRow).isEmpty();
+    assertThat(general).containsExactly(overflow);
+  }
+
+  @Test
   void importExtract_backendProblemWithoutDetail_flashesGenericError() {
     // Given — a backend reject whose problem body carries no detail text
     when(backendApiClient.post(

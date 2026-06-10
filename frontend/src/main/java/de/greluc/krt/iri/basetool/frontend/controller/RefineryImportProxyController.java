@@ -261,7 +261,9 @@ public class RefineryImportProxyController {
 
   /**
    * Extracts the draft goods index from an issue's field path, or {@code null} when the issue is
-   * not anchored to a rendered row (order-level fields, bare {@code goods[n]} skip references).
+   * not anchored to a rendered row (order-level fields, bare {@code goods[n]} skip references). An
+   * index beyond {@link Integer} range (the {@code \d+} pattern accepts any digit count) is treated
+   * as un-anchored instead of letting the {@link NumberFormatException} abort the whole import.
    *
    * @param issue the finding
    * @return the draft row index, or {@code null}
@@ -271,6 +273,14 @@ public class RefineryImportProxyController {
       return null;
     }
     Matcher matcher = DRAFT_ROW_FIELD.matcher(issue.field());
-    return matcher.matches() ? Integer.valueOf(matcher.group(1)) : null;
+    if (!matcher.matches()) {
+      return null;
+    }
+    try {
+      return Integer.valueOf(matcher.group(1));
+    } catch (NumberFormatException e) {
+      log.warn("Refinery import issue field index out of int range: {}", issue.field());
+      return null;
+    }
   }
 }
