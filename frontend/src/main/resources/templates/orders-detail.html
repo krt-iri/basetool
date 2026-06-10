@@ -114,7 +114,7 @@
              linked-inventory drill-down). ITEM orders render the ordered-items table plus the
              internal aggregated-materials view further below instead. -->
         <th:block th:if="${order.type != 'ITEM'}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
+        <h3 class="section-title" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders, detected by the backend
              populating openAmount (null on private squadron orders). -->
@@ -206,7 +206,7 @@
              material, and (3) the internal aggregated-materials view (one row per material+quality,
              unit-formatted by quantityType). Mirrors the material layout as closely as possible. -->
         <th:block th:if="${order.type == 'ITEM'}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
+        <h3 class="section-title" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
         <div class="table-responsive">
         <table class="data-table">
             <thead>
@@ -256,7 +256,7 @@
             </ul>
         </div>
 
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
+        <h3 class="section-title" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders (backend populates
              openAmount; null on private squadron orders). -->
@@ -347,7 +347,7 @@
              swap; all controls use delegated data-trigger handlers, so they keep working after the
              section's outerHTML is replaced. -->
         <div id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
+        <h3 class="section-title" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
             <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
                 <li th:each="assignee : ${order.assignees}"
@@ -471,7 +471,7 @@
         <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
              phase; for now the material-specific handover protocol is hidden for item orders. -->
         <th:block th:if="${order.type != 'ITEM'}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
+        <h3 class="section-title" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
             <button type="button" class="btn btn-outline" th:text="#{orders.detail.handover}" data-testid="order-handover-open" data-trigger="od-open-handover">Übergabe protokollieren</button>
@@ -528,7 +528,7 @@
              backend decrements outstanding amounts and auto-completes the order once every line is
              fully delivered. Each persisted handover offers a PDF delivery note. -->
         <th:block th:if="${order.type == 'ITEM'}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
+        <h3 class="section-title" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
 
         <!-- Handover toolbar — mirrors the MATERIAL handover toolbar by sitting the
              Materialsammelübersicht link next to the handover button. The toolbar itself always
