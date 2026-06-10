@@ -50,8 +50,9 @@ import org.springframework.security.core.Authentication;
  * Unit tests for {@link MaterialExternalAliasService}.
  *
  * <p>Coverage for the four behaviours that matter for the R3 sync's correctness: lookup chain uses
- * the case-insensitive alias resolver, create / update reject duplicates, create / update reject a
- * missing material, and update enforces the optimistic-lock version.
+ * the case-insensitive alias resolver, create / update reject duplicates — including case-only
+ * variants (REQ-REFINERY-010) — create / update reject a missing material, and update enforces the
+ * optimistic-lock version.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExternalAliasServiceTest {
@@ -122,7 +123,7 @@ class MaterialExternalAliasServiceTest {
         new MaterialExternalAliasCreateRequest(
             siliconId, "SCWIKI", "Raw Silicon", null, null, null, "verification note");
     when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
-    when(repository.findBySourceSystemAndExternalName(
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
         .thenReturn(Optional.empty());
     Authentication auth = new UsernamePasswordAuthenticationToken("admin-sub", "n/a");
@@ -144,7 +145,8 @@ class MaterialExternalAliasServiceTest {
         new MaterialExternalAliasCreateRequest(
             siliconId, "SCWIKI", "Raw Silicon", null, null, null, null);
     when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
-    when(repository.findBySourceSystemAndExternalName(any(), any())).thenReturn(Optional.empty());
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(any(), any()))
+        .thenReturn(Optional.empty());
     when(authHelperService.currentAuthentication()).thenReturn(Optional.empty());
     when(repository.save(any(MaterialExternalAlias.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -170,11 +172,30 @@ class MaterialExternalAliasServiceTest {
         new MaterialExternalAliasCreateRequest(
             siliconId, "SCWIKI", "Raw Silicon", null, null, null, null);
     when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
-    when(repository.findBySourceSystemAndExternalName(
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
         .thenReturn(Optional.of(newAlias("Raw Silicon")));
 
     assertThrows(DuplicateEntityException.class, () -> service.create(request));
+    verify(repository, never()).save(any());
+  }
+
+  // covers REQ-REFINERY-010 — a case-only variant of an existing alias is a duplicate (409),
+  // matching the case-insensitive resolution lookup and the V146 unique index.
+  @Test
+  void create_throwsDuplicate_whenCaseVariantOfExistingAliasIsSubmitted() {
+    MaterialExternalAliasCreateRequest request =
+        new MaterialExternalAliasCreateRequest(
+            siliconId, "SCWIKI", "STILERON (ORE)", null, null, null, null);
+    when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(
+            MaterialExternalAliasSource.SCWIKI, "STILERON (ORE)"))
+        .thenReturn(Optional.of(newAlias("Stileron (Ore)")));
+
+    DuplicateEntityException ex =
+        assertThrows(DuplicateEntityException.class, () -> service.create(request));
+
+    assertTrue(ex.getMessage().contains("Stileron (Ore)"));
     verify(repository, never()).save(any());
   }
 
@@ -201,7 +222,7 @@ class MaterialExternalAliasServiceTest {
     existing.setVersion(7L);
     when(repository.findById(aliasId)).thenReturn(Optional.of(existing));
     when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
-    when(repository.findBySourceSystemAndExternalName(
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
         .thenReturn(Optional.empty());
     when(repository.save(any(MaterialExternalAlias.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -227,7 +248,7 @@ class MaterialExternalAliasServiceTest {
 
     MaterialExternalAlias other = newAlias("Raw Silicon");
     other.setId(UUID.randomUUID());
-    when(repository.findBySourceSystemAndExternalName(
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
         .thenReturn(Optional.of(other));
 
@@ -237,6 +258,53 @@ class MaterialExternalAliasServiceTest {
 
     assertThrows(DuplicateEntityException.class, () -> service.update(aliasId, request));
     verify(repository, never()).save(any());
+  }
+
+  // covers REQ-REFINERY-010 — renaming an alias onto a case-variant of ANOTHER row's name is a
+  // duplicate (409); renaming a row onto a case-variant of ITSELF stays allowed.
+  @Test
+  void update_throwsDuplicate_whenCaseVariantOfAnotherRowExists() {
+    MaterialExternalAlias existing = newAlias("Old Name");
+    existing.setId(aliasId);
+    existing.setVersion(0L);
+    when(repository.findById(aliasId)).thenReturn(Optional.of(existing));
+    when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
+
+    MaterialExternalAlias other = newAlias("Stileron (Ore)");
+    other.setId(UUID.randomUUID());
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(
+            MaterialExternalAliasSource.SCWIKI, "STILERON (ORE)"))
+        .thenReturn(Optional.of(other));
+
+    MaterialExternalAliasUpdateRequest request =
+        new MaterialExternalAliasUpdateRequest(
+            siliconId, "SCWIKI", "STILERON (ORE)", null, null, null, null, 0L);
+
+    assertThrows(DuplicateEntityException.class, () -> service.update(aliasId, request));
+    verify(repository, never()).save(any());
+  }
+
+  // covers REQ-REFINERY-010 — recasing a row's own name (same id matched case-insensitively) is
+  // NOT a duplicate; admins may fix casing in place.
+  @Test
+  void update_allowsRecasingOwnName_withoutDuplicateError() {
+    MaterialExternalAlias existing = newAlias("stileron (ore)");
+    existing.setId(aliasId);
+    existing.setVersion(0L);
+    when(repository.findById(aliasId)).thenReturn(Optional.of(existing));
+    when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(
+            MaterialExternalAliasSource.SCWIKI, "Stileron (Ore)"))
+        .thenReturn(Optional.of(existing));
+    when(repository.save(any(MaterialExternalAlias.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    MaterialExternalAliasUpdateRequest request =
+        new MaterialExternalAliasUpdateRequest(
+            siliconId, "SCWIKI", "Stileron (Ore)", null, null, null, null, 0L);
+
+    MaterialExternalAlias saved = service.update(aliasId, request);
+
+    assertEquals("Stileron (Ore)", saved.getExternalName());
   }
 
   @Test

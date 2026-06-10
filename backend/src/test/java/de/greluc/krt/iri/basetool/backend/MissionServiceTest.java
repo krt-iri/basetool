@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -81,6 +82,7 @@ class MissionServiceTest {
 
   @InjectMocks private MissionService missionService;
 
+  // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions
   @Test
   void getNextMission_allowInternal_refetchesByIdThroughGraph() {
     // The limit-1 lookup is intentionally not graphed (a collection fetch + limit forces in-memory
@@ -91,14 +93,17 @@ class MissionServiceTest {
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
-    when(missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(any()))
+    when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
+            any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.of(head));
     when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
 
     Optional<Mission> result = missionService.getNextMission(true);
 
     assertSame(detail, result.orElseThrow(), "must return the graphed findById re-fetch");
-    verify(missionRepository).findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(any());
+    verify(missionRepository)
+        .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
+            any(), eq(List.of("PLANNED", "ACTIVE")));
     verify(missionRepository).findById(id);
   }
 
@@ -110,7 +115,8 @@ class MissionServiceTest {
     Mission detail = new Mission();
     detail.setId(id);
     when(missionRepository
-            .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(any()))
+            .findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
+                any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.of(head));
     when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
 
@@ -118,13 +124,15 @@ class MissionServiceTest {
 
     assertSame(detail, result.orElseThrow());
     verify(missionRepository)
-        .findFirstByPlannedStartTimeAfterAndIsInternalFalseOrderByPlannedStartTimeAsc(any());
+        .findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
+            any(), eq(List.of("PLANNED", "ACTIVE")));
     verify(missionRepository).findById(id);
   }
 
   @Test
   void getNextMission_noUpcomingMission_returnsEmptyWithoutRefetch() {
-    when(missionRepository.findFirstByPlannedStartTimeAfterOrderByPlannedStartTimeAsc(any()))
+    when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
+            any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.empty());
 
     Optional<Mission> result = missionService.getNextMission(true);

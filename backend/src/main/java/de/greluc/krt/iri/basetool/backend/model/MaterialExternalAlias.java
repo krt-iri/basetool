@@ -30,7 +30,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -53,16 +52,15 @@ import lombok.ToString;
  * V108 seed (Construction-* triplet, Combat Supplies) are intentionally created manually by an
  * admin after in-game grade verification.
  *
- * <p>The unique constraint on {@code (source_system, external_name)} guarantees that an external
- * name resolves deterministically — adding a duplicate via the admin form returns HTTP 409.
+ * <p>Uniqueness on {@code (source_system, LOWER(external_name))} guarantees that an external name
+ * resolves deterministically for the case-insensitive resolution lookup — adding a duplicate
+ * (including a case-only variant) via the admin form returns HTTP 409. The constraint lives in the
+ * DB as the functional unique index {@code uq_material_external_alias_source_lower_name} (V146); it
+ * cannot be expressed as a JPA {@code @UniqueConstraint} because of the {@code LOWER()} expression,
+ * so there is intentionally no {@code uniqueConstraints} declaration here (REQ-REFINERY-010).
  */
 @Entity
-@Table(
-    name = "material_external_alias",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uk_material_external_alias_source_external_name",
-            columnNames = {"source_system", "external_name"}))
+@Table(name = "material_external_alias")
 @Getter
 @Setter
 @ToString
@@ -105,7 +103,7 @@ public class MaterialExternalAlias extends AbstractEntity<UUID> {
 
   /**
    * Optional external short code (e.g. UEX's 4-letter trading codes like {@code "AGRI"}). Audit aid
-   * only; the unique constraint stays on {@code (source_system, external_name)}.
+   * only; uniqueness stays on {@code (source_system, LOWER(external_name))}.
    */
   @Column(name = "external_code", length = 64)
   private String externalCode;

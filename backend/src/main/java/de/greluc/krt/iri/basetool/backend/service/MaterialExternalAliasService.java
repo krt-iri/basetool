@@ -46,9 +46,12 @@ import org.springframework.transaction.annotation.Transactional;
  * inserts use the literal {@code "system"} so admin-created rows are distinguishable from the
  * R1-seeded fuzzy / manual aliases in audit views.
  *
- * <p>The {@code (sourceSystem, externalName)} uniqueness is enforced both by the DB constraint
- * (catch-all defence) and pre-emptively here so the caller gets a clean {@link
- * DuplicateEntityException} → 409 instead of a generic {@code DataIntegrityViolationException}.
+ * <p>The {@code (sourceSystem, externalName)} uniqueness is case-INSENSITIVE — matching the
+ * resolution lookup, so {@link #resolveMaterialByAlias} can never see two candidate rows
+ * (REQ-REFINERY-010). It is enforced both by the V146 DB unique index on {@code (source_system,
+ * LOWER(external_name))} (catch-all defence) and pre-emptively here so the caller gets a clean
+ * {@link DuplicateEntityException} → 409 instead of a generic {@code
+ * DataIntegrityViolationException}.
  */
 @Slf4j
 @Service
@@ -105,8 +108,10 @@ public class MaterialExternalAliasService {
 
   /**
    * Persists a new alias. Validates that the referenced material exists and that no alias with the
-   * same {@code (sourceSystem, externalName)} exists yet; on a duplicate the row is NOT saved and a
-   * {@link DuplicateEntityException} is thrown so the controller can map it to HTTP 409.
+   * same {@code (sourceSystem, externalName)} exists yet — compared case-insensitively, matching
+   * the V146 unique index and the resolution lookup (REQ-REFINERY-010); on a duplicate the row is
+   * NOT saved and a {@link DuplicateEntityException} is thrown so the controller can map it to HTTP
+   * 409.
    *
    * <p>{@code createdBy} is stamped from the authenticated principal — {@code "system"} when no
    * principal can be resolved (defensive default; the controller's {@code @PreAuthorize} gate
@@ -128,7 +133,7 @@ public class MaterialExternalAliasService {
                 () ->
                     new NotFoundException("Material " + request.materialId() + " does not exist."));
     repository
-        .findBySourceSystemAndExternalName(source, request.externalName())
+        .findBySourceSystemAndExternalNameIgnoreCase(source, request.externalName())
         .ifPresent(
             existing -> {
               throw new DuplicateEntityException(
@@ -136,7 +141,9 @@ public class MaterialExternalAliasService {
                       + request.externalName()
                       + "' already exists for source "
                       + source
-                      + ".");
+                      + " (case-insensitive match: '"
+                      + existing.getExternalName()
+                      + "').");
             });
 
     MaterialExternalAlias alias = new MaterialExternalAlias();
@@ -167,8 +174,8 @@ public class MaterialExternalAliasService {
    * @param request validated update payload
    * @return the persisted alias row
    * @throws NotFoundException if {@code id} or {@code request.materialId()} does not exist
-   * @throws DuplicateEntityException if the new {@code (sourceSystem, externalName)} collides with
-   *     a different row
+   * @throws DuplicateEntityException if the new {@code (sourceSystem, externalName)} collides
+   *     case-insensitively with a different row (REQ-REFINERY-010)
    */
   @Transactional
   public MaterialExternalAlias update(UUID id, MaterialExternalAliasUpdateRequest request) {
@@ -186,7 +193,7 @@ public class MaterialExternalAliasService {
                 () ->
                     new NotFoundException("Material " + request.materialId() + " does not exist."));
     repository
-        .findBySourceSystemAndExternalName(source, request.externalName())
+        .findBySourceSystemAndExternalNameIgnoreCase(source, request.externalName())
         .filter(other -> !other.getId().equals(id))
         .ifPresent(
             other -> {
@@ -195,7 +202,9 @@ public class MaterialExternalAliasService {
                       + request.externalName()
                       + "' already exists for source "
                       + source
-                      + ".");
+                      + " (case-insensitive match: '"
+                      + other.getExternalName()
+                      + "').");
             });
 
     alias.setMaterial(material);
