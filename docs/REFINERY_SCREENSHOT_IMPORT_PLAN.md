@@ -1,8 +1,9 @@
 # Refinery Screenshot Import — Master Implementation Plan
 
-> **Doc type:** Forward plan for epic #439 (not yet built). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md); freeze it as a historical plan and point to the living truth once it ships.
+> **Doc type:** Historical plan — frozen after implementation (2026-06-10). Do not edit to track new changes.
+> Current behaviour: the living spec [`docs/specs/refinery-screenshot-import.md`](specs/refinery-screenshot-import.md) (`REQ-REFINERY-001…016`), [ADR-0007](adr/0007-client-side-vlm-screenshot-extraction.md) / [ADR-0008](adr/0008-refinery-extract-json-contract.md), and — for the desktop tool — the `basetool-bp-extractor` repo (its `CLAUDE.md` guardrails, `docs/refinery-extractor/PHASE0_FINDINGS.md` frozen strategy and test suite).
 >
-> **Status:** Approved; implementation in progress (owner-approved 2026-06-10). **Phase 1 (#434) shipped** — its living requirements are `REQ-REFINERY-001..011` in [`docs/specs/refinery-screenshot-import.md`](specs/refinery-screenshot-import.md). Phases 0/2/3 pending.
+> **Status:** **v1 shipped 2026-06-10.** Phase 0 (extractor PR #4), Phase 1 (basetool #515), Phase 2 (basetool #518) and Phase 3 (extractor PR #5) are merged; Phases 4 (#437) and 5 (#438) remain **deferred by owner decision** and are governed by their GitHub issues, not this document.
 > **GitHub epic:** [krt-iri/basetool#439](https://github.com/krt-iri/basetool/issues/439) · **Sub-issues:** #433 (Phase 0), #434 (Phase 1), #435 (Phase 2), #436 (Phase 3), #437 (Phase 4 — deferred), #438 (Phase 5 — deferred).
 > **Last updated:** 2026-06-10 — plan-review amendments applied (matching algorithm, stitch/dedupe key, quoted/un-quoted panel state, classical-CV Locate, derived confidence, model pins incl. June-2026 challengers, REQ/ADR process gates). See §3.1 for the amendment summary. No resolved decision from §3 was re-opened.
 > **Example screenshots:** the owner's example refinery-order SETUP screenshots are at <https://nc.greluc.me/s/bbzFYL4PT4jkBKK> — the source material for the Phase 0 golden set and the test fixtures of Phases 1–3.
