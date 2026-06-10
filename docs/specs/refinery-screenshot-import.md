@@ -12,9 +12,10 @@ that JSON, and the backend matches it against master data into a **non-persisted
 the user reviews before saving through the unchanged create path.
 
 This spec holds the requirements that are implemented on `main`. Phase 1 (#434, the
-backend import endpoint) minted `REQ-REFINERY-001`–`011`; later phases (frontend upload
-UI #435, desktop extractor #436) add their requirements here when they ship. The full
-forward plan, including not-yet-built phases, lives in
+backend import endpoint) minted `REQ-REFINERY-001`–`011`; Phase 2 (#435, the frontend
+upload + pre-filled review form) added `REQ-REFINERY-012`–`015`. The desktop extractor
+(#436) adds its requirements here when it ships. The full forward plan, including
+not-yet-built phases, lives in
 [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md).
 
 ## Requirements
@@ -144,6 +145,63 @@ the caller. Because nothing is persisted, org-unit scoping is not consulted here
 applies unchanged when the reviewed draft is saved through the create path
 (REQ-REFINERY-002).
 
+### REQ-REFINERY-012 — Frontend upload seam
+
+The refinery create page carries the import control: a hidden `<input type="file">`
+behind a styled trigger button (the established KRT pattern) that submits a regular
+multipart form to `POST /refinery-orders/import` (authenticated). The proxy verifies the
+upload parses as a JSON **object** locally (cheap pre-check with a friendly localized
+error, sanity-capped at 2 MB — a real extract is a few KB), relays the parsed document
+as an `application/json` body to `POST /api/v1/refinery-orders/import-extract`, and
+never persists anything itself. The frontend mirrors the backend draft DTOs
+field-for-field (mirror-DTO rule), including the `ImportIssueCode` /
+`ImportIssueSeverity` enums.
+
+### REQ-REFINERY-013 — Server-side pre-fill via flash attributes
+
+The pre-fill reuses the create page's existing flash-attribute mechanism — the GET
+handler already prefers a flashed `refineryOrderForm` over a fresh one — so no new
+client-side fill logic exists. Mapping rules: nested DTO ids into the form's id fields,
+`durationMinutes` split into the hours/minutes inputs, money fields defaulted to `0`,
+`status` defaulted to `OPEN`, `startedAt` left empty (the create flow defaults it to
+"now" at save time). An all-skipped draft keeps the form's single seeded empty goods row
+so the template's row-clone JS keeps working. Saving still goes exclusively through the
+unchanged create POST with full validation (REQ-REFINERY-002).
+
+### REQ-REFINERY-014 — Review rendering
+
+The redirected create page renders the draft findings without re-deriving anything:
+
+- a summary banner counts the match result (`{matched} of {total} rows, {skipped}
+  skipped`) and lists every finding that has no rendered form row (order-level fields,
+  skipped/un-quoted source rows), each translated via `refineryImport.issue.<CODE>` with
+  the verbatim raw read appended;
+- findings anchored to a draft row (`goods[<draftIndex>].<subField>`) render as inline
+  flags on that goods row; flagged rows get a 3 px left status bar;
+- confidence renders as percent text in the **accessible tints** (`--color-*-text`,
+  REQ-UI-006) plus a square dot in the canonical hue, coloured ≥ 90 % success / 75–90 %
+  warning / < 75 % danger — the value is always the backend-supplied confidence;
+- `UNMATCHED_MATERIAL` / `LOW_CONFIDENCE_MATERIAL` flags render the ranked
+  `suggestions` as one-click chips that assign the candidate to the row's material
+  select (dispatching the normal change event so output display and yield badge
+  update); an unmatched row's empty required select forces completion before save.
+
+The create form has no Refine column (drafted rows are refine-ON by definition —
+refine-off rows are skipped backend-side per REQ-REFINERY-005), so no toggle/switch
+component was introduced; the design-system component budget is unchanged.
+
+### REQ-REFINERY-015 — Error and empty states
+
+All import feedback is KRT-styled inline alerts (no native dialogs, REQ-UI-008): a
+non-JSON / non-object / oversized upload fails locally with
+`refineryImport.error.invalidFile`; an envelope-level backend reject (wrong
+`schemaVersion`, non-SETUP panel) surfaces the backend's already-localized problem
+detail verbatim; an unexpected relay failure falls back to
+`refineryImport.error.failed`; a draft with zero matched rows adds an explicit
+zero-matches hint to the banner; a fully un-quoted order surfaces its `UNQUOTED_ORDER`
+finding danger-tinted. All strings live in `refineryImport.*` keys in the three frontend
+bundles (DE default + EN parity).
+
 ## Traceability
 
 - `RefineryImportServiceTest`, `RefineryImportControllerTest`,
@@ -152,4 +210,8 @@ applies unchanged when the reviewed draft is saved through the create path
   table is the mapping).
 - V146 migration + `MaterialExternalAliasSource.REFINERY_SCREEN` + the
   `/admin/material-aliases` option cover REQ-REFINERY-010.
+- `RefineryImportProxyControllerTest` (relay, form mapping, error branches),
+  `RefineryOrderCreateImportRenderTest` (full Thymeleaf render with flags, chips and
+  banner) and the `RefineryImportE2eTest` file-upload flow
+  ([UC-23](../e2e-test/UC-23-refinery-import-extract.md)) cover REQ-REFINERY-012–015.
 

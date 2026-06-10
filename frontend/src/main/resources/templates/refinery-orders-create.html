@@ -178,6 +178,39 @@
             <p th:text="#{__${errorToast}__}">Fehler</p>
         </div>
 
+        <!-- Screenshot-extract import (#435): file picker posts the RefineryExtract JSON to the
+             proxy, which flashes the pre-filled form + review flags back onto this page. -->
+        <div class="import-extract-bar" data-testid="refinery-import-box">
+            <form id="refineryImportForm" th:action="@{/refinery-orders/import}" method="post" enctype="multipart/form-data">
+                <input type="file" id="refineryImportFile" name="file" accept=".json,application/json" hidden data-trigger="rfc-import-file" data-testid="refinery-import-file">
+                <button type="button" class="btn btn-outline" data-trigger="rfc-import-pick" data-testid="refinery-import-button" th:text="#{refineryImport.button}">Aus Screenshot-Extract importieren (JSON)</button>
+                <span class="text-muted import-extract-help" th:text="#{refineryImport.help}">JSON-Datei aus dem Basetool SC Extractor wählen – das Formular wird vorbefüllt.</span>
+            </form>
+        </div>
+
+        <!-- Import error states (#435): local key-based errors and verbatim localized backend
+             problem details (e.g. unsupported schemaVersion) use separate attributes. -->
+        <div th:if="${importErrorKey != null}" class="alert alert-danger mt-1" data-testid="refinery-import-error">
+            <p class="mb-0" th:text="#{__${importErrorKey}__}">Import fehlgeschlagen.</p>
+        </div>
+        <div th:if="${importErrorText != null}" class="alert alert-danger mt-1" data-testid="refinery-import-error">
+            <p class="mb-0" th:text="${importErrorText}">Import fehlgeschlagen.</p>
+        </div>
+
+        <!-- Import review banner (#435): match counters + every finding that has no form row to
+             anchor to (order-level fields, skipped/un-quoted source rows). -->
+        <div th:if="${importGoodsTotal != null}" class="alert alert-warning mt-1" data-testid="refinery-import-banner">
+            <p th:text="#{refineryImport.banner(${importGoodsMatched}, ${importGoodsTotal}, ${importRowsSkipped})}">X von Y Zeilen zugeordnet, Z übersprungen – bitte markierte Felder prüfen.</p>
+            <p th:if="${importGoodsTotal > 0 and importGoodsMatched == 0}" class="import-flag-danger" th:text="#{refineryImport.banner.zeroMatches}">Keine Zeile konnte zugeordnet werden.</p>
+            <ul th:if="${importIssues != null and !importIssues.isEmpty()}" class="import-issue-list">
+                <li th:each="issue : ${importIssues}"
+                    th:classappend="${issue.severity().name() == 'BLOCKING'} ? 'import-flag-danger' : (${issue.severity().name() == 'INFO'} ? 'import-flag-info' : 'import-flag-warning')">
+                    <span th:text="#{__${'refineryImport.issue.' + issue.code()}__}">Hinweis</span>
+                    <span th:if="${issue.rawValue() != null}" class="import-flag-raw" th:text="|(${issue.rawValue()})|"></span>
+                </li>
+            </ul>
+        </div>
+
         <div class="form-container">
             <form data-testid="refinery-form" th:action="@{/refinery-orders/create}" method="post" th:object="${refineryOrderForm}">
                 <input type="hidden" th:field="*{source}" />
@@ -309,10 +342,32 @@
                 </div>
 
                 <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-gray-4); margin-bottom: 1rem;">
+                    <div th:each="good, stat : *{goods}" class="material-entry" th:classappend="${importRowIssues != null and importRowIssues.containsKey(stat.index)} ? 'import-flagged-row'" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-gray-4); margin-bottom: 1rem;">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
                             <button th:if="${stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon" data-trigger="rfc-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        </div>
+
+                        <!-- Inline import review flags (#435): findings anchored to this draft row,
+                             incl. the derived read confidence (accessible text tints, REQ-UI-006)
+                             and one-click suggestion chips for unmatched/fuzzy materials. -->
+                        <div th:if="${importRowIssues != null and importRowIssues.containsKey(stat.index)}" class="import-row-flags" th:attr="data-testid='refinery-import-row-flags-' + ${stat.index}">
+                            <div th:each="rowIssue : ${importRowIssues.get(stat.index)}" class="import-row-flag"
+                                 th:classappend="${rowIssue.severity().name() == 'BLOCKING'} ? 'import-flag-danger' : (${rowIssue.severity().name() == 'INFO'} ? 'import-flag-info' : 'import-flag-warning')">
+                                <span th:text="#{__${'refineryImport.issue.' + rowIssue.code()}__}">Hinweis</span>
+                                <span th:if="${rowIssue.rawValue() != null}" class="import-flag-raw" th:text="|(${rowIssue.rawValue()})|"></span>
+                                <span th:if="${rowIssue.confidence() != null}" class="import-flag-confidence"
+                                      th:classappend="${rowIssue.confidence() >= 0.9} ? 'import-confidence-success' : (${rowIssue.confidence() >= 0.75} ? 'import-confidence-warning' : 'import-confidence-danger')">
+                                    <span class="import-confidence-dot" aria-hidden="true"></span>
+                                    <span th:text="|${#numbers.formatInteger(rowIssue.confidence() * 100, 1)}%|">95%</span>
+                                </span>
+                                <span th:if="${rowIssue.suggestions() != null and !rowIssue.suggestions().isEmpty()}" class="import-suggestions">
+                                    <button th:each="suggestion : ${rowIssue.suggestions()}" type="button" class="btn btn-ghost import-suggestion-chip"
+                                            data-trigger="rfc-apply-suggestion"
+                                            th:attr="data-row=${stat.index}, data-material-id=${suggestion.id()}, data-testid='refinery-import-suggestion-' + ${stat.index}"
+                                            th:text="|${suggestion.name()} (${#numbers.formatInteger(suggestion.score() * 100, 1)}%)|">Stileron (Raw) (89%)</button>
+                                </span>
+                            </div>
                         </div>
 
                         <div class="material-row">
@@ -647,6 +702,13 @@
         entries.forEach((_, index) => {
             calcScu(index);
         });
+        // Pre-filled rows (validation-error re-render or screenshot import, #435) arrive with a
+        // selected input material but a "-" output display — re-derive it once on load.
+        document.querySelectorAll('select[id^="inputMaterialId_"]').forEach(function (select) {
+            if (select.value) {
+                updateOutputMaterial(select);
+            }
+        });
     });
 
     /**
@@ -691,6 +753,27 @@
         window.krtEvents.on('change', 'rfc-location-change', function (el) { window.krtRefineryYield.onLocationChange(el); });
         window.krtEvents.on('input', 'rfc-calc-scu', function (el) {
             calcScu(el.getAttribute('data-index'));
+        });
+        // Screenshot-extract import (#435): hidden file input + styled trigger, submit-on-pick.
+        window.krtEvents.on('click', 'rfc-import-pick', function () {
+            const fileInput = document.getElementById('refineryImportFile');
+            if (fileInput) fileInput.click();
+        });
+        window.krtEvents.on('change', 'rfc-import-file', function (el) {
+            if (el.files && el.files.length > 0) {
+                const importForm = document.getElementById('refineryImportForm');
+                if (importForm) importForm.submit();
+            }
+        });
+        // One-click assignment of a ranked suggestion to the row's material select; the change
+        // event re-derives the output-material display and the yield badge like a manual pick.
+        window.krtEvents.on('click', 'rfc-apply-suggestion', function (el) {
+            const row = el.getAttribute('data-row');
+            const materialId = el.getAttribute('data-material-id');
+            const select = document.getElementById('inputMaterialId_' + row);
+            if (!select || !materialId) return;
+            select.value = materialId;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
         });
     }
 </script>

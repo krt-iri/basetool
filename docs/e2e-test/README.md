@@ -22,6 +22,7 @@ Für Aufbau, Cross-Browser-Matrix und CI-Workflows der E2E-Suite siehe den Testi
 | [UC-19](UC-19-refinery-order-einlagern.md)  | Refinery Order einlagern (in das Lager)               | `e2e`   | `RefineryOrderStoreE2eTest`     |
 | [UC-20](UC-20-refinery-order-lifecycle.md)  | Refinery Order: Bearbeiten/Abbrechen/Filter/Edges     | `e2e`   | `RefineryOrderLifecycleE2eTest` |
 | [UC-22](UC-22-mission-finanzeintrag.md)     | Einsatz: Finanzeintrag anlegen & Detail erneut öffnen | `e2e`   | `MissionFinanceEntryE2eTest`    |
+| [UC-23](UC-23-refinery-import-extract.md)   | Refinery Order aus Screenshot-Extract importieren     | `e2e`   | `RefineryImportE2eTest`         |
 
 UC-01 bis UC-07 sowie UC-13 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied); UC-15 bis UC-17 erweitern die Job-Order-Flows (Bearbeiten, Status-Wechsel, Item-Auftrag/Item-Handover), UC-19 und UC-20 die Refinery-Flows (Einlagern, Lifecycle/Edge Cases), UC-22 den Einsatz-Finanzeintrag (Regressionsschutz gegen den Detail-500, wenn ein Einsatz einen Finanzeintrag besitzt) — ebenfalls `@Tag("e2e")`. Zusammen mit UC-04 (Anlegen) bilden UC-19/UC-20 den vollen Refinery-Funktionsumfang ab.
 
