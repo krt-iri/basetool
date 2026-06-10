@@ -29,8 +29,9 @@ record family. Key shape decisions:
   per-image `cropMode`) for display and debugging only.
 - Read-quality signals as data, not behaviour: order-level `quoted` + `layoutConfidence`,
   per-row `rowIndex`, nullable `outputQuantity` (un-quoted state) and **derived**
-  per-row `confidence` (two-pass agreement + checksum; never the model's verbalized
-  self-estimate).
+  per-row `confidence` (deterministic validation + header checksum, the frozen Phase 0
+  policy — the originally planned two-pass agreement was rejected by the golden-set
+  data; never the model's verbalized self-estimate).
 - A binding JSON example lives in the plan §5 and is deserialized verbatim by
   `RefineryExtractDtoJsonTest`, so contract drift fails the build.
 
