@@ -100,6 +100,11 @@ class DatabaseIndexMigrationTest {
     // V143: composite stack-key index backing the group-on-read GROUP BY and the lazy per-stack
     // entries lookup (ADR-0003, REQ-INV-002).
     assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_stack_key");
+    // V146 (covers REQ-REFINERY-010): case-insensitive unique index that replaced the V108
+    // case-sensitive constraint — guarantees the IgnoreCase alias resolver can never see two
+    // case-variant rows for the same (source_system, external_name).
+    assertIndexExists(
+        jdbc, "material_external_alias", "uq_material_external_alias_source_lower_name");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {
