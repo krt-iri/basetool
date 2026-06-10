@@ -38,7 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Flyway-run time, so the seed inserts zero rows; this test asserts:
  *
  * <ul>
- *   <li>the table + columns + check constraint + unique constraint + index exist
+ *   <li>the table + columns + check constraint + case-insensitive unique index (post-V146) + index
+ *       exist
  *   <li>the seed INSERT statements are idempotent — when the test pre-populates the 6 target
  *       materials and re-runs the SELECT-driven INSERTs by hand, exactly 6 alias rows are created,
  *       all stamped {@code created_by = 'system'} and pointing at the right material
@@ -81,14 +82,16 @@ class V108MigrationTest {
 
   @Test
   void v108AddsUniqueAndCheckConstraints() {
+    // V146 dropped the original case-sensitive UNIQUE constraint and replaced it with a functional
+    // unique index on (source_system, LOWER(external_name)) — assert that case-folded index instead.
     Integer uniqueCount =
         jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM information_schema.table_constraints "
-                + "WHERE table_name = 'material_external_alias' "
-                + "AND constraint_type = 'UNIQUE' "
-                + "AND constraint_name = 'uk_material_external_alias_source_external_name'",
+            "SELECT count(*) FROM pg_indexes "
+                + "WHERE tablename = 'material_external_alias' "
+                + "AND indexname = 'uq_material_external_alias_source_lower_name'",
             Integer.class);
-    assertEquals(1, uniqueCount == null ? 0 : uniqueCount, "UNIQUE constraint must exist");
+    assertEquals(
+        1, uniqueCount == null ? 0 : uniqueCount, "case-insensitive unique index must exist");
 
     Integer checkCount =
         jdbcTemplate.queryForObject(
@@ -147,7 +150,7 @@ class V108MigrationTest {
               + "SELECT gen_random_uuid(), m.id, 'SCWIKI', ?, "
               + "'V108 seed replay', 'system' "
               + "FROM material m WHERE m.name = ? "
-              + "ON CONFLICT (source_system, external_name) DO NOTHING",
+              + "ON CONFLICT (source_system, LOWER(external_name)) DO NOTHING",
           wikiName,
           uexName);
     }
