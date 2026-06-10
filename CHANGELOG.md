@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.13](https://github.com/krt-iri/basetool/releases/tag/v0.4.13) - 2026-06-10
+
 ### Changed
 
 - **Die Oberfläche nutzt jetzt durchgängig nur noch die Schriftart Lato.** Audiowide entfällt als separate Headline-Schrift (die Schriftdatei wurde entfernt); Überschriften bleiben in Großbuchstaben, werden aber jetzt als Lato Bold dargestellt.

@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:deacaa4a-7363-4746-9588-401957a1c735",
+  "serialNumber" : "urn:uuid:4a687454-163a-42c0-8fa5-1f71a1aae6de",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-06-10T18:54:11Z",
+    "timestamp" : "2026-06-10T19:47:39Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-iri/basetool/actions/runs/27298797731"
+          "url" : "https://github.com/krt-iri/basetool/actions/runs/27301798328"
         },
         {
           "type" : "vcs",
