@@ -128,6 +128,20 @@
         setTimeout(() => window.location.reload(), 1500);
     }
 
+    // CSRF is enforced for these session-authenticated frontend routes (the former
+    // /inventory/** carve-out was removed in audit finding H-6), so every state-changing
+    // fetch must echo the token from the head fragment's meta tags — otherwise the request
+    // is rejected with 403 before it reaches the proxy controller.
+    function csrfHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = document.querySelector('meta[name="_csrf"]')?.content;
+        const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+        if (token && header && header !== 'undefined' && token !== 'undefined') {
+            headers[header] = token;
+        }
+        return headers;
+    }
+
     // Owner dropdown change
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.owner-select').forEach(function (select) {
@@ -145,7 +159,7 @@
 
                 fetch('/inventory/' + inventoryId + '/transfer', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: csrfHeaders(),
                     body: JSON.stringify({ amount: amount, targetUserId: targetUserId, targetLocationId: null, type: 'TRANSFER', terminal: null, sellAmount: null, version: version })
                 }).then(function (res) {
                     if (res.status === 409) { handleConflict(); return null; }
@@ -179,7 +193,7 @@
 
                 fetch('/inventory/' + inventoryId + '/transfer', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: csrfHeaders(),
                     body: JSON.stringify({ amount: amount2, targetUserId: null, targetLocationId: targetLocationId, type: 'TRANSFER', terminal: null, sellAmount: null, version: version })
                 }).then(function (res) {
                     if (res.status === 409) { handleConflict(); return null; }
@@ -206,7 +220,7 @@
 
                 fetch('/inventory/' + inventoryId + '/delivered', {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: csrfHeaders(),
                     body: JSON.stringify({ delivered: delivered, version: version })
                 }).then(function (res) {
                     if (res.status === 409) { handleConflict(); return null; }
