@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-10.
-> **Owner area:** REFINERY · **Related:** [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) (epic #439 forward plan), [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md), [`api-conventions.md`](api-conventions.md), [`security-and-access.md`](security-and-access.md)
+> **Owner area:** REFINERY · **Related:** [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) (epic #439 — historical plan, frozen 2026-06-10), [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md), [`api-conventions.md`](api-conventions.md), [`security-and-access.md`](security-and-access.md)
 
 # Refinery screenshot import
 
@@ -15,8 +15,13 @@ This spec holds the requirements that are implemented on `main`. Phase 1 (#434, 
 backend import endpoint) minted `REQ-REFINERY-001`–`009`, `011` and `012`;
 `REQ-REFINERY-010` hardens the shared alias table the import consults (shipped
 separately, #517); Phase 2 (#435, the frontend upload + pre-filled review form) added
-`REQ-REFINERY-013`–`016`. The desktop extractor (#436) adds its requirements here when
-it ships. The full forward plan, including not-yet-built phases, lives in
+`REQ-REFINERY-013`–`016`. The desktop extractor (#436, shipped 2026-06-10 as
+`basetool-bp-extractor` PR #5) lives in its own repo; its binding desktop-side rules —
+the frozen read strategy, the deterministic confidence policy, the resource-safety
+guardrails — are recorded there (`CLAUDE.md`,
+`docs/refinery-extractor/PHASE0_FINDINGS.md`, the contract test pinning the §5 example),
+while the cross-repo contract stays governed by `REQ-REFINERY-001` + ADR-0008 here. The
+original master plan is frozen as a historical record in
 [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md).
 
 ## Requirements
@@ -250,11 +255,11 @@ surfaces its `UNQUOTED_ORDER` finding danger-tinted. All strings live in
 
 ## Out of scope
 
-- The not-yet-shipped parts of the epic (the desktop extractor
-  [#436](https://github.com/krt-iri/basetool/issues/436) and the deferred phases 4/5) —
-  the forward plan in
-  [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) governs
-  them until they ship and mint their requirements here.
+- The desktop extractor's internals ([#436](https://github.com/krt-iri/basetool/issues/436),
+  shipped) — they live in the `basetool-bp-extractor` repo; this spec only governs the
+  cross-repo contract and the basetool-side import behaviour.
+- The deferred phases 4 (#437, direct upload) and 5 (#438, log hints) — deferred by owner
+  decision; their GitHub issues govern them if they are ever revived.
 - `blueprint_external_alias` — the blueprint import keeps its own alias table and matching
   rules, specced in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md).
 

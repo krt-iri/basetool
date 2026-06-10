@@ -1,6 +1,6 @@
 # Design Spec — Basetool SC Extractor (GUI rebuild for epic #439)
 
-> **Doc type:** Binding design spec for epic #439 (not yet built). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md).
+> **Doc type:** Binding design spec for epic #439 — **implemented** (desktop tool: `basetool-bp-extractor` PR #5; frontend review surface: basetool #518; both 2026-06-10). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Remains the binding visual reference for the extractor GUI and the shared review language; UI changes must keep matching it or amend it in the same PR.
 >
 > **Provenance / how to read this.** This is the **binding** UI/UX design for the SC
 > Extractor desktop tool (and the shared visual language of the frontend review
