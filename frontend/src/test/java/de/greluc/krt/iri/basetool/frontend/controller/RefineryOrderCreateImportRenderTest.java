@@ -170,11 +170,52 @@ class RefineryOrderCreateImportRenderTest {
         .andExpect(content().string(containsString("data-testid=\"refinery-import-row-flags-2\"")))
         .andExpect(content().string(containsString("data-testid=\"refinery-import-suggestion-2\"")))
         .andExpect(content().string(containsString("data-material-id=\"" + SUGGESTION_ID + "\"")))
-        // the matched rows keep their pre-selected material value
+        // the matched rows keep their pre-selected material: some option must carry the
+        // selected marker (a bare value="<id>" match would hit every dropdown's option list)
         .andExpect(content().string(containsString("value=\"" + MATERIAL_ID + "\"")))
+        .andExpect(content().string(containsString("selected=\"selected\"")))
         // the import upload control is present
         .andExpect(content().string(containsString("data-testid=\"refinery-import-button\"")))
         .andExpect(content().string(containsString("</html>")));
+  }
+
+  @Test
+  void createPage_rendersZeroMatchesHintAndBlockingTint() throws Exception {
+    // Given — a draft where no row matched and the order is un-quoted (BLOCKING finding)
+    RefineryOrderForm form = new RefineryOrderForm();
+    form.setGoods(new ArrayList<>(List.of(good(null, 250, null, 618))));
+    ImportIssueDto unquotedOrder =
+        new ImportIssueDto(
+            "quoted",
+            null,
+            ImportIssueCode.UNQUOTED_ORDER,
+            ImportIssueSeverity.BLOCKING,
+            null,
+            null);
+
+    // When / Then — the banner adds the explicit zero-matches hint and the BLOCKING finding
+    // renders with the danger tint (REQ-REFINERY-016 / REQ-REFINERY-014)
+    mockMvc
+        .perform(
+            get("/refinery-orders/create")
+                .with(oidcLogin())
+                // pin the resolved locale so the asserted bundle text is deterministic
+                .locale(java.util.Locale.GERMAN)
+                .flashAttr("refineryOrderForm", form)
+                .flashAttr("importIssues", List.of(unquotedOrder))
+                .flashAttr("importRowIssues", Map.of())
+                .flashAttr("importGoodsMatched", 0)
+                .flashAttr("importGoodsTotal", 3)
+                .flashAttr("importRowsSkipped", 3))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"refinery-import-banner\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Keine Zeile konnte automatisch zugeordnet werden - bitte Materialien"
+                            + " manuell wählen.")))
+        .andExpect(content().string(containsString("import-flag-danger")));
   }
 
   @Test

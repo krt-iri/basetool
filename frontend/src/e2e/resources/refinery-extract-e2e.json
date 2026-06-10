@@ -23,7 +23,7 @@
       "goods": [
         {
           "rowIndex": 0,
-          "rawMaterialName": "E2E REFINERY MATERIAL",
+          "rawMaterialName": "E2E IMPORT MATERIAL",
           "quality": 618,
           "inputQuantity": 250,
           "outputQuantity": 120,
@@ -33,7 +33,7 @@
         },
         {
           "rowIndex": 1,
-          "rawMaterialName": "E2E REFINRY MATERAIL",
+          "rawMaterialName": "E2E IMPRT MATERAIL",
           "quality": 385,
           "inputQuantity": 150,
           "outputQuantity": 70,

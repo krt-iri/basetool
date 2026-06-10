@@ -41,8 +41,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <p>This is the repo's first file-upload e2e: {@code setInputFiles} targets the hidden file input
  * behind the styled import button; the change handler submits the multipart form to {@code
  * /refinery-orders/import}, which relays to the Phase 1 backend endpoint and flashes the pre-filled
- * form back onto the create page. The fixture's second row ("E2E REFINRY MATERAIL") is misspelled
- * on purpose so it stays below the fuzzy accept threshold and surfaces only as a ranked suggestion.
+ * form back onto the create page. The fixture's second row ("E2E IMPRT MATERAIL") is misspelled on
+ * purpose (3 edits over 19 characters ≈ 0.84 similarity) so it stays below the fuzzy accept
+ * threshold and surfaces only as a ranked suggestion.
  */
 @Tag("e2e")
 class RefineryImportE2eTest {
@@ -65,9 +66,11 @@ class RefineryImportE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      // The fixture's first row reads "E2E REFINERY MATERIAL" — the canonical fold matches it to
-      // this seeded manual RAW material; location + method come from the SQL catalog seed.
-      materialId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Refinery Material");
+      // The fixture's first row reads "E2E IMPORT MATERIAL" — the canonical fold matches it to
+      // this seeded manual RAW material; location + method come from the SQL catalog seed. The
+      // name is unique to this class: RefineryOrderCreateE2eTest already seeds
+      // "E2E Refinery Material" on the shared stack, and a duplicate would break either class.
+      materialId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Import Material");
     }
   }
 

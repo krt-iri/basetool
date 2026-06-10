@@ -210,6 +210,66 @@ class RefineryImportProxyControllerTest {
   }
 
   @Test
+  void importExtract_oversizedUpload_flashesInvalidFileWithoutBackendCall() {
+    // Given — a file above the 2 MB sanity cap (the wrong file, e.g. a screenshot)
+    byte[] oversized = new byte[(int) RefineryImportProxyController.MAX_EXTRACT_BYTES + 1];
+    MultipartFile file =
+        new MockMultipartFile("file", "screenshot.png", "application/json", oversized);
+
+    // When
+    String view = controller.importExtract(file, redirectAttributes);
+
+    // Then — rejected locally, the backend is never called (covers REQ-REFINERY-016)
+    assertThat(view).isEqualTo("redirect:/refinery-orders/create");
+    assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.invalidFile");
+    verifyNoInteractions(backendApiClient);
+  }
+
+  @Test
+  void handleOversizedUpload_flashesInvalidFile() {
+    // Given / When — Spring rejected the multipart before the handler ran (above the 64 MB cap)
+    String view = controller.handleOversizedUpload(redirectAttributes);
+
+    // Then — same friendly inline error as the controller's own sanity cap
+    assertThat(view).isEqualTo("redirect:/refinery-orders/create");
+    assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.invalidFile");
+  }
+
+  @Test
+  void importExtract_backendProblemWithoutDetail_flashesGenericError() {
+    // Given — a backend reject whose problem body carries no detail text
+    when(backendApiClient.post(
+            eq("/api/v1/refinery-orders/import-extract"), any(), eq(RefineryImportDraftDto.class)))
+        .thenThrow(
+            new BackendServiceException(
+                "400 from backend", null, 400, "BAD_REQUEST", null, Collections.emptyList(), null));
+
+    // When
+    String view = controller.importExtract(jsonUpload("{\"schemaVersion\":2}"), redirectAttributes);
+
+    // Then — falls back to the generic frontend i18n key instead of flashing blank text
+    assertThat(view).isEqualTo("redirect:/refinery-orders/create");
+    assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.failed");
+    assertThat(flash()).doesNotContainKey("importErrorText");
+  }
+
+  @Test
+  void importExtract_nullDraft_flashesGenericError() {
+    // Given — the relay succeeded but returned no usable draft
+    when(backendApiClient.post(
+            eq("/api/v1/refinery-orders/import-extract"), any(), eq(RefineryImportDraftDto.class)))
+        .thenReturn(null);
+
+    // When
+    String view = controller.importExtract(jsonUpload("{\"schemaVersion\":1}"), redirectAttributes);
+
+    // Then
+    assertThat(view).isEqualTo("redirect:/refinery-orders/create");
+    assertThat(flash()).containsEntry("importErrorKey", "refineryImport.error.failed");
+    assertThat(flash()).doesNotContainKey("refineryOrderForm");
+  }
+
+  @Test
   void importExtract_backendProblem_surfacesLocalizedDetailVerbatim() {
     // Given — envelope-level reject (e.g. unsupported schemaVersion) with localized detail
     when(backendApiClient.post(

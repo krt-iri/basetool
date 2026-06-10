@@ -221,13 +221,17 @@ component was introduced; the design-system component budget is unchanged.
 
 All import feedback is KRT-styled inline alerts (no native dialogs, REQ-UI-008): a
 non-JSON / non-object / oversized upload fails locally with
-`refineryImport.error.invalidFile`; an envelope-level backend reject (wrong
-`schemaVersion`, non-SETUP panel) surfaces the backend's already-localized problem
-detail verbatim; an unexpected relay failure falls back to
-`refineryImport.error.failed`; a draft with zero matched rows adds an explicit
-zero-matches hint to the banner; a fully un-quoted order surfaces its `UNQUOTED_ORDER`
-finding danger-tinted. All strings live in `refineryImport.*` keys in the three frontend
-bundles (DE default + EN parity).
+`refineryImport.error.invalidFile` (uploads beyond Spring's multipart cap are caught by
+a controller-local `MaxUploadSizeExceededException` handler and yield the same inline
+error instead of the generic error page); an envelope-level backend reject (wrong
+`schemaVersion`, non-SETUP panel) surfaces the backend's localized problem detail
+verbatim — which requires the frontend `WebClient` to relay the user's resolved locale
+as `Accept-Language` on every backend call (`UserLocaleRelayFilter`; without the header
+the backend localizes in its container-default locale, violating the i18n rule); an
+unexpected relay failure falls back to `refineryImport.error.failed`; a draft with zero
+matched rows adds an explicit zero-matches hint to the banner; a fully un-quoted order
+surfaces its `UNQUOTED_ORDER` finding danger-tinted. All strings live in
+`refineryImport.*` keys in the three frontend bundles (DE default + EN parity).
 
 ## Traceability
 

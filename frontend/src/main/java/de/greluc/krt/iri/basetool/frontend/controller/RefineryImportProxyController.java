@@ -41,9 +41,11 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import tools.jackson.core.JacksonException;
@@ -151,6 +153,22 @@ public class RefineryImportProxyController {
       redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.failed");
       return "redirect:/refinery-orders/create";
     }
+  }
+
+  /**
+   * Turns a multipart upload above Spring's 64 MB cap into the same friendly inline error as the
+   * controller's own 2 MB sanity check. Without this, picking a grossly wrong file (e.g. the
+   * screenshots themselves instead of the extract) raises {@link MaxUploadSizeExceededException}
+   * before the handler runs and bounces the user onto the generic 500 error page instead of back to
+   * the create form (REQ-REFINERY-016).
+   *
+   * @param redirectAttributes flash sink for the error key
+   * @return redirect to {@code /refinery-orders/create}
+   */
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public String handleOversizedUpload(RedirectAttributes redirectAttributes) {
+    redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.invalidFile");
+    return "redirect:/refinery-orders/create";
   }
 
   /**

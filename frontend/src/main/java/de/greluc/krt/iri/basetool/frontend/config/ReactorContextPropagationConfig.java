@@ -23,9 +23,11 @@ import de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronContext;
 import de.greluc.krt.iri.basetool.frontend.logging.CorrelationContext;
 import io.micrometer.context.ContextRegistry;
 import jakarta.annotation.PostConstruct;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.i18n.LocaleContextHolder;
 import reactor.core.publisher.Hooks;
 
 /**
@@ -83,6 +85,14 @@ public class ReactorContextPropagationConfig {
   public static final String CORRELATION_CONTEXT_KEY = "iridium.correlationId";
 
   /**
+   * Context-registry key under which the user's resolved UI locale ({@link
+   * org.springframework.context.i18n.LocaleContextHolder}) is propagated through Reactor pipelines,
+   * feeding the {@code Accept-Language} relay of {@link
+   * de.greluc.krt.iri.basetool.frontend.logging.UserLocaleRelayFilter} (#435).
+   */
+  public static final String USER_LOCALE_CONTEXT_KEY = "iridium.userLocale";
+
+  /**
    * Activates {@link Hooks#enableAutomaticContextPropagation()} and registers {@code
    * ThreadLocalAccessor}s for {@link ActiveSquadronContext} and {@link CorrelationContext} on the
    * global {@link ContextRegistry}. Runs once at bean-init time; the registry is a process-wide
@@ -123,10 +133,26 @@ public class ReactorContextPropagationConfig {
         },
         CorrelationContext::clear);
 
+    registry.registerThreadLocalAccessor(
+        USER_LOCALE_CONTEXT_KEY,
+        () ->
+            LocaleContextHolder.getLocaleContext() != null
+                ? LocaleContextHolder.getLocaleContext().getLocale()
+                : null,
+        (Locale value) -> {
+          if (value == null) {
+            LocaleContextHolder.resetLocaleContext();
+          } else {
+            LocaleContextHolder.setLocale(value);
+          }
+        },
+        LocaleContextHolder::resetLocaleContext);
+
     log.info(
         "Reactor automatic context propagation enabled; registered ThreadLocalAccessors for "
-            + "ActiveSquadronContext ({}) and CorrelationContext ({}).",
+            + "ActiveSquadronContext ({}), CorrelationContext ({}) and the user locale ({}).",
         ACTIVE_ORG_UNIT_CONTEXT_KEY,
-        CORRELATION_CONTEXT_KEY);
+        CORRELATION_CONTEXT_KEY,
+        USER_LOCALE_CONTEXT_KEY);
   }
 }

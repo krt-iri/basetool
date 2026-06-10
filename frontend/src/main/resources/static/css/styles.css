@@ -3733,14 +3733,19 @@ textarea:focus-visible,
     transform: translateX(-50%);
 }
 
-/* ??? Refinery screenshot import (#435): create-page review flags ??????????? */
+/* ------------------ Refinery screenshot import (#435): create-page review flags */
 
 .import-extract-bar {
+    margin-bottom: 1rem;
+}
+
+/* The bar's only child is the upload form — the flex row has to live there,
+   or the gap between button and help text never applies. */
+.import-extract-bar form {
     display: flex;
     align-items: center;
     gap: 1rem;
     flex-wrap: wrap;
-    margin-bottom: 1rem;
 }
 
 .import-extract-help {
@@ -3769,8 +3774,10 @@ textarea:focus-visible,
     color: var(--color-info-text);
 }
 
+/* De-emphasised via the neutral body tone — an opacity fade would drop the
+   severity tints below the AA contrast headroom REQ-UI-006 chose them for. */
 .import-flag-raw {
-    opacity: 0.8;
+    color: var(--color-gray-1);
 }
 
 /* 3px left status bar on flagged goods rows; inset shadow so the inline border of
@@ -3839,5 +3846,5 @@ textarea:focus-visible,
 }
 
 .import-suggestion-chip {
-    min-height: 44px;
+    min-height: var(--touch-target);
 }

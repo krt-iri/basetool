@@ -14,9 +14,9 @@ Authentifizierter User mit IRIDIUM-Mitgliedschaft.
 
 - Eingeloggte Session (UC-01).
 - IRIDIUM-Mitgliedschaft geseedet (`ensureIridiumMembership`).
-- Ein RAW-Eingangsmaterial „E2E Refinery Material" geseedet (`createRefineryMaterial`).
+- Ein RAW-Eingangsmaterial „E2E Import Material" geseedet (`createRefineryMaterial`); der Name ist bewusst klassen-eindeutig, weil `RefineryOrderCreateE2eTest` auf demselben Stack bereits „E2E Refinery Material" anlegt.
 - UEX-Katalog per JDBC geseedet (`seedCatalog`): Location „E2E Refinery Hub" (refinery-fähig) und Refining Method „E2E Refining Method".
-- Fixture [`refinery-extract-e2e.json`](../../frontend/src/e2e/resources/refinery-extract-e2e.json): ein quotierter SETUP-Auftrag mit einer exakt matchbaren Zeile („E2E REFINERY MATERIAL") und einer absichtlich vertippten Zeile („E2E REFINRY MATERAIL"), die unter dem Fuzzy-Accept-Threshold bleibt und nur als Vorschlag erscheint.
+- Fixture [`refinery-extract-e2e.json`](../../frontend/src/e2e/resources/refinery-extract-e2e.json): ein quotierter SETUP-Auftrag mit einer exakt matchbaren Zeile („E2E IMPORT MATERIAL") und einer absichtlich vertippten Zeile („E2E IMPRT MATERAIL"), die unter dem Fuzzy-Accept-Threshold bleibt und nur als Vorschlag erscheint.
 
 ## Auslöser
 
@@ -37,6 +37,6 @@ Der Auftrag erscheint in der Liste unter `/refinery-orders` als `refinery-order-
 ## Sonderfälle & Lehren
 
 - **`setInputFiles` funktioniert auf versteckten Inputs** (Playwright prüft für File-Inputs keine Sichtbarkeit) — der KRT-Pattern „hidden input + gestylter Trigger-Button" braucht keinen Klick auf den nativen Dialog.
-- **Fixture-Namen müssen die Matching-Stufen treffen:** „E2E REFINRY MATERAIL" ist so gewählt, dass weder Canonical- noch Suffix-Matching greift und der Fuzzy-Score (~0,86) unter dem Accept-Threshold 0,9 bleibt, aber über dem Vorschlags-Floor 0,5 liegt.
+- **Fixture-Namen müssen die Matching-Stufen treffen:** „E2E IMPRT MATERAIL" ist so gewählt, dass weder Canonical- noch Suffix-Matching greift und der Fuzzy-Score (~0,84) unter dem Accept-Threshold 0,9 bleibt, aber über dem Vorschlags-Floor 0,5 liegt.
 - Der Import-POST ist ein normaler Form-Submit (Flash-Attribute + Redirect), kein AJAX — `awaitFormPost` wartet wie beim Create-Submit auf das Settling des Redirects.
 

@@ -364,7 +364,7 @@
                                 <span th:if="${rowIssue.suggestions() != null and !rowIssue.suggestions().isEmpty()}" class="import-suggestions">
                                     <button th:each="suggestion : ${rowIssue.suggestions()}" type="button" class="btn btn-ghost import-suggestion-chip"
                                             data-trigger="rfc-apply-suggestion"
-                                            th:attr="data-row=${stat.index}, data-material-id=${suggestion.id()}, data-testid='refinery-import-suggestion-' + ${stat.index}"
+                                            th:attr="data-material-id=${suggestion.id()}, data-testid='refinery-import-suggestion-' + ${stat.index}"
                                             th:text="|${suggestion.name()} (${#numbers.formatInteger(suggestion.score() * 100, 1)}%)|">Stileron (Raw) (89%)</button>
                                 </span>
                             </div>
@@ -570,6 +570,15 @@
             yieldBadge.remove();
         }
 
+        // Same for the import review flags (#435): findings, confidence and suggestion chips
+        // belong to the SOURCE row's draft data — a fresh row has no import finding, and a
+        // cloned chip would still write to the source row's select when clicked.
+        template.classList.remove('import-flagged-row');
+        const importFlags = template.querySelector('.import-row-flags');
+        if (importFlags) {
+            importFlags.remove();
+        }
+
         const labels = template.querySelectorAll('label');
         labels.forEach(label => {
             const forAttr = label.getAttribute('for');
@@ -702,13 +711,8 @@
         entries.forEach((_, index) => {
             calcScu(index);
         });
-        // Pre-filled rows (validation-error re-render or screenshot import, #435) arrive with a
-        // selected input material but a "-" output display — re-derive it once on load.
-        document.querySelectorAll('select[id^="inputMaterialId_"]').forEach(function (select) {
-            if (select.value) {
-                updateOutputMaterial(select);
-            }
-        });
+        // Pre-filled selects (validation-error re-render or screenshot import, #435) are
+        // re-derived by the pre-existing DOMContentLoaded handler further up — no repeat here.
     });
 
     /**
@@ -767,10 +771,12 @@
         });
         // One-click assignment of a ranked suggestion to the row's material select; the change
         // event re-derives the output-material display and the yield badge like a manual pick.
+        // The select is resolved RELATIVE to the chip (not via a row index): add/remove
+        // renumber the select ids, so a stored index would silently target the wrong row.
         window.krtEvents.on('click', 'rfc-apply-suggestion', function (el) {
-            const row = el.getAttribute('data-row');
             const materialId = el.getAttribute('data-material-id');
-            const select = document.getElementById('inputMaterialId_' + row);
+            const entry = el.closest('.material-entry');
+            const select = entry ? entry.querySelector('select[id^="inputMaterialId_"]') : null;
             if (!select || !materialId) return;
             select.value = materialId;
             select.dispatchEvent(new Event('change', { bubbles: true }));
