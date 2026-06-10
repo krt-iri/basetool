@@ -51,10 +51,12 @@ cards, sidebar). `color-scheme: dark`; there is **no light theme**.
 
 ### REQ-UI-004 — Typography
 
-- **Headlines:** **Audiowide**, **UPPERCASE only**, letter-spacing `0.05em`. (Audiowide
-  replaced Ethnocentric in 2026-06 — Ethnocentric is no longer used.) Never set body copy
-  in the display face.
-- **Body / UI:** **Lato**, default weight Light 300, Bold 700 for emphasis.
+- **One typeface: Lato.** Body / UI default weight Light 300, Bold 700 for emphasis.
+- **Headlines:** Lato too — distinguished by **weight (Bold 700)** + **UPPERCASE only** +
+  letter-spacing `0.05em`, **not** by a separate display face. (History: Ethnocentric →
+  Audiowide → consolidated to **Lato-only** in 2026-06; the Audiowide/Ethnocentric `@font-face`
+  rules and font files were removed. `--font-headline` is kept as a Lato alias so existing
+  `var(--font-headline)` references keep resolving.)
 - The brand ships no monospace face; "mono" contexts use Lato with tabular figures.
 
 ### REQ-UI-005 — Department colours (Bereichsfarben) — values are frozen

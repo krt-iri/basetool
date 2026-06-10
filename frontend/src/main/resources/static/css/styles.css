@@ -7,20 +7,13 @@
  * the system fallback visible until the brand font arrives, eliminating the FOIT blank period.
  */
 /*
- * Audiowide — the wide, techy display face. Headlines ONLY, always UPPERCASE.
- * Replaced Ethnocentric (2026-06) as part of the design-system unification:
- * Ethnocentric's irregular kerning was hard to read at small sizes, Audiowide
- * is the current KRT display face. Single weight, no italic. WOFF2-only (see
- * the note above — every supported browser ships WOFF2).
+ * Lato is the single typeface for the whole app — body, UI AND headlines.
+ * Headlines are distinguished by weight (700) + UPPERCASE + tracking, not by a
+ * separate display face. History: Ethnocentric -> Audiowide -> Lato-only
+ * (2026-06); the Audiowide @font-face + Audiowide-Regular.woff2 were removed and
+ * --font-headline is kept as an alias of Lato so existing var(--font-headline)
+ * references still resolve.
  */
-@font-face {
-    font-family: Audiowide;
-    src: url('../fonts/Audiowide-Regular.woff2') format('woff2');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-
 @font-face {
     font-family: Lato;
     src: url('../fonts/Lato-Light.woff2') format('woff2');
@@ -114,8 +107,10 @@
     --action-neutral: var(--color-gray-3); /* ghost border */
     --data-fg: var(--color-white); /* bright neutral readouts */
 
-    /* Typography */
-    --font-headline: 'Audiowide', sans-serif;
+    /* Typography — Lato only. Headlines are distinguished by weight (700) +
+       UPPERCASE + tracking, not by a separate face; --font-headline is kept as a
+       Lato alias so existing var(--font-headline) references keep resolving. */
+    --font-headline: 'Lato', sans-serif;
     --font-body: 'Lato', sans-serif;
     /* The brand ships no monospace face, so "mono" contexts (version strings,
        IDs, hex codes, code) use the house font Lato with tabular figures for
@@ -136,7 +131,7 @@
     --fw-bold: 700; /* labels, nav, btn, strong */
     --fw-black: 900;
 
-    --tracking-display: 0.05em; /* Audiowide display tracking */
+    --tracking-display: 0.05em; /* headline tracking (Lato, uppercase) */
     --tracking-overline: 0.15em; /* admin chip, overlines */
     --lh-body: 1.5;
 
@@ -213,7 +208,8 @@ h6 {
     color: var(--color-primary);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display); /* Optical kerning fix */
-    font-weight: normal;
+    /* Lato needs weight to read as a heading (Audiowide carried it intrinsically). */
+    font-weight: var(--fw-bold);
 }
 
 a {
@@ -279,6 +275,7 @@ body.admin-mode header {
     border: 1px solid var(--color-accent-dark);
     color: var(--color-accent-light);
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     font-size: var(--fs-2xs);
     text-transform: uppercase;
     letter-spacing: 0.15em;
@@ -331,6 +328,7 @@ nav .brand {
 
 nav .logo-text {
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     font-size: 1.2rem;
     color: var(--color-primary);
 }
@@ -1879,6 +1877,7 @@ input[type='radio']:focus {
     border-left: 4px solid var(--color-primary);
     cursor: pointer;
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     color: var(--color-gray-1);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -1900,6 +1899,7 @@ input[type='radio']:focus {
     font-size: 1.1rem;
     color: var(--color-white);
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -2159,6 +2159,150 @@ input[type='radio']:focus {
     border-right: 2px solid var(--color-primary);
 }
 
+/* ----------------------------------------------------------------------------
+   Plain card - a simple square surface (border + dark fill), no HUD brackets.
+   Use for list items, sub-panels and summary tiles where the bracketed .hud-box
+   is too heavy. Compose with .section-title, .kv-list and .chip.
+   ---------------------------------------------------------------------------- */
+.card {
+    background-color: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    padding: 1rem 1.25rem;
+}
+
+.card--inset {
+    background-color: var(--color-surface-input); /* nested / quieter */
+}
+
+.card--accent {
+    border-top: 3px solid var(--color-primary); /* top accent bar */
+}
+
+.card--flush {
+    padding: 0; /* card wrapping a table/list */
+}
+
+.card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.card-title {
+    margin: 0;
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 0.95rem;
+    color: var(--color-white);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+}
+
+.card + .card {
+    margin-top: 1rem;
+}
+
+/* ----------------------------------------------------------------------------
+   Chip - small SQUARE inline label for data tags (order kind, quality, claims,
+   counts). Pills (border-radius) are reserved for .squadron-badge; chips are the
+   squared counterpart. currentColor-driven, so a tone modifier is all that is
+   needed on top of the neutral base.
+   ---------------------------------------------------------------------------- */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.5rem;
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-2xs);
+    line-height: 1.3;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    color: var(--color-gray-1);
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+}
+
+.chip .krt-icon {
+    width: 0.9em;
+    height: 0.9em;
+}
+
+/* Tone variants - border + text take the hue, the fill stays a faint tint. */
+.chip--primary {
+    color: var(--color-primary);
+    background-color: rgb(231 126 35 / 10%);
+    border-color: var(--color-primary);
+}
+
+.chip--success {
+    color: var(--color-success);
+    background-color: rgb(35 158 51 / 12%);
+    border-color: var(--color-success);
+}
+
+.chip--danger {
+    color: var(--color-danger-text);
+    background-color: rgb(163 0 10 / 15%);
+    border-color: var(--color-danger);
+}
+
+.chip--warning {
+    color: var(--color-warning);
+    background-color: rgb(255 210 63 / 12%);
+    border-color: var(--color-warning);
+}
+
+.chip--info {
+    color: var(--color-info);
+    background-color: rgb(53 93 220 / 15%);
+    border-color: var(--color-info);
+}
+
+.chip--muted {
+    color: var(--color-gray-2);
+    background-color: transparent;
+    border-color: var(--color-gray-3);
+}
+
+/* A chip carrying "key: value" data, e.g. a claim "IRI: 1,200 SCU". */
+.chip--data {
+    font-weight: var(--fw-regular);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.chip--data strong {
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+}
+
+/* ----------------------------------------------------------------------------
+   Section title - standard sub-section heading inside a page/panel. Replaces the
+   ad-hoc inline `style="font-family:'Lato'; font-weight:700; …"` repeated on the
+   detail-page <h3>s. Lato bold, neutral light, hairline rule beneath.
+   ---------------------------------------------------------------------------- */
+.section-title {
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 1rem;
+    color: var(--color-gray-1);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+    border-bottom: var(--border-hairline);
+}
+
+.section-title:first-child {
+    margin-top: 0;
+}
+
 /* Notification Toast */
 .notification-toast {
     position: fixed;
@@ -2210,6 +2354,7 @@ input[type='radio']:focus {
     margin: 0 0 var(--space-2) 0;
     color: var(--color-primary);
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     font-size: var(--fs-body);
     text-transform: uppercase;
 }
@@ -2913,6 +3058,7 @@ input[type='radio']:focus {
     align-items: center;
     gap: 0.4rem;
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     font-size: var(--fs-2xs);
     letter-spacing: 0.08em;
 }
@@ -3373,7 +3519,7 @@ textarea:focus-visible,
 /* ==========================================================================
    KRT Loading Indicator (used by live-filter overlays, e.g. mission list).
    Respects corporate design: dark background, orange accent, uppercase
-   Audiowide label and no native browser UI.
+   Lato headline label and no native browser UI.
    ========================================================================== */
 .krt-loading-indicator {
     display: flex;

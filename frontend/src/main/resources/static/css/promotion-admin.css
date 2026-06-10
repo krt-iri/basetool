@@ -52,6 +52,7 @@
 
 .modal-title {
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     color: var(--color-primary);
     font-size: var(--fs-body);
@@ -304,6 +305,7 @@
     background: rgb(231 126 35 / 6%);
     color: var(--color-primary);
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     font-size: 0.75rem;
     letter-spacing: 0.05em;

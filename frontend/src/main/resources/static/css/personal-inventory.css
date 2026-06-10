@@ -1,7 +1,7 @@
 /*
  * KRT "DAS KARTELL" Corporate Design styling for the Personal Inventory feature.
  * Color tokens: --color-primary (#E77E23), --color-bg-dark-gray (#141414).
- * Typography: Audiowide for headlines (ALL CAPS), Lato for body.
+ * Typography: Lato only - headlines use weight (700) + ALL CAPS + tracking.
  * Touch targets >= 44px; responsive across 4 device classes.
  */
 
@@ -38,6 +38,7 @@
     border: 1px solid var(--color-primary, #e77e23);
     color: var(--color-primary, #e77e23);
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.18em;
     padding: 0.6rem 1rem;
@@ -420,6 +421,7 @@
     align-items: center;
     padding: 0.5rem 1.4rem;
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-size: var(--fs-xs);
@@ -452,6 +454,7 @@
 
 .krt-bp-section-title {
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--color-primary, #e77e23);
@@ -687,6 +690,7 @@
 
 .krt-bp-imp-group-title {
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--color-primary, #e77e23);
@@ -872,6 +876,7 @@
     padding: 0.25rem 0.6rem;
     border-bottom: 1px solid var(--color-gray-3, #282828);
     font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-size: var(--fs-xs);
@@ -1035,6 +1040,7 @@
         display: block;
         margin-bottom: 0.3rem;
         font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-size: var(--fs-xs);

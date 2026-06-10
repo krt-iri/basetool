@@ -93,7 +93,7 @@ don't use "tests pass" as a stand-in.
 ### UI / Frontend (if affected)
 
 - [ ] Layout works on Smartphone (<=768px), Tablet (768-1024px), Desktop (1024-1600px), and Ultra-wide (1600px+); touch targets >= 44px.
-- [ ] Styleguide respected (brand orange `#E77E23`, `Audiowide`/`Lato` fonts, department colors semantically correct).
+- [ ] Styleguide respected (brand orange `#E77E23`, `Lato`-only type — headlines = Lato Bold + uppercase, department colors semantically correct).
 - [ ] No `confirm()` / `alert()` / native browser dialogs — KRT modals/toasts instead.
 - [ ] Every user-visible string comes from `messages.properties` (de + en + fallback); umlauts in `.properties` as `\uXXXX`, in Markdown literal UTF-8.
 - [ ] DOM `data-version` attributes are consistently propagated after AJAX updates to **all** related elements (edit buttons, modals, action buttons in the same `<tr>`/container) — otherwise 409 on the next click.
