@@ -30,7 +30,7 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
 ## Frontend / UI & design system
 
 The UI is a **binding requirement**: follow the DAS KARTELL design system. The rules —
-brand colours, Audiowide/Lato typography, the authoritative department colours, the
+brand colours, Lato-only typography (headlines = Lato Bold + uppercase), the authoritative department colours, the
 square-first sci-fi HUD style, "no native browser dialogs", and the four responsive device
 classes — live in [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md). The
 visual source of truth is the design skill at

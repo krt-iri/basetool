@@ -69,10 +69,11 @@ tokens. The desktop app already mirrors these in `ui/Theme.kt`; keep them in syn
   house orange `#E77E23` (hover `#EEB64B`). Status: danger `#A3000A`,
   success `#239E33`, warning `#FFD23F`, info `#355DDC`. Department hues only where a
   department actually applies.
-- **Type.** Display **Audiowide**, UPPERCASE, tracking 0.05em — headings, tab/step
-  labels, status pills, the title bar. Body **Lato** Light 300, Bold 700 for
-  labels/emphasis. Numeric/ID/path readouts use Lato with **tabular figures**
-  (the system's "mono" stand-in).
+- **Type.** One typeface: **Lato**. Headlines are Lato **Bold 700**, UPPERCASE,
+  tracking 0.05em — headings, tab/step labels, status pills, the title bar (no
+  separate display face). Body Lato Light 300, Bold 700 for labels/emphasis.
+  Numeric/ID/path readouts use Lato with **tabular figures** (the system's "mono"
+  stand-in).
 - **Shape.** Square everywhere (radius 0). Only pills (chips/badges) and the radio
   control round. Cards are `.hud-box`: 1px `#282828` border + two diagonal orange
   corner brackets (TL + BR), translucent `rgba(20,20,20,0.5)` fill.
@@ -145,7 +146,7 @@ Header actions: ghost "Im Explorer zeigen" + outline "Erneut".
 ## 5. Screen specs — Refinery workflow (new, the core of #439)
 
 **5.1 Vorprüfung & Setup** — two side-by-side `PanelCard`s (header = surface fill +
-orange left bar + Audiowide title + status dot OK/Achtung/Fehlt), plus an SC-process
+orange left bar + Lato Bold uppercase title + status dot OK/Achtung/Fehlt), plus an SC-process
 banner and the footer CTA **„Weiter: Bilder laden"** (disabled until ready). All edge
 cases are first-class states (in the prototype a dashed "Demo-Zustand" switch flips
 between them; in the product they are driven by real detection):

@@ -5,7 +5,7 @@
  * typography stack, spacing) are defined in `frontend/src/main/resources/
  * static/css/styles.css :root`. This file mirrors the same values so the
  * Keycloak login renders identically to the in-app screens (same orange,
- * same dark background, same Audiowide headlines, same Lato body).
+ * same dark background, same Lato headlines (bold + uppercase), same Lato body).
  *
  * MAINTENANCE RULE: any styleguide change to a token must be reflected in
  * both files in the same commit. The `.btn` / `.btn-secondary` aliases at
@@ -21,15 +21,6 @@
  * swaps in the brand font once it has arrived, eliminating the FOIT blank
  * period that the default `auto` causes. Matches frontend/static/css/styles.css.
  */
-@font-face {
-    font-family: 'Audiowide';
-    src: url('../fonts/Audiowide-Regular.woff2') format('woff2'),
-         url('../fonts/Audiowide-Regular.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-
 @font-face {
     font-family: 'Lato';
     src: url('../fonts/Lato-Light.woff2') format('woff2'),
@@ -84,7 +75,7 @@
     --color-warning: #FFD23F;
     --color-info: #355DDC;
 
-    --font-headline: 'Audiowide', sans-serif;
+    --font-headline: 'Lato', sans-serif;
     --font-body: 'Lato', sans-serif;
 
     /* Glows — orange bloom for the primary CTA, red bloom for error fields. */
@@ -204,7 +195,7 @@ h1 {
     letter-spacing: 0.05em;
     text-align: center;
     margin-bottom: 30px;
-    font-weight: normal;
+    font-weight: 700;
 }
 
 .krt-input,
@@ -302,7 +293,7 @@ button.pf-v5-c-button.pf-m-primary {
     cursor: pointer;
     letter-spacing: 1px;
     transition: background-color 0.3s, box-shadow 0.3s, transform 0.1s;
-    font-weight: normal !important;
+    font-weight: 700 !important;
     appearance: none !important;
     -webkit-appearance: none !important;
     border-radius: 0 !important;
@@ -370,7 +361,7 @@ button[name="cancel-aia"] {
     cursor: pointer;
     letter-spacing: 1px;
     transition: background-color 0.3s, transform 0.1s;
-    font-weight: normal !important;
+    font-weight: 700 !important;
     text-decoration: none !important;
     text-align: center;
     display: inline-block;
@@ -495,7 +486,7 @@ input[type="checkbox"]:checked::after,
     letter-spacing: 0.05em;
     text-align: center;
     margin-bottom: 30px;
-    font-weight: normal;
+    font-weight: 700;
     font-size: 1.5em;
 }
 
@@ -946,7 +937,7 @@ select[aria-invalid="true"],
     cursor: pointer;
     letter-spacing: 1px;
     transition: background-color 0.3s, transform 0.1s;
-    font-weight: normal;
+    font-weight: 700;
     text-decoration: none;
     box-sizing: border-box;
     border-radius: 0;

@@ -38,83 +38,74 @@
     </div>
 
     <div class="hud-box mt-2">
-        <div style="margin-bottom: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; align-items: start;">
-            <div>
-                <strong th:text="#{orders.index.id}">ID</strong><br>
-                <span id="order-display-id" th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}"></span>
-            </div>
-            <div>
-                <strong th:text="#{orders.detail.createdAt}">Erstellt am</strong><br>
-                <span id="created-date-span" th:data-utc="${order.createdAt}"></span>
-            </div>
-            <div>
-                <strong th:text="#{orders.detail.elapsedDays}">Vergangene Tage</strong><br>
-                <span id="elapsed-days-container">
-                    <span id="elapsed-days-span" th:data-utc="${order.createdAt}"></span> <span th:text="#{orders.detail.days}">Tage</span>
-                </span>
-            </div>
-            <div>
-                <strong th:text="#{orders.detail.priority}">Priorität</strong><br>
-                <span th:text="${order.priority != null ? order.priority : '-'}"></span>
-            </div>
-            <div>
-                <strong th:text="#{orders.detail.responsible}">Bearbeitende Einheit</strong><br>
+        <dl class="kv-list kv-ruled" style="margin-bottom: 2rem;">
+            <dt th:text="#{orders.index.id}">ID</dt>
+            <dd><span id="order-display-id" th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}"></span></dd>
+
+            <dt th:text="#{orders.detail.createdAt}">Erstellt am</dt>
+            <dd><span id="created-date-span" th:data-utc="${order.createdAt}"></span></dd>
+
+            <dt th:text="#{orders.detail.elapsedDays}">Vergangene Tage</dt>
+            <dd><span id="elapsed-days-container">
+                <span id="elapsed-days-span" th:data-utc="${order.createdAt}"></span> <span th:text="#{orders.detail.days}">Tage</span>
+            </span></dd>
+
+            <dt th:text="#{orders.detail.priority}">Priorität</dt>
+            <dd th:text="${order.priority != null ? order.priority : '-'}">-</dd>
+
+            <dt th:text="#{orders.detail.responsible}">Bearbeitende Einheit</dt>
+            <dd>
                 <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
                       th:title="${order.responsibleOrgUnit.name()}"
                       th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
                 <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
-            </div>
-            <div>
-                <strong th:text="#{orders.detail.requesting}">Auftraggeber</strong><br>
+            </dd>
+
+            <dt th:text="#{orders.detail.requesting}">Auftraggeber</dt>
+            <dd>
                 <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
                       th:title="${order.requestingOrgUnit.name()}"
                       th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
                 <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
-            </div>
-            <div>
-                <strong th:text="#{orders.detail.handle}">Handle</strong><br>
-                <span th:text="${order.handle}"></span>
-            </div>
-            <div>
-                <strong th:text="#{orders.create.kind}">Auftragsart</strong><br>
-                <span th:switch="${order.type}" style="display: inline-block; margin-top: 0.25rem;">
-                    <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
-                    <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
-                </span>
-            </div>
-            <div>
-                <strong th:text="#{orders.index.status}">Status</strong><br>
-                <!-- DEBUG: Authorities: [[${#authentication.authorities}]] -->
-                <div sec:authorize="!hasRole('LOGISTICIAN')" style="margin-top: 0.25rem;">
-                    <span th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
-                </div>
-                <div sec:authorize="hasRole('LOGISTICIAN')" style="margin-top: 0.75rem;">
-                    <!-- DEBUG: LOGISTICIAN check passed -->
-                    <select id="status-select"
-                            name="status"
-                            data-trigger="od-update-status"
-                            th:data-order-id="${order.id}"
-                            th:data-version="${order.version}"
-                            style="background-color: var(--color-surface-input); color: white; border: 1px solid var(--color-gray-3);">
-                        <option value="OPEN" th:selected="${order.status == 'OPEN'}" th:text="#{status.OPEN}">Offen</option>
-                        <option value="IN_PROGRESS" th:selected="${order.status == 'IN_PROGRESS'}" th:text="#{status.IN_PROGRESS}">In Bearbeitung</option>
-                        <option value="REJECTED" th:selected="${order.status == 'REJECTED'}" th:text="#{status.REJECTED}">Abgelehnt</option>
-                        <option value="COMPLETED" th:selected="${order.status == 'COMPLETED'}" th:text="#{status.COMPLETED}">Abgeschlossen</option>
-                    </select>
-                </div>
-            </div>
-        </div>
+            </dd>
 
-        <div th:if="${order.comment != null and !order.comment.isEmpty()}" style="margin-bottom: 2rem;">
-            <strong th:text="#{orders.detail.comment}">Kommentar</strong><br>
-            <span th:text="${order.comment}" style="white-space: pre-wrap;"></span>
-        </div>
+            <dt th:text="#{orders.detail.handle}">Handle</dt>
+            <dd th:text="${order.handle}">handle</dd>
+
+            <dt th:text="#{orders.create.kind}">Auftragsart</dt>
+            <dd th:switch="${order.type}">
+                <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
+                <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
+            </dd>
+
+            <dt th:text="#{orders.index.status}">Status</dt>
+            <dd>
+                <span sec:authorize="!hasRole('LOGISTICIAN')" th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
+                <select sec:authorize="hasRole('LOGISTICIAN')"
+                        id="status-select"
+                        name="status"
+                        data-trigger="od-update-status"
+                        th:data-order-id="${order.id}"
+                        th:data-version="${order.version}"
+                        style="background-color: var(--color-surface-input); color: white; border: 1px solid var(--color-gray-3);">
+                    <option value="OPEN" th:selected="${order.status == 'OPEN'}" th:text="#{status.OPEN}">Offen</option>
+                    <option value="IN_PROGRESS" th:selected="${order.status == 'IN_PROGRESS'}" th:text="#{status.IN_PROGRESS}">In Bearbeitung</option>
+                    <option value="REJECTED" th:selected="${order.status == 'REJECTED'}" th:text="#{status.REJECTED}">Abgelehnt</option>
+                    <option value="COMPLETED" th:selected="${order.status == 'COMPLETED'}" th:text="#{status.COMPLETED}">Abgeschlossen</option>
+                </select>
+            </dd>
+
+            <th:block th:if="${order.comment != null and !order.comment.isEmpty()}">
+                <dt class="kv-row-wide" th:text="#{orders.detail.comment}">Kommentar</dt>
+                <dd class="kv-row-wide kv-row-self-start" style="white-space: pre-wrap;" th:text="${order.comment}">Kommentar</dd>
+            </th:block>
+        </dl>
 
         <!-- MATERIAL orders: the direct material-requirement table (click a row to expand the
              linked-inventory drill-down). ITEM orders render the ordered-items table plus the
              internal aggregated-materials view further below instead. -->
         <th:block th:if="${order.type != 'ITEM'}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
+        <h3 class="section-title" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders, detected by the backend
              populating openAmount (null on private squadron orders). -->
@@ -161,9 +152,9 @@
                             <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn-claim-edit" data-claim-control data-trigger="claim-edit"
-                                style="background:none;border:none;color:var(--color-primary);cursor:pointer;padding:0 0.2rem;min-height:auto;"
+                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
                                 th:title="#{orders.claim.edit}"
+                                th:aria-label="#{orders.claim.edit}"
                                 th:data-material-id="${mat.material.id}"
                                 th:data-quality="${mat.minQuality != null ? 'GOOD' : 'NONE'}"
                                 th:data-material-name="${mat.material.name}"
@@ -172,7 +163,7 @@
                                 th:data-claim-id="${c.id}"
                                 th:data-squadron-id="${c.claimingOrgUnit != null ? c.claimingOrgUnit.id : ''}"
                                 th:data-squadron-name="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : ''}"
-                                th:data-amount="${c.amount}">&#9998;</button>
+                                th:data-amount="${c.amount}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                     </span>
                 </td>
                 <td th:if="${showClaims}" data-claim-control>
@@ -206,7 +197,7 @@
              material, and (3) the internal aggregated-materials view (one row per material+quality,
              unit-formatted by quantityType). Mirrors the material layout as closely as possible. -->
         <th:block th:if="${order.type == 'ITEM'}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem;" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
+        <h3 class="section-title" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
         <div class="table-responsive">
         <table class="data-table">
             <thead>
@@ -256,7 +247,7 @@
             </ul>
         </div>
 
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
+        <h3 class="section-title" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders (backend populates
              openAmount; null on private squadron orders). -->
@@ -302,9 +293,9 @@
                             <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn-claim-edit" data-claim-control data-trigger="claim-edit"
-                                style="background:none;border:none;color:var(--color-primary);cursor:pointer;padding:0 0.2rem;min-height:auto;"
+                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
                                 th:title="#{orders.claim.edit}"
+                                th:aria-label="#{orders.claim.edit}"
                                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                 th:data-quality="${agg.qualityRequirement}"
                                 th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
@@ -313,7 +304,7 @@
                                 th:data-claim-id="${c.id}"
                                 th:data-squadron-id="${c.claimingOrgUnit != null ? c.claimingOrgUnit.id : ''}"
                                 th:data-squadron-name="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : ''}"
-                                th:data-amount="${c.amount}">&#9998;</button>
+                                th:data-amount="${c.amount}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                     </span>
                 </td>
                 <td th:if="${showClaims}" data-claim-control>
@@ -347,7 +338,7 @@
              swap; all controls use delegated data-trigger handlers, so they keep working after the
              section's outerHTML is replaced. -->
         <div id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
+        <h3 class="section-title" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
             <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
                 <li th:each="assignee : ${order.assignees}"
@@ -471,11 +462,11 @@
         <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
              phase; for now the material-specific handover protocol is hidden for item orders. -->
         <th:block th:if="${order.type != 'ITEM'}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
+        <h3 class="section-title" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button type="button" class="btn btn-outline" th:text="#{orders.detail.handover}" data-testid="order-handover-open" data-trigger="od-open-handover">Übergabe protokollieren</button>
-            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
+            <button type="button" class="btn btn-outline" data-testid="order-handover-open" data-trigger="od-open-handover"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.handover}">Übergabe protokollieren</span></button>
+            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
 
         <div th:if="${order.handovers != null and !order.handovers.isEmpty()}" class="mt-2">
@@ -508,14 +499,13 @@
                         </td>
                         <td sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
                             <button type="button"
-                                    class="btn btn-ghost"
-                                    style="min-height: 44px; font-size: 0.85rem; white-space: nowrap;"
+                                    class="btn btn-ghost btn-icon"
                                     th:data-order-id="${order.id}"
                                     th:data-handover-id="${ho.id}"
                                     th:data-handover-time="${ho.handoverTime}"
                                     th:title="#{orders.handover.report.download}"
-                                    th:text="#{orders.handover.report.download}"
-                                    data-trigger="od-download-report">Übergabeprotokoll herunterladen</button>
+                                    th:aria-label="#{orders.handover.report.download}"
+                                    data-trigger="od-download-report"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg></button>
                         </td>
                     </tr>
                     </tbody>
@@ -528,7 +518,7 @@
              backend decrements outstanding amounts and auto-completes the order once every line is
              fully delivered. Each persisted handover offers a PDF delivery note. -->
         <th:block th:if="${order.type == 'ITEM'}">
-        <h3 style="color: var(--color-gray-1); font-family: 'Lato', sans-serif; font-weight: 700; margin-bottom: 1rem; margin-top: 2rem;" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
+        <h3 class="section-title" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
 
         <!-- Handover toolbar — mirrors the MATERIAL handover toolbar by sitting the
              Materialsammelübersicht link next to the handover button. The toolbar itself always
@@ -536,8 +526,8 @@
              delivered; only the handover button is gated on outstanding lines (it hides once the
              order is fully delivered). -->
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn-outline" style="min-height: 44px;" th:text="#{orders.detail.itemHandover}" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal">Item-Übergabe protokollieren</button>
-            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost" style="min-height: 44px; display: inline-flex; align-items: center;" th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</a>
+            <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn-outline" style="min-height: 44px;" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</span></button>
+            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost" style="min-height: 44px; display: inline-flex; align-items: center;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
         <p sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:unless="${hasOutstandingItemLines}" class="text-muted" style="margin-top: 1rem;" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
 
@@ -566,14 +556,13 @@
                         </td>
                         <td sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
                             <button type="button"
-                                    class="btn btn-ghost"
-                                    style="min-height: 44px; font-size: 0.85rem; white-space: nowrap;"
+                                    class="btn btn-ghost btn-icon"
                                     th:data-order-id="${order.id}"
                                     th:data-handover-id="${ho.id}"
                                     th:data-handover-time="${ho.handoverTime}"
                                     th:title="#{orders.handover.report.download}"
-                                    th:text="#{orders.handover.report.download}"
-                                    data-trigger="od-download-item-report">Übergabeprotokoll herunterladen</button>
+                                    th:aria-label="#{orders.handover.report.download}"
+                                    data-trigger="od-download-item-report"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg></button>
                         </td>
                     </tr>
                     </tbody>

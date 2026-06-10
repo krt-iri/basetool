@@ -731,7 +731,7 @@ FreeMarker theme families:
 | `login/`   | The Keycloak login flow (`login.ftl`, OTP, password reset, …) | `keycloak` (Keycloak's classic theme)              | `de` (default), `en` |
 | `account/` | The user-facing self-service Account Console                  | `keycloak.v3` (Keycloak's modern v3 account theme) | `de` (default), `en` |
 
-Both flavours pull in the `Audiowide` and `Lato` font faces from
+Both flavours pull in the `Lato` font faces from
 `<flavour>/resources/fonts/` and a single CSS file
 (`login/resources/css/krt-login-v3.css` and
 `account/resources/css/krt-account-v3.css`) that overrides the parent

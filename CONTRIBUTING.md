@@ -552,9 +552,9 @@ of [`CLAUDE.md`](CLAUDE.md). Highlights:
 - **Brand colour** `#E77E23` (orange). Logo only in this orange, white,
   or black.
 - **Backgrounds** `#000000` / `#141414` (dark-mode aesthetic).
-- **Headlines** `Audiowide`, **uppercase only**, with display letter-spacing
-  (~0.05em) for legibility.
-- **Body** `Lato` (Light 300 standard, Bold 700 emphasis).
+- **Type** `Lato` only (Light 300 standard, Bold 700 emphasis). Headlines are
+  Lato **Bold + uppercase only** with display letter-spacing (~0.05em) — there is
+  no separate display face (Audiowide/Ethnocentric retired 2026-06).
 - **Department colours** are semantic — Combat red `#A3000A`,
   Sub-Radar/Covert blue `#355DDC`, Research cyan `#37BBC0`, Profit
   green `#239E33`, Search & Rescue yellow `#FFD23F`, Marine Corps
