@@ -83,7 +83,8 @@ class V108MigrationTest {
   @Test
   void v108AddsUniqueAndCheckConstraints() {
     // V146 dropped the original case-sensitive UNIQUE constraint and replaced it with a functional
-    // unique index on (source_system, LOWER(external_name)) — assert that case-folded index instead.
+    // unique index on (source_system, LOWER(external_name)) — assert that case-folded index
+    // instead.
     Integer uniqueCount =
         jdbcTemplate.queryForObject(
             "SELECT count(*) FROM pg_indexes "
