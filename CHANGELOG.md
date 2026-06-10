@@ -2,18 +2,21 @@
 
 ## [Unreleased]
 
+## [v0.4.11](https://github.com/krt-iri/basetool/releases/tag/v0.4.11) - 2026-06-10
+
+### Added
+
+- **Screenshot-Import auf der Raffinerieauftrag-Seite (Frontend, Phase 2 von Epic #439).** Auf „Neuer Raffinerieauftrag“ lässt sich jetzt die Extract-JSON-Datei des Desktop-Extractors hochladen: Das Formular wird serverseitig vorbefüllt, ein Banner fasst die Zuordnung zusammen, markierte Zeilen zeigen Konfidenz und Prüfhinweise, und nicht zugeordnete Materialien lassen sich per Vorschlags-Chip mit einem Klick zuweisen. Gespeichert wird unverändert erst über das geprüfte Formular.
+
+- **Die Detailansicht eines Item-Auftrags zeigt jetzt unter „Blaupausen-Verfügbarkeit" (direkt nach den Bearbeitern), welche Mitglieder der bearbeitenden Staffel/SK die Blaupausen für die geforderten Items besitzen** — je Person mit der Liste der vorhandenen Blaupausen und einer Abdeckungsübersicht je Item (Items, die niemand bauen kann, werden markiert). Diese Information ist nur für Mitglieder der bearbeitenden Staffel/SK (und Admins) sichtbar.
+
+- **Raffinerieaufträge können jetzt aus einem Screenshot-Extract vorbefüllt werden (Backend, Phase 1 von Epic #439).** Der neue Endpoint `POST /api/v1/refinery-orders/import-extract` nimmt das vom Desktop-Extractor erzeugte `RefineryExtract`-JSON entgegen, gleicht Materialien, Standort und Methode gegen die Stammdaten ab und liefert einen nicht gespeicherten Entwurf samt Prüfhinweisen (übersprungene/un-quotierte Zeilen, Summen-Check, Zuordnungsvorschläge) zurück. Migration V148 erweitert die Material-Alias-Tabelle um die Quelle `REFINERY_SCREEN`, die Admins unter „Material-Aliase“ pflegen können.
+
 ### Fixed
 
 - **In der Materialsammelübersicht eines Auftrags lösen das Setzen oder Entfernen des „Geliefert"-Häkchens sowie der Besitzer- und Standortwechsel keine Fehlermeldung mehr aus.** Diese Aktionen schickten kein CSRF-Token mit und wurden serverseitig mit HTTP 403 abgewiesen; das Token wird jetzt wie auf den übrigen Seiten mitgeschickt.
 
 - **Backend-Fehlermeldungen erscheinen jetzt in der Sprache des Benutzers.** Das Frontend reicht die gewählte UI-Sprache als `Accept-Language` an das Backend weiter; zuvor wurden vom Backend lokalisierte Hinweise (z. B. beim Screenshot-Import) immer in der Server-Standardsprache angezeigt.
-
-### Added
-
-- **Screenshot-Import auf der Raffinerieauftrag-Seite (Frontend, Phase 2 von Epic #439).** Auf „Neuer Raffinerieauftrag“ lässt sich jetzt die Extract-JSON-Datei des Desktop-Extractors hochladen: Das Formular wird serverseitig vorbefüllt, ein Banner fasst die Zuordnung zusammen, markierte Zeilen zeigen Konfidenz und Prüfhinweise, und nicht zugeordnete Materialien lassen sich per Vorschlags-Chip mit einem Klick zuweisen. Gespeichert wird unverändert erst über das geprüfte Formular.
-- **Die Detailansicht eines Item-Auftrags zeigt jetzt unter „Blaupausen-Verfügbarkeit" (direkt nach den Bearbeitern), welche Mitglieder der bearbeitenden Staffel/SK die Blaupausen für die geforderten Items besitzen** — je Person mit der Liste der vorhandenen Blaupausen und einer Abdeckungsübersicht je Item (Items, die niemand bauen kann, werden markiert). Diese Information ist nur für Mitglieder der bearbeitenden Staffel/SK (und Admins) sichtbar.
-
-- **Raffinerieaufträge können jetzt aus einem Screenshot-Extract vorbefüllt werden (Backend, Phase 1 von Epic #439).** Der neue Endpoint `POST /api/v1/refinery-orders/import-extract` nimmt das vom Desktop-Extractor erzeugte `RefineryExtract`-JSON entgegen, gleicht Materialien, Standort und Methode gegen die Stammdaten ab und liefert einen nicht gespeicherten Entwurf samt Prüfhinweisen (übersprungene/un-quotierte Zeilen, Summen-Check, Zuordnungsvorschläge) zurück. Migration V148 erweitert die Material-Alias-Tabelle um die Quelle `REFINERY_SCREEN`, die Admins unter „Material-Aliase“ pflegen können.
 
 ## [v0.4.10](https://github.com/krt-iri/basetool/releases/tag/v0.4.10) - 2026-06-10
 
