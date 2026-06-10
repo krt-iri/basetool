@@ -950,6 +950,36 @@ public class OwnerScopeService {
   }
 
   /**
+   * {@code true} iff the current principal may see the item job-order <em>blueprint-coverage</em>
+   * view of {@code jobOrderId} — who among the order's responsible (processing) squadron/SK owns
+   * the blueprints for the order's required items. This is <strong>stricter</strong> than {@link
+   * #canSeeJobOrder(UUID)}: an SK-responsible order is publicly readable (its detail page is shown
+   * to every profit-eligible member), but the coverage view exposes which named members hold which
+   * blueprints, so it is restricted to members of the responsible org unit itself.
+   *
+   * <p>The check delegates to {@link #canSeeSquadron(UUID)} on the order's responsible org unit,
+   * which evaluates the same effective-scope vector the staffel-scoped lists use: a non-admin
+   * matches only org units in their own membership set (whether the responsible unit is a Staffel
+   * or a Spezialkommando), an admin without an active pin matches every org unit, and an admin
+   * pinned to another org unit does not. There is therefore no SK-public escape here — a non-member
+   * viewing an SK order's detail page is denied the coverage view (HTTP 403), and the frontend
+   * simply omits the section. A {@code null} responsible org unit (legacy pre-backfill rows) and
+   * non-existent ids return {@code false}.
+   *
+   * @param jobOrderId the job order whose blueprint-coverage view the caller wants to read; never
+   *     {@code null}.
+   * @return {@code true} iff the caller is a member of the order's responsible org unit (or an
+   *     admin with matching scope).
+   */
+  public boolean canSeeJobOrderBlueprintOwners(@NotNull UUID jobOrderId) {
+    return jobOrderRepository
+        .findById(jobOrderId)
+        .map(JobOrder::getResponsibleOrgUnit)
+        .map(responsible -> canSeeSquadron(responsible.getId()))
+        .orElse(false);
+  }
+
+  /**
    * {@code true} iff the current principal may edit job order {@code jobOrderId} (Phase 3, #343).
    * Mirrors {@link #canSeeJobOrder(UUID)} but for writes:
    *

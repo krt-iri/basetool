@@ -124,6 +124,19 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       String productKey, Collection<String> ownerSubs);
 
   /**
+   * Bulk owner + product lookup — backs the item job-order blueprint-coverage view: given the
+   * Keycloak {@code sub}s of every member of the order's responsible org unit and the set of
+   * normalized product keys the order's item lines resolve to, returns exactly the owned-blueprint
+   * rows that match both, so the service can group them by owner and by product in one query.
+   *
+   * @param ownerSubs the Keycloak {@code sub}s of the responsible org unit's members
+   * @param productKeys the normalized product keys of the order's required items
+   * @return the matching rows (one per owning member × owned required product); never {@code null}
+   */
+  List<PersonalBlueprint> findAllByOwnerSubInAndProductKeyIn(
+      Collection<String> ownerSubs, Collection<String> productKeys);
+
+  /**
    * Returns the distinct Keycloak {@code sub} of every blueprint owner in the table. Backs the
    * admin "all org units" branch of the availability overview (#364, #371 fix): that scope spans
    * every owner — including a user with no org-unit membership (e.g. an admin without a Staffel) —

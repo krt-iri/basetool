@@ -29,6 +29,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
@@ -36,6 +37,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderItemBlueprintOwnersService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderItemHandoverReportService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderItemHandoverService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderItemService;
@@ -43,6 +45,8 @@ import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -96,6 +100,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderController {
   private final JobOrderService jobOrderService;
   private final JobOrderItemService jobOrderItemService;
+  private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   private final JobOrderItemHandoverService jobOrderItemHandoverService;
   private final JobOrderItemHandoverReportService jobOrderItemHandoverReportService;
   private final JobOrderHandoverService jobOrderHandoverService;
@@ -516,6 +521,37 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
     return jobOrderService.getJobOrderById(id);
+  }
+
+  /**
+   * Item-order blueprint-coverage view: which members of the order's responsible (processing)
+   * squadron/SK own the blueprints for the items the order requests, and which of those blueprints
+   * each member holds. Restricted to members of the responsible org unit (+ admins) by {@code
+   * canSeeJobOrderBlueprintOwners} — deliberately stricter than the order's own {@code
+   * canSeeJobOrder} visibility, so the named-member coverage is never exposed to a non-member who
+   * can otherwise read a public SK order. Empty for {@code MATERIAL} orders.
+   *
+   * @param id job-order id
+   * @return the blueprint-coverage view (required products with owner counts + owning members)
+   */
+  @GetMapping("/{id}/item-blueprint-owners")
+  @Operation(
+      summary = "Get item-order blueprint coverage",
+      description =
+          "Returns which members of the responsible squadron/SK own the blueprints for the"
+              + " order's required items. Members of the responsible org unit only.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Blueprint coverage for the item order."),
+    @ApiResponse(responseCode = "401", description = "Authentication required."),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Caller is not a member of the order's responsible squadron/SK."),
+    @ApiResponse(responseCode = "404", description = "Job order not found.")
+  })
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrderBlueprintOwners(#id)")
+  @Transactional(readOnly = true)
+  public JobOrderItemBlueprintOwnersDto getItemBlueprintOwners(@PathVariable UUID id) {
+    return jobOrderItemBlueprintOwnersService.getBlueprintOwners(id);
   }
 
   /**

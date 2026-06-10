@@ -32,12 +32,15 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.ClaimDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.GameItemReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderBlueprintOwnerDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemHandoverEntryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderItemMaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderRequiredBlueprintDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
@@ -582,5 +585,111 @@ class JobOrderItemDetailRenderTest {
 
     assertThat(html).as("no claims column on a private order").doesNotContain("Eingetragen");
     assertThat(html).as("no claim chips on a private order").doesNotContain("claim-chip");
+  }
+
+  private JobOrderDto oneLineItemOrder(UUID orderId) {
+    JobOrderItemDto line =
+        new JobOrderItemDto(
+            UUID.randomUUID(),
+            new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+            new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
+            3,
+            0,
+            null,
+            List.of(
+                new JobOrderItemMaterialDto(
+                    UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+            1L);
+    return new JobOrderDto(
+        orderId,
+        21,
+        null,
+        null,
+        "Handle",
+        null,
+        1,
+        "OPEN",
+        "ITEM",
+        List.of(),
+        List.of(line),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        Instant.now(),
+        1L);
+  }
+
+  @Test
+  void itemOrder_memberSeesBlueprintCoverageSection() throws Exception {
+    // Given: a member of the responsible org unit — the members-only coverage endpoint returns
+    // data.
+    // Alice owns the Sniper Rifle blueprint; the Optic Scope blueprint is a coverage gap (count 0).
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    JobOrderItemBlueprintOwnersDto coverage =
+        new JobOrderItemBlueprintOwnersDto(
+            List.of(
+                new JobOrderRequiredBlueprintDto("a03 sniper rifle", "A03 Sniper Rifle", 1),
+                new JobOrderRequiredBlueprintDto("a03 optic scope", "A03 Optic Scope", 0)),
+            List.of(new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"))));
+    when(backendApiClient.get(
+            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class)))
+        .thenReturn(coverage);
+
+    // When (German render so the gap marker assertion is locale-stable).
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: the coverage section, the owning member, the per-item coverage table and the gap marker
+    // for the unowned item all render.
+    assertThat(html)
+        .as("coverage section rendered")
+        .contains("data-testid=\"blueprint-owners-section\"");
+    assertThat(html).as("owning member display name").contains("Alice");
+    assertThat(html).as("owned-blueprint product badge").contains("A03 Sniper Rifle");
+    assertThat(html)
+        .as("per-item coverage row present")
+        .contains("data-testid=\"blueprint-coverage-row\"");
+    assertThat(html).as("coverage gap marker for the unowned item").contains("Keine Abdeckung");
+  }
+
+  @Test
+  void itemOrder_nonMember_blueprintCoverageSectionOmitted() throws Exception {
+    // Given: a non-member viewing a public SK item order — the members-only coverage endpoint is
+    // forbidden. The page controller swallows the failure; the section must be absent, not fatal.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    when(backendApiClient.get(
+            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class)))
+        .thenThrow(new RuntimeException("forbidden"));
+
+    // When
+    String html =
+        mockMvc
+            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: the detail page still renders, but without the members-only coverage section.
+    assertThat(html)
+        .as("coverage section omitted when the members-only endpoint is forbidden")
+        .doesNotContain("data-testid=\"blueprint-owners-section\"");
   }
 }

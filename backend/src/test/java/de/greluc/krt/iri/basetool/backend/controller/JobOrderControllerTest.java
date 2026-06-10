@@ -36,12 +36,14 @@ import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderHandoverDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.iri.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderHandoverService;
+import de.greluc.krt.iri.basetool.backend.service.JobOrderItemBlueprintOwnersService;
 import de.greluc.krt.iri.basetool.backend.service.JobOrderService;
 import de.greluc.krt.iri.basetool.backend.service.UserService;
 import java.time.Instant;
@@ -96,6 +98,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class JobOrderControllerTest {
 
   @Mock private JobOrderService jobOrderService;
+  @Mock private JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   @Mock private JobOrderHandoverService jobOrderHandoverService;
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
   @Mock private UserService userService;
@@ -171,6 +174,23 @@ class JobOrderControllerTest {
     assertThat(result.handovers()).isEmpty();
     assertThat(result.version()).isNull();
     verifyNoInteractions(userService, authHelperService);
+  }
+
+  // ── GET /api/v1/orders/{id}/item-blueprint-owners ────────────────────
+
+  @Test
+  void getItemBlueprintOwners_delegatesToServiceAndReturnsResult() {
+    UUID id = UUID.randomUUID();
+    JobOrderItemBlueprintOwnersDto coverage =
+        new JobOrderItemBlueprintOwnersDto(List.of(), List.of());
+    when(jobOrderItemBlueprintOwnersService.getBlueprintOwners(id)).thenReturn(coverage);
+
+    JobOrderItemBlueprintOwnersDto result = controller.getItemBlueprintOwners(id);
+
+    // The members-only gate lives in @PreAuthorize (canSeeJobOrderBlueprintOwners, covered by
+    // OwnerScopeServiceTest); the controller method itself is a thin pass-through to the service.
+    assertThat(result).isSameAs(coverage);
+    verify(jobOrderItemBlueprintOwnersService).getBlueprintOwners(id);
   }
 
   // ── GET /api/v1/orders (list) ────────────────────────────────────────

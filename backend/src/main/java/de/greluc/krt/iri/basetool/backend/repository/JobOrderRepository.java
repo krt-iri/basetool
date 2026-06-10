@@ -143,6 +143,27 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       Pageable pageable);
 
   /**
+   * Loads a single job order together with its ordered item lines and, for each line, the chosen
+   * blueprint and the requested game item, in one query. Backs the item blueprint-coverage view
+   * ({@code JobOrderItemBlueprintOwnersService}), which reads {@code item.blueprint.outputName}
+   * (the product-key source) and {@code item.gameItem.name} (the display label) for every line — so
+   * the dedicated fetch join avoids the per-line N+1 that the default {@link #findById(UUID)}
+   * entity graph (which does not fetch {@code items}) would incur. Empty for a {@code MATERIAL}
+   * order, whose {@code items} set is empty.
+   *
+   * @param id the job-order id
+   * @return the order with its items + their blueprint/game-item to-one relations eagerly loaded,
+   *     or empty when the id is unknown
+   */
+  @Query(
+      "SELECT o FROM JobOrder o"
+          + " LEFT JOIN FETCH o.items i"
+          + " LEFT JOIN FETCH i.blueprint"
+          + " LEFT JOIN FETCH i.gameItem"
+          + " WHERE o.id = :id")
+  Optional<JobOrder> findByIdWithItemBlueprints(@Param("id") UUID id);
+
+  /**
    * Returns the current maximum priority across all job-orders (used to assign the next priority
    * slot when creating a new order); {@link Optional#empty} when the table is empty.
    */
