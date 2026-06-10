@@ -412,6 +412,62 @@
         </div>
         </div>
 
+        <!-- Blueprint coverage (Blaupausen-Verfügbarkeit). ITEM orders only, and only populated when
+             the viewer is a member of the responsible squadron/SK — the backend gates the data
+             members-only (canSeeJobOrderBlueprintOwners), and JobOrderPageController omits the model
+             attribute when the call is forbidden, so a non-member viewing a public SK order never
+             sees this section. Person-centric primary list + a per-item coverage table. -->
+        <section
+          th:if="${itemBlueprintOwners != null}"
+          id="blueprint-owners-section"
+          class="bp-coverage"
+          aria-labelledby="blueprint-owners-heading"
+          data-testid="blueprint-owners-section"
+        >
+          <h3 id="blueprint-owners-heading" th:text="#{orders.detail.blueprintOwners.title}">Blaupausen-Verfügbarkeit</h3>
+          <p class="bp-coverage__subtitle" th:text="#{orders.detail.blueprintOwners.subtitle}">
+            Mitglieder der bearbeitenden Staffel/SK mit Blaupausen für die geforderten Items.
+          </p>
+
+          <ul class="bp-owner-list">
+            <li class="bp-owner" th:each="owner : ${itemBlueprintOwners.owners}">
+              <div class="bp-owner__head">
+                <span class="bp-owner__name" th:text="${owner.ownerName}">Name</span>
+                <span class="bp-owner__count" th:text="#{orders.detail.blueprintOwners.ownedCount(${owner.ownedProductNames.size()})}">3 Blaupausen</span>
+              </div>
+              <ul class="bp-owner__tags">
+                <li class="bp-tag" th:each="product : ${owner.ownedProductNames}" th:text="${product}">Produkt</li>
+              </ul>
+            </li>
+            <li class="bp-coverage__empty" th:if="${itemBlueprintOwners.owners.isEmpty()}" th:text="#{orders.detail.blueprintOwners.empty}">
+              Niemand aus der bearbeitenden Staffel/SK besitzt eine der benötigten Blaupausen.
+            </li>
+          </ul>
+
+          <div th:if="${!itemBlueprintOwners.requiredBlueprints.isEmpty()}">
+            <h4 th:text="#{orders.detail.blueprintOwners.coverage.title}">Abdeckung je Item</h4>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col" th:text="#{orders.detail.blueprintOwners.coverage.item}">Item</th>
+                    <th scope="col" th:text="#{orders.detail.blueprintOwners.coverage.owners}">Mitglieder mit Blaupause</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr th:each="rb : ${itemBlueprintOwners.requiredBlueprints}" data-testid="blueprint-coverage-row">
+                    <td th:text="${rb.productName}">Item</td>
+                    <td>
+                      <span th:if="${rb.ownerCount > 0}" th:text="${rb.ownerCount}">2</span>
+                      <span th:if="${rb.ownerCount == 0}" class="bp-gap" th:text="#{orders.detail.blueprintOwners.gap}">Keine Abdeckung</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
              phase; for now the material-specific handover protocol is hidden for item orders. -->
         <th:block th:if="${order.type != 'ITEM'}">
