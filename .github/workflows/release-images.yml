@@ -390,7 +390,34 @@ jobs:
       # uses the workflow's GitHub-OIDC token to mint a short-lived
       # Sigstore Fulcio cert and writes the signature to the Rekor
       # transparency log.
+      #
+      # Retry wrapper: the keyless path is a network round-trip to the
+      # Sigstore public-good services (Fulcio cert issuance + Rekor log
+      # upload). Those shared services intermittently return transient
+      # gRPC/HTTP2 failures — the one that failed the v0.4.10 frontend
+      # sign was `error signing bundle: stream error: stream ID 1;
+      # INTERNAL_ERROR; received from peer`. A single flake there would
+      # fail an otherwise-complete release whose images are already pushed
+      # to GHCR, leaving an unsigned (and therefore unpullable, since the
+      # server verifies signatures) tag. Signing is idempotent — re-signing
+      # the same digest just attaches another equivalent signature — so it
+      # is safe to retry with exponential backoff before giving up.
       - name: Sign image (keyless / OIDC)
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.inspect.outputs.digest }}
-        run: cosign sign --yes "$IMAGE"
+        run: |
+          set -eu
+          attempts=5
+          delay=10
+          for i in $(seq 1 "$attempts"); do
+            if cosign sign --yes "$IMAGE"; then
+              exit 0
+            fi
+            if [ "$i" -lt "$attempts" ]; then
+              echo "::warning::cosign sign attempt ${i}/${attempts} failed; retrying in ${delay}s" >&2
+              sleep "$delay"
+              delay=$((delay * 2))
+            fi
+          done
+          echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
+          exit 1
