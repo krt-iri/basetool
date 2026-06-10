@@ -47,7 +47,8 @@ import java.util.UUID;
  *     MATERIAL})
  * @param aggregatedMaterials derived material requirements grouped by material + quality (populated
  *     for {@code ITEM} orders; empty for {@code MATERIAL})
- * @param assignees users assigned to the order
+ * @param assignees assignees of the order, each carrying the user, their optional note and the
+ *     assignee edge's own version
  * @param handovers material-handover events (populated for {@code MATERIAL} orders)
  * @param itemHandovers item-handover events (populated for {@code ITEM} orders)
  * @param createdAt creation instant (UTC)
@@ -66,7 +67,7 @@ public record JobOrderDto(
     List<JobOrderMaterialDto> materials,
     List<JobOrderItemDto> items,
     List<AggregatedMaterialDto> aggregatedMaterials,
-    List<UserDto> assignees,
+    List<JobOrderAssigneeDto> assignees,
     List<JobOrderHandoverDto> handovers,
     List<JobOrderItemHandoverDto> itemHandovers,
     Instant createdAt,

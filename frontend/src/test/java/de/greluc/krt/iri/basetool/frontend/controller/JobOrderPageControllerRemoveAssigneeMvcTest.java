@@ -19,19 +19,21 @@
 
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,14 +46,17 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-Tests fuer den removeAssignee-POST-Pfad in {@link JobOrderPageController#removeAssignee}.
- *
- * <p>Testet, dass Logistiker Bearbeiter aus einem Auftrag entfernen koennen:
+ * MVC tests for the AJAX {@code DELETE /orders/{id}/assignees/{userId}} unenroll path in {@link
+ * JobOrderPageController#removeAssignee}. Since the Bearbeiter section moved to AJAX, the endpoint
+ * no longer redirects with a flash toast — it re-renders the {@code orders-detail ::
+ * assigneesSection} fragment and the page JS swaps it in place. The tests assert:
  *
  * <ul>
- *   <li>Logistiker kann Bearbeiter entfernen (success-Toast + Redirect).
- *   <li>Einfacher Member ohne Logistiker-Rechte erhaelt 403 Forbidden.
- *   <li>Backend-Fehler bei Logistiker → error-Toast + Redirect.
+ *   <li>A Logistician removing an assignee gets the re-rendered fragment (HTTP 200).
+ *   <li>A plain member may also call the endpoint ({@code isAuthenticated()}); the backend owns the
+ *       per-entry authorization.
+ *   <li>A backend failure is relayed as the matching HTTP status (here 500), so the page JS can
+ *       surface an error toast.
  * </ul>
  */
 @SpringBootTest
@@ -72,28 +77,42 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
+  /** Minimal order DTO with an empty assignee list, enough to render the section fragment. */
+  private JobOrderDto orderWithNoAssignees(UUID orderId) {
+    return new JobOrderDto(
+        orderId,
+        1,
+        null,
+        null,
+        null,
+        null,
+        null,
+        "OPEN",
+        "MATERIAL",
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        Instant.now(),
+        1L);
+  }
+
   @Test
   @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
-  void removeAssignee_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
-      throws Exception {
-    // Given
+  void removeAssignee_AsLogistician_reRendersSectionFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.delete(
             eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class)))
-        .thenReturn(null);
+        .thenReturn(orderWithNoAssignees(orderId));
 
-    // When
     mockMvc
-        .perform(
-            post("/orders/" + orderId + "/assignees/remove")
-                .with(csrf())
-                .param("userId", userId.toString()))
-        // Then
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/orders/" + orderId))
-        .andExpect(flash().attribute("successToast", "success.joborder.assignee.removed"));
+        .perform(delete("/orders/" + orderId + "/assignees/" + userId).with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("assignees-section")));
 
     verify(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class));
@@ -101,33 +120,25 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
 
   @Test
   @WithMockUser(roles = {"MEMBER"})
-  void removeAssignee_AsPlainMember_ShouldCallBackendAndRedirectWithSuccessToast()
-      throws Exception {
-    // Given
+  void removeAssignee_AsPlainMember_reRendersSectionFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.delete(
             eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class)))
-        .thenReturn(null);
+        .thenReturn(orderWithNoAssignees(orderId));
 
-    // When
+    // The frontend endpoint only requires isAuthenticated(); the backend owns the per-entry
+    // self-or-logistician rule and would return 403 there if violated.
     mockMvc
-        .perform(
-            post("/orders/" + orderId + "/assignees/remove")
-                .with(csrf())
-                .param("userId", userId.toString()))
-        // Then: Frontend-Endpunkt erlaubt isAuthenticated(); ob Backend 403 zurueckgibt,
-        // liegt in der Verantwortung des Backends. Das Frontend leitet immer weiter.
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/orders/" + orderId))
-        .andExpect(flash().attribute("successToast", "success.joborder.assignee.removed"));
+        .perform(delete("/orders/" + orderId + "/assignees/" + userId).with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("assignees-section")));
   }
 
   @Test
   @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
-  void removeAssignee_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
-    // Given
+  void removeAssignee_WhenBackendFails_relaysStatus() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
@@ -135,15 +146,8 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
             eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class)))
         .thenThrow(new BackendServiceException("Internal Server Error", null, 500));
 
-    // When
     mockMvc
-        .perform(
-            post("/orders/" + orderId + "/assignees/remove")
-                .with(csrf())
-                .param("userId", userId.toString()))
-        // Then
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/orders/" + orderId))
-        .andExpect(flash().attribute("errorToast", "error.joborder.assignee.remove"));
+        .perform(delete("/orders/" + orderId + "/assignees/" + userId).with(csrf()))
+        .andExpect(status().is5xxServerError());
   }
 }

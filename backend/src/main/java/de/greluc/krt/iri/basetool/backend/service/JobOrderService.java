@@ -24,6 +24,7 @@ import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
@@ -702,12 +703,18 @@ public class JobOrderService {
         jobOrderRepository
             .findById(jobOrderId)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+    boolean alreadyAssigned =
+        jobOrder.getAssignees().stream()
+            .anyMatch(a -> a.getUser() != null && a.getUser().getId().equals(userId));
+    if (alreadyAssigned) {
+      return mapToDtoWithStock(jobOrder);
+    }
     User user =
         userRepository
             .findById(userId)
             .orElseThrow(() -> new NotFoundException("User not found: " + userId));
-    jobOrder.getAssignees().add(user);
-    return mapToDtoWithStock(jobOrderRepository.save(jobOrder));
+    jobOrder.addAssignee(JobOrderAssignee.builder().user(user).build());
+    return mapToDtoWithStock(jobOrderRepository.saveAndFlush(jobOrder));
   }
 
   /**
@@ -777,12 +784,84 @@ public class JobOrderService {
         jobOrderRepository
             .findById(jobOrderId)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + userId));
-    jobOrder.getAssignees().remove(user);
-    return mapToDtoWithStock(jobOrderRepository.save(jobOrder));
+    jobOrder
+        .getAssignees()
+        .removeIf(a -> a.getUser() != null && a.getUser().getId().equals(userId));
+    return mapToDtoWithStock(jobOrderRepository.saveAndFlush(jobOrder));
+  }
+
+  /**
+   * Sets (creates or replaces) the note on a user's assignee entry. The note is the assignee's own
+   * free-text context — when they work on the order, which part they take. Optimistic-locked on the
+   * assignee edge's own version, so a stale client edit surfaces as HTTP 409 without ever bumping
+   * the parent order's version.
+   *
+   * @param jobOrderId job order primary key
+   * @param userId the assignee whose note is changed
+   * @param note the new note text (already length-validated at the controller boundary)
+   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
+   * @return the persisted order with the refreshed assignee list
+   * @throws NotFoundException when the order or the assignee entry is unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code version} is
+   *     stale
+   */
+  @Transactional
+  public JobOrderDto updateAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
+    return setAssigneeNote(jobOrderId, userId, note, version);
+  }
+
+  /**
+   * Clears the note on a user's assignee entry. Same optimistic-locking semantics as {@link
+   * #updateAssigneeNote}.
+   *
+   * @param jobOrderId job order primary key
+   * @param userId the assignee whose note is cleared
+   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
+   * @return the persisted order with the refreshed assignee list
+   * @throws NotFoundException when the order or the assignee entry is unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code version} is
+   *     stale
+   */
+  @Transactional
+  public JobOrderDto deleteAssigneeNote(UUID jobOrderId, UUID userId, Long version) {
+    return setAssigneeNote(jobOrderId, userId, null, version);
+  }
+
+  /**
+   * Shared implementation for the note set/clear endpoints: locates the assignee edge, enforces the
+   * supplied version against the edge's own {@code @Version}, mutates the note via dirty-checking
+   * and flushes so the returned DTO carries the freshly incremented edge version.
+   *
+   * @param jobOrderId job order primary key
+   * @param userId the assignee whose note is changed
+   * @param note the new note value, or {@code null} to clear it
+   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
+   * @return the persisted order with the refreshed assignee list
+   */
+  private JobOrderDto setAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(jobOrderId)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+    JobOrderAssignee assignee =
+        jobOrder.getAssignees().stream()
+            .filter(a -> a.getUser() != null && a.getUser().getId().equals(userId))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new NotFoundException(
+                        "Assignee not found on job order " + jobOrderId + ": " + userId));
+
+    if (version != null
+        && assignee.getVersion() != null
+        && !assignee.getVersion().equals(version)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          JobOrderAssignee.class, assignee.getId());
+    }
+
+    String trimmed = (note == null || note.isBlank()) ? null : note.strip();
+    assignee.setNote(trimmed);
+    return mapToDtoWithStock(jobOrderRepository.saveAndFlush(jobOrder));
   }
 
   /**

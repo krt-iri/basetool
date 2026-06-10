@@ -74,10 +74,12 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -996,24 +998,30 @@ public class JobOrderPageController {
   }
 
   /**
-   * Adds an assignee to the job order. The user-picker is fed by {@link UserProxyController}'s
-   * search endpoint.
+   * Adds an assignee to the job order and re-renders the Bearbeiter section as an AJAX fragment (no
+   * full-page reload). The user-picker is fed by {@link UserProxyController}'s search endpoint.
    *
-   * @return redirect to the order detail page
+   * @param id job-order id
+   * @param userId the user to add
+   * @param model the view model populated for the fragment render
+   * @param principal the authenticated caller
+   * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @PostMapping("/{id}/assignees")
   @PreAuthorize("isAuthenticated()")
   public String addAssignee(
-      @PathVariable UUID id, @RequestParam UUID userId, RedirectAttributes redirectAttributes) {
-    try {
-      backendApiClient.post(
-          "/api/v1/orders/" + id + "/assignees/" + userId, null, JobOrderDto.class);
-      redirectAttributes.addFlashAttribute("successToast", "success.joborder.assignee.added");
-    } catch (Exception e) {
-      log.error("Failed to add assignee", e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.assignee.add");
-    }
-    return "redirect:/orders/" + id;
+      @PathVariable UUID id,
+      @RequestParam UUID userId,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    JobOrderDto order =
+        callAssigneeMutation(
+            "add assignee",
+            () ->
+                backendApiClient.post(
+                    "/api/v1/orders/" + id + "/assignees/" + userId, null, JobOrderDto.class));
+    populateAssigneeSectionModel(model, principal, order);
+    return "orders-detail :: assigneesSection";
   }
 
   /**
@@ -1225,23 +1233,146 @@ public class JobOrderPageController {
   }
 
   /**
-   * Removes an assignee from the job order.
+   * Removes an assignee from the job order and re-renders the Bearbeiter section as an AJAX
+   * fragment (no full-page reload).
    *
-   * @return redirect to the order detail page
+   * @param id job-order id
+   * @param userId the user to remove
+   * @param model the view model populated for the fragment render
+   * @param principal the authenticated caller
+   * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
-  @PostMapping("/{id}/assignees/remove")
+  @DeleteMapping("/{id}/assignees/{userId}")
   @PreAuthorize("isAuthenticated()")
   public String removeAssignee(
-      @PathVariable UUID id, @RequestParam UUID userId, RedirectAttributes redirectAttributes) {
-    try {
-      backendApiClient.delete("/api/v1/orders/" + id + "/assignees/" + userId, JobOrderDto.class);
-      redirectAttributes.addFlashAttribute("successToast", "success.joborder.assignee.removed");
-    } catch (Exception e) {
-      log.error("Failed to remove assignee", e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.assignee.remove");
-    }
-    return "redirect:/orders/" + id;
+      @PathVariable UUID id,
+      @PathVariable UUID userId,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    JobOrderDto order =
+        callAssigneeMutation(
+            "remove assignee",
+            () ->
+                backendApiClient.delete(
+                    "/api/v1/orders/" + id + "/assignees/" + userId, JobOrderDto.class));
+    populateAssigneeSectionModel(model, principal, order);
+    return "orders-detail :: assigneesSection";
   }
+
+  /**
+   * Sets (creates or replaces) the current user's — or, for a Logistician+, any assignee's — note
+   * on the order, then re-renders the Bearbeiter section as an AJAX fragment. The backend enforces
+   * the self-or-logistician rule and the optimistic lock on the assignee edge (HTTP 409 on stale
+   * input, relayed here so the page JS can prompt a reload).
+   *
+   * @param id job-order id
+   * @param userId the assignee whose note is changed
+   * @param body the new note text + the assignee edge version last seen by the client
+   * @param model the view model populated for the fragment render
+   * @param principal the authenticated caller
+   * @return the {@code orders-detail :: assigneesSection} fragment view name
+   */
+  @PutMapping("/{id}/assignees/{userId}/note")
+  @PreAuthorize("isAuthenticated()")
+  public String setAssigneeNote(
+      @PathVariable UUID id,
+      @PathVariable UUID userId,
+      @RequestBody AssigneeNoteRequest body,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    JobOrderDto order =
+        callAssigneeMutation(
+            "set assignee note",
+            () ->
+                backendApiClient.put(
+                    "/api/v1/orders/" + id + "/assignees/" + userId + "/note",
+                    body,
+                    JobOrderDto.class));
+    populateAssigneeSectionModel(model, principal, order);
+    return "orders-detail :: assigneesSection";
+  }
+
+  /**
+   * Clears an assignee's note and re-renders the Bearbeiter section as an AJAX fragment. Same
+   * self-or-logistician + optimistic-lock semantics as {@link #setAssigneeNote}.
+   *
+   * @param id job-order id
+   * @param userId the assignee whose note is cleared
+   * @param version the assignee edge version last seen by the client
+   * @param model the view model populated for the fragment render
+   * @param principal the authenticated caller
+   * @return the {@code orders-detail :: assigneesSection} fragment view name
+   */
+  @DeleteMapping("/{id}/assignees/{userId}/note")
+  @PreAuthorize("isAuthenticated()")
+  public String deleteAssigneeNote(
+      @PathVariable UUID id,
+      @PathVariable UUID userId,
+      @RequestParam(required = false) Long version,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    String query = version != null ? "?version=" + version : "";
+    JobOrderDto order =
+        callAssigneeMutation(
+            "delete assignee note",
+            () ->
+                backendApiClient.delete(
+                    "/api/v1/orders/" + id + "/assignees/" + userId + "/note" + query,
+                    JobOrderDto.class));
+    populateAssigneeSectionModel(model, principal, order);
+    return "orders-detail :: assigneesSection";
+  }
+
+  /**
+   * Runs an assignee-section mutation against the backend and translates a backend failure into the
+   * matching HTTP status so the order-detail page JS can react (409 → reload prompt, 403 →
+   * forbidden toast, else generic error). Keeps the four AJAX endpoints free of duplicated
+   * try/catch.
+   *
+   * @param action short action label for the log line
+   * @param call the backend call returning the updated order
+   * @return the updated order on success
+   */
+  private JobOrderDto callAssigneeMutation(
+      String action, java.util.function.Supplier<JobOrderDto> call) {
+    try {
+      return call.get();
+    } catch (BackendServiceException bse) {
+      log.warn("Failed to {} (status {})", action, bse.getStatusCode());
+      throw new org.springframework.web.server.ResponseStatusException(
+          org.springframework.http.HttpStatus.valueOf(bse.getStatusCode()));
+    } catch (Exception e) {
+      log.error("Failed to {}", action, e);
+      throw new org.springframework.web.server.ResponseStatusException(
+          org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /**
+   * Populates the model attributes the {@code assigneesSection} fragment reads — the updated order,
+   * the caller's user id, the Logistician flag and (for Logisticians) the full user list backing
+   * the add-user picker. Shared by the four assignee AJAX endpoints and mirrors what {@link
+   * #viewOrderDetail} sets for the initial full-page render.
+   *
+   * @param model the view model to populate
+   * @param principal the authenticated caller
+   * @param order the freshly mutated order
+   */
+  private void populateAssigneeSectionModel(Model model, OidcUser principal, JobOrderDto order) {
+    model.addAttribute("order", order);
+    model.addAttribute("currentUserId", getCurrentUserId(principal));
+    boolean canAssign = isLogistician(principal);
+    model.addAttribute("isLogistician", canAssign);
+    model.addAttribute("users", canAssign ? fetchUsers() : new ArrayList<>());
+  }
+
+  /**
+   * Request body for the assignee-note PUT endpoint (frontend mirror of the backend record).
+   *
+   * @param note the new note text (blank/{@code null} clears the note)
+   * @param version the assignee edge version the client last saw
+   */
+  public record AssigneeNoteRequest(String note, Long version) {}
 
   /**
    * AJAX endpoint that lists inventory items eligible for linking to the given material on the

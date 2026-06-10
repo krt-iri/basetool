@@ -804,4 +804,71 @@ public class JobOrderController {
       throw new AccessDeniedException("Not allowed to modify other users' assignments");
     }
   }
+
+  /**
+   * Sets (creates or replaces) the note on an assignee entry. The note is the assignee's own
+   * context — when they work on the order, which part they take. Same self-or-logistician rule as
+   * {@link #addAssignee}: a user may edit only their own note, a Logistician+ any entry on an order
+   * they can see. Optimistic-locked on the assignee edge's own version (HTTP 409 on stale input),
+   * which never bumps the parent order's version.
+   *
+   * @param id job-order id
+   * @param userId the assignee whose note is changed
+   * @param body the new note + the edge version last seen by the client
+   * @param jwt caller's JWT
+   * @return the persisted DTO with the refreshed assignee list
+   */
+  @PutMapping("/{id}/assignees/{userId}/note")
+  @Operation(
+      summary = "Set an assignee note",
+      description = "Creates or replaces the note on a user's assignee entry.")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  public JobOrderDto setAssigneeNote(
+      @PathVariable UUID id,
+      @PathVariable UUID userId,
+      @RequestBody @Valid AssigneeNoteRequest body,
+      @AuthenticationPrincipal Jwt jwt) {
+    verifyAssigneeAccess(jwt, userId);
+    return jobOrderService.updateAssigneeNote(id, userId, body.note(), body.version());
+  }
+
+  /**
+   * Clears the note on an assignee entry. Same self-or-logistician rule and optimistic-locking
+   * semantics as {@link #setAssigneeNote}.
+   *
+   * @param id job-order id
+   * @param userId the assignee whose note is cleared
+   * @param version the assignee edge version last seen by the client, or {@code null} to skip the
+   *     check
+   * @param jwt caller's JWT
+   * @return the persisted DTO with the refreshed assignee list
+   */
+  @DeleteMapping("/{id}/assignees/{userId}/note")
+  @Operation(
+      summary = "Delete an assignee note",
+      description = "Clears the note on a user's assignee entry.")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  public JobOrderDto deleteAssigneeNote(
+      @PathVariable UUID id,
+      @PathVariable UUID userId,
+      @RequestParam(required = false) Long version,
+      @AuthenticationPrincipal Jwt jwt) {
+    verifyAssigneeAccess(jwt, userId);
+    return jobOrderService.deleteAssigneeNote(id, userId, version);
+  }
+
+  /**
+   * Request body for the assignee-note PUT endpoint.
+   *
+   * @param note the new note text (at most {@value
+   *     de.greluc.krt.iri.basetool.backend.model.JobOrderAssignee#NOTE_MAX_LENGTH} characters;
+   *     blank/{@code null} clears the note)
+   * @param version the assignee edge version the client last saw, or {@code null} to skip the
+   *     optimistic-lock check
+   */
+  public record AssigneeNoteRequest(
+      @jakarta.validation.constraints.Size(
+              max = de.greluc.krt.iri.basetool.backend.model.JobOrderAssignee.NOTE_MAX_LENGTH)
+          String note,
+      Long version) {}
 }

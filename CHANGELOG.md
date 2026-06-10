@@ -4,7 +4,15 @@
 
 ### Added
 
-- **Raffinerieaufträge können jetzt aus einem Screenshot-Extract vorbefüllt werden (Backend, Phase 1 von Epic #439).** Der neue Endpoint `POST /api/v1/refinery-orders/import-extract` nimmt das vom Desktop-Extractor erzeugte `RefineryExtract`-JSON entgegen, gleicht Materialien, Standort und Methode gegen die Stammdaten ab und liefert einen nicht gespeicherten Entwurf samt Prüfhinweisen (übersprungene/un-quotierte Zeilen, Summen-Check, Zuordnungsvorschläge) zurück. Migration V147 erweitert die Material-Alias-Tabelle um die Quelle `REFINERY_SCREEN`, die Admins unter „Material-Aliase“ pflegen können.
+- **Raffinerieaufträge können jetzt aus einem Screenshot-Extract vorbefüllt werden (Backend, Phase 1 von Epic #439).** Der neue Endpoint `POST /api/v1/refinery-orders/import-extract` nimmt das vom Desktop-Extractor erzeugte `RefineryExtract`-JSON entgegen, gleicht Materialien, Standort und Methode gegen die Stammdaten ab und liefert einen nicht gespeicherten Entwurf samt Prüfhinweisen (übersprungene/un-quotierte Zeilen, Summen-Check, Zuordnungsvorschläge) zurück. Migration V148 erweitert die Material-Alias-Tabelle um die Quelle `REFINERY_SCREEN`, die Admins unter „Material-Aliase“ pflegen können.
+
+## [v0.4.10](https://github.com/krt-iri/basetool/releases/tag/v0.4.10) - 2026-06-10
+
+## [v0.4.9](https://github.com/krt-iri/basetool/releases/tag/v0.4.9) - 2026-06-10
+
+### Added
+
+- **Bearbeiter eines Auftrags können jetzt eine Notiz zu ihrem Eintrag hinterlegen** — z. B. wann sie daran arbeiten oder welchen Teil sie übernehmen. Über ein Stift-Symbol neben dem Namen öffnet sich ein Dialog zur Eingabe (max. 500 Zeichen); ist eine Notiz vorhanden, lässt sie sich über ein Lösch-Symbol wieder entfernen. Notizen sind für alle sichtbar, die den Auftrag sehen; bearbeiten darf sie nur der Bearbeiter selbst oder ein Logistiker (und höher). Ein- und Austragen sowie das Speichern der Notiz laufen jetzt ohne Neuladen der Seite.
 
 ### Fixed
 
