@@ -185,10 +185,10 @@ migration — entries come from golden-set verification (#433) and live curation
 
 ## Out of scope
 
-- The not-yet-shipped phases of epic #439 (frontend upload UI #435, desktop extractor
-
-  # 436) — the forward plan in
-
+- The not-yet-shipped phases of the epic (the frontend upload UI
+  [#435](https://github.com/krt-iri/basetool/issues/435), the desktop extractor
+  [#436](https://github.com/krt-iri/basetool/issues/436) and the deferred phases 4/5) —
+  the forward plan in
   [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) governs
   them until they ship and mint their requirements here.
 
