@@ -28,7 +28,7 @@
 
     <div class="hud-box mt-2">
         <form id="filter-form" class="no-track" method="get" th:action="@{/orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
-            <span th:text="#{orders.index.filter.status}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1);">Status:</span>
+            <span th:text="#{orders.index.filter.status}" style="font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1);">Status:</span>
             <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{status.OPEN}">Offen</span>
@@ -50,7 +50,7 @@
                  union. Collapses silently to "all" for users with no active squadron context
                  (admins in "all squadrons" mode) — the backend filter is a display preference,
                  not an access-control gate. -->
-            <span th:text="#{orders.index.filter.scope}" style="font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1); margin-left: 1rem;">Staffel:</span>
+            <span th:text="#{orders.index.filter.scope}" style="font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1); margin-left: 1rem;">Staffel:</span>
             <label class="flex-gap-2xs">
                 <input type="radio" name="scope" value="mine" th:checked="${selectedScope == null or selectedScope == 'mine'}">
                 <span th:text="#{orders.index.filter.scope.mine}">Eigene Staffel</span>
