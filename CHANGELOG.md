@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Startseite zeigt unter „Nächster Einsatz" nur noch Einsätze mit dem Status „Geplant" oder „Aktiv".** Abgeschlossene oder abgebrochene Einsätze mit einem in der Zukunft liegenden Startzeitpunkt tauchen dort nicht mehr auf.
+
 ## [v0.4.7](https://github.com/krt-iri/basetool/releases/tag/v0.4.7) - 2026-06-09
 
 ### Fixed

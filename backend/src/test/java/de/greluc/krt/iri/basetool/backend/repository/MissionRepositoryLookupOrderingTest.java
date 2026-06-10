@@ -88,6 +88,37 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
+   * Verifies the home-page "next mission" finder skips terminal-status missions. A {@code
+   * COMPLETED} mission with an <em>earlier</em> future planned start must not be returned ahead of
+   * a later {@code PLANNED} one — proving the {@code status IN (PLANNED, ACTIVE)} clause filters
+   * before the {@code ORDER BY plannedStartTime ASC} tiebreaker. The fixtures use far-future (year
+   * 2099) planned starts and a matching lower bound so they dominate the shared test container
+   * regardless of what other suites have committed.
+   */
+  // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions
+  @Test
+  void findFirstByPlannedStartTimeAfterAndStatusIn_skipsTerminalStatusEvenWhenItSortsEarlier() {
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    Squadron squadron = new Squadron();
+    squadron.setName("Next-Status-" + tag);
+    squadron.setShorthand("NS" + tag.substring(0, 3));
+    OrgUnit owner = squadronRepository.save(squadron);
+
+    Instant lowerBound = Instant.parse("2099-01-01T00:00:00Z");
+    saveMission(owner, "Completed-Earlier", Instant.parse("2099-02-01T00:00:00Z"), "COMPLETED");
+    UUID plannedId =
+        saveMission(owner, "Planned-Later", Instant.parse("2099-03-01T00:00:00Z"), "PLANNED");
+
+    Mission next =
+        missionRepository
+            .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
+                lowerBound, List.of("PLANNED", "ACTIVE"))
+            .orElseThrow();
+
+    assertThat(next.getId()).isEqualTo(plannedId);
+  }
+
+  /**
    * Persists one {@code ACTIVE} mission so it is always returned by the lookup regardless of the
    * three-month terminal cut-off.
    *
@@ -97,9 +128,22 @@ class MissionRepositoryLookupOrderingTest {
    * @return the generated mission id.
    */
   private UUID saveMission(OrgUnit owner, String name, Instant plannedStartTime) {
+    return saveMission(owner, name, plannedStartTime, "ACTIVE");
+  }
+
+  /**
+   * Persists a mission with an explicit status, used by the next-mission status-filter test.
+   *
+   * @param owner the owning org unit (a {@code NOT NULL} FK on the mission row).
+   * @param name the mission display name used by the {@code name} tiebreaker.
+   * @param plannedStartTime the planned start, or {@code null} to exercise the NULLS-LAST branch.
+   * @param status the mission status (e.g. {@code PLANNED}, {@code ACTIVE}, {@code COMPLETED}).
+   * @return the generated mission id.
+   */
+  private UUID saveMission(OrgUnit owner, String name, Instant plannedStartTime, String status) {
     Mission mission = new Mission();
     mission.setName(name);
-    mission.setStatus("ACTIVE");
+    mission.setStatus(status);
     mission.setIsInternal(false);
     mission.setOwningOrgUnit(owner);
     mission.setPlannedStartTime(plannedStartTime);
