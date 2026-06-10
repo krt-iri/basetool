@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.9](https://github.com/krt-iri/basetool/releases/tag/v0.4.9) - 2026-06-10
+
 ### Added
 
 - **Bearbeiter eines Auftrags können jetzt eine Notiz zu ihrem Eintrag hinterlegen** — z. B. wann sie daran arbeiten oder welchen Teil sie übernehmen. Über ein Stift-Symbol neben dem Namen öffnet sich ein Dialog zur Eingabe (max. 500 Zeichen); ist eine Notiz vorhanden, lässt sie sich über ein Lösch-Symbol wieder entfernen. Notizen sind für alle sichtbar, die den Auftrag sehen; bearbeiten darf sie nur der Bearbeiter selbst oder ein Logistiker (und höher). Ein- und Austragen sowie das Speichern der Notiz laufen jetzt ohne Neuladen der Seite.
