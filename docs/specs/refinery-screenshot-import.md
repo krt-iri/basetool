@@ -164,7 +164,7 @@ applies unchanged when the reviewed draft is saved through the create path
 ### REQ-REFINERY-012 — Alias curation
 
 Refinery-screen aliases live in the existing `material_external_alias` table under the
-dedicated source `REFINERY_SCREEN` (V147 widened the V108 CHECK constraint). Admins
+dedicated source `REFINERY_SCREEN` (V148 widened the V108 CHECK constraint). Admins
 curate them at `/admin/material-aliases`. An alias whose target material fails the
 REQ-REFINERY-004 candidate gate is ignored by the import (logged, falls through to the
 next matching stage) — curation cannot bypass the create-path mirror. Resolution is
@@ -241,12 +241,12 @@ surfaces its `UNQUOTED_ORDER` finding danger-tinted. All strings live in
   table is the mapping).
 - `MaterialExternalAliasServiceTest` + `DatabaseIndexMigrationTest` cover
   REQ-REFINERY-010 (see its embedded acceptance list).
-- V147 migration + `MaterialExternalAliasSource.REFINERY_SCREEN` + the
+- V148 migration + `MaterialExternalAliasSource.REFINERY_SCREEN` + the
   `/admin/material-aliases` option cover REQ-REFINERY-012.
 - `RefineryImportProxyControllerTest` (relay, form mapping, error branches),
   `RefineryOrderCreateImportRenderTest` (full Thymeleaf render with flags, chips and
   banner) and the `RefineryImportE2eTest` file-upload flow
-  ([UC-23](../e2e-test/UC-23-refinery-import-extract.md)) cover REQ-REFINERY-013–016.
+  ([UC-24](../e2e-test/UC-24-refinery-import-extract.md)) cover REQ-REFINERY-013–016.
 
 ## Out of scope
 

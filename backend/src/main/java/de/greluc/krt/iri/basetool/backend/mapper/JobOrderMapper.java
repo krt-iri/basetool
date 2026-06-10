@@ -20,7 +20,9 @@
 package de.greluc.krt.iri.basetool.backend.mapper;
 
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
+import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderAssigneeDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.JobOrderMaterialDto;
 import java.util.Comparator;
@@ -74,6 +76,40 @@ public interface JobOrderMapper {
   @Mapping(target = "claims", ignore = true)
   @Mapping(target = "openAmount", ignore = true)
   JobOrderMaterialDto toDto(JobOrderMaterial material);
+
+  /**
+   * Maps a single {@link JobOrderAssignee} edge to its DTO: the assigned {@code user} routes
+   * through {@code UserMapper}, while {@code note} and the edge's own {@code version} map straight
+   * across.
+   *
+   * @param assignee the assignee edge to project; {@code null} returns {@code null}.
+   * @return the populated assignee DTO.
+   */
+  JobOrderAssigneeDto toDto(JobOrderAssignee assignee);
+
+  /**
+   * Maps a set of {@link JobOrderAssignee} edges into a DTO list sorted by the assignee's effective
+   * name (case-insensitive), so the Bearbeiter list renders in a stable order across reloads and
+   * fragment refreshes.
+   *
+   * @param assignees the assignee edges to project; {@code null} returns {@code null}.
+   * @return the sorted assignee DTO list.
+   */
+  default List<JobOrderAssigneeDto> mapAndSortAssignees(Set<JobOrderAssignee> assignees) {
+    if (assignees == null) {
+      return null;
+    }
+    return assignees.stream()
+        .map(this::toDto)
+        .sorted(
+            Comparator.comparing(
+                a ->
+                    (a.user() != null && a.user().effectiveName() != null)
+                        ? a.user().effectiveName()
+                        : "",
+                String.CASE_INSENSITIVE_ORDER))
+        .toList();
+  }
 
   /**
    * Maps a set of {@link JobOrderMaterial} children into a sorted DTO list: SCU-typed materials

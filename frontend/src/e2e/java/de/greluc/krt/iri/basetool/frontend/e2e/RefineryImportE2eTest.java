@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow (UC-23): upload a {@code RefineryExtract} JSON on the refinery create page, get
+ * Functional flow (UC-24): upload a {@code RefineryExtract} JSON on the refinery create page, get
  * the form pre-filled from the backend draft (#434/#435), resolve the one intentionally unmatched
  * row via its suggestion chip, save, and verify the order appears in the list.
  *

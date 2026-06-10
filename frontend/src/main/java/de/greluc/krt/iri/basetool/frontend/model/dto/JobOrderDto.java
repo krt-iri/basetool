@@ -42,7 +42,7 @@ public record JobOrderDto(
     List<JobOrderMaterialDto> materials,
     List<JobOrderItemDto> items,
     List<AggregatedMaterialDto> aggregatedMaterials,
-    List<UserDto> assignees,
+    List<JobOrderAssigneeDto> assignees,
     List<JobOrderHandoverDto> handovers,
     List<JobOrderItemHandoverDto> itemHandovers,
     Instant createdAt,

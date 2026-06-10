@@ -39,7 +39,7 @@ public enum MaterialExternalAliasSource {
    * Material name as the Star Citizen refinement-terminal SETUP screen renders it (verbatim,
    * including {@code "(ORE)"} suffixes or game-UI truncation). Consulted by the refinery screenshot
    * import (#434) as matching stage 2, after the canonical-name fold fails — admins curate these
-   * rows at {@code /admin/material-aliases}. The V147 migration widens the V108 CHECK constraint
+   * rows at {@code /admin/material-aliases}. The V148 migration widens the V108 CHECK constraint
    * for this value.
    */
   REFINERY_SCREEN

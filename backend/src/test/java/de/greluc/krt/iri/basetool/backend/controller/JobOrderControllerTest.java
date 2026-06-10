@@ -474,6 +474,75 @@ class JobOrderControllerTest {
     verify(jobOrderService, never()).removeAssignee(any(), any());
   }
 
+  // ── PUT/DELETE /api/v1/orders/{id}/assignees/{userId}/note ───────────
+
+  @Test
+  void setAssigneeNote_self_doesNotConsultRoleHelper() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    JobOrderDto persisted = jobOrderDto(jobOrderId);
+    JobOrderController.AssigneeNoteRequest body =
+        new JobOrderController.AssigneeNoteRequest("works Friday", 2L);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(jobOrderService.updateAssigneeNote(jobOrderId, callerId, "works Friday", 2L))
+        .thenReturn(persisted);
+
+    JobOrderDto result = controller.setAssigneeNote(jobOrderId, callerId, body, jwt);
+
+    assertThat(result).isSameAs(persisted);
+    verify(authHelperService, never()).isLogisticianOrAbove();
+  }
+
+  @Test
+  void setAssigneeNote_otherUser_logistician_isAllowed() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    JobOrderDto persisted = jobOrderDto(jobOrderId);
+    JobOrderController.AssigneeNoteRequest body =
+        new JobOrderController.AssigneeNoteRequest("note", null);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(jobOrderService.updateAssigneeNote(jobOrderId, targetUserId, "note", null))
+        .thenReturn(persisted);
+
+    JobOrderDto result = controller.setAssigneeNote(jobOrderId, targetUserId, body, jwt);
+
+    assertThat(result).isSameAs(persisted);
+  }
+
+  @Test
+  void setAssigneeNote_otherUser_nonLogistician_throws403() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    JobOrderController.AssigneeNoteRequest body =
+        new JobOrderController.AssigneeNoteRequest("note", null);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+
+    assertThatThrownBy(() -> controller.setAssigneeNote(jobOrderId, targetUserId, body, jwt))
+        .isInstanceOf(AccessDeniedException.class);
+    verify(jobOrderService, never()).updateAssigneeNote(any(), any(), any(), any());
+  }
+
+  @Test
+  void deleteAssigneeNote_otherUser_nonLogistician_throws403() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+
+    assertThatThrownBy(() -> controller.deleteAssigneeNote(jobOrderId, targetUserId, 1L, jwt))
+        .isInstanceOf(AccessDeniedException.class);
+    verify(jobOrderService, never()).deleteAssigneeNote(any(), any(), any());
+  }
+
   // ── POST /api/v1/orders/{id}/handovers ───────────────────────────────
 
   @Test

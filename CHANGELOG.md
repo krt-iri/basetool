@@ -5,11 +5,22 @@
 ### Added
 
 - **Screenshot-Import auf der Raffinerieauftrag-Seite (Frontend, Phase 2 von Epic #439).** Auf „Neuer Raffinerieauftrag“ lässt sich jetzt die Extract-JSON-Datei des Desktop-Extractors hochladen: Das Formular wird serverseitig vorbefüllt, ein Banner fasst die Zuordnung zusammen, markierte Zeilen zeigen Konfidenz und Prüfhinweise, und nicht zugeordnete Materialien lassen sich per Vorschlags-Chip mit einem Klick zuweisen. Gespeichert wird unverändert erst über das geprüfte Formular.
-- **Raffinerieaufträge können jetzt aus einem Screenshot-Extract vorbefüllt werden (Backend, Phase 1 von Epic #439).** Der neue Endpoint `POST /api/v1/refinery-orders/import-extract` nimmt das vom Desktop-Extractor erzeugte `RefineryExtract`-JSON entgegen, gleicht Materialien, Standort und Methode gegen die Stammdaten ab und liefert einen nicht gespeicherten Entwurf samt Prüfhinweisen (übersprungene/un-quotierte Zeilen, Summen-Check, Zuordnungsvorschläge) zurück. Migration V147 erweitert die Material-Alias-Tabelle um die Quelle `REFINERY_SCREEN`, die Admins unter „Material-Aliase“ pflegen können.
+- **Raffinerieaufträge können jetzt aus einem Screenshot-Extract vorbefüllt werden (Backend, Phase 1 von Epic #439).** Der neue Endpoint `POST /api/v1/refinery-orders/import-extract` nimmt das vom Desktop-Extractor erzeugte `RefineryExtract`-JSON entgegen, gleicht Materialien, Standort und Methode gegen die Stammdaten ab und liefert einen nicht gespeicherten Entwurf samt Prüfhinweisen (übersprungene/un-quotierte Zeilen, Summen-Check, Zuordnungsvorschläge) zurück. Migration V148 erweitert die Material-Alias-Tabelle um die Quelle `REFINERY_SCREEN`, die Admins unter „Material-Aliase“ pflegen können.
 
 ### Fixed
 
 - **Backend-Fehlermeldungen erscheinen jetzt in der Sprache des Benutzers.** Das Frontend reicht die gewählte UI-Sprache als `Accept-Language` an das Backend weiter; zuvor wurden vom Backend lokalisierte Hinweise (z. B. beim Screenshot-Import) immer in der Server-Standardsprache angezeigt.
+
+## [v0.4.10](https://github.com/krt-iri/basetool/releases/tag/v0.4.10) - 2026-06-10
+
+## [v0.4.9](https://github.com/krt-iri/basetool/releases/tag/v0.4.9) - 2026-06-10
+
+### Added
+
+- **Bearbeiter eines Auftrags können jetzt eine Notiz zu ihrem Eintrag hinterlegen** — z. B. wann sie daran arbeiten oder welchen Teil sie übernehmen. Über ein Stift-Symbol neben dem Namen öffnet sich ein Dialog zur Eingabe (max. 500 Zeichen); ist eine Notiz vorhanden, lässt sie sich über ein Lösch-Symbol wieder entfernen. Notizen sind für alle sichtbar, die den Auftrag sehen; bearbeiten darf sie nur der Bearbeiter selbst oder ein Logistiker (und höher). Ein- und Austragen sowie das Speichern der Notiz laufen jetzt ohne Neuladen der Seite.
+
+### Fixed
+
 - **Material-Aliasse (Admin → Material-Aliasse) sind jetzt unabhängig von Groß-/Kleinschreibung eindeutig.** Bisher konnten zwei Aliasse, die sich nur in der Schreibweise unterschieden (z. B. „STILERON (ORE)" und „Stileron (Ore)"), nebeneinander existieren und ließen den SC-Wiki-Abgleich mit einem Fehler (HTTP 500) abbrechen. Eine Migration entfernt vorhandene Duplikate (die älteste Zeile bleibt erhalten); das Anlegen eines solchen Duplikats meldet jetzt einen sauberen Konflikt (HTTP 409).
 
 ## [v0.4.8](https://github.com/krt-iri/basetool/releases/tag/v0.4.8) - 2026-06-10
