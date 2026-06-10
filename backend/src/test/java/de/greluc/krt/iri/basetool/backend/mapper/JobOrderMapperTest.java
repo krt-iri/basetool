@@ -22,6 +22,7 @@ package de.greluc.krt.iri.basetool.backend.mapper;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.iri.basetool.backend.model.JobOrder;
+import de.greluc.krt.iri.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.iri.basetool.backend.model.JobOrderStatus;
@@ -96,10 +97,15 @@ class JobOrderMapperTest {
     jm.setAmount(5.0);
     jm.setVersion(1L);
 
-    User assignee = new User();
+    User assigneeUser = new User();
+    assigneeUser.setId(UUID.randomUUID());
+    assigneeUser.setUsername("logist");
+    assigneeUser.setRoles(new HashSet<>());
+    JobOrderAssignee assignee = new JobOrderAssignee();
     assignee.setId(UUID.randomUUID());
-    assignee.setUsername("logist");
-    assignee.setRoles(new HashSet<>());
+    assignee.setUser(assigneeUser);
+    assignee.setNote("works on Friday");
+    assignee.setVersion(2L);
 
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(id);
@@ -144,10 +150,12 @@ class JobOrderMapperTest {
     assertEquals(5.0, matDto.amount());
     assertEquals("Gold", matDto.material().name());
 
-    // Assignees mapped via UserMapper
+    // Assignees mapped via UserMapper, carrying the per-edge note + version
     assertNotNull(dto.assignees());
     assertEquals(1, dto.assignees().size());
-    assertEquals("logist", dto.assignees().getFirst().username());
+    assertEquals("logist", dto.assignees().getFirst().user().username());
+    assertEquals("works on Friday", dto.assignees().getFirst().note());
+    assertEquals(2L, dto.assignees().getFirst().version());
 
     // Handovers — empty set should map to empty list, not null
     assertNotNull(dto.handovers());

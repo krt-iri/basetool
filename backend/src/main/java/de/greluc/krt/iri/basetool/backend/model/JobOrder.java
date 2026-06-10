@@ -29,8 +29,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -136,13 +134,19 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private Set<JobOrderMaterial> materials = new HashSet<>();
 
-  @ManyToMany(fetch = FetchType.LAZY)
-  @JoinTable(
-      name = "job_order_assignees",
-      joinColumns = @JoinColumn(name = "job_order_id"),
-      inverseJoinColumns = @JoinColumn(name = "user_id"))
+  /**
+   * Users who signed up to work on this order (the "Bearbeiter"), each as a {@link
+   * JobOrderAssignee} edge that additionally carries the assignee's optional note. A
+   * {@code @OneToMany} child collection (not a plain {@code @ManyToMany}) since the V147 promotion
+   * so the per-assignee note + version live on the edge.
+   */
+  @OneToMany(
+      mappedBy = "jobOrder",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
   @Builder.Default
-  private Set<User> assignees = new HashSet<>();
+  private Set<JobOrderAssignee> assignees = new HashSet<>();
 
   @OneToMany(
       mappedBy = "jobOrder",
@@ -185,6 +189,17 @@ public class JobOrder extends AbstractEntity<UUID> {
   public void addMaterial(JobOrderMaterial material) {
     materials.add(material);
     material.setJobOrder(this);
+  }
+
+  /**
+   * Adds an assignee edge and keeps the bidirectional back-reference in sync.
+   *
+   * @param assignee the {@link JobOrderAssignee} edge to attach; mutated so its {@code jobOrder}
+   *     back-link points at this order.
+   */
+  public void addAssignee(JobOrderAssignee assignee) {
+    assignees.add(assignee);
+    assignee.setJobOrder(this);
   }
 
   /**
