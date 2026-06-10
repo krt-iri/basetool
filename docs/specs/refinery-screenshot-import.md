@@ -12,9 +12,11 @@ that JSON, and the backend matches it against master data into a **non-persisted
 the user reviews before saving through the unchanged create path.
 
 This spec holds the requirements that are implemented on `main`. Phase 1 (#434, the
-backend import endpoint) minted `REQ-REFINERY-001`–`011`; later phases (frontend upload
-UI #435, desktop extractor #436) add their requirements here when they ship. The full
-forward plan, including not-yet-built phases, lives in
+backend import endpoint) minted `REQ-REFINERY-001`–`009`, `011` and `012`;
+`REQ-REFINERY-010` hardens the shared alias table the import consults (shipped
+separately, #517). Later phases (frontend upload UI #435, desktop extractor #436) add
+their requirements here when they ship. The full forward plan, including not-yet-built
+phases, lives in
 [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md).
 
 ## Requirements
@@ -122,19 +124,34 @@ confidence from the contract (never re-derived). `suggestions`
 `UNMATCHED_MATERIAL`/`LOW_CONFIDENCE_MATERIAL` issue when candidates score above the
 suggestion floor.
 
-### REQ-REFINERY-010 — Alias curation
+### REQ-REFINERY-010 — Material-alias uniqueness is case-insensitive
 
-Refinery-screen aliases live in the existing `material_external_alias` table under the
-dedicated source `REFINERY_SCREEN` (V146 widened the V108 CHECK constraint). Admins
-curate them at `/admin/material-aliases`. An alias whose target material fails the
-REQ-REFINERY-004 candidate gate is ignored by the import (logged, falls through to the
-next matching stage) — curation cannot bypass the create-path mirror. Resolution is
-deterministic as long as curated names stay unique case-insensitively: the DB unique
-constraint on `(source_system, external_name)` is case-sensitive while the lookup is
-case-insensitive (shared with the SC-Wiki sync), so admins must not create two aliases
-differing only in case; enforcing this DB-side is a tracked hardening follow-up. No
-aliases are seeded by migration — entries come from golden-set verification (#433) and
-live curation.
+At most one `material_external_alias` row may exist per
+`(source_system, LOWER(external_name))`. The uniqueness rule must match the resolution
+lookup (`findBySourceSystemAndExternalNameIgnoreCase`), which folds case because external
+systems drift casing across patch versions (the refinery screen shows `"STILERON (ORE)"`
+where the Wiki writes `"Stileron (Ore)"`).
+
+*Why:* the original V108 constraint was case-sensitive while the lookup was not. Two rows
+differing only in case could legally coexist, making the `Optional`-returning lookup throw
+`IncorrectResultSizeDataAccessException` → HTTP 500 on **every** import/sync touching that
+name. V146 de-duplicated existing case-variant rows (oldest row per group survives) and
+replaced the constraint with the functional unique index
+`uq_material_external_alias_source_lower_name`.
+
+**Acceptance**
+
+- [x] The DB rejects a second alias whose `(source_system, external_name)` differs from an
+  existing row only in case (V146 unique index on `(source_system, LOWER(external_name))`).
+- [x] `MaterialExternalAliasService.create` and `.update` detect a case-insensitive
+  duplicate pre-emptively and raise `DuplicateEntityException` → HTTP 409 (clean conflict
+  instead of a generic DB error); recasing a row's *own* name remains allowed.
+- [x] `resolveMaterialByAlias` can never observe two candidate rows, so the
+  `IncorrectResultSizeDataAccessException` failure mode is structurally impossible.
+
+**Enforced by:** `MaterialExternalAliasServiceTest`, `DatabaseIndexMigrationTest` ·
+**Code:** `MaterialExternalAliasService`, `MaterialExternalAliasRepository`,
+`V146__make_material_alias_uniqueness_case_insensitive.sql` · **Issues:** epic #439
 
 ### REQ-REFINERY-011 — Security
 
@@ -144,12 +161,37 @@ the caller. Because nothing is persisted, org-unit scoping is not consulted here
 applies unchanged when the reviewed draft is saved through the create path
 (REQ-REFINERY-002).
 
+### REQ-REFINERY-012 — Alias curation
+
+Refinery-screen aliases live in the existing `material_external_alias` table under the
+dedicated source `REFINERY_SCREEN` (V147 widened the V108 CHECK constraint). Admins
+curate them at `/admin/material-aliases`. An alias whose target material fails the
+REQ-REFINERY-004 candidate gate is ignored by the import (logged, falls through to the
+next matching stage) — curation cannot bypass the create-path mirror. Resolution is
+deterministic: REQ-REFINERY-010 enforces case-insensitive uniqueness DB-side and the
+service rejects case-variant duplicates with a clean 409. No aliases are seeded by
+migration — entries come from golden-set verification (#433) and live curation.
+
 ## Traceability
 
 - `RefineryImportServiceTest`, `RefineryImportControllerTest`,
   `RefineryExtractDtoJsonTest`, `MaterialNameCanonicalizerTest` cover
   REQ-REFINERY-001–009 and 011 (test names reference the behaviour, not the id; this
   table is the mapping).
-- V146 migration + `MaterialExternalAliasSource.REFINERY_SCREEN` + the
-  `/admin/material-aliases` option cover REQ-REFINERY-010.
+- `MaterialExternalAliasServiceTest` + `DatabaseIndexMigrationTest` cover
+  REQ-REFINERY-010 (see its embedded acceptance list).
+- V147 migration + `MaterialExternalAliasSource.REFINERY_SCREEN` + the
+  `/admin/material-aliases` option cover REQ-REFINERY-012.
+
+## Out of scope
+
+- The not-yet-shipped phases of epic #439 (frontend upload UI #435, desktop extractor
+
+  # 436) — the forward plan in
+
+  [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) governs
+  them until they ship and mint their requirements here.
+
+- `blueprint_external_alias` — the blueprint import keeps its own alias table and matching
+  rules, specced in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md).
 

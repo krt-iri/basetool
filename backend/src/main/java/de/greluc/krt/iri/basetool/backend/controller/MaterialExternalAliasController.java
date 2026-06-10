@@ -103,7 +103,8 @@ public class MaterialExternalAliasController {
 
   /**
    * Creates a new alias. The service validates that the referenced material exists and that the
-   * {@code (sourceSystem, externalName)} pair is unique.
+   * {@code (sourceSystem, externalName)} pair is unique — compared case-insensitively, matching the
+   * resolution lookup (REQ-REFINERY-010).
    *
    * @param request validated create payload
    * @return the persisted alias, 201 Created
@@ -113,7 +114,9 @@ public class MaterialExternalAliasController {
     @ApiResponse(responseCode = "201", description = "Alias created"),
     @ApiResponse(responseCode = "400", description = "Validation error"),
     @ApiResponse(responseCode = "404", description = "Linked material not found"),
-    @ApiResponse(responseCode = "409", description = "Duplicate alias for source / external name")
+    @ApiResponse(
+        responseCode = "409",
+        description = "Duplicate alias for source / external name (case-insensitive)")
   })
   @PostMapping
   public ResponseEntity<MaterialExternalAliasDto> createAlias(
@@ -136,7 +139,9 @@ public class MaterialExternalAliasController {
     @ApiResponse(responseCode = "200", description = "Alias updated"),
     @ApiResponse(responseCode = "400", description = "Validation error"),
     @ApiResponse(responseCode = "404", description = "Alias or linked material not found"),
-    @ApiResponse(responseCode = "409", description = "Stale version or duplicate external name")
+    @ApiResponse(
+        responseCode = "409",
+        description = "Stale version or duplicate external name (case-insensitive)")
   })
   @PutMapping("/{id}")
   public MaterialExternalAliasDto updateAlias(
