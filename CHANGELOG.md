@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.17](https://github.com/krt-iri/basetool/releases/tag/v0.4.17) - 2026-06-11
+
 ### Fixed
 
 - **Feinschliff der Einsatzseite nach Owner-Review:** Wirtschaft-Sprungkarte aus der Übersicht entfernt (Inhalt über die Tabs erreichbar), Hinweistexte auf dem Crew-Board besser lesbar (heller/kräftiger), die Auszahlungsart-Dropdowns werden bei halber 4K-Fensterbreite nicht mehr abgeschnitten, Raffinerieaufträge/Lagereinträge im Finanzen-Tab haben jetzt einen Panel-Hintergrund und die „Jetzt"-Buttons der Verwaltung brechen bei wenig Platz um statt abgeschnitten zu werden.
