@@ -175,8 +175,11 @@ public class RefineryImportProxyController {
    * Pours the backend draft into the create form, mirroring the field mapping the detail view
    * already uses for its edit form: ids out of the nested DTOs, the minute total split into the
    * hours/minutes inputs, money fields defaulted to {@code 0} (the form's convention). {@code
-   * startedAt} stays empty — the create flow defaults it to "now" at save time. An empty goods
-   * draft keeps the form's single seeded empty row so the template's row-clone JS keeps working.
+   * startedAt} carries the backend-derived capture time of the order's last screenshot as a UTC ISO
+   * instant the datetime splitter renders in browser-local time (REQ-REFINERY-017); when the
+   * extract carried no capture metadata it stays empty and the create flow defaults it to "now" at
+   * save time. An empty goods draft keeps the form's single seeded empty row so the template's
+   * row-clone JS keeps working.
    *
    * @param order the draft order (never {@code null})
    * @return the pre-filled form
@@ -185,6 +188,9 @@ public class RefineryImportProxyController {
     RefineryOrderForm form = new RefineryOrderForm();
     if (order.owner() != null) {
       form.setOwnerId(order.owner().id());
+    }
+    if (order.startedAt() != null) {
+      form.setStartedAt(order.startedAt().toString());
     }
     if (order.location() != null) {
       form.setLocationId(order.location().id());

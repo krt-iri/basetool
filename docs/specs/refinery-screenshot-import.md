@@ -15,7 +15,8 @@ This spec holds the requirements that are implemented on `main`. Phase 1 (#434, 
 backend import endpoint) minted `REQ-REFINERY-001`–`009`, `011` and `012`;
 `REQ-REFINERY-010` hardens the shared alias table the import consults (shipped
 separately, #517); Phase 2 (#435, the frontend upload + pre-filled review form) added
-`REQ-REFINERY-013`–`016`. The desktop extractor (#436, shipped 2026-06-10 as
+`REQ-REFINERY-013`–`016`; `REQ-REFINERY-017` (2026-06-11) derives the order start time
+from the screenshots' capture metadata across both repos. The desktop extractor (#436, shipped 2026-06-10 as
 `basetool-bp-extractor` PR #5) lives in its own repo; its binding desktop-side rules —
 the frozen read strategy, the deterministic confidence policy, the resource-safety
 guardrails — are recorded there (`CLAUDE.md`,
@@ -131,8 +132,12 @@ picker source); `rawMethodName` resolves case-insensitively against
 adds `UNRESOLVED_LOCATION` / `UNRESOLVED_METHOD` (WARNING) — the normal case for
 pre-cropped panel input, which never contains the terminal header. `expenses` and
 `durationMinutes` are copied verbatim; `status` defaults to `OPEN`; the owner defaults
-to the uploading user; `mission`, `startedAt`, `otherExpenses`, `oreSales` and the
-org-unit stamping stay with the create flow.
+to the uploading user; `startedAt` derives from the screenshot capture metadata
+(REQ-REFINERY-017); `mission`, `otherExpenses`, `oreSales` and the org-unit stamping
+stay with the create flow.
+
+*Amended 2026-06-11:* `startedAt` originally stayed with the create flow ("now" at save
+time); REQ-REFINERY-017 now derives it from the contract's per-image `capturedAt`.
 
 ### REQ-REFINERY-009 — Issue model (cross-module contract)
 
@@ -231,10 +236,15 @@ The pre-fill reuses the create page's existing flash-attribute mechanism — the
 handler already prefers a flashed `refineryOrderForm` over a fresh one — so no new
 client-side fill logic exists. Mapping rules: nested DTO ids into the form's id fields,
 `durationMinutes` split into the hours/minutes inputs, money fields defaulted to `0`,
-`status` defaulted to `OPEN`, `startedAt` left empty (the create flow defaults it to
-"now" at save time). An all-skipped draft keeps the form's single seeded empty goods row
-so the template's row-clone JS keeps working. Saving still goes exclusively through the
-unchanged create POST with full validation (REQ-REFINERY-002).
+`status` defaulted to `OPEN`, `startedAt` filled with the draft's capture-derived start
+time as a UTC ISO instant (the existing datetime splitter renders it in browser-local
+time; an absent value stays empty and the create flow defaults it to "now" at save
+time — REQ-REFINERY-017). An all-skipped draft keeps the form's single seeded empty
+goods row so the template's row-clone JS keeps working. Saving still goes exclusively
+through the unchanged create POST with full validation (REQ-REFINERY-002).
+
+*Amended 2026-06-11:* `startedAt` was originally always left empty; it now carries the
+REQ-REFINERY-017 capture-derived value when the extract provides one.
 
 ### REQ-REFINERY-015 — Review rendering
 
@@ -274,6 +284,48 @@ matched rows adds an explicit zero-matches hint to the banner; a fully un-quoted
 surfaces its `UNQUOTED_ORDER` finding danger-tinted. All strings live in
 `refineryImport.*` keys in the three frontend bundles (DE default + EN parity).
 
+### REQ-REFINERY-017 — Start time from screenshot capture metadata
+
+The order's start time is extracted from the screenshots' file metadata instead of being
+typed by hand. Added 2026-06-11 as the contract's first additive v1 field (the ADR-0008
+evolution rule: new optional fields land within `schemaVersion 1`; older producers and
+consumers stay compatible because the field is nullable and unknown JSON fields are
+ignored).
+
+- **Producer (extractor repo):** every `sourceImages[]` element may carry `capturedAt`,
+  a UTC ISO-8601 instant derived per image — a timestamp embedded in the file *name*
+  wins (it survives copies/downloads that reset file times; recognized: the Windows
+  Snipping Tool scheme `Screenshot 2026-06-01 213823.png` and the SC client scheme
+  `ScreenShot-2026-06-06_15-50-53-C28.jpg`), else the file's last-modified time, else
+  the field stays `null`. Name timestamps are interpreted in the extractor machine's
+  zone. EXIF is not read — neither producer of the field samples writes a capture tag.
+- **Backend:** `buildDraft` sets the draft's `startedAt` to the **latest** `capturedAt`
+  across `orders[0].sourceImages` — the user captures the SETUP panel right when
+  starting the order, and a scrolled multi-capture sequence ends closest to the actual
+  start. No `capturedAt` anywhere → draft `startedAt` stays `null`. The value is never
+  validated against "now" (clock skew on the capture machine is the user's to review).
+- **Frontend:** the proxy maps the draft's `startedAt` into the create form as the UTC
+  ISO instant; the existing datetime splitter renders it in browser-local time. An
+  empty value keeps the previous behaviour ("now" at save time, REQ-REFINERY-014).
+
+**Acceptance**
+
+- [x] An extract whose images carry `capturedAt` pre-fills the create form's start-time
+  field with the latest capture instant; images without the field do not disturb the
+  maximum.
+- [x] An extract without any `capturedAt` (older extractor) behaves exactly as before:
+  empty field, "now" default at save time — no 400, no issue flag.
+- [x] The §5 contract example carries the field and round-trips through both repos'
+  binding contract tests.
+
+**Enforced by:** `RefineryImportServiceTest` (latest-capture derivation, null-safety),
+`RefineryExtractDtoJsonTest`, `RefineryImportProxyControllerTest` (form mapping),
+`RefineryImportE2eTest` (UC-24 pre-fill assertion); extractor repo: `CaptureTimeTest`,
+`RefineryPipelineTest`, `RefineryExtractContractTest` · **Code:**
+`RefineryExtractImageDto`, `RefineryImportService#deriveStartedAt`,
+`RefineryImportProxyController#toForm`; extractor repo: `CaptureTime`,
+`RefineryPipeline` · **Issues:** epic #439
+
 ## Traceability
 
 - `RefineryImportServiceTest`, `RefineryImportControllerTest`,
@@ -288,6 +340,8 @@ surfaces its `UNQUOTED_ORDER` finding danger-tinted. All strings live in
   `RefineryOrderCreateImportRenderTest` (full Thymeleaf render with flags, chips and
   banner) and the `RefineryImportE2eTest` file-upload flow
   ([UC-24](../e2e-test/UC-24-refinery-import-extract.md)) cover REQ-REFINERY-013–016.
+- REQ-REFINERY-017 carries its own enforcement list (see its **Enforced by** line —
+  the producer half lives in the extractor repo's tests).
 
 ## Out of scope
 
