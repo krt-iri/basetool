@@ -4495,6 +4495,11 @@ textarea:focus-visible,
 /* ----------------------------------------------------------- EMPTY STATE -- */
 /* Centered placeholder for empty lists/collections: short reason + ONE next
    action (ghost or cta). Never leave a bare "Keine Einträge." table cell. */
+/* The hidden attribute must win over the flex display (UA [hidden] rule loses to a class). */
+.empty-state[hidden] {
+    display: none;
+}
+
 .empty-state {
     display: flex;
     flex-direction: column;
