@@ -95,12 +95,20 @@ forces correction in the review form.
 
 ### REQ-REFINERY-007 — Header-total checksum
 
-When the extract carries the panel-header totals, the backend reconciles them and flags
-a difference as `SUM_MISMATCH` (WARNING, "a scrolled screenshot may be missing"):
-`rawInManifestTotal` against the sum of **all** row input quantities and
-`rawToRefineTotal` against the sum of **refine-ON** row input quantities. These v1
-semantics are the golden-set hypothesis; Phase 0 (#433) freezes the exact rule and this
-requirement is amended if the verification disagrees.
+When the extract carries `rawToRefineTotal`, the backend applies the frozen Phase-0
+checksum (one-sided; extractor repo `PHASE0_FINDINGS.md` §7): `SUM_MISMATCH` (WARNING)
+is flagged only when the sum of the **refine-ON** row input quantities exceeds
+`rawToRefineTotal` by more than a ±1-per-row display-rounding tolerance, or when a
+single row alone exceeds it by more than 1 — both indicate a mis-read quantity or a
+duplicated capture. A shortfall is never flagged: the materials list is a scrolling
+~6-row viewport, so scrolled-out rows legitimately reduce the visible sum.
+`rawInManifestTotal` is **never** validated — its composition is not reliably
+reconstructible from a single frame (golden-set order a4 counted some refine-OFF rows
+but not others; a 2026-06 field sample excluded the inert row entirely).
+
+*Amended 2026-06-11:* the original v1 hypothesis (`rawInManifestTotal` = sum of all
+rows, hard equality on both totals) was refuted by the Phase 0 (#433) verification and
+a field sample; the rule above mirrors the extractor's frozen `Validation` semantics.
 
 ### REQ-REFINERY-008 — Order-level resolution
 

@@ -57,7 +57,7 @@ public enum ImportIssueCode {
   /** Whole order captured before GET QUOTE; nothing could be pre-filled. */
   UNQUOTED_ORDER,
 
-  /** A panel-header total does not reconcile with the rows read. */
+  /** The rows read sum past the TO REFINE panel total — mis-read quantity or duplicate capture. */
   SUM_MISMATCH,
 
   /** The extract carried more than one order; only the first was imported. */

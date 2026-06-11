@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Summen-Check des Raffinerie-Screenshot-Imports meldet keine falschen Warnungen mehr.** Er prüft jetzt die in Phase 0 verifizierte Regel: nur noch einseitig gegen die TO-REFINE-Kopfzeile (mit Rundungstoleranz von ±1 pro Zeile); IN MANIFEST wird nicht mehr geprüft, da das Spiel diese Summe nicht zuverlässig nachvollziehbar bildet (z. B. ohne inerte Materialien).
+
 ## [v0.4.13](https://github.com/krt-iri/basetool/releases/tag/v0.4.13) - 2026-06-10
 
 ### Changed
