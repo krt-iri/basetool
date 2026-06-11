@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:cdf72663-a36a-419d-9d84-5e2d6cb285e3" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:1365b283-774a-4218-b378-b2fb76919c0e" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-06-11T07:09:35Z</timestamp>
+    <timestamp>2026-06-11T13:24:52Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-iri/basetool/actions/runs/27330130675</url>
+          <url>https://github.com/krt-iri/basetool/actions/runs/27349956185</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-iri/basetool</url>
@@ -587,27 +587,27 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.github.spotbugs/spotbugs-annotations@4.10.2?type=jar">
       <group>com.github.spotbugs</group>
       <name>spotbugs-annotations</name>
-      <version>4.9.8</version>
+      <version>4.10.2</version>
       <description>Annotations the SpotBugs tool supports</description>
       <hashes>
-        <hash alg="MD5">d4c2e7bd090be697ad409a4e75684a94</hash>
-        <hash alg="SHA-1">ca4a2783a6123e67124fd7feb4caccd2e2ac9a73</hash>
-        <hash alg="SHA-256">6f69d6fe9c55a54dcb30e87d8fa2d5f52246af50d7a3445246d9539ef221be1c</hash>
-        <hash alg="SHA-512">a2dfdd7972db1adc141a845bc8a3fb81325d987dff1237017f58120f7caa6f1be5bdf2ea79bac7fc2db700596e62bb253e2b0762939f72905feb59fd6e29eaeb</hash>
-        <hash alg="SHA-384">195ffc652c90e70b81a2382ad6c45ea62685efdd3a2275253578ff4bdd31ef13b58826a3660e6d790302d44c3d113c78</hash>
-        <hash alg="SHA3-384">9fc94170c4172fd3e503c426b7d0a9ee0ada37b578acd0ff359b9e4f34b5a70ca82db9aad4820803d19b1040d3a9ec72</hash>
-        <hash alg="SHA3-256">b7763028ce7f89bf44d27fb71570cb7bc66a8cfc6c202813bbf9e37df3983ab8</hash>
-        <hash alg="SHA3-512">2afeca14b480b86e836e122e30c6db85231938332c59e706b70eb6a499bbad6a32676e4416a6d2f56e92588772de13640b84907826eff4817d172b6cc969a72a</hash>
+        <hash alg="MD5">a6d1c0f0ee39dcba6841ba2c8059f213</hash>
+        <hash alg="SHA-1">13f9ddf33804e6f69e7aa37b0bfd071b1bf397da</hash>
+        <hash alg="SHA-256">5335e5107c74cdd62ef96a7908066c51abb3de63b1ebf99dc953c2c7d0747678</hash>
+        <hash alg="SHA-512">46fdb78b609c5d909677c1d99347ce093d3b842ff003d7d281a9dce251dbd5063a82f0090e04c0762d7fd6fb59d4bb50f5c7bf7a6f50d9e856c22392873f7272</hash>
+        <hash alg="SHA-384">720b62a2721550545cce0794605d2f13fabddb9685f7d15b51492cfd383fb73df962e17b5da360b48db2c0752710511d</hash>
+        <hash alg="SHA3-384">dce389e17cf58fc3727a16c3e18e0b5387bb3bf7aa52a6484b328fb23a023258eca931eb8d9ecad1e702150b11f6aace</hash>
+        <hash alg="SHA3-256">537abe14301fbdb7354e634a512399e8cf6652d01332536b8cc819606d1e029b</hash>
+        <hash alg="SHA3-512">38f9db77eeb38f5f1d8c1df5d86d978f25e43023c911b0a13c3b86488870e27d0bd22893ab7dc231ce521b5a5126065c0a7fa45c0d7466b2b37208d8d60db247</hash>
       </hashes>
       <licenses>
         <license>
           <id>LGPL-2.1-only</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar</purl>
+      <purl>pkg:maven/com.github.spotbugs/spotbugs-annotations@4.10.2?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -618,27 +618,27 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar">
       <group>com.github.spotbugs</group>
       <name>spotbugs</name>
-      <version>4.9.8</version>
+      <version>4.10.2</version>
       <description>SpotBugs: Because it is easy!</description>
       <hashes>
-        <hash alg="MD5">a137de2cd433fbf0d42205650c7b0eeb</hash>
-        <hash alg="SHA-1">661dba9d1f4d027591b2b4102e0f493bb4c0691b</hash>
-        <hash alg="SHA-256">4469bc080afe7cd2290a20bf63e28392b80abcc7c7ace33c8f55da52a17c7ca5</hash>
-        <hash alg="SHA-512">2699f1cc702c30d458e8d22b024d0eb9be6707e6b4281a7fe0d0e90f99402baacb9ab6804582d76433887dd5bd4f8071e6fda0cd203fa94e45c4bb908b7c72b4</hash>
-        <hash alg="SHA-384">0276b63c76a34a60ebe9e73c2d0d9d1eb72576e3eb6350d7f553015a2a35ab624247570b11f8b0cc9bd36a6c7fbe8127</hash>
-        <hash alg="SHA3-384">bf053962a161b2be9155b38fb0d92d483f55b19e3024410107a0d1a65a7d7bb7aeff153ccd14a108b78b231697cb3780</hash>
-        <hash alg="SHA3-256">fbe4c7d185bab0e7d59fd131f46de7e40e9f2f03d8305c835be03435d1bebcf7</hash>
-        <hash alg="SHA3-512">6d0ee1c5441c03489f85cdd84467863195da9fd70003e73c5f307834ff208da5ef4a97b09d749519e5ad01c5ebe5be0a7fc428fbe410b59bbca506c038d5bb59</hash>
+        <hash alg="MD5">6605058bb309b22d32da2492873eae19</hash>
+        <hash alg="SHA-1">58f176483ca305ecb02bbdf748f7a10ce75520bc</hash>
+        <hash alg="SHA-256">46f5c9524c08d027cf96cda2704e5d8ded633626b94a19dc9ced3ae67595d80b</hash>
+        <hash alg="SHA-512">e9b5b2934ca5ef9b14e5b997855620c60923b3d4c96896fd784f679bc3dcfe9cf19f3fc64da6300949277a71c14d559909305688cdc10967796b27a3ba1a173b</hash>
+        <hash alg="SHA-384">4ffe7db26b81c7f0ea6b0fb818bc5a411fa300d3405ea1f253b6225afa9ed17ac242ed2543d432bcefcf1309b997798c</hash>
+        <hash alg="SHA3-384">7c187cd556fdd1f09235d402f989ae9c76f8ca549530f29ef0880142ae1eb7139192b579de230cacceeea03571271591</hash>
+        <hash alg="SHA3-256">5da9f2aaf54fe9c799240050ab8760ae895de13bd485a1ebf689df7831a40feb</hash>
+        <hash alg="SHA3-512">384331018323c585f74b4f388fc18d28427f48f2a4c14ba5c1cf178df01ac6ae95bc8249b7f6eb8946e9a19c93ec86cd0006afd5e10fdfbc82122816bd32effc</hash>
       </hashes>
       <licenses>
         <license>
           <id>LGPL-2.1-only</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar</purl>
+      <purl>pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -1526,6 +1526,45 @@ file comparators, endian transformation classes, and much more.</description>
         </license>
       </licenses>
       <purl>pkg:maven/commons-io/commons-io@2.20.0?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="build-system">
+          <url>https://github.com/apache/commons-io/actions</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://issues.apache.org/jira/browse/IO</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://gitbox.apache.org/repos/asf?p=commons-io.git</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/commons-io/commons-io@2.21.0?type=jar">
+      <group>commons-io</group>
+      <name>commons-io</name>
+      <version>2.21.0</version>
+      <description>The Apache Commons IO library contains utility classes, stream implementations, file filters,
+file comparators, endian transformation classes, and much more.</description>
+      <hashes>
+        <hash alg="MD5">bc7e020873f086ede85f97bd9f013215</hash>
+        <hash alg="SHA-1">52a6f68fe5afe335cde95461dd5c3412f04996f7</hash>
+        <hash alg="SHA-256">7d643a2afea8b058b762aa6fb90e5b256f6c729739f8b3784c3370ddc609e88d</hash>
+        <hash alg="SHA-512">7ac1aa4d834cd7cdecaee223a64c63d481810c73dfdb5109f402234a05cadf754e414cead99072f5140d4f7042ee084161935fb28129a631d908d989c5bbac5d</hash>
+        <hash alg="SHA-384">97c07e5c4f62484c98b6777f63ab032ee09eeb1c9ddae8332890126df9c665afb9cd554db02495171738720d23c53732</hash>
+        <hash alg="SHA3-384">e3e44c9f4a5f4075fb62a438a84015fe2abf878e9793835a7816dc3c35141bb79fe96dfdc6bb5aef96b7c5bbbcf453c1</hash>
+        <hash alg="SHA3-256">1f8f4ce25b7169452dabb10ce843b3246378ea55c1971acd2300e417747b3a68</hash>
+        <hash alg="SHA3-512">175630adf10305aeb31d737f833021a25582ffe2ef66fda6e7f694598af9c68cebbd205ade469eca4faaf6b9d349244289e62179d9cf48d93427090e2c008cf8</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+          <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/commons-io/commons-io@2.21.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
@@ -3113,20 +3152,20 @@ There are currently about 600 StringTemplate source downloads a month.</descript
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.apache.bcel/bcel@6.11.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.apache.bcel/bcel@6.12.0?type=jar">
       <group>org.apache.bcel</group>
       <name>bcel</name>
-      <version>6.11.0</version>
-      <description>Apache Commons Bytecode Engineering Library</description>
+      <version>6.12.0</version>
+      <description>The Commons Byte Code Engineering Library (BCEL) is designed to provide users with a convenient way to analyze, create, and manipulate compiled .class files.</description>
       <hashes>
-        <hash alg="MD5">6925a5d8d522c0ae44f88631a9b99c99</hash>
-        <hash alg="SHA-1">8d800a87a4a7e09b1d3e634725806faf11a05006</hash>
-        <hash alg="SHA-256">5901a6439ffb2aff0eb533cfab4dc9c054d143e4caa1bd33460efaa575f7cfdb</hash>
-        <hash alg="SHA-512">280b7f9689f6ab5a8ce7f24966a6874e5fb486fc799d576c40d3036988e04ec4be102bc26bce0dd91ef13640d4289d3d2d1ea2a81106336db9fd8786320e2cc6</hash>
-        <hash alg="SHA-384">ec035caa142340846955dd9903f6b2881fb6734205c8d2dae00f4ab85085421d91192cf4e8c729ad44c420a6c4746084</hash>
-        <hash alg="SHA3-384">42a54c04fad68db933604b784ac264f8959b6cec7de4b5689547e5cdbaf3dfd019355d69dd10d7844059488f8cba9395</hash>
-        <hash alg="SHA3-256">512ca3263c88b3452e40fda46b69c9c2ecc5c194b3a7a4d1f70f920ce26b191c</hash>
-        <hash alg="SHA3-512">7b048c6a9f76f2b11330ed31114d211222206abef74b36086c7c92a77ff687bcffa1b93cad5868a27790f6d2dff92775ce437e571778529867c1d2b03d75afb4</hash>
+        <hash alg="MD5">f7db448193f858a275e57d050a125937</hash>
+        <hash alg="SHA-1">a1dfc639fd6914d187b16a92ee00e84adc22a9a3</hash>
+        <hash alg="SHA-256">012639e3d2a3079f4c9c1350f18202cea83a7112ef210e50c93b0b771ad5d3af</hash>
+        <hash alg="SHA-512">df32314412348db9df494e717cc1130531afdf337dcb94d7c5a0ab56b9326309d8d58800bb7135fa7b01346af1120ada3654f7b60b368bbe8f20678cc1332212</hash>
+        <hash alg="SHA-384">bbf5c4771d41ee4cab9a9a34ad5975d4e31dfa865adf9afcffe447f5bba6e010e5b4976e9aca5ca1774b50d2c8fefc8a</hash>
+        <hash alg="SHA3-384">fc695e8681808d94fb5269ecb88cb9977e1e66d385c0b7cbbe888ada1b9fbfe33001faec682f66e0ff4b5fb3bb9236e7</hash>
+        <hash alg="SHA3-256">c8ef1467086b1d76b57decf10a9b12c3c3f79d04ac105e1814d3c5a21b5e7ea7</hash>
+        <hash alg="SHA3-512">b70686d127e8341e94e5ba0786892d98e7d59d17d3cd216acdeb0e83b72f65e255a8d7a48cb731a2c12ff6fd42e14694d16ad9f27b155ccb3f1a14b0a399a9fe</hash>
       </hashes>
       <licenses>
         <license>
@@ -3134,7 +3173,7 @@ There are currently about 600 StringTemplate source downloads a month.</descript
           <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.apache.bcel/bcel@6.11.0?type=jar</purl>
+      <purl>pkg:maven/org.apache.bcel/bcel@6.12.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
@@ -3261,6 +3300,45 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         </license>
       </licenses>
       <purl>pkg:maven/org.apache.commons/commons-text@1.14.0?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="build-system">
+          <url>https://github.com/apache/commons-text/actions</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://issues.apache.org/jira/browse/TEXT</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://gitbox.apache.org/repos/asf?p=commons-text.git</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.apache.commons/commons-text@1.15.0?type=jar">
+      <group>org.apache.commons</group>
+      <name>commons-text</name>
+      <version>1.15.0</version>
+      <description>Apache Commons Text is a set of utility functions and reusable components for processing
+    and manipulating text in a Java environment.</description>
+      <hashes>
+        <hash alg="MD5">756b7c5438d89a0c311d811c1a06d19a</hash>
+        <hash alg="SHA-1">9899093aa40f0199d6c39b131b8f087cdb37e399</hash>
+        <hash alg="SHA-256">58d2da30f058512a1e7f914e39241deca4dff5c27a085b4ed2faa9e7208067f6</hash>
+        <hash alg="SHA-512">be41b2c3a347bfd6eea3a957fb9a8d631c32b973fbbbe3e097d544d893ab4e587c3dfc38e89b4039b815b17d268cc7940e1ffb464050c7924acb56cc422613fb</hash>
+        <hash alg="SHA-384">d3df5a4656967277d738e9d981d7b065dcda91f25553f8fc5c3d26edf07079cc5526508b0951da45ef614663ee9d471d</hash>
+        <hash alg="SHA3-384">bedce93fea6c4aaaf7feb52f75d4265c41b3b0d39976248b4d9d5b879d18403335364b3f845585ce5fceb80a34c592df</hash>
+        <hash alg="SHA3-256">48fd7a8921eca0e1dc185a0ad5f8e89ab3399f0327bc57cd9e09988fce75d1ef</hash>
+        <hash alg="SHA3-512">f996b808d5f7bff8ac7aa79a2f73b93a4edb687cace7b54089246b6b4005ebbaab00f752a79205479023c802a56e42605806113d6af36e28469fa6a63ae710d2</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+          <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.apache.commons/commons-text@1.15.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
@@ -4853,27 +4931,6 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.junit/junit-bom@5.14.0?type=pom">
-      <group>org.junit</group>
-      <name>junit-bom</name>
-      <version>5.14.0</version>
-      <description>This Bill of Materials POM can be used to ease dependency management when referencing multiple JUnit artifacts using Gradle or Maven.</description>
-      <licenses>
-        <license>
-          <id>EPL-2.0</id>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.junit/junit-bom@5.14.0?type=pom</purl>
-      <modified>false</modified>
-      <externalReferences>
-        <reference type="vcs">
-          <url>https://github.com/junit-team/junit-framework</url>
-        </reference>
-      </externalReferences>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
     <component type="library" bom-ref="pkg:maven/org.junit/junit-bom@6.0.3?type=pom">
       <group>org.junit</group>
       <name>junit-bom</name>
@@ -4893,6 +4950,27 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
       </externalReferences>
       <properties>
         <property name="cdx:maven:package:test">true</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.junit/junit-bom@6.1.0?type=pom">
+      <group>org.junit</group>
+      <name>junit-bom</name>
+      <version>6.1.0</version>
+      <description>This Bill of Materials POM can be used to ease dependency management when referencing multiple JUnit artifacts using Gradle or Maven.</description>
+      <licenses>
+        <license>
+          <id>EPL-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.junit/junit-bom@6.1.0?type=pom</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/junit-team/junit-framework</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
     <component type="library" bom-ref="pkg:maven/org.mapstruct/mapstruct-processor@1.6.3?type=jar">
@@ -5226,6 +5304,48 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar">
+      <publisher>OW2</publisher>
+      <group>org.ow2.asm</group>
+      <name>asm-analysis</name>
+      <version>9.10.1</version>
+      <description>Static code analysis API of ASM, a very small and fast Java bytecode manipulation framework</description>
+      <hashes>
+        <hash alg="MD5">6dd9011ec87f65e4b2e14e938c4118e4</hash>
+        <hash alg="SHA-1">8d49f14d51f632cb1d87c88d1ceaf50db0d8af1b</hash>
+        <hash alg="SHA-256">dede75a21306b65974ecd8f87114ff6970f09fb794157a4ca09ab25c888c2bfc</hash>
+        <hash alg="SHA-512">0542a90be38f81e39ef43a9253630a2d59f82c17c24492f005c67619561308afbbd23bf8504d3e83b1d4cebe5746126da76037473ddac3071b028c2ae279296b</hash>
+        <hash alg="SHA-384">2ea2f3e3a56fb4db022575571587f359bcaaa737f67d8da090a3162b566275646e3d5cc497680518077888f6b8086183</hash>
+        <hash alg="SHA3-384">c628dac683022dcd2cdcc8634d147dc0d38e9535147e4ca82a67e68df34c90fab1f8d1aa1bef7602bd1c739b6e4fc491</hash>
+        <hash alg="SHA3-256">8a6d91fef9a93a7c0bcf7bd0374ab83a8aba0394104718f88a81445ad03be382</hash>
+        <hash alg="SHA3-512">b6e1087c15aa39dda89655dc4f568e0d5e17a606f31a5fac0f20347561212f724469f21e6c60830299f9bf5ead086d992a749329bbef53c052d923996d1afda8</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>BSD-3-Clause</id>
+          <url>https://opensource.org/licenses/BSD-3-Clause</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>http://www.ow2.org/</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://gitlab.ow2.org/asm/asm/issues</url>
+        </reference>
+        <reference type="mailing-list">
+          <url>https://mail.ow2.org/wws/arc/asm/</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://gitlab.ow2.org/asm/asm/</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-analysis@9.9.1?type=jar">
       <publisher>OW2</publisher>
       <group>org.ow2.asm</group>
@@ -5268,21 +5388,21 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-commons@9.10.1?type=jar">
       <publisher>OW2</publisher>
       <group>org.ow2.asm</group>
-      <name>asm-analysis</name>
-      <version>9.9</version>
-      <description>Static code analysis API of ASM, a very small and fast Java bytecode manipulation framework</description>
+      <name>asm-commons</name>
+      <version>9.10.1</version>
+      <description>Usefull class adapters based on ASM, a very small and fast Java bytecode manipulation framework</description>
       <hashes>
-        <hash alg="MD5">f07383cfbd50f097558341a03b8871e1</hash>
-        <hash alg="SHA-1">0bf4fa6e66638851c1cd22c2caea0c3ee5d5f437</hash>
-        <hash alg="SHA-256">6a15d28e8bd29ba4fd5bca4baf9b50e8fba2d7b51fbf78cfa0c875a7214c678b</hash>
-        <hash alg="SHA-512">293fdf9ffd6858559d9bf4a2b68dfcfc58cb581d27e0fbcd2c2d0c540520498e9d587094534dd58d782ff5051b90f160971cfc388ea132e06eafa089bcc0bed7</hash>
-        <hash alg="SHA-384">b5fd220b1fbdecaf2b56448d863f946150d1f0fbc62186aa9f405025119e4fab2712c177b73b4b8cb1c44a1d128c45c3</hash>
-        <hash alg="SHA3-384">3dab6e180cebe76e2fdfc77c5ce8a8bb9dc09bc080ebec84d821380cdda17cce22987689a09a425bee82107313c0ed49</hash>
-        <hash alg="SHA3-256">6f4dab7104f74b0171b23e5f33aefc68ca554ba76f2464e8b83686bab1b31a4b</hash>
-        <hash alg="SHA3-512">ca64aa7abbff55df08ded99c1aafd97ea227826332cba050726f59bd5f2b8b5c6c0d03887a74b182957a2ed421f0d16a1da8f6ff33dd741ad1b24cdbcde2e131</hash>
+        <hash alg="MD5">8eee0b1bdd046baf472eb83dd5e6bb44</hash>
+        <hash alg="SHA-1">4229e4c55fd8e01c23f9fe9884075cc628aacc50</hash>
+        <hash alg="SHA-256">6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895</hash>
+        <hash alg="SHA-512">8540a8f9a63b22bae54fc501f2da405c2c1c45fa13921a1193629cfbfbb716473f8a19984559af7b0b1ea3814d439ec445ea1cfeb159bf922bb7e60a40acf823</hash>
+        <hash alg="SHA-384">f5af3084db87003010b4b46ef666ba2b981e1e09dd4c232de731cb71e5e1fd8166e93ad96d63a85f359c82da93c7b7a9</hash>
+        <hash alg="SHA3-384">e0825b7c5e5815d196d5d2eeebd89221ac2ccac24976892d4ea46413c836e06c015d3c7aec708203a1cdcb2c8041bf97</hash>
+        <hash alg="SHA3-256">00c38b6149e09b247b84aaae5b01cca589f5464ae76bedc03edfd3bf8c96fe8e</hash>
+        <hash alg="SHA3-512">80587f5518e9a24fb1a9e2d81d7a96ad35545bbc8e50a162d3b199040536a0457ceb9342b8d4ef762efa4455314e8c6f7d8eefc68afcb84c89365781d0bad83c</hash>
       </hashes>
       <licenses>
         <license>
@@ -5290,7 +5410,7 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
           <url>https://opensource.org/licenses/BSD-3-Clause</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar</purl>
+      <purl>pkg:maven/org.ow2.asm/asm-commons@9.10.1?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -5394,6 +5514,48 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar">
+      <publisher>OW2</publisher>
+      <group>org.ow2.asm</group>
+      <name>asm-tree</name>
+      <version>9.10.1</version>
+      <description>Tree API of ASM, a very small and fast Java bytecode manipulation framework</description>
+      <hashes>
+        <hash alg="MD5">62541e1dc62331408ef31317555bf4fa</hash>
+        <hash alg="SHA-1">e244332a17564c1d1572449399a842de35881be2</hash>
+        <hash alg="SHA-256">3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b</hash>
+        <hash alg="SHA-512">2ffe5bbfac53bbacc1e4e474628b4247fb1c5f592017f393a327b3f2d2a72a338263f2f6549a42cea57a42f676b967153a10a22aae46affed83608f74daf3768</hash>
+        <hash alg="SHA-384">847b70b47e73412531dbe8a4d2d8249accbc26ee6c51878f2d49ba16d6d7b7cebde1f09d1b2810b3b3f9ccf1fe50bdbf</hash>
+        <hash alg="SHA3-384">15b57ecebed0cd80a0bba96ba7bb45ccc0c88ba76fb7b721a37407899c7d9f7f6ff6a1608b04a83d4c84f6fc1c777fc0</hash>
+        <hash alg="SHA3-256">caa1fbee0889f0a23d84920e0b129c63f04f0b9f459a46f1e4759f8071756f3f</hash>
+        <hash alg="SHA3-512">d7439f4f4d4b34caf02932ea6434f80748038a16375241ac8f28e145e06dc79d4a15d12585f533dfccf86440f55bc7001f6ad6f696e0b2c78f9741be35d12b2e</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>BSD-3-Clause</id>
+          <url>https://opensource.org/licenses/BSD-3-Clause</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>http://www.ow2.org/</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://gitlab.ow2.org/asm/asm/issues</url>
+        </reference>
+        <reference type="mailing-list">
+          <url>https://mail.ow2.org/wws/arc/asm/</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://gitlab.ow2.org/asm/asm/</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-tree@9.9.1?type=jar">
       <publisher>OW2</publisher>
       <group>org.ow2.asm</group>
@@ -5478,6 +5640,48 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-util@9.10.1?type=jar">
+      <publisher>OW2</publisher>
+      <group>org.ow2.asm</group>
+      <name>asm-util</name>
+      <version>9.10.1</version>
+      <description>Utilities for ASM, a very small and fast Java bytecode manipulation framework</description>
+      <hashes>
+        <hash alg="MD5">d0892ecb209867805e7d2418e5dc6c42</hash>
+        <hash alg="SHA-1">7bb9d450e8d4cbf9f9e04096c44bbfe7fba80b15</hash>
+        <hash alg="SHA-256">1bb99d091fba2597dc6d51193e9bbcf0d8447e7ed96bd8f0198b18152f09655c</hash>
+        <hash alg="SHA-512">7330ded981ddeb01b302cba12d56b419207b6b02ebfaf814cbbc3d2d2d1055e055294ce108ac9e4de9e1d0f3c4e0064f133e87e8085922241c1a2e5fa1fedd2c</hash>
+        <hash alg="SHA-384">b5cb85ec0ea75e131e6b36f16fa70b83f6453a113e2d26f1dd98c43e9de2842dd1d699db8b64e7b0062aaa0ce9690137</hash>
+        <hash alg="SHA3-384">219222dbe46404adf68e451689645b611ef102f2ffd911c9c6495212fd1ca0ea44835786b96c166db24bad2119398f30</hash>
+        <hash alg="SHA3-256">c94d09d3f74706ba73cf2fa9d58167d0b50add082fb72b5821d36aee6d0a8d7f</hash>
+        <hash alg="SHA3-512">00a24d0a2e6feb1877f3662f3678397f1e904527b17dc12fdece673c9e99d936aab22ae48b2b9fa1f22c6a808d0c413e640d1957066086fb8c1159ee16472944</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>BSD-3-Clause</id>
+          <url>https://opensource.org/licenses/BSD-3-Clause</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.ow2.asm/asm-util@9.10.1?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>http://www.ow2.org/</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://gitlab.ow2.org/asm/asm/issues</url>
+        </reference>
+        <reference type="mailing-list">
+          <url>https://mail.ow2.org/wws/arc/asm/</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://gitlab.ow2.org/asm/asm/</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-util@9.9.1?type=jar">
       <publisher>OW2</publisher>
       <group>org.ow2.asm</group>
@@ -5520,21 +5724,21 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm-util@9.9?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.ow2.asm/asm@9.10.1?type=jar">
       <publisher>OW2</publisher>
       <group>org.ow2.asm</group>
-      <name>asm-util</name>
-      <version>9.9</version>
-      <description>Utilities for ASM, a very small and fast Java bytecode manipulation framework</description>
+      <name>asm</name>
+      <version>9.10.1</version>
+      <description>ASM, a very small and fast Java bytecode manipulation framework</description>
       <hashes>
-        <hash alg="MD5">ef5e90e736cd09bc407c1d46a3faba0f</hash>
-        <hash alg="SHA-1">42fdfc0508b43807c8078d6e82ecff2ce2112ae8</hash>
-        <hash alg="SHA-256">3842e13cfe324ee9ab7cdc4914be9943541ead397c17e26daf0b8a755bede717</hash>
-        <hash alg="SHA-512">cd4f82589e0acc801618e4f55de2e7b85718d30cf5a7d2e5ead383dcdc2689a934abea37b81f5a7c508d9f7fc9ceb2e8ae5c8e4e958537ebb80b621814b099fb</hash>
-        <hash alg="SHA-384">a5800299041d2f9cfa66f3673ce7ed48a2046d483dfb20d4e0fe145b9793c90c1de4f26e3f1177474e7f4c01f2b15271</hash>
-        <hash alg="SHA3-384">446c5e418ef1e8b4a8972912ecf0dc6304e8d5f990c568bcd0c91343dad6d04533d482e370acff2dc65523f838a2753b</hash>
-        <hash alg="SHA3-256">29ebf3c30c9111473c454990ac07e63c1417f8950a22c30ff685a554f3386590</hash>
-        <hash alg="SHA3-512">35726f547ad1eb769328c0cb5dd0e596614bb16e547d08c85efb4d924d7a11a29b98cb774c0a7952d48c46a247cb082756bed64522075fb79b0fdc8a382dd7a3</hash>
+        <hash alg="MD5">9cb72080438acf27f2607002e1444a7b</hash>
+        <hash alg="SHA-1">ada2141c0cc52ee8f5c48cd5fa4ce0e794f22236</hash>
+        <hash alg="SHA-256">ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb</hash>
+        <hash alg="SHA-512">8db6efa37d4d569bf2b95d90931b8064f87ed928d20bbf8d8e7fa6182e9a11d32e6a2cc034a3d173a38ee70ce2ea9f20f52f9d8730d9401d2bc6060674c18928</hash>
+        <hash alg="SHA-384">451863dca686c04151bef6e632df2ee3c8c67ca97d191cdee3d7c4f9350f8a096011cadc1c79b4ba012b3f2179ef2bbe</hash>
+        <hash alg="SHA3-384">faa7b5fa7a5fefaae6d320ad43c09d588d6deecd41b2a3ebec36a4143a2b90373b2d01936c0733413a01f451c9740bc8</hash>
+        <hash alg="SHA3-256">e37aa694329cbbfcd0a81a735270166386aceff3797af2c391fd8484baa5a576</hash>
+        <hash alg="SHA3-512">1d660ebc24411c38b0928b543f402e7cb09747b7c522047f36b57865acfb83d25c9348c1d70af78e3d26e1ad220f10055d63eeb2965f7b6966cb2fbd29b47671</hash>
       </hashes>
       <licenses>
         <license>
@@ -5542,7 +5746,7 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
           <url>https://opensource.org/licenses/BSD-3-Clause</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.ow2.asm/asm-util@9.9?type=jar</purl>
+      <purl>pkg:maven/org.ow2.asm/asm@9.10.1?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -9042,20 +9246,20 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.testcontainers/database-commons@1.21.4?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.testcontainers/testcontainers-database-commons@2.0.5?type=jar">
       <group>org.testcontainers</group>
-      <name>database-commons</name>
-      <version>1.21.4</version>
+      <name>testcontainers-database-commons</name>
+      <version>2.0.5</version>
       <description>Isolated container management for Java code testing</description>
       <hashes>
-        <hash alg="MD5">b70935a5fd64cb56296177cc5dd1432e</hash>
-        <hash alg="SHA-1">a296403734f19fdbec722cce719b190bb12bcc21</hash>
-        <hash alg="SHA-256">539167f41549b597efa04a40912f58a2d56f422040d014993951ec6f0e14c691</hash>
-        <hash alg="SHA-512">bcc4e6a03f05edd8c759fd9904c4246bbbcbd88d60e6f07e5a98537bbd06b4d3a633966fd0920ba03d5fee2e1a315310a216b7ff625eef644a30c6f344f12eac</hash>
-        <hash alg="SHA-384">97aab3e19a95ac6f55ed840ba30fad0946cde4493200a7d9bec6ea80767990ed400ded69d8ceff1c5ca0ae7d83a83269</hash>
-        <hash alg="SHA3-384">b1d1fa9426ee942b2a6945fd04da07ca581d14376450830b91dec080538d4e29cad573795f1199cad82b327bd4ade0bd</hash>
-        <hash alg="SHA3-256">c5385cfc700996bb97864f3850fb8e4e59bb8ba94ee59a6bf4316017cc0076c5</hash>
-        <hash alg="SHA3-512">87f12a3721930f1388d50088a0495807d364fa34c203bdffa3f204d36d4a4a55ebae2c7cb42fea8fd8702500bb376bacc1db9b9e37a8261e9bcd5d8b379537ec</hash>
+        <hash alg="MD5">c972d00439082d9a42a965bcc73935f0</hash>
+        <hash alg="SHA-1">bc1eeea337c461c108507f596122b3e6fdb62122</hash>
+        <hash alg="SHA-256">0ebbc62bdcfb315cb840a63fbaa148b455927666d9034b5e5c00009d84c755b0</hash>
+        <hash alg="SHA-512">67da45ad8b1d2f6dcc1384111cd04776b972f62f04e8f41bbf3b2a1db270f70473c4fcb54dd695e1a49ccf8aba948529012ccc2b352f33139c00f514075dd782</hash>
+        <hash alg="SHA-384">14244e7f97ba9363b6acb20e96dd76e0106add0fa57bbc8ebb97c59273f7d844250aac35d673f9036598847d635040b2</hash>
+        <hash alg="SHA3-384">477c572542d80b2143cb40685a4823d53a80bef2778cce521f4bb148268c41aa410c13d33eb4be814a541eb067ec43b9</hash>
+        <hash alg="SHA3-256">d6a0a4e73c90bce68ca29169f4ae3caacc2c1e71cfbeda992ac75de92281c23d</hash>
+        <hash alg="SHA3-512">70d85b562ce3ddc43a387c9ea52cee93e8f44851994e994dac7b4740c9e9f47c3999687b4004c8412ddd55035f1b5407ba9f1786229d790bdffbc6cba2de4c0b</hash>
       </hashes>
       <licenses>
         <license>
@@ -9063,7 +9267,7 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
           <url>https://opensource.org/license/mit/</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.testcontainers/database-commons@1.21.4?type=jar</purl>
+      <purl>pkg:maven/org.testcontainers/testcontainers-database-commons@2.0.5?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="issue-tracker">
@@ -9077,20 +9281,20 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.testcontainers/jdbc@1.21.4?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.testcontainers/testcontainers-jdbc@2.0.5?type=jar">
       <group>org.testcontainers</group>
-      <name>jdbc</name>
-      <version>1.21.4</version>
+      <name>testcontainers-jdbc</name>
+      <version>2.0.5</version>
       <description>Isolated container management for Java code testing</description>
       <hashes>
-        <hash alg="MD5">d0cce5dae2373e13eeb275b00d995b45</hash>
-        <hash alg="SHA-1">22a1ee9cce8dda6ac579981746a6c9d87288c4d9</hash>
-        <hash alg="SHA-256">15ce7d24f4a869fcf225875fcfeea8fd1f86991c8f00286e435c8602ea426470</hash>
-        <hash alg="SHA-512">7847999c9240296d37cf2658d89168a526d1932e6728b2d5b68980a0dc5b8f5e80a5ee9bf7fcfba24733b509eec302cbf1419967a80b9241b50d5d3bd6abcef8</hash>
-        <hash alg="SHA-384">2eb89b838f76819f121eea02a80d9fa25d89ffb869e7e4bc4f60c41e9e1bed3853fad97a665886300454080ee7860641</hash>
-        <hash alg="SHA3-384">578df98b0c6944827b846a99c68b325690c76a32ba2ae4edc761bffd3e7170bc64e8412c108e3f96bfa381e954ae24a9</hash>
-        <hash alg="SHA3-256">4d8bd5fe0afae8fe951d04ffbad4d52eebe7b4829ccda60ba638ce29f84f7897</hash>
-        <hash alg="SHA3-512">43050468d1ca69dfc64a9e1b816f6dc115eab34909a276ddeb04d495ed611c28729401386b4e0dcafd301d696e3aadb5aa8dd27d0998ff8a8bab3f3fa183a990</hash>
+        <hash alg="MD5">44d0139a6d63b98645d36ad6521ad682</hash>
+        <hash alg="SHA-1">8b93b3febba94df8a3bd67c9fde8f63c8ddf2177</hash>
+        <hash alg="SHA-256">0f7fe603a32692c33739cf99d638206f9060ca47615bf0141ca2eb32d33d764a</hash>
+        <hash alg="SHA-512">c703a5cde05a1cfd98b6edb2c4247cf80e943a6a62b909707b2afed2b2c54e97ad25da1ef6129a6e60e11eefd337a80e661f66b1658b0a02dd019e795eaf401e</hash>
+        <hash alg="SHA-384">0eb2e1e93a74131c1144bde65d254416ebbc9a15925f1799218cfdf344a5b8c4d545b02ad51a531c2a78f493737d1b4b</hash>
+        <hash alg="SHA3-384">b7b14b8648c3478614b27452ae1e84d77030e98c5675e392fea7b1ddd8ccebcda553c78a6befe78ebd85722a6a037964</hash>
+        <hash alg="SHA3-256">e31384afb0be5276ecd2acfdefcc7eda16122ec28a4b1566ae3fc34635dee6c6</hash>
+        <hash alg="SHA3-512">2698a5b96e735057adf26ad90e49e2b02deb0b3740742ec85c0e9cce7a614d00b9c49dba5de9135c4ca62e40800cdf9e5e8e8848f7c6ab92153df237badc9c5c</hash>
       </hashes>
       <licenses>
         <license>
@@ -9098,7 +9302,7 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
           <url>https://opensource.org/license/mit/</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.testcontainers/jdbc@1.21.4?type=jar</purl>
+      <purl>pkg:maven/org.testcontainers/testcontainers-jdbc@2.0.5?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="issue-tracker">
@@ -9112,20 +9316,20 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.testcontainers/junit-jupiter@1.21.4?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.testcontainers/testcontainers-junit-jupiter@2.0.5?type=jar">
       <group>org.testcontainers</group>
-      <name>junit-jupiter</name>
-      <version>1.21.4</version>
+      <name>testcontainers-junit-jupiter</name>
+      <version>2.0.5</version>
       <description>Isolated container management for Java code testing</description>
       <hashes>
-        <hash alg="MD5">52a9b2a49aafede562be9dedc0ce8f50</hash>
-        <hash alg="SHA-1">268b0aca9c79c19b65988d98a688fce81861aa77</hash>
-        <hash alg="SHA-256">92df2a6fd67c30acb5b3521118558033f711c7973fab5f4597211ff3fd13f416</hash>
-        <hash alg="SHA-512">910bb7803db0a9d471ebd0ab1cfe138128185400f2ccef13c1eb24493b6f008e75543c5a898f606b71ad68e57487ad8e3d6a7afd8a5eaab2d8eb00606edce27e</hash>
-        <hash alg="SHA-384">85869d707cba4b83b22aa5c82d67471b1218a9ca81ec61133041ae33f0822b0bf1957d0c7e3e665425224455de8218e4</hash>
-        <hash alg="SHA3-384">0589747f60927ab1d1e1eb5f600586972febc5b012a06cdddd8deed108f3c6eacb79bbc261025ed6d93493c1d0f4c7dc</hash>
-        <hash alg="SHA3-256">99e419e26cd8b06121ed584a93debd1db7892d8bd1acadfffc946df6ef22ab37</hash>
-        <hash alg="SHA3-512">cbcb6cb69c52e56e93d7c5886271911305b38d79b6dadafd8744d4d0f90e8c072bf54d6c6f80b859842a878912c3dee7a9d8ae822473e7c00364eaedaba97239</hash>
+        <hash alg="MD5">5b4112d0b6e947f506eb600d6c47fa24</hash>
+        <hash alg="SHA-1">89bd1ef45ec60b17b323c747da1e6f2af6187543</hash>
+        <hash alg="SHA-256">d66eb7f257a85833a8cc973e3814d740967d40a7db1a0de0040653c6ed236748</hash>
+        <hash alg="SHA-512">031b655d8139da04e4969ccd0bd3aa8fe80c5ac7368ae8c82ce624f79a5a3e7bb10bc620cdce3165bc52fdb3680b2fb6b57f1e5a292d430915e4e391a94d2622</hash>
+        <hash alg="SHA-384">6f51e7636443d21b63d3b92cf604f19fac9fbac80ce02c315a8f2c09bb2345092511e79e2784b0a052f1198a18498ef1</hash>
+        <hash alg="SHA3-384">70d3614bfbe8b61227fc746186404a2b2309c57b734b6414894a24342c58b7b508737df15fa3735782913eca771437c9</hash>
+        <hash alg="SHA3-256">c179bb737450bc96b994b62956a3f08d8d794a1ba9f20af1f00a0a7be51025b9</hash>
+        <hash alg="SHA3-512">eadc5fcfa9f89863483556e1407235356f017b081b010b2a44a154749b38fb106994b8277bd8202c8e0bb8f24c89c041572843e800fd442b835c92eafa552437</hash>
       </hashes>
       <licenses>
         <license>
@@ -9133,7 +9337,7 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
           <url>https://opensource.org/license/mit/</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.testcontainers/junit-jupiter@1.21.4?type=jar</purl>
+      <purl>pkg:maven/org.testcontainers/testcontainers-junit-jupiter@2.0.5?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="issue-tracker">
@@ -9147,20 +9351,20 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">true</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.testcontainers/postgresql@1.21.4?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.testcontainers/testcontainers-postgresql@2.0.5?type=jar">
       <group>org.testcontainers</group>
-      <name>postgresql</name>
-      <version>1.21.4</version>
+      <name>testcontainers-postgresql</name>
+      <version>2.0.5</version>
       <description>Isolated container management for Java code testing</description>
       <hashes>
-        <hash alg="MD5">931f4a9e3178e20820adf12a4227d224</hash>
-        <hash alg="SHA-1">7c5962f994944d7ab3b058d8cc7fabef61da3733</hash>
-        <hash alg="SHA-256">38fc4c42580c96d9f8cdc2286612dd9e1f589b3ed2f57b3fb5e690f7b1505c03</hash>
-        <hash alg="SHA-512">d02d023d92281cb8826341a23b22b18e2b6829bd23952b8bad43bff99311b84492e568a22cafeebdc87b49381023164f4ec91fdd2910acdad9e3a3a5fd1f6728</hash>
-        <hash alg="SHA-384">0cc45a077afd880a2bf89b8d33923fd93e46ca5d796b874c6fd52c7b71e53cd37f8156094378a3fc94e85c2be43397ab</hash>
-        <hash alg="SHA3-384">bf8110a3d928b661cd1e19a118a82d0fc6e9acddac884d95c2fd806d01d1c8cee296322e270cea7f9b11b3ede3d97370</hash>
-        <hash alg="SHA3-256">08be0a0d70262772dabb618ea6c67c09755aa61de4c4032aef7b555f2c71a30d</hash>
-        <hash alg="SHA3-512">45c8e4c6bbca21d040cfcfe7eda914a2630c7b01b9066971886cb48b13bd6ca02015864113313379b00245b13d5f128e637d9a89655258cb3eefe9589f61917b</hash>
+        <hash alg="MD5">bef512d37585abd81fc34ce0498eb1b9</hash>
+        <hash alg="SHA-1">a7a9f748bb0e043098d3fc36d4929538ee0f6de8</hash>
+        <hash alg="SHA-256">8dbfb2fda977eb813ed1188ce02f098b8b634910eeab220568d54d6bd5b7ce9f</hash>
+        <hash alg="SHA-512">b961e475853e3ca5e8de355bf249cb324de4621264ece04f531a62c14a5abf29529e2d84704f4b0de204aef0ba138d414a0afd63c8d73a837f06dc9be4f257a2</hash>
+        <hash alg="SHA-384">e67d5f2f2df8006db816e899afd19ce208e0d9a5f91cac991f1c31f14310c2ebfaafffc52e855bb770997cdfc6d289e0</hash>
+        <hash alg="SHA3-384">cc4fd9bb57156b5efbea7fec347e719c54a3131a9fbb21815700fd59c8805dd5682d3f48aa72563d0761140d6aed96e4</hash>
+        <hash alg="SHA3-256">9aaeaca0931b5456943561183cf28dd58db0c0001fff18467d5048bdc905e3c0</hash>
+        <hash alg="SHA3-512">bfe9b0f778db1f1f8dc8209ecf181e0ae0408c59166d2c6b69b31273955705f86a71e102fa547b4ae7ea55c57ddcf99c3382838d018be52662e09c6ea5f40cb8</hash>
       </hashes>
       <licenses>
         <license>
@@ -9168,7 +9372,7 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
           <url>https://opensource.org/license/mit/</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.testcontainers/postgresql@1.21.4?type=jar</purl>
+      <purl>pkg:maven/org.testcontainers/testcontainers-postgresql@2.0.5?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="issue-tracker">
@@ -9456,27 +9660,27 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar">
       <dependency ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar">
+    <dependency ref="pkg:maven/com.github.spotbugs/spotbugs-annotations@4.10.2?type=jar">
       <dependency ref="pkg:maven/com.google.code.findbugs/jsr305@3.0.2?type=jar"/>
-      <dependency ref="pkg:maven/org.junit/junit-bom@5.14.0?type=pom"/>
+      <dependency ref="pkg:maven/org.junit/junit-bom@6.1.0?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar">
-      <dependency ref="pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar"/>
+    <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar">
+      <dependency ref="pkg:maven/com.github.spotbugs/spotbugs-annotations@4.10.2?type=jar"/>
       <dependency ref="pkg:maven/com.github.stephenc.jcip/jcip-annotations@1.0-1?type=jar"/>
       <dependency ref="pkg:maven/com.google.code.gson/gson@2.13.2?type=jar"/>
       <dependency ref="pkg:maven/jaxen/jaxen@2.0.6?type=jar"/>
       <dependency ref="pkg:maven/net.sf.saxon/Saxon-HE@12.9?type=jar"/>
-      <dependency ref="pkg:maven/org.apache.bcel/bcel@6.11.0?type=jar"/>
+      <dependency ref="pkg:maven/org.apache.bcel/bcel@6.12.0?type=jar"/>
       <dependency ref="pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"/>
-      <dependency ref="pkg:maven/org.apache.commons/commons-text@1.14.0?type=jar"/>
+      <dependency ref="pkg:maven/org.apache.commons/commons-text@1.15.0?type=jar"/>
       <dependency ref="pkg:maven/org.apache.logging.log4j/log4j-core@2.25.4?type=jar"/>
       <dependency ref="pkg:maven/org.dom4j/dom4j@2.2.0?type=jar"/>
-      <dependency ref="pkg:maven/org.junit/junit-bom@5.14.0?type=pom"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm-commons@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm-util@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
+      <dependency ref="pkg:maven/org.junit/junit-bom@6.1.0?type=pom"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm-commons@9.10.1?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm-util@9.10.1?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm@9.10.1?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.github.stephenc.jcip/jcip-annotations@1.0-1?type=jar"/>
@@ -9552,12 +9756,13 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/commons-codec/commons-codec@1.21.0?type=jar"/>
     <dependency ref="pkg:maven/commons-collections/commons-collections@3.2.2?type=jar"/>
     <dependency ref="pkg:maven/commons-io/commons-io@2.20.0?type=jar"/>
+    <dependency ref="pkg:maven/commons-io/commons-io@2.21.0?type=jar"/>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
     <dependency ref="pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend">
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar"/>
       <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar"/>
-      <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar"/>
+      <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar"/>
       <dependency ref="pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar"/>
       <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar"/>
       <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar"/>
@@ -9591,8 +9796,8 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-test-autoconfigure@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.security/spring-security-test@7.1.0?type=jar"/>
-      <dependency ref="pkg:maven/org.testcontainers/junit-jupiter@1.21.4?type=jar"/>
-      <dependency ref="pkg:maven/org.testcontainers/postgresql@1.21.4?type=jar"/>
+      <dependency ref="pkg:maven/org.testcontainers/testcontainers-junit-jupiter@2.0.5?type=jar"/>
+      <dependency ref="pkg:maven/org.testcontainers/testcontainers-postgresql@2.0.5?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/info.picocli/picocli@4.7.7?type=jar"/>
     <dependency ref="pkg:maven/io.micrometer/micrometer-commons@1.17.0?type=jar">
@@ -9814,8 +10019,8 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/org.antlr/stringtemplate@3.2.1?type=jar">
       <dependency ref="pkg:maven/antlr/antlr@2.7.7?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.apache.bcel/bcel@6.11.0?type=jar">
-      <dependency ref="pkg:maven/commons-io/commons-io@2.20.0?type=jar"/>
+    <dependency ref="pkg:maven/org.apache.bcel/bcel@6.12.0?type=jar">
+      <dependency ref="pkg:maven/commons-io/commons-io@2.21.0?type=jar"/>
       <dependency ref="pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.apache.commons/commons-compress@1.28.0?type=jar">
@@ -9825,6 +10030,9 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     </dependency>
     <dependency ref="pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"/>
     <dependency ref="pkg:maven/org.apache.commons/commons-text@1.14.0?type=jar">
+      <dependency ref="pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.apache.commons/commons-text@1.15.0?type=jar">
       <dependency ref="pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.apache.commons/commons-text@1.3?type=jar">
@@ -10005,8 +10213,8 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.junit.platform/junit-platform-engine@6.0.3?type=jar"/>
       <dependency ref="pkg:maven/org.junit/junit-bom@6.0.3?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/org.junit/junit-bom@5.14.0?type=pom"/>
     <dependency ref="pkg:maven/org.junit/junit-bom@6.0.3?type=pom"/>
+    <dependency ref="pkg:maven/org.junit/junit-bom@6.1.0?type=pom"/>
     <dependency ref="pkg:maven/org.mapstruct/mapstruct-processor@1.6.3?type=jar"/>
     <dependency ref="pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar"/>
     <dependency ref="pkg:maven/org.mockito/mockito-core@5.23.0?type=jar">
@@ -10026,11 +10234,15 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/org.osgi/org.osgi.annotation.versioning@1.1.2?type=jar"/>
     <dependency ref="pkg:maven/org.osgi/org.osgi.resource@1.0.0?type=jar"/>
     <dependency ref="pkg:maven/org.osgi/org.osgi.service.serviceloader@1.0.0?type=jar"/>
+    <dependency ref="pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar">
+      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/org.ow2.asm/asm-analysis@9.9.1?type=jar">
       <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9.1?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar">
-      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar"/>
+    <dependency ref="pkg:maven/org.ow2.asm/asm-commons@9.10.1?type=jar">
+      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm@9.10.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.ow2.asm/asm-commons@9.9.1?type=jar">
       <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9.1?type=jar"/>
@@ -10040,22 +10252,26 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar"/>
       <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
     </dependency>
+    <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar">
+      <dependency ref="pkg:maven/org.ow2.asm/asm@9.10.1?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9.1?type=jar">
       <dependency ref="pkg:maven/org.ow2.asm/asm@9.9.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar">
       <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
     </dependency>
+    <dependency ref="pkg:maven/org.ow2.asm/asm-util@9.10.1?type=jar">
+      <dependency ref="pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar"/>
+      <dependency ref="pkg:maven/org.ow2.asm/asm@9.10.1?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/org.ow2.asm/asm-util@9.9.1?type=jar">
       <dependency ref="pkg:maven/org.ow2.asm/asm-analysis@9.9.1?type=jar"/>
       <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9.1?type=jar"/>
       <dependency ref="pkg:maven/org.ow2.asm/asm@9.9.1?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.ow2.asm/asm-util@9.9?type=jar">
-      <dependency ref="pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar"/>
-      <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
-    </dependency>
+    <dependency ref="pkg:maven/org.ow2.asm/asm@9.10.1?type=jar"/>
     <dependency ref="pkg:maven/org.ow2.asm/asm@9.7.1?type=jar"/>
     <dependency ref="pkg:maven/org.ow2.asm/asm@9.9.1?type=jar"/>
     <dependency ref="pkg:maven/org.ow2.asm/asm@9.9?type=jar"/>
@@ -10502,17 +10718,17 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework/spring-expression@7.0.8?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-web@7.0.8?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.testcontainers/database-commons@1.21.4?type=jar">
+    <dependency ref="pkg:maven/org.testcontainers/testcontainers-database-commons@2.0.5?type=jar">
       <dependency ref="pkg:maven/org.testcontainers/testcontainers@2.0.5?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.testcontainers/jdbc@1.21.4?type=jar">
-      <dependency ref="pkg:maven/org.testcontainers/database-commons@1.21.4?type=jar"/>
+    <dependency ref="pkg:maven/org.testcontainers/testcontainers-jdbc@2.0.5?type=jar">
+      <dependency ref="pkg:maven/org.testcontainers/testcontainers-database-commons@2.0.5?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.testcontainers/junit-jupiter@1.21.4?type=jar">
+    <dependency ref="pkg:maven/org.testcontainers/testcontainers-junit-jupiter@2.0.5?type=jar">
       <dependency ref="pkg:maven/org.testcontainers/testcontainers@2.0.5?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.testcontainers/postgresql@1.21.4?type=jar">
-      <dependency ref="pkg:maven/org.testcontainers/jdbc@1.21.4?type=jar"/>
+    <dependency ref="pkg:maven/org.testcontainers/testcontainers-postgresql@2.0.5?type=jar">
+      <dependency ref="pkg:maven/org.testcontainers/testcontainers-jdbc@2.0.5?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.testcontainers/testcontainers@2.0.5?type=jar">
       <dependency ref="pkg:maven/com.github.docker-java/docker-java-api@3.7.1?type=jar"/>

@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:10d01ea9-7e34-43da-b7d3-6c9bdf497de5",
+  "serialNumber" : "urn:uuid:5fe181a4-ad58-4304-964d-f143c186b161",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-06-11T07:09:35Z",
+    "timestamp" : "2026-06-11T13:24:52Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-iri/basetool/actions/runs/27330130675"
+          "url" : "https://github.com/krt-iri/basetool/actions/runs/27349956185"
         },
         {
           "type" : "vcs",
@@ -703,43 +703,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar",
+      "bom-ref" : "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.10.2?type=jar",
       "group" : "com.github.spotbugs",
       "name" : "spotbugs-annotations",
-      "version" : "4.9.8",
+      "version" : "4.10.2",
       "description" : "Annotations the SpotBugs tool supports",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "d4c2e7bd090be697ad409a4e75684a94"
+          "content" : "a6d1c0f0ee39dcba6841ba2c8059f213"
         },
         {
           "alg" : "SHA-1",
-          "content" : "ca4a2783a6123e67124fd7feb4caccd2e2ac9a73"
+          "content" : "13f9ddf33804e6f69e7aa37b0bfd071b1bf397da"
         },
         {
           "alg" : "SHA-256",
-          "content" : "6f69d6fe9c55a54dcb30e87d8fa2d5f52246af50d7a3445246d9539ef221be1c"
+          "content" : "5335e5107c74cdd62ef96a7908066c51abb3de63b1ebf99dc953c2c7d0747678"
         },
         {
           "alg" : "SHA-512",
-          "content" : "a2dfdd7972db1adc141a845bc8a3fb81325d987dff1237017f58120f7caa6f1be5bdf2ea79bac7fc2db700596e62bb253e2b0762939f72905feb59fd6e29eaeb"
+          "content" : "46fdb78b609c5d909677c1d99347ce093d3b842ff003d7d281a9dce251dbd5063a82f0090e04c0762d7fd6fb59d4bb50f5c7bf7a6f50d9e856c22392873f7272"
         },
         {
           "alg" : "SHA-384",
-          "content" : "195ffc652c90e70b81a2382ad6c45ea62685efdd3a2275253578ff4bdd31ef13b58826a3660e6d790302d44c3d113c78"
+          "content" : "720b62a2721550545cce0794605d2f13fabddb9685f7d15b51492cfd383fb73df962e17b5da360b48db2c0752710511d"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "9fc94170c4172fd3e503c426b7d0a9ee0ada37b578acd0ff359b9e4f34b5a70ca82db9aad4820803d19b1040d3a9ec72"
+          "content" : "dce389e17cf58fc3727a16c3e18e0b5387bb3bf7aa52a6484b328fb23a023258eca931eb8d9ecad1e702150b11f6aace"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "b7763028ce7f89bf44d27fb71570cb7bc66a8cfc6c202813bbf9e37df3983ab8"
+          "content" : "537abe14301fbdb7354e634a512399e8cf6652d01332536b8cc819606d1e029b"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "2afeca14b480b86e836e122e30c6db85231938332c59e706b70eb6a499bbad6a32676e4416a6d2f56e92588772de13640b84907826eff4817d172b6cc969a72a"
+          "content" : "38f9db77eeb38f5f1d8c1df5d86d978f25e43023c911b0a13c3b86488870e27d0bd22893ab7dc231ce521b5a5126065c0a7fa45c0d7466b2b37208d8d60db247"
         }
       ],
       "licenses" : [
@@ -749,7 +749,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar",
+      "purl" : "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.10.2?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -766,43 +766,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
+      "bom-ref" : "pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar",
       "group" : "com.github.spotbugs",
       "name" : "spotbugs",
-      "version" : "4.9.8",
+      "version" : "4.10.2",
       "description" : "SpotBugs: Because it is easy!",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a137de2cd433fbf0d42205650c7b0eeb"
+          "content" : "6605058bb309b22d32da2492873eae19"
         },
         {
           "alg" : "SHA-1",
-          "content" : "661dba9d1f4d027591b2b4102e0f493bb4c0691b"
+          "content" : "58f176483ca305ecb02bbdf748f7a10ce75520bc"
         },
         {
           "alg" : "SHA-256",
-          "content" : "4469bc080afe7cd2290a20bf63e28392b80abcc7c7ace33c8f55da52a17c7ca5"
+          "content" : "46f5c9524c08d027cf96cda2704e5d8ded633626b94a19dc9ced3ae67595d80b"
         },
         {
           "alg" : "SHA-512",
-          "content" : "2699f1cc702c30d458e8d22b024d0eb9be6707e6b4281a7fe0d0e90f99402baacb9ab6804582d76433887dd5bd4f8071e6fda0cd203fa94e45c4bb908b7c72b4"
+          "content" : "e9b5b2934ca5ef9b14e5b997855620c60923b3d4c96896fd784f679bc3dcfe9cf19f3fc64da6300949277a71c14d559909305688cdc10967796b27a3ba1a173b"
         },
         {
           "alg" : "SHA-384",
-          "content" : "0276b63c76a34a60ebe9e73c2d0d9d1eb72576e3eb6350d7f553015a2a35ab624247570b11f8b0cc9bd36a6c7fbe8127"
+          "content" : "4ffe7db26b81c7f0ea6b0fb818bc5a411fa300d3405ea1f253b6225afa9ed17ac242ed2543d432bcefcf1309b997798c"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "bf053962a161b2be9155b38fb0d92d483f55b19e3024410107a0d1a65a7d7bb7aeff153ccd14a108b78b231697cb3780"
+          "content" : "7c187cd556fdd1f09235d402f989ae9c76f8ca549530f29ef0880142ae1eb7139192b579de230cacceeea03571271591"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "fbe4c7d185bab0e7d59fd131f46de7e40e9f2f03d8305c835be03435d1bebcf7"
+          "content" : "5da9f2aaf54fe9c799240050ab8760ae895de13bd485a1ebf689df7831a40feb"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "6d0ee1c5441c03489f85cdd84467863195da9fd70003e73c5f307834ff208da5ef4a97b09d749519e5ad01c5ebe5be0a7fc428fbe410b59bbca506c038d5bb59"
+          "content" : "384331018323c585f74b4f388fc18d28427f48f2a4c14ba5c1cf178df01ac6ae95bc8249b7f6eb8946e9a19c93ec86cd0006afd5e10fdfbc82122816bd32effc"
         }
       ],
       "licenses" : [
@@ -812,7 +812,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
+      "purl" : "pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -2489,43 +2489,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/commons-io/commons-io@2.20.0?type=jar",
+      "bom-ref" : "pkg:maven/commons-io/commons-io@2.21.0?type=jar",
       "group" : "commons-io",
       "name" : "commons-io",
-      "version" : "2.20.0",
+      "version" : "2.21.0",
       "description" : "The Apache Commons IO library contains utility classes, stream implementations, file filters, file comparators, endian transformation classes, and much more.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "94e7e6b9b5fe82388687b584d3571081"
+          "content" : "bc7e020873f086ede85f97bd9f013215"
         },
         {
           "alg" : "SHA-1",
-          "content" : "36f3474daec2849c149e877614e7f979b2082cd2"
+          "content" : "52a6f68fe5afe335cde95461dd5c3412f04996f7"
         },
         {
           "alg" : "SHA-256",
-          "content" : "df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72"
+          "content" : "7d643a2afea8b058b762aa6fb90e5b256f6c729739f8b3784c3370ddc609e88d"
         },
         {
           "alg" : "SHA-512",
-          "content" : "fea08e150473673b0608eaee3ae1cb4e73834039db80d3b758710d6baf3a5840a0878a4eb64739ae9bb21ccc7148c8520fe873616a3f6d5cdb4305deabdd015c"
+          "content" : "7ac1aa4d834cd7cdecaee223a64c63d481810c73dfdb5109f402234a05cadf754e414cead99072f5140d4f7042ee084161935fb28129a631d908d989c5bbac5d"
         },
         {
           "alg" : "SHA-384",
-          "content" : "22db5e18e3512ed44474e75a124a052d5a1a6f35ce458f6a201a5ccc9510c57c10c117dba80ac6ce91745cf2b51e63f2"
+          "content" : "97c07e5c4f62484c98b6777f63ab032ee09eeb1c9ddae8332890126df9c665afb9cd554db02495171738720d23c53732"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "a70700d24df3c276ff387c359e0e940b834e413b72a49917de9a82615836eca8cca1bee1ed71790606c795da795e9151"
+          "content" : "e3e44c9f4a5f4075fb62a438a84015fe2abf878e9793835a7816dc3c35141bb79fe96dfdc6bb5aef96b7c5bbbcf453c1"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "a8d044d3a4a069d0f20d24112b6427a3a6f02a925b31b932721d1f545ff32cec"
+          "content" : "1f8f4ce25b7169452dabb10ce843b3246378ea55c1971acd2300e417747b3a68"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "3417bf811d7e5fc1e71b8540f3379751434ea8540c421ff2c8bb5f5ce34401cd0ad8a829b65aa55e055c57141181762c4827099352c2bba453e48ad2df67526a"
+          "content" : "175630adf10305aeb31d737f833021a25582ffe2ef66fda6e7f694598af9c68cebbd205ade469eca4faaf6b9d349244289e62179d9cf48d93427090e2c008cf8"
         }
       ],
       "licenses" : [
@@ -2536,7 +2536,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/commons-io/commons-io@2.20.0?type=jar",
+      "purl" : "pkg:maven/commons-io/commons-io@2.21.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -6345,43 +6345,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.apache.bcel/bcel@6.11.0?type=jar",
+      "bom-ref" : "pkg:maven/org.apache.bcel/bcel@6.12.0?type=jar",
       "group" : "org.apache.bcel",
       "name" : "bcel",
-      "version" : "6.11.0",
-      "description" : "Apache Commons Bytecode Engineering Library",
+      "version" : "6.12.0",
+      "description" : "The Commons Byte Code Engineering Library (BCEL) is designed to provide users with a convenient way to analyze, create, and manipulate compiled .class files.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "6925a5d8d522c0ae44f88631a9b99c99"
+          "content" : "f7db448193f858a275e57d050a125937"
         },
         {
           "alg" : "SHA-1",
-          "content" : "8d800a87a4a7e09b1d3e634725806faf11a05006"
+          "content" : "a1dfc639fd6914d187b16a92ee00e84adc22a9a3"
         },
         {
           "alg" : "SHA-256",
-          "content" : "5901a6439ffb2aff0eb533cfab4dc9c054d143e4caa1bd33460efaa575f7cfdb"
+          "content" : "012639e3d2a3079f4c9c1350f18202cea83a7112ef210e50c93b0b771ad5d3af"
         },
         {
           "alg" : "SHA-512",
-          "content" : "280b7f9689f6ab5a8ce7f24966a6874e5fb486fc799d576c40d3036988e04ec4be102bc26bce0dd91ef13640d4289d3d2d1ea2a81106336db9fd8786320e2cc6"
+          "content" : "df32314412348db9df494e717cc1130531afdf337dcb94d7c5a0ab56b9326309d8d58800bb7135fa7b01346af1120ada3654f7b60b368bbe8f20678cc1332212"
         },
         {
           "alg" : "SHA-384",
-          "content" : "ec035caa142340846955dd9903f6b2881fb6734205c8d2dae00f4ab85085421d91192cf4e8c729ad44c420a6c4746084"
+          "content" : "bbf5c4771d41ee4cab9a9a34ad5975d4e31dfa865adf9afcffe447f5bba6e010e5b4976e9aca5ca1774b50d2c8fefc8a"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "42a54c04fad68db933604b784ac264f8959b6cec7de4b5689547e5cdbaf3dfd019355d69dd10d7844059488f8cba9395"
+          "content" : "fc695e8681808d94fb5269ecb88cb9977e1e66d385c0b7cbbe888ada1b9fbfe33001faec682f66e0ff4b5fb3bb9236e7"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "512ca3263c88b3452e40fda46b69c9c2ecc5c194b3a7a4d1f70f920ce26b191c"
+          "content" : "c8ef1467086b1d76b57decf10a9b12c3c3f79d04ac105e1814d3c5a21b5e7ea7"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "7b048c6a9f76f2b11330ed31114d211222206abef74b36086c7c92a77ff687bcffa1b93cad5868a27790f6d2dff92775ce437e571778529867c1d2b03d75afb4"
+          "content" : "b70686d127e8341e94e5ba0786892d98e7d59d17d3cd216acdeb0e83b72f65e255a8d7a48cb731a2c12ff6fd42e14694d16ad9f27b155ccb3f1a14b0a399a9fe"
         }
       ],
       "licenses" : [
@@ -6392,7 +6392,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.apache.bcel/bcel@6.11.0?type=jar",
+      "purl" : "pkg:maven/org.apache.bcel/bcel@6.12.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -6537,6 +6537,78 @@
         }
       ],
       "purl" : "pkg:maven/org.apache.commons/commons-text@1.14.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "build-system",
+          "url" : "https://github.com/apache/commons-text/actions"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://issues.apache.org/jira/browse/TEXT"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://gitbox.apache.org/repos/asf?p=commons-text.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.apache.commons/commons-text@1.15.0?type=jar",
+      "group" : "org.apache.commons",
+      "name" : "commons-text",
+      "version" : "1.15.0",
+      "description" : "Apache Commons Text is a set of utility functions and reusable components for processing and manipulating text in a Java environment.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "756b7c5438d89a0c311d811c1a06d19a"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "9899093aa40f0199d6c39b131b8f087cdb37e399"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "58d2da30f058512a1e7f914e39241deca4dff5c27a085b4ed2faa9e7208067f6"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "be41b2c3a347bfd6eea3a957fb9a8d631c32b973fbbbe3e097d544d893ab4e587c3dfc38e89b4039b815b17d268cc7940e1ffb464050c7924acb56cc422613fb"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "d3df5a4656967277d738e9d981d7b065dcda91f25553f8fc5c3d26edf07079cc5526508b0951da45ef614663ee9d471d"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "bedce93fea6c4aaaf7feb52f75d4265c41b3b0d39976248b4d9d5b879d18403335364b3f845585ce5fceb80a34c592df"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "48fd7a8921eca0e1dc185a0ad5f8e89ab3399f0327bc57cd9e09988fce75d1ef"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "f996b808d5f7bff8ac7aa79a2f73b93a4edb687cace7b54089246b6b4005ebbaab00f752a79205479023c802a56e42605806113d6af36e28469fa6a63ae710d2"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.apache.commons/commons-text@1.15.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -7863,6 +7935,64 @@
           "url" : "http://github.com/codehaus-plexus/plexus-utils"
         }
       ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.commonmark/commonmark@0.25.1?type=jar",
+      "group" : "org.commonmark",
+      "name" : "commonmark",
+      "version" : "0.25.1",
+      "description" : "Core of commonmark-java (a library for parsing Markdown to an AST, modifying the AST and rendering it to HTML or Markdown)",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "bfc5c7136958635cce65e9a4d27c3ea9"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "c691886308d41f45556c335a063a0a4ac15e3f6f"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "b862e3a8be7defd9611502c7f63c9417018ca395608c216a13e2de23d37d52ee"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "c9a32c752efbb762896c74464bb806d3ef4d0a59202f9fa31d9a10a223211664fe50ffe9d2430831c23e74e70ed73a6fc3da9ade34d83dd5675bd46e3a11b3ce"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "28fd1cc813614838e91b25eab5a3fb771501544ba937eb11d4e4d3ee76dd2af156322c643372bec32afefbd1d6d477ac"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "19f7f5b185df1e16cd8dd919a1580b6e92e90aba3bb35f348bb4c55be807cd875d19ddb875f745c583e004e3c2db32b9"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "47fb7ef3dbaec643175a5952251eafaa49fd0dbfe0151b2ae710d047b0f402ed"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "b1ae8c2e9ffcb3469cc77517deee58c6fece1ccd132067efa99fbffb07da95fb9e011e4f1ca5b1a18208cf4c71a4cefb4371db644e785cdd7be5f1d7ac1feea8"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "BSD-2-Clause",
+            "url" : "https://opensource.org/licenses/BSD-2-Clause"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.commonmark/commonmark@0.25.1?type=jar",
+      "modified" : false,
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -9271,35 +9401,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.junit/junit-bom@5.14.0?type=pom",
-      "group" : "org.junit",
-      "name" : "junit-bom",
-      "version" : "5.14.0",
-      "description" : "This Bill of Materials POM can be used to ease dependency management when referencing multiple JUnit artifacts using Gradle or Maven.",
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "EPL-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.junit/junit-bom@5.14.0?type=pom",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/junit-team/junit-framework"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.junit/junit-bom@6.0.3?type=pom",
       "group" : "org.junit",
       "name" : "junit-bom",
@@ -9324,6 +9425,35 @@
         {
           "name" : "cdx:maven:package:test",
           "value" : "true"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.junit/junit-bom@6.1.0?type=pom",
+      "group" : "org.junit",
+      "name" : "junit-bom",
+      "version" : "6.1.0",
+      "description" : "This Bill of Materials POM can be used to ease dependency management when referencing multiple JUnit artifacts using Gradle or Maven.",
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "EPL-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.junit/junit-bom@6.1.0?type=pom",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/junit-team/junit-framework"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
         }
       ]
     },
@@ -9859,6 +9989,83 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar",
+      "publisher" : "OW2",
+      "group" : "org.ow2.asm",
+      "name" : "asm-analysis",
+      "version" : "9.10.1",
+      "description" : "Static code analysis API of ASM, a very small and fast Java bytecode manipulation framework",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "6dd9011ec87f65e4b2e14e938c4118e4"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "8d49f14d51f632cb1d87c88d1ceaf50db0d8af1b"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "dede75a21306b65974ecd8f87114ff6970f09fb794157a4ca09ab25c888c2bfc"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "0542a90be38f81e39ef43a9253630a2d59f82c17c24492f005c67619561308afbbd23bf8504d3e83b1d4cebe5746126da76037473ddac3071b028c2ae279296b"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "2ea2f3e3a56fb4db022575571587f359bcaaa737f67d8da090a3162b566275646e3d5cc497680518077888f6b8086183"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "c628dac683022dcd2cdcc8634d147dc0d38e9535147e4ca82a67e68df34c90fab1f8d1aa1bef7602bd1c739b6e4fc491"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "8a6d91fef9a93a7c0bcf7bd0374ab83a8aba0394104718f88a81445ad03be382"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "b6e1087c15aa39dda89655dc4f568e0d5e17a606f31a5fac0f20347561212f724469f21e6c60830299f9bf5ead086d992a749329bbef53c052d923996d1afda8"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "BSD-3-Clause",
+            "url" : "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "http://www.ow2.org/"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://gitlab.ow2.org/asm/asm/issues"
+        },
+        {
+          "type" : "mailing-list",
+          "url" : "https://mail.ow2.org/wws/arc/asm/"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://gitlab.ow2.org/asm/asm/"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.ow2.asm/asm-analysis@9.9.1?type=jar",
       "publisher" : "OW2",
       "group" : "org.ow2.asm",
@@ -9936,44 +10143,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar",
+      "bom-ref" : "pkg:maven/org.ow2.asm/asm-commons@9.10.1?type=jar",
       "publisher" : "OW2",
       "group" : "org.ow2.asm",
-      "name" : "asm-analysis",
-      "version" : "9.9",
-      "description" : "Static code analysis API of ASM, a very small and fast Java bytecode manipulation framework",
+      "name" : "asm-commons",
+      "version" : "9.10.1",
+      "description" : "Usefull class adapters based on ASM, a very small and fast Java bytecode manipulation framework",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "f07383cfbd50f097558341a03b8871e1"
+          "content" : "8eee0b1bdd046baf472eb83dd5e6bb44"
         },
         {
           "alg" : "SHA-1",
-          "content" : "0bf4fa6e66638851c1cd22c2caea0c3ee5d5f437"
+          "content" : "4229e4c55fd8e01c23f9fe9884075cc628aacc50"
         },
         {
           "alg" : "SHA-256",
-          "content" : "6a15d28e8bd29ba4fd5bca4baf9b50e8fba2d7b51fbf78cfa0c875a7214c678b"
+          "content" : "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895"
         },
         {
           "alg" : "SHA-512",
-          "content" : "293fdf9ffd6858559d9bf4a2b68dfcfc58cb581d27e0fbcd2c2d0c540520498e9d587094534dd58d782ff5051b90f160971cfc388ea132e06eafa089bcc0bed7"
+          "content" : "8540a8f9a63b22bae54fc501f2da405c2c1c45fa13921a1193629cfbfbb716473f8a19984559af7b0b1ea3814d439ec445ea1cfeb159bf922bb7e60a40acf823"
         },
         {
           "alg" : "SHA-384",
-          "content" : "b5fd220b1fbdecaf2b56448d863f946150d1f0fbc62186aa9f405025119e4fab2712c177b73b4b8cb1c44a1d128c45c3"
+          "content" : "f5af3084db87003010b4b46ef666ba2b981e1e09dd4c232de731cb71e5e1fd8166e93ad96d63a85f359c82da93c7b7a9"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "3dab6e180cebe76e2fdfc77c5ce8a8bb9dc09bc080ebec84d821380cdda17cce22987689a09a425bee82107313c0ed49"
+          "content" : "e0825b7c5e5815d196d5d2eeebd89221ac2ccac24976892d4ea46413c836e06c015d3c7aec708203a1cdcb2c8041bf97"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "6f4dab7104f74b0171b23e5f33aefc68ca554ba76f2464e8b83686bab1b31a4b"
+          "content" : "00c38b6149e09b247b84aaae5b01cca589f5464ae76bedc03edfd3bf8c96fe8e"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "ca64aa7abbff55df08ded99c1aafd97ea227826332cba050726f59bd5f2b8b5c6c0d03887a74b182957a2ed421f0d16a1da8f6ff33dd741ad1b24cdbcde2e131"
+          "content" : "80587f5518e9a24fb1a9e2d81d7a96ad35545bbc8e50a162d3b199040536a0457ceb9342b8d4ef762efa4455314e8c6f7d8eefc68afcb84c89365781d0bad83c"
         }
       ],
       "licenses" : [
@@ -9984,7 +10191,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar",
+      "purl" : "pkg:maven/org.ow2.asm/asm-commons@9.10.1?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -10167,6 +10374,83 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar",
+      "publisher" : "OW2",
+      "group" : "org.ow2.asm",
+      "name" : "asm-tree",
+      "version" : "9.10.1",
+      "description" : "Tree API of ASM, a very small and fast Java bytecode manipulation framework",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "62541e1dc62331408ef31317555bf4fa"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "e244332a17564c1d1572449399a842de35881be2"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "2ffe5bbfac53bbacc1e4e474628b4247fb1c5f592017f393a327b3f2d2a72a338263f2f6549a42cea57a42f676b967153a10a22aae46affed83608f74daf3768"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "847b70b47e73412531dbe8a4d2d8249accbc26ee6c51878f2d49ba16d6d7b7cebde1f09d1b2810b3b3f9ccf1fe50bdbf"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "15b57ecebed0cd80a0bba96ba7bb45ccc0c88ba76fb7b721a37407899c7d9f7f6ff6a1608b04a83d4c84f6fc1c777fc0"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "caa1fbee0889f0a23d84920e0b129c63f04f0b9f459a46f1e4759f8071756f3f"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "d7439f4f4d4b34caf02932ea6434f80748038a16375241ac8f28e145e06dc79d4a15d12585f533dfccf86440f55bc7001f6ad6f696e0b2c78f9741be35d12b2e"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "BSD-3-Clause",
+            "url" : "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "http://www.ow2.org/"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://gitlab.ow2.org/asm/asm/issues"
+        },
+        {
+          "type" : "mailing-list",
+          "url" : "https://mail.ow2.org/wws/arc/asm/"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://gitlab.ow2.org/asm/asm/"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.ow2.asm/asm-tree@9.9.1?type=jar",
       "publisher" : "OW2",
       "group" : "org.ow2.asm",
@@ -10321,6 +10605,83 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.ow2.asm/asm-util@9.10.1?type=jar",
+      "publisher" : "OW2",
+      "group" : "org.ow2.asm",
+      "name" : "asm-util",
+      "version" : "9.10.1",
+      "description" : "Utilities for ASM, a very small and fast Java bytecode manipulation framework",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "d0892ecb209867805e7d2418e5dc6c42"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "7bb9d450e8d4cbf9f9e04096c44bbfe7fba80b15"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "1bb99d091fba2597dc6d51193e9bbcf0d8447e7ed96bd8f0198b18152f09655c"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "7330ded981ddeb01b302cba12d56b419207b6b02ebfaf814cbbc3d2d2d1055e055294ce108ac9e4de9e1d0f3c4e0064f133e87e8085922241c1a2e5fa1fedd2c"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "b5cb85ec0ea75e131e6b36f16fa70b83f6453a113e2d26f1dd98c43e9de2842dd1d699db8b64e7b0062aaa0ce9690137"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "219222dbe46404adf68e451689645b611ef102f2ffd911c9c6495212fd1ca0ea44835786b96c166db24bad2119398f30"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "c94d09d3f74706ba73cf2fa9d58167d0b50add082fb72b5821d36aee6d0a8d7f"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "00a24d0a2e6feb1877f3662f3678397f1e904527b17dc12fdece673c9e99d936aab22ae48b2b9fa1f22c6a808d0c413e640d1957066086fb8c1159ee16472944"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "BSD-3-Clause",
+            "url" : "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.ow2.asm/asm-util@9.10.1?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "http://www.ow2.org/"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://gitlab.ow2.org/asm/asm/issues"
+        },
+        {
+          "type" : "mailing-list",
+          "url" : "https://mail.ow2.org/wws/arc/asm/"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://gitlab.ow2.org/asm/asm/"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.ow2.asm/asm-util@9.9.1?type=jar",
       "publisher" : "OW2",
       "group" : "org.ow2.asm",
@@ -10398,44 +10759,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.ow2.asm/asm-util@9.9?type=jar",
+      "bom-ref" : "pkg:maven/org.ow2.asm/asm@9.10.1?type=jar",
       "publisher" : "OW2",
       "group" : "org.ow2.asm",
-      "name" : "asm-util",
-      "version" : "9.9",
-      "description" : "Utilities for ASM, a very small and fast Java bytecode manipulation framework",
+      "name" : "asm",
+      "version" : "9.10.1",
+      "description" : "ASM, a very small and fast Java bytecode manipulation framework",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "ef5e90e736cd09bc407c1d46a3faba0f"
+          "content" : "9cb72080438acf27f2607002e1444a7b"
         },
         {
           "alg" : "SHA-1",
-          "content" : "42fdfc0508b43807c8078d6e82ecff2ce2112ae8"
+          "content" : "ada2141c0cc52ee8f5c48cd5fa4ce0e794f22236"
         },
         {
           "alg" : "SHA-256",
-          "content" : "3842e13cfe324ee9ab7cdc4914be9943541ead397c17e26daf0b8a755bede717"
+          "content" : "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb"
         },
         {
           "alg" : "SHA-512",
-          "content" : "cd4f82589e0acc801618e4f55de2e7b85718d30cf5a7d2e5ead383dcdc2689a934abea37b81f5a7c508d9f7fc9ceb2e8ae5c8e4e958537ebb80b621814b099fb"
+          "content" : "8db6efa37d4d569bf2b95d90931b8064f87ed928d20bbf8d8e7fa6182e9a11d32e6a2cc034a3d173a38ee70ce2ea9f20f52f9d8730d9401d2bc6060674c18928"
         },
         {
           "alg" : "SHA-384",
-          "content" : "a5800299041d2f9cfa66f3673ce7ed48a2046d483dfb20d4e0fe145b9793c90c1de4f26e3f1177474e7f4c01f2b15271"
+          "content" : "451863dca686c04151bef6e632df2ee3c8c67ca97d191cdee3d7c4f9350f8a096011cadc1c79b4ba012b3f2179ef2bbe"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "446c5e418ef1e8b4a8972912ecf0dc6304e8d5f990c568bcd0c91343dad6d04533d482e370acff2dc65523f838a2753b"
+          "content" : "faa7b5fa7a5fefaae6d320ad43c09d588d6deecd41b2a3ebec36a4143a2b90373b2d01936c0733413a01f451c9740bc8"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "29ebf3c30c9111473c454990ac07e63c1417f8950a22c30ff685a554f3386590"
+          "content" : "e37aa694329cbbfcd0a81a735270166386aceff3797af2c391fd8484baa5a576"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "35726f547ad1eb769328c0cb5dd0e596614bb16e547d08c85efb4d924d7a11a29b98cb774c0a7952d48c46a247cb082756bed64522075fb79b0fdc8a382dd7a3"
+          "content" : "1d660ebc24411c38b0928b543f402e7cb09747b7c522047f36b57865acfb83d25c9348c1d70af78e3d26e1ad220f10055d63eeb2965f7b6966cb2fbd29b47671"
         }
       ],
       "licenses" : [
@@ -10446,7 +10807,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.ow2.asm/asm-util@9.9?type=jar",
+      "purl" : "pkg:maven/org.ow2.asm/asm@9.10.1?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -17738,31 +18099,31 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar",
+      "ref" : "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.10.2?type=jar",
       "dependsOn" : [
         "pkg:maven/com.google.code.findbugs/jsr305@3.0.2?type=jar",
-        "pkg:maven/org.junit/junit-bom@5.14.0?type=pom"
+        "pkg:maven/org.junit/junit-bom@6.1.0?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
+      "ref" : "pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.9.8?type=jar",
+        "pkg:maven/com.github.spotbugs/spotbugs-annotations@4.10.2?type=jar",
         "pkg:maven/com.github.stephenc.jcip/jcip-annotations@1.0-1?type=jar",
         "pkg:maven/com.google.code.gson/gson@2.13.2?type=jar",
         "pkg:maven/jaxen/jaxen@2.0.6?type=jar",
         "pkg:maven/net.sf.saxon/Saxon-HE@12.9?type=jar",
-        "pkg:maven/org.apache.bcel/bcel@6.11.0?type=jar",
+        "pkg:maven/org.apache.bcel/bcel@6.12.0?type=jar",
         "pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar",
-        "pkg:maven/org.apache.commons/commons-text@1.14.0?type=jar",
+        "pkg:maven/org.apache.commons/commons-text@1.15.0?type=jar",
         "pkg:maven/org.apache.logging.log4j/log4j-core@2.25.4?type=jar",
         "pkg:maven/org.dom4j/dom4j@2.2.0?type=jar",
-        "pkg:maven/org.junit/junit-bom@5.14.0?type=pom",
-        "pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar",
-        "pkg:maven/org.ow2.asm/asm-commons@9.9?type=jar",
-        "pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar",
-        "pkg:maven/org.ow2.asm/asm-util@9.9?type=jar",
-        "pkg:maven/org.ow2.asm/asm@9.9?type=jar",
+        "pkg:maven/org.junit/junit-bom@6.1.0?type=pom",
+        "pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar",
+        "pkg:maven/org.ow2.asm/asm-commons@9.10.1?type=jar",
+        "pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar",
+        "pkg:maven/org.ow2.asm/asm-util@9.10.1?type=jar",
+        "pkg:maven/org.ow2.asm/asm@9.10.1?type=jar",
         "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
       ]
     },
@@ -17924,7 +18285,7 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/commons-io/commons-io@2.20.0?type=jar",
+      "ref" : "pkg:maven/commons-io/commons-io@2.21.0?type=jar",
       "dependsOn" : [ ]
     },
     {
@@ -17937,7 +18298,7 @@
         "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.4?type=jar",
         "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.4?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
-        "pkg:maven/com.github.spotbugs/spotbugs@4.9.8?type=jar",
+        "pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar",
         "pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar",
         "pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar",
         "pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar",
@@ -17946,6 +18307,7 @@
         "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
         "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
+        "pkg:maven/org.commonmark/commonmark@0.25.1?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
         "pkg:maven/org.jetbrains/annotations@26.1.0?type=jar",
@@ -18436,9 +18798,9 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.apache.bcel/bcel@6.11.0?type=jar",
+      "ref" : "pkg:maven/org.apache.bcel/bcel@6.12.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/commons-io/commons-io@2.20.0?type=jar",
+        "pkg:maven/commons-io/commons-io@2.21.0?type=jar",
         "pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"
       ]
     },
@@ -18448,6 +18810,12 @@
     },
     {
       "ref" : "pkg:maven/org.apache.commons/commons-text@1.14.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.apache.commons/commons-text@1.15.0?type=jar",
       "dependsOn" : [
         "pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar"
       ]
@@ -18590,6 +18958,10 @@
       "dependsOn" : [ ]
     },
     {
+      "ref" : "pkg:maven/org.commonmark/commonmark@0.25.1?type=jar",
+      "dependsOn" : [ ]
+    },
+    {
       "ref" : "pkg:maven/org.dom4j/dom4j@2.2.0?type=jar",
       "dependsOn" : [ ]
     },
@@ -18727,11 +19099,11 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.junit/junit-bom@5.14.0?type=pom",
+      "ref" : "pkg:maven/org.junit/junit-bom@6.0.3?type=pom",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.junit/junit-bom@6.0.3?type=pom",
+      "ref" : "pkg:maven/org.junit/junit-bom@6.1.0?type=pom",
       "dependsOn" : [ ]
     },
     {
@@ -18776,15 +19148,22 @@
       "dependsOn" : [ ]
     },
     {
+      "ref" : "pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.ow2.asm/asm-analysis@9.9.1?type=jar",
       "dependsOn" : [
         "pkg:maven/org.ow2.asm/asm-tree@9.9.1?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar",
+      "ref" : "pkg:maven/org.ow2.asm/asm-commons@9.10.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar"
+        "pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar",
+        "pkg:maven/org.ow2.asm/asm@9.10.1?type=jar"
       ]
     },
     {
@@ -18802,6 +19181,12 @@
       ]
     },
     {
+      "ref" : "pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.ow2.asm/asm@9.10.1?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.ow2.asm/asm-tree@9.9.1?type=jar",
       "dependsOn" : [
         "pkg:maven/org.ow2.asm/asm@9.9.1?type=jar"
@@ -18814,6 +19199,14 @@
       ]
     },
     {
+      "ref" : "pkg:maven/org.ow2.asm/asm-util@9.10.1?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.ow2.asm/asm-analysis@9.10.1?type=jar",
+        "pkg:maven/org.ow2.asm/asm-tree@9.10.1?type=jar",
+        "pkg:maven/org.ow2.asm/asm@9.10.1?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.ow2.asm/asm-util@9.9.1?type=jar",
       "dependsOn" : [
         "pkg:maven/org.ow2.asm/asm-analysis@9.9.1?type=jar",
@@ -18822,12 +19215,8 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.ow2.asm/asm-util@9.9?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.ow2.asm/asm-analysis@9.9?type=jar",
-        "pkg:maven/org.ow2.asm/asm-tree@9.9?type=jar",
-        "pkg:maven/org.ow2.asm/asm@9.9?type=jar"
-      ]
+      "ref" : "pkg:maven/org.ow2.asm/asm@9.10.1?type=jar",
+      "dependsOn" : [ ]
     },
     {
       "ref" : "pkg:maven/org.ow2.asm/asm@9.7.1?type=jar",
