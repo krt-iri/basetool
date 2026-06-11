@@ -24,8 +24,11 @@ a `.facts-bar` (server join = planned start, TS meeting time, participants, chec
 finance total for member+ viewers) and a `.tab-nav` with up to four tabs:
 
 1. **Übersicht** — read-only landing tab: briefing/description (member+ gate unchanged), schedule /
-   radio / leadership as a `.kv-list`, the caller's personal participation status, and summary
-   cards that jump into the other tabs.
+   radio / leadership as a `.kv-list` (operation labelled singular; actual start and end as
+   separate rows; the leadership-position rows precede the party lead), the caller's personal
+   participation status, and a single Wirtschaft jump card (no Teilnehmer/Finanzen cards — those
+   targets are one tab click away; owner decision 2026-06-11). The page content is capped at the
+   app's regular `--content-max` width.
 2. **Teilnehmer & Einheiten** — the crew board (REQ-MISSION-005).
 3. **Finanzen & Auszahlung** — summary strip + finance ledger (member+ gate unchanged), payout
    table (public; participation % authenticated-only), and the Wirtschaft `<details>` sections

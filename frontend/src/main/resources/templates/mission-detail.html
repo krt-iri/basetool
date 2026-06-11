@@ -20,7 +20,10 @@
         html, body { margin: 0; overflow-x: hidden; }
         .page-wrapper {
             width: 100%;
-            max-width: 100%;
+            /* The tab layout is column-based and dense — cap it at the app's regular
+               content width instead of spanning ultra-wide viewports edge to edge. */
+            max-width: var(--content-max, 1200px);
+            margin: 0 auto;
             overflow-x: clip;
             box-sizing: border-box;
             /* Reserve viewport-bottom space for the fixed footer (see styles.css `main`). */
@@ -238,25 +241,24 @@
                             <dd><span class="krt-local-dt" th:attr="data-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'}" th:text="${mission.plannedEndTime != null ? #temporals.format(mission.plannedEndTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
                             <dt th:text="#{mission.meeting_time}">TS-Treffen</dt>
                             <dd><span class="krt-local-dt" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
-                            <dt th:text="#{mission.actual_start} + ' / ' + #{mission.actual_end}">Tats. Start / Ende</dt>
-                            <dd>
-                                <span class="krt-local-dt" th:attr="data-utc=${mission.actualStartTime != null ? mission.actualStartTime.toEpochMilli() : 'null'}" th:text="${mission.actualStartTime != null ? #temporals.format(mission.actualStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span>
-                                / <span class="krt-local-dt" th:attr="data-utc=${mission.actualEndTime != null ? mission.actualEndTime.toEpochMilli() : 'null'}" th:text="${mission.actualEndTime != null ? #temporals.format(mission.actualEndTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span>
-                            </dd>
-                            <dt th:text="#{nav.operations}">Operation</dt>
+                            <dt th:text="#{mission.actual_start}">Tats&auml;chlicher Start</dt>
+                            <dd><span class="krt-local-dt" th:attr="data-utc=${mission.actualStartTime != null ? mission.actualStartTime.toEpochMilli() : 'null'}" th:text="${mission.actualStartTime != null ? #temporals.format(mission.actualStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
+                            <dt th:text="#{mission.actual_end}">Tats&auml;chliches Ende</dt>
+                            <dd><span class="krt-local-dt" th:attr="data-utc=${mission.actualEndTime != null ? mission.actualEndTime.toEpochMilli() : 'null'}" th:text="${mission.actualEndTime != null ? #temporals.format(mission.actualEndTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
+                            <dt th:text="#{mission.operation}">Operation</dt>
                             <dd th:text="${mission.operation != null ? mission.operation.name : '&mdash;'}">&mdash;</dd>
                             <dt th:if="${mission.canEdit and mission.isInternal != null and mission.isInternal}" th:text="#{mission.is_internal}">Intern</dt>
                             <dd th:if="${mission.canEdit and mission.isInternal != null and mission.isInternal}"><span class="chip chip--warning chip-xs" th:text="#{general.yes}">Ja</span></dd>
+                            <th:block th:each="leadType : ${missionLeadTypes}">
+                                <dt th:text="${leadType.name}">Role</dt>
+                                <dd><span th:each="p, iter : ${participantsByLeadType[#strings.toString(leadType.id)]}" th:text="${(p['user'] != null ? p['user']['effectiveName'] : p['guestName']) + (!iter.last ? ', ' : '')}">User</span></dd>
+                            </th:block>
                             <dt th:text="#{mission.party_lead}">Einsatzleiter</dt>
                             <dd>
                                 <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead</span>
                                 <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
                                 <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                             </dd>
-                            <th:block th:each="leadType : ${missionLeadTypes}">
-                                <dt th:text="${leadType.name}">Role</dt>
-                                <dd><span th:each="p, iter : ${participantsByLeadType[#strings.toString(leadType.id)]}" th:text="${(p['user'] != null ? p['user']['effectiveName'] : p['guestName']) + (!iter.last ? ', ' : '')}">User</span></dd>
-                            </th:block>
                             <th:block th:each="freqType : ${frequencyTypes}" th:with="f=${frequencyByTypeId[freqType.id]}">
                                 <dt th:text="${freqType.name}">Funk</dt>
                                 <dd>
@@ -272,18 +274,9 @@
                     </div>
                 </div>
             </div>
+            <!-- Only the Wirtschaft jump card remains: Teilnehmer/Finanzen are reachable via the
+                 tab nav itself, duplicate jump cards added no information (owner feedback). -->
             <div class="navrow">
-                <button type="button" class="navcard" data-tab-jump="crew">
-                    <span class="nk"><span th:text="#{mission.tab.crew}">Teilnehmer &amp; Einheiten</span> <span class="arrow" aria-hidden="true">&rarr;</span></span>
-                    <span class="nv" th:text="|${mission.checkedInParticipants}/${mission.registeredParticipants}|">0/0</span>
-                    <span class="nd warn" th:text="|${unassignedParticipants.size()} ${#messages.msg('mission.overview.without_unit')} &middot; ${(mission.registeredParticipants ?: 0) - (mission.checkedInParticipants ?: 0)} ${#messages.msg('mission.overview.without_checkin')}|">3 ohne Einheit</span>
-                </button>
-                <button type="button" class="navcard" data-tab-jump="fin">
-                    <span class="nk"><span th:text="#{mission.tab.finance}">Finanzen &amp; Auszahlung</span> <span class="arrow" aria-hidden="true">&rarr;</span></span>
-                    <span class="nv" th:if="${financeSum != null}" th:classappend="${financeSum >= 0 ? 'pos' : 'neg'}" th:style="${financeSum >= 0 ? 'color: var(--color-success);' : 'color: var(--color-danger-text);'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</span>
-                    <span class="nv" th:if="${financeSum == null}" th:text="#{mission.payout}">Auszahlung</span>
-                    <span class="nd" th:if="${financeSum != null}" th:text="|${financeIncomeCount + financeExpenseCount} ${#messages.msg('mission.finance.entries')}${financePerShare != null ? ' &middot; ' + #messages.msg('mission.finance.per_share') + ' ' + #numbers.formatInteger(financePerShare, 1, 'POINT') : ''}|">9 Eintr&auml;ge</span>
-                </button>
                 <button type="button" class="navcard" data-tab-jump="fin" sec:authorize="isAuthenticated()" th:if="${(mission?.refineryOrders != null and !#lists.isEmpty(mission.refineryOrders)) or (mission?.inventoryEntries != null and !#lists.isEmpty(mission.inventoryEntries))}">
                     <span class="nk"><span th:text="#{mission.economy}">Wirtschaft</span> <span class="arrow" aria-hidden="true">&rarr;</span></span>
                     <span class="nv" th:text="|${mission.refineryOrders != null ? #lists.size(mission.refineryOrders) : 0} + ${mission.inventoryEntries != null ? #lists.size(mission.inventoryEntries) : 0}|">2 + 3</span>
@@ -626,7 +619,7 @@
             </div>
 
             <div class="form-group">
-                <label th:text="#{nav.operations}">Operation</label>
+                <label th:text="#{mission.operation}">Operation</label>
                 <select name="operationId" th:disabled="${!isNew and !mission.canEdit}">
                     <option value="" th:text="#{general.none}">-- Keine --</option>
                     <option th:each="op : ${operationsList}" th:value="${op.id}" th:text="${op.name}" th:selected="${missionForm.operationId != null and missionForm.operationId == op.id.toString()}"></option>

@@ -4362,3 +4362,12 @@ textarea:focus-visible,
     outline: none;
     box-shadow: var(--glow-primary);
 }
+
+/* The closed control is transparent on the dark row, but the OPTION popup must
+   not inherit that: Firefox paints the list with the select's background, which
+   computes to white — light-gray text on it is unreadable. Pin the popup to the
+   dark surface explicitly. */
+.chip-select option {
+    background-color: var(--color-bg-dark-gray);
+    color: var(--color-gray-1);
+}
