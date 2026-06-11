@@ -32,10 +32,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Ad-hoc visual verification harness for the personal-inventory items page against an ALREADY
- * RUNNING local test stack ({@code E2E_BASE_URL} env; self-skipping without {@code
- * PI_CHECK=true}). Logs in as the synthetic test admin, probes the shared tab-nav, the empty
- * state and the KRT modal frames (including the inline validation re-render), and screenshots
- * each step while dumping console errors. Not part of CI.
+ * RUNNING local test stack ({@code E2E_BASE_URL} env; self-skipping without {@code PI_CHECK=true}).
+ * Logs in as the synthetic test admin, probes the shared tab-nav, the empty state and the KRT modal
+ * frames (including the inline validation re-render), and screenshots each step while dumping
+ * console errors. Not part of CI.
  */
 @Tag("e2e")
 class ItemsMockupCheckE2eTest {
@@ -93,14 +93,14 @@ class ItemsMockupCheckE2eTest {
       page.waitForTimeout(500);
       Object probe =
           page.evaluate(
-              "() => ({ tabNav: !!document.querySelector('.tab-nav'),"
-                  + " activeTab: document.querySelector('.tab-nav .tab.active span')?.textContent,"
-                  + " tabCount: document.querySelector('.tab-nav .tab.active .tab-count')?.textContent,"
-                  + " oldTabs: !!document.querySelector('.krt-pi-tabs'),"
-                  + " emptyState: !!document.querySelector('.krt-personal-inventory .empty-state'),"
-                  + " tableVisible: !!document.querySelector('.krt-pi-table'),"
-                  + " modalFrame: !!document.querySelector('#krt-pi-modal .krt-modal'),"
-                  + " dangerFrame: !!document.querySelector('#krt-pi-delete-modal .krt-modal--danger'),"
+              "() => ({ tabNav: !!document.querySelector('.tab-nav'), activeTab:"
+                  + " document.querySelector('.tab-nav .tab.active span')?.textContent, tabCount:"
+                  + " document.querySelector('.tab-nav .tab.active .tab-count')?.textContent,"
+                  + " oldTabs: !!document.querySelector('.krt-pi-tabs'), emptyState:"
+                  + " !!document.querySelector('.krt-personal-inventory .empty-state'),"
+                  + " tableVisible: !!document.querySelector('.krt-pi-table'), modalFrame:"
+                  + " !!document.querySelector('#krt-pi-modal .krt-modal'), dangerFrame:"
+                  + " !!document.querySelector('#krt-pi-delete-modal .krt-modal--danger'),"
                   + " dangerBtn: !!document.querySelector('#krt-pi-delete-modal .btn-danger') })");
       System.out.println("[pi-check] probe: " + probe);
       page.screenshot(
@@ -125,9 +125,10 @@ class ItemsMockupCheckE2eTest {
       page.waitForTimeout(500);
       Object validationProbe =
           page.evaluate(
-              "() => ({ modalShown: getComputedStyle(document.getElementById('krt-pi-modal')).display,"
-                  + " errorBox: !!document.querySelector('#krt-pi-modal .krt-pi-error-box'),"
-                  + " nameKept: document.getElementById('krt-pi-name')?.value })");
+              "() => ({ modalShown:"
+                  + " getComputedStyle(document.getElementById('krt-pi-modal')).display, errorBox:"
+                  + " !!document.querySelector('#krt-pi-modal .krt-pi-error-box'), nameKept:"
+                  + " document.getElementById('krt-pi-name')?.value })");
       System.out.println("[pi-check] validation probe: " + validationProbe);
       page.screenshot(
           new Page.ScreenshotOptions()
