@@ -37894,6 +37894,12 @@
           "highValueUnit" : {
             "type" : "boolean"
           },
+          "responsibleUser" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "note" : {
+            "type" : "string"
+          },
           "crew" : {
             "type" : "array",
             "items" : {
@@ -37960,7 +37966,8 @@
         "properties" : {
           "name" : {
             "type" : "string",
-            "minLength" : 1
+            "maxLength" : 255,
+            "minLength" : 0
           },
           "shipTypeId" : {
             "type" : "string",
@@ -37976,9 +37983,17 @@
           "frequency" : {
             "type" : "number",
             "format" : "double"
+          },
+          "responsibleUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
           }
-        },
-        "required" : [ "name" ]
+        }
       },
       "UpdateCrewRequest" : {
         "type" : "object",
@@ -39354,6 +39369,10 @@
               "type" : "string",
               "format" : "uuid"
             }
+          },
+          "payoutPreference" : {
+            "type" : "string",
+            "enum" : [ "PAYOUT", "DONATE" ]
           }
         }
       },

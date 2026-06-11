@@ -224,6 +224,34 @@ class MissionServiceTest {
         "a user with no profile default keeps the PAYOUT entity default");
   }
 
+  // The sign-up modal's explicit Auszahlungsart choice wins over the user's profile default.
+  @Test
+  void addParticipant_ExplicitPayoutChoice_WinsOverProfileDefault() {
+    UUID missionId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    user.setUsername("explicit-chooser");
+    user.setDefaultPayoutPreference(PayoutPreference.DONATE);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+
+    Mission result =
+        missionService.addParticipant(
+            missionId, userId, null, null, "No comment", null, PayoutPreference.PAYOUT);
+
+    MissionParticipant participant = result.getParticipants().iterator().next();
+    assertEquals(
+        PayoutPreference.PAYOUT,
+        participant.getPayoutPreference(),
+        "an explicit sign-up payout choice must override the profile default");
+  }
+
   @Test
   void searchMissions_ShouldCallRepository() {
     String query = "Test";

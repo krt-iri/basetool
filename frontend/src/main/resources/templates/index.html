@@ -59,7 +59,13 @@
         
         <div th:if="${nextMission}" class="mission-info-grid">
              <strong th:text="#{mission.name} + ':'">Name:</strong> <span th:text="${nextMission.name}">Mission Name</span>
-             <strong sec:authorize="isAuthenticated()" th:text="#{mission.description} + ':'">Beschreibung:</strong> <span sec:authorize="isAuthenticated()" th:text="${nextMission.description}" style="white-space: pre-wrap;">Desc</span>
+             <strong sec:authorize="isAuthenticated()" th:text="#{mission.description} + ':'">Beschreibung:</strong>
+             <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
+                  link protocols. Bean call bound via th:with — th:utext is a restricted expression
+                  context in Thymeleaf 3.1 where @bean references are forbidden (cf. @moneyFormat). -->
+             <div sec:authorize="isAuthenticated()" class="markdown-content"
+                  th:with="descriptionHtml=${@markdown.render(nextMission.description)}"
+                  th:utext="${descriptionHtml}">Desc</div>
              
              <strong th:if="${nextMission.get('calendarLink') != null and !#strings.isEmpty(nextMission.get('calendarLink'))}" th:text="#{mission.calendar_link} + ':'">Kalender:</strong> 
              <span th:if="${nextMission.get('calendarLink') != null and !#strings.isEmpty(nextMission.get('calendarLink'))}"><a th:href="${nextMission.get('calendarLink')}" target="_blank" rel="noopener noreferrer" th:text="#{mission.calendar_link_open}">Öffnen</a></span>

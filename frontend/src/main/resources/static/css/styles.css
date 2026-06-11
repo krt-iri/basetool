@@ -4093,3 +4093,563 @@ textarea:focus-visible,
 .import-suggestion-chip {
     min-height: var(--touch-target);
 }
+
+/* ==========================================================================
+   Mission page patterns (ported from design-system krt-components.css,
+   commit ea56d7c): tab nav, facts bar, KRT modal, assign board, chip select.
+   ========================================================================== */
+
+/* -------------------------------------------------------------- TAB NAV -- */
+/* Page-level tab navigation (e.g. mission detail). Surface row; active tab =
+   white text + 3px orange underline; counts orange. Use role="tablist"/"tab"
+   + aria-selected, arrow-key navigation, and sync the active tab with a
+   ?tab=/#tab= deeplink. Specimen: preview/components-tabs.html */
+.tab-nav {
+    display: flex;
+    border-bottom: var(--border-hairline);
+    background-color: var(--color-bg-dark-gray);
+    padding: 0 12px;
+    overflow-x: auto;
+}
+.tab-nav .tab {
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.72rem;
+    color: var(--color-gray-2);
+    padding: 11px 14px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    min-height: var(--touch-target);
+    white-space: nowrap;
+}
+.tab-nav .tab:hover {
+    color: var(--color-gray-1);
+}
+.tab-nav .tab.active {
+    color: var(--color-white);
+    border-bottom-color: var(--color-primary);
+}
+.tab-nav .tab:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+.tab-nav .tab .tab-count {
+    color: var(--color-primary);
+    margin-left: 4px;
+}
+
+/* ------------------------------------------------------------ FACTS BAR -- */
+/* Compact key-fact strip under a sticky page head — answers the most common
+   questions without scrolling. Values use tabular figures. */
+.facts-bar {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    background-color: var(--color-surface-input);
+    border-bottom: var(--border-hairline);
+    font-size: 0.78rem;
+}
+.facts-bar .fact-k {
+    color: var(--color-gray-2);
+    text-transform: uppercase;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    font-weight: var(--fw-bold);
+    margin-right: 5px;
+}
+.facts-bar .fact-v {
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- MODAL -- */
+/* KRT modal: surface + orange top edge + HUD corner brackets on a blurred
+   scrim. Rules: exactly ONE filled CTA per modal (right), Cancel = .btn-ghost,
+   close-X = icon button with aria-label; danger variant for destructive
+   confirms (consequence named in the body). Focus-trap + Esc required. */
+.krt-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgb(0 0 0 / 80%);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 3000;
+}
+/* The frame itself must NOT scroll: its ::before/::after corner brackets sit
+   2px outside the box and would register as permanent overflow, forcing
+   scrollbars even when the content fits. Scrolling happens in .krt-modal-body
+   only (head/foot stay pinned), so bars appear solely when space runs out. */
+.krt-modal {
+    width: 100%;
+    max-width: 440px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    border-top: 3px solid var(--color-primary);
+    position: relative;
+    box-shadow: var(--glow-primary-lg);
+}
+.krt-modal > form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.krt-modal::before,
+.krt-modal::after {
+    content: '';
+    position: absolute;
+    width: 13px;
+    height: 13px;
+    border: 2px solid var(--color-primary);
+}
+.krt-modal::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+}
+.krt-modal::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+}
+/* Width variant for form-heavy modals (3+ stacked fields): confirms and
+   single-field prompts stay at the compact 440px default. */
+.krt-modal--wide {
+    max-width: 600px;
+}
+.krt-modal--danger {
+    border-top-color: var(--color-danger);
+    box-shadow: var(--glow-danger-lg);
+}
+.krt-modal--danger::before,
+.krt-modal--danger::after {
+    border-color: var(--color-danger);
+}
+.krt-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: var(--border-hairline);
+    flex-shrink: 0;
+}
+.krt-modal-head h2 {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 0.85rem;
+    color: var(--color-white);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0;
+}
+.krt-modal--danger .krt-modal-head h2 {
+    color: var(--color-danger-text);
+}
+.krt-modal-body {
+    padding: 14px 16px;
+    min-height: 0;
+    overflow-y: auto;
+}
+.krt-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: var(--border-hairline);
+    flex-shrink: 0;
+}
+
+/* --------------------------------------------------------- ASSIGN BOARD -- */
+/* Drag-&-drop planning board (mission crew): a pool of unassigned people and
+   open-ended unit drop zones — units have NO fixed size; per-person on-board
+   function is a flexible .chip-select. Always provide a click fallback
+   (select person → click target zone) and keyboard operability. */
+.person-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--color-surface-input);
+    border: var(--border-hairline);
+    cursor: grab;
+}
+.person-row.is-selected {
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-primary);
+}
+.person-row:active {
+    cursor: grabbing;
+}
+.person-row:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+.person-row .row-grip {
+    color: var(--color-gray-2);
+    flex: none;
+}
+.person-row .row-main {
+    flex: 1;
+    min-width: 0;
+}
+.person-row .row-sub {
+    font-size: 0.66rem;
+    color: var(--color-gray-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.status-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    display: inline-block;
+    background: var(--color-gray-2);
+}
+.status-dot--on {
+    background: var(--color-success);
+}
+.drop-zone {
+    min-height: var(--touch-target);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.drop-zone:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -4px;
+}
+.drop-zone.is-over {
+    outline: 2px dashed var(--color-primary);
+    outline-offset: -4px;
+    background: rgb(231 126 35 / 6%);
+}
+.drop-hint {
+    border: 1px dashed var(--color-gray-3);
+    color: var(--color-gray-2);
+    font-size: 0.66rem;
+    text-align: center;
+    padding: 7px;
+    font-style: italic;
+}
+.drop-zone.is-over .drop-hint {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* Chip-styled inline select — uppercase label + orange chevron; reads like a
+   .chip but is editable (e.g. on-board function in a dense row). */
+.chip-select {
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    background-color: transparent;
+    color: var(--color-gray-1);
+    border: var(--border-hairline);
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 22px 4px 8px;
+    max-width: 165px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath fill='%23E77E23' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 7px center;
+}
+.chip-select:hover {
+    border-color: var(--color-primary);
+    color: var(--color-white);
+}
+.chip-select:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: var(--glow-primary);
+}
+
+/* The closed control is transparent on the dark row, but the OPTION popup must
+   not inherit that: Firefox paints the list with the select's background, which
+   computes to white — light-gray text on it is unreadable. Pin the popup to the
+   dark surface explicitly. */
+.chip-select option {
+    background-color: var(--color-bg-dark-gray);
+    color: var(--color-gray-1);
+}
+
+/* ==========================================================================
+   Rendered user Markdown (mission description). Source HTML is generated by
+   the server-side @markdown bean (raw HTML escaped, unsafe URLs stripped) —
+   these rules only give the generated tags the KRT look.
+   ========================================================================== */
+.markdown-content {
+    font-size: 0.85rem;
+    font-weight: 300;
+    color: var(--color-gray-1);
+    line-height: 1.55;
+    max-width: 80ch;
+}
+
+.markdown-content > :first-child {
+    margin-top: 0;
+}
+
+.markdown-content > :last-child {
+    margin-bottom: 0;
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content pre {
+    margin: 0 0 0.6em;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    padding-left: 1.4em;
+}
+
+.markdown-content li + li {
+    margin-top: 0.2em;
+}
+
+.markdown-content strong {
+    color: var(--color-white);
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-gray-1);
+    margin: 0.9em 0 0.4em;
+}
+
+.markdown-content h1 {
+    font-size: 1rem;
+}
+
+.markdown-content h2 {
+    font-size: 0.9rem;
+}
+
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+    font-size: 0.8rem;
+}
+
+.markdown-content code {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    background-color: var(--color-surface-input);
+    border: var(--border-hairline);
+    padding: 0.05em 0.35em;
+}
+
+.markdown-content pre {
+    background-color: var(--color-surface-input);
+    border: var(--border-hairline);
+    padding: 0.6em 0.8em;
+    overflow-x: auto;
+}
+
+.markdown-content pre code {
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.markdown-content blockquote {
+    border-left: 3px solid var(--color-primary);
+    padding-left: 0.8em;
+    color: var(--color-gray-2);
+}
+
+.markdown-content hr {
+    border: none;
+    border-top: var(--border-hairline);
+    margin: 0.8em 0;
+}
+
+.markdown-content table {
+    border-collapse: collapse;
+    margin: 0 0 0.6em;
+}
+
+.markdown-content th,
+.markdown-content td {
+    border: var(--border-hairline);
+    padding: 0.25em 0.6em;
+}
+
+/* ==========================================================================
+   Master-detail, ingredient-quality, and empty-state patterns (ported from
+   design-system krt-components.css, commit dab7640).
+   ========================================================================== */
+
+/* ----------------------------------------------------------- EMPTY STATE -- */
+/* Centered placeholder for empty lists/collections: short reason + ONE next
+   action (ghost or cta). Never leave a bare "Keine Einträge." table cell. */
+/* The hidden attribute must win over the flex display (UA [hidden] rule loses to a class). */
+.empty-state[hidden] {
+    display: none;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 28px 16px;
+    text-align: center;
+    border: 1px dashed var(--color-gray-3);
+    background: var(--color-bg-dark-gray);
+}
+.empty-state .empty-title {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.85rem;
+    color: var(--color-gray-1);
+}
+.empty-state .empty-text {
+    font-size: 0.8rem;
+    font-weight: 300;
+    color: var(--color-gray-2);
+    max-width: 48ch;
+}
+
+/* ---------------------------------------------------------- MASTER-DETAIL -- */
+/* Collection browser (e.g. blueprints): dense filterable list left, permanent
+   detail pane right. On small screens collapse to list → detail navigation
+   (back button in the pane). Keyboard: ↑/↓ move the active row. */
+.master-detail {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 12px;
+    align-items: start;
+}
+@media (width <= 900px) {
+    .master-detail {
+        grid-template-columns: 1fr;
+    }
+}
+.master-list {
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+}
+.master-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 11px;
+    border-bottom: var(--border-hairline);
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--color-gray-1);
+}
+.master-row:hover {
+    background: rgb(255 255 255 / 3%);
+}
+.master-row.is-active {
+    border-left: 3px solid var(--color-primary);
+    background: var(--color-surface-input);
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+}
+.master-row:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+.detail-pane {
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    padding: 14px 16px;
+}
+
+/* ------------------------------------------------- INGREDIENT QUALITY ----- */
+/* "Stat-Beitrag nach Zutat-Qualität": every ingredient carries its OWN quality
+   slider which scales only its mapped stats. Show the live factor on the
+   affected stat chips; keep "min. Qualität" and "höher ist besser" hints. */
+input[type='range'] {
+    accent-color: var(--color-primary);
+}
+.quality-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 250px;
+}
+.quality-block .quality-source {
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--color-gray-2);
+}
+.quality-block .quality-name {
+    font-size: 0.8rem;
+    color: var(--color-gray-1);
+}
+.quality-block .quality-name strong {
+    color: var(--color-white);
+}
+.quality-block .quality-name small {
+    color: var(--color-gray-2);
+}
+.quality-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.quality-row input[type='range'] {
+    width: 200px;
+    height: 18px;
+    background: transparent;
+}
+.quality-row .quality-value {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+    font-size: 0.76rem;
+    min-width: 70px;
+}
+.quality-row .quality-value small {
+    color: var(--color-gray-2);
+    font-weight: 400;
+}
+.quality-affects {
+    font-size: 0.72rem;
+    color: var(--color-gray-2);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}

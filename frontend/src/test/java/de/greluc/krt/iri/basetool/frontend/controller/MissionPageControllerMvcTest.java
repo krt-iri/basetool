@@ -153,58 +153,26 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(Collections.emptyList());
 
-    // This will fail with TemplateProcessingException if the th:onclick syntax is invalid
+    // This will fail with TemplateProcessingException if the template syntax is invalid
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail"))
-        // Responsive panel grid (no horizontal scroll)
-        .andExpect(content().string(containsString("mission-columns-container")))
-        // Accessible collapse buttons with aria-expanded and data-panel-key
-        .andExpect(content().string(containsString("data-panel-key=\"details\"")))
-        .andExpect(content().string(containsString("data-panel-key=\"participants\"")))
-        .andExpect(content().string(containsString("data-panel-key=\"units\"")))
-        .andExpect(content().string(containsString("data-panel-key=\"finance\"")))
-        .andExpect(content().string(containsString("data-panel-toggle=\"col-details\"")))
-        .andExpect(content().string(containsString("aria-expanded=\"true\"")))
-        .andExpect(content().string(containsString("aria-controls=\"col-details-content\"")))
+        // Tab layout (Variante B): sticky head + facts bar + accessible tab nav
+        .andExpect(content().string(containsString("mission-head-sticky")))
+        .andExpect(content().string(containsString("facts-bar")))
+        .andExpect(content().string(containsString("role=\"tablist\"")))
+        .andExpect(content().string(containsString("id=\"pane-ueb\"")))
+        .andExpect(content().string(containsString("id=\"pane-crew\"")))
+        .andExpect(content().string(containsString("id=\"pane-fin\"")))
+        // Verwaltung tab renders for an editor (canEdit=true in this fixture)
+        .andExpect(content().string(containsString("id=\"pane-verw\"")))
+        .andExpect(content().string(containsString("role=\"tabpanel\"")))
+        // Crew board skeleton: pool drop zone + the legacy participants table is gone
+        .andExpect(content().string(containsString("id=\"board-pool\"")))
+        .andExpect(content().string(not(containsString("mission-columns-container"))))
         // Legacy horizontal-scroll markers must be gone
-        .andExpect(content().string(not(containsString("vertical-title"))))
-        // Content-aware per-panel min-widths so wide tables/action
-        // buttons never overflow their panel; also drives the
-        // 1-column-fallback when two panels don't fit side by side.
-        .andExpect(content().string(containsString("--panel-min-width")))
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "[data-panel-key=\"participants\"] { --panel-min-width: 1100px;")))
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "[data-panel-key=\"units\"]        { --panel-min-width: 1100px;")))
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "[data-panel-key=\"payout\"]       { --panel-min-width: 820px;")))
-        // Ultra-wide breakpoint explicitly caps column count so wide
-        // panels like "participants" never get squeezed on 4K/UHD.
-        .andExpect(content().string(containsString("@media (min-width: 2400px)")))
-        .andExpect(content().string(containsString("@media (min-width: 3600px)")))
-        // Regression guard: .table-responsive must not have a default
-        // overflow-x: auto anymore (that caused intra-panel horizontal
-        // scrolling instead of letting the panel grow wide enough).
-        .andExpect(
-            content()
-                .string(
-                    not(
-                        containsString(
-                            ".mission-column .col-content .table-responsive {\n"
-                                + "            width: 100%;\n"
-                                + "            /* Intra-panel horizontal scroll is a last-resort"
-                                + " fallback"))));
+        .andExpect(content().string(not(containsString("vertical-title"))));
   }
 
   @Test
@@ -434,7 +402,7 @@ class MissionPageControllerMvcTest {
         // string).
         .andExpect(content().string(containsString("10.02.2026 11:00 UTC")))
         // The conversion script must be present so the value becomes browser-local on load.
-        .andExpect(content().string(containsString("formatRefineryEndLocalTimes")));
+        .andExpect(content().string(containsString("krtFormatLocalDateTime")));
   }
 
   @Test
@@ -1790,6 +1758,8 @@ class MissionPageControllerMvcTest {
             assignedShip,
             123.45,
             false,
+            null,
+            null,
             Collections.emptyList());
 
     MissionDto mission =
@@ -1996,5 +1966,177 @@ class MissionPageControllerMvcTest {
         .andExpect(view().name("mission-detail"))
         // The rounded amount is rendered as a raw integer data attribute (HALF_UP: 1234.5 -> 1235).
         .andExpect(content().string(containsString("data-amount=\"1235\"")));
+  }
+
+  /**
+   * Renders the crew board with a unit that actually has crew: the earlier render fixtures all use
+   * empty crew lists, so the person-row fragment's crew branch (chip-select with the assigned job
+   * preselected, the multi-edit entry, and the unit drop-zone wiring) never executed. This test
+   * populates one unit with one crew member holding one function and asserts the board markup.
+   */
+  @Test
+  void missionDetail_UnitWithCrew_RendersBoardRowWithChipSelect() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    UUID crewId = UUID.randomUUID();
+    UUID jobTypeId = UUID.randomUUID();
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto participant =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto(
+            participantId,
+            null,
+            "Crewman",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            de.greluc.krt.iri.basetool.frontend.model.PayoutPreference.PAYOUT,
+            1L);
+
+    de.greluc.krt.iri.basetool.frontend.model.dto.JobTypeDto gunner =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.JobTypeDto(
+            jobTypeId, "Gunner", null, "CREW", null, true, false, 1L);
+    de.greluc.krt.iri.basetool.frontend.model.dto.MissionCrewDto crew =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.MissionCrewDto(
+            crewId, participantId, "Crewman", java.util.Set.of(gunner));
+    de.greluc.krt.iri.basetool.frontend.model.dto.MissionUnitDto unit =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.MissionUnitDto(
+            unitId, "Alpha", null, null, null, true, null, null, List.of(crew));
+
+    MissionDto mission =
+        new MissionDto(
+            missionId,
+            "Board Mission",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            java.util.Set.of(participant),
+            List.of(unit),
+            Collections.emptyList(),
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            null,
+            null,
+            Collections.emptySet(),
+            true,
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            0,
+            1,
+            null,
+            null,
+            null,
+            0L);
+
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(mission);
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+    // The chip-select options are rendered from the CREW job-type lookup; without this stub the
+    // generic emptyList answer above throws on .content() and the options list stays empty.
+    de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<java.util.Map<String, Object>>
+        crewJobTypesPage =
+            new de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse<>(
+                List.of(java.util.Map.of("id", jobTypeId, "name", "Gunner")),
+                0,
+                1,
+                1,
+                1,
+                Collections.emptyList());
+    when(backendApiClient.getCached(
+            eq("/api/v1/job-types?archetype=CREW&size=1000"),
+            any(ParameterizedTypeReference.class),
+            eq(true)))
+        .thenReturn(crewJobTypesPage);
+
+    mockMvc
+        .perform(get("/missions/" + missionId))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail"))
+        // The unit renders as a drop zone carrying its id; the crew member renders as a
+        // person row carrying participant + crew ids for the board move handlers.
+        .andExpect(content().string(containsString("data-unit-id=\"" + unitId + "\"")))
+        .andExpect(
+            content().string(containsString("data-participant-id=\"" + participantId + "\"")))
+        .andExpect(content().string(containsString("data-crew-id=\"" + crewId + "\"")))
+        // On-board function chip-select with the single assigned job preselected and the
+        // multi-function edit entry present (canEdit=true in this fixture).
+        .andExpect(content().string(containsString("crew-role-select")))
+        .andExpect(content().string(containsString("value=\"" + jobTypeId + "\" selected")))
+        .andExpect(content().string(containsString("value=\"__edit\"")))
+        // HVU marking surfaces as the warning chip on the unit head.
+        .andExpect(content().string(containsString("chip--warning")));
+  }
+
+  /**
+   * The mission description is Markdown: the Uebersicht briefing panel must render it to HTML via
+   * the {@code @markdown} bean (bold -> strong) while raw HTML in the source stays escaped — the
+   * th:utext sink must never emit user-controlled markup.
+   */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_DescriptionMarkdown_RendersHtmlAndEscapesRawTags() throws Exception {
+    UUID missionId = UUID.randomUUID();
+
+    MissionDto mission =
+        new MissionDto(
+            missionId,
+            "Markdown Mission",
+            "**Sammeln** bei ARC-L1 <script>alert('xss')</script>",
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            null,
+            null,
+            Collections.emptySet(),
+            true,
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            0,
+            0,
+            null,
+            null,
+            null,
+            0L);
+
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(mission);
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("<strong>Sammeln</strong>")))
+        .andExpect(content().string(not(containsString("<script>alert"))));
   }
 }

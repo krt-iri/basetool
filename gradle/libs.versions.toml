@@ -28,6 +28,7 @@ axeCorePlaywright = "4.11.3"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
 openpdf = "3.0.5"
+commonmark = "0.25.1"
 
 [libraries]
 
@@ -51,3 +52,4 @@ axe-core-playwright = { module = "com.deque.html.axe-core:playwright", version.r
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrainsAnnotations" }
 lombok-mapstruct-binding = { module = "org.projectlombok:lombok-mapstruct-binding", version.ref = "lombokMapstructBinding" }
 openpdf-core = { module = "com.github.librepdf:openpdf", version.ref = "openpdf" }
+commonmark-core = { module = "org.commonmark:commonmark", version.ref = "commonmark" }

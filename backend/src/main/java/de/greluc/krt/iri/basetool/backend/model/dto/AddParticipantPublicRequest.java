@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
+import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
@@ -33,10 +34,15 @@ import java.util.UUID;
  * may label those org units — see {@code MissionService.resolveGuestSubmittedOrgUnits}); for a
  * registered participant the affiliations are auto-derived server-side from the user's memberships
  * and any submitted list is ignored.
+ *
+ * <p>{@code payoutPreference} optionally fixes the per-mission payout choice at sign-up time (the
+ * "Auszahlungsart" select in the sign-up modal). When {@code null}, the registered user's profile
+ * default (REQ-MISSION-002) respectively the entity default ({@code PAYOUT}) applies.
  */
 public record AddParticipantPublicRequest(
     UUID userId,
     @Size(max = 100) String guestName,
     UUID desiredJobTypeId,
     @Size(max = 1000) String comment,
-    List<UUID> orgUnitIds) {}
+    List<UUID> orgUnitIds,
+    PayoutPreference payoutPreference) {}

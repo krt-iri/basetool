@@ -159,7 +159,6 @@
 #krt-pi-delete-modal .form-group {
     margin-bottom: 1.25rem;
 }
-
 .krt-personal-inventory .form-group input,
 .krt-personal-inventory .form-group textarea,
 #krt-pi-modal .form-group input,
@@ -403,54 +402,10 @@
 }
 
 /* ------------------------------------------------------------------ *
- * Blueprints sub-page (#327, Phase 5): in-page tabs + multi-select   *
- * staging chips. Reuses the krt-pi-* table / modal / typeahead base. *
+ * Blueprints sub-page (#327, Phase 5): multi-select staging chips.   *
+ * Reuses the krt-pi-* table / modal / typeahead base. The in-page    *
+ * Items | Blueprints tabs use the shared .tab-nav DS component.      *
  * ------------------------------------------------------------------ */
-
-/* In-page tab bar mirroring the sidebar Items | Blueprints group. */
-.krt-pi-tabs {
-    display: flex;
-    gap: 0.4rem;
-    margin: 1rem 0 0;
-    flex-wrap: wrap;
-}
-
-.krt-pi-tab {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem 1.4rem;
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: var(--fs-xs);
-    color: var(--color-gray-1, #d2d2d2);
-    text-decoration: none;
-    border: 1px solid var(--color-gray-3, #282828);
-    border-radius: 4px;
-    background: var(--color-surface-input, #1c1c1c);
-    transition:
-        color 0.15s ease,
-        border-color 0.15s ease,
-        background 0.15s ease;
-}
-
-.krt-pi-tab:hover,
-.krt-pi-tab:focus {
-    color: var(--color-primary, #e77e23);
-    border-color: var(--color-primary, #e77e23);
-    background: rgb(231 126 35 / 12%);
-}
-
-.krt-pi-tab-active,
-.krt-pi-tab-active:hover,
-.krt-pi-tab-active:focus {
-    color: #000;
-    border-color: var(--color-primary, #e77e23);
-    background: var(--color-primary, #e77e23);
-    font-weight: 700;
-}
 
 .krt-bp-section-title {
     font-family: var(--font-headline);
@@ -1049,5 +1004,161 @@
 
     .krt-bp-recipe-range {
         max-width: none;
+    }
+}
+
+/* ==========================================================================
+   Blueprints master-detail (V3) — page-specific layout on top of the DS
+   .master-detail / .quality-* / .empty-state patterns.
+   ========================================================================== */
+
+/* Compact add bar in the greeting head (typeahead + CTA + JSON import). */
+.krt-bp-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.krt-bp-addbar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.krt-bp-addbar .krt-bp-search {
+    margin: 0;
+    min-width: 280px;
+    position: relative;
+}
+
+.krt-bp-addbar .krt-bp-search input {
+    min-height: 44px;
+}
+
+/* Staging chips collapse to a compact strip under the bar; hidden when empty
+   (the CTA stays disabled until something is staged). */
+.krt-bp-staging-bar {
+    margin-top: 0.5rem;
+}
+
+.krt-bp-staging-bar .krt-bp-chip-list {
+    min-height: 0;
+}
+
+.krt-bp-staging-bar .krt-bp-staging-empty {
+    display: none;
+}
+
+/* Master list: scrollable, filter box pinned on top. */
+.krt-bp-master-filter {
+    padding: 8px;
+    border-bottom: var(--border-hairline);
+}
+
+.krt-bp-master-filter input {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    min-height: 44px;
+}
+
+.krt-bp-master-rows {
+    max-height: 65vh;
+    overflow-y: auto;
+}
+
+.master-row {
+    width: 100%;
+    background: none;
+    border-top: none;
+    border-left: 3px solid transparent;
+    border-right: none;
+    text-align: left;
+    font-family: var(--font-body);
+}
+
+.master-row .master-row-note {
+    color: var(--color-primary);
+    flex: none;
+}
+
+/* Detail pane: head row, quality blocks, note box, mobile back button. */
+.krt-bp-detail-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.krt-bp-detail-name {
+    font-weight: var(--fw-bold);
+    color: var(--color-white);
+    font-size: 0.95rem;
+}
+
+.krt-bp-detail-acquired {
+    font-size: 0.7rem;
+    color: var(--color-gray-2);
+    margin-top: 2px;
+}
+
+.krt-bp-detail-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.krt-bp-detail-recipe .quality-block {
+    margin-bottom: 12px;
+}
+
+.krt-bp-detail-note {
+    margin: 0;
+    font-size: 0.8rem;
+    background: var(--color-surface-input);
+    border-left: 3px solid var(--color-primary);
+    padding: 6px 9px;
+    white-space: pre-line;
+}
+
+.krt-bp-detail-back {
+    display: none;
+    margin-bottom: 0.75rem;
+}
+
+/* Wide variant for the import preview inside the KRT modal frame. */
+.krt-modal.krt-bp-import-frame {
+    max-width: 1100px;
+    width: 95%;
+}
+
+/* Mobile (≤900px): list → detail navigation. */
+@media (width <= 900px) {
+    .krt-bp-md .detail-pane {
+        display: none;
+    }
+
+    .krt-bp-md.is-detail .master-list {
+        display: none;
+    }
+
+    .krt-bp-md.is-detail .detail-pane {
+        display: block;
+    }
+
+    .krt-bp-md.is-detail .krt-bp-detail-back {
+        display: inline-flex;
+    }
+
+    .krt-bp-addbar .krt-bp-search {
+        min-width: 0;
+        flex: 1 1 100%;
     }
 }

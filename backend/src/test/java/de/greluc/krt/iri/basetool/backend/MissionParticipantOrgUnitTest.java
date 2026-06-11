@@ -169,7 +169,8 @@ class MissionParticipantOrgUnitTest {
             "Guest",
             null,
             "Comment",
-            List.of(testStaffel.getId(), testSk.getId()));
+            List.of(testStaffel.getId(), testSk.getId()),
+            null);
 
     MissionParticipant participant =
         updated.getParticipants().stream()

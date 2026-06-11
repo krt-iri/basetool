@@ -127,7 +127,7 @@ class MissionValidationTest {
 
     missionService.addParticipant(mission.getId(), officerUser.getId());
     missionService.addUnitToMission(
-        mission.getId(), "Test Unit", st.getId(), ship.getId(), false, null);
+        mission.getId(), "Test Unit", st.getId(), ship.getId(), false, null, null, null);
     mission = missionRepository.findById(mission.getId()).orElseThrow();
     missionShip = mission.getAssignedUnits().iterator().next();
 
@@ -222,7 +222,7 @@ class MissionValidationTest {
   @Test
   void testAddParticipantPublic_GuestNameTaken_ShouldReturn400() throws Exception {
     AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(null, "officer1", null, null, null);
+        new AddParticipantPublicRequest(null, "officer1", null, null, null, null);
 
     mockMvc
         .perform(
@@ -240,7 +240,8 @@ class MissionValidationTest {
             "UniqueGuestName",
             taskJobType.getId(),
             "Comment",
-            java.util.List.of(testSquadron.getId()));
+            java.util.List.of(testSquadron.getId()),
+            null);
 
     mockMvc
         .perform(
@@ -271,7 +272,7 @@ class MissionValidationTest {
     saveIridiumMembership(caller);
 
     AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(null, "  Lord_Adley  ", null, null, null);
+        new AddParticipantPublicRequest(null, "  Lord_Adley  ", null, null, null, null);
 
     mockMvc
         .perform(
@@ -314,7 +315,7 @@ class MissionValidationTest {
     saveIridiumMembership(caller);
 
     AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(null, "Lord_Adley", null, null, null);
+        new AddParticipantPublicRequest(null, "Lord_Adley", null, null, null, null);
 
     mockMvc
         .perform(
@@ -355,7 +356,7 @@ class MissionValidationTest {
     saveIridiumMembership(caller);
 
     AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(null, "Shared Alias", null, null, null);
+        new AddParticipantPublicRequest(null, "Shared Alias", null, null, null, null);
 
     mockMvc
         .perform(

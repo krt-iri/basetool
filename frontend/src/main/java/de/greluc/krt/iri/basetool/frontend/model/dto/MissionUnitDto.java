@@ -24,7 +24,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission Unit payload. */
+/**
+ * Data transfer record carrying Mission Unit payload. {@code responsibleUser} is the explicit
+ * responsible person (PII-free reference tuple); when {@code null} the view falls back to the
+ * assigned ship's owner. {@code note} is the unit's free-text planning note.
+ */
 public record MissionUnitDto(
     UUID id,
     String name,
@@ -32,6 +36,8 @@ public record MissionUnitDto(
     ShipDto ship,
     Double frequency,
     Boolean highValueUnit,
+    UserReferenceDto responsibleUser,
+    String note,
     List<MissionCrewDto> crew) {
   /**
    * Aggregates this unit's crew job assignments into a name-to-count map preserving first-seen

@@ -19,16 +19,31 @@
 
 package de.greluc.krt.iri.basetool.backend.model.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
-/** Inbound request payload for the Add Unit operation. */
+/**
+ * Inbound request payload for the Add Unit operation.
+ *
+ * <p>{@code name} is an optional display name (per the approved unit-modal mock): when blank, the
+ * service derives the stored name from the assigned ship or ship type — at least one of name / ship
+ * / ship type must be present. {@code responsibleUserId} optionally pins an explicit responsible
+ * person (otherwise the UI falls back to the ship owner); {@code note} is a free-text planning
+ * note.
+ */
 public record AddUnitRequest(
-    @NotBlank(message = "{validation.mission.unit.name.required}") String name,
+    @Size(max = 255) String name,
     UUID shipTypeId,
     UUID shipId,
     Boolean highValueUnit,
-    Double frequency) {
+    Double frequency,
+    UUID responsibleUserId,
+    @Size(max = 500) String note) {
+  /**
+   * Null-safe accessor for the HVU flag.
+   *
+   * @return {@code true} only when the caller explicitly flagged the unit as high-value
+   */
   public boolean isHighValueUnit() {
     return highValueUnit != null && highValueUnit;
   }

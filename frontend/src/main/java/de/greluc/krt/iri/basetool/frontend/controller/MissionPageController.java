@@ -182,7 +182,7 @@ public class MissionPageController {
       model.addAttribute("participantForm", form);
     }
     if (!model.containsAttribute("unitForm")) {
-      model.addAttribute("unitForm", new UnitForm("", null, null, false, null));
+      model.addAttribute("unitForm", new UnitForm("", null, null, false, null, null, null));
     }
     if (!model.containsAttribute("crewForm")) {
       model.addAttribute("crewForm", new CrewForm(null, null));
@@ -381,6 +381,17 @@ public class MissionPageController {
               .filter(p -> p.id() != null && !assignedUnitByParticipantId.containsKey(p.id()))
               .toList();
       model.addAttribute("unassignedParticipants", unassignedParticipants);
+
+      // Crew board (tab layout, Variante B): unit crew lists carry only
+      // participantId/participantName, so the board's person rows resolve the full participant
+      // payload (org units, desired job, comment, check-in state, version) via this id lookup.
+      Map<UUID, MissionParticipantDto> participantsById = new java.util.HashMap<>();
+      for (MissionParticipantDto p : participants) {
+        if (p.id() != null) {
+          participantsById.put(p.id(), p);
+        }
+      }
+      model.addAttribute("participantsById", participantsById);
 
       // Calculate participation percentages
       Map<UUID, Double> participationPercentages = new java.util.HashMap<>();
@@ -609,6 +620,42 @@ public class MissionPageController {
                   new ParameterizedTypeReference<List<RefineryOrderListDto>>() {},
                   false);
           model.addAttribute("refineryOrders", refineryOrders);
+
+          // Finance tab summary strip (Gesamtsumme / Einnahmen / Ausgaben / je Anteil): income
+          // and expense buckets aggregate the manual ledger entries; refinery-order expenses are
+          // the automatic "auto" rows and therefore count into the expense bucket as well.
+          java.math.BigDecimal incomeSum = java.math.BigDecimal.ZERO;
+          java.math.BigDecimal expenseSum = java.math.BigDecimal.ZERO;
+          int incomeCount = 0;
+          int expenseCount = 0;
+          for (MissionFinanceEntryDto entry : financesPage.content()) {
+            if (entry.type() != null && "INCOME".equals(entry.type().name())) {
+              incomeSum = incomeSum.add(entry.amount());
+              incomeCount++;
+            } else if (entry.type() != null) {
+              expenseSum = expenseSum.add(entry.amount());
+              expenseCount++;
+            }
+          }
+          if (refineryOrders != null) {
+            for (RefineryOrderListDto order : refineryOrders) {
+              if (order.expenses() != null && order.expenses() > 0) {
+                expenseSum = expenseSum.add(java.math.BigDecimal.valueOf(order.expenses()));
+                expenseCount++;
+              }
+            }
+          }
+          model.addAttribute("financeIncomeSum", incomeSum);
+          model.addAttribute("financeExpenseSum", expenseSum);
+          model.addAttribute("financeIncomeCount", incomeCount);
+          model.addAttribute("financeExpenseCount", expenseCount);
+          Integer registered = mission.registeredParticipants();
+          model.addAttribute(
+              "financePerShare",
+              (financeSum != null && registered != null && registered > 0)
+                  ? financeSum.divide(
+                      java.math.BigDecimal.valueOf(registered), 0, java.math.RoundingMode.HALF_UP)
+                  : null);
         } catch (Exception e) {
           log.error("Error loading finance entries or refinery orders", e);
         }
@@ -662,6 +709,9 @@ public class MissionPageController {
       }
       if (form.orgUnitIds() != null && !form.orgUnitIds().isEmpty()) {
         body.put("orgUnitIds", form.orgUnitIds());
+      }
+      if (form.payoutPreference() != null) {
+        body.put("payoutPreference", form.payoutPreference().name());
       }
       body.put("comment", form.comment());
 
@@ -990,11 +1040,13 @@ public class MissionPageController {
   @PreAuthorize("isAuthenticated()")
   public String addUnit(
       @PathVariable @NotNull UUID id,
-      @RequestParam String name,
+      @RequestParam(required = false) String name,
       @RequestParam(required = false) UUID shipTypeId,
       @RequestParam(required = false) UUID shipId,
       @RequestParam(required = false, defaultValue = "false") boolean highValueUnit,
       @RequestParam(required = false) Double frequency,
+      @RequestParam(required = false) UUID responsibleUserId,
+      @RequestParam(required = false) String note,
       RedirectAttributes redirectAttributes) {
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1005,6 +1057,8 @@ public class MissionPageController {
       }
       body.put("highValueUnit", highValueUnit);
       body.put("frequency", frequency);
+      body.put("responsibleUserId", responsibleUserId);
+      body.put("note", note);
 
       backendApiClient.post("/api/v1/missions/" + id + "/units", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -1025,11 +1079,13 @@ public class MissionPageController {
   public String updateUnit(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @RequestParam String name,
+      @RequestParam(required = false) String name,
       @RequestParam(required = false) UUID shipTypeId,
       @RequestParam(required = false) UUID shipId,
       @RequestParam(required = false, defaultValue = "false") boolean highValueUnit,
       @RequestParam(required = false) Double frequency,
+      @RequestParam(required = false) UUID responsibleUserId,
+      @RequestParam(required = false) String note,
       RedirectAttributes redirectAttributes) {
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1040,6 +1096,8 @@ public class MissionPageController {
       }
       body.put("highValueUnit", highValueUnit);
       body.put("frequency", frequency);
+      body.put("responsibleUserId", responsibleUserId);
+      body.put("note", note);
 
       backendApiClient.put("/api/v1/missions/" + id + "/units/" + unitId, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");

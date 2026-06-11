@@ -1,21 +1,46 @@
 /*
- * Personal Inventory — Blueprints sub-page: expandable recipe detail (#327).
+ * Personal Inventory — Blueprints sub-page: master-detail view (V3).
  *
- * Each owned-blueprint row carries a chevron toggle (data-trigger="bp-toggle-recipe").
- * Expanding it reveals a hidden detail <tr> and, on first open, lazily fetches the
- * product's SC Wiki recipe from /personal-inventory/blueprints/{id}/recipe and renders
- * a compact two-column view — "Zutaten" (ingredients) next to "Stat-Beitrag nach
- * Zutat-Qualität" (per-quality stat sliders) — mirroring the admin /admin/blueprints
- * page. Each stat slider recomputes its multiplier live, client-side, exactly like the
- * admin page (linear band, or segment-by-segment for stepped curves).
+ * The owned collection renders as a master list (left) with a permanent detail
+ * pane (right). Selecting a row — by click, ↑/↓ keys on the listbox, or the
+ * `?bp={id}` deeplink — fills the pane head from the row's data attributes and
+ * lazily fetches the product's SC Wiki recipe from
+ * /personal-inventory/blueprints/{id}/recipe (cached per id). Each requirement
+ * group renders as a quality block: source slot, ingredient line(s), ONE quality
+ * slider spanning the group's effective band, and the group's affected stats as
+ * chips whose multiplier recomputes live — using exactly the interpolation logic
+ * of the previous expandable-row view (linear band, or segment-by-segment for
+ * stepped curves; see computeModifierValue, kept verbatim).
  *
- * Wiring: uses the global `krtEvents.on` delegation helper (CSP-nonce-safe, no inline
- * onclick). Strings come from window.krtBlueprintsRecipeI18n; the per-row URL (with an
- * `ID_PLACEHOLDER` placeholder) from window.krtBlueprintsEndpoints. The DOM is built with
- * createElement + textContent only (no innerHTML), so no value is ever an HTML sink.
+ * The list filter input doubles up: typing filters the rendered rows instantly
+ * client-side, Enter submits the existing ?q= server filter. On ≤900px the
+ * layout collapses to list → detail navigation (back button in the pane).
+ *
+ * Wiring: CSP-nonce-safe (no inline handlers); strings from
+ * window.krtBlueprintsRecipeI18n; URLs (ID_PLACEHOLDER template) from
+ * window.krtBlueprintsEndpoints. DOM is built with createElement + textContent
+ * only (no innerHTML), so no value is ever an HTML sink.
  */
 (function () {
     'use strict';
+
+    let mdEl = null;
+    let rowsEl = null;
+    let filterInput = null;
+    let detailEmpty = null;
+    let detailContent = null;
+    let nameEl = null;
+    let acquiredEl = null;
+    let recipeEl = null;
+    let noteSection = null;
+    let noteEl = null;
+    let editBtn = null;
+    let deleteBtn = null;
+    let backBtn = null;
+    let activeRow = null;
+
+    // id -> recipe JSON, so re-selecting a row never refetches.
+    const recipeCache = new Map();
 
     function i18n() {
         return window.krtBlueprintsRecipeI18n || {};
@@ -49,35 +74,136 @@
         return window.safeSameOriginUrl ? window.safeSameOriginUrl(raw, raw) : raw;
     }
 
-    /* --------------------------------------------------------- expand / fetch */
+    // Thymeleaf renders a null Instant attribute as the literal string "null".
+    function attr(row, name) {
+        const v = row.getAttribute(name);
+        return v == null || v === 'null' ? '' : v;
+    }
 
-    function toggleRecipe(btn) {
-        const id = btn.getAttribute('data-id');
-        if (!id) {
-            return;
+    // Same UTC → local conversion the .utc-time elements get globally (sidebar.html).
+    function formatAcquired(iso) {
+        if (!iso) {
+            return '';
         }
-        const row = document.getElementById('bp-recipe-' + id);
+        let s = iso;
+        if (!s.endsWith('Z') && s.includes('T')) {
+            s += 'Z';
+        }
+        const date = new Date(s);
+        if (isNaN(date)) {
+            return iso;
+        }
+        return new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Europe/Berlin',
+        }).format(date);
+    }
+
+    /* ------------------------------------------------------- selection state */
+
+    function rows() {
+        return rowsEl ? Array.from(rowsEl.querySelectorAll('.master-row')) : [];
+    }
+
+    function visibleRows() {
+        return rows().filter(function (r) {
+            return !r.hidden;
+        });
+    }
+
+    function select(row, opts) {
         if (!row) {
             return;
         }
-        const expanded = btn.getAttribute('aria-expanded') === 'true';
-        if (expanded) {
-            row.hidden = true;
-            btn.setAttribute('aria-expanded', 'false');
-            return;
+        const options = opts || {};
+        if (activeRow) {
+            activeRow.classList.remove('is-active');
+            activeRow.setAttribute('aria-selected', 'false');
+            activeRow.tabIndex = -1;
         }
-        btn.setAttribute('aria-expanded', 'true');
-        row.hidden = false;
-        const panel = row.querySelector('.krt-bp-recipe-panel');
-        if (panel && panel.getAttribute('data-loaded') !== 'true') {
-            loadRecipe(id, panel);
+        activeRow = row;
+        row.classList.add('is-active');
+        row.setAttribute('aria-selected', 'true');
+        row.tabIndex = 0;
+        if (options.focus) {
+            row.focus();
+        }
+
+        // Deeplink: keep the existing ?q= server-filter param intact.
+        try {
+            const url = new URL(window.location);
+            url.searchParams.set('bp', attr(row, 'data-id'));
+            history.replaceState(null, '', url);
+        } catch (_e) {
+            /* URL API unavailable — deeplink update is best-effort */
+        }
+
+        renderDetailHead(row);
+        loadRecipe(attr(row, 'data-id'));
+
+        if (options.showDetail && mdEl && window.matchMedia('(max-width: 900px)').matches) {
+            mdEl.classList.add('is-detail');
         }
     }
 
-    function loadRecipe(id, panel) {
-        panel.setAttribute('data-loaded', 'true');
-        clear(panel);
-        panel.appendChild(el('div', 'krt-bp-recipe-loading', i18n().loading || 'Loading...'));
+    function renderDetailHead(row) {
+        if (!detailContent) {
+            return;
+        }
+        detailEmpty.hidden = true;
+        detailContent.hidden = false;
+
+        const id = attr(row, 'data-id');
+        const name = attr(row, 'data-name');
+        const note = attr(row, 'data-note');
+        const version = attr(row, 'data-version');
+        const acquired = attr(row, 'data-acquired-at');
+
+        nameEl.textContent = name;
+        const formatted = formatAcquired(acquired);
+        acquiredEl.textContent = formatted
+            ? (i18n().acquiredLabel || 'Erhalten am') + ' ' + formatted
+            : '';
+
+        // The pane's edit/remove buttons reuse the existing bp-open-edit/bp-open-delete
+        // delegation — only their data attributes change per selection.
+        [editBtn, deleteBtn].forEach(function (btn) {
+            if (!btn) {
+                return;
+            }
+            btn.setAttribute('data-id', id);
+            btn.setAttribute('data-name', name);
+        });
+        if (editBtn) {
+            editBtn.setAttribute('data-note', note);
+            editBtn.setAttribute('data-version', version);
+            editBtn.setAttribute('data-acquired-at', acquired);
+        }
+
+        if (note) {
+            noteEl.textContent = note;
+            noteSection.hidden = false;
+        } else {
+            noteSection.hidden = true;
+        }
+    }
+
+    /* --------------------------------------------------------- recipe loading */
+
+    function loadRecipe(id) {
+        if (!recipeEl || !id) {
+            return;
+        }
+        if (recipeCache.has(id)) {
+            renderRecipe(recipeCache.get(id));
+            return;
+        }
+        clear(recipeEl);
+        recipeEl.appendChild(el('div', 'krt-bp-recipe-loading', i18n().loading || 'Loading...'));
         fetch(resolveUrl(endpoints().recipe, id), {
             credentials: 'same-origin',
             headers: { Accept: 'application/json' },
@@ -87,37 +213,38 @@
             })
             .then(function (recipe) {
                 if (!recipe) {
-                    showError(panel);
+                    showError();
                     return;
                 }
-                renderRecipe(panel, recipe);
+                recipeCache.set(id, recipe);
+                // Only render if this id is still the active selection.
+                if (activeRow && attr(activeRow, 'data-id') === id) {
+                    renderRecipe(recipe);
+                }
             })
             .catch(function () {
-                showError(panel);
+                showError();
             });
     }
 
-    function showError(panel) {
-        // Allow a retry on the next expand by clearing the loaded flag.
-        panel.setAttribute('data-loaded', 'false');
-        clear(panel);
-        panel.appendChild(el('div', 'krt-bp-recipe-error', i18n().error || 'Error.'));
+    function showError() {
+        clear(recipeEl);
+        recipeEl.appendChild(el('div', 'krt-bp-recipe-error', i18n().error || 'Error.'));
     }
 
     /* -------------------------------------------------------------- rendering */
 
-    // renderRecipe is only ever called from loadRecipe after `recipe` is confirmed truthy, so the
-    // object itself needs no further guarding here — only its optional fields default to empty.
-    function renderRecipe(panel, recipe) {
-        clear(panel);
+    function renderRecipe(recipe) {
+        clear(recipeEl);
         const groups = recipe.requirementGroups || [];
         const flat = recipe.ingredients || [];
         if (groups.length === 0 && flat.length === 0) {
-            panel.appendChild(el('div', 'krt-bp-recipe-empty', i18n().empty || 'No recipe data.'));
+            recipeEl.appendChild(
+                el('div', 'krt-bp-recipe-empty', i18n().empty || 'No recipe data.'),
+            );
             return;
         }
 
-        const wrap = el('div', 'krt-bp-recipe');
         if (recipe.variantCount > 1) {
             const hint =
                 recipe.variantCount +
@@ -125,131 +252,178 @@
                 (i18n().variants || 'variants') +
                 ' · ' +
                 (i18n().exampleRecipe || 'example recipe');
-            wrap.appendChild(el('p', 'krt-bp-recipe-variants', hint));
+            recipeEl.appendChild(el('p', 'krt-bp-recipe-variants', hint));
         }
 
-        const table = el('table', 'krt-bp-recipe-table');
-        const thead = document.createElement('thead');
-        const htr = document.createElement('tr');
-        htr.appendChild(el('th', null, i18n().ingredients || 'Ingredients'));
-        htr.appendChild(el('th', null, i18n().statContribution || 'Stat contribution'));
-        thead.appendChild(htr);
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
         if (groups.length > 0) {
             groups.forEach(function (g) {
-                tbody.appendChild(renderGroupRow(g));
+                recipeEl.appendChild(renderQualityBlock(g));
             });
         } else {
-            tbody.appendChild(renderFlatRow(flat));
+            // Legacy fallback for a blueprint synced without requirement groups: the flat
+            // ingredient list with no stat band (a dash).
+            const block = el('div', 'quality-block');
+            flat.forEach(function (ing) {
+                block.appendChild(renderIngredientLine(ing));
+            });
+            const affects = el('div', 'quality-affects');
+            affects.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
+            block.appendChild(affects);
+            recipeEl.appendChild(block);
         }
-        table.appendChild(tbody);
-        wrap.appendChild(table);
-        panel.appendChild(wrap);
     }
 
-    // Legacy fallback row for a blueprint synced without requirement groups: the flat
-    // ingredient list with no stat band (a dash), mirroring the admin page's fallback.
-    function renderFlatRow(ingredients) {
-        const tr = document.createElement('tr');
-        const ingCell = ingredientCell();
-        ingredients.forEach(function (ing) {
-            ingCell.appendChild(renderIngredient(ing));
-        });
-        tr.appendChild(ingCell);
-        const statCell = statContributionCell();
-        statCell.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
-        tr.appendChild(statCell);
-        return tr;
-    }
-
-    function renderGroupRow(group) {
-        const tr = document.createElement('tr');
-
-        const ingCell = ingredientCell();
+    function renderQualityBlock(group) {
+        const block = el('div', 'quality-block');
         const slot = group.name || group.groupKey;
         if (slot) {
-            ingCell.appendChild(el('span', 'krt-bp-recipe-slot', slot));
+            block.appendChild(el('span', 'quality-source', slot));
         }
+
         const ings = group.ingredients || [];
+        let firstIngredientName = '';
         if (ings.length > 0) {
-            ings.forEach(function (ing) {
-                ingCell.appendChild(renderIngredient(ing));
+            ings.forEach(function (ing, idx) {
+                if (idx === 0) {
+                    firstIngredientName = ing.name || '';
+                }
+                block.appendChild(renderIngredientLine(ing));
             });
         } else {
-            ingCell.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
+            block.appendChild(el('div', 'quality-name', '–'));
         }
-        tr.appendChild(ingCell);
 
-        const statCell = statContributionCell();
         const mods = group.modifiers || [];
-        if (mods.length > 0) {
-            mods.forEach(function (m) {
-                statCell.appendChild(renderModifier(m));
-            });
-        } else {
-            statCell.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
-        }
-        tr.appendChild(statCell);
-        return tr;
-    }
-
-    // The data-label is surfaced as a pseudo-element heading on narrow screens, where
-    // the table collapses to stacked blocks and the column <thead> is hidden.
-    function ingredientCell() {
-        const td = el('td', 'krt-bp-recipe-ing-cell');
-        td.setAttribute('data-label', i18n().ingredients || 'Ingredients');
-        return td;
-    }
-
-    function statContributionCell() {
-        const td = el('td', 'krt-bp-recipe-stat-cell');
-        td.setAttribute('data-label', i18n().statContribution || 'Stat contribution');
-        return td;
-    }
-
-    function renderIngredient(ing) {
-        const span = el('span', 'krt-bp-recipe-ing');
-        span.appendChild(el('span', null, ing.name || '?'));
-        if (ing.quantityScu != null) {
-            span.appendChild(
-                el(
-                    'span',
-                    'krt-bp-recipe-ing-meta',
-                    ' · ' + Number(ing.quantityScu).toFixed(2) + ' SCU',
-                ),
+        const banded = mods.filter(function (m) {
+            return (
+                m.effectiveQualityMin != null &&
+                m.effectiveQualityMax != null &&
+                m.effectiveQualityMax > m.effectiveQualityMin
             );
+        });
+
+        const affects = el('div', 'quality-affects');
+        affects.appendChild(el('span', null, '→'));
+
+        if (mods.length === 0) {
+            affects.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
+            block.appendChild(affects);
+            return block;
+        }
+
+        // One slider per ingredient block spanning the union of its stats' bands; every
+        // affected-stat chip recomputes its own multiplier from the shared quality value.
+        const chips = [];
+        mods.forEach(function (m) {
+            const chip = el('span', 'chip');
+            chip.appendChild(el('span', null, (m.label || m.propertyKey || '') + ' '));
+            const valueOut = el('output', null, '×?');
+            chip.appendChild(valueOut);
+            const bw = betterWhenText(m.betterWhen);
+            if (bw) {
+                chip.title = bw;
+            }
+            chips.push({ modifier: m, out: valueOut });
+            affects.appendChild(chip);
+        });
+
+        if (banded.length > 0) {
+            const qmin = Math.min.apply(
+                null,
+                banded.map(function (m) {
+                    return m.effectiveQualityMin;
+                }),
+            );
+            const qmax = Math.max.apply(
+                null,
+                banded.map(function (m) {
+                    return m.effectiveQualityMax;
+                }),
+            );
+
+            const qrow = el('div', 'quality-row');
+            const range = document.createElement('input');
+            range.type = 'range';
+            range.step = '1';
+            range.min = String(qmin);
+            range.max = String(qmax);
+            range.value = String(qmax);
+            range.setAttribute(
+                'aria-label',
+                (i18n().qualityAria || 'Quality') +
+                    (firstIngredientName ? ' ' + firstIngredientName : ''),
+            );
+            qrow.appendChild(range);
+            const qval = el('span', 'quality-value');
+            const qOut = el('output', null, String(Math.round(qmax)));
+            qval.appendChild(qOut);
+            const qMaxSmall = document.createElement('small');
+            qMaxSmall.textContent = ' / ' + Math.round(qmax);
+            qval.appendChild(qMaxSmall);
+            qrow.appendChild(qval);
+            block.appendChild(qrow);
+
+            // Hint after the chips, mirroring the mock: "(höher ist besser · 1000 → ×1.15)".
+            const hintParts = [];
+            const firstBw = betterWhenText(mods[0] && mods[0].betterWhen);
+            if (firstBw) {
+                hintParts.push(firstBw);
+            }
+            if (banded[0] && banded[0].modifierAtMaxQuality != null) {
+                hintParts.push(
+                    Math.round(qmax) + ' → ×' + Number(banded[0].modifierAtMaxQuality).toFixed(2),
+                );
+            }
+            if (hintParts.length > 0) {
+                const hint = document.createElement('small');
+                hint.textContent = '(' + hintParts.join(' · ') + ')';
+                affects.appendChild(hint);
+            }
+
+            function compute() {
+                const q = parseFloat(range.value);
+                qOut.textContent = String(Math.round(q));
+                range.setAttribute('aria-valuetext', Math.round(q) + ' / ' + Math.round(qmax));
+                chips.forEach(function (c) {
+                    const value = computeModifierValue(c.modifier, q);
+                    c.out.textContent = '×' + (value == null ? '?' : value.toFixed(2));
+                });
+            }
+            range.addEventListener('input', compute);
+            compute();
+        } else {
+            // No usable quality band to slide over: show each stat's max-quality multiplier.
+            chips.forEach(function (c) {
+                const v = c.modifier.modifierAtMaxQuality;
+                c.out.textContent = v == null ? '–' : '×' + Number(v).toFixed(2);
+            });
+        }
+
+        block.appendChild(affects);
+        return block;
+    }
+
+    function renderIngredientLine(ing) {
+        const line = el('div', 'quality-name');
+        const strong = document.createElement('strong');
+        strong.textContent = ing.name || '?';
+        line.appendChild(strong);
+        const metaParts = [];
+        if (ing.quantityScu != null) {
+            metaParts.push(Number(ing.quantityScu).toFixed(2) + ' SCU');
         }
         if (ing.quantityUnits != null) {
-            span.appendChild(el('span', 'krt-bp-recipe-ing-meta', ' · ' + ing.quantityUnits + 'x'));
+            metaParts.push(ing.quantityUnits + 'x');
         }
         if (ing.minQuality != null) {
-            span.appendChild(
-                el(
-                    'span',
-                    'krt-bp-recipe-ing-meta',
-                    ' · ' + (i18n().minQuality || 'min. quality') + ' ' + ing.minQuality,
-                ),
-            );
+            metaParts.push((i18n().minQuality || 'min. quality') + ' ' + ing.minQuality);
         }
-        return span;
-    }
-
-    function renderModifier(m) {
-        const stat = el('div', 'krt-bp-recipe-stat');
-        stat.appendChild(el('span', 'krt-bp-recipe-stat-label', m.label || m.propertyKey || ''));
-        const bw = betterWhenText(m.betterWhen);
-        if (bw) {
-            stat.appendChild(el('span', 'krt-bp-recipe-stat-bw', '(' + bw + ')'));
+        if (metaParts.length > 0) {
+            const small = document.createElement('small');
+            small.textContent = ' · ' + metaParts.join(' · ');
+            line.appendChild(small);
         }
-
-        const hasBand =
-            m.effectiveQualityMin != null &&
-            m.effectiveQualityMax != null &&
-            m.effectiveQualityMax > m.effectiveQualityMin;
-        stat.appendChild(hasBand ? buildSlider(m) : buildFallback(m));
-        return stat;
+        return line;
     }
 
     function betterWhenText(bw) {
@@ -263,59 +437,6 @@
             return i18n().betterNeutral || 'neutral';
         }
         return null;
-    }
-
-    // Live slider spanning the ingredient's effective quality band; the output recomputes
-    // the stat multiplier on every input event, identically to the admin blueprint page.
-    function buildSlider(m) {
-        const qmin = m.effectiveQualityMin;
-        const qmax = m.effectiveQualityMax;
-        const slider = el('div', 'krt-bp-recipe-slider');
-
-        const row = el('div', 'krt-bp-recipe-slider-row');
-        row.appendChild(el('span', 'krt-bp-recipe-end', String(Math.round(qmin))));
-        const range = document.createElement('input');
-        range.type = 'range';
-        range.className = 'krt-bp-recipe-range';
-        range.step = '1';
-        range.min = String(qmin);
-        range.max = String(qmax);
-        range.value = String(qmax);
-        row.appendChild(range);
-        row.appendChild(
-            el('span', 'krt-bp-recipe-end krt-bp-recipe-end-max', String(Math.round(qmax))),
-        );
-        slider.appendChild(row);
-
-        const out = el('div', 'krt-bp-recipe-slider-out');
-        const qOut = el('output', 'krt-bp-recipe-q', '–');
-        out.appendChild(qOut);
-        out.appendChild(el('span', 'krt-bp-recipe-arrow', '→'));
-        const vOut = el('output', 'krt-bp-recipe-val', '×?');
-        out.appendChild(vOut);
-        slider.appendChild(out);
-
-        function compute() {
-            const q = parseFloat(range.value);
-            const value = computeModifierValue(m, q);
-            qOut.textContent = String(Math.round(q));
-            vOut.textContent = '×' + (value == null ? '?' : value.toFixed(2));
-        }
-        range.addEventListener('input', compute);
-        compute();
-        return slider;
-    }
-
-    // No usable quality band to slide over: show the max-quality multiplier, else a dash.
-    function buildFallback(m) {
-        if (m.modifierAtMaxQuality != null) {
-            return el(
-                'span',
-                'krt-bp-recipe-depval',
-                '×' + Number(m.modifierAtMaxQuality).toFixed(2),
-            );
-        }
-        return el('span', 'krt-bp-recipe-dash', '–');
     }
 
     /* ----------------------------------------------------------- computation */
@@ -365,9 +486,112 @@
         return null;
     }
 
-    /* --------------------------------------------------------------- wiring */
+    /* ----------------------------------------------------- filter + keyboard */
 
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'bp-toggle-recipe', toggleRecipe);
+    function applyClientFilter() {
+        if (!filterInput) {
+            return;
+        }
+        const q = (filterInput.value || '').trim().toLowerCase();
+        rows().forEach(function (r) {
+            const name = attr(r, 'data-name').toLowerCase();
+            r.hidden = q !== '' && name.indexOf(q) === -1;
+        });
+    }
+
+    function onListKeydown(e) {
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
+            return;
+        }
+        const vis = visibleRows();
+        if (vis.length === 0) {
+            return;
+        }
+        e.preventDefault();
+        let idx = vis.indexOf(activeRow);
+        if (e.key === 'ArrowDown') {
+            idx = Math.min(vis.length - 1, idx + 1);
+        } else if (e.key === 'ArrowUp') {
+            idx = Math.max(0, idx - 1);
+        } else if (e.key === 'Home') {
+            idx = 0;
+        } else {
+            idx = vis.length - 1;
+        }
+        select(vis[idx], { focus: true, showDetail: false });
+    }
+
+    /* ------------------------------------------------------------------ init */
+
+    function init() {
+        mdEl = document.getElementById('krt-bp-md');
+        if (!mdEl) {
+            return; // empty collection — nothing to wire
+        }
+        rowsEl = document.getElementById('krt-bp-master-rows');
+        filterInput = document.getElementById('krt-bp-q');
+        detailEmpty = document.getElementById('krt-bp-detail-empty');
+        detailContent = document.getElementById('krt-bp-detail-content');
+        nameEl = document.getElementById('krt-bp-detail-name');
+        acquiredEl = document.getElementById('krt-bp-detail-acquired');
+        recipeEl = document.getElementById('krt-bp-detail-recipe');
+        noteSection = document.getElementById('krt-bp-detail-note-section');
+        noteEl = document.getElementById('krt-bp-detail-note');
+        editBtn = document.getElementById('krt-bp-detail-edit');
+        deleteBtn = document.getElementById('krt-bp-detail-delete');
+        backBtn = document.getElementById('krt-bp-detail-back');
+
+        rows().forEach(function (r) {
+            r.tabIndex = -1;
+            r.addEventListener('click', function () {
+                select(r, { showDetail: true });
+            });
+        });
+        if (rowsEl) {
+            rowsEl.addEventListener('keydown', onListKeydown);
+        }
+        if (filterInput) {
+            filterInput.addEventListener('input', applyClientFilter);
+        }
+        if (backBtn) {
+            backBtn.addEventListener('click', function () {
+                mdEl.classList.remove('is-detail');
+                if (activeRow) {
+                    activeRow.focus();
+                }
+            });
+        }
+
+        // Initial selection: ?bp= deeplink wins; otherwise the first row. On desktop the
+        // detail pane is permanent, so auto-select; on mobile only a deeplink opens it.
+        let initial = null;
+        let fromDeeplink = false;
+        try {
+            const wanted = new URLSearchParams(window.location.search).get('bp');
+            if (wanted && rowsEl) {
+                initial = rows().find(function (r) {
+                    return attr(r, 'data-id') === wanted;
+                });
+                fromDeeplink = initial != null;
+            }
+        } catch (_e) {
+            /* URLSearchParams unavailable */
+        }
+        if (!initial) {
+            initial = rows()[0] || null;
+        }
+        if (initial) {
+            const mobile = window.matchMedia('(max-width: 900px)').matches;
+            select(initial, { showDetail: fromDeeplink || !mobile });
+            if (!fromDeeplink && mobile) {
+                mdEl.classList.remove('is-detail');
+            }
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
     }
 })();

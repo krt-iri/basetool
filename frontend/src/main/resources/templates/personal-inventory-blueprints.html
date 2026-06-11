@@ -22,183 +22,197 @@
 </header>
 
 <main>
-    <div class="greeting hud-box krt-personal-inventory-header">
-        <h1 th:text="#{personalInventory.blueprints.title}">Meine Blueprints</h1>
-        <p class="krt-subtitle" th:text="#{personalInventory.blueprints.subtitle}">Ingame freigeschaltete Blueprints</p>
-    </div>
-
-    <nav class="krt-pi-tabs" aria-label="Personal inventory sections">
-        <a th:href="@{/personal-inventory}" class="krt-pi-tab"
-           th:text="#{personalInventory.tab.items}">Items</a>
-        <a th:href="@{/personal-inventory/blueprints}" class="krt-pi-tab krt-pi-tab-active"
-           th:text="#{personalInventory.tab.blueprints}">Blueprints</a>
-    </nav>
-
-    <!-- Multi-select add bar -->
-    <div class="hud-box krt-personal-inventory mt-2">
-        <div class="krt-bp-addbar-head">
-            <h2 class="krt-bp-section-title" th:text="#{personalInventory.blueprints.add.heading}">Blueprints hinzufuegen</h2>
-            <div class="krt-bp-import-trigger">
+    <!-- Head: greeting + facts subtitle left, compact add bar (typeahead + CTA + JSON import) right. -->
+    <div class="greeting hud-box krt-personal-inventory-header krt-bp-head"
+         th:with="noteCount=${blueprints.?[note != null and !note.isBlank()].size()}">
+        <div>
+            <h1 th:text="#{personalInventory.blueprints.title}">Meine Blueprints</h1>
+            <p class="krt-subtitle" th:text="|${blueprints.size()} ${#messages.msg('personalInventory.blueprints.facts.count')} &middot; ${noteCount} ${#messages.msg('personalInventory.blueprints.facts.withNote')}|">42 Blueprints &middot; 6 mit Notiz</p>
+        </div>
+        <div class="krt-bp-addbar-wrap">
+            <div class="krt-bp-addbar">
+                <div class="krt-pi-typeahead krt-bp-search">
+                    <label for="krt-bp-search-input" class="visually-hidden" th:text="#{personalInventory.blueprints.add.search}">Blueprints suchen</label>
+                    <input id="krt-bp-search-input" type="text" autocomplete="off"
+                           th:placeholder="#{personalInventory.blueprints.add.searchPlaceholder}">
+                    <div id="krt-bp-search-results" class="krt-pi-typeahead-results" hidden></div>
+                </div>
+                <button type="button" id="krt-bp-add-selected" class="btn btn--cta" disabled>
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{general.add}">Hinzuf&uuml;gen</span>
+                </button>
                 <input type="file" id="krt-bp-import-file" accept=".json,application/json" hidden>
                 <button type="button" id="krt-bp-import-open" class="btn btn-outline"
-                        data-trigger="bp-import-pick"
-                        th:text="#{personalInventory.blueprints.import.button}">JSON importieren</button>
+                        data-trigger="bp-import-pick">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
+                    <span th:text="#{personalInventory.blueprints.import.button}">JSON importieren</span>
+                </button>
             </div>
-        </div>
-
-        <div class="form-group krt-pi-typeahead krt-bp-search">
-            <label for="krt-bp-search-input" th:text="#{personalInventory.blueprints.add.search}">Blueprints suchen</label>
-            <input id="krt-bp-search-input" type="text" autocomplete="off"
-                   th:placeholder="#{personalInventory.blueprints.add.searchPlaceholder}">
-            <div id="krt-bp-search-results" class="krt-pi-typeahead-results" hidden></div>
-        </div>
-
-        <div class="krt-bp-staging">
-            <span class="krt-bp-staging-label" th:text="#{personalInventory.blueprints.add.selectedHeading}">Auswahl</span>
-            <div id="krt-bp-staging-list" class="krt-bp-chip-list"
-                 th:attr="data-empty-text=#{personalInventory.blueprints.add.empty}">
-                <span class="krt-bp-staging-empty" th:text="#{personalInventory.blueprints.add.empty}">Noch keine Blueprints ausgewaehlt.</span>
-            </div>
-            <div class="krt-pi-modal-actions">
-                <button type="button" id="krt-bp-add-selected" class="btn btn--cta" disabled
-                        th:text="#{personalInventory.blueprints.add.submit}">Auswahl hinzufuegen</button>
+            <!-- Multi-select staging: chips appear compactly under the bar; the CTA stays
+                 disabled until at least one blueprint is staged. -->
+            <div class="krt-bp-staging-bar">
+                <span class="visually-hidden" th:text="#{personalInventory.blueprints.add.selectedHeading}">Auswahl</span>
+                <div id="krt-bp-staging-list" class="krt-bp-chip-list"
+                     th:attr="data-empty-text=#{personalInventory.blueprints.add.empty}">
+                    <span class="krt-bp-staging-empty" th:text="#{personalInventory.blueprints.add.empty}">Noch keine Blueprints ausgew&auml;hlt.</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Owned blueprint list -->
+    <nav class="tab-nav" th:aria-label="#{personalInventory.blueprints.title}">
+        <a th:href="@{/personal-inventory}" class="tab" th:text="#{personalInventory.tab.items}">Items</a>
+        <a th:href="@{/personal-inventory/blueprints}" class="tab active" aria-current="page">
+            <span th:text="#{personalInventory.tab.blueprints}">Blueprints</span>
+            <span class="tab-count" th:text="${blueprints.size()}">42</span>
+        </a>
+    </nav>
+
+    <!-- Collection: master list left, permanent recipe/stat detail right (V3). -->
     <div class="hud-box krt-personal-inventory mt-2">
-        <div class="krt-pi-actionbar">
-            <form th:action="@{/personal-inventory/blueprints}" method="get" class="krt-pi-filter no-track">
-                <label for="krt-bp-q" class="visually-hidden" th:text="#{personalInventory.filter.search}">Suche</label>
-                <input id="krt-bp-q" type="search" name="q" th:value="${filterQuery}"
-                       th:placeholder="#{personalInventory.filter.search}"
-                       class="krt-pi-search-input">
-                <button type="submit" class="btn btn-ghost" th:text="#{personalInventory.filter.apply}">Filtern</button>
-            </form>
+        <div th:if="${#lists.isEmpty(blueprints)}" class="empty-state">
+            <span class="empty-title" th:text="#{personalInventory.blueprints.collection.emptyTitle}">Noch keine Blueprints</span>
+            <span class="empty-text" th:text="#{personalInventory.blueprints.empty}">Du hast noch keine Blueprints hinzugef&uuml;gt.</span>
+            <span class="empty-text" th:if="${filterQuery != null and !filterQuery.isBlank()}" th:text="#{personalInventory.blueprints.collection.emptyFilterHint}">Filter aktiv &mdash; Suche zur&uuml;cksetzen?</span>
         </div>
 
-        <div class="table-responsive krt-pi-table-wrapper">
-            <table class="krt-table krt-pi-table">
-                <thead>
-                <tr>
-                    <th class="krt-bp-recipe-toggle-col" scope="col">
-                        <span class="visually-hidden" th:text="#{personalInventory.blueprints.recipe.toggle}">Zutaten &amp; Stats</span>
-                    </th>
-                    <th th:text="#{personalInventory.blueprints.field.product}">Produkt</th>
-                    <th th:text="#{personalInventory.blueprints.field.acquired}">Erhalten am</th>
-                    <th th:text="#{personalInventory.blueprints.field.note}">Notiz</th>
-                    <th th:text="#{personalInventory.blueprints.field.actions}">Aktionen</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:if="${#lists.isEmpty(blueprints)}">
-                    <td colspan="5" class="krt-pi-empty" th:text="#{personalInventory.blueprints.empty}">Keine Blueprints.</td>
-                </tr>
-                <th:block th:each="bp : ${blueprints}">
-                    <tr th:attr="data-bp-id=${bp.id}">
-                        <td class="krt-bp-recipe-toggle-cell">
-                            <button type="button" class="krt-bp-recipe-toggle"
-                                    data-trigger="bp-toggle-recipe" aria-expanded="false"
-                                    th:attr="data-id=${bp.id},aria-controls=|bp-recipe-${bp.id}|,aria-label=#{personalInventory.blueprints.recipe.toggle}">
-                                <span class="krt-bp-recipe-caret" aria-hidden="true">&#9656;</span>
-                            </button>
-                        </td>
-                        <td th:text="${bp.productName}">Produkt</td>
-                        <td>
-                            <span th:if="${bp.acquiredAt != null}" class="utc-time" th:text="${bp.acquiredAt}">2026-01-01</span>
-                            <span th:unless="${bp.acquiredAt != null}" class="krt-bp-dash">&mdash;</span>
-                        </td>
-                        <td class="krt-pi-note" th:text="${bp.note}">Notiz</td>
-                        <td>
-                            <div class="krt-pi-actions">
-                                <button type="button" class="btn btn-ghost btn-icon"
-                                        data-trigger="bp-open-edit"
-                                        th:attr="data-id=${bp.id},
-                                                 data-version=${bp.version},
-                                                 data-name=${bp.productName},
-                                                 data-note=${bp.note},
-                                                 data-acquired-at=${bp.acquiredAt}"
-                                        th:title="#{personalInventory.blueprints.action.editNote}"
-                                        th:aria-label="#{personalInventory.blueprints.action.editNote}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                <button type="button" class="btn btn-quiet-danger btn-icon"
-                                        data-trigger="bp-open-delete"
-                                        th:attr="data-id=${bp.id},
-                                                 data-name=${bp.productName}"
-                                        th:title="#{personalInventory.blueprints.action.remove}"
-                                        th:aria-label="#{personalInventory.blueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr class="krt-bp-recipe-row" hidden
-                        th:attr="id=|bp-recipe-${bp.id}|,data-recipe-for=${bp.id}">
-                        <td colspan="5" class="krt-bp-recipe-cell">
-                            <div class="krt-bp-recipe-panel" data-loaded="false"></div>
-                        </td>
-                    </tr>
-                </th:block>
-                </tbody>
-            </table>
+        <div th:unless="${#lists.isEmpty(blueprints)}" class="master-detail krt-bp-md" id="krt-bp-md">
+            <!-- Master list -->
+            <div class="master-list">
+                <!-- One input, two filters: typing filters the rendered rows instantly
+                     (client-side); Enter submits the existing ?q= server filter. -->
+                <form class="krt-bp-master-filter no-track" th:action="@{/personal-inventory/blueprints}" method="get">
+                    <label for="krt-bp-q" class="visually-hidden" th:text="#{personalInventory.filter.search}">Suche</label>
+                    <input id="krt-bp-q" type="search" name="q" th:value="${filterQuery}"
+                           th:placeholder="#{personalInventory.filter.search}">
+                </form>
+                <div class="krt-bp-master-rows" id="krt-bp-master-rows" role="listbox"
+                     th:aria-label="#{personalInventory.blueprints.list.aria}">
+                    <button type="button" class="master-row" role="option" aria-selected="false"
+                            th:each="bp : ${blueprints}"
+                            th:attr="data-id=${bp.id},
+                                     data-name=${bp.productName},
+                                     data-note=${bp.note},
+                                     data-version=${bp.version},
+                                     data-acquired-at=${bp.acquiredAt}">
+                        <span th:text="${bp.productName}">Produkt</span>
+                        <span class="master-row-note" th:if="${bp.note != null and !bp.note.isBlank()}"
+                              th:title="#{personalInventory.blueprints.field.note}" aria-hidden="true">&#x270E;</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Detail pane -->
+            <div class="detail-pane" id="krt-bp-detail" aria-live="polite">
+                <button type="button" class="btn btn-ghost krt-bp-detail-back" id="krt-bp-detail-back">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg>
+                    <span th:text="#{personalInventory.blueprints.detail.back}">Zur&uuml;ck zur Liste</span>
+                </button>
+
+                <div class="empty-state" id="krt-bp-detail-empty">
+                    <span class="empty-title" th:text="#{personalInventory.blueprints.detail.emptyTitle}">Kein Blueprint ausgew&auml;hlt</span>
+                    <span class="empty-text" th:text="#{personalInventory.blueprints.detail.emptyText}">W&auml;hle links einen Blueprint, um Zutaten und Stats zu sehen.</span>
+                </div>
+
+                <div id="krt-bp-detail-content" hidden>
+                    <div class="krt-bp-detail-head">
+                        <div>
+                            <span class="krt-bp-detail-name" id="krt-bp-detail-name">Produkt</span>
+                            <div class="krt-bp-detail-acquired" id="krt-bp-detail-acquired"></div>
+                        </div>
+                        <div class="krt-bp-detail-actions">
+                            <button type="button" class="btn btn-ghost btn-icon" id="krt-bp-detail-edit"
+                                    data-trigger="bp-open-edit"
+                                    th:title="#{personalInventory.blueprints.action.editNote}"
+                                    th:aria-label="#{personalInventory.blueprints.action.editNote}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button type="button" class="btn btn-quiet-danger btn-icon" id="krt-bp-detail-delete"
+                                    data-trigger="bp-open-delete"
+                                    th:title="#{personalInventory.blueprints.action.remove}"
+                                    th:aria-label="#{personalInventory.blueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        </div>
+                    </div>
+
+                    <h2 class="section-title" th:text="#{personalInventory.blueprints.detail.heading}">Zutaten &amp; Stat-Beitrag nach Zutat-Qualit&auml;t</h2>
+                    <div class="krt-bp-detail-recipe" id="krt-bp-detail-recipe"></div>
+
+                    <div id="krt-bp-detail-note-section" hidden>
+                        <h2 class="section-title" th:text="#{personalInventory.blueprints.field.note}">Notiz</h2>
+                        <p class="krt-bp-detail-note" id="krt-bp-detail-note"></p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </main>
 
-<!-- Edit-note modal (KRT-styled, no native dialogs) -->
-<div id="krt-bp-edit-modal" class="modal" style="display:none;">
-    <div class="modal-content hud-box">
-        <span class="close" data-trigger="bp-close-edit">&times;</span>
-        <h2 id="krt-bp-edit-title" th:text="#{personalInventory.blueprints.modal.editNote.title}">Notiz bearbeiten</h2>
+<!-- Edit-note modal (KRT modal frame, no native dialogs) -->
+<div id="krt-bp-edit-modal" class="krt-modal-overlay" style="display:none;" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.modal.editNote.title}">
+    <div class="krt-modal krt-modal--wide">
+        <div class="krt-modal-head">
+            <h2 id="krt-bp-edit-title" th:text="#{personalInventory.blueprints.modal.editNote.title}">Notiz bearbeiten</h2>
+            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="bp-close-edit" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+        </div>
         <form id="krt-bp-edit-form" method="post">
-            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <input type="hidden" name="version" id="krt-bp-edit-version">
-            <input type="hidden" name="acquiredAt" id="krt-bp-edit-acquired">
-            <p class="krt-bp-edit-product" id="krt-bp-edit-product"></p>
-            <div class="form-group">
-                <label for="krt-bp-edit-note" th:text="#{personalInventory.blueprints.field.note}">Notiz</label>
-                <textarea id="krt-bp-edit-note" name="note" maxlength="2000" rows="4"></textarea>
+            <div class="krt-modal-body">
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <input type="hidden" name="version" id="krt-bp-edit-version">
+                <input type="hidden" name="acquiredAt" id="krt-bp-edit-acquired">
+                <p class="krt-bp-edit-product" id="krt-bp-edit-product"></p>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="krt-bp-edit-note" th:text="#{personalInventory.blueprints.field.note}">Notiz</label>
+                    <textarea id="krt-bp-edit-note" name="note" maxlength="2000" rows="4"></textarea>
+                </div>
             </div>
-            <div class="krt-pi-modal-actions">
-                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
+            <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost" data-trigger="bp-close-edit" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Remove confirmation modal (KRT-styled, replaces native confirm()) -->
-<div id="krt-bp-delete-modal" class="modal" style="display:none;">
-    <div class="modal-content hud-box">
-        <span class="close" data-trigger="bp-close-delete">&times;</span>
-        <h2 th:text="#{personalInventory.blueprints.modal.remove.title}">Blueprint entfernen</h2>
-        <p id="krt-bp-delete-message" th:text="#{personalInventory.blueprints.modal.remove.body}">Wirklich entfernen?</p>
+<!-- Remove confirmation modal (KRT danger frame; the body names what is removed) -->
+<div id="krt-bp-delete-modal" class="krt-modal-overlay" style="display:none;" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.modal.remove.title}">
+    <div class="krt-modal krt-modal--danger">
+        <div class="krt-modal-head">
+            <h2 th:text="#{personalInventory.blueprints.modal.remove.title}">Blueprint entfernen</h2>
+            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="bp-close-delete" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+        </div>
+        <div class="krt-modal-body">
+            <p id="krt-bp-delete-message" style="margin: 0;" th:text="#{personalInventory.blueprints.modal.remove.body}">Wirklich entfernen?</p>
+        </div>
         <form id="krt-bp-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <div class="krt-pi-modal-actions">
-                <button type="submit" class="btn krt-danger" th:text="#{personalInventory.blueprints.action.remove}">Entfernen</button>
+            <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost" data-trigger="bp-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{personalInventory.blueprints.action.remove}">Entfernen</span></button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Blueprint import preview modal (KRT-styled, no native dialogs). Body filled by JS. -->
-<div id="krt-bp-import-modal" class="modal" style="display:none;">
-    <div class="modal-content hud-box krt-bp-import-content">
-        <span class="close" data-trigger="bp-import-close">&times;</span>
-        <h2 th:text="#{personalInventory.blueprints.import.title}">Import-Vorschau</h2>
-        <p class="krt-bp-import-summary" id="krt-bp-import-summary"></p>
-        <div class="krt-bp-import-toolbar">
-            <button type="button" class="btn btn-ghost" data-trigger="bp-import-selectall"
-                    th:text="#{personalInventory.blueprints.import.selectAll}">Alle auswählen</button>
-            <button type="button" class="btn btn-ghost" data-trigger="bp-import-selectnone"
-                    th:text="#{personalInventory.blueprints.import.selectNone}">Auswahl aufheben</button>
+<!-- Blueprint import preview modal (KRT modal frame, wide). Body filled by JS. -->
+<div id="krt-bp-import-modal" class="krt-modal-overlay" style="display:none;" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.import.title}">
+    <div class="krt-modal krt-bp-import-frame">
+        <div class="krt-modal-head">
+            <h2 th:text="#{personalInventory.blueprints.import.title}">Import-Vorschau</h2>
+            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="bp-import-close" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
         </div>
-        <div id="krt-bp-import-body" class="krt-bp-import-body"></div>
-        <div class="krt-pi-modal-actions">
-            <button type="button" id="krt-bp-import-apply" class="btn btn--cta" data-trigger="bp-import-apply"
-                    th:text="#{personalInventory.blueprints.import.apply}">Anwenden</button>
+        <div class="krt-modal-body">
+            <p class="krt-bp-import-summary" id="krt-bp-import-summary"></p>
+            <div class="krt-bp-import-toolbar">
+                <button type="button" class="btn btn-ghost" data-trigger="bp-import-selectall"
+                        th:text="#{personalInventory.blueprints.import.selectAll}">Alle ausw&auml;hlen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="bp-import-selectnone"
+                        th:text="#{personalInventory.blueprints.import.selectNone}">Auswahl aufheben</button>
+            </div>
+            <div id="krt-bp-import-body" class="krt-bp-import-body"></div>
+        </div>
+        <div class="krt-modal-foot">
             <button type="button" class="btn btn-ghost" data-trigger="bp-import-close"
                     th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+            <button type="button" id="krt-bp-import-apply" class="btn btn--cta" data-trigger="bp-import-apply"
+                    th:text="#{personalInventory.blueprints.import.apply}">Anwenden</button>
         </div>
     </div>
 </div>
@@ -251,7 +265,9 @@
         empty:            /*[[#{personalInventory.blueprints.recipe.empty}]]*/    'Keine Rezeptdaten verfuegbar.',
         error:            /*[[#{personalInventory.blueprints.recipe.error}]]*/    'Rezept konnte nicht geladen werden.',
         exampleRecipe:    /*[[#{personalInventory.blueprints.recipe.exampleRecipe}]]*/ 'Beispielrezept',
-        variants:         /*[[#{personalInventory.blueprints.add.variants}]]*/    'Varianten'
+        variants:         /*[[#{personalInventory.blueprints.add.variants}]]*/    'Varianten',
+        acquiredLabel:    /*[[#{personalInventory.blueprints.field.acquired}]]*/  'Erhalten am',
+        qualityAria:      /*[[#{personalInventory.blueprints.detail.qualityAria}]]*/ 'Qualitaet'
     };
     window.krtBlueprintsEndpoints = {
         search:      /*[[@{/personal-inventory/blueprints/search}]]*/      '/personal-inventory/blueprints/search',
