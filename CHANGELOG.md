@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.14](https://github.com/krt-iri/basetool/releases/tag/v0.4.14) - 2026-06-11
+
 ### Changed
 
 - **Spring Boot wurde auf 4.1.0 aktualisiert.** Die drei temporären Versions-Overrides für Tomcat (11.0.22), Netty (4.2.14) und den PostgreSQL-Treiber (42.7.11) entfallen, da Spring Boot 4.1.0 diese (oder neuere) gepatchten Versionen jetzt selbst ausliefert.
