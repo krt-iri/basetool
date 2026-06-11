@@ -111,6 +111,16 @@ class ItemsMockupCheckE2eTest {
       // Open the create modal and screenshot the KRT frame.
       page.locator(".krt-pi-create").click();
       page.waitForTimeout(300);
+      Object modalProbe =
+          page.evaluate(
+              "() => { const m = document.querySelector('#krt-pi-modal .krt-modal');"
+                  + " const b = m.querySelector('.krt-modal-body');"
+                  + " return { width: Math.round(m.getBoundingClientRect().width),"
+                  + " frameVScroll: m.scrollHeight > m.clientHeight,"
+                  + " frameHScroll: m.scrollWidth > m.clientWidth,"
+                  + " bodyVScroll: b.scrollHeight > b.clientHeight,"
+                  + " bodyHScroll: b.scrollWidth > b.clientWidth }; }");
+      System.out.println("[pi-check] modal probe: " + modalProbe);
       page.screenshot(
           new Page.ScreenshotOptions()
               .setFullPage(true)

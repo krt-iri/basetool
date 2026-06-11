@@ -160,6 +160,12 @@
     margin-bottom: 1.25rem;
 }
 
+/* The create/edit form stacks four labelled fields — give it more room than
+   the 440px KRT modal default so the inputs don't feel cramped. */
+#krt-pi-modal .krt-modal {
+    max-width: 600px;
+}
+
 .krt-personal-inventory .form-group input,
 .krt-personal-inventory .form-group textarea,
 #krt-pi-modal .form-group input,

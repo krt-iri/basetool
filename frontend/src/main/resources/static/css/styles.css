@@ -4184,16 +4184,26 @@ textarea:focus-visible,
     padding: 20px;
     z-index: 3000;
 }
+/* The frame itself must NOT scroll: its ::before/::after corner brackets sit
+   2px outside the box and would register as permanent overflow, forcing
+   scrollbars even when the content fits. Scrolling happens in .krt-modal-body
+   only (head/foot stay pinned), so bars appear solely when space runs out. */
 .krt-modal {
     width: 100%;
     max-width: 440px;
     max-height: 90vh;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
     background: var(--color-bg-dark-gray);
     border: var(--border-hairline);
     border-top: 3px solid var(--color-primary);
     position: relative;
     box-shadow: var(--glow-primary-lg);
+}
+.krt-modal > form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 .krt-modal::before,
 .krt-modal::after {
@@ -4230,6 +4240,7 @@ textarea:focus-visible,
     gap: 10px;
     padding: 12px 16px;
     border-bottom: var(--border-hairline);
+    flex-shrink: 0;
 }
 .krt-modal-head h2 {
     font-family: var(--font-headline);
@@ -4245,6 +4256,8 @@ textarea:focus-visible,
 }
 .krt-modal-body {
     padding: 14px 16px;
+    min-height: 0;
+    overflow-y: auto;
 }
 .krt-modal-foot {
     display: flex;
@@ -4252,6 +4265,7 @@ textarea:focus-visible,
     gap: 8px;
     padding: 12px 16px;
     border-top: var(--border-hairline);
+    flex-shrink: 0;
 }
 
 /* --------------------------------------------------------- ASSIGN BOARD -- */
