@@ -179,9 +179,11 @@
         </div>
 
         <!-- Screenshot-extract import (#435): file picker posts the RefineryExtract JSON to the
-             proxy, which flashes the pre-filled form + review flags back onto this page. -->
+             proxy, which flashes the pre-filled form + review flags back onto this page.
+             no-track: picking the file must not arm the unsaved-changes guard - the import
+             replaces the form wholesale, so there is nothing on this page worth protecting. -->
         <div class="import-extract-bar" data-testid="refinery-import-box">
-            <form id="refineryImportForm" th:action="@{/refinery-orders/import}" method="post" enctype="multipart/form-data">
+            <form id="refineryImportForm" class="no-track" th:action="@{/refinery-orders/import}" method="post" enctype="multipart/form-data">
                 <input type="file" id="refineryImportFile" name="file" accept=".json,application/json" hidden data-trigger="rfc-import-file" data-testid="refinery-import-file">
                 <button type="button" class="btn btn-outline" data-trigger="rfc-import-pick" data-testid="refinery-import-button" th:text="#{refineryImport.button}">Aus Screenshot-Extract importieren (JSON)</button>
                 <span class="text-muted import-extract-help" th:text="#{refineryImport.help}">JSON-Datei aus dem Basetool SC Extractor wählen – das Formular wird vorbefüllt.</span>
@@ -769,7 +771,10 @@
         window.krtEvents.on('change', 'rfc-import-file', function (el) {
             if (el.files && el.files.length > 0) {
                 const importForm = document.getElementById('refineryImportForm');
-                if (importForm) importForm.submit();
+                // requestSubmit (not submit): only it fires the submit event that clears the
+                // unsaved-changes dirty flag - values typed into the create form before an
+                // import are discarded by design, so no leave-page warning may appear here.
+                if (importForm) importForm.requestSubmit();
             }
         });
         // One-click assignment of a ranked suggestion to the row's material select; the change

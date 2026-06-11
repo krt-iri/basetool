@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Beim Screenshot-Import auf der Raffinerieauftrag-Seite erscheint keine „Website verlassen?"-Warnung mehr.** Die Dateiauswahl markierte das Formular fälschlich als ungespeichert geändert; der Import-Upload ist jetzt von dieser Prüfung ausgenommen. Vor dem Import eingegebene Formularwerte werden beim Import bewusst verworfen und vollständig durch die Daten aus der JSON ersetzt.
+
 ## [v0.4.14](https://github.com/krt-iri/basetool/releases/tag/v0.4.14) - 2026-06-11
 
 ### Changed

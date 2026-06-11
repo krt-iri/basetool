@@ -212,6 +212,19 @@ never persists anything itself. The frontend mirrors the backend draft DTOs
 field-for-field (mirror-DTO rule), including the `ImportIssueCode` /
 `ImportIssueSeverity` enums.
 
+Triggering an import must **never** raise the unsaved-changes leave-page warning: the
+import form is exempt from the dirty tracking (`no-track`) and is submitted via
+`requestSubmit()` so the guard's submit listener clears any dirty state armed by values
+typed into the create form beforehand. Those values are discarded **by design** — the
+redirected pre-fill (REQ-REFINERY-014) flashes a freshly built form that replaces the
+page's form state wholesale; nothing typed before the import survives, and no merge of
+old and imported values is attempted.
+
+*Amended 2026-06-11:* picking the extract JSON armed the guard (the file input's
+`change` event marked the page dirty) and the programmatic `submit()` skipped the
+submit event that resets it, so the native leave-page warning appeared on every
+import — even on a pristine form.
+
 ### REQ-REFINERY-014 — Server-side pre-fill via flash attributes
 
 The pre-fill reuses the create page's existing flash-attribute mechanism — the GET

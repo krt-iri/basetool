@@ -176,8 +176,13 @@ class RefineryOrderCreateImportRenderTest {
         // selected marker (a bare value="<id>" match would hit every dropdown's option list)
         .andExpect(content().string(containsString("value=\"" + MATERIAL_ID + "\"")))
         .andExpect(content().string(containsString("selected=\"selected\"")))
-        // the import upload control is present
+        // the import upload control is present and exempt from the unsaved-changes guard:
+        // picking a file must not arm the leave-page warning (the import replaces the form
+        // wholesale, REQ-REFINERY-013)
         .andExpect(content().string(containsString("data-testid=\"refinery-import-button\"")))
+        .andExpect(
+            content().string(containsString("<form id=\"refineryImportForm\" class=\"no-track\"")))
+        .andExpect(content().string(containsString("importForm.requestSubmit()")))
         .andExpect(content().string(containsString("</html>")));
   }
 
