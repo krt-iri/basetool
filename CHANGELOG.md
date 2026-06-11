@@ -12,6 +12,7 @@
 - **Der Finanzen-Tab zeigt eine Summen-Leiste (Gesamtsumme, Einnahmen, Ausgaben, je Anteil)**; Raffinerie-Ausgaben erscheinen als automatische Zeile mit Link zum Auftrag.
 - **Die Einsatz-Beschreibung unterstützt jetzt Markdown** (fett, Listen, Links u. a.) und wird auf der Übersicht sowie im „Nächste Mission"-Banner formatiert dargestellt; eingebettetes HTML wird aus Sicherheitsgründen als Text angezeigt.
 - **„Meine Blueprints" ist jetzt eine Master-Detail-Ansicht:** Sammlung links (Sofort-Filter, Pfeiltasten, `?bp=`-Deeplink), rechts permanent Zutaten und Stat-Beiträge mit Qualitäts-Slidern je Zutat (Live-Faktoren, Berechnung unverändert). Hinzufügen/JSON-Import wandern als kompakte Leiste in den Kopf; alle bisherigen Funktionen bleiben erhalten.
+- **Die Items-Seite des persönlichen Inventars nutzt jetzt dieselbe Tab-Leiste wie „Meine Blueprints"** (mit Anzahl-Badge) statt der bisherigen Button-Tabs; Anlegen/Bearbeiten- und Lösch-Modal verwenden den KRT-Modal-Rahmen und eine leere Liste erscheint als gestalteter Leerzustand.
 
 ## [v0.4.15](https://github.com/krt-iri/basetool/releases/tag/v0.4.15) - 2026-06-11
 

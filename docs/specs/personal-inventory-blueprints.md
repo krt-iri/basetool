@@ -55,3 +55,17 @@ modal (optimistic-locking `version`, hidden `acquiredAt`, maxlength 2000); remov
 (danger `.krt-modal--danger` with `.btn-danger`, naming the product); per-blueprint recipe data;
 UTC→local "Erhalten am"; CSRF hidden inputs; CSP nonces. Modals use the `.krt-modal*` frame
 (one filled CTA, ghost cancel, Esc).
+
+### REQ-INV-011 — Items page on the shared DS components
+
+The personal inventory **items** page (`/personal-inventory`) uses the same shell as the
+blueprints page: the greeting head carries a facts subtitle ("N Einträge", total element
+count), the PI tabs render as the shared `.tab-nav` (Items active with a `.tab-count`,
+Blueprints plain), an empty collection (optionally filtered via `?q=`) renders as an
+`.empty-state` instead of an empty table row, and both modals (create/edit form, delete
+confirm) use the `.krt-modal*` frame — the delete confirm as `.krt-modal--danger` with a
+`.btn-danger` CTA naming the entry. Everything else is unchanged: action bar (create CTA +
+`?q=` filter form), table columns, per-row edit/delete icon buttons with the
+optimistic-locking `data-version` payload, UEX location typeahead, quantity sanitizing,
+CSRF hidden inputs, CSP nonces, and the inline re-render of the form modal on validation
+errors (`showItemModal`).

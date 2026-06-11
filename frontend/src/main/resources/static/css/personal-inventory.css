@@ -403,54 +403,10 @@
 }
 
 /* ------------------------------------------------------------------ *
- * Blueprints sub-page (#327, Phase 5): in-page tabs + multi-select   *
- * staging chips. Reuses the krt-pi-* table / modal / typeahead base. *
+ * Blueprints sub-page (#327, Phase 5): multi-select staging chips.   *
+ * Reuses the krt-pi-* table / modal / typeahead base. The in-page    *
+ * Items | Blueprints tabs use the shared .tab-nav DS component.      *
  * ------------------------------------------------------------------ */
-
-/* In-page tab bar mirroring the sidebar Items | Blueprints group. */
-.krt-pi-tabs {
-    display: flex;
-    gap: 0.4rem;
-    margin: 1rem 0 0;
-    flex-wrap: wrap;
-}
-
-.krt-pi-tab {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem 1.4rem;
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: var(--fs-xs);
-    color: var(--color-gray-1, #d2d2d2);
-    text-decoration: none;
-    border: 1px solid var(--color-gray-3, #282828);
-    border-radius: 4px;
-    background: var(--color-surface-input, #1c1c1c);
-    transition:
-        color 0.15s ease,
-        border-color 0.15s ease,
-        background 0.15s ease;
-}
-
-.krt-pi-tab:hover,
-.krt-pi-tab:focus {
-    color: var(--color-primary, #e77e23);
-    border-color: var(--color-primary, #e77e23);
-    background: rgb(231 126 35 / 12%);
-}
-
-.krt-pi-tab-active,
-.krt-pi-tab-active:hover,
-.krt-pi-tab-active:focus {
-    color: #000;
-    border-color: var(--color-primary, #e77e23);
-    background: var(--color-primary, #e77e23);
-    font-weight: 700;
-}
 
 .krt-bp-section-title {
     font-family: var(--font-headline);

@@ -138,7 +138,7 @@
             const url = new URL(window.location);
             url.searchParams.set('bp', attr(row, 'data-id'));
             history.replaceState(null, '', url);
-        } catch (e) {
+        } catch (_e) {
             /* URL API unavailable — deeplink update is best-effort */
         }
 

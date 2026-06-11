@@ -22,15 +22,18 @@
 </header>
 
 <main>
+    <!-- Head: greeting + facts subtitle, mirroring the blueprints master-detail head. -->
     <div class="greeting hud-box krt-personal-inventory-header">
         <h1 th:text="#{personalInventory.title}">Persoenliches Inventar</h1>
-        <p class="krt-subtitle" th:text="#{personalInventory.subtitle}">Eigene Bestaende</p>
+        <p class="krt-subtitle" th:text="|${page != null ? page.totalElements : items.size()} ${#messages.msg('personalInventory.facts.count')}|">42 Eintraege</p>
     </div>
 
-    <nav class="krt-pi-tabs" aria-label="Personal inventory sections">
-        <a th:href="@{/personal-inventory}" class="krt-pi-tab krt-pi-tab-active"
-           th:text="#{personalInventory.tab.items}">Items</a>
-        <a th:href="@{/personal-inventory/blueprints}" class="krt-pi-tab"
+    <nav class="tab-nav" th:aria-label="#{personalInventory.title}">
+        <a th:href="@{/personal-inventory}" class="tab active" aria-current="page">
+            <span th:text="#{personalInventory.tab.items}">Items</span>
+            <span class="tab-count" th:text="${page != null ? page.totalElements : items.size()}">42</span>
+        </a>
+        <a th:href="@{/personal-inventory/blueprints}" class="tab"
            th:text="#{personalInventory.tab.blueprints}">Blueprints</a>
     </nav>
 
@@ -51,7 +54,13 @@
             </form>
         </div>
 
-        <div class="table-responsive krt-pi-table-wrapper">
+        <div th:if="${#lists.isEmpty(items)}" class="empty-state">
+            <span class="empty-title" th:text="#{personalInventory.collection.emptyTitle}">Noch keine Eintr&auml;ge</span>
+            <span class="empty-text" th:text="#{personalInventory.empty}">Noch keine Eintr&auml;ge vorhanden.</span>
+            <span class="empty-text" th:if="${filterQuery != null and !filterQuery.isBlank()}" th:text="#{personalInventory.collection.emptyFilterHint}">Filter aktiv &mdash; eine leere Suche zeigt alle Eintr&auml;ge.</span>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(items)}" class="table-responsive krt-pi-table-wrapper">
             <table class="krt-table krt-pi-table">
                 <thead>
                 <tr>
@@ -63,9 +72,6 @@
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:if="${#lists.isEmpty(items)}">
-                    <td colspan="5" class="krt-pi-empty" th:text="#{personalInventory.empty}">Keine Eintraege.</td>
-                </tr>
                 <tr th:each="item : ${items}" th:attr="data-item-id=${item.id}">
                     <td th:text="${item.name}">Name</td>
                     <td>
@@ -105,72 +111,80 @@
     </div>
 </main>
 
-<!-- Create / Edit modal (KRT-styled, no native confirm/alert) -->
-<div id="krt-pi-modal" class="modal" th:style="${showItemModal != null ? 'display:flex' : 'display:none'}">
-    <div class="modal-content hud-box">
-        <span class="close" data-trigger="pi-close-modal">&times;</span>
-        <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
+<!-- Create / Edit modal (KRT modal frame, no native dialogs) -->
+<div id="krt-pi-modal" class="krt-modal-overlay" role="dialog" aria-modal="true"
+     aria-labelledby="krt-pi-modal-title"
+     th:style="${showItemModal != null ? 'display:flex' : 'display:none'}">
+    <div class="krt-modal">
+        <div class="krt-modal-head">
+            <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
+            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="pi-close-modal" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+        </div>
 
         <form id="krt-pi-form"
               th:action="${modalAction != null ? modalAction : '/personal-inventory/add'}"
               method="post"
               th:object="${personalInventoryForm}">
+            <div class="krt-modal-body">
+                <div th:if="${#fields.hasErrors('*')}" class="krt-pi-error-box">
+                    <ul>
+                        <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
+                    </ul>
+                </div>
 
-            <div th:if="${#fields.hasErrors('*')}" class="krt-pi-error-box">
-                <ul>
-                    <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
-                </ul>
+                <input type="hidden" th:field="*{id}">
+                <input type="hidden" th:field="*{version}">
+                <input type="hidden" id="krt-pi-location-uex-id" th:field="*{locationUexId}">
+                <input type="hidden" id="krt-pi-location-type" th:field="*{locationType}">
+
+                <div class="form-group">
+                    <label for="krt-pi-name" th:text="#{personalInventory.field.name}">Name</label>
+                    <input id="krt-pi-name" type="text" maxlength="120" required th:field="*{name}">
+                </div>
+
+                <div class="form-group">
+                    <label for="krt-pi-quantity" th:text="#{personalInventory.field.quantity}">Menge</label>
+                    <input id="krt-pi-quantity" type="number" min="1" step="1" inputmode="numeric"
+                           pattern="[0-9]*" required th:field="*{quantity}"
+                           data-trigger="pi-sanitize-quantity">
+                </div>
+
+                <div class="form-group krt-pi-typeahead">
+                    <label for="krt-pi-location-search" th:text="#{personalInventory.field.location}">Ort</label>
+                    <input id="krt-pi-location-search" type="text" autocomplete="off"
+                           th:value="${personalInventoryForm.locationName}"
+                           th:placeholder="#{personalInventory.field.location.placeholder}">
+                    <div id="krt-pi-location-results" class="krt-pi-typeahead-results" hidden></div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="krt-pi-note" th:text="#{personalInventory.field.note}">Notiz</label>
+                    <textarea id="krt-pi-note" maxlength="2000" rows="4" th:field="*{note}"></textarea>
+                </div>
             </div>
-
-            <input type="hidden" th:field="*{id}">
-            <input type="hidden" th:field="*{version}">
-            <input type="hidden" id="krt-pi-location-uex-id" th:field="*{locationUexId}">
-            <input type="hidden" id="krt-pi-location-type" th:field="*{locationType}">
-
-            <div class="form-group">
-                <label for="krt-pi-name" th:text="#{personalInventory.field.name}">Name</label>
-                <input id="krt-pi-name" type="text" maxlength="120" required th:field="*{name}">
-            </div>
-
-            <div class="form-group">
-                <label for="krt-pi-quantity" th:text="#{personalInventory.field.quantity}">Menge</label>
-                <input id="krt-pi-quantity" type="number" min="1" step="1" inputmode="numeric"
-                       pattern="[0-9]*" required th:field="*{quantity}"
-                       data-trigger="pi-sanitize-quantity">
-            </div>
-
-            <div class="form-group krt-pi-typeahead">
-                <label for="krt-pi-location-search" th:text="#{personalInventory.field.location}">Ort</label>
-                <input id="krt-pi-location-search" type="text" autocomplete="off"
-                       th:value="${personalInventoryForm.locationName}"
-                       th:placeholder="#{personalInventory.field.location.placeholder}">
-                <div id="krt-pi-location-results" class="krt-pi-typeahead-results" hidden></div>
-            </div>
-
-            <div class="form-group">
-                <label for="krt-pi-note" th:text="#{personalInventory.field.note}">Notiz</label>
-                <textarea id="krt-pi-note" maxlength="2000" rows="4" th:field="*{note}"></textarea>
-            </div>
-
-            <div class="krt-pi-modal-actions">
-                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
+            <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost" data-trigger="pi-close-modal" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Delete confirmation modal (KRT-styled, replaces native confirm()) -->
-<div id="krt-pi-delete-modal" class="modal" style="display:none;">
-    <div class="modal-content hud-box">
-        <span class="close" data-trigger="pi-close-delete">&times;</span>
-        <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
-        <p id="krt-pi-delete-message" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
+<!-- Delete confirmation modal (KRT danger frame; the body names what is deleted) -->
+<div id="krt-pi-delete-modal" class="krt-modal-overlay" style="display:none;" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
+    <div class="krt-modal krt-modal--danger">
+        <div class="krt-modal-head">
+            <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
+            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="pi-close-delete" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+        </div>
+        <div class="krt-modal-body">
+            <p id="krt-pi-delete-message" style="margin: 0;" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
+        </div>
         <form id="krt-pi-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <div class="krt-pi-modal-actions">
-                <button type="submit" class="btn krt-danger" th:text="#{personalInventory.action.delete.confirm.ok}">Loeschen</button>
+            <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost" data-trigger="pi-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{personalInventory.action.delete.confirm.ok}">L&ouml;schen</span></button>
             </div>
         </form>
     </div>
