@@ -528,58 +528,67 @@ class RefineryImportServiceTest {
   // ─── header-total checksum (§5) ───────────────────────────────────────────
 
   @Test
-  void buildDraft_flagsHeaderTotalMismatchOnBothTotals() {
-    // Given — IN MANIFEST counts all rows, TO REFINE only refine-ON rows (v1 hypothesis)
-    RefineryExtractOrderDto order =
-        new RefineryExtractOrderDto(
-            "SETUP",
-            true,
-            0.9,
-            "LEVSKI",
-            "FERRON EXCHANGE",
-            9999L,
-            8888L,
-            null,
-            null,
-            null,
-            null,
-            List.of(
-                quotedGood(0, "STILERON (ORE)"), good(1, "INERT MATERIALS", 0, 5449, 0, false)));
-
-    // When
-    RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
+  void buildDraft_flagsSumMismatchWhenRefineOnRowsExceedToRefineTotal() {
+    // Given — refine-ON qty 957 vs TO REFINE 800: exceeds the header beyond the ±1-per-row
+    // tolerance (2 rows) — a mis-read quantity or a duplicated capture
+    RefineryImportDraftDto draft =
+        service.buildDraft(extract(1, headerOrder(9999L, 800L)), CALLER_ID);
 
     // Then
-    List<ImportIssueDto> mismatches = issues(draft, ImportIssueCode.SUM_MISMATCH);
-    assertThat(mismatches).hasSize(2);
-    assertThat(mismatches.stream().map(ImportIssueDto::field))
-        .containsExactlyInAnyOrder("rawInManifestTotal", "rawToRefineTotal");
+    ImportIssueDto mismatch = onlyIssue(draft, ImportIssueCode.SUM_MISMATCH);
+    assertThat(mismatch.field()).isEqualTo("rawToRefineTotal");
+    assertThat(mismatch.rawValue()).isEqualTo("800 != 957");
   }
 
   @Test
-  void buildDraft_acceptsReconcilingHeaderTotals() {
-    // Given — quoted row qty 957 + inert qty 5449: IN MANIFEST = 6406, TO REFINE = 957
-    RefineryExtractOrderDto order =
-        new RefineryExtractOrderDto(
-            "SETUP",
-            true,
-            0.9,
-            "LEVSKI",
-            "FERRON EXCHANGE",
-            6406L,
-            957L,
-            null,
-            null,
-            null,
-            null,
-            List.of(
-                quotedGood(0, "STILERON (ORE)"), good(1, "INERT MATERIALS", 0, 5449, 0, false)));
+  void buildDraft_flagsSumMismatchWhenSingleRowExceedsToRefineTotal() {
+    // Given — TO REFINE 955: the sum (957) stays within the 2-row tolerance, but the single
+    // refine-ON row (957) alone exceeds the header by more than 1
+    RefineryImportDraftDto draft =
+        service.buildDraft(extract(1, headerOrder(null, 955L)), CALLER_ID);
 
-    // When
-    RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
+    // Then
+    assertThat(onlyIssue(draft, ImportIssueCode.SUM_MISMATCH).field())
+        .isEqualTo("rawToRefineTotal");
+  }
+
+  @Test
+  void buildDraft_acceptsToRefineShortfallFromScrolledOutRows() {
+    // Given — TO REFINE 5000 vs visible refine-ON qty 957: the list is a scrolling viewport,
+    // a shortfall means scrolled-out rows and is never flagged (one-sided check)
+    RefineryImportDraftDto draft =
+        service.buildDraft(extract(1, headerOrder(null, 5000L)), CALLER_ID);
 
     // Then
     assertThat(issues(draft, ImportIssueCode.SUM_MISMATCH)).isEmpty();
+  }
+
+  @Test
+  void buildDraft_ignoresInManifestTotalEvenWhenItExcludesInertRows() {
+    // Given — the 2026-06 field sample shape: IN MANIFEST (957) excludes the inert row, the
+    // all-row sum is 6406; IN MANIFEST is never validated, TO REFINE reconciles exactly
+    RefineryImportDraftDto draft =
+        service.buildDraft(extract(1, headerOrder(957L, 957L)), CALLER_ID);
+
+    // Then
+    assertThat(issues(draft, ImportIssueCode.SUM_MISMATCH)).isEmpty();
+  }
+
+  /** Order with one refine-ON row (qty 957) + the inert refine-OFF row (qty 5449). */
+  private static RefineryExtractOrderDto headerOrder(Long inManifestTotal, Long toRefineTotal) {
+    return new RefineryExtractOrderDto(
+        "SETUP",
+        true,
+        0.9,
+        "LEVSKI",
+        "FERRON EXCHANGE",
+        inManifestTotal,
+        toRefineTotal,
+        null,
+        null,
+        null,
+        null,
+        List.of(quotedGood(0, "STILERON (ORE)"), good(1, "INERT MATERIALS", 0, 5449, 0, false)));
   }
 
   // ─── per-good field mapping (§7.2) ────────────────────────────────────────

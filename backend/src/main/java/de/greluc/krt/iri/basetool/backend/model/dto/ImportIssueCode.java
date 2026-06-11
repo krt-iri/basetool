@@ -90,9 +90,10 @@ public enum ImportIssueCode {
   UNQUOTED_ORDER,
 
   /**
-   * A panel-header total ({@code IN MANIFEST} vs the sum of all row quantities, or {@code TO
-   * REFINE} vs the sum of refine-ON row quantities) did not reconcile — a scrolled screenshot may
-   * be missing from the capture set.
+   * The refine-ON row quantities sum past the {@code TO REFINE} panel total beyond the ±1-per-row
+   * display rounding (or a single row alone exceeds it) — a quantity was mis-read or a screenshot
+   * captured twice. One-sided per the frozen Phase-0 rule: a shortfall (scrolled-out rows) is never
+   * flagged and {@code IN MANIFEST} is never validated.
    */
   SUM_MISMATCH,
 
