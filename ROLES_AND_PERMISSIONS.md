@@ -1,6 +1,6 @@
 # Rollen- und Rechte-Matrix (Profit Basetool)
 
-> **Stand 2026-06-02 (nach Auftrags-Umbau #340, Operations/Auszahlungen, Material-Claims, Personal-Blueprints, Blueprint-Verfügbarkeit #364).**
+> **Stand 2026-06-11 (nach Auftrags-Umbau #340, Operations/Auszahlungen, Material-Claims, Personal-Blueprints, Blueprint-Verfügbarkeit #364, Bereichsleitungs-Operationen + Teilnehmer-Sichtbarkeit #500/#501, Bearbeiter-Notizen #520, Blaupausen-Abdeckung bei Item-Aufträgen #526, Raffinerie-Screenshot-Import #439).**
 > Diese Matrix wurde gegen die tatsächliche Implementierung verifiziert:
 > die `@PreAuthorize`-Annotationen aller ~50 Backend-Controller, die
 > URL-Matrix in
@@ -186,7 +186,7 @@ befördert daraus zwei Authority-Flächen:
   (`@ownerScopeService.canEdit…`) ohne Service-Roundtrip aufgelöst werden kann.
 
 > Die **alten** `app_user.is_logistician` / `app_user.is_mission_manager`-Spalten
-> wurden mit **V101** entfernt — Quelle der Wahrheit ist ausschließlich
+> wurden mit **V104** entfernt — Quelle der Wahrheit ist ausschließlich
 > `org_unit_membership`. Mitgliedschaftslose Accounts (Admins, Gäste) tragen
 > kein Logistician-/Mission-Manager-Flag.
 
@@ -240,16 +240,18 @@ Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
 
 ### 3.3 Lager (Inventory) & Aufträge (Job Orders)
 
-| Funktion (Gate)                                                                                                  | Anonym | Member | Log. | MM | Officer | Admin |
-|:-----------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Lager-View ansehen (`/inventory`, Member+)                                                                       |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Lager bearbeiten / aus-/einbuchen (`isAuthenticated()` + `canEditInventoryItem`, Owner-Scope)                    |   ❌    |   ✅¹   |  ✅   | ✅¹ |    ✅    |   ✅   |
-| Auftrag **anlegen** (Material- & Item-Auftrag)                                                                   |   ✅    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                     |   ❌    |   ✅³   |  ✅³  | ✅³ |   ✅³    |   ✅   |
-| Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`) |   ❌    |   ❌    |  ✅³  | ❌  |   ✅³    |   ✅   |
-| Verantwortliche Einheit umsetzen (`PATCH /{id}/responsible-org-unit`)                                            |   ❌    |   ❌    |  ✅²  | ❌  |   ✅²    |   ✅   |
-| Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)          |   ❌    |   ❌    |  ✅³  | ❌  |   ✅³    |   ✅   |
-| Auftrag **löschen** (`hasRole('ADMIN')`)                                                                         |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Funktion (Gate)                                                                                                             | Anonym | Member | Log. | MM  | Officer | Admin |
+|:----------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:---:|:-------:|:-----:|
+| Lager-View ansehen (`/inventory`, Member+)                                                                                  |   ❌    |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
+| Lager bearbeiten / aus-/einbuchen (`isAuthenticated()` + `canEditInventoryItem`, Owner-Scope)                               |   ❌    |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
+| Auftrag **anlegen** (Material- & Item-Auftrag)                                                                              |   ✅    |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
+| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                |   ❌    |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
+| Sich selbst als **Bearbeiter** ein-/austragen, eigene Bearbeiter-Notiz pflegen (`canSeeJobOrder` + selbst-oder-Logistician) |   ❌    |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
+| **Blaupausen-Abdeckung** eines Item-Auftrags lesen (`canSeeJobOrderBlueprintOwners`)                                        |   ❌    |   ✅⁴   |  ✅⁴  | ✅⁴  |   ✅⁴    |   ✅   |
+| Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`)            |   ❌    |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Verantwortliche Einheit umsetzen (`PATCH /{id}/responsible-org-unit`)                                                       |   ❌    |   ❌    |  ✅²  |  ❌  |   ✅²    |   ✅   |
+| Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                     |   ❌    |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Auftrag **löschen** (`hasRole('ADMIN')`)                                                                                    |   ❌    |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
 
 ¹ Nur über das eigene Lager / die Owner-Scope-Prüfung — nicht generell.
 ² Admin frei; Staffel-Logistiker/-Officer nur **Eskalation** des eigenen
@@ -266,14 +268,23 @@ ist für sie immer wahr). Im Frontend wird der „Aufträge"-Link durch „Auftr
 anlegen" ersetzt und ein Direktaufruf von `/orders` bzw. `/orders/{id}` auf das
 Anlege-Formular umgeleitet; das Backend liefert für Nicht-Profit-Mitglieder eine
 leere Liste bzw. `403` (auch bei Schreib-/Claim-Endpunkten).
+⁴ Strenger als `canSeeJobOrder` — **kein** SK-Public-Escape: Die Abdeckungssicht
+nennt Mitglieder namentlich samt ihrer Blaupausen und ist deshalb auf Mitglieder
+der **bearbeitenden** (responsible) Orgeinheit beschränkt. Wer den SK-Auftrag nur
+über die öffentliche Warteschlange sieht, bekommt `403`; das Frontend blendet den
+Abschnitt aus. Admins ohne Pin immer, mit Pin nur bei passender Einheit.
+⁵ Selbst-oder-Logistician-Regel (`verifyAssigneeAccess`): Jeder, der den Auftrag
+sieht, darf **sich selbst** ein-/austragen und **seine eigene** Notiz (max. 500
+Zeichen) pflegen; fremde Einträge/Notizen darf nur ein Logistician+ ändern.
+Notizen sind für alle sichtbar, die den Auftrag sehen.
 
 ### 3.4 Refinery
 
-| Funktion (Gate)                                                                                                     | Anonym | Member | Log. | MM | Officer | Admin |
-|:--------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Eigene Refinery-Orders lesen/anlegen (`isAuthenticated()` [+ `canSeeRefineryOrder`])                                |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Refinery-Order bearbeiten/löschen/lagern (`isAuthenticated()` + `canEditRefineryOrder`: Owner **oder** Logistician) |   ❌    |   ✅¹   |  ✅   | ✅¹ |    ✅    |   ✅   |
-| Refinery-Orders **für andere** anlegen/verwalten (`/users/{id}`, `hasRole('LOGISTICIAN')`)                          |   ❌    |   ❌    |  ✅   | ❌  |    ✅    |   ✅   |
+| Funktion (Gate)                                                                                                                        | Anonym | Member | Log. | MM | Officer | Admin |
+|:---------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| Eigene Refinery-Orders lesen/anlegen, inkl. Screenshot-Import (`POST /import-extract`) (`isAuthenticated()` [+ `canSeeRefineryOrder`]) |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Refinery-Order bearbeiten/löschen/lagern (`isAuthenticated()` + `canEditRefineryOrder`: Owner **oder** Logistician)                    |   ❌    |   ✅¹   |  ✅   | ✅¹ |    ✅    |   ✅   |
+| Refinery-Orders **für andere** anlegen/verwalten (`/users/{id}`, `hasRole('LOGISTICIAN')`)                                             |   ❌    |   ❌    |  ✅   | ❌  |    ✅    |   ✅   |
 
 ¹ Nur als Owner der jeweiligen Order.
 
@@ -319,6 +330,19 @@ und ein Guest wird hier wie ein anonymer Besucher behandelt.
 > Asymmetrie der Auszahlung: jeder Mission-Manager darf `paidOut=true` setzen,
 > aber nur Officer/Admin dürfen ein bestätigtes paid-out wieder auf `false`
 > zurücksetzen.
+>
+> **Sichtbarkeit (`canSeeOperation`) hat seit #500/#501 drei Pfade** (es genügt einer):
+> **(1)** der normale Staffel-Scope (Operation der eigenen Orgeinheit);
+> **(2)** eine **ownerless Bereichsleitungs-Operation** (`owning_org_unit_id = NULL`,
+> V145, ADR-0005) ist für **alle Mitglieder-oder-höher** sichtbar — Operations haben
+> keinen Public-Escape, für Gäste/Anonyme bleibt sie unsichtbar;
+> **(3)** **Teilnehmer-Sichtbarkeit** (ADR-0006): Wer an einem der verknüpften
+> Einsätze teilgenommen hat, sieht die Operation und seine Auszahlung auch
+> staffelfremd (anonyme Aufrufer nie — kein `currentUserId`).
+> Anlegen einer ownerless Operation steht jedem Mission-Manager **ohne**
+> Orgeinheit offen (Bereichsleitung); bearbeiten darf sie jeder Mission-Manager,
+> löschen jeder Admin (`canEditOperation` ist für ownerless Operationen ein
+> No-op, das Rollen-Gate des Endpunkts trägt die Einschränkung).
 
 ### 3.7 Mission-Finanzen & Profit
 
@@ -415,12 +439,20 @@ Mitgliedschaften; Admins ohne aktiven Pin sehen alles, mit Pin dieselbe
 restriktive Sicht wie ein Member.
 
 - **Strikt staffel-gescopt** (kein Cross-Staffel): `Ship`, `InventoryItem`
-  (Lager-View), `RefineryOrder`, `Operation` — Listen filtern auf
+  (Lager-View), `RefineryOrder` — Listen filtern auf
   `owning_org_unit_id`, Detail-/Schreib-Endpunkte gaten auf
-  `canSee*`/`canEdit*`.
+  `canSee*`/`canEdit*`. Persönliche Zeilen ganz ohne Orgeinheit
+  (`owning_org_unit_id = NULL`, V132 — z. B. das Schiff eines Nutzers ohne
+  Staffel/SK) sind **owner-only**: sichtbar/editierbar nur für den Besitzer
+  selbst und Admins (`canAccessOwnerlessPersonalRow`).
 - **Cross-Staffel mit Public-Escape**: `Mission` — für andere OrgUnits sichtbar
   genau dann, wenn `is_internal = false`; editierbar nur durch die besitzende
-  OrgUnit + Admins.
+  OrgUnit + Admins. Ownerless Bereichsleitungs-Missionen (V144) folgen
+  REQ-ORG-009 (siehe Kasten in §3.5).
+- **Staffel-gescopt mit zwei Escapes**: `Operation` — kein Public-Escape, aber
+  (a) **ownerless Bereichsleitungs-Operationen** (V145) sind für alle
+  Mitglieder-oder-höher sichtbar und (b) **Teilnehmer** der verknüpften
+  Einsätze sehen die Operation staffelfremd (#500; Details im Kasten in §3.6).
 - **Bedingt staffel-gescopt**: `JobOrder` (+ `JobOrderMaterial` /
   `JobOrderHandover` / `MaterialClaim`). Ein Auftrag trägt
   `responsible_org_unit_id` (die **bearbeitende** Einheit — steuert die
@@ -455,7 +487,7 @@ restriktive Sicht wie ein Member.
    (`UserController#patchLogistician` / `#patchMissionManager` und die
    SquadronMembership-/SpecialCommandMembership-Endpunkte sind `hasRole('ADMIN')`
    bzw. für SK zusätzlich der SK-Lead über `canManageMembers`). Die alten
-   `app_user`-Flag-Spalten existieren seit V101 nicht mehr.
+   `app_user`-Flag-Spalten existieren seit V104 nicht mehr.
 5. **Phase-4-Lockdown:** Der gesamte Admin-Bereich (Stammdaten,
    Member-Management, Ankündigungen, UEX, System-Settings,
    SK-/Staffel-Lifecycle) ist `hasRole('ADMIN')`. Officer behalten ihre

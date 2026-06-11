@@ -13,15 +13,16 @@ single-sign-on via Keycloak and a clear role and permission model.
 ### What the application provides
 
 - **Mission planning** — plan, brief and review squadron missions with role-aware access (`MISSION_MANAGER`, `OFFICER`, `ADMIN`). Non-internal missions are browsable (and joinable) without an account.
-- **Operations & payouts** — group missions under an *Operation*, track per-participant finances and payouts, and confirm pay-outs with an asymmetric mark/clear gate (`MISSION_MANAGER` sets, `OFFICER`/`ADMIN` clears).
+- **Operations & payouts** — group missions under an *Operation*, track per-participant finances and payouts, and confirm pay-outs with an asymmetric mark/clear gate (`MISSION_MANAGER` sets, `OFFICER`/`ADMIN` clears). Members can set a default payout preference (pay out / donate) in their profile that pre-selects on every mission signup. Leadership members without an org unit can create org-wide *ownerless* operations, and every participant of a linked mission can see the operation and their payout regardless of squadron.
 - **Public request surface** — unauthenticated visitors can submit material/item job orders (auto-routed to the intake Spezialkommando) and sign up for non-internal missions as a named guest — including changing their payout preference — without logging in. See [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) §1.
 - **Hangar & inventory** — track ships and personal inventories per member, including UEX City and Space Station locations.
-- **Refinery & materials** — manage refinery job orders, material handovers and the materials matrix (`/materials/overview`) with planet-aware grouping.
+- **Refinery & materials** — manage refinery job orders, material handovers and the materials matrix (`/materials/overview`) with planet-aware grouping. A new refinery order can be pre-filled from a screenshot-extract JSON produced by the desktop extractor (`POST /api/v1/refinery-orders/import-extract` matches materials, location and method against the master data and returns an unsaved draft with review hints).
 - **Terminals** — administer trade terminals, including UEX raw state (loading dock, auto-load) and the last UEX sync timestamp (`/admin/terminals`).
 - **User administration** — manage members, roles and the `LOGISTICIAN` / `MISSION_MANAGER` capability flags.
 - **Personal inventory** — every authenticated member maintains their own item list at `/personal-inventory`; admins manage other members' inventories at `/admin/personal-inventory`. Backend endpoints under `/api/v1/personal-inventory` (user) and `/api/v1/admin/personal-inventory` (admin) are paginated, validated, and protected by optimistic locking.
 - **Personal blueprints** — the personal-inventory area splits into *Items* and *Blueprints* sub-pages. On `/personal-inventory/blueprints` a member records the crafting blueprints they have unlocked in-game, added via a multi-select type-ahead over the SC Wiki product catalogue or by importing a JSON export from the **SCMDB log-watcher** or the **[Basetool Blueprint Extractor](https://github.com/krt-iri/basetool-bp-extractor)** (both carry a `blueprints` array of identically-named entries; the importer reads the acquisition time from either `ts` or `receivedAt`). The import previews each blueprint name, resolving it by normalized-exact match, a curated alias, or dependency-free fuzzy suggestions; the user resolves the rest manually and each manual pick is learned as an alias for future imports. Admins manage any member's blueprints at `/admin/personal-blueprints`. Backend endpoints under `/api/v1/personal-blueprints` (user) and `/api/v1/admin/personal-blueprints` (admin), plus the slim product search at `/api/v1/blueprints/products/search`.
-- **Blueprint availability overview** — officers, admins and Spezialkommando leads can see which blueprints are available among the members of their org unit at `/blueprint-overview`, with a lazy per-blueprint drill-down to the owning members (display name only). Officers see their squadron, SK leads their SK, admins all org units (or a pinned one); the sidebar entry is hidden from everyone else. Backend endpoints `GET /api/v1/personal-blueprints/overview` (+ `/owners`) gate on the same check as the menu (`GET /api/v1/me/capabilities`).
+- **Blueprint availability overview** — officers, admins and Spezialkommando leads can see which blueprints are available among the members of their org unit at `/blueprint-overview`, with a lazy per-blueprint drill-down to the owning members (display name only). Officers see their squadron, SK leads their SK, admins all org units (or a pinned one); the sidebar entry is hidden from everyone else. Backend endpoints `GET /api/v1/personal-blueprints/overview` (+ `/owners`) gate on the same check as the menu (`GET /api/v1/me/capabilities`). Item-order detail pages additionally show a *blueprint coverage* section — which members of the order's responsible squadron/SK own the blueprints for the requested items — visible only to members of that responsible unit (and admins).
+- **Org chart** — an interactive, keyboard-accessible organization chart (`/org-chart`) of squadrons, special commands and command groups; readable by every authenticated member, editable by admins.
 - **i18n** — every user-visible string is fully translated (German default, English).
 - **Custom Keycloak theme** — login and account console in the IRIDIUM corporate design.
 
@@ -50,7 +51,7 @@ single-sign-on via Keycloak and a clear role and permission model.
 - **Keycloak** — OAuth2 / OIDC identity provider, custom IRIDIUM theme.
 - **Redis** — Spring Session store; sessions survive frontend restarts.
 
-The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECIAL_COMMAND` (SK). A user belongs to at most one Staffel and to any number of SKs; the strict staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder) carry an `owning_org_unit_id` FK that resolves to either kind. **Job Orders are scoped differently** (see the Job-Order rework, parent issue #340): they carry a `responsible_org_unit_id` (the *processing* unit — a profit-eligible Squadron or SK, governs visibility) and a `requesting_org_unit_id` (the customer), and are conditionally scoped — an SK-responsible order is public to all squadrons (a shared queue that squadrons sign up for partial material *claims* against), a squadron-responsible order is private to that squadron + admins. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule, and is itself per-squadron: every read is filtered to the caller's active squadron, so a member or officer sees only their own squadron's system, an admin sees the pinned squadron's (all-squadrons mode shows a "pick a squadron" prompt rather than a cross-staffel merge), and a non-admin without any squadron sees no promotion system at all (menu hidden, list reads empty, direct page access 403). See `CLAUDE.md` ("Aggregate scope kinds") for the full per-aggregate scope model.
+The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECIAL_COMMAND` (SK). A user belongs to at most one Staffel and to any number of SKs; the staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder) carry an `owning_org_unit_id` FK that resolves to either kind (nullable for deliberate *ownerless* rows: personal aggregates of members without an org unit, and leadership missions/operations). **Job Orders are scoped differently** (see the Job-Order rework, parent issue #340): they carry a `responsible_org_unit_id` (the *processing* unit — a profit-eligible Squadron or SK, governs visibility) and a `requesting_org_unit_id` (the customer), and are conditionally scoped — an SK-responsible order is public to all squadrons (a shared queue that squadrons sign up for partial material *claims* against), a squadron-responsible order is private to that squadron + admins. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule, and is itself per-squadron: every read is filtered to the caller's active squadron, so a member or officer sees only their own squadron's system, an admin sees the pinned squadron's (all-squadrons mode shows a "pick a squadron" prompt rather than a cross-staffel merge), and a non-admin without any squadron sees no promotion system at all (menu hidden, list reads empty, direct page access 403). See [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) for the full per-aggregate scope model.
 
 ---
 
@@ -59,21 +60,23 @@ The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECI
 The README focuses on getting the project up and running. The following
 documents cover everything else:
 
-| Document                                                                                               | Purpose                                                                                                                                                                                                              |
-|:-------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [CHANGELOG.md](CHANGELOG.md)                                                                           | Release notes and every user-visible change.                                                                                                                                                                         |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                                                                     | How to report bugs, suggest features and submit pull requests, plus the coding style guide.                                                                                                                          |
-| [CLA.md](CLA.md)                                                                                       | Individual Contributor License Agreement every contributor signs before their first pull request; the public roster of signatures lives in [docs/cla-signatures.md](docs/cla-signatures.md).                         |
-| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)                                                               | Community standards (Contributor Covenant 3.0).                                                                                                                                                                      |
-| [.github/SECURITY.md](.github/SECURITY.md)                                                             | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM).                                       |
-| [LICENSE.md](LICENSE.md)                                                                               | GNU General Public License v3.0.                                                                                                                                                                                     |
-| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md)                                                   | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface.          |
-| [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md)             | "DAS KARTELL" design system / Corporate Design Manual — the source of truth for brand colors, typography, the department palette and UI components (bundles `KRT_Styleguide_V2.pdf`).                                |
-| [docs/deployment.md](docs/deployment.md)                                                               | Production deployment runbook — host bootstrap, normal releases, manual rollback, PAT rotation, troubleshooting.                                                                                                     |
-| [backend/src/main/resources/db/migration/README.md](backend/src/main/resources/db/migration/README.md) | Flyway migration conventions — destructive-ops two-phase rule, data-migration patterns, performance / locking, pre-merge checklist.                                                                                  |
-| [docs/e2e-test/README.md](docs/e2e-test/README.md)                                                     | End-to-end test use cases — one document per functional flow (actor, preconditions, steps, expected result) linking the Playwright test classes, plus the [role/scope reference](docs/e2e-test/rollen-und-scope.md). |
-| [CLAUDE.md](CLAUDE.md)                                                                                 | Project-specific guidance for the Claude Code AI assistant — build / run / test commands, architectural invariants, conventions.                                                                                     |
-| [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)                                   | The pull-request template that ships with every PR.                                                                                                                                                                  |
+| Document                                                                                               | Purpose                                                                                                                                                                                                                                     |
+|:-------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [CHANGELOG.md](CHANGELOG.md)                                                                           | Release notes and every user-visible change.                                                                                                                                                                                                |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                                                                     | How to report bugs, suggest features and submit pull requests, plus the coding style guide.                                                                                                                                                 |
+| [CLA.md](CLA.md)                                                                                       | Individual Contributor License Agreement every contributor signs before their first pull request; the public roster of signatures lives in [docs/cla-signatures.md](docs/cla-signatures.md).                                                |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)                                                               | Community standards (Contributor Covenant 3.0).                                                                                                                                                                                             |
+| [.github/SECURITY.md](.github/SECURITY.md)                                                             | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM).                                                              |
+| [LICENSE.md](LICENSE.md)                                                                               | GNU General Public License v3.0.                                                                                                                                                                                                            |
+| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md)                                                   | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface.                                 |
+| [docs/specs/INDEX.md](docs/specs/INDEX.md)                                                             | Registry of the canonical, binding requirement specs (`REQ-<AREA>-NNN`) — security & access, org-unit tenancy, data persistence, API conventions, observability, UI design system and the per-feature specs.                                |
+| [docs/adr/README.md](docs/adr/README.md)                                                               | Architecture Decision Records — every architecturally significant decision, recorded before or with the change that implements it.                                                                                                          |
+| [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md)             | "DAS KARTELL" design system / Corporate Design Manual — the source of truth for brand colors, typography, the department palette and UI components. A git submodule of [`krt-iri/design-system`](https://github.com/krt-iri/design-system). |
+| [docs/deployment.md](docs/deployment.md)                                                               | Production deployment runbook — host bootstrap, normal releases, manual rollback, PAT rotation, troubleshooting.                                                                                                                            |
+| [backend/src/main/resources/db/migration/README.md](backend/src/main/resources/db/migration/README.md) | Flyway migration conventions — destructive-ops two-phase rule, data-migration patterns, performance / locking, pre-merge checklist.                                                                                                         |
+| [docs/e2e-test/README.md](docs/e2e-test/README.md)                                                     | End-to-end test use cases — one document per functional flow (actor, preconditions, steps, expected result) linking the Playwright test classes, plus the [role/scope reference](docs/e2e-test/rollen-und-scope.md).                        |
+| [CLAUDE.md](CLAUDE.md)                                                                                 | Project-specific guidance for the Claude Code AI assistant — build / run / test commands, architectural invariants, conventions.                                                                                                            |
+| [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)                                   | The pull-request template that ships with every PR.                                                                                                                                                                                         |
 
 ---
 
@@ -191,17 +194,18 @@ backend DB `15432`, Keycloak DB `15433`, Redis `6379`, NPM admin `10081`.
 
 The deployed shape on `MULTI_SQUADRON` (Flyway `V80`–`V83`) turns the
 single-tenant Basetool into a multi-squadron app while keeping a single
-production database and a single Keycloak realm. The design lives in
-[`MULTI_SQUADRON_PLAN.md`](MULTI_SQUADRON_PLAN.md) (German, source of
-truth) and the full audit trail in
+production database and a single Keycloak realm. The living spec is
+[`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md)
+(`REQ-ORG-*`); the full audit trail is in
 [`CHANGELOG.md`](CHANGELOG.md) under the `Multi-Squadron-Umbau` heading.
 
 What changed at the data layer:
 
-* Every `app_user` row carries a `squadron_id` (FK to `squadron`). The
+* Every `app_user` row gained a `squadron_id` (FK to `squadron`). The
   IRIDIUM squadron is seeded at the canonical UUID
-  `00000000-0000-0000-0000-000000000001` and is the default for legacy
-  rows.
+  `00000000-0000-0000-0000-000000000001` and was the default for legacy
+  rows. (Since superseded: `V104` dropped `app_user.squadron_id` again —
+  memberships live exclusively in `org_unit_membership`.)
 * The five staffel-scoped aggregate roots —
   `mission` / `operation` / `ship` / `inventory_item` /
   `refinery_order` — gain an `owning_squadron_id` column.
@@ -262,20 +266,21 @@ operations boards), but everything else respects the strict squadron
 filter.
 
 **Status today.** The multi-squadron rollout is long complete and was
-**extended into a multi-OrgUnit model** by the Spezialkommando work (see
-[`SPEZIALKOMMANDO_PLAN.md`](SPEZIALKOMMANDO_PLAN.md)): a shared `org_unit`
-table with a `kind` discriminator (`SQUADRON` / `SPECIAL_COMMAND`) now backs
-every owner reference, and the squadron switcher / context badge shipped in
-the frontend. The schema has advanced well past the original Phase-7 chain
-(currently `V132`). Several legacy columns have already been dropped — the
-`app_user.is_logistician` / `is_mission_manager` flags (`V101`, now sourced
-from `org_unit_membership`), `job_order.creating_*` (`V129`), and the legacy
-material / ship-type columns (`V125`). The one remaining dual-write is
-`owning_squadron_id` (kept in lockstep with `owning_org_unit_id` by JPA
-lifecycle hooks); it is dropped in the destructive cleanup release, after
-which a rollback to single-tenant is no longer supported. See
-[`CLAUDE.md`](CLAUDE.md) (“Multi-org-unit tenancy”) for the current
-per-aggregate scope model.
+**extended into a multi-OrgUnit model** by the Spezialkommando work: a shared
+`org_unit` table with a `kind` discriminator (`SQUADRON` / `SPECIAL_COMMAND`)
+now backs every owner reference, and the squadron switcher / context badge
+shipped in the frontend. The schema has advanced well past the original
+Phase-7 chain (currently `V149`). The destructive cleanup is done — the
+legacy `owning_squadron_id` mirror columns (`V103`), the per-user
+`app_user.squadron_id` / `is_logistician` / `is_mission_manager` columns
+(`V104`, now sourced from `org_unit_membership`), the legacy `squadron` table
+(`V105`), `job_order.creating_*` (`V129`), and the legacy material /
+ship-type columns (`V125`) are all dropped; a rollback to single-tenant is no
+longer supported. Strict not-null owner stamping has since been *relaxed*
+for deliberate ownerless rows: personal aggregates (`V132`), leadership
+missions (`V144`) and leadership operations (`V145`). See
+[`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md)
+(`REQ-ORG-*`) for the current per-aggregate scope model.
 
 ---
 
@@ -594,7 +599,7 @@ expected result) are documented under [`docs/e2e-test/`](docs/e2e-test/README.md
 ### 5.1 Tech stack
 
 * **Language** — Java 25
-* **Framework** — Spring Boot 4.0.4
+* **Framework** — Spring Boot 4.1.0
 * **Build tool** — Gradle 9 with the Kotlin DSL, dependencies via refreshVersions
 * **Database** — PostgreSQL 18, schema owned by Flyway (Hibernate `ddl-auto=validate` everywhere)
 * **Session store** — Redis (`spring-session-data-redis`)
@@ -612,9 +617,9 @@ top-level directories:
 * **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records, MapStruct `mapper`s, `config` (security, caching, OpenAPI, rate limiting, WebClient), `integration` (UEX external API), `task` (scheduled jobs), `filter`/`interceptor` (correlation ID, deprecation headers), `annotation` (`@ApiDeprecation`).
 * **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `service.BackendApiClient` is the single seam. Persistent state across frontend restarts lives in Redis (Spring Session).
 * **`keycloak-theme/krt-theme`** — Custom Keycloak login and account UI theme matching the IRIDIUM corporate design. See [§5.7 Keycloak theme](#57-keycloak-theme).
-* **`design`** — Source assets for the brand (logos, mock-ups, the [Styleguide.md](Styleguide.md) reference). Not consumed by the runtime, kept in the repo so designers and developers share one source of truth.
+* **`design`** — Brand font sources. The design system itself (colors, typography, components, the Corporate Design Manual) lives in the [`krt-iri/design-system`](https://github.com/krt-iri/design-system) git submodule mounted at [`.claude/skills/das-kartell-design/`](.claude/skills/das-kartell-design/README.md).
 * **`scripts`** — One-off Python helper scripts for repository maintenance (i18n key sync, umlaut escaping, untranslated-string detection, etc.).
-* **`docs`** — Long-form documentation, primarily the [deployment runbook](docs/deployment.md).
+* **`docs`** — Long-form documentation: the binding requirement specs under [`docs/specs/`](docs/specs/INDEX.md), the ADRs under [`docs/adr/`](docs/adr/README.md), the [deployment runbook](docs/deployment.md) and the [E2E use cases](docs/e2e-test/README.md).
 
 The frontend never talks to PostgreSQL or the Keycloak Admin API directly.
 The backend never serves HTML.
@@ -736,7 +741,9 @@ Both flavours pull in the `Lato` font faces from
 (`login/resources/css/krt-login-v3.css` and
 `account/resources/css/krt-account-v3.css`) that overrides the parent
 theme's colours and typography to match the corporate design described
-in [Styleguide.md](Styleguide.md).
+in the design system
+([`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md),
+binding rules in [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)).
 
 **Wiring.** `docker-compose.yml` bind-mounts the theme directory directly
 into the Keycloak container, so any edit takes effect on the next
