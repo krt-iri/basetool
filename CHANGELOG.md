@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der wöchentliche OWASP-Dependency-Check-Scan läuft wieder mit paralleler Gradle-Ausführung.** Das `--no-parallel`-Workaround im CI-Workflow galt einem Konfigurations-Lock-Fehler des inzwischen entfernten AsciidoctorJ-Plugins; ein paralleler Testlauf wurde als sauber bestätigt.
+
 ## [v0.4.17](https://github.com/krt-iri/basetool/releases/tag/v0.4.17) - 2026-06-11
 
 ### Fixed

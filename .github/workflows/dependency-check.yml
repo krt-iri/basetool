@@ -103,26 +103,14 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # `--no-parallel` is kept defensively for this one Gradle invocation:
-      # Gradle 9 enforces an exclusive lock on every Configuration resolution,
-      # and some plugins' internal detached configurations do not acquire that
-      # lock when `dependencyCheckAggregate` resolves them concurrently from
-      # multiple worker threads. With the repo-wide `org.gradle.parallel=true`
-      # setting (gradle.properties) this can race and abort the scan before any
-      # analyser stage runs. The originally-documented offender was the
-      # AsciidoctorJ plugin's `__$asciidoctorj$___r` detached configs (runs
-      # 26516932803 + earlier failures since 2026-05-20); that plugin has since
-      # been removed, but the flag is retained until a parallel scan is
-      # confirmed clean. It scopes the workaround to this CI step only, so
-      # day-to-day developer builds keep their parallel speedup.
       - name: Run dependencyCheckAggregate
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           if [ -n "$NVD_API_KEY" ]; then
-            ./gradlew dependencyCheckAggregate --no-parallel --stacktrace -PnvdApiKey="$NVD_API_KEY"
+            ./gradlew dependencyCheckAggregate --stacktrace -PnvdApiKey="$NVD_API_KEY"
           else
-            ./gradlew dependencyCheckAggregate --no-parallel --stacktrace
+            ./gradlew dependencyCheckAggregate --stacktrace
           fi
 
       # Guard the SARIF upload against a missing report file. If the gradle
