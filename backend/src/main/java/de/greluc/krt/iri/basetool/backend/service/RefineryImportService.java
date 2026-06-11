@@ -380,10 +380,14 @@ public class RefineryImportService {
   }
 
   /**
-   * Reconciles the panel-header totals against the row quantities and flags a mismatch as {@code
-   * SUM_MISMATCH} (a scrolled screenshot may be missing from the capture set). v1 semantics
-   * (hypothesis from the golden set, to be confirmed/frozen by Phase 0 #433): {@code IN MANIFEST} =
-   * sum of <em>all</em> row quantities, {@code TO REFINE} = sum of refine-ON row quantities.
+   * Applies the frozen Phase-0 header checksum (one-sided; extractor repo {@code
+   * PHASE0_FINDINGS.md} §7, REQ-REFINERY-007): flags {@code SUM_MISMATCH} when the refine-ON row
+   * quantities sum past {@code rawToRefineTotal} beyond the ±1-per-row display rounding, or when a
+   * single row alone exceeds it by more than 1 — both indicate a mis-read quantity or a duplicated
+   * capture. A shortfall is never flagged (the materials list is a scrolling ~6-row viewport, so
+   * scrolled-out rows legitimately reduce the visible sum), and {@code rawInManifestTotal} is never
+   * validated — its composition is not reliably reconstructible from a single frame (e.g. it may
+   * exclude the inert row).
    *
    * @param order the extracted order carrying the nullable header totals
    * @param sourceGoods all source rows (including skipped ones)
@@ -393,38 +397,28 @@ public class RefineryImportService {
       RefineryExtractOrderDto order,
       List<RefineryExtractGoodDto> sourceGoods,
       List<ImportIssueDto> issues) {
-    if (order.rawInManifestTotal() != null) {
-      long sumAll =
-          sourceGoods.stream()
-              .mapToLong(g -> g.inputQuantity() != null ? g.inputQuantity() : 0L)
-              .sum();
-      if (sumAll != order.rawInManifestTotal()) {
-        issues.add(
-            issue(
-                "rawInManifestTotal",
-                order.rawInManifestTotal() + " != " + sumAll,
-                ImportIssueCode.SUM_MISMATCH,
-                ImportIssueSeverity.WARNING,
-                null,
-                null));
-      }
+    Long toRefineTotal = order.rawToRefineTotal();
+    if (toRefineTotal == null) {
+      return;
     }
-    if (order.rawToRefineTotal() != null) {
-      long sumRefineOn =
-          sourceGoods.stream()
-              .filter(g -> !Boolean.FALSE.equals(g.refine()))
-              .mapToLong(g -> g.inputQuantity() != null ? g.inputQuantity() : 0L)
-              .sum();
-      if (sumRefineOn != order.rawToRefineTotal()) {
-        issues.add(
-            issue(
-                "rawToRefineTotal",
-                order.rawToRefineTotal() + " != " + sumRefineOn,
-                ImportIssueCode.SUM_MISMATCH,
-                ImportIssueSeverity.WARNING,
-                null,
-                null));
-      }
+    List<Long> refineOnQuantities =
+        sourceGoods.stream()
+            .filter(g -> !Boolean.FALSE.equals(g.refine()))
+            .map(g -> g.inputQuantity() != null ? g.inputQuantity().longValue() : 0L)
+            .toList();
+    long sumRefineOn = refineOnQuantities.stream().mapToLong(Long::longValue).sum();
+    // The tolerance absorbs the ±1 display rounding every visible row may carry.
+    long tolerance = sourceGoods.size();
+    boolean anyRowExceeds = refineOnQuantities.stream().anyMatch(qty -> qty > toRefineTotal + 1);
+    if (sumRefineOn > toRefineTotal + tolerance || anyRowExceeds) {
+      issues.add(
+          issue(
+              "rawToRefineTotal",
+              toRefineTotal + " != " + sumRefineOn,
+              ImportIssueCode.SUM_MISMATCH,
+              ImportIssueSeverity.WARNING,
+              null,
+              null));
     }
   }
 
