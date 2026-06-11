@@ -4225,6 +4225,11 @@ textarea:focus-visible,
     border-left: none;
     border-top: none;
 }
+/* Width variant for form-heavy modals (3+ stacked fields): confirms and
+   single-field prompts stay at the compact 440px default. */
+.krt-modal--wide {
+    max-width: 600px;
+}
 .krt-modal--danger {
     border-top-color: var(--color-danger);
     box-shadow: var(--glow-danger-lg);

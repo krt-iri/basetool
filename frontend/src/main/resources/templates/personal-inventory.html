@@ -115,7 +115,7 @@
 <div id="krt-pi-modal" class="krt-modal-overlay" role="dialog" aria-modal="true"
      aria-labelledby="krt-pi-modal-title"
      th:style="${showItemModal != null ? 'display:flex' : 'display:none'}">
-    <div class="krt-modal">
+    <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
             <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
             <button type="button" class="btn btn-ghost btn-icon close" data-trigger="pi-close-modal" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>

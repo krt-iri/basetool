@@ -132,6 +132,25 @@ class BlueprintsMockupCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "bp-master-detail.png")));
 
+      // Open the edit-note modal: must use the wide KRT frame without scrollbars.
+      if (page.locator("#krt-bp-detail-edit").isVisible()) {
+        page.locator("#krt-bp-detail-edit").click();
+        page.waitForTimeout(300);
+        Object modalProbe =
+            page.evaluate(
+                "() => { const m = document.querySelector('#krt-bp-edit-modal .krt-modal');"
+                    + " const b = m.querySelector('.krt-modal-body');"
+                    + " return { width: Math.round(m.getBoundingClientRect().width),"
+                    + " wide: m.classList.contains('krt-modal--wide'),"
+                    + " bodyVScroll: b.scrollHeight > b.clientHeight,"
+                    + " bodyHScroll: b.scrollWidth > b.clientWidth }; }");
+        System.out.println("[bp-check] note modal probe: " + modalProbe);
+        page.screenshot(
+            new Page.ScreenshotOptions()
+                .setFullPage(true)
+                .setPath(Paths.get("build", "e2e", "bp-note-modal.png")));
+      }
+
       System.out.println("[bp-check] console messages:\n" + consoleLog);
     }
   }

@@ -925,7 +925,7 @@
 
     <!-- Add Participant Modal -->
     <div id="participant-modal" class="krt-modal-overlay" th:style="${openModal == 'participant-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.participant.add}">
-        <div class="krt-modal">
+        <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.participant.add}">Anmelden</h2>
                 <button type="button" class="btn btn-ghost btn-icon close-participant-modal close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
@@ -990,7 +990,7 @@
 
     <!-- Edit Participant Modal -->
     <div id="edit-participant-modal" class="krt-modal-overlay" style="display:none;" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{members.edit}">
-        <div class="krt-modal">
+        <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 id="edit-participant-title" th:text="#{members.edit}">Bearbeiten</h2>
                 <button type="button" class="btn btn-ghost btn-icon close-edit-participant-modal close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
@@ -1071,7 +1071,7 @@
 
     <!-- Add Unit Modal -->
     <div id="add-unit-modal" class="krt-modal-overlay" th:style="${openModal == 'unit-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.add}">
-        <div class="krt-modal"
+        <div class="krt-modal krt-modal--wide"
              th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
             <div class="krt-modal-head">
@@ -1164,7 +1164,7 @@
 
     <!-- Edit Unit Modal -->
     <div id="edit-unit-modal" class="krt-modal-overlay" th:style="${openModal == 'edit-unit-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit}">
-        <div class="krt-modal"
+        <div class="krt-modal krt-modal--wide"
              th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
             <div class="krt-modal-head">
@@ -1258,7 +1258,7 @@
 
     <!-- Add Finance Entry Modal -->
     <div id="finance-modal" class="krt-modal-overlay" th:style="${openModal == 'finance-entry-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.add}">
-        <div class="krt-modal">
+        <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</h2>
                 <button type="button" class="btn btn-ghost btn-icon close-finance-modal close-modal" data-modal-dismiss data-trigger="close-modal-display" data-modal-id="finance-modal" th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
@@ -1307,7 +1307,7 @@
 
     <!-- Edit Finance Entry Modal -->
     <div id="edit-finance-entry-modal" class="krt-modal-overlay" th:style="${openModal == 'edit-finance-entry-modal' ? 'display:flex;' : 'display:none;'}" sec:authorize="isAuthenticated()" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.edit}">
-        <div class="krt-modal">
+        <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.finance.edit}">Finanzeintrag bearbeiten</h2>
                 <button type="button" class="btn btn-ghost btn-icon close-edit-finance-modal close-modal" data-modal-dismiss data-trigger="close-modal-display" data-modal-id="edit-finance-entry-modal" th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>

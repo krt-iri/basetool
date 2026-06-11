@@ -13,7 +13,7 @@
 - **Die Einsatz-Beschreibung unterstützt jetzt Markdown** (fett, Listen, Links u. a.) und wird auf der Übersicht sowie im „Nächste Mission"-Banner formatiert dargestellt; eingebettetes HTML wird aus Sicherheitsgründen als Text angezeigt.
 - **„Meine Blueprints" ist jetzt eine Master-Detail-Ansicht:** Sammlung links (Sofort-Filter, Pfeiltasten, `?bp=`-Deeplink), rechts permanent Zutaten und Stat-Beiträge mit Qualitäts-Slidern je Zutat (Live-Faktoren, Berechnung unverändert). Hinzufügen/JSON-Import wandern als kompakte Leiste in den Kopf; alle bisherigen Funktionen bleiben erhalten.
 - **Die Items-Seite des persönlichen Inventars nutzt jetzt dieselbe Tab-Leiste wie „Meine Blueprints"** (mit Anzahl-Badge) statt der bisherigen Button-Tabs; Anlegen/Bearbeiten- und Lösch-Modal verwenden den KRT-Modal-Rahmen und eine leere Liste erscheint als gestalteter Leerzustand.
-- **KRT-Modals zeigen keine dauerhaften Scrollbalken mehr:** Es scrollt nur noch der Modal-Inhalt (Kopf- und Fußleiste bleiben stehen) und nur, wenn der Bildschirm zu klein ist. Das Anlegen/Bearbeiten-Modal des persönlichen Inventars ist zudem auf 600 px verbreitert.
+- **KRT-Modals zeigen keine dauerhaften Scrollbalken mehr:** Es scrollt nur noch der Modal-Inhalt (Kopf- und Fußleiste bleiben stehen) und nur, wenn der Bildschirm zu klein ist. Formularlastige Modals (Einsatz-Anmeldung/-Bearbeitung, Einheiten, Finanzeinträge, Inventar-Eintrag, Blueprint-Notiz) sind zudem auf 600 px verbreitert; Bestätigungen und Einfeld-Abfragen bleiben kompakt.
 
 ## [v0.4.15](https://github.com/krt-iri/basetool/releases/tag/v0.4.15) - 2026-06-11
 
