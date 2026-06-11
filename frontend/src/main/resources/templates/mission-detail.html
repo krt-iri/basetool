@@ -20,9 +20,11 @@
         html, body { margin: 0; overflow-x: hidden; }
         .page-wrapper {
             width: 100%;
-            /* The tab layout is column-based and dense — cap it at the app's regular
-               content width instead of spanning ultra-wide viewports edge to edge. */
-            max-width: var(--content-max, 1200px);
+            /* The tab layout is column-based and dense — cap it instead of spanning
+               ultra-wide viewports edge to edge. 1.5x the regular --content-max
+               (1200px): the board and the finance grid carry side-by-side columns
+               that profit from the extra room (owner decision 2026-06-11). */
+            max-width: 1800px;
             margin: 0 auto;
             overflow-x: clip;
             box-sizing: border-box;
