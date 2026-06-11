@@ -8,7 +8,7 @@ plugins {
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
-  id("com.github.spotbugs-base") version "6.5.5"
+  id("com.github.spotbugs-base") version "6.5.6"
   id("info.solidsoft.pitest") version "1.19.0"
   id("com.diffplug.spotless")
   // Node toolchain for the web-asset linters (ESLint / Stylelint / HTMLHint). The

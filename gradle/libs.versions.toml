@@ -11,7 +11,7 @@ cyclonedx-bom = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
 springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.2.4"
-testcontainers = "1.21.4"
+testcontainers = "2.0.5"
 flyway = "12.8.1"
 mapstruct = "1.6.3"
 ##     ⬆ = "1.7.0.Beta1"
@@ -31,8 +31,8 @@ openpdf = "3.0.5"
 
 [libraries]
 
-testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
-testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 mapstruct-core = { module = "org.mapstruct:mapstruct", version.ref = "mapstruct" }
