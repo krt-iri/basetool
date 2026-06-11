@@ -118,6 +118,9 @@ class RefineryImportE2eTest {
         assertThat(page.locator("#inputQuantity_0")).hasValue("250");
         assertThat(page.locator("#outputQuantity_0")).hasValue("120");
         assertThat(page.locator("#quality_0")).hasValue("618");
+        // The capture time of the fixture's source image pre-fills the start time (UTC instant
+        // in the hidden field; the visible date/time parts are browser-local).
+        assertThat(page.locator("#startedAt")).hasValue("2026-06-01T19:39:01Z");
         // The misspelled second row stays unmatched and carries the inline flag + suggestion chip.
         assertThat(page.getByTestId("refinery-import-row-flags-1")).isVisible();
         assertThat(page.locator("#inputMaterialId_1")).hasValue("");

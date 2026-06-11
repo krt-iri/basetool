@@ -18,7 +18,7 @@
       "durationMinutes": 90,
       "totalYieldScu": null,
       "sourceImages": [
-        { "name": "e2e_frame_1.png", "width": 3840, "height": 2160, "cropMode": "manual" }
+        { "name": "e2e_frame_1.png", "width": 3840, "height": 2160, "cropMode": "manual", "capturedAt": "2026-06-01T19:39:01Z" }
       ],
       "goods": [
         {

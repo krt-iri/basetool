@@ -22,20 +22,27 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 
 /**
  * Provenance descriptor for one source screenshot of an extracted order ({@code sourceImages[]} in
- * the frozen contract, plan §5). Display-only — the backend never sees the image itself, only this
- * metadata the desktop extractor recorded.
+ * the frozen contract, plan §5). The backend never sees the image itself, only this metadata the
+ * desktop extractor recorded; {@code capturedAt} is the one field the import consumes beyond
+ * display — the latest capture of an order becomes the draft's {@code startedAt}
+ * (REQ-REFINERY-017).
  *
  * @param name screenshot file name on the user's machine, e.g. {@code "frame_213823.png"}
  * @param width capture width in pixels (native, before client-side normalization)
  * @param height capture height in pixels
  * @param cropMode how the work-order panel was isolated: {@code vlm} (model-located), {@code
  *     manual} (user-drawn crop) or {@code precropped} (input already was a panel-only image)
+ * @param capturedAt UTC capture instant the extractor derived from the screenshot file (name
+ *     timestamp, else file modified time); optional additive v1 field (ADR-0008), {@code null} when
+ *     the producer is older or the capture time was undeterminable
  */
 public record RefineryExtractImageDto(
     @NotNull @Size(max = 255) String name,
     @Positive Integer width,
     @Positive Integer height,
-    @Size(max = 32) String cropMode) {}
+    @Size(max = 32) String cropMode,
+    Instant capturedAt) {}

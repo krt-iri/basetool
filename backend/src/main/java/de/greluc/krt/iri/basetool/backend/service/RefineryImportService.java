@@ -40,6 +40,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.ImportSuggestionDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryExtractDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryExtractGoodDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.RefineryExtractImageDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryGoodDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryImportDraftDto;
@@ -50,6 +51,7 @@ import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.iri.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import de.greluc.krt.iri.basetool.backend.service.BlueprintProductService.ResolvedProduct;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -293,7 +295,7 @@ public class RefineryImportService {
             resolveOwnerReference(callerId),
             location.map(locationMapper::toDto).orElse(null),
             null,
-            null,
+            deriveStartedAt(order.sourceImages()),
             order.durationMinutes(),
             order.expenses(),
             null,
@@ -594,6 +596,28 @@ public class RefineryImportService {
       return null;
     }
     return userRepository.findById(callerId).map(userMapper::toReferenceDto).orElse(null);
+  }
+
+  /**
+   * Derives the draft's start time from the screenshot capture metadata (REQ-REFINERY-017): the
+   * LATEST {@code capturedAt} across the order's source images — the user captures the SETUP panel
+   * right when starting the order, and a scrolled multi-capture sequence ends closest to the actual
+   * start. {@code null} when no image carries a capture instant (older extractor, or the file
+   * metadata was undeterminable); the create flow then keeps its "now" default at save time.
+   *
+   * @param sourceImages the order's source-image provenance; {@code null}-safe
+   * @return the latest capture instant, or {@code null}
+   */
+  private static @Nullable Instant deriveStartedAt(
+      @Nullable List<RefineryExtractImageDto> sourceImages) {
+    if (sourceImages == null) {
+      return null;
+    }
+    return sourceImages.stream()
+        .filter(image -> image != null && image.capturedAt() != null)
+        .map(RefineryExtractImageDto::capturedAt)
+        .max(Comparator.naturalOrder())
+        .orElse(null);
   }
 
   /**

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Screenshot-Import befüllt jetzt auch das Startdatum des Raffinerieauftrags vor.** Der Basetool SC Extractor liefert pro Screenshot die Aufnahmezeit mit (aus dem Dateinamen, sonst aus dem Datei-Änderungsdatum); der Import übernimmt die Aufnahmezeit des letzten Screenshots als Startzeit. Ohne Zeitangabe (ältere Extractor-Version) bleibt das Feld wie bisher leer und wird beim Speichern auf „jetzt" gesetzt.
+
 ## [v0.4.17](https://github.com/krt-iri/basetool/releases/tag/v0.4.17) - 2026-06-11
 
 ### Fixed

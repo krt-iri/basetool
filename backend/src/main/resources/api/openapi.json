@@ -38604,6 +38604,10 @@
             "type" : "string",
             "maxLength" : 32,
             "minLength" : 0
+          },
+          "capturedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         },
         "required" : [ "name" ]
