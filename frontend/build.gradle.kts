@@ -111,6 +111,8 @@ dependencies {
   // Caching
   implementation("org.springframework.boot:spring-boot-starter-cache")
   implementation("com.github.ben-manes.caffeine:caffeine")
+  // CommonMark renderer for the mission-description markdown (escaped + URL-sanitized HTML).
+  implementation(libs.commonmark.core)
   // Actuator for /actuator/health -- consumed by the Docker HEALTHCHECK
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   // Spring Session with Redis for persistent sessions across restarts

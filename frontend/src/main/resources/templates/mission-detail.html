@@ -226,7 +226,13 @@
                     <div class="kpanel-head" th:text="#{mission.overview.briefing}">Auftrag</div>
                     <div class="kpanel-body">
                         <th:block sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
-                            <p class="desc" th:if="${!#strings.isEmpty(mission.description)}" th:text="${mission.description}">Beschreibung</p>
+                            <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips
+                                 unsafe link protocols, so only renderer-generated markup is emitted. The bean
+                                 call is bound via th:with because Thymeleaf 3.1 evaluates th:utext in a
+                                 restricted context where @bean references are forbidden (cf. @moneyFormat). -->
+                            <div class="markdown-content" th:if="${!#strings.isEmpty(mission.description)}"
+                                 th:with="descriptionHtml=${@markdown.render(mission.description)}"
+                                 th:utext="${descriptionHtml}">Beschreibung</div>
                             <p class="desc" th:if="${#strings.isEmpty(mission.description)}" th:text="#{general.none}">&mdash;</p>
                         </th:block>
                         <div class="chiprow" th:if="${myParticipant != null}" style="margin-top: 10px;">
@@ -595,6 +601,7 @@
                 <label th:text="#{mission.description}">Description</label>
                 <textarea name="description" rows="5" th:text="*{description}"
                           th:disabled="${!isNew and !mission.canEdit}"></textarea>
+                <small class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterst&uuml;tzt.</small>
                 <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
             </div>
 

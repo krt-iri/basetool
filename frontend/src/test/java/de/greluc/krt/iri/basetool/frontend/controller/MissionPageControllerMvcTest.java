@@ -2081,4 +2081,62 @@ class MissionPageControllerMvcTest {
         // HVU marking surfaces as the warning chip on the unit head.
         .andExpect(content().string(containsString("chip--warning")));
   }
+
+  /**
+   * The mission description is Markdown: the Uebersicht briefing panel must render it to HTML via
+   * the {@code @markdown} bean (bold -> strong) while raw HTML in the source stays escaped — the
+   * th:utext sink must never emit user-controlled markup.
+   */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_DescriptionMarkdown_RendersHtmlAndEscapesRawTags() throws Exception {
+    UUID missionId = UUID.randomUUID();
+
+    MissionDto mission =
+        new MissionDto(
+            missionId,
+            "Markdown Mission",
+            "**Sammeln** bei ARC-L1 <script>alert('xss')</script>",
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            null,
+            null,
+            Collections.emptySet(),
+            true,
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            0,
+            0,
+            null,
+            null,
+            null,
+            0L);
+
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(mission);
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("<strong>Sammeln</strong>")))
+        .andExpect(content().string(not(containsString("<script>alert"))));
+  }
 }

@@ -23,7 +23,10 @@ The detail page renders a sticky head (title, owning-squadron badge, status pill
 a `.facts-bar` (server join = planned start, TS meeting time, participants, checked-in count,
 finance total for member+ viewers) and a `.tab-nav` with up to four tabs:
 
-1. **Übersicht** — read-only landing tab: briefing/description (member+ gate unchanged), schedule /
+1. **Übersicht** — read-only landing tab: briefing/description (member+ gate unchanged; the
+   description is **Markdown** and renders server-side via the `@markdown` bean — raw HTML in the
+   source is escaped, unsafe link protocols are stripped, so `th:utext` never emits
+   user-controlled markup; the same renderer feeds the home-page next-mission banner), schedule /
    radio / leadership as a `.kv-list` (operation labelled singular; actual start and end as
    separate rows; the leadership-position rows precede the party lead), the caller's personal
    participation status, and a single Wirtschaft jump card (no Teilnehmer/Finanzen cards — those
