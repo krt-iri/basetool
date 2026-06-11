@@ -4486,3 +4486,146 @@ textarea:focus-visible,
     border: var(--border-hairline);
     padding: 0.25em 0.6em;
 }
+
+/* ==========================================================================
+   Master-detail, ingredient-quality, and empty-state patterns (ported from
+   design-system krt-components.css, commit dab7640).
+   ========================================================================== */
+
+/* ----------------------------------------------------------- EMPTY STATE -- */
+/* Centered placeholder for empty lists/collections: short reason + ONE next
+   action (ghost or cta). Never leave a bare "Keine Einträge." table cell. */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 28px 16px;
+    text-align: center;
+    border: 1px dashed var(--color-gray-3);
+    background: var(--color-bg-dark-gray);
+}
+.empty-state .empty-title {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.85rem;
+    color: var(--color-gray-1);
+}
+.empty-state .empty-text {
+    font-size: 0.8rem;
+    font-weight: 300;
+    color: var(--color-gray-2);
+    max-width: 48ch;
+}
+
+/* ---------------------------------------------------------- MASTER-DETAIL -- */
+/* Collection browser (e.g. blueprints): dense filterable list left, permanent
+   detail pane right. On small screens collapse to list → detail navigation
+   (back button in the pane). Keyboard: ↑/↓ move the active row. */
+.master-detail {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 12px;
+    align-items: start;
+}
+@media (width <= 900px) {
+    .master-detail {
+        grid-template-columns: 1fr;
+    }
+}
+.master-list {
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+}
+.master-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 11px;
+    border-bottom: var(--border-hairline);
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--color-gray-1);
+}
+.master-row:hover {
+    background: rgb(255 255 255 / 3%);
+}
+.master-row.is-active {
+    border-left: 3px solid var(--color-primary);
+    background: var(--color-surface-input);
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+}
+.master-row:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+.detail-pane {
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    padding: 14px 16px;
+}
+
+/* ------------------------------------------------- INGREDIENT QUALITY ----- */
+/* "Stat-Beitrag nach Zutat-Qualität": every ingredient carries its OWN quality
+   slider which scales only its mapped stats. Show the live factor on the
+   affected stat chips; keep "min. Qualität" and "höher ist besser" hints. */
+input[type='range'] {
+    accent-color: var(--color-primary);
+}
+.quality-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 250px;
+}
+.quality-block .quality-source {
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--color-gray-2);
+}
+.quality-block .quality-name {
+    font-size: 0.8rem;
+    color: var(--color-gray-1);
+}
+.quality-block .quality-name strong {
+    color: var(--color-white);
+}
+.quality-block .quality-name small {
+    color: var(--color-gray-2);
+}
+.quality-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.quality-row input[type='range'] {
+    width: 200px;
+    height: 18px;
+    background: transparent;
+}
+.quality-row .quality-value {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+    font-size: 0.76rem;
+    min-width: 70px;
+}
+.quality-row .quality-value small {
+    color: var(--color-gray-2);
+    font-weight: 400;
+}
+.quality-affects {
+    font-size: 0.72rem;
+    color: var(--color-gray-2);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}

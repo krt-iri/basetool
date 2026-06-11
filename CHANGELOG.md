@@ -11,6 +11,7 @@
 - **Einheiten haben jetzt einen optionalen Anzeigenamen** (wird sonst aus Schiff/Schiffstyp abgeleitet), **einen wählbaren Verantwortlichen** (sonst automatisch der Schiffseigner) **und eine Notiz** (Migration V149, Einheiten-Modal und Crew-Board zeigen beides an).
 - **Der Finanzen-Tab zeigt eine Summen-Leiste (Gesamtsumme, Einnahmen, Ausgaben, je Anteil)**; Raffinerie-Ausgaben erscheinen als automatische Zeile mit Link zum Auftrag.
 - **Die Einsatz-Beschreibung unterstützt jetzt Markdown** (fett, Listen, Links u. a.) und wird auf der Übersicht sowie im „Nächste Mission"-Banner formatiert dargestellt; eingebettetes HTML wird aus Sicherheitsgründen als Text angezeigt.
+- **„Meine Blueprints" ist jetzt eine Master-Detail-Ansicht:** Sammlung links (Sofort-Filter, Pfeiltasten, `?bp=`-Deeplink), rechts permanent Zutaten und Stat-Beiträge mit Qualitäts-Slidern je Zutat (Live-Faktoren, Berechnung unverändert). Hinzufügen/JSON-Import wandern als kompakte Leiste in den Kopf; alle bisherigen Funktionen bleiben erhalten.
 
 ## [v0.4.15](https://github.com/krt-iri/basetool/releases/tag/v0.4.15) - 2026-06-11
 
