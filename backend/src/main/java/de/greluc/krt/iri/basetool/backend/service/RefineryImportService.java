@@ -27,6 +27,7 @@ import de.greluc.krt.iri.basetool.backend.mapper.RefiningMethodMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.MaterialExternalAlias;
 import de.greluc.krt.iri.basetool.backend.model.MaterialExternalAliasSource;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus;
@@ -53,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -80,9 +82,10 @@ import org.springframework.util.StringUtils;
  * with {@link MaterialNameCanonicalizer} (master data stores {@code "Stileron (Raw)"}, the screen
  * shows {@code "STILERON (ORE)"}); the candidate set mirrors the create path's input gate ({@code
  * type == RAW || isManualRawMaterial}, visible only). Stages: unique canonical match → curated
- * {@code REFINERY_SCREEN} alias → unique suffix/contains (game-UI-truncated names) → fuzzy via the
- * reused {@link BlueprintFuzzyMatcher} with a conservative accept threshold; fuzzy hits are never
- * silent ({@code LOW_CONFIDENCE_MATERIAL}), misses keep the row with ranked suggestions.
+ * {@code REFINERY_SCREEN} alias → unique suffix/contains for game-UI-truncated names, anchored on
+ * both the candidate names and the canonicalized alias names → fuzzy via the reused {@link
+ * BlueprintFuzzyMatcher} with a conservative accept threshold; fuzzy hits are never silent ({@code
+ * LOW_CONFIDENCE_MATERIAL}), misses keep the row with ranked suggestions.
  *
  * <p>Matching never touches the security context (kept pure and unit-testable); the caller id is
  * passed in explicitly and used only to default the draft's owner to the uploading user (§7.4).
@@ -430,7 +433,13 @@ public class RefineryImportService {
 
   /**
    * Loads the candidate set once per request and pre-computes the canonical-core index plus the
-   * name-keyed lookup the fuzzy stage maps its results back through.
+   * name-keyed lookup the fuzzy stage maps its results back through. Also folds the curated {@code
+   * REFINERY_SCREEN} alias names through the canonicalizer into an index of their own, so the
+   * truncation stage can use aliases as containment anchors — the game UI clips long names on both
+   * ends, and the master-data name (often the external-catalogue spelling) may not contain the
+   * clipped fragment while a curated alias of the on-screen spelling does. Aliases whose target
+   * material fails the create-path candidate gate are left out, mirroring the exact-alias stage's
+   * gate (REQ-REFINERY-012).
    *
    * @return the per-request matching context
    */
@@ -451,14 +460,30 @@ public class RefineryImportService {
         candidateIds.add(candidate.getId());
       }
     }
-    return new MatchContext(candidates, canonicalIndex, byName, candidateIds);
+    Map<String, List<Material>> aliasCanonicalIndex = new HashMap<>();
+    for (MaterialExternalAlias alias :
+        materialExternalAliasService.findBySourceSystem(
+            MaterialExternalAliasSource.REFINERY_SCREEN)) {
+      Material target = alias.getMaterial();
+      String aliasCanonical = MaterialNameCanonicalizer.canonicalCore(alias.getExternalName());
+      if (aliasCanonical == null
+          || aliasCanonical.isEmpty()
+          || target == null
+          || target.getId() == null
+          || !candidateIds.contains(target.getId())) {
+        continue;
+      }
+      aliasCanonicalIndex.computeIfAbsent(aliasCanonical, k -> new ArrayList<>()).add(target);
+    }
+    return new MatchContext(candidates, canonicalIndex, byName, candidateIds, aliasCanonicalIndex);
   }
 
   /**
    * Runs the §7.3 stages against the prepared context: unique canonical match, curated {@code
-   * REFINERY_SCREEN} alias, unique suffix/contains for game-UI-truncated reads, then the fuzzy
-   * fallback. Fuzzy results at or above the accept threshold match (flagged); everything below
-   * leaves the row unmatched but carries the ranked suggestions.
+   * REFINERY_SCREEN} alias, unique suffix/contains for game-UI-truncated reads — tested against the
+   * candidate canonical names <em>and</em> the canonicalized alias names, unique across the union —
+   * then the fuzzy fallback. Fuzzy results at or above the accept threshold match (flagged);
+   * everything below leaves the row unmatched but carries the ranked suggestions.
    *
    * @param rawName verbatim screen read
    * @param context the per-request candidate context
@@ -492,17 +517,23 @@ public class RefineryImportService {
     }
 
     if (canonical.length() >= MIN_PARTIAL_MATCH_LENGTH) {
-      List<Material> partial =
-          context.candidates().stream()
-              .filter(
-                  c -> {
-                    String candidateCanonical =
-                        MaterialNameCanonicalizer.canonicalCore(c.getName());
-                    return candidateCanonical != null && candidateCanonical.contains(canonical);
-                  })
-              .toList();
+      // Keyed by material id so a material reachable both through its own name and through an
+      // alias counts as ONE hit — uniqueness is judged across the union of both anchor sets.
+      Map<UUID, Material> partial = new LinkedHashMap<>();
+      for (Material candidate : context.candidates()) {
+        String candidateCanonical = MaterialNameCanonicalizer.canonicalCore(candidate.getName());
+        if (candidateCanonical != null && candidateCanonical.contains(canonical)) {
+          partial.put(candidate.getId(), candidate);
+        }
+      }
+      for (Map.Entry<String, List<Material>> aliasEntry :
+          context.aliasCanonicalIndex().entrySet()) {
+        if (aliasEntry.getKey().contains(canonical)) {
+          aliasEntry.getValue().forEach(target -> partial.put(target.getId(), target));
+        }
+      }
       if (partial.size() == 1) {
-        return MaterialMatch.exact(partial.getFirst());
+        return MaterialMatch.exact(partial.values().iterator().next());
       }
     }
 
@@ -600,12 +631,15 @@ public class RefineryImportService {
    * @param byName exact display name → candidate (names are unique)
    * @param candidateIds candidate primary keys — the alias stage validates its hit against this set
    *     so a mis-curated alias can never bypass the create-path gate
+   * @param aliasCanonicalIndex canonicalized {@code REFINERY_SCREEN} alias name → gate-passing
+   *     target materials; containment anchors for the truncation stage
    */
   private record MatchContext(
       List<Material> candidates,
       Map<String, List<Material>> canonicalIndex,
       Map<String, Material> byName,
-      Set<UUID> candidateIds) {}
+      Set<UUID> candidateIds,
+      Map<String, List<Material>> aliasCanonicalIndex) {}
 
   /**
    * Detailed outcome of one material-matching run.

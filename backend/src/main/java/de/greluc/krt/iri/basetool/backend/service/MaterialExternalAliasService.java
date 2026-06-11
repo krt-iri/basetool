@@ -107,6 +107,18 @@ public class MaterialExternalAliasService {
   }
 
   /**
+   * Returns every alias of one source system. Consumed by the refinery import, which folds the
+   * {@code REFINERY_SCREEN} alias names through the shared canonicalizer and uses them as
+   * containment anchors for game-UI-truncated reads (REQ-REFINERY-004 stage 3).
+   *
+   * @param sourceSystem catalogue the aliases belong to
+   * @return all alias rows of that source
+   */
+  public List<MaterialExternalAlias> findBySourceSystem(MaterialExternalAliasSource sourceSystem) {
+    return repository.findBySourceSystem(sourceSystem);
+  }
+
+  /**
    * Persists a new alias. Validates that the referenced material exists and that no alias with the
    * same {@code (sourceSystem, externalName)} exists yet — compared case-insensitively, matching
    * the V146 unique index and the resolution lookup (REQ-REFINERY-010); on a duplicate the row is

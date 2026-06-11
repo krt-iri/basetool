@@ -59,4 +59,15 @@ public interface MaterialExternalAliasRepository
    */
   Optional<MaterialExternalAlias> findBySourceSystemAndExternalNameIgnoreCase(
       MaterialExternalAliasSource sourceSystem, String externalName);
+
+  /**
+   * Returns every alias of one source system. The refinery import loads the {@code REFINERY_SCREEN}
+   * rows once per request so its truncation stage can test containment against the canonicalized
+   * alias names (REQ-REFINERY-004 stage 3) — the curated set is small (tens of rows), so no
+   * pagination is needed.
+   *
+   * @param sourceSystem catalogue the aliases belong to
+   * @return all alias rows of that source, in no guaranteed order
+   */
+  List<MaterialExternalAlias> findBySourceSystem(MaterialExternalAliasSource sourceSystem);
 }
