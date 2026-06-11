@@ -63,7 +63,7 @@
         .tab-pane { display: none; flex-direction: column; gap: 12px; }
         .tab-pane.on { display: flex; }
         .pane-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
-        .pane-grid-fin { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; align-items: start; }
+        .pane-grid-fin { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; align-items: start; }
         .pane-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
         @media (max-width: 980px) { .pane-grid-2, .pane-grid-fin { grid-template-columns: 1fr; } }
 
@@ -106,7 +106,8 @@
         .sec-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
         .sec-h h2 { font-family: var(--font-body); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.07em; font-size: 0.75rem; color: var(--color-gray-1); margin: 0; }
         .sec-h .warn { color: var(--color-warning); }
-        .sec-h .legend { font-size: 0.68rem; color: var(--color-gray-2); }
+        /* gray-1 + regular weight: gray-2 at thin weight was unreadable over the honeycomb. */
+        .sec-h .legend { font-size: 0.72rem; color: var(--color-gray-1); font-weight: 400; }
         /* Pool column widened to match the 1800px page cap — the person rows carry
            name + badges + wish/note + actions and clipped at the mock's 340px. */
         .board { display: grid; grid-template-columns: 600px 1fr; gap: 12px; align-items: start; }
@@ -137,6 +138,18 @@
         .sum .sd { font-size: 0.66rem; color: var(--color-gray-2); margin-top: 2px; }
         td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         td.num { color: var(--color-white); }
+        /* The payout table must fit a half-4K browser window without clipping the
+           preference dropdowns: denser cells, content-shrunk % column, ellipsised names. */
+        .payout-table th, .payout-table td { padding: 8px 10px; }
+        .payout-table th.num, .payout-table td.num { width: 1%; }
+        .payout-table td:first-child { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .payout-table select { min-width: 0; }
+        /* The Wirtschaft details sit directly on the honeycomb backdrop — give them
+           the panel surface so summary titles stay readable. */
+        #pane-fin details.hud-details { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 12px 14px; }
+        /* Actual start/end carry a trailing "Jetzt" button — let it wrap below the
+           inputs instead of clipping on narrow panes. */
+        .datetime-with-now { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
         .reflink { color: var(--color-dept-profit); text-decoration: underline; }
         .auto-marker { font-size: 0.62rem; color: var(--color-gray-2); text-transform: uppercase; letter-spacing: 0.05em; }
         .fact-v.pos { color: var(--color-success); }
@@ -284,15 +297,8 @@
                     </div>
                 </div>
             </div>
-            <!-- Only the Wirtschaft jump card remains: Teilnehmer/Finanzen are reachable via the
-                 tab nav itself, duplicate jump cards added no information (owner feedback). -->
-            <div class="navrow">
-                <button type="button" class="navcard" data-tab-jump="fin" sec:authorize="isAuthenticated()" th:if="${(mission?.refineryOrders != null and !#lists.isEmpty(mission.refineryOrders)) or (mission?.inventoryEntries != null and !#lists.isEmpty(mission.inventoryEntries))}">
-                    <span class="nk"><span th:text="#{mission.economy}">Wirtschaft</span> <span class="arrow" aria-hidden="true">&rarr;</span></span>
-                    <span class="nv" th:text="|${mission.refineryOrders != null ? #lists.size(mission.refineryOrders) : 0} + ${mission.inventoryEntries != null ? #lists.size(mission.inventoryEntries) : 0}|">2 + 3</span>
-                    <span class="nd" th:text="#{mission.refinery_orders} + ' &middot; ' + #{mission.inventory_entries}">Raffinerieauftr&auml;ge &middot; Lagereintr&auml;ge</span>
-                </button>
-            </div>
+            <!-- No jump cards: every aggregate (Teilnehmer/Finanzen/Wirtschaft) is reachable via
+                 the tab nav itself, duplicate cards added no information (owner feedback). -->
         </section>
         <!-- ================= Tab 2: Teilnehmer & Einheiten (crew board) ================= -->
         <section th:unless="${isNew}" id="pane-crew" class="tab-pane" role="tabpanel" aria-labelledby="tab-crew">
@@ -457,7 +463,7 @@
                     <div class="kpanel-head" th:text="#{mission.payout}">Auszahlung</div>
                     <div class="kpanel-body">
                     <div class="table-responsive">
-                        <table th:if="${participants != null and !participants.isEmpty()}">
+                        <table class="payout-table" th:if="${participants != null and !participants.isEmpty()}">
                             <thead>
                                 <tr>
                                     <th th:text="#{mission.participant.user}">Benutzer</th>
@@ -689,7 +695,7 @@
             <div class="form-group datetime-split-group">
                 <label th:text="#{mission.actual_start}">Actual Start</label>
                 <input type="hidden" name="actualStartTime" id="actualStartTime" th:value="*{actualStartTime}">
-                <div style="display: flex; gap: 0.5rem; align-items: center; width: fit-content;">
+                <div class="datetime-with-now">
                     <div class="datetime-split-inputs">
                         <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
                         <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
@@ -703,7 +709,7 @@
             <div class="form-group datetime-split-group" th:attr="data-validate-after='actualStartTime', data-error-after=#{validation.datetime.after}">
                 <label th:text="#{mission.actual_end}">Actual End</label>
                 <input type="hidden" name="actualEndTime" id="actualEndTime" th:value="*{actualEndTime}">
-                <div style="display: flex; gap: 0.5rem; align-items: center; width: fit-content;">
+                <div class="datetime-with-now">
                     <div class="datetime-split-inputs">
                         <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:disabled="${!isNew and !mission.canEdit}">
                         <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:disabled="${!isNew and !mission.canEdit}">
