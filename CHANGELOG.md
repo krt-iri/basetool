@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Screenshot-Import ordnet vom Spiel abgeschnittene Materialnamen (z. B. „UCTION SALVAGE") jetzt auch über Material-Aliase zu.** Die Teilstring-Stufe prüft das gelesene Fragment zusätzlich gegen die unter „Admin → Material-Aliase" gepflegten `REFINERY_SCREEN`-Aliase; ein Alias mit der vollen Bildschirm-Schreibweise deckt damit alle Abschneide-Varianten (vorne/hinten/beidseitig) ab.
+
 ### Fixed
 
 - **Der Summen-Check des Raffinerie-Screenshot-Imports meldet keine falschen Warnungen mehr.** Er prüft jetzt die in Phase 0 verifizierte Regel: nur noch einseitig gegen die TO-REFINE-Kopfzeile (mit Rundungstoleranz von ±1 pro Zeile); IN MANIFEST wird nicht mehr geprüft, da das Spiel diese Summe nicht zuverlässig nachvollziehbar bildet (z. B. ohne inerte Materialien).

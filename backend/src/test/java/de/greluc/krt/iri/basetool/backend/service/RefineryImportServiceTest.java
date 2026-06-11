@@ -33,6 +33,7 @@ import de.greluc.krt.iri.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.iri.basetool.backend.mapper.UserMapperImpl;
 import de.greluc.krt.iri.basetool.backend.model.Location;
 import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.MaterialExternalAlias;
 import de.greluc.krt.iri.basetool.backend.model.MaterialExternalAliasSource;
 import de.greluc.krt.iri.basetool.backend.model.MaterialType;
 import de.greluc.krt.iri.basetool.backend.model.RefineryOrderStatus;
@@ -261,6 +262,113 @@ class RefineryImportServiceTest {
     assertThat(draft.goodsMatched()).isEqualTo(1);
     assertThat(draft.order().goods().getFirst().inputMaterial().id())
         .isEqualTo(constructionSalvage.getId());
+  }
+
+  @Test
+  void buildDraft_matchesTruncatedNameViaAliasContainmentAnchor() {
+    // Given — the catalogue names it "Construction Material Salvage" (UEX spelling), the game UI
+    // shows "Construction Salvage" and clips it to "UCTION SALVAGE"; the master name does not
+    // contain the fragment, but one curated alias of the on-screen spelling does
+    Material constructionMaterialSalvage =
+        material("Construction Material Salvage", MaterialType.RAW, false);
+    lenient()
+        .when(materialRepository.findRefineryInputCandidates(MaterialType.RAW))
+        .thenReturn(List.of(stileron, lindinium, aluminum, constructionMaterialSalvage));
+    lenient()
+        .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
+        .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", constructionMaterialSalvage)));
+
+    // When
+    RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
+
+    // Then — a deterministic hit, not a fuzzy one
+    assertThat(draft.goodsMatched()).isEqualTo(1);
+    assertThat(draft.order().goods().getFirst().inputMaterial().id())
+        .isEqualTo(constructionMaterialSalvage.getId());
+    assertThat(issues(draft, ImportIssueCode.UNMATCHED_MATERIAL)).isEmpty();
+    assertThat(issues(draft, ImportIssueCode.LOW_CONFIDENCE_MATERIAL)).isEmpty();
+  }
+
+  @Test
+  void buildDraft_matchesBothSideTruncatedNameViaAliasContainmentAnchor() {
+    // Given — clipping on both ends still yields a contiguous fragment of the alias name
+    Material constructionMaterialSalvage =
+        material("Construction Material Salvage", MaterialType.RAW, false);
+    lenient()
+        .when(materialRepository.findRefineryInputCandidates(MaterialType.RAW))
+        .thenReturn(List.of(stileron, lindinium, aluminum, constructionMaterialSalvage));
+    lenient()
+        .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
+        .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", constructionMaterialSalvage)));
+
+    // When
+    RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALV"));
+
+    // Then
+    assertThat(draft.goodsMatched()).isEqualTo(1);
+    assertThat(draft.order().goods().getFirst().inputMaterial().id())
+        .isEqualTo(constructionMaterialSalvage.getId());
+  }
+
+  @Test
+  void buildDraft_countsNameAndAliasAnchorOfSameMaterialAsOneHit() {
+    // Given — the fragment is contained in the candidate's own name AND in an alias pointing at
+    // the same material; uniqueness is judged per material, so this stays a single hit
+    lenient()
+        .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
+        .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", constructionSalvage)));
+
+    // When
+    RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
+
+    // Then
+    assertThat(draft.goodsMatched()).isEqualTo(1);
+    assertThat(draft.order().goods().getFirst().inputMaterial().id())
+        .isEqualTo(constructionSalvage.getId());
+  }
+
+  @Test
+  void buildDraft_leavesAmbiguousTruncationAcrossNameAndAliasAnchorsUnmatched() {
+    // Given — the fragment hits the candidate "Construction Salvage" directly AND an alias
+    // pointing at a different material; the union has two materials, so no deterministic match
+    Material constructionMaterialSalvage =
+        material("Construction Material Salvage", MaterialType.RAW, false);
+    lenient()
+        .when(materialRepository.findRefineryInputCandidates(MaterialType.RAW))
+        .thenReturn(
+            List.of(
+                stileron, lindinium, aluminum, constructionSalvage, constructionMaterialSalvage));
+    lenient()
+        .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
+        .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", constructionMaterialSalvage)));
+
+    // When
+    RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
+
+    // Then — falls through to fuzzy, which stays below the accept threshold here
+    assertThat(draft.goodsMatched()).isZero();
+    assertThat(draft.order().goods().getFirst().inputMaterial()).isNull();
+    assertThat(issues(draft, ImportIssueCode.UNMATCHED_MATERIAL)).hasSize(1);
+  }
+
+  @Test
+  void buildDraft_ignoresAliasAnchorTargetingNonCandidateMaterial() {
+    // Given — the only containment anchor is an alias mis-curated onto a REFINED material; the
+    // truncation stage must honour the create-path gate just like the exact-alias stage
+    lenient()
+        .when(materialRepository.findRefineryInputCandidates(MaterialType.RAW))
+        .thenReturn(List.of(stileron, lindinium, aluminum));
+    lenient()
+        .when(aliasService.findBySourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN))
+        .thenReturn(List.of(alias("CONSTRUCTION SALVAGE", stileronRefined)));
+
+    // When
+    RefineryImportDraftDto draft = draftFor(quotedGood(0, "UCTION SALVAGE"));
+
+    // Then
+    assertThat(draft.goodsMatched()).isZero();
+    assertThat(draft.order().goods().getFirst().inputMaterial()).isNull();
+    assertThat(issues(draft, ImportIssueCode.UNMATCHED_MATERIAL)).hasSize(1);
   }
 
   @Test
@@ -656,6 +764,15 @@ class RefineryImportServiceTest {
       boolean refine) {
     return new RefineryExtractGoodDto(
         rowIndex, rawMaterialName, quality, inputQuantity, outputQuantity, refine, 0.95, null);
+  }
+
+  private static MaterialExternalAlias alias(String externalName, Material target) {
+    MaterialExternalAlias alias = new MaterialExternalAlias();
+    alias.setId(UUID.randomUUID());
+    alias.setSourceSystem(MaterialExternalAliasSource.REFINERY_SCREEN);
+    alias.setExternalName(externalName);
+    alias.setMaterial(target);
+    return alias;
   }
 
   private static Material material(String name, MaterialType type, boolean manualRaw) {

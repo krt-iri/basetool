@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-11.
 > **Owner area:** REFINERY · **Related:** [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) (epic #439 — historical plan, frozen 2026-06-10), [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md), [`api-conventions.md`](api-conventions.md), [`security-and-access.md`](security-and-access.md)
 
 # Refinery screenshot import
@@ -63,7 +63,11 @@ stripped, qualifier words `raw/ore/refined/pure/r` dropped, non-alphanumerics fo
 
 1. unique canonical-name match,
 2. curated `MaterialExternalAlias` lookup (source `REFINERY_SCREEN`, case-insensitive),
-3. unique suffix/contains match for game-UI-truncated names (≥ 5 canonical chars),
+3. unique suffix/contains match for game-UI-truncated names (≥ 5 canonical chars): the
+   clipped fragment is tested for containment in the candidate canonical names **and**
+   in the canonicalized `REFINERY_SCREEN` alias names (gate-passing targets only);
+   the union must resolve to exactly one material — an alias and the name of the same
+   material count as one hit, two different materials mean no match,
 4. fuzzy fallback via the reused `BlueprintFuzzyMatcher`; a hit at or above the
    configurable accept threshold (`krt.refinery-import.fuzzy-accept-threshold`,
    default 0.9) is applied **and** flagged `LOW_CONFIDENCE_MATERIAL`; below the
@@ -74,6 +78,14 @@ The candidate set mirrors the create path's input gate exactly: visible material
 external names. A matched input's `outputMaterial` derives from the admin-curated
 `Material.refinedMaterial` link; a missing link is `NO_REFINED_MATERIAL` (INFO), not an
 error.
+
+*Amended 2026-06-11:* stage 3 originally tested only the candidate names. A field
+sample showed the game UI and the synced catalogue can spell the same material
+differently (screen `"Construction Salvage"`, UEX `"Construction Material Salvage"`),
+so a clipped read like `"UCTION SALVAGE"` named a material whose master name does not
+contain the fragment. Canonicalized aliases now serve as additional containment
+anchors: one curated alias of the full on-screen spelling resolves every clipping
+variant (front, back, or both — clipping always yields a contiguous fragment).
 
 ### REQ-REFINERY-005 — Row skip rules & un-quoted state
 
@@ -178,9 +190,12 @@ applies unchanged when the reviewed draft is saved through the create path
 
 Refinery-screen aliases live in the existing `material_external_alias` table under the
 dedicated source `REFINERY_SCREEN` (V148 widened the V108 CHECK constraint). Admins
-curate them at `/admin/material-aliases`. An alias whose target material fails the
-REQ-REFINERY-004 candidate gate is ignored by the import (logged, falls through to the
-next matching stage) — curation cannot bypass the create-path mirror. Resolution is
+curate them at `/admin/material-aliases`. Besides the exact stage-2 lookup, aliases
+also serve as containment anchors for the REQ-REFINERY-004 truncation stage, so one
+alias of the full on-screen spelling covers every clipped variant of that name. An
+alias whose target material fails the REQ-REFINERY-004 candidate gate is ignored by
+the import in both roles (the exact stage logs it, falls through to the next matching
+stage) — curation cannot bypass the create-path mirror. Resolution is
 deterministic: REQ-REFINERY-010 enforces case-insensitive uniqueness DB-side and the
 service rejects case-variant duplicates with a clean 409. No aliases are seeded by
 migration — entries come from golden-set verification (#433) and live curation.
