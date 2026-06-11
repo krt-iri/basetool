@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Einsatz-Detailseite hat jetzt ein Tab-Layout (Übersicht · Teilnehmer & Einheiten · Finanzen & Auszahlung · Verwaltung) mit klebrigem Kopf, Fakten-Leiste und Deeplink über `?tab=`.** Alle bisherigen Funktionen, Sichtbarkeiten und Berechtigungen bleiben erhalten; der Verwaltungs-Tab erscheint nur für Berechtigte.
+- **Teilnehmer werden Einheiten jetzt direkt auf einem Crew-Board zugewiesen (Drag & Drop, Klick-Auswahl oder Tastatur) statt über das bisherige „Crew zuweisen"-Modal.** Die Bordfunktion ist pro Person über ein Chip-Dropdown schnell änderbar; Mehrfach-Funktionen weiterhin über das Crew-Modal.
+- **Alle Modals der Einsatzseite nutzen den neuen KRT-Modal-Rahmen** (Fokus-Falle, Esc, eine gefüllte CTA); Lösch-Bestätigungen benennen jetzt die Konsequenz. Im Einheiten-Modal sind Schiffstyp und Hangar-Schiff klar getrennt wählbar („— keines · nur Typ verwenden —").
+- **Der Finanzen-Tab zeigt eine Summen-Leiste (Gesamtsumme, Einnahmen, Ausgaben, je Anteil)**; Raffinerie-Ausgaben erscheinen als automatische Zeile mit Link zum Auftrag.
+
 ## [v0.4.15](https://github.com/krt-iri/basetool/releases/tag/v0.4.15) - 2026-06-11
 
 ### Fixed

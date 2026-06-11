@@ -382,6 +382,17 @@ public class MissionPageController {
               .toList();
       model.addAttribute("unassignedParticipants", unassignedParticipants);
 
+      // Crew board (tab layout, Variante B): unit crew lists carry only
+      // participantId/participantName, so the board's person rows resolve the full participant
+      // payload (org units, desired job, comment, check-in state, version) via this id lookup.
+      Map<UUID, MissionParticipantDto> participantsById = new java.util.HashMap<>();
+      for (MissionParticipantDto p : participants) {
+        if (p.id() != null) {
+          participantsById.put(p.id(), p);
+        }
+      }
+      model.addAttribute("participantsById", participantsById);
+
       // Calculate participation percentages
       Map<UUID, Double> participationPercentages = new java.util.HashMap<>();
       for (MissionParticipantDto p : participants) {
@@ -609,6 +620,42 @@ public class MissionPageController {
                   new ParameterizedTypeReference<List<RefineryOrderListDto>>() {},
                   false);
           model.addAttribute("refineryOrders", refineryOrders);
+
+          // Finance tab summary strip (Gesamtsumme / Einnahmen / Ausgaben / je Anteil): income
+          // and expense buckets aggregate the manual ledger entries; refinery-order expenses are
+          // the automatic "auto" rows and therefore count into the expense bucket as well.
+          java.math.BigDecimal incomeSum = java.math.BigDecimal.ZERO;
+          java.math.BigDecimal expenseSum = java.math.BigDecimal.ZERO;
+          int incomeCount = 0;
+          int expenseCount = 0;
+          for (MissionFinanceEntryDto entry : financesPage.content()) {
+            if (entry.type() != null && "INCOME".equals(entry.type().name())) {
+              incomeSum = incomeSum.add(entry.amount());
+              incomeCount++;
+            } else if (entry.type() != null) {
+              expenseSum = expenseSum.add(entry.amount());
+              expenseCount++;
+            }
+          }
+          if (refineryOrders != null) {
+            for (RefineryOrderListDto order : refineryOrders) {
+              if (order.expenses() != null && order.expenses() > 0) {
+                expenseSum = expenseSum.add(java.math.BigDecimal.valueOf(order.expenses()));
+                expenseCount++;
+              }
+            }
+          }
+          model.addAttribute("financeIncomeSum", incomeSum);
+          model.addAttribute("financeExpenseSum", expenseSum);
+          model.addAttribute("financeIncomeCount", incomeCount);
+          model.addAttribute("financeExpenseCount", expenseCount);
+          Integer registered = mission.registeredParticipants();
+          model.addAttribute(
+              "financePerShare",
+              (financeSum != null && registered != null && registered > 0)
+                  ? financeSum.divide(
+                      java.math.BigDecimal.valueOf(registered), 0, java.math.RoundingMode.HALF_UP)
+                  : null);
         } catch (Exception e) {
           log.error("Error loading finance entries or refinery orders", e);
         }

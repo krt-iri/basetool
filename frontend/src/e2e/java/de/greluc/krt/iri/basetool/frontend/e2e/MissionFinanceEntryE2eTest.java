@@ -125,17 +125,20 @@ class MissionFinanceEntryE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Open the seeded mission's detail page and the finance "Neuer Eintrag" modal.
-        E2eSupport.navigate(page, baseUrl + "/missions/" + missionId);
+        // Open the seeded mission's detail page on the finance tab (?tab=fin deeplink —
+        // the "Neuer Eintrag" button lives inside the Finanzen tab pane) and the modal.
+        E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
         page.waitForLoadState();
         page.locator("button[data-trigger='open-modal-display'][data-modal-id='finance-modal']")
             .click();
 
         // Fill an income entry. The participant <select> is `required`; index 0 is the disabled
         // "- Bitte wählen -" placeholder, so index 1 is the first real (seeded guest) participant.
+        // The type is a segment control mirroring into the hidden type input; INCOME is the
+        // default, the explicit click guards against a changed default.
         Locator modal = page.locator("#finance-modal");
         modal.locator("select[name='participantId']").selectOption(new SelectOption().setIndex(1));
-        modal.locator("select[name='type']").selectOption("INCOME");
+        modal.locator(".seg button[data-type-value='INCOME']").click();
         modal.locator("input[name='amount']").fill(FINANCE_AMOUNT);
 
         // Submit: footer-safe click that awaits the POST and the redirect GET back to the detail
@@ -146,14 +149,15 @@ class MissionFinanceEntryE2eTest {
         // called @moneyFormat inside the restricted th:data-amount attribute and threw a
         // TemplateProcessingException. It must now render 200 with the finance edit button
         // carrying the rounded amount as a plain data-amount value.
-        Response reopened = E2eSupport.navigate(page, baseUrl + "/missions/" + missionId);
+        Response reopened =
+            E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
         assertEquals(
             200,
             reopened.status(),
             "GET /missions/{id} must render 200 (no 500) once the mission owns a finance entry");
         assertThat(
                 page.locator(
-                    "#col-finance button.edit-finance-btn[data-amount='" + FINANCE_AMOUNT + "']"))
+                    "#pane-fin button.edit-finance-btn[data-amount='" + FINANCE_AMOUNT + "']"))
             .isVisible();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "mission-finance-entry");
