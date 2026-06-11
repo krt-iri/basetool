@@ -8,13 +8,7 @@ cyclonedx-bom = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
 
 [versions]
 
-springBoot = "4.0.6"
-##      ⬆ = "4.1.0-M1"
-##      ⬆ = "4.1.0-M2"
-##      ⬆ = "4.1.0-M3"
-##      ⬆ = "4.1.0-M4"
-##      ⬆ = "4.1.0-RC1"
-# Stay on 4.0.x stable; only 4.1.0-M1..M4 / RC1 milestones available upstream as of 2026-06.
+springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.2.4"
 testcontainers = "1.21.4"

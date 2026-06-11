@@ -162,26 +162,6 @@ subprojects {
       jvmArgs("--enable-native-access=ALL-UNNAMED")
       systemProperty("spring.profiles.active", "dev")
     }
-
-    // BOM-property overrides for transitive dependencies whose Spring Boot 4.0.6
-    // pin is now vulnerable. The Spring Boot dependency-management plugin reads
-    // these `ext` properties and substitutes them into the managed BOM so every
-    // module (backend + frontend) inherits the patched version without having
-    // to redeclare individual `implementation(...)` coordinates. Drop these
-    // overrides as soon as the Spring Boot patch release that adopts the same
-    // (or newer) versions lands and refreshVersions confirms parity.
-    //
-    //   tomcat 11.0.21    -> 11.0.22       (CVE-2026-41284, -41293, -42498,
-    //                                       -43512, -43513, -43515)
-    //   netty 4.2.12      -> 4.2.14.Final  (CVE-2026-42577, -42579, -42581,
-    //                                       -42582, -42583, -42584, -42585,
-    //                                       -42586, -42587, -44248; .14 is the
-    //                                       latest 4.2.x patch — 5.0.0 is Alpha)
-    //   postgresql 42.7.10 -> 42.7.11      (CVE-2026-42198 - SCRAM-SHA-256
-    //                                       client-side DoS in pgjdbc)
-    extra["tomcat.version"] = "11.0.22"
-    extra["netty.version"] = "4.2.14.Final"
-    extra["postgresql.version"] = "42.7.11"
   }
 
   // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
