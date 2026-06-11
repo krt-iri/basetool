@@ -74,6 +74,20 @@ public class MissionUnit extends AbstractEntity<UUID> {
   @Column(nullable = false)
   private String name;
 
+  /**
+   * Explicit responsible person for this unit (the mock's "Verantwortlich" select). Nullable — when
+   * unset the UI falls back to the assigned ship's owner. {@code ON DELETE SET NULL} mirrors the
+   * {@code ship} reference so deleting a user never cascades into mission planning data.
+   */
+  @ManyToOne
+  @JoinColumn(name = "responsible_user_id", nullable = true)
+  @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+  private User responsibleUser;
+
+  /** Free-text planning note for the unit (e.g. "Eskorte, Gruppe 1"). Nullable. */
+  @Column(columnDefinition = "TEXT")
+  private String note;
+
   @OneToMany(mappedBy = "missionUnit", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<MissionCrew> crew = new HashSet<>();
 }

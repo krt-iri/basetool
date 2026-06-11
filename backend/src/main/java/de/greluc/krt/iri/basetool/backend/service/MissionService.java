@@ -678,13 +678,13 @@ public class MissionService {
    */
   @Transactional
   public Mission addParticipant(@NotNull UUID missionId, @NotNull UUID userId) {
-    return addParticipant(missionId, userId, null, null, null, null);
+    return addParticipant(missionId, userId, null, null, null, null, null);
   }
 
   /**
    * Mid-form participant add — accepts a user reference, optional guest name (when the user isn't
    * authenticated), an optional desired job type, and an optional comment. Convenience overload
-   * that delegates to the full form with {@code orgUnitIds=null}.
+   * that delegates to the full form with {@code orgUnitIds=null} and no explicit payout choice.
    */
   @Transactional
   public Mission addParticipant(
@@ -693,7 +693,7 @@ public class MissionService {
       String guestName,
       UUID desiredJobTypeId,
       String comment) {
-    return addParticipant(missionId, userId, guestName, desiredJobTypeId, comment, null);
+    return addParticipant(missionId, userId, guestName, desiredJobTypeId, comment, null, null);
   }
 
   /**
@@ -714,6 +714,11 @@ public class MissionService {
    *       can edit).
    * </ul>
    *
+   * <p>{@code payoutPreference} (nullable) fixes the per-mission payout choice at sign-up time —
+   * the sign-up modal's "Auszahlungsart" select. A non-null value wins over the registered user's
+   * profile default (REQ-MISSION-002); {@code null} keeps the existing default chain (profile
+   * default for users, entity default {@code PAYOUT} for guests).
+   *
    * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when any referenced id
    *     is unknown
    */
@@ -724,7 +729,8 @@ public class MissionService {
       String guestName,
       UUID desiredJobTypeId,
       String comment,
-      java.util.List<UUID> orgUnitIds) {
+      java.util.List<UUID> orgUnitIds,
+      PayoutPreference payoutPreference) {
     Mission mission =
         missionRepository
             .findById(missionId)
@@ -814,6 +820,12 @@ public class MissionService {
     if (desiredJobTypeId != null) {
       JobType job = jobTypeRepository.findById(desiredJobTypeId).orElse(null);
       participant.setDesiredMissionJobType(job);
+    }
+
+    // An explicit sign-up choice (the modal's Auszahlungsart select) wins over the profile-default
+    // seeding above; null keeps the default chain untouched.
+    if (payoutPreference != null) {
+      participant.setPayoutPreference(payoutPreference);
     }
 
     participant.setComment(comment);
@@ -1095,15 +1107,22 @@ public class MissionService {
   /**
    * Adds a unit (team grouping) to a mission. Units are the top level of the participant hierarchy:
    * each unit may contain several crews.
+   *
+   * <p>{@code name} is an optional display name: when blank, the stored name is derived from the
+   * assigned ship respectively ship type (the unit-modal mock's "Anzeigename (optional)"); at least
+   * one of name / ship / ship type must be present. {@code responsibleUserId} (nullable) pins an
+   * explicit responsible person; {@code note} (nullable) is a free-text planning note.
    */
   @Transactional
   public Mission addUnitToMission(
       @NotNull UUID missionId,
-      @NotNull String name,
+      String name,
       UUID shipTypeId,
       UUID shipId,
       boolean highValueUnit,
-      Double frequency) {
+      Double frequency,
+      UUID responsibleUserId,
+      String note) {
     Mission mission =
         missionRepository
             .findById(missionId)
@@ -1111,7 +1130,6 @@ public class MissionService {
 
     MissionUnit missionUnit = new MissionUnit();
     missionUnit.setMission(mission);
-    missionUnit.setName(name);
 
     if (shipTypeId != null) {
       ShipType shipType =
@@ -1141,6 +1159,9 @@ public class MissionService {
       }
     }
 
+    missionUnit.setName(resolveUnitName(name, missionUnit));
+    missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
+    missionUnit.setNote(normalizeUnitNote(note));
     missionUnit.setHighValueUnit(highValueUnit);
 
     if (frequency != null) {
@@ -1159,6 +1180,59 @@ public class MissionService {
   }
 
   /**
+   * Resolves the stored (NOT NULL) unit name from the optional display name: a non-blank caller
+   * value wins; otherwise the name is derived from the already-resolved ship (its hangar name)
+   * respectively ship type. Mirrors the unit-modal mock where the Anzeigename is optional because
+   * ship / ship type carry the unit's identity.
+   *
+   * @param name the caller-submitted display name (nullable/blank)
+   * @param unit the unit with {@code ship} / {@code shipType} already resolved
+   * @return the effective non-blank name to store
+   * @throws IllegalArgumentException when neither a name nor a ship / ship type is present
+   */
+  private static String resolveUnitName(String name, MissionUnit unit) {
+    if (name != null && !name.isBlank()) {
+      return name.trim();
+    }
+    if (unit.getShip() != null && unit.getShip().getName() != null) {
+      return unit.getShip().getName();
+    }
+    if (unit.getShipType() != null) {
+      return unit.getShipType().getName();
+    }
+    throw new IllegalArgumentException(
+        "Unit needs a display name or a ship / ship type to derive one from");
+  }
+
+  /**
+   * Resolves the optional explicit responsible person of a unit.
+   *
+   * @param responsibleUserId the user id, or {@code null} for "no explicit responsible" (the UI
+   *     then falls back to the assigned ship's owner)
+   * @return the resolved user or {@code null}
+   * @throws de.greluc.krt.iri.basetool.backend.exception.NotFoundException when the id is unknown
+   */
+  private User resolveResponsibleUser(UUID responsibleUserId) {
+    if (responsibleUserId == null) {
+      return null;
+    }
+    return userRepository
+        .findById(responsibleUserId)
+        .orElseThrow(() -> new NotFoundException("Responsible user not found"));
+  }
+
+  /**
+   * Normalises a unit note: trims surrounding whitespace and collapses blank input to {@code null}
+   * so the column stays empty instead of storing whitespace-only strings.
+   *
+   * @param note the caller-submitted note (nullable)
+   * @return the trimmed note or {@code null}
+   */
+  private static String normalizeUnitNote(String note) {
+    return note == null || note.isBlank() ? null : note.trim();
+  }
+
+  /**
    * Updates a unit's name and the assigned ship. Per-unit optimistic lock — concurrent unit edits
    * across the mission don't collide.
    */
@@ -1166,11 +1240,13 @@ public class MissionService {
   public Mission updateMissionUnit(
       @NotNull UUID missionId,
       @NotNull UUID unitId,
-      @NotNull String name,
+      String name,
       UUID shipTypeId,
       UUID shipId,
       boolean highValueUnit,
-      Double frequency) {
+      Double frequency,
+      UUID responsibleUserId,
+      String note) {
     Mission mission =
         missionRepository
             .findById(missionId)
@@ -1182,8 +1258,9 @@ public class MissionService {
             .findFirst()
             .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
 
-    missionUnit.setName(name);
     missionUnit.setHighValueUnit(highValueUnit);
+    missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
+    missionUnit.setNote(normalizeUnitNote(note));
 
     if (shipTypeId != null) {
       ShipType shipType =
@@ -1223,6 +1300,10 @@ public class MissionService {
     } else {
       missionUnit.setShip(null);
     }
+
+    // After ship / ship type resolution so a blank display name can derive from them (same rule
+    // as addUnitToMission).
+    missionUnit.setName(resolveUnitName(name, missionUnit));
 
     if (frequency != null) {
       double roundedFrequency =

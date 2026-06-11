@@ -22,7 +22,12 @@ package de.greluc.krt.iri.basetool.backend.model.dto;
 import java.util.List;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission Unit payload. */
+/**
+ * Data transfer record carrying Mission Unit payload. {@code responsibleUser} is the explicit
+ * responsible person as a PII-free reference tuple (callsign/rank only — safe for the
+ * guest-redacted mission views, which forward units unchanged); when {@code null} the UI falls back
+ * to the assigned ship's owner. {@code note} is the unit's free-text planning note.
+ */
 public record MissionUnitDto(
     UUID id,
     String name,
@@ -30,4 +35,6 @@ public record MissionUnitDto(
     ShipDto ship,
     Double frequency,
     Boolean highValueUnit,
+    UserReferenceDto responsibleUser,
+    String note,
     List<MissionCrewDto> crew) {}

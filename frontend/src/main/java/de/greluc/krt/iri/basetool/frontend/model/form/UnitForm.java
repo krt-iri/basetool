@@ -19,14 +19,19 @@
 
 package de.greluc.krt.iri.basetool.frontend.model.form;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
-/** Form-binding object for Unit input. */
+/**
+ * Form-binding object for Unit input. {@code name} is the optional display name (the backend
+ * derives the stored name from ship / ship type when blank); {@code responsibleUserId} optionally
+ * pins an explicit responsible person; {@code note} is a free-text planning note.
+ */
 public record UnitForm(
-    @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,
+    @Size(max = 255) String name,
     UUID shipTypeId,
     UUID shipId,
     Boolean highValueUnit,
-    Double frequency) {}
+    Double frequency,
+    UUID responsibleUserId,
+    @Size(max = 500) String note) {}

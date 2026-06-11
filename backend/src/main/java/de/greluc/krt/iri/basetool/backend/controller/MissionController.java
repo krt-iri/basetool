@@ -714,7 +714,9 @@ public class MissionController {
             request.shipTypeId(),
             request.shipId(),
             request.isHighValueUnit(),
-            request.frequency()));
+            request.frequency(),
+            request.responsibleUserId(),
+            request.note()));
   }
 
   /**
@@ -750,7 +752,9 @@ public class MissionController {
             request.shipTypeId(),
             request.shipId(),
             request.isHighValueUnit(),
-            request.frequency()));
+            request.frequency(),
+            request.responsibleUserId(),
+            request.note()));
   }
 
   /**
@@ -1215,7 +1219,8 @@ public class MissionController {
                 finalGuestName,
                 request.desiredJobTypeId(),
                 request.comment(),
-                request.orgUnitIds()));
+                request.orgUnitIds(),
+                request.payoutPreference()));
     // C-1 + H-2: every caller below Officer+ gets a redacted shape — anonymous / guest callers
     // would otherwise see participant emails / real names; authenticated non-Logistician members
     // got the same leak on the legacy public endpoint until H-2. Two tiers:
@@ -1610,7 +1615,9 @@ public class MissionController {
             request.shipTypeId(),
             request.shipId(),
             request.isHighValueUnit(),
-            request.frequency());
+            request.frequency(),
+            request.responsibleUserId(),
+            request.note());
     return mission.getAssignedUnits().stream().map(missionMapper::toDto).toList();
   }
 
@@ -1639,7 +1646,9 @@ public class MissionController {
             request.shipTypeId(),
             request.shipId(),
             request.isHighValueUnit(),
-            request.frequency());
+            request.frequency(),
+            request.responsibleUserId(),
+            request.note());
     return missionMapper.toDto(findUnit(mission, unitId));
   }
 
@@ -1969,7 +1978,8 @@ public class MissionController {
             finalGuestName,
             request.desiredJobTypeId(),
             request.comment(),
-            request.orgUnitIds());
+            request.orgUnitIds(),
+            request.payoutPreference());
     java.util.stream.Stream<MissionParticipantDto> participants =
         mission.getParticipants().stream().map(missionMapper::toDto);
     // C-1 (anonymous + guest) + H-5 (authenticated non-Officer): every caller below Logistician+

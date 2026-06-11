@@ -94,7 +94,14 @@ class MissionExpansionTest {
     // 4b. Add Ship to Mission
     mission =
         missionService.addUnitToMission(
-            mission.getId(), "Expansion Unit", fighter.getId(), ship.getId(), false, null);
+            mission.getId(),
+            "Expansion Unit",
+            fighter.getId(),
+            ship.getId(),
+            false,
+            null,
+            null,
+            null);
 
     assertNotNull(mission.getAssignedUnits());
     assertEquals(1, mission.getAssignedUnits().size());

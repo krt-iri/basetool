@@ -108,7 +108,7 @@ class MissionUnitManagementTest {
 
     mission =
         missionService.addUnitToMission(
-            mission.getId(), "Initial Unit", st.getId(), ship.getId(), false, 123.45);
+            mission.getId(), "Initial Unit", st.getId(), ship.getId(), false, 123.45, null, null);
     unit = mission.getAssignedUnits().iterator().next();
   }
 
@@ -180,6 +180,8 @@ class MissionUnitManagementTest {
                 outsiderShip.getShipType().getId(),
                 outsiderShip.getId(),
                 false,
+                null,
+                null,
                 null));
   }
 
@@ -194,6 +196,8 @@ class MissionUnitManagementTest {
             ship.getShipType().getId(),
             ship.getId(),
             false,
+            null,
+            null,
             null);
 
     assertTrue(
@@ -220,6 +224,8 @@ class MissionUnitManagementTest {
                 outsiderShip.getShipType().getId(),
                 outsiderShip.getId(),
                 false,
+                null,
+                null,
                 null));
   }
 
@@ -243,7 +249,9 @@ class MissionUnitManagementTest {
         ship.getShipType().getId(),
         ship.getId(),
         false,
-        222.22);
+        222.22,
+        null,
+        null);
 
     MissionUnit reloaded =
         missionRepository.findById(mission.getId()).orElseThrow().getAssignedUnits().stream()
@@ -261,6 +269,102 @@ class MissionUnitManagementTest {
    *
    * @return the saved ship whose owner is absent from the mission roster
    */
+  /** A blank display name derives the stored unit name from the assigned ship (mock: optional). */
+  @Test
+  void testAddUnit_BlankName_DerivesNameFromShip() {
+    Mission updated =
+        missionService.addUnitToMission(
+            mission.getId(),
+            "  ",
+            ship.getShipType().getId(),
+            ship.getId(),
+            false,
+            null,
+            null,
+            null);
+
+    MissionUnit created =
+        updated.getAssignedUnits().stream()
+            .filter(u -> !u.getId().equals(unit.getId()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(
+        ship.getName(),
+        created.getName(),
+        "blank display name must derive the stored name from the assigned ship");
+  }
+
+  /** A blank display name with only a ship type derives the name from the type. */
+  @Test
+  void testAddUnit_BlankName_DerivesNameFromShipType() {
+    Mission updated =
+        missionService.addUnitToMission(
+            mission.getId(), null, ship.getShipType().getId(), null, false, null, null, null);
+
+    MissionUnit created =
+        updated.getAssignedUnits().stream()
+            .filter(u -> !u.getId().equals(unit.getId()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(
+        ship.getShipType().getName(),
+        created.getName(),
+        "blank display name must fall back to the ship type name");
+  }
+
+  /** Without name, ship, and ship type there is nothing to call the unit — rejected. */
+  @Test
+  void testAddUnit_BlankNameWithoutShipOrType_Rejected() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            missionService.addUnitToMission(
+                mission.getId(), " ", null, null, false, null, null, null));
+  }
+
+  /** Responsible person and note round-trip; the note is trimmed and blank collapses to null. */
+  @Test
+  void testAddUnit_ResponsibleAndNote_Persisted() {
+    Mission updated =
+        missionService.addUnitToMission(
+            mission.getId(),
+            "Responsible Unit",
+            null,
+            null,
+            false,
+            null,
+            officerUser.getId(),
+            "  Eskorte, Gruppe 1  ");
+
+    MissionUnit created =
+        updated.getAssignedUnits().stream()
+            .filter(u -> "Responsible Unit".equals(u.getName()))
+            .findFirst()
+            .orElseThrow();
+    assertNotNull(created.getResponsibleUser(), "explicit responsible must be stored");
+    assertEquals(officerUser.getId(), created.getResponsibleUser().getId());
+    assertEquals("Eskorte, Gruppe 1", created.getNote(), "note must be trimmed");
+
+    Mission cleared =
+        missionService.updateMissionUnit(
+            mission.getId(),
+            created.getId(),
+            "Responsible Unit",
+            null,
+            null,
+            false,
+            null,
+            null,
+            "   ");
+    MissionUnit reloaded =
+        cleared.getAssignedUnits().stream()
+            .filter(u -> u.getId().equals(created.getId()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(null, reloaded.getResponsibleUser(), "responsible must be clearable");
+    assertEquals(null, reloaded.getNote(), "blank note must collapse to null");
+  }
+
   private Ship shipOwnedByNonParticipant() {
     User outsider = new User();
     outsider.setId(UUID.randomUUID());

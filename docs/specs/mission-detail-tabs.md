@@ -64,12 +64,25 @@ modal (multiple functions per person stay supported). Unit heads show name, ship
 
 All page modals (participant add/edit, unit add/edit, frequency, finance add/edit, crew functions,
 delete confirm) use the `.krt-modal*` frame: one filled CTA per modal, ghost cancel, close-X with
-`aria-label`, focus trap, Esc closes, backdrop click closes. The unit modal offers ship type and
-hangar ship **separately** (hangar select filtered by type, with an explicit "— keines · nur Typ
-verwenden —" option) plus the HVU checkbox. The finance modal's type is an income/expense segment
-control mirroring into the classic `type` form field. The delete confirmation uses the
-`--danger` variant and names the consequence per sub-section (participant / unit incl. crew
-fallback to the pool / crew / mission / finance entry).
+`aria-label`, focus trap, Esc closes, backdrop click closes.
+
+The **sign-up modal** carries an "Auszahlungsart" select: an explicit choice is stored on the new
+participant and wins over the user's profile default; the empty "Standard" option keeps the
+existing default chain (profile default for members per REQ-MISSION-002, `PAYOUT` for guests).
+
+The **unit modal** matches the approved mock: ship type and hangar ship are offered
+**separately** (hangar select filtered by type, with an explicit "— keines · nur Typ verwenden —"
+option), the display name is **optional** (when blank the backend derives the stored name from the
+assigned ship respectively ship type; without name, ship, and type the request is rejected), a
+**Verantwortlich** select pins an explicit responsible person from the registered participants
+(empty = automatic fallback to the assigned ship's owner, also in the board's unit head), an HVU
+checkbox, the frequency field (existing function, kept beyond the mock), and a free-text **Notiz**
+(shown as a tooltip mark in the unit head). `responsible_user_id` / `note` live on `mission_unit`
+(V149); the responsible person is exposed as a PII-free `UserReferenceDto`.
+
+The finance modal's type is an income/expense segment control mirroring into the classic `type`
+form field. The delete confirmation uses the `--danger` variant and names the consequence per
+sub-section (participant / unit incl. crew fallback to the pool / crew / mission / finance entry).
 
 ### REQ-MISSION-007 — No regression of permissions, contracts, or concurrency behaviour
 

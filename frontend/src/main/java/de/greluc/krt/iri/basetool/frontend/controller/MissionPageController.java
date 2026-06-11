@@ -182,7 +182,7 @@ public class MissionPageController {
       model.addAttribute("participantForm", form);
     }
     if (!model.containsAttribute("unitForm")) {
-      model.addAttribute("unitForm", new UnitForm("", null, null, false, null));
+      model.addAttribute("unitForm", new UnitForm("", null, null, false, null, null, null));
     }
     if (!model.containsAttribute("crewForm")) {
       model.addAttribute("crewForm", new CrewForm(null, null));
@@ -710,6 +710,9 @@ public class MissionPageController {
       if (form.orgUnitIds() != null && !form.orgUnitIds().isEmpty()) {
         body.put("orgUnitIds", form.orgUnitIds());
       }
+      if (form.payoutPreference() != null) {
+        body.put("payoutPreference", form.payoutPreference().name());
+      }
       body.put("comment", form.comment());
 
       boolean isPublic = (principal == null);
@@ -1037,11 +1040,13 @@ public class MissionPageController {
   @PreAuthorize("isAuthenticated()")
   public String addUnit(
       @PathVariable @NotNull UUID id,
-      @RequestParam String name,
+      @RequestParam(required = false) String name,
       @RequestParam(required = false) UUID shipTypeId,
       @RequestParam(required = false) UUID shipId,
       @RequestParam(required = false, defaultValue = "false") boolean highValueUnit,
       @RequestParam(required = false) Double frequency,
+      @RequestParam(required = false) UUID responsibleUserId,
+      @RequestParam(required = false) String note,
       RedirectAttributes redirectAttributes) {
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1052,6 +1057,8 @@ public class MissionPageController {
       }
       body.put("highValueUnit", highValueUnit);
       body.put("frequency", frequency);
+      body.put("responsibleUserId", responsibleUserId);
+      body.put("note", note);
 
       backendApiClient.post("/api/v1/missions/" + id + "/units", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -1072,11 +1079,13 @@ public class MissionPageController {
   public String updateUnit(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @RequestParam String name,
+      @RequestParam(required = false) String name,
       @RequestParam(required = false) UUID shipTypeId,
       @RequestParam(required = false) UUID shipId,
       @RequestParam(required = false, defaultValue = "false") boolean highValueUnit,
       @RequestParam(required = false) Double frequency,
+      @RequestParam(required = false) UUID responsibleUserId,
+      @RequestParam(required = false) String note,
       RedirectAttributes redirectAttributes) {
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1087,6 +1096,8 @@ public class MissionPageController {
       }
       body.put("highValueUnit", highValueUnit);
       body.put("frequency", frequency);
+      body.put("responsibleUserId", responsibleUserId);
+      body.put("note", note);
 
       backendApiClient.put("/api/v1/missions/" + id + "/units/" + unitId, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");

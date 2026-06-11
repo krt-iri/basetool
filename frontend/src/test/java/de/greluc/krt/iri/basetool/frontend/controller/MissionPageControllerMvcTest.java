@@ -1758,6 +1758,8 @@ class MissionPageControllerMvcTest {
             assignedShip,
             123.45,
             false,
+            null,
+            null,
             Collections.emptyList());
 
     MissionDto mission =
@@ -2002,7 +2004,7 @@ class MissionPageControllerMvcTest {
             crewId, participantId, "Crewman", java.util.Set.of(gunner));
     de.greluc.krt.iri.basetool.frontend.model.dto.MissionUnitDto unit =
         new de.greluc.krt.iri.basetool.frontend.model.dto.MissionUnitDto(
-            unitId, "Alpha", null, null, null, true, List.of(crew));
+            unitId, "Alpha", null, null, null, true, null, null, List.of(crew));
 
     MissionDto mission =
         new MissionDto(

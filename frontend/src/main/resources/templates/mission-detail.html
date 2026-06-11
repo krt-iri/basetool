@@ -317,12 +317,14 @@
                          th:classappend="'unit-color-' + ${unitStat.index % 24}"
                          th:attr="data-unit-id=${unit.id}">
                         <div class="kpanel-head">
-                            <span class="uname">
+                            <span class="uname"
+                                  th:with="unitResponsible=${unit.responsibleUser != null ? unit.responsibleUser.effectiveName : (unit.ship != null and unit.ship.owner != null ? unit.ship.owner.effectiveName : null)}">
                                 <span th:text="${unit.name}">Unit</span>
                                 <small>
                                     <th:block th:if="${unit.shipType != null}">&mdash; <span th:text="${unit.shipType.name}">Typ</span></th:block>
-                                    <th:block th:if="${unit.ship != null and unit.ship.owner != null}">&middot; <span th:text="${unit.ship.owner.effectiveName}">Owner</span></th:block>
+                                    <th:block th:if="${unitResponsible != null}">&middot; <span th:text="${unitResponsible}" th:title="#{mission.unit.responsible}">Owner</span></th:block>
                                     <th:block th:if="${unit.frequency != null}">&middot; <span class="data-value--mono" th:text="#{mission.unit.frequency} + ' ' + ${#strings.replace(#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">Freq</span></th:block>
+                                    <span th:if="${!#strings.isEmpty(unit.note)}" class="notemark" th:title="${unit.note}" tabindex="0" th:attr="aria-label=#{mission.unit.note} + ': ' + ${unit.note}">&#x270E;</span>
                                 </small>
                                 <span th:if="${unit.highValueUnit}" class="chip chip--warning chip-xs" th:title="#{mission.unit.hvu.tooltip}" th:text="#{mission.unit.hvu.short}">HVU</span>
                             </span>
@@ -337,6 +339,8 @@
                                         th:data-ship="${unit.ship != null ? unit.ship.id : ''}"
                                         th:data-frequency="${unit.frequency}"
                                         th:data-hvu="${unit.highValueUnit}"
+                                        th:data-responsible="${unit.responsibleUser != null ? unit.responsibleUser.id : ''}"
+                                        th:data-note="${unit.note}"
                                         th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                                 <button th:if="${mission.canEdit}" type="button" class="btn btn-quiet-danger btn-icon delete-unit-btn"
                                         th:data-action="@{/missions/{id}/units/{uId}/delete(id=${mission.id}, uId=${unit.id})}"
@@ -945,12 +949,25 @@
                     <small class="form-hint" th:text="#{mission.participant.org_units.guest_hint}">Nur fuer Gaeste relevant.</small>
                 </div>
 
+                <div class="form-row">
                 <div class="form-group">
                     <label th:text="#{mission.participant.desired_job}">Job</label>
                     <select name="desiredJobTypeId">
                         <option value="">-</option>
                         <option th:if="${jobTypes}" th:each="job : ${jobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${participantForm.desiredJobTypeId != null and participantForm.desiredJobTypeId.toString() == job.id.toString()}">Fleet Commander</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label th:text="#{mission.participant.payout_preference}">Auszahlungsart</label>
+                    <!-- Empty option = backend default chain (profile default for members,
+                         PAYOUT for guests, REQ-MISSION-002); an explicit choice wins. -->
+                    <select name="payoutPreference">
+                        <option value="" th:text="#{mission.payout.preference.default}" th:selected="${participantForm.payoutPreference == null}">Standard</option>
+                        <option value="PAYOUT" th:text="#{mission.payout.preference.payout}" th:selected="${participantForm.payoutPreference != null and participantForm.payoutPreference.name() == 'PAYOUT'}">Auszahlen</option>
+                        <option value="DONATE" th:text="#{mission.payout.preference.donate}" th:selected="${participantForm.payoutPreference != null and participantForm.payoutPreference.name() == 'DONATE'}">Spenden</option>
+                    </select>
+                </div>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 0;">
@@ -1079,19 +1096,35 @@
                     </select>
                     <small class="form-hint" th:text="#{mission.unit.ship.none_hint}">Ohne passendes Schiff wird die Einheit nur &uuml;ber den Typ angelegt.</small>
                 </div>
+                <div class="form-row">
                 <div class="form-group">
-                    <label th:text="#{mission.unit.name}">Name</label>
-                    <input type="text" name="name" th:value="*{name}" required>
+                    <label th:text="#{mission.unit.display_name}">Anzeigename (optional)</label>
+                    <input type="text" name="name" th:value="*{name}">
                     <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
+                </div>
+                <div class="form-group">
+                    <label th:text="#{mission.unit.responsible}">Verantwortlich</label>
+                    <!-- Registered participants only — mirrors the board's responsible display;
+                         the empty option falls back to the assigned ship's owner. -->
+                    <select name="responsibleUserId" id="add-unit-responsible">
+                        <option value="" selected th:text="#{mission.unit.responsible.auto}">&mdash; automatisch: Schiffseigner &mdash;</option>
+                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:text="${p.user.effectiveName}">User</option>
+                    </select>
+                </div>
                 </div>
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz</label>
                     <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
                     <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" class="field-error"></div>
                 </div>
-                <div class="form-group flex-gap-sm" style="margin-bottom: 0;">
+                <div class="form-group flex-gap-sm">
                     <input type="checkbox" name="highValueUnit" id="hvu-check" value="true" th:checked="*{highValueUnit}">
                     <label for="hvu-check" class="m-0"><span th:text="#{mission.unit.hvu}">HVU</span> <span class="chip chip--warning chip-xs" th:title="#{mission.unit.hvu.tooltip}" th:text="#{mission.unit.hvu.short}">HVU</span></label>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label th:text="#{mission.unit.note}">Notiz</label>
+                    <input type="text" name="note" th:value="*{note}" th:placeholder="#{mission.unit.note.placeholder}">
+                    <div th:if="${#fields.hasErrors('note')}" th:errors="*{note}" class="field-error"></div>
                 </div>
                 </div>
                 <div class="krt-modal-foot">
@@ -1156,19 +1189,33 @@
                     </select>
                     <small class="form-hint" th:text="#{mission.unit.ship.none_hint}">Ohne passendes Schiff wird die Einheit nur &uuml;ber den Typ angelegt.</small>
                 </div>
+                <div class="form-row">
                 <div class="form-group">
-                    <label th:text="#{mission.unit.name}">Name</label>
-                    <input type="text" name="name" id="edit-unit-name" th:value="*{name}" required>
+                    <label th:text="#{mission.unit.display_name}">Anzeigename (optional)</label>
+                    <input type="text" name="name" id="edit-unit-name" th:value="*{name}">
                     <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
+                </div>
+                <div class="form-group">
+                    <label th:text="#{mission.unit.responsible}">Verantwortlich</label>
+                    <select name="responsibleUserId" id="edit-unit-responsible">
+                        <option value="" selected th:text="#{mission.unit.responsible.auto}">&mdash; automatisch: Schiffseigner &mdash;</option>
+                        <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:text="${p.user.effectiveName}">User</option>
+                    </select>
+                </div>
                 </div>
                 <div class="form-group">
                     <label th:text="#{mission.unit.frequency}">Frequenz</label>
                     <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="frequency" id="edit-unit-frequency" th:value="*{frequency}" th:placeholder="#{mission.unit.frequency.placeholder}">
                     <div th:if="${#fields.hasErrors('frequency')}" th:errors="*{frequency}" class="field-error"></div>
                 </div>
-                <div class="form-group flex-gap-sm" style="margin-bottom: 0;">
+                <div class="form-group flex-gap-sm">
                     <input type="checkbox" name="highValueUnit" id="edit-unit-hvu" value="true" th:checked="*{highValueUnit}">
                     <label for="edit-unit-hvu" class="m-0"><span th:text="#{mission.unit.hvu}">HVU</span> <span class="chip chip--warning chip-xs" th:title="#{mission.unit.hvu.tooltip}" th:text="#{mission.unit.hvu.short}">HVU</span></label>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label th:text="#{mission.unit.note}">Notiz</label>
+                    <input type="text" name="note" id="edit-unit-note" th:value="*{note}" th:placeholder="#{mission.unit.note.placeholder}">
+                    <div th:if="${#fields.hasErrors('note')}" th:errors="*{note}" class="field-error"></div>
                 </div>
                 </div>
                 <div class="krt-modal-foot">
@@ -1732,6 +1779,15 @@
                     editUnitFrequency.value = freqVal != null ? freqVal : '';
                     const hvuVal = this.getAttribute('data-hvu') === 'true';
                     editUnitHvu.checked = hvuVal;
+                    const editUnitResponsible = document.getElementById('edit-unit-responsible');
+                    if (editUnitResponsible) {
+                        editUnitResponsible.value = this.getAttribute('data-responsible') || '';
+                    }
+                    const editUnitNote = document.getElementById('edit-unit-note');
+                    if (editUnitNote) {
+                        const noteVal = this.getAttribute('data-note');
+                        editUnitNote.value = noteVal && noteVal !== 'null' ? noteVal : '';
+                    }
                     window.krtModalOpen(editUnitModal);
                 });
             });
@@ -1758,7 +1814,9 @@
                         shipTypeId: fd.get('shipTypeId') || null,
                         shipId: fd.get('shipId') || null,
                         highValueUnit: fd.get('highValueUnit') === 'true',
-                        frequency: fd.get('frequency') ? parseFloat(fd.get('frequency')) : null
+                        frequency: fd.get('frequency') ? parseFloat(fd.get('frequency')) : null,
+                        responsibleUserId: fd.get('responsibleUserId') || null,
+                        note: fd.get('note') || null
                     };
                     const res = await window.MissionSubresource.patchSubResource({
                         method: 'POST',
@@ -1788,7 +1846,9 @@
                         shipTypeId: fd.get('shipTypeId') || null,
                         shipId: fd.get('shipId') || null,
                         highValueUnit: fd.get('highValueUnit') === 'true',
-                        frequency: fd.get('frequency') ? parseFloat(fd.get('frequency')) : null
+                        frequency: fd.get('frequency') ? parseFloat(fd.get('frequency')) : null,
+                        responsibleUserId: fd.get('responsibleUserId') || null,
+                        note: fd.get('note') || null
                     };
                     const res = await window.MissionSubresource.patchSubResource({
                         method: 'PUT',
@@ -1856,7 +1916,8 @@
                         guestName: fd.get('guestName') || null,
                         desiredJobTypeId: fd.get('desiredJobTypeId') || null,
                         orgUnitIds: addOrgUnitIds,
-                        comment: fd.get('comment') || null
+                        comment: fd.get('comment') || null,
+                        payoutPreference: fd.get('payoutPreference') || null
                     };
                     const res = await window.MissionSubresource.patchSubResource({
                         method: 'POST',
