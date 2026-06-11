@@ -33,10 +33,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Ad-hoc visual verification harness for the blueprints master-detail page against an ALREADY
- * RUNNING local test stack ({@code E2E_BASE_URL} env; self-skipping without {@code
- * BP_CHECK=true}). Logs in as the synthetic test admin, walks the empty state, stages and adds a
- * blueprint through the typeahead, then screenshots the master-detail view and dumps console
- * errors. Not part of CI.
+ * RUNNING local test stack ({@code E2E_BASE_URL} env; self-skipping without {@code BP_CHECK=true}).
+ * Logs in as the synthetic test admin, walks the empty state, stages and adds a blueprint through
+ * the typeahead, then screenshots the master-detail view and dumps console errors. Not part of CI.
  */
 @Tag("e2e")
 class BlueprintsMockupCheckE2eTest {
@@ -77,7 +76,12 @@ class BlueprintsMockupCheckE2eTest {
       page.onConsoleMessage(
           msg -> {
             if ("error".equals(msg.type()) || "warning".equals(msg.type())) {
-              consoleLog.append('[').append(msg.type()).append("] ").append(msg.text()).append('\n');
+              consoleLog
+                  .append('[')
+                  .append(msg.type())
+                  .append("] ")
+                  .append(msg.text())
+                  .append('\n');
             }
           });
       page.onPageError(err -> consoleLog.append("[pageerror] ").append(err).append('\n'));

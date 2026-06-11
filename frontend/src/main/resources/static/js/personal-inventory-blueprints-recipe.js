@@ -574,7 +574,7 @@
                 });
                 fromDeeplink = initial != null;
             }
-        } catch (e) {
+        } catch (_e) {
             /* URLSearchParams unavailable */
         }
         if (!initial) {
