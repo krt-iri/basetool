@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-11.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
 > **Owner area:** REFINERY · **Related:** [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) (epic #439 — historical plan, frozen 2026-06-10), [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md), [`api-conventions.md`](api-conventions.md), [`security-and-access.md`](security-and-access.md)
 
 # Refinery screenshot import
@@ -112,16 +112,27 @@ When the extract carries `rawToRefineTotal`, the backend applies the frozen Phas
 checksum (one-sided; extractor repo `PHASE0_FINDINGS.md` §7): `SUM_MISMATCH` (WARNING)
 is flagged only when the sum of the **refine-ON** row input quantities exceeds
 `rawToRefineTotal` by more than a ±1-per-row display-rounding tolerance, or when a
-single row alone exceeds it by more than 1 — both indicate a mis-read quantity or a
-duplicated capture. A shortfall is never flagged: the materials list is a scrolling
-~6-row viewport, so scrolled-out rows legitimately reduce the visible sum.
-`rawInManifestTotal` is **never** validated — its composition is not reliably
+single row alone exceeds it by more than 1. An excess is **not proof of a mis-read**:
+besides a mis-read quantity, a flipped REFINE toggle, or a duplicated capture, the
+header itself can be legitimately stale — the game freezes IN MANIFEST / TO REFINE at
+GET QUOTE while the row list and toggles stay live, so an order modified after quoting
+can truthfully sum past the frozen header (`PHASE0_FINDINGS.md` §7 addendum 2026-06-12,
+sample order 10: pixel-verified Σ ON = 1724 vs. header 1645). This is why the finding
+stays a WARNING and the message tells the user to check the rows and, if the order was
+changed, to re-quote and re-capture. A shortfall is never flagged: the materials list
+is a scrolling ~6-row viewport, so scrolled-out rows legitimately reduce the visible
+sum. `rawInManifestTotal` is **never** validated — its composition is not reliably
 reconstructible from a single frame (golden-set order a4 counted some refine-OFF rows
 but not others; a 2026-06 field sample excluded the inert row entirely).
 
 *Amended 2026-06-11:* the original v1 hypothesis (`rawInManifestTotal` = sum of all
 rows, hard equality on both totals) was refuted by the Phase 0 (#433) verification and
 a field sample; the rule above mirrors the extractor's frozen `Validation` semantics.
+
+*Amended 2026-06-12:* field sample order 10 showed the headers freeze at GET QUOTE
+while rows stay live, refuting the premise that an excess always indicates a read
+error; the check, severity, and tolerance are unchanged — only the documented causes
+and the user-facing message wording were widened.
 
 ### REQ-REFINERY-008 — Order-level resolution
 

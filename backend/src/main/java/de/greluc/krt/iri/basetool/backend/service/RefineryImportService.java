@@ -388,11 +388,15 @@ public class RefineryImportService {
    * Applies the frozen Phase-0 header checksum (one-sided; extractor repo {@code
    * PHASE0_FINDINGS.md} §7, REQ-REFINERY-007): flags {@code SUM_MISMATCH} when the refine-ON row
    * quantities sum past {@code rawToRefineTotal} beyond the ±1-per-row display rounding, or when a
-   * single row alone exceeds it by more than 1 — both indicate a mis-read quantity or a duplicated
-   * capture. A shortfall is never flagged (the materials list is a scrolling ~6-row viewport, so
-   * scrolled-out rows legitimately reduce the visible sum), and {@code rawInManifestTotal} is never
-   * validated — its composition is not reliably reconstructible from a single frame (e.g. it may
-   * exclude the inert row).
+   * single row alone exceeds it by more than 1. The finding stays a WARNING because an excess is
+   * not proof of a mis-read: besides a mis-read quantity, a flipped REFINE toggle, or a duplicated
+   * capture, the header itself can be legitimately stale — the game freezes IN MANIFEST / TO REFINE
+   * at GET QUOTE while the row list and toggles stay live, so an order modified after quoting can
+   * truthfully sum past the frozen header ({@code PHASE0_FINDINGS.md} §7 addendum, sample order 10:
+   * pixel-verified Σ ON = 1724 vs. header 1645). A shortfall is never flagged (the materials list
+   * is a scrolling ~6-row viewport, so scrolled-out rows legitimately reduce the visible sum), and
+   * {@code rawInManifestTotal} is never validated — its composition is not reliably reconstructible
+   * from a single frame (e.g. it may exclude the inert row).
    *
    * @param order the extracted order carrying the nullable header totals
    * @param sourceGoods all source rows (including skipped ones)
