@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.bank.audit.title} + ' - ' + ${appTitle}">Bank-Audit-Log - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.bank.audit.title}">Bank-Audit-Log</h1>
+        <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+           th:text="#{admin.bank.audit.subtitle}">Jede Bank-Mutation, lückenlos protokolliert.</p>
+    </div>
+
+    <div th:if="${error != null}" class="hud-box mt-2" style="border-color: var(--color-danger);"
+         data-testid="bank-audit-error">
+        <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <!-- A2 filter bar: period (split datetime), account, event type. -->
+    <form method="get" th:action="@{/admin/bank-audit}" class="bank-filterbar mt-2 no-track">
+        <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
+            <label for="bank-audit-from-date" th:text="#{admin.bank.audit.filter.from}">Von</label>
+            <input type="hidden" name="from" th:value="${filterFrom}">
+            <div class="bank-datetime-row">
+                <input type="date" id="bank-audit-from-date" class="date-part">
+                <input type="time" class="time-part" th:aria-label="#{admin.bank.audit.filter.from}">
+            </div>
+        </div>
+        <div class="bank-form-row datetime-split-group" data-datetime-filter-role="end">
+            <label for="bank-audit-to-date" th:text="#{admin.bank.audit.filter.to}">Bis</label>
+            <input type="hidden" name="to" th:value="${filterTo}">
+            <div class="bank-datetime-row">
+                <input type="date" id="bank-audit-to-date" class="date-part">
+                <input type="time" class="time-part" th:aria-label="#{admin.bank.audit.filter.to}">
+            </div>
+        </div>
+        <div class="bank-form-row">
+            <label for="bank-audit-account" th:text="#{admin.bank.audit.filter.account}">Konto-ID</label>
+            <input type="text" id="bank-audit-account" name="accountId" th:value="${filterAccountId}"
+                   data-testid="bank-audit-filter-account" th:placeholder="#{admin.bank.audit.filter.account.placeholder}">
+        </div>
+        <div class="bank-form-row">
+            <label for="bank-audit-event" th:text="#{admin.bank.audit.filter.event}">Ereignistyp</label>
+            <select id="bank-audit-event" name="eventType" data-testid="bank-audit-filter-event">
+                <option value="" th:text="#{admin.bank.audit.filter.allEvents}">Alle Ereignisse</option>
+                <option th:each="et : ${eventTypes}" th:value="${et}"
+                        th:selected="${filterEventType == et}"
+                        th:text="#{'admin.bank.audit.event.' + ${et}}">Ereignis</option>
+            </select>
+        </div>
+        <div class="bank-filter-actions">
+            <button type="submit" class="btn btn--cta" data-testid="bank-audit-filter-apply"
+                    th:text="#{admin.bank.audit.filter.apply}">Filtern</button>
+            <a th:href="@{/admin/bank-audit}" class="btn btn-ghost"
+               th:text="#{admin.bank.audit.filter.reset}">Zurücksetzen</a>
+        </div>
+    </form>
+
+    <div class="bank-panel mt-2" data-testid="bank-audit-panel">
+        <div class="bank-panel-body">
+            <div class="table-responsive" th:if="${events != null and !#lists.isEmpty(events.content())}">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.bank.audit.col.time}">Zeitpunkt</th>
+                        <th th:text="#{admin.bank.audit.col.actor}">Akteur</th>
+                        <th th:text="#{admin.bank.audit.col.event}">Ereignis</th>
+                        <th th:text="#{admin.bank.audit.col.account}">Konto</th>
+                        <th th:text="#{admin.bank.audit.col.details}">Details</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="e : ${events.content()}" data-testid="bank-audit-row">
+                        <td><span class="utc-time" th:text="${e.occurredAt()}">2026-06-12T18:30:00Z</span></td>
+                        <td th:text="${e.actorHandle()}">greluc</td>
+                        <td>
+                            <span class="chip" style="font-size: 0.55rem;"
+                                  th:text="#{'admin.bank.audit.event.' + ${e.eventType()}}">Ereignis</span>
+                        </td>
+                        <td th:text="${e.accountNo() != null ? e.accountNo() : '—'}">KB-0001</td>
+                        <td class="bank-note-cell" th:text="${e.details()}" th:title="${e.details()}">Details</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-center text-muted"
+               th:if="${events == null or #lists.isEmpty(events.content())}"
+               data-testid="bank-audit-empty" th:text="#{admin.bank.audit.empty}">Keine Ereignisse.</p>
+            <nav th:if="${events != null}"
+                 th:replace="~{fragments/pagination :: pagination(${events}, ${paginationBaseUrl})}"></nav>
+        </div>
+    </div>
+</main>
+
+<script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>
