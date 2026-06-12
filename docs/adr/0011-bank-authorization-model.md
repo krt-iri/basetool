@@ -1,6 +1,6 @@
 # ADR-0011 — Bank authorization: coarse Keycloak roles + app-managed per-account grants
 
-- **Status:** Proposed — becomes Accepted with the Phase 1 sign-off of epic #556
+- **Status:** Accepted (epic #556 delivered, 2026-06-13)
 - **Date:** 2026-06-12
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-BANK-007..011 (`docs/specs/bank.md`) · REQ-SEC-002/005/006

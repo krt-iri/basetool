@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Kartellbank (Epic #556):** Neuer Bank-Bereich für die Organisation. Konten je Org-Einheit/Bereich plus Kartell- und Kartellbank-Sonderkonten, mit Halter-Verteilung statt Einzelkonten — jede Buchung ist einem Halter zugeordnet, der Kontosaldo ist die Summe aller Halter-Bestände. Bank-Mitarbeiter sehen und bebuchen nur freigegebene Konten (Einzahlen/Auszahlen/Transfer je Konto einzeln berechtigt), die Bankleitung verwaltet Konten, Halter und Berechtigungen. Ein- und Auszahlungen, Konto-zu-Konto-Transfers und Halter-Umbuchungen laufen über ein fälschungssicheres, nur-anhängendes Hauptbuch; Korrekturen erfolgen als Storno-Gegenbuchung (Bankleitung). Der Bank-Zugang ist unabhängig von der Staffel-/Org-Zugehörigkeit. Kontoauszug (Zeitraum frei wählbar) und 3-Monats-Report als PDF im KRT-Design.
+
 ## [v0.4.20](https://github.com/krt-iri/basetool/releases/tag/v0.4.20) - 2026-06-12
 
 ### Changed
