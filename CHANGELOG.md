@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Auftragsdetails: Die Überschrift „Bearbeiter" hat wieder den normalen Abstand zur Materialtabelle darüber.** Der AJAX-Fragment-Wrapper der Bearbeiter-Sektion hatte den Standard-Abstand der Sektionsüberschrift verschluckt.
+
 ## [v0.4.19](https://github.com/krt-iri/basetool/releases/tag/v0.4.19) - 2026-06-12
 
 ### Changed
