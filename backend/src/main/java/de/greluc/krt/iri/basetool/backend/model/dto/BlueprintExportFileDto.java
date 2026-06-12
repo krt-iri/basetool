@@ -30,8 +30,21 @@ import java.util.List;
  * their records in a top-level {@code blueprints} array; every other top-level field (schema
  * version, tool metadata, mission list, player summaries, …) is ignored.
  *
+ * <p>{@code additionalSourceFolders} is mirrored from the Blueprint Extractor's {@code
+ * BlueprintExport} contract for explicitness only — the import never consumes it. The extractor
+ * keeps its export schema at version 1 and evolves it additively (same rule as ADR-0008 for the
+ * refinery extract; precedent: {@code capturedAt} on {@code sourceImages}), so new nullable
+ * envelope fields like this one must parse without a schema bump while exports from older extractor
+ * versions, which lack the key entirely, stay accepted.
+ *
  * @param blueprints the acquired-blueprint entries; {@code null} if the key is absent
+ * @param additionalSourceFolders extra game-channel folders the Blueprint Extractor scanned beside
+ *     its primary {@code sourceFolder} (currently the {@code HOTFIX} sibling of {@code LIVE});
+ *     {@code null} when only the primary folder was scanned, when an older extractor wrote the
+ *     export, or in SCMDB log-watcher exports — the extractor serializes the key even when {@code
+ *     null} (it encodes defaults). Provenance only, not consumed by the import
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record BlueprintExportFileDto(
-    @JsonProperty("blueprints") List<BlueprintExportEntryDto> blueprints) {}
+    @JsonProperty("blueprints") List<BlueprintExportEntryDto> blueprints,
+    @JsonProperty("additionalSourceFolders") List<String> additionalSourceFolders) {}
