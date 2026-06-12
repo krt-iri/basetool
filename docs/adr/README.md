@@ -46,4 +46,7 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0006](0006-operation-participant-visibility.md)      | Operation visibility for mission participants                                         | Accepted                          |
 | [0007](0007-client-side-vlm-screenshot-extraction.md) | Client-side VLM screenshot extraction with manual JSON upload (epic #439)             | Accepted                          |
 | [0008](0008-refinery-extract-json-contract.md)        | `RefineryExtract` JSON as the frozen cross-repo contract                              | Accepted                          |
+| [0009](0009-bank-postgresql-single-datastore.md)      | PostgreSQL stays the single datastore for the Kartell bank                            | Proposed                          |
+| [0010](0010-bank-double-entry-append-only-ledger.md)  | Bank ledger: append-only double-entry with compute-on-read balances                   | Proposed                          |
+| [0011](0011-bank-authorization-model.md)              | Bank authorization: coarse Keycloak roles + app-managed per-account grants            | Proposed                          |
 

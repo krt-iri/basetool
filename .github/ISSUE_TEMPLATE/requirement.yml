@@ -47,6 +47,7 @@ body:
         - REFINERY
         - HANGAR
         - PROMO (promotion system)
+        - BANK (Kartell bank)
         - ADMIN
         - UEX integration
         - UI / design
