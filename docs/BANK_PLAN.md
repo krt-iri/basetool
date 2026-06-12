@@ -6,9 +6,11 @@
 
 # Kartell bank — implementation plan
 
-A phase-by-phase, AI-executable plan for the bank feature: org/area/cartel/special/player
-accounts, an append-only double-entry ledger, per-employee per-account grants, an
-admin-only audit log, KRT-design PDF exports, dashboards, and an admin wipe reset. Five
+A phase-by-phase, AI-executable plan for the bank feature: org/area/cartel/special
+accounts with a per-player **holder distribution** (which player physically holds which
+part of each balance), an append-only double-entry ledger, per-employee per-account
+grants, an admin-only audit log, KRT-design PDF exports, dashboards, and an admin wipe
+reset. Five
 phases, each independently deployable, each with its own sub-issue carrying the phase
 spec **and the deployment steps for that phase**.
 
