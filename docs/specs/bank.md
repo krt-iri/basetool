@@ -12,10 +12,13 @@
 DAS KARTELL runs an in-game bank for its members and units. The basetool gets a dedicated
 **bank area** in which a small, dedicated staff (not regular squadron members) manages
 accounts for every organizational layer — Staffeln, Spezialkommandos, areas (Bereiche),
-the cartel as a whole, the cartel bank itself, dynamically named special accounts, and
-per-player accounts split across the player's Star Citizen characters. Bank staff book
-deposits, withdrawals and transfers; every change lands in an immutable audit log that
-only administrators can read. Account statements and a management overview are exported
+the cartel as a whole, the cartel bank itself, and dynamically named special accounts.
+There are **no accounts for individual players**. Because aUEC in Star Citizen only
+exists on *player* accounts, every bank account additionally tracks its **holder
+distribution**: which player physically holds which part of the account's balance (e.g.
+the area-Profit account holds 1 000 aUEC — 500 with player greluc, 250 with carol, 250
+with doppi). Bank staff book deposits, withdrawals and transfers; every change lands in
+an immutable audit log that only administrators can read. Account statements and a management overview are exported
 as KRT-design PDFs. The feature is deliberately **independent of seasons, price lines and
 the mission/operation profit flows** — it is a standalone ledger.
 
@@ -39,15 +42,15 @@ account types:
 | `CARTEL`      | none (the organization as a whole)                                              | singleton                |
 | `CARTEL_BANK` | none (the bank's own operating account)                                         | singleton                |
 | `SPECIAL`     | free-form name, dynamically created                                             | many                     |
-| `PLAYER`      | FK → `app_user`                                                                 | at most one per user     |
 
-Singleton and per-owner uniqueness are enforced by partial unique indexes, not by
-application convention alone.
+There is deliberately **no per-player account type** — players appear only as *holders*
+of organizational money (REQ-BANK-003). Singleton and per-owner uniqueness are enforced
+by partial unique indexes, not by application convention alone.
 
 **Acceptance**
 
-- [ ] Creating a second `CARTEL`, `CARTEL_BANK`, per-org-unit or per-user account is
-  rejected with a 409 and a stable problem code.
+- [ ] Creating a second `CARTEL`, `CARTEL_BANK` or per-org-unit account is rejected with
+  a 409 and a stable problem code.
 - [ ] Account numbers are unique, server-generated and never reused.
 - [ ] New entities reference org units via an `org_unit` FK (`org_unit_id`), never
   `squadron_id` (ArchUnit rule
@@ -57,16 +60,15 @@ application convention alone.
 
 ### REQ-BANK-002 — Dynamic account lifecycle, no hard delete
 
-**All** account types — org-unit, area, cartel, cartel-bank, special and player — are
-created at runtime by bank management (and admins) through the same endpoint; nothing is
-seeded by migration, including the two singletons. Accounts for org units, areas and
-special purposes are thereby **dynamically creatable and closable** without a migration
-or restart. Closing an account requires a **zero balance** (transfer the remainder
-first); a closed account becomes read-only (no postings) but stays visible to authorized
-readers with its full history. Closed accounts can be reopened by bank management. The
-close/reopen rules apply to every type including `PLAYER`. Accounts are **never
-hard-deleted**; deactivating an org unit (soft delete, see
-`SquadronService.deleteSquadron`) does not touch its bank account.
+**All** account types — org-unit, area, cartel, cartel-bank and special — are created at
+runtime by bank management (and admins) through the same endpoint; nothing is seeded by
+migration, including the two singletons. Accounts are thereby **dynamically creatable
+and closable** without a migration or restart. Closing an account requires a **zero
+balance** (transfer the remainder first); a closed account becomes read-only (no
+postings) but stays visible to authorized readers with its full history. Closed accounts
+can be reopened by bank management. Accounts are **never hard-deleted**; deactivating an
+org unit (soft delete, see `SquadronService.deleteSquadron`) does not touch its bank
+account.
 
 **Acceptance**
 
@@ -76,36 +78,42 @@ hard-deleted**; deactivating an org unit (soft delete, see
 
 **Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
 
-### REQ-BANK-003 — Player accounts are partitioned across Star Citizen characters
+### REQ-BANK-003 — Holder distribution: every account is partitioned across players
 
-For a `PLAYER` account it must be determinable **which Star Citizen character holds which
-part** of the player's balance. The bank therefore maintains, per player account, a set of
-named characters (`bank_player_character`; at least one, the "main", created with the
-account). **Every posting on a player account references exactly one character**; the
-per-character balance is the sum of its postings. Moving value between characters of the
-same player is an **intra-account rebooking** (REQ-BANK-011) and changes per-character
-balances without changing the account balance. Characters with a zero balance can be
-deactivated; characters are never hard-deleted while postings reference them. There is no
-pre-existing character concept in the tool (`app_user` has none) — this modeling is new
-and bank-local.
+aUEC physically exists only on Star Citizen **player accounts**, so for every bank
+account it must be determinable **which player holds which part** of the account's
+balance, and this distribution must be **visible and manageable** in the account and in
+the evaluations. The bank therefore maintains a bank-local **holder registry**
+(`bank_holder`): one row per player acting as custodian, created by bank staff via the
+user lookup, carrying an optional FK to `app_user` plus a denormalized handle snapshot
+(the ledger must survive user deletion). **Every posting references exactly one
+holder** — a deposit names the player who physically received the money, a withdrawal
+the player who paid it out, each transfer leg the player whose stash changes. The
+per-(account, holder) sub-balance is the sum of those postings; the sub-balances of an
+account always sum exactly to its balance. Moving money between holders **within the
+same account** is an intra-account holder rebooking (REQ-BANK-011) — the account balance
+is unchanged, only custody moves. Holders are never hard-deleted while postings
+reference them.
 
 **Acceptance**
 
-- [ ] A posting on a `PLAYER` account without a character reference is rejected (400).
-- [ ] Postings on non-player accounts carry no character reference (DB CHECK).
-- [ ] The account detail view and the statement PDF show per-character sub-balances that
-  sum exactly to the account balance.
+- [ ] A posting without a holder reference is rejected (400) — on every account type.
+- [ ] The account detail view, the statement PDF (REQ-BANK-014) and the management
+  export (REQ-BANK-015) show the per-holder sub-balances, summing exactly to the
+  account balance.
+- [ ] A holder row whose linked user is deleted keeps its handle snapshot and its ledger
+  history.
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** _pending (Phases 1–3)_ · **Code:** _pending_ · **Issues:** #556
 
 ### REQ-BANK-004 — Append-only double-entry ledger
 
 All value movements are recorded in an **append-only ledger**: a `bank_transaction`
-(type, initiator, note, timestamp) with 1..n `bank_posting` rows (account, signed amount,
-optional character). Transaction types: `DEPOSIT` (one positive posting), `WITHDRAWAL`
-(one negative posting), `TRANSFER` (two postings summing to zero — covers
-account-to-account, player-to-player and intra-account character rebookings),
-`WIPE_RESET` (admin-only, REQ-BANK-013) and `REVERSAL` (corrections). A reversal's
+(type, initiator, note, timestamp) with 1..n `bank_posting` rows (account, signed
+amount, holder — REQ-BANK-003). Transaction types: `DEPOSIT` (one positive posting),
+`WITHDRAWAL` (one negative posting), `TRANSFER` (two postings summing to zero — covers
+account-to-account transfers and intra-account holder rebookings), `WIPE_RESET`
+(admin-only, REQ-BANK-013) and `REVERSAL` (corrections). A reversal's
 postings are the **negated mirror** of the reversed transaction's postings — its
 per-transaction sum is the negation of the original's sum (zero exactly when the
 original was a `TRANSFER`). Ledger rows are **never updated or deleted** — mistakes are
@@ -144,19 +152,20 @@ whole aUEC via the frontend `MoneyFormat` bean. Amount inputs use
 
 ### REQ-BANK-006 — No overdraft
 
-No posting may take an account balance below zero — and on `PLAYER` accounts no posting
-may take a **character sub-balance** below zero either (an intra-account rebooking can
-only move value a character actually holds). Withdrawals and transfers are validated
-against the current balance **inside the booking transaction** with an atomic/locked
-balance check so concurrent bookings cannot jointly overdraw an account. Violations
-surface as 409 with a stable problem code (not 500).
+No posting may take an account balance below zero — and no posting may take any
+**(account, holder) sub-balance** below zero either: a withdrawal, transfer leg or
+holder rebooking can only move money the named holder actually holds on that account
+(REQ-BANK-003). Withdrawals and transfers are validated against the current balances
+**inside the booking transaction** with an atomic/locked balance check so concurrent
+bookings cannot jointly overdraw an account or a holder stash. Violations surface as 409
+with a stable problem code (not 500).
 
 **Acceptance**
 
 - [ ] Concurrent withdrawals that would jointly overdraw an account: exactly one
   succeeds (concurrency test).
-- [ ] An intra-account rebooking exceeding the source character's sub-balance is
-  rejected (409).
+- [ ] A booking exceeding the named holder's sub-balance on that account is rejected
+  (409), even when the account balance would suffice.
 - [ ] The error response names the account and the available balance — without leaking
   data to callers who cannot see the account (403 takes precedence).
 
@@ -170,7 +179,7 @@ rename before Phase 1 — see Open questions):
 - `Bank Employee` → `ROLE_BANK_EMPLOYEE` — may use the bank area within the limits of
   their per-account grants (REQ-BANK-009).
 - `Bank Management` → `ROLE_BANK_MANAGEMENT` (Bankleitung) — sees and manages
-  **all** accounts, characters and grants.
+  **all** accounts, holders and grants.
 
 Role hierarchy (both `SecurityConfig` beans, kept in sync):
 `ROLE_ADMIN > ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE`. Admins therefore pass every
@@ -234,12 +243,12 @@ grants become inert (not deleted) while the holder is ineligible.
 
 ### REQ-BANK-010 — Visibility matrix
 
-|                                 Actor                                 |                 Sees                 |                     May change                      |
-|-----------------------------------------------------------------------|--------------------------------------|-----------------------------------------------------|
-| Anonymous, `GUEST`, members, officers, logisticians, mission managers | **nothing** (no bank surface at all) | nothing                                             |
-| Bank employee (eligible, REQ-BANK-008)                                | accounts they hold a grant on        | bookings per their capability flags                 |
-| Bank management (eligible)                                            | **all** accounts, characters, grants | all bookings, account lifecycle, characters, grants |
-| Admin (`ROLE_ADMIN`)                                                  | everything incl. the **audit log**   | everything incl. wipe reset (REQ-BANK-013)          |
+|                                 Actor                                 |                 Sees                 |                    May change                    |
+|-----------------------------------------------------------------------|--------------------------------------|--------------------------------------------------|
+| Anonymous, `GUEST`, members, officers, logisticians, mission managers | **nothing** (no bank surface at all) | nothing                                          |
+| Bank employee (eligible, REQ-BANK-008)                                | accounts they hold a grant on        | bookings per their capability flags              |
+| Bank management (eligible)                                            | **all** accounts, holders, grants    | all bookings, account lifecycle, holders, grants |
+| Admin (`ROLE_ADMIN`)                                                  | everything incl. the **audit log**   | everything incl. wipe reset (REQ-BANK-013)       |
 
 The audit log is **admin-only** — bank management does **not** see it. The bank area
 contributes nothing to the anonymous/guest surface (consistent with REQ-SEC-009). Bank
@@ -257,24 +266,27 @@ endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
 
 ### REQ-BANK-011 — Transfer semantics
 
-A transfer (Umbuchung) moves value between two postings of one `TRANSFER` transaction.
-Variants, all audited:
+A transfer (Umbuchung) moves value between two postings of one `TRANSFER` transaction;
+each leg names the holder whose stash changes (REQ-BANK-003). Variants, all audited:
 
 1. **Account → account** (e.g. Staffel → SK, area → cartel): employee needs
    `can_transfer` on the **source** account; the **destination** must be an account the
-   employee can see (any grant row). Bank management and admins are unrestricted.
-2. **Player ↔ player** (between different players' accounts): same rule; both postings
-   name the respective character (REQ-BANK-003).
-3. **Intra-account character rebooking** (same player account, two characters): requires
-   `can_transfer` on that account; account balance is unchanged.
+   employee can see (any grant row). Bank management and admins are unrestricted. The
+   physical custody may stay with the same player (same holder on both legs) or change
+   hands as part of the transfer.
+2. **Intra-account holder rebooking** (same account, two different holders): requires
+   `can_transfer` on that account; the account balance is unchanged — only custody
+   moves between the players.
 
-Self-transfers (same account, same character) are rejected.
+Self-transfers (same account, same holder on both legs) are rejected.
 
 **Acceptance**
 
 - [ ] An employee with `can_transfer` on A but no grant on B cannot transfer A → B (403).
-- [ ] Intra-account rebooking changes character sub-balances, not the account balance.
-- [ ] All variants appear in the audit log and the statement PDF with both legs.
+- [ ] Intra-account holder rebooking changes the holder sub-balances, not the account
+  balance.
+- [ ] All variants appear in the audit log and the statement PDF with both legs incl.
+  their holders.
 
 **Enforced by:** _pending (Phases 1, 3)_ · **Code:** _pending_ · **Issues:** #556
 
@@ -282,8 +294,8 @@ Self-transfers (same account, same character) are rejected.
 
 Every bank mutation writes exactly one row to an **insert-only** audit table
 (`bank_audit_event`, modeled after `external_sync_report` — no `@Version`, no updates):
-bookings of every type, reversals, account lifecycle (create/close/reopen), character
-lifecycle, every grant change, the wipe reset, and **PDF exports** (statement and
+bookings of every type, reversals, account lifecycle (create/close/reopen), holder
+registry changes, every grant change, the wipe reset, and **PDF exports** (statement and
 management export, with parameters). Each event stores: timestamp, actor user id (FK
 `ON DELETE SET NULL`) **plus** a denormalized actor handle snapshot (the trail must
 survive user deletion), event type, affected account/transaction/target-user references,
@@ -307,16 +319,17 @@ The audit table is business data, not logging — the `docs/specs/observability.
 
 A Star Citizen wipe erases in-game currency. The admin area gets **one button** that
 resets **all** account balances to zero: for every account with a non-zero balance the
-service books a `WIPE_RESET` transaction (one posting per account, per character for
-player accounts) bringing the balance to exactly zero. History, statements and audit
-trail are **preserved** — nothing is deleted. The action requires `ROLE_ADMIN`, a
+service books a `WIPE_RESET` transaction (one posting per holder with a non-zero
+sub-balance on that account) bringing the balance and every holder sub-balance to
+exactly zero. History, statements and audit trail are **preserved** — nothing is
+deleted. The action requires `ROLE_ADMIN`, a
 KRT-styled confirmation modal (no native dialogs) with an explicit consequence text, and
 writes one summarizing audit event plus the individual transactions. The operation is
 idempotent (a second click on an all-zero bank is a no-op with a notice).
 
 **Acceptance**
 
-- [ ] After the reset every account balance and every character sub-balance is zero;
+- [ ] After the reset every account balance and every holder sub-balance is zero;
   pre-wipe statements still render correctly.
 - [ ] The button sits in the admin area, is admin-only, and uses the shared danger-modal
   pattern (`btn-danger` + confirm modal).
@@ -329,9 +342,9 @@ idempotent (a second click on an all-zero bank is a no-op with a notice).
 For every account they can see, bank staff can export an **account statement PDF** for a
 **user-selected period** (from/to, reusing the `datetime-split-group` filter pattern):
 header with account number/name/type/status, opening balance at period start, every
-booking in the period (timestamp, type, counter-account where applicable, character for
-player accounts, note, signed amount, running balance), closing balance, and per-character
-sub-balances for player accounts. The PDF is generated backend-side with OpenPDF, follows
+booking in the period (timestamp, type, counter-account where applicable, holder, note,
+signed amount, running balance), closing balance, and the closing **holder
+distribution** (per-holder sub-balances). The PDF is generated backend-side with OpenPDF, follows
 the KRT design system (page background, KRT orange `#E77E23`, **embedded Lato** — the
 existing Helvetica-based reports predate the rule), and is delivered via the established
 `ResponseEntity<byte[]>` + frontend-proxy + fetch/blob download pattern with the
@@ -352,9 +365,9 @@ existing Helvetica-based reports predate the rule), and is delivered via the est
 
 Bank management and admins can export a **single PDF over all accounts** covering the
 **last three months** (rolling window). Per account: a header line with opening balance
-(3 months ago), in/out totals, net change and closing balance, **followed by the
-itemized bookings of the window** (the owner asked for the *changes*, not just totals);
-plus an overall summary section up front. Same design/delivery/audit rules as
+(3 months ago), in/out totals, net change and closing balance, the closing **holder
+distribution**, **followed by the itemized bookings of the window** (the owner asked for
+the *changes*, not just totals); plus an overall summary section up front. Same design/delivery/audit rules as
 REQ-BANK-014. Employees cannot trigger this export.
 
 **Acceptance**
@@ -409,7 +422,7 @@ Bank endpoints live under `/api/v1/bank/**` and follow
 `docs/specs/api-conventions.md` (DTO-only boundaries, MapStruct, `@Valid`, RFC 7807,
 `PageResponse` with whitelisted sort fields, UTC storage, SpringDoc/`openapi.json`
 upkeep) and `docs/specs/data-persistence.md` (Flyway-only schema, no N+1). Mutable rows
-(`bank_account`, `bank_account_grant`, `bank_player_character`) carry `@Version` and
+(`bank_account`, `bank_account_grant`, `bank_holder`) carry `@Version` and
 echo it through DTOs and `data-version` DOM attributes; ledger and audit rows are
 insert-only and deliberately version-less. The booking flow observes the CLAUDE.md
 concurrency rules (`…WithinTransaction` pattern, no bulk updates in loops).
@@ -445,8 +458,8 @@ backed by a composite index on `bank_posting (account_id, created_at)`; the dash
 statement queries are grouped single-statement reads. A scheduled integrity job (pattern:
 `task/UserSyncTask`) periodically verifies the ledger invariants (`TRANSFER` postings
 sum to zero; `REVERSAL` postings are the negated mirror of the reversed transaction's
-postings; no negative account or character balances; audit row exists for every
-transaction) and reports violations as `ERROR` log events with `correlationId`.
+postings; no negative account balances or holder sub-balances; audit row exists for
+every transaction) and reports violations as `ERROR` log events with `correlationId`.
 
 **Acceptance**
 
@@ -458,6 +471,8 @@ transaction) and reports violations as `ERROR` log events with `correlationId`.
 
 ## Out of scope
 
+- **Accounts for individual players** — an explicit owner decision: players appear only
+  as holders (custody dimension, REQ-BANK-003), never as account owners.
 - **Automated money flows** from missions/operations/orders into the bank (REQ-BANK-019)
   — a possible future epic, requires its own spec.
 - **Interest, fees, loans, currencies other than aUEC.**
@@ -479,4 +494,7 @@ transaction) and reports violations as `ERROR` log events with `correlationId`.
    ask management to fix mistakes). Confirm at Phase 1 review.
 4. **Statement number/archival** — statements are generated on demand and not persisted;
    if the org wants numbered, archived statements, that becomes a follow-up requirement.
+5. **Holders without a basetool account** — v1 requires every holder to be a registered
+   tool user (picked via the user lookup, handle snapshotted). Allowing free-text
+   external holders would be a small spec change; decide at Phase 1 review.
 

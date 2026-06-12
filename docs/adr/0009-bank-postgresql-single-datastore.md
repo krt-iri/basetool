@@ -35,7 +35,7 @@ Forces:
 ## Decision
 
 We will keep **PostgreSQL as the single datastore** for all bank data — accounts,
-characters, transactions, postings, grants and the audit log. No second database, no
+holders, transactions, postings, grants and the audit log. No second database, no
 event store, no separate OLAP/reporting store, no Redis-backed balance cache. Read
 performance is secured structurally instead: append-only postings with a composite index
 `(account_id, created_at)`, grouped single-statement aggregates for balances, dashboards

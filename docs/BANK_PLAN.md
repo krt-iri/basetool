@@ -101,15 +101,16 @@ start.
 
 ```text
 bank_account            id UUID PK · account_no TEXT UNIQUE (KB-0001…) · name · type
-                        (ORG_UNIT|AREA|CARTEL|CARTEL_BANK|SPECIAL|PLAYER) · status
+                        (ORG_UNIT|AREA|CARTEL|CARTEL_BANK|SPECIAL) · status
                         (ACTIVE|CLOSED) · org_unit_id UUID NULL FK org_unit ·
-                        user_id UUID NULL FK app_user · area_name TEXT NULL ·
-                        version/created_at/updated_at
+                        area_name TEXT NULL · version/created_at/updated_at
                         CHECKs: owner-ref matches type; partial UNIQUEs: one CARTEL,
-                        one CARTEL_BANK, one per org_unit, one per user
-bank_player_character   id UUID PK · account_id FK bank_account (type=PLAYER) ·
-                        name TEXT · active BOOL · version/timestamps ·
-                        UNIQUE (account_id, name)
+                        one CARTEL_BANK, one per org_unit
+bank_holder             id UUID PK · user_id UUID NULL UNIQUE FK app_user
+                        ON DELETE SET NULL · handle TEXT NOT NULL (snapshot, survives
+                        user deletion) · active BOOL · version/timestamps
+                        (bank-local registry of players physically holding org money,
+                        REQ-BANK-003; created via the user lookup)
 bank_account_grant      PK (user_id, account_id) · can_deposit · can_withdraw ·
                         can_transfer · granted_by UUID FK SET NULL ·
                         version/timestamps
@@ -118,12 +119,11 @@ bank_transaction        id UUID PK · type (DEPOSIT|WITHDRAWAL|TRANSFER|WIPE_RES
                         reversed_transaction_id UUID NULL FK UNIQUE · created_at
                         (insert-only; no version)
 bank_posting            id UUID PK · transaction_id FK · account_id FK ·
-                        character_id UUID NULL FK bank_player_character ·
+                        holder_id UUID NOT NULL FK bank_holder (ON DELETE RESTRICT) ·
                         amount NUMERIC(19,4) NOT NULL (signed, != 0) · created_at
                         (insert-only; no version)
-                        INDEX (account_id, created_at) · INDEX (transaction_id)
-                        CHECK: character presence ⇔ player account (enforced via
-                        trigger or service+test if a CHECK can't see the account type)
+                        INDEX (account_id, created_at) · INDEX (transaction_id) ·
+                        INDEX (account_id, holder_id)
 bank_audit_event        id UUID PK · occurred_at · actor_user_id UUID FK SET NULL ·
                         actor_handle TEXT (snapshot) · event_type TEXT ·
                         account_id UUID NULL · transaction_id UUID NULL ·
@@ -132,29 +132,32 @@ bank_audit_event        id UUID PK · occurred_at · actor_user_id UUID FK SET N
                         INDEX (account_id, occurred_at DESC)
 ```
 
-Entities: `BankAccount`, `BankPlayerCharacter`, `BankAccountGrant` extend
+Entities: `BankAccount`, `BankHolder`, `BankAccountGrant` extend
 `AbstractEntity` (mutable, versioned); `BankTransaction`, `BankPosting`,
 `BankAuditEvent` are insert-only (no `AbstractEntity`, `ExternalSyncReport` style).
+Holder sub-balances are never stored — `SUM(amount) GROUP BY account_id, holder_id`
+(same compute-on-read contract as the account balance, ADR-0010).
 
 ## 3. API surface (backend, `/api/v1/bank/**`)
 
-|                      Endpoint                      |         Method          |                   Gate (inner, `@PreAuthorize`)                   |
-|----------------------------------------------------|-------------------------|-------------------------------------------------------------------|
-| `/bank/accounts`                                   | GET (paged)             | `hasRole('BANK_EMPLOYEE')` + service filters to visible accounts  |
-| `/bank/accounts`                                   | POST                    | `hasRole('BANK_MANAGEMENT')`                                      |
-| `/bank/accounts/{id}`                              | GET                     | `@bankSecurityService.canSee(#id, authentication)`                |
-| `/bank/accounts/{id}/close` · `/reopen`            | POST                    | `hasRole('BANK_MANAGEMENT')`                                      |
-| `/bank/accounts/{id}/characters` (+ item ops)      | GET/POST/PATCH          | see > management for writes                                       |
-| `/bank/accounts/{id}/transactions`                 | GET (paged)             | `canSee`                                                          |
-| `/bank/deposits` · `/bank/withdrawals`             | POST                    | `canDeposit(#req.accountId)` / `canWithdraw(...)`                 |
-| `/bank/transfers`                                  | POST                    | `canTransfer(#req.sourceAccountId)` + destination-visibility rule |
-| `/bank/transactions/{id}/reversal`                 | POST                    | `hasRole('BANK_MANAGEMENT')` (open question 3)                    |
-| `/bank/grants` (+ per-account list, delete, patch) | GET/POST/PATCH/DELETE   | `hasRole('BANK_MANAGEMENT')`                                      |
-| `/bank/dashboard`                                  | GET                     | `hasRole('BANK_EMPLOYEE')` (content scoped by visibility)         |
-| `/bank/accounts/{id}/statement`                    | GET → PDF               | `canSee` (Phase 3)                                                |
-| `/bank/export/three-month-report`                  | GET → PDF               | `hasRole('BANK_MANAGEMENT')` (Phase 3)                            |
-| `/bank/admin/wipe-reset`                           | POST                    | `hasRole('ADMIN')` (+ URL gate) (Phase 4)                         |
-| `/bank/admin/audit`                                | GET (paged, filterable) | `hasRole('ADMIN')` (+ URL gate) (Phase 4)                         |
+|                      Endpoint                      |         Method          |                    Gate (inner, `@PreAuthorize`)                    |
+|----------------------------------------------------|-------------------------|---------------------------------------------------------------------|
+| `/bank/accounts`                                   | GET (paged)             | `hasRole('BANK_EMPLOYEE')` + service filters to visible accounts    |
+| `/bank/accounts`                                   | POST                    | `hasRole('BANK_MANAGEMENT')`                                        |
+| `/bank/accounts/{id}`                              | GET                     | `@bankSecurityService.canSee(#id, authentication)`                  |
+| `/bank/accounts/{id}/close` · `/reopen`            | POST                    | `hasRole('BANK_MANAGEMENT')`                                        |
+| `/bank/holders` (+ item ops)                       | GET/POST/PATCH          | GET `hasRole('BANK_EMPLOYEE')`, writes `hasRole('BANK_MANAGEMENT')` |
+| `/bank/accounts/{id}/holders`                      | GET (distribution)      | `canSee` (derived per-holder sub-balances)                          |
+| `/bank/accounts/{id}/transactions`                 | GET (paged)             | `canSee`                                                            |
+| `/bank/deposits` · `/bank/withdrawals`             | POST                    | `canDeposit(#req.accountId)` / `canWithdraw(...)`                   |
+| `/bank/transfers`                                  | POST                    | `canTransfer(#req.sourceAccountId)` + destination-visibility rule   |
+| `/bank/transactions/{id}/reversal`                 | POST                    | `hasRole('BANK_MANAGEMENT')` (open question 3)                      |
+| `/bank/grants` (+ per-account list, delete, patch) | GET/POST/PATCH/DELETE   | `hasRole('BANK_MANAGEMENT')`                                        |
+| `/bank/dashboard`                                  | GET                     | `hasRole('BANK_EMPLOYEE')` (content scoped by visibility)           |
+| `/bank/accounts/{id}/statement`                    | GET → PDF               | `canSee` (Phase 3)                                                  |
+| `/bank/export/three-month-report`                  | GET → PDF               | `hasRole('BANK_MANAGEMENT')` (Phase 3)                              |
+| `/bank/admin/wipe-reset`                           | POST                    | `hasRole('ADMIN')` (+ URL gate) (Phase 4)                           |
+| `/bank/admin/audit`                                | GET (paged, filterable) | `hasRole('ADMIN')` (+ URL gate) (Phase 4)                           |
 
 URL matrix addition (backend `SecurityConfig`):
 `.requestMatchers("/api/v1/bank/admin/**").hasRole("ADMIN")` before the catch-all; the
@@ -164,14 +167,14 @@ with any org-unit membership → deny).
 
 ## 4. Frontend surface
 
-|                                                                  Page                                                                  |         Route         |  Audience  |
-|----------------------------------------------------------------------------------------------------------------------------------------|-----------------------|------------|
-| Bank dashboard (cards: balance + 30-day delta + SVG sparkline; totals row for management)                                              | `/bank`               | employee+  |
-| Account detail (booking history paged, deposit/withdraw/transfer modals, character sub-balances, statement export with from/to picker) | `/bank/accounts/{id}` | per grant  |
-| Account administration (create/close/reopen, characters)                                                                               | `/bank/manage`        | management |
-| Grants administration (user lookup via `krt-searchable-select`, flag matrix)                                                           | `/bank/grants`        | management |
-| Admin: wipe reset (danger section + confirm modal)                                                                                     | `/admin/bank`         | admin      |
-| Admin: audit log (paged, filter: period/actor/account/type)                                                                            | `/admin/bank-audit`   | admin      |
+|                                                                          Page                                                                          |         Route         |  Audience  |
+|--------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------|------------|
+| Bank dashboard (cards: balance + 30-day delta + SVG sparkline; totals row for management)                                                              | `/bank`               | employee+  |
+| Account detail (booking history paged, deposit/withdraw/transfer + holder-rebooking modals, holder distribution, statement export with from/to picker) | `/bank/accounts/{id}` | per grant  |
+| Account administration (create/close/reopen) + holder registry                                                                                         | `/bank/manage`        | management |
+| Grants administration (user lookup via `krt-searchable-select`, flag matrix)                                                                           | `/bank/grants`        | management |
+| Admin: wipe reset (danger section + confirm modal)                                                                                                     | `/admin/bank`         | admin      |
+| Admin: audit log (paged, filter: period/actor/account/type)                                                                                            | `/admin/bank-audit`   | admin      |
 
 Sidebar: new group `data-group-key="bank"` gated
 `sec:authorize="hasRole('BANK_EMPLOYEE')"` (hierarchy lets management/admin see it);
@@ -193,8 +196,9 @@ whenever frontend flows, auth or migrations are touched.
 
 **Objective.** Everything server-side: the two Keycloak roles wired through both
 modules, all six tables + entities + repositories, the booking service with double-entry
-invariants and no-overdraft guard (account **and** character level), grant management,
-the audit core, and the REST API — everything in §3 **except** the two PDF endpoints
+invariants and no-overdraft guard (account **and** holder level), the holder registry,
+grant management, the audit core, and the REST API — everything in §3 **except** the two
+PDF endpoints
 (Phase 3) and the two `/bank/admin/**` endpoints (Phase 4). The `WIPE_RESET` and
 `REVERSAL` transaction types and their ledger invariants are implemented here; the
 reversal endpoint ships in this phase, the wipe-reset endpoint and UI in Phase 4. No UI
@@ -208,8 +212,9 @@ Deliverables:
   `SecurityConfig`s.
 - `model/` entities + enums (`BankAccountType`, `BankAccountStatus`,
   `BankTransactionType`, `BankAuditEventType`), `repository/`, `service/BankAccountService`,
-  `service/BankLedgerService` (booking + invariants; mutators named with covered
-  prefixes or explicit `@Transactional`), `service/BankGrantService`,
+  `service/BankLedgerService` (booking + invariants incl. per-holder sub-balance guard;
+  mutators named with covered prefixes or explicit `@Transactional`),
+  `service/BankHolderService` (registry, handle snapshot), `service/BankGrantService`,
   `service/BankAuditService` (same-TX append), `service/BankSecurityService`
   (eligibility predicate + capability checks), `controller/Bank*Controller`, `dto/` +
   `dto/request/` records (server-managed fields excluded from request DTOs), MapStruct
@@ -224,11 +229,12 @@ Deliverables:
   `'BANK_MANAGEMENT'` so the Phase 2 grants UI can resolve users (see §1 gate caveat).
 
 Tests (Gradle only): `BankLedgerServiceTest` (double-entry invariants, no-overdraft
-concurrency, append-only pin, character rules), `BankSecurityServiceTest` (capability ×
-eligibility matrix), `BankGrantServiceTest`, `BankAccountServiceTest` (lifecycle,
-uniqueness 409s), `BankAuditServiceTest` (one event per mutation, same-TX),
-controller tests per controller, `DatabaseIndexMigrationTest` registration,
-`ArchitectureTest` green.
+concurrency at account and holder level, append-only pin, holder-on-every-posting rule,
+holder-distribution sums), `BankSecurityServiceTest` (capability × eligibility matrix),
+`BankHolderServiceTest` (registry, handle snapshot on user deletion),
+`BankGrantServiceTest`, `BankAccountServiceTest` (lifecycle, uniqueness 409s),
+`BankAuditServiceTest` (one event per mutation, same-TX), controller tests per
+controller, `DatabaseIndexMigrationTest` registration, `ArchitectureTest` green.
 
 **Deployment (Phase 1).**
 
@@ -248,10 +254,10 @@ controller tests per controller, `DatabaseIndexMigrationTest` registration,
 
 **Objective.** The complete bank UI per §4 except admin pages and PDFs: sidebar group,
 employee/management dashboard (cards + totals + SVG sparkline), account detail with
-deposit/withdraw/transfer/character-rebooking modals (KRT modals, `data-version` sync or
-reload-on-success), account + character administration, grants administration with the
-user lookup, suspension notice for employees with memberships (REQ-BANK-008), full i18n
-de+en, `bank.css`.
+deposit/withdraw/transfer/holder-rebooking modals (KRT modals, `data-version` sync or
+reload-on-success) and the holder-distribution section, account administration + holder
+registry, grants administration with the user lookup, suspension notice for employees
+with memberships (REQ-BANK-008), full i18n de+en, `bank.css`.
 
 Deliverables: `BankPageController`, `BankManagePageController`, `BankGrantsPageController`
 (+ `/api/proxy/bank/**` AJAX proxy controllers where needed), templates `bank/*.html`,
@@ -277,10 +283,10 @@ suspension case), seeded via `BackendSeeder`.
 (page background, fonts, table helpers) used by both existing handover reports **and**
 the two new documents; bundle and embed Lato (`Lato-Regular`/`Lato-Bold` TTFs into
 backend resources, loaded via `BaseFont`); implement the account statement
-(REQ-BANK-014: period picker → opening balance, postings with running balance,
-per-character sub-balances, closing balance) and the management three-month report
-(REQ-BANK-015: all accounts, rolling 3-month window, per-account summary **plus**
-itemized bookings). PDF labels from backend message bundles (German). Frontend: export
+(REQ-BANK-014: period picker → opening balance, postings with running balance and
+holder, closing balance, closing holder distribution) and the management three-month
+report (REQ-BANK-015: all accounts, rolling 3-month window, per-account summary +
+closing holder distribution **plus** itemized bookings). PDF labels from backend message bundles (German). Frontend: export
 modal with the `datetime-split-group` from/to picker + fetch/blob download; audit
 events for both exports.
 
@@ -288,10 +294,10 @@ Deliverables: `service/pdf/KrtPdfSupport`, `BankStatementReportService`,
 `BankManagementReportService`, the two GET endpoints (§3), frontend proxy +
 download JS, font resources + license note (Lato is OFL — include `OFL.txt`).
 
-Tests: `PdfTextExtractor` content tests (balance math, character sections, period
-filter, label keys), regression tests proving the two existing handover reports render
-unchanged on the shared layer, proxy controller tests, access-matrix tests
-(employee/management/admin × statement/quarter-report).
+Tests: `PdfTextExtractor` content tests (balance math, holder-distribution sections,
+period filter, label keys), regression tests proving the two existing handover reports
+render unchanged on the shared layer, proxy controller tests, access-matrix tests
+(employee/management/admin × statement/three-month-report).
 
 **Deployment (Phase 3).**
 
@@ -312,7 +318,8 @@ Deliverables: `AdminBankPageController`, `AdminBankAuditPageController`, templat
 backend wipe-reset service path (`WIPE_RESET` transactions per REQ-BANK-013) + audit
 summary event, audit query endpoint with whitelisted sort/filter fields.
 
-Tests: wipe-reset service test (all balances zero, history intact, idempotency),
+Tests: wipe-reset service test (all account balances and holder sub-balances zero,
+history intact, idempotency),
 audit filter/pagination tests, admin-only access tests (management → 403 on both
 pages/endpoints), e2e `BankAdminResetE2eTest` + `BankAuditLogE2eTest` (PR labeled
 `e2e`).
@@ -359,4 +366,5 @@ ADRs were flipped to `Accepted` at the Phase 1 sign-off (their stated trigger).
 
 Mirrored from the spec (decide at latest at each phase's review): final role names
 (before Phase 1), transfer destination visibility rule (Phase 1), reversal permission
-level (Phase 1), persisted/numbered statements (post-v1).
+level (Phase 1), persisted/numbered statements (post-v1), holders without a basetool
+account (Phase 1).

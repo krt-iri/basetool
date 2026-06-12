@@ -8,10 +8,12 @@
 
 ## Context
 
-The bank must record deposits, withdrawals and transfers (account ↔ account,
-player ↔ player, and intra-account between a player's Star Citizen characters), keep a
-complete audit trail, survive a Star Citizen wipe (admin reset to zero) **without losing
-history**, and produce period statements with opening/closing balances. Candidate models:
+The bank must record deposits, withdrawals and transfers (account ↔ account, and
+intra-account **holder rebookings** — aUEC exists only on Star Citizen player accounts,
+so every bank account must track which player physically holds which part of its
+balance, REQ-BANK-003), keep a complete audit trail, survive a Star Citizen wipe (admin
+reset to zero) **without losing history**, and produce period statements with
+opening/closing balances and holder distributions. Candidate models:
 
 - a mutable `balance` column updated in place (simple, but history-free and
   audit-hostile);
@@ -33,18 +35,22 @@ We will model the ledger as **append-only double-entry**:
   `REVERSAL`), initiating user (FK `ON DELETE SET NULL`), note, optional FK to a
   reversed transaction, `created_at`. Insert-only.
 - `bank_posting` — leg: FK transaction, FK account, signed `NUMERIC(19,4)` amount,
-  optional FK character (mandatory on `PLAYER` accounts, forbidden otherwise — DB
-  CHECK). Insert-only. `TRANSFER` legs sum to zero per transaction; a `REVERSAL`'s legs
-  are the negated mirror of the reversed transaction's legs (their sum is the negation
-  of the original's sum — zero exactly when the original was a `TRANSFER`).
+  **mandatory FK holder** (`bank_holder`, the player physically holding/moving the
+  money — every leg names exactly one). Insert-only. `TRANSFER` legs sum to zero per
+  transaction; a `REVERSAL`'s legs are the negated mirror of the reversed transaction's
+  legs (their sum is the negation of the original's sum — zero exactly when the
+  original was a `TRANSFER`).
 - **No UPDATE/DELETE ever** on either table; corrections are `REVERSAL` transactions
   referencing the original. The **wipe reset is itself a transaction type** — one
-  `WIPE_RESET` posting per non-zero account/character — so the post-wipe zero state is
-  derived the same way as every other balance and the pre-wipe history stays intact.
-- **Balances are computed on read** (`SUM(amount)` grouped by account / character),
-  backed by a composite index `(account_id, created_at)`. No materialized balance
-  column in v1; the no-overdraft check runs inside the booking transaction with an
-  atomic guard so concurrent bookings serialize on the account.
+  `WIPE_RESET` posting per non-zero (account, holder) sub-balance — so the post-wipe
+  zero state is derived the same way as every other balance and the pre-wipe history
+  stays intact.
+- **Balances are computed on read** (`SUM(amount)` grouped by account, and by
+  account + holder for the distribution), backed by composite indexes
+  `(account_id, created_at)` and `(account_id, holder_id)`. No materialized balance
+  column in v1; the no-overdraft check (account level **and** per-holder sub-balance)
+  runs inside the booking transaction with an atomic guard so concurrent bookings
+  serialize on the account.
 
 ## Consequences
 
@@ -68,8 +74,8 @@ We will model the ledger as **append-only double-entry**:
   would disagree; exactly the bug class ADR-0003 eliminated for the inventory.
 - **Single-leg booking rows with from/to columns** — rejected: transfers become
   half-nullable rows, per-account aggregation needs UNIONs over both columns, and the
-  per-character partitioning of player accounts (REQ-BANK-003) does not fit a single
-  row cleanly. Double-entry keeps every aggregate a single GROUP BY.
+  per-holder partitioning of every account (REQ-BANK-003) does not fit a single row
+  cleanly. Double-entry keeps every aggregate a single GROUP BY.
 - **Event sourcing with projection rebuild** — rejected: a framework-grade pattern for
   a problem the relational ledger already solves; no replay consumer exists.
 - **Hard reset on wipe (truncate ledger)** — rejected: violates the explicit
