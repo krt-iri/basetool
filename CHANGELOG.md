@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Blueprint-Import kennt das neue Extractor-Feld `additionalSourceFolders`.** Der Basetool Blueprint Extractor listet darin zusätzlich gescannte Channel-Ordner (z. B. HOTFIX neben LIVE); der Import akzeptiert Exporte mit und ohne das Feld unverändert — es wird nur mitgelesen, nicht ausgewertet.
+
 ### Fixed
 
 - **Auftragsdetails: Die Überschrift „Bearbeiter" hat wieder den normalen Abstand zur Materialtabelle darüber.** Der AJAX-Fragment-Wrapper der Bearbeiter-Sektion hatte den Standard-Abstand der Sektionsüberschrift verschluckt.

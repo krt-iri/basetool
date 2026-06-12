@@ -236,6 +236,8 @@ class BlueprintImportServiceTest {
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
     // Basetool Blueprint Extractor shape: full document with receivedAt (ISO-8601) instead of ts.
+    // Deliberately has no additionalSourceFolders key — pins that exports from extractor versions
+    // predating that additive v1 field keep importing unchanged.
     String json =
         "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
             + "\"players\":[{\"handle\":\"greluc\",\"blueprintCount\":1}],"
@@ -249,6 +251,50 @@ class BlueprintImportServiceTest {
     assertEquals(BlueprintImportStatus.MATCHED, entry.status());
     assertEquals("arclight pistol", entry.productKey());
     assertEquals(Instant.parse("2026-03-26T16:49:31.050Z"), entry.suggestedAcquiredAt());
+  }
+
+  @Test
+  void preview_acceptsBpExtractorWithAdditionalSourceFolders() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+
+    // Blueprint Extractor envelope with the additive v1 field additionalSourceFolders populated
+    // (the extractor also scanned the HOTFIX sibling channel beside sourceFolder). The envelope is
+    // provenance only — the import must resolve the entries exactly as without it.
+    String json =
+        "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
+            + "\"sourceFolder\":\"C:\\\\Games\\\\StarCitizen\\\\LIVE\","
+            + "\"additionalSourceFolders\":[\"C:\\\\Games\\\\StarCitizen\\\\HOTFIX\"],"
+            + "\"blueprints\":[{\"productName\":\"Arclight Pistol\","
+            + "\"receivedAt\":\"2026-03-26T16:49:31.050Z\"}]}";
+    BlueprintImportPreviewDto preview = service.previewImport(SUB, upload(json));
+
+    assertEquals(1, preview.total());
+    assertEquals(1, preview.matched());
+    BlueprintImportEntryDto entry = preview.entries().get(0);
+    assertEquals(BlueprintImportStatus.MATCHED, entry.status());
+    assertEquals("arclight pistol", entry.productKey());
+    assertEquals(Instant.parse("2026-03-26T16:49:31.050Z"), entry.suggestedAcquiredAt());
+  }
+
+  @Test
+  void preview_acceptsBpExtractorWithNullAdditionalSourceFolders() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+
+    // The extractor encodes defaults, so a single-folder scan writes the key with a JSON null
+    // instead of omitting it — that explicit null must parse like an absent key.
+    String json =
+        "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
+            + "\"sourceFolder\":\"C:\\\\Games\\\\StarCitizen\\\\LIVE\","
+            + "\"additionalSourceFolders\":null,"
+            + "\"blueprints\":[{\"productName\":\"Arclight Pistol\","
+            + "\"receivedAt\":\"2026-03-26T16:49:31.050Z\"}]}";
+    BlueprintImportPreviewDto preview = service.previewImport(SUB, upload(json));
+
+    assertEquals(1, preview.total());
+    assertEquals(1, preview.matched());
+    assertEquals("arclight pistol", preview.entries().get(0).productKey());
   }
 
   @Test
