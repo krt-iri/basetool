@@ -28,9 +28,8 @@ start.
   indexes registered in `DatabaseIndexMigrationTest`). The test profile runs against a
   Testcontainers PostgreSQL 18 container with Flyway enabled and `ddl-auto: validate` —
   `./gradlew :backend:test` therefore validates the new `V150+` migrations; booting the
-  dev stack remains an optional extra check. (The "Tests" section of the migration
-  README still describes the pre-Testcontainers H2 setup and is stale — tracked as a
-  separate docs fix, do not copy it.)
+  dev stack remains an optional extra check. (The migration README's formerly stale H2
+  claims were fixed in #558.)
 - **Money:** `MissionFinanceEntry.amount` is the precedent — `BigDecimal`,
   `NUMERIC(19,4)`, `CHECK (amount >= 0)`; whole-aUEC via value-based `@WholeNumber`
   (ADR-0002, REQ-MISSION-001); display HALF_UP through the frontend `MoneyFormat` bean
