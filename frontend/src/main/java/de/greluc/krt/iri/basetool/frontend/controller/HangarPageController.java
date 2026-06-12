@@ -282,11 +282,15 @@ public class HangarPageController {
   }
 
   /**
-   * Page sizes the squadron overview offers in its picker. Any other client-supplied {@code size}
-   * is snapped back to the default so a crafted URL cannot request an unbounded page from the
-   * backend (REQ-HANGAR-001).
+   * Page sizes the squadron overview offers in its picker (REQ-HANGAR-001, same trio as the
+   * blueprint availability overview). Any other client-supplied {@code size} is snapped back to
+   * {@link #SQUADRON_DEFAULT_PAGE_SIZE} so a crafted URL cannot request an unbounded page from the
+   * backend.
    */
   private static final List<Integer> SQUADRON_PAGE_SIZES = List.of(10, 50, 100);
+
+  /** Page size applied when the request carries none (or a non-whitelisted one). */
+  private static final int SQUADRON_DEFAULT_PAGE_SIZE = 50;
 
   /**
    * Renders the squadron-wide hangar overview ({@code /hangar/squadron}), server-side paginated
@@ -309,7 +313,7 @@ public class HangarPageController {
       @RequestParam(required = false) String search,
       Model model) {
     int effectiveSize =
-        size != null && SQUADRON_PAGE_SIZES.contains(size) ? size : SQUADRON_PAGE_SIZES.get(0);
+        size != null && SQUADRON_PAGE_SIZES.contains(size) ? size : SQUADRON_DEFAULT_PAGE_SIZE;
     int effectivePage = page == null || page < 0 ? 0 : page;
     String effectiveSearch = search == null || search.isBlank() ? null : search.trim();
 
@@ -346,7 +350,7 @@ public class HangarPageController {
     model.addAttribute("overview", overview);
     model.addAttribute("overviewPage", res);
     model.addAttribute("search", effectiveSearch);
-    model.addAttribute("pageSizeOptions", SQUADRON_PAGE_SIZES);
+    model.addAttribute("pageSizes", SQUADRON_PAGE_SIZES);
     model.addAttribute("pageSize", effectiveSize);
     model.addAttribute("paginationBaseUrl", paginationBaseUrl);
     return "hangar-squadron";

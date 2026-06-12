@@ -34,8 +34,11 @@ scope. No fetch cap may silently truncate the fleet.
 - [ ] The endpoint's optional `search` parameter filters case-insensitively on ship-type
   *or* manufacturer name; types without a manufacturer still match on their own name
   (LEFT-JOIN semantics). Blank input means "no filter".
-- [ ] The frontend page offers exactly the page sizes 10 / 50 / 100; any other
-  client-supplied `size` snaps back to the default (10) before reaching the backend.
+- [ ] The frontend page offers exactly the page sizes 10 / 50 / 100 (shared
+  `pageSizePicker` fragment, same trio and default 50 as the blueprint availability
+  overview's REQ-INV-013); any other client-supplied `size` snaps back to the default
+  before reaching the backend. The picker hides while the total fits the smallest size,
+  where switching could never change anything.
 - [ ] Changing the page size re-enters at page 0, and pagination/page-size links preserve
   an active search term — switching the size never silently drops the filter.
 - [ ] The filter input submits to the server (GET form); the page renders distinct empty

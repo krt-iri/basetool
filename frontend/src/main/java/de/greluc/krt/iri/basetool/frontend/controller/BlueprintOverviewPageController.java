@@ -52,26 +52,49 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Slf4j
 public class BlueprintOverviewPageController {
 
-  /** Page size for the overview fetch — generous so the client-side filter sees every product. */
-  private static final int PAGE_SIZE = 1000;
+  /** Selectable page sizes (REQ-INV-013); requests with any other size fall back to the default. */
+  private static final List<Integer> PAGE_SIZES = List.of(10, 50, 100);
+
+  /** Page size applied when the request carries none (or a non-whitelisted one). */
+  private static final int DEFAULT_PAGE_SIZE = 50;
 
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the blueprint availability list (one row per product, with the owning-member count and
-   * a lazy owner drill-down). A backend failure collapses to an empty list plus an error banner.
+   * Renders one server-side page of the blueprint availability list (one row per product, with the
+   * owning-member count and a lazy owner drill-down). {@code size} is restricted to {@link
+   * #PAGE_SIZES} so the query string cannot turn the page into the unbounded fetch this view used
+   * to do; the optional {@code search} is relayed to the backend, which filters before pagination
+   * so the search spans every entry. A backend failure collapses to an empty list plus an error
+   * banner.
    *
-   * @param model Thymeleaf model populated with the overview list
+   * @param page zero-based page index, defaulted/clamped to 0
+   * @param size requested page size; only {@link #PAGE_SIZES} are honoured
+   * @param search optional case-insensitive product-name fragment
+   * @param model Thymeleaf model populated with the page content, the page envelope ({@code
+   *     overviewPage}), and the echoed {@code search}/{@code pageSizes} for the filter form and
+   *     size picker
    * @return the {@code blueprint-overview} view name
    */
   @GetMapping
-  public String view(Model model) {
+  public String view(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String search,
+      Model model) {
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
+    String trimmedSearch = search == null || search.isBlank() ? null : search.trim();
     List<BlueprintOverviewEntryDto> overview = new ArrayList<>();
+    PageResponse<BlueprintOverviewEntryDto> res = null;
     try {
-      PageResponse<BlueprintOverviewEntryDto> res =
-          backendApiClient.get(
-              "/api/v1/personal-blueprints/overview?size=" + PAGE_SIZE,
-              new ParameterizedTypeReference<>() {});
+      String uri =
+          "/api/v1/personal-blueprints/overview?page=" + effectivePage + "&size=" + effectiveSize;
+      res =
+          trimmedSearch != null
+              ? backendApiClient.get(
+                  uri + "&search={search}", new ParameterizedTypeReference<>() {}, trimmedSearch)
+              : backendApiClient.get(uri, new ParameterizedTypeReference<>() {});
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }
@@ -80,6 +103,9 @@ public class BlueprintOverviewPageController {
       model.addAttribute("error", "error.blueprintOverview.load");
     }
     model.addAttribute("overview", overview);
+    model.addAttribute("overviewPage", res);
+    model.addAttribute("search", trimmedSearch);
+    model.addAttribute("pageSizes", PAGE_SIZES);
     return "blueprint-overview";
   }
 

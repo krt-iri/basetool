@@ -9,6 +9,11 @@
   the `.disabled` class additionally removes pointer-events and dims them. The
   whole bar is a <nav> with an accessible label; the visible "x / y" readout is
   aria-hidden and the page position is announced via the status aria-label.
+
+  `pageResponse` is the frontend PageResponse record — accessors are page(),
+  size(), totalElements(), totalPages(). `baseUrl` may already carry a query
+  string (e.g. '/blueprint-overview?search=x'); the Thymeleaf link expression
+  then appends the page/size parameters with '&'.
 -->
 <nav th:fragment="pagination(pageResponse, baseUrl)" class="pagination"
      th:if="${pageResponse != null and pageResponse.totalPages() > 1}"
@@ -52,22 +57,25 @@
 </nav>
 
 <!--
-  Page-size picker fragment — a segmented group of the same square `.page-btn`
-  buttons the pagination bar uses, prefixed by an uppercase label. Selecting a
-  size always jumps back to page 0 (the old page index would be meaningless
-  under a new page size). Unlike the pagination bar it renders whenever a page
-  response exists, even with a single page: the user must be able to switch
-  back DOWN from a large page size. The active size carries aria-current="true".
+  Page-size picker — square link group in the same `.page-btn` visual language
+  (design-system: square-first, no native select). Each size is a plain link
+  that jumps back to page 0; the active size renders as an inert <span> marked
+  `.active` + aria-current. Hidden while the total fits the smallest size, where
+  switching could never change anything. Shares `baseUrl` semantics with the
+  pagination fragment above (query string allowed).
 -->
 <nav th:fragment="pageSizePicker(pageResponse, baseUrl, sizes)" class="pagination page-size-picker"
-     th:if="${pageResponse != null}"
-     th:aria-label="#{general.pagination.page_size.aria}">
-    <span class="page-size-label" th:text="#{general.pagination.page_size}">Eintr&auml;ge pro Seite</span>
-    <a class="page-btn" th:each="s : ${sizes}"
-       th:href="@{${baseUrl}(page=0, size=${s})}"
-       th:aria-label="#{general.pagination.page_size.option(${s})}"
-       th:aria-current="${pageResponse.size() == s} ? 'true' : null"
-       th:text="${s}">10</a>
+     th:if="${pageResponse != null and pageResponse.totalElements() > sizes[0]}"
+     th:aria-label="#{general.pagination.size.aria}">
+    <span class="page-size-label" th:text="#{general.pagination.size.label}">Entries per page</span>
+    <th:block th:each="s : ${sizes}">
+        <span th:if="${pageResponse.size() == s}" class="page-btn active" aria-current="true"
+              th:text="${s}">50</span>
+        <a th:if="${pageResponse.size() != s}" class="page-btn"
+           th:href="@{${baseUrl}(page=0, size=${s})}"
+           th:aria-label="#{general.pagination.size.option(${s})}"
+           th:text="${s}">50</a>
+    </th:block>
 </nav>
 </body>
 </html>

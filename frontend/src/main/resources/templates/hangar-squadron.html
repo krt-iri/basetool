@@ -75,20 +75,13 @@
             .sub-table tr:hover {
                 background-color: rgba(231, 126, 35, 0.05) !important;
             }
-            /* ---- Table controls: server-side filter (left) + page-size picker (right) ---- */
-            .squadron-controls {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                justify-content: space-between;
-                gap: 0.75rem 1rem;
-                margin-bottom: 1.25rem;
-            }
+            /* ---- Server-side ship-type filter above the table ---- */
             .squadron-filter-form {
                 display: flex;
                 flex-wrap: wrap;
                 align-items: center;
                 gap: 0.5rem;
+                margin-bottom: 1.25rem;
             }
             .hangar-filter {
                 position: relative;
@@ -120,28 +113,25 @@
             Aggregation across all squadrons. Select a single squadron to filter.
         </div>
 
-        <!-- Filter + page-size picker. Both are server-side: the form GETs back to this page
-             (search resets to page 0 by omitting the page param), the picker links re-enter
-             at page 0 with the chosen size. The block stays visible while a search yields
-             nothing - otherwise the filter could never be cleared. -->
-        <div class="squadron-controls" th:if="${!#lists.isEmpty(overview) or search != null}">
-            <form id="squadron-filter-form" class="squadron-filter-form" role="search"
-                  method="get" th:action="@{/hangar/squadron}">
-                <div class="hangar-filter">
-                    <span class="hangar-filter-icon" aria-hidden="true">
-                        <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
-                    </span>
-                    <input type="search" id="squadron-ship-filter" name="search" autocomplete="off"
-                           th:value="${search}"
-                           th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
-                    <input type="hidden" name="size" th:value="${pageSize}">
-                </div>
-                <a th:if="${search != null}" class="btn btn-ghost"
-                   th:href="@{/hangar/squadron(size=${pageSize})}"
-                   th:text="#{hangar.filter.clear}">Filter zur&uuml;cksetzen</a>
-            </form>
-            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizeOptions})}"></nav>
-        </div>
+        <!-- Server-side filter: the form GETs back to this page (search resets to page 0 by
+             omitting the page param). It stays visible while a search yields nothing -
+             otherwise the filter could never be cleared. -->
+        <form th:if="${!#lists.isEmpty(overview) or search != null}"
+              id="squadron-filter-form" class="squadron-filter-form" role="search"
+              method="get" th:action="@{/hangar/squadron}">
+            <div class="hangar-filter">
+                <span class="hangar-filter-icon" aria-hidden="true">
+                    <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
+                </span>
+                <input type="search" id="squadron-ship-filter" name="search" autocomplete="off"
+                       th:value="${search}"
+                       th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
+                <input type="hidden" name="size" th:value="${pageSize}">
+            </div>
+            <a th:if="${search != null}" class="btn btn-ghost"
+               th:href="@{/hangar/squadron(size=${pageSize})}"
+               th:text="#{hangar.filter.clear}">Filter zur&uuml;cksetzen</a>
+        </form>
 
         <div class="table-responsive">
         <table class="data-table">
@@ -197,7 +187,13 @@
         </table>
         </div>
 
-        <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl})}"></nav>
+        <!-- Footer bar: size picker left, page-nav right (same pattern as the blueprint
+             overview). The base URL keeps the active search so paging and re-sizing
+             never drop the filter. -->
+        <div class="pagination-controls" th:if="${overviewPage != null}">
+            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+            <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl})}"></nav>
+        </div>
     </div>
 </main>
 

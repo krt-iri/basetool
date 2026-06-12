@@ -60,15 +60,23 @@ public class PersonalBlueprintOverviewController {
 
   /**
    * Lists the blueprints available among the members of the caller's oversight org units
-   * (paginated, sortable by product name), one row per product with the owning-member count.
+   * (paginated, sortable by product name), one row per product with the owning-member count. The
+   * optional {@code search} narrows to products whose name contains the fragment
+   * (case-insensitive); it is applied before pagination so the page numbers describe the filtered
+   * set.
    *
    * @param page optional zero-based page index
    * @param size optional page size
    * @param sort optional sort expression over the whitelisted product-name field
+   * @param search optional case-insensitive product-name fragment
    * @return the paged availability list
    */
   @GetMapping
-  @Operation(summary = "List blueprints available among the caller's oversight org-unit members.")
+  @Operation(
+      summary = "List blueprints available among the caller's oversight org-unit members.",
+      description =
+          "Paginated; the optional product-name search filters before pagination so it spans"
+              + " every entry, not just the requested page.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paginated list of available blueprints."),
     @ApiResponse(responseCode = "401", description = "Authentication required."),
@@ -79,7 +87,8 @@ public class PersonalBlueprintOverviewController {
   public PageResponse<BlueprintOverviewEntryDto> listAvailableBlueprints(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String search) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -87,7 +96,7 @@ public class PersonalBlueprintOverviewController {
             sort,
             PersonalBlueprintOverviewService.SORTABLE_FIELDS,
             PersonalBlueprintOverviewService.DEFAULT_SORT_FIELD);
-    Page<BlueprintOverviewEntryDto> result = service.listAvailableBlueprints(pageable);
+    Page<BlueprintOverviewEntryDto> result = service.listAvailableBlueprints(pageable, search);
     return new PageResponse<>(
         result.getContent(),
         result.getNumber(),

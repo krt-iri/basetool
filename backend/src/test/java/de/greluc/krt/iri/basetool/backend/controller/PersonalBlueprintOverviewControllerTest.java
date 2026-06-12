@@ -21,6 +21,7 @@ package de.greluc.krt.iri.basetool.backend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,15 +60,26 @@ class PersonalBlueprintOverviewControllerTest {
             List.of(new BlueprintOverviewEntryDto("aurora", "Aurora MR", 3L)),
             PageRequest.of(0, 50, Sort.by("productName")),
             1);
-    when(service.listAvailableBlueprints(any())).thenReturn(page);
+    when(service.listAvailableBlueprints(any(), any())).thenReturn(page);
 
     PageResponse<BlueprintOverviewEntryDto> result =
-        controller.listAvailableBlueprints(0, 50, null);
+        controller.listAvailableBlueprints(0, 50, null, null);
 
     assertEquals(1, result.totalElements());
     assertEquals("Aurora MR", result.content().get(0).productName());
     assertEquals(3L, result.content().get(0).ownerCount());
-    verify(service).listAvailableBlueprints(any());
+    verify(service).listAvailableBlueprints(any(), any());
+  }
+
+  // covers REQ-INV-013 — the search query parameter reaches the service untouched.
+  @Test
+  void list_relaysSearchToService() {
+    when(service.listAvailableBlueprints(any(), eq("aurora")))
+        .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10, Sort.by("productName")), 0));
+
+    controller.listAvailableBlueprints(0, 10, null, "aurora");
+
+    verify(service).listAvailableBlueprints(any(), eq("aurora"));
   }
 
   @Test

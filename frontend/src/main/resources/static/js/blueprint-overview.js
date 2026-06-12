@@ -78,13 +78,20 @@
 
     function wireDetails(details) {
         details.addEventListener('toggle', function () {
+            const row = details.closest('tr');
+            const detailsRow = row ? row.nextElementSibling : null;
+            if (!detailsRow || !detailsRow.classList.contains('details-row')) {
+                return;
+            }
+            // Show/hide the companion row via a class on it directly — a CSS
+            // tr:has(details[open]) sibling rule re-evaluates style across the
+            // whole table per toggle and janks the UI (REQ-INV-012).
+            detailsRow.classList.toggle('bp-expanded', details.open);
             if (!details.open) {
                 return;
             }
             const productKey = details.getAttribute('data-product-key');
-            const row = details.closest('tr');
-            const detailsRow = row ? row.nextElementSibling : null;
-            const panel = detailsRow ? detailsRow.querySelector('.bp-owners-panel') : null;
+            const panel = detailsRow.querySelector('.bp-owners-panel');
             if (!productKey || !panel) {
                 return;
             }
@@ -94,36 +101,10 @@
         });
     }
 
-    function wireFilter() {
-        const input = document.getElementById('bp-overview-filter');
-        if (!input) {
-            return;
-        }
-        const rows = document.querySelectorAll('tr.bp-row');
-        const noResults = document.getElementById('bp-filter-empty');
-        input.addEventListener('input', function () {
-            const query = this.value.trim().toLowerCase();
-            let anyVisible = false;
-            rows.forEach(function (row) {
-                const haystack = row.getAttribute('data-bp-filter') || '';
-                const match = query === '' || haystack.indexOf(query) !== -1;
-                row.style.display = match ? '' : 'none';
-                const detailsRow = row.nextElementSibling;
-                if (detailsRow && detailsRow.classList.contains('details-row')) {
-                    detailsRow.style.display = match ? '' : 'none';
-                }
-                if (match) {
-                    anyVisible = true;
-                }
-            });
-            if (noResults) {
-                noResults.style.display = !anyVisible && query !== '' ? '' : 'none';
-            }
-        });
-    }
-
+    // The product search is server-side (REQ-INV-013): the table is paginated, so a
+    // client-side row filter would only ever see the current page. The search input is
+    // a plain GET form submitted on Enter - no JS wiring needed.
     document.addEventListener('DOMContentLoaded', function () {
-        wireFilter();
         document.querySelectorAll('details[data-product-key]').forEach(wireDetails);
     });
 })();
