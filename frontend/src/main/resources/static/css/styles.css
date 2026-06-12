@@ -2008,7 +2008,8 @@ input[type='radio']:focus {
     color: var(--color-primary);
 }
 
-.pagination .page-btn[aria-current='page'] {
+.pagination .page-btn[aria-current='page'],
+.pagination .page-btn[aria-current='true'] {
     background-color: var(--color-primary);
     color: var(--color-bg-black);
     border-color: var(--color-primary);
@@ -2032,6 +2033,32 @@ input[type='radio']:focus {
 .pagination .page-status b {
     color: var(--color-primary);
     font-weight: var(--fw-bold);
+}
+
+/* Page-size picker - the same square `.page-btn` group as the pagination bar,
+   but placed inline with the table controls (left-aligned, no centering gap).
+   The active size is marked via aria-current="true" (see the shared
+   aria-current rule above); the label follows the sub-table header type:
+   Lato uppercase, muted. */
+.pagination.page-size-picker {
+    justify-content: flex-start;
+    margin-top: 0;
+}
+
+.page-size-picker .page-size-label {
+    display: inline-flex;
+    align-items: center;
+    padding-right: var(--space-2);
+    color: var(--color-gray-2);
+    font-family: var(--font-headline);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.page-size-picker .page-btn {
+    font-variant-numeric: tabular-nums;
+    text-align: center;
 }
 
 /* Key-value detail list - read-only "label : value" rows (profile, detail

@@ -137,7 +137,10 @@ public class HangarService {
   /**
    * Returns the per-ship-type squadron overview. When {@code includeOwnerDetails} is {@code true}
    * the returned DTOs carry the per-ship owner/location/fitted breakdown; when {@code false} only
-   * the aggregated counts are exposed.
+   * the aggregated counts are exposed. The optional {@code query} filters the ship types
+   * server-side (case-insensitive contains on ship-type or manufacturer name) so the filter spans
+   * the whole scoped fleet, not just the rows of the current page — blank input is normalised to
+   * "no filter".
    *
    * <p>The role-based decision (only ADMIN/OFFICER see the owner breakdown) lives in {@code
    * HangarController} so this method stays pure business logic and the service layer keeps its
@@ -150,13 +153,23 @@ public class HangarService {
    * to a squadron therefore sees only that squadron's ships in the breakdown — not, say, an SK-only
    * member's ship that merely shares a ship type with the pinned squadron (Hangar = strict eigene
    * Staffel, MULTI_SQUADRON_PLAN.md section 1).
+   *
+   * @param pageable page request (sortable by {@code shipType.name})
+   * @param includeOwnerDetails whether to load the per-ship owner/location/fitted breakdown
+   * @param query optional ship-type/manufacturer name filter; {@code null} or blank means no filter
+   * @return one page of per-ship-type aggregates, REQ-HANGAR-001
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
-      Pageable pageable, boolean includeOwnerDetails) {
+      Pageable pageable, boolean includeOwnerDetails, String query) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
     Page<Object[]> p =
         shipRepository.countShipsByType(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            normalizedQuery,
+            pageable);
 
     List<de.greluc.krt.iri.basetool.backend.model.ShipType> types =
         includeOwnerDetails

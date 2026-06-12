@@ -422,6 +422,77 @@ class HangarIntegrationTest {
     assertTrue(response.contains("\"details\":[{\"ownerName\":\"user1\""));
   }
 
+  @Test
+  void testSquadronOverviewPaginatesAndFiltersAcrossAllTypes() throws Exception {
+    // covers REQ-HANGAR-001 — page metadata counts ship TYPES (not ships) and the search
+    // term filters server-side across the whole scoped fleet, including types without a
+    // manufacturer (LEFT JOIN path).
+    ShipType cutlass = new ShipType();
+    cutlass.setName("Cutlass Black");
+    cutlass = shipTypeRepository.save(cutlass);
+    ShipType cutter = new ShipType();
+    cutter.setName("Cutter");
+    cutter = shipTypeRepository.save(cutter);
+
+    for (ShipType type : java.util.List.of(fighter, cutlass, cutter)) {
+      Ship ship = new Ship();
+      ship.setOwningOrgUnit(iridium);
+      ship.setName("Ship " + type.getName());
+      ship.setShipType(type);
+      ship.setOwner(user1);
+      ship.setInsurance("LTI");
+      ship.setFitted(false);
+      shipRepository.save(ship);
+    }
+    // A second ship of an already-counted type must not inflate totalElements.
+    Ship second = new Ship();
+    second.setOwningOrgUnit(iridium);
+    second.setName("Second Cutlass");
+    second.setShipType(cutlass);
+    second.setOwner(user2);
+    second.setInsurance("LTI");
+    second.setFitted(false);
+    shipRepository.save(second);
+
+    String paged =
+        mockMvc
+            .perform(
+                get("/api/v1/hangar/squadron-overview")
+                    .param("page", "0")
+                    .param("size", "2")
+                    .with(
+                        jwt()
+                            .jwt(builder -> builder.subject(user1.getId().toString()))
+                            .authorities(new SimpleGrantedAuthority("HANGAR_READ"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // 3 distinct types in scope, page size 2 -> 2 pages; 4 ships must NOT leak into the total.
+    assertTrue(paged.contains("\"totalElements\":3"));
+    assertTrue(paged.contains("\"totalPages\":2"));
+
+    String filtered =
+        mockMvc
+            .perform(
+                get("/api/v1/hangar/squadron-overview")
+                    .param("search", "cut")
+                    .with(
+                        jwt()
+                            .jwt(builder -> builder.subject(user1.getId().toString()))
+                            .authorities(new SimpleGrantedAuthority("HANGAR_READ"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertTrue(filtered.contains("\"totalElements\":2"));
+    assertTrue(filtered.contains("Cutlass Black"));
+    assertTrue(filtered.contains("Cutter"));
+    assertFalse(filtered.contains("Fighter"));
+  }
+
   /**
    * Regression for the hangar squadron-overview scope leak: an admin pinned to a squadron must NOT
    * see the owner-detail rows of a ship owned by a different OrgUnit (here a Spezialkommando the

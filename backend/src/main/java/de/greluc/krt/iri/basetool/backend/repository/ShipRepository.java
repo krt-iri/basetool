@@ -167,22 +167,52 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   /**
    * Aggregates ships by type for the squadron-overview page: tuple of {@code (shipType, totalCount,
    * fittedCount)} ordered alphabetically by ship-type name. Returns raw {@code Object[]} - the
-   * service projects it into the squadron-overview DTO. When {@code owningSquadronId} is {@code
-   * null} the aggregation spans every squadron (admin "all squadrons" mode); otherwise the row set
-   * is pre-filtered to that squadron's ships only.
+   * service projects it into the squadron-overview DTO. When {@code isAdminAllScope} is {@code
+   * true} the aggregation spans every org unit (admin "all squadrons" mode); otherwise the row set
+   * is pre-filtered through the scope-predicate triple. The optional {@code query} narrows the
+   * grouped types to those whose ship-type name or manufacturer name contains the term
+   * (case-insensitive) — manufacturer is LEFT-joined so types without one still match on their own
+   * name. The explicit {@code countQuery} counts distinct ship types: the derived count of a
+   * GROUP-BY query would tally ships instead of groups, breaking the page metadata
+   * (totalElements/totalPages) this endpoint's pagination UI relies on.
+   *
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection
+   * @param activeOrgUnitId the pinned OrgUnit id, or {@code null} when no pin is active
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin, no-pin path)
+   * @param query optional case-insensitive contains-filter on ship-type/manufacturer name; {@code
+   *     null} returns every type in scope
+   * @param pageable page request (sortable by {@code shipType.name})
+   * @return one row per ship type: {@code [ShipType, totalCount, fittedCount]}
    */
   @Query(
-      "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END) FROM Ship s"
-          + " WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " ) GROUP BY s.shipType ORDER BY s.shipType.name ASC")
+      value =
+          "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END)"
+              + " FROM Ship s LEFT JOIN s.shipType.manufacturer m"
+              + " WHERE ("
+              + "  :isAdminAllScope = true"
+              + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
+              + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
+              + " ) AND (cast(:query as string) IS NULL"
+              + "  OR LOWER(s.shipType.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
+              + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
+              + " ) GROUP BY s.shipType ORDER BY s.shipType.name ASC",
+      countQuery =
+          "SELECT COUNT(DISTINCT s.shipType)"
+              + " FROM Ship s LEFT JOIN s.shipType.manufacturer m"
+              + " WHERE ("
+              + "  :isAdminAllScope = true"
+              + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
+              + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
+              + " ) AND (cast(:query as string) IS NULL"
+              + "  OR LOWER(s.shipType.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
+              + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
+              + " )")
   Page<Object[]> countShipsByType(
       @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
       @org.springframework.data.repository.query.Param("memberOrgUnitIds")
           java.util.Collection<UUID> memberOrgUnitIds,
+      @org.springframework.data.repository.query.Param("query") String query,
       Pageable pageable);
 
   /**

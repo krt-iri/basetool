@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Staffelübersicht im Hangar ist jetzt echt paginiert:** Die Tabelle blättert serverseitig über alle Schiffstypen (vorher wurden maximal 1000 Einträge auf einmal geladen), mit wählbarer Seitengröße 10/50/100 im KRT-Stil. Die Schiffstyp-Suche filtert jetzt serverseitig über die gesamte Flotte statt nur über die sichtbaren Zeilen.
+
 ### Fixed
 
 - **Die Staffelübersicht im Hangar klappt Detailzeilen jetzt ohne spürbares Ruckeln auf:** Die Detailzeile wird per Klassen-Umschaltung im JavaScript statt über einen `:has()`-Geschwister-Selektor eingeblendet, der bei großen Tabellen eine Neuberechnung der gesamten Tabelle bei jedem Auf-/Zuklappen erzwang.
