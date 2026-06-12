@@ -80,13 +80,13 @@ public class AdminBankPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the wipe-reset danger card.
+   * Renders the wipe-reset danger card. The page is static except for the PRG flash attributes,
+   * which Spring exposes to the template without a model parameter.
    *
-   * @param model Thymeleaf model
    * @return the {@code admin/bank} view name
    */
   @GetMapping("/admin/bank")
-  public String bankAdmin(Model model) {
+  public String bankAdmin() {
     return "admin/bank";
   }
 

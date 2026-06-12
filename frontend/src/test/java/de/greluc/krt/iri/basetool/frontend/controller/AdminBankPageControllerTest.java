@@ -174,7 +174,7 @@ class AdminBankPageControllerTest {
 
   @Test
   void bankAdmin_returnsView() {
-    assertEquals("admin/bank", controller.bankAdmin(new ConcurrentModel()));
+    assertEquals("admin/bank", controller.bankAdmin());
   }
 
   @Test
