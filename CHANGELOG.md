@@ -6,6 +6,12 @@
 
 - **Die Screenshot-Import-Warnung `SUM_MISMATCH` nennt jetzt beide möglichen Ursachen:** Neben einer falsch gelesenen Menge/einem falsch gelesenen Toggle kann auch ein nach GET QUOTE geänderter Auftrag die eingefrorene TO-REFINE-Kopfzeile übersteigen (das Spiel friert die Kopfzeilen beim Quote ein). Meldungstexte (DE/EN) mit Handlungsempfehlung umformuliert; Prüfung und Schwere unverändert.
 
+## [v0.4.18](https://github.com/krt-iri/basetool/releases/tag/v0.4.18) - 2026-06-11
+
+### Changed
+
+- **Der Screenshot-Import befüllt jetzt auch das Startdatum des Raffinerieauftrags vor.** Der Basetool SC Extractor liefert pro Screenshot die Aufnahmezeit mit (aus dem Dateinamen, sonst aus dem Datei-Änderungsdatum); der Import übernimmt die Aufnahmezeit des letzten Screenshots als Startzeit. Ohne Zeitangabe (ältere Extractor-Version) bleibt das Feld wie bisher leer und wird beim Speichern auf „jetzt" gesetzt.
+
 ## [v0.4.17](https://github.com/krt-iri/basetool/releases/tag/v0.4.17) - 2026-06-11
 
 ### Fixed

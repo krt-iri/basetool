@@ -137,7 +137,7 @@ This is the **single** integration point. Phase 1 (backend) and Phase 3 (desktop
       "durationMinutes": 1258,            // processing time in minutes (from "20h 58m"); nullable
       "totalYieldScu": null,              // PROCESSING only; null on SETUP
       "sourceImages": [
-        { "name": "frame_213823.png", "width": 3840, "height": 2160, "cropMode": "vlm" }  // vlm | manual | precropped
+        { "name": "frame_213823.png", "width": 3840, "height": 2160, "cropMode": "vlm", "capturedAt": "2026-06-05T19:38:23Z" }  // cropMode: vlm | manual | precropped; capturedAt: UTC capture instant from file metadata (additive v1 field, 2026-06-11, REQ-REFINERY-017) — nullable
       ],
       "goods": [
         {

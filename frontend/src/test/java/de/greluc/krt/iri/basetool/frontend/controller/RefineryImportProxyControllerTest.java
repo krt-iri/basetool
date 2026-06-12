@@ -41,6 +41,7 @@ import de.greluc.krt.iri.basetool.frontend.model.form.RefineryOrderForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -113,7 +114,7 @@ class RefineryImportProxyControllerTest {
             null,
             new LocationDto(LOCATION_ID, "Levski", null, false, false, 0L),
             null,
-            null,
+            Instant.parse("2026-06-01T19:39:01Z"),
             1258L,
             48928.0,
             null,
@@ -142,6 +143,8 @@ class RefineryImportProxyControllerTest {
     assertThat(form).isNotNull();
     assertThat(form.getLocationId()).isEqualTo(LOCATION_ID);
     assertThat(form.getRefiningMethodId()).isEqualTo(METHOD_ID);
+    // The capture-derived start time arrives as the UTC ISO instant the splitter renders locally.
+    assertThat(form.getStartedAt()).isEqualTo("2026-06-01T19:39:01Z");
     assertThat(form.getDurationHours()).isEqualTo(20);
     assertThat(form.getDurationMinutes()).isEqualTo(58);
     assertThat(form.getExpenses()).isEqualTo(48928.0);
@@ -362,6 +365,8 @@ class RefineryImportProxyControllerTest {
     // Then — the template's row-clone JS needs at least the one seeded empty row
     assertThat(form.getGoods()).hasSize(1);
     assertThat(form.getGoods().getFirst().getInputMaterialId()).isNull();
+    // No capture metadata in the draft → the create flow keeps its "now" default at save time.
+    assertThat(form.getStartedAt()).isNull();
   }
 
   private Map<String, Object> flash() {

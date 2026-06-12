@@ -29,9 +29,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Binding test deserializing the frozen-contract example from {@code
  * docs/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 verbatim (#434) — including the 2026-06-10 contract
- * amendments {@code quoted}, {@code rowIndex}, the header totals, {@code cropMode} and a {@code
- * null} {@code outputQuantity} on an un-quoted row. A shape drift between the documented contract
- * and these records fails here before it fails in the field.
+ * amendments {@code quoted}, {@code rowIndex}, the header totals, {@code cropMode}, a {@code null}
+ * {@code outputQuantity} on an un-quoted row, and the 2026-06-11 additive v1 field {@code
+ * capturedAt} (REQ-REFINERY-017). A shape drift between the documented contract and these records
+ * fails here before it fails in the field.
  */
 class RefineryExtractDtoJsonTest {
 
@@ -57,7 +58,7 @@ class RefineryExtractDtoJsonTest {
             "durationMinutes": 1258,
             "totalYieldScu": null,
             "sourceImages": [
-              { "name": "frame_213823.png", "width": 3840, "height": 2160, "cropMode": "vlm" }
+              { "name": "frame_213823.png", "width": 3840, "height": 2160, "cropMode": "vlm", "capturedAt": "2026-06-05T19:38:23Z" }
             ],
             "goods": [
               {
@@ -116,6 +117,8 @@ class RefineryExtractDtoJsonTest {
     assertThat(order.totalYieldScu()).isNull();
     assertThat(order.sourceImages().getFirst().name()).isEqualTo("frame_213823.png");
     assertThat(order.sourceImages().getFirst().cropMode()).isEqualTo("vlm");
+    assertThat(order.sourceImages().getFirst().capturedAt())
+        .isEqualTo(Instant.parse("2026-06-05T19:38:23Z"));
 
     // Then — goods incl. rowIndex and the nullable outputQuantity (un-quoted row)
     assertThat(order.goods()).hasSize(2);

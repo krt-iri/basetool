@@ -44,6 +44,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.ImportIssueDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.ImportIssueSeverity;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryExtractDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryExtractGoodDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.RefineryExtractImageDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
@@ -676,6 +677,38 @@ class RefineryImportServiceTest {
   }
 
   @Test
+  void buildDraft_derivesStartedAtFromTheLatestCapture() {
+    // Given — a scrolled three-capture order; the LAST capture marks the order start
+    // (REQ-REFINERY-017), and an image without a capture time must not disturb the max
+    RefineryExtractOrderDto order =
+        setupOrder(
+            List.of(quotedGood(0, "STILERON (ORE)")),
+            List.of(
+                image("a_upper.png", Instant.parse("2026-06-01T19:38:23Z")),
+                image("b_lower.png", Instant.parse("2026-06-01T19:39:01Z")),
+                image("c_pasted.png", null)));
+
+    // When
+    RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
+
+    // Then
+    assertThat(draft.order().startedAt()).isEqualTo(Instant.parse("2026-06-01T19:39:01Z"));
+  }
+
+  @Test
+  void buildDraft_leavesStartedAtNullWhenNoCaptureTimeIsKnown() {
+    // Given — an older extractor: source images without the additive capturedAt field
+    RefineryExtractOrderDto order =
+        setupOrder(List.of(quotedGood(0, "STILERON (ORE)")), List.of(image("a_upper.png", null)));
+
+    // When
+    RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
+
+    // Then — the create flow keeps its "now" default at save time
+    assertThat(draft.order().startedAt()).isNull();
+  }
+
+  @Test
   void buildDraft_flagsMissingLocationAndMethodForPreCroppedInput() {
     // Given — pre-cropped panel input never contains the terminal header
     RefineryExtractOrderDto order = setupOrder(List.of(quotedGood(0, "STILERON (ORE)")));
@@ -747,8 +780,17 @@ class RefineryImportServiceTest {
   }
 
   private static RefineryExtractOrderDto setupOrder(List<RefineryExtractGoodDto> goods) {
+    return setupOrder(goods, null);
+  }
+
+  private static RefineryExtractOrderDto setupOrder(
+      List<RefineryExtractGoodDto> goods, List<RefineryExtractImageDto> sourceImages) {
     return new RefineryExtractOrderDto(
-        "SETUP", true, 0.92, null, null, null, null, null, null, null, null, goods);
+        "SETUP", true, 0.92, null, null, null, null, null, null, null, sourceImages, goods);
+  }
+
+  private static RefineryExtractImageDto image(String name, Instant capturedAt) {
+    return new RefineryExtractImageDto(name, 1920, 1080, "vlm", capturedAt);
   }
 
   private static RefineryExtractGoodDto quotedGood(int rowIndex, String rawMaterialName) {
