@@ -10,7 +10,8 @@
 ## Context & goal
 
 DAS KARTELL runs an in-game bank for its members and units. The basetool gets a dedicated
-**bank area** in which a small, dedicated staff (not regular squadron members) manages
+**bank area** in which a dedicated staff — defined solely by the bank roles, fully
+independent of any org-unit membership — manages
 accounts for every organizational layer — Staffeln, Spezialkommandos, areas (Bereiche),
 the cartel as a whole, the cartel bank itself, and dynamically named special accounts.
 There are **no accounts for individual players**. Because aUEC in Star Citizen only
@@ -197,26 +198,29 @@ documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
 
 **Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
 
-### REQ-BANK-008 — Separation of duties: bank staff hold no org-unit membership
+### REQ-BANK-008 — Bank membership is independent of org-unit membership
 
-To act in the bank (any read or write under the bank surface, except the admin
-carve-out), a user must (a) hold a basetool account and (b) have **zero
-`org_unit_membership` rows** — bank staff must not be members of any Staffel,
-Spezialkommando or other org unit. This is checked **at access time** on every bank gate
-(`BankSecurityService`), not only at grant time: if a bank employee later joins an org
-unit, their bank access (including bank-management rights) is **suspended** until the
-membership is removed; their grants stay stored but inert. Admins are exempt
-(REQ-BANK-010) — admin access is the maintenance carve-out and is always audited.
+Working in the bank — as employee or management — requires only a basetool account and
+the respective Keycloak role (REQ-BANK-007) plus grants (REQ-BANK-009). It is **fully
+independent of org-unit membership**: a bank employee or bank manager may, but need
+not, also be a member of a Staffel, Spezialkommando or any other org unit. Org-unit
+memberships neither qualify nor disqualify anyone for the bank, and joining or leaving
+an org unit has **no effect** on bank roles, grants or access. Consequently, bank
+authorization decisions **never consult org-unit scope**: `OwnerScopeService` scoping,
+contextual `ROLE_X@orgUnitId` authorities and the `X-Active-Org-Unit-Id` admin pin have
+no influence on any bank gate — `BankSecurityService` evaluates only the bank roles and
+the grant table.
 
 **Acceptance**
 
-- [ ] Granting bank permissions to a user with a membership is rejected (409, stable
-  code) with a message naming the conflict.
-- [ ] A bank employee who gains a membership receives 403 on every bank endpoint and the
-  frontend shows a "bank access suspended" notice instead of account data.
-- [ ] Removing the membership restores access without re-granting.
+- [ ] A user who is a Staffel/SK member **and** holds `Bank Employee` plus a grant can
+  use the bank exactly like a membership-less bank employee (matrix test).
+- [ ] Joining or leaving an org unit changes nothing about a user's bank access or
+  grants (test pins both directions).
+- [ ] Bank gates ignore the `X-Active-Org-Unit-Id` pin and contextual org-unit
+  authorities (test).
 
-**Enforced by:** _pending (Phases 1–2)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
 
 ### REQ-BANK-009 — Per-account grants: view + deposit / withdraw / transfer
 
@@ -227,8 +231,8 @@ grant row gives **view access** to that account (a row with all flags false is
 view-only). This expresses every required combination: deposit-only, withdraw-only,
 both, and rebooking permission. Grants are managed by bank management and admins; every
 grant change (create, flag change, revoke) is audited (REQ-BANK-012). Grants can only be
-**created** for eligible users (REQ-BANK-008) holding the `Bank Employee` role; existing
-grants become inert (not deleted) while the holder is ineligible.
+**created** for users holding the `Bank Employee` role; whether the grantee belongs to
+an org unit is irrelevant (REQ-BANK-008).
 
 **Acceptance**
 
@@ -236,19 +240,19 @@ grants become inert (not deleted) while the holder is ineligible.
   `can_deposit` on the account, withdrawal `can_withdraw`, transfer `can_transfer`
   on the **source** account (REQ-BANK-011 for the destination rule).
 - [ ] Grant management endpoints are gated `hasRole('BANK_MANAGEMENT')` (admins pass via
-  hierarchy) and reject users lacking the employee role or eligibility.
+  hierarchy) and reject grantees lacking the employee role.
 - [ ] Every grant mutation produces exactly one audit event with before/after flags.
 
 **Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
 
 ### REQ-BANK-010 — Visibility matrix
 
-|                                 Actor                                 |                 Sees                 |                    May change                    |
-|-----------------------------------------------------------------------|--------------------------------------|--------------------------------------------------|
-| Anonymous, `GUEST`, members, officers, logisticians, mission managers | **nothing** (no bank surface at all) | nothing                                          |
-| Bank employee (eligible, REQ-BANK-008)                                | accounts they hold a grant on        | bookings per their capability flags              |
-| Bank management (eligible)                                            | **all** accounts, holders, grants    | all bookings, account lifecycle, holders, grants |
-| Admin (`ROLE_ADMIN`)                                                  | everything incl. the **audit log**   | everything incl. wipe reset (REQ-BANK-013)       |
+|                                                Actor                                                 |                 Sees                 |                    May change                    |
+|------------------------------------------------------------------------------------------------------|--------------------------------------|--------------------------------------------------|
+| Everyone without a bank role (anonymous, `GUEST`, members, officers, logisticians, mission managers) | **nothing** (no bank surface at all) | nothing                                          |
+| Bank employee (role + grants; org-unit membership irrelevant, REQ-BANK-008)                          | accounts they hold a grant on        | bookings per their capability flags              |
+| Bank management (role; org-unit membership irrelevant)                                               | **all** accounts, holders, grants    | all bookings, account lifecycle, holders, grants |
+| Admin (`ROLE_ADMIN`)                                                                                 | everything incl. the **audit log**   | everything incl. wipe reset (REQ-BANK-013)       |
 
 The audit log is **admin-only** — bank management does **not** see it. The bank area
 contributes nothing to the anonymous/guest surface (consistent with REQ-SEC-009). Bank

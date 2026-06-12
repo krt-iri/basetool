@@ -53,9 +53,10 @@ start.
   `realm-export.json` is gitignored, host-installed, and **not** auto-imported in prod
   (`start` without `--import-realm`) → prod realm changes are **manual admin-console
   steps + updating the host export file** (see `docs/deployment.md` §5.3).
-- **Membership-less detection:** `OwnerScopeService.currentMemberOrgUnitIds().isEmpty()`
-  (per-request memoised) — the primitive for the REQ-BANK-008 eligibility predicate.
-  `AuthHelperService.isMemberOrAbove()` is role-based and NOT usable for this.
+- **Org-unit independence (REQ-BANK-008):** bank gates consult only the two bank roles
+  and `bank_account_grant` rows. `OwnerScopeService` scoping, contextual
+  `ROLE_X@orgUnitId` authorities and the `X-Active-Org-Unit-Id` admin pin must have
+  **zero** influence on bank decisions — bank staff may or may not be org-unit members.
 - **PDF:** OpenPDF 3.0.5 (`org.openpdf.*`), used by `JobOrderHandoverReportService` +
   `JobOrderItemHandoverReportService` — KRT page background (`KrtPageBackground`),
   orange `#E77E23`, logo `backend/src/main/resources/META-INF/resources/logos/krt.png`
@@ -163,9 +164,9 @@ Holder sub-balances are never stored — `SUM(amount) GROUP BY account_id, holde
 
 URL matrix addition (backend `SecurityConfig`):
 `.requestMatchers("/api/v1/bank/admin/**").hasRole("ADMIN")` before the catch-all; the
-rest rides `anyRequest().authenticated()` + method gates. Every check in
-`BankSecurityService` first applies the REQ-BANK-008 eligibility predicate (non-admins
-with any org-unit membership → deny).
+rest rides `anyRequest().authenticated()` + method gates. `BankSecurityService`
+evaluates only bank roles + grants — org-unit memberships, contextual authorities and
+the admin pin have no effect on bank gates (REQ-BANK-008).
 
 ## 4. Frontend surface
 
@@ -218,7 +219,8 @@ Deliverables:
   mutators named with covered prefixes or explicit `@Transactional`),
   `service/BankHolderService` (registry, handle snapshot), `service/BankGrantService`,
   `service/BankAuditService` (same-TX append), `service/BankSecurityService`
-  (eligibility predicate + capability checks), `controller/Bank*Controller`, `dto/` +
+  (role + capability checks only — deliberately blind to org-unit memberships, the
+  admin pin and contextual authorities, REQ-BANK-008), `controller/Bank*Controller`, `dto/` +
   `dto/request/` records (server-managed fields excluded from request DTOs), MapStruct
   mappers, Javadoc everywhere.
 - Backend `SecurityConfig`: `/api/v1/bank/admin/**` URL gate.
@@ -226,13 +228,14 @@ Deliverables:
 - `ROLES_AND_PERMISSIONS.md`: bank section; `realm-export.e2e.json`: roles + synthetic
   `test-bank-employee` / `test-bank-management` users.
 - OpenAPI regenerated; backend `messages*.properties` problem keys for the new 409
-  codes (`BANK_OVERDRAFT`, `BANK_ACCOUNT_NOT_EMPTY`, `BANK_INELIGIBLE_GRANTEE`, …).
+  codes (`BANK_OVERDRAFT`, `BANK_ACCOUNT_NOT_EMPTY`, `BANK_GRANTEE_MISSING_ROLE`, …).
 - Widen the `GET /api/v1/users/lookup` gate (URL matrix + `@PreAuthorize`) by
   `'BANK_MANAGEMENT'` so the Phase 2 grants UI can resolve users (see §1 gate caveat).
 
 Tests (Gradle only): `BankLedgerServiceTest` (double-entry invariants, no-overdraft
 concurrency at account and holder level, append-only pin, holder-on-every-posting rule,
-holder-distribution sums), `BankSecurityServiceTest` (capability × eligibility matrix),
+holder-distribution sums), `BankSecurityServiceTest` (capability matrix; org-unit
+membership, admin pin and contextual authorities have no effect — both directions),
 `BankHolderServiceTest` (registry, handle snapshot on user deletion),
 `BankGrantServiceTest`, `BankAccountServiceTest` (lifecycle, uniqueness 409s),
 `BankAuditServiceTest` (one event per mutation, same-TX), controller tests per
@@ -258,8 +261,7 @@ controller, `DatabaseIndexMigrationTest` registration, `ArchitectureTest` green.
 employee/management dashboard (cards + totals + SVG sparkline), account detail with
 deposit/withdraw/transfer/holder-rebooking modals (KRT modals, `data-version` sync or
 reload-on-success) and the holder-distribution section, account administration + holder
-registry, grants administration with the user lookup, suspension notice for employees
-with memberships (REQ-BANK-008), full i18n de+en, `bank.css`.
+registry, grants administration with the user lookup, full i18n de+en, `bank.css`.
 
 Deliverables: `BankPageController`, `BankManagePageController`, `BankGrantsPageController`
 (+ `/api/proxy/bank/**` AJAX proxy controllers where needed), templates `bank/*.html`,
@@ -269,8 +271,9 @@ i18n keys, `data-testid` hooks for e2e (`nav-bank`, `bank-account-row`,
 
 Tests: frontend controller unit tests (MockWebServer for error paths), Playwright e2e:
 `BankDashboardE2eTest`, `BankBookingE2eTest` (deposit/withdraw/transfer incl. 409 paths),
-`BankPermissionsE2eTest` (visibility matrix incl. the member-sees-nothing row and the
-suspension case), seeded via `BackendSeeder`.
+`BankPermissionsE2eTest` (visibility matrix incl. the member-without-bank-role-sees-nothing
+row and a bank employee who is also an org-unit member working normally), seeded via
+`BackendSeeder`.
 
 **Deployment (Phase 2).**
 
@@ -359,7 +362,7 @@ ADRs were flipped to `Accepted` at the Phase 1 sign-off (their stated trigger).
 |--------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Keycloak prod realm drift (roles exist in dev export but not prod) | explicit manual step in Phase 1 deployment + smoke test that a bank-role login passes a bank gate                                                                            |
 | Concurrency bugs in booking (the project's known trap class)       | insert-only ledger avoids `@Version` churn; no-overdraft via atomic guard + dedicated concurrency test; CLAUDE.md `…WithinTransaction` rules honored in handover-style flows |
-| Eligibility bypass via admin pin or contextual roles               | `BankSecurityService` ignores org-unit pin semantics entirely; eligibility uses raw membership rows; matrix e2e pins it                                                      |
+| Org-unit scoping leaking into bank gates (pin / contextual roles)  | `BankSecurityService` evaluates only bank roles + grants; independence is test-pinned in both directions (matrix e2e)                                                        |
 | PDF refactor regresses the two shipped handover reports            | golden-text regression tests before switching them to `KrtPdfSupport`                                                                                                        |
 | Audit gaps (mutation without event)                                | audit append in the same transaction + per-endpoint "exactly one event" tests                                                                                                |
 | Sparkline scope creep toward a chart library                       | spec fixes server-rendered inline SVG; anything more is a new requirement                                                                                                    |
