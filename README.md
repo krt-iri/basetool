@@ -1,7 +1,7 @@
 # Profit Basetool
 
 The Profit Basetool is the squadron-management web app for the
-"DAS KARTELL" / IRIDIUM organization in *Star Citizen*. It provides a central
+"DAS KARTELL" organization in *Star Citizen*. It provides a central
 platform for mission planning, hangar and inventory tracking, refinery and
 material logistics, terminal data, and member administration — backed by
 single-sign-on via Keycloak and a clear role and permission model.
