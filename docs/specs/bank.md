@@ -326,17 +326,19 @@ resets **all** account balances to zero: for every account with a non-zero balan
 service books a `WIPE_RESET` transaction (one posting per holder with a non-zero
 sub-balance on that account) bringing the balance and every holder sub-balance to
 exactly zero. History, statements and audit trail are **preserved** — nothing is
-deleted. The action requires `ROLE_ADMIN`, a
-KRT-styled confirmation modal (no native dialogs) with an explicit consequence text, and
-writes one summarizing audit event plus the individual transactions. The operation is
-idempotent (a second click on an all-zero bank is a no-op with a notice).
+deleted. The action requires `ROLE_ADMIN` and a KRT-styled danger confirmation modal
+(no native dialogs) with an explicit consequence text **and a type-to-confirm hurdle**
+(the design system's `.confirm-input` pattern, reserved for wipe-reset-grade actions),
+and writes one summarizing audit event plus the individual transactions. The operation
+is idempotent (a second click on an all-zero bank is a no-op with a notice).
 
 **Acceptance**
 
 - [ ] After the reset every account balance and every holder sub-balance is zero;
   pre-wipe statements still render correctly.
-- [ ] The button sits in the admin area, is admin-only, and uses the shared danger-modal
-  pattern (`btn-danger` + confirm modal).
+- [ ] The button sits in the admin area, is admin-only, and uses the danger-modal
+  pattern with type-to-confirm (`btn-danger` + danger `.krt-modal` + `.confirm-input`),
+  matching the A1 mockup (`proposals/bank-admin-varianten.html`).
 - [ ] The audit log contains the summary event (actor, account count, total zeroed).
 
 **Enforced by:** _pending (Phases 1, 4)_ · **Code:** _pending_ · **Issues:** #556
@@ -384,10 +386,14 @@ REQ-BANK-014. Employees cannot trigger this export.
 
 ### REQ-BANK-016 — Dashboards
 
-The bank landing page (`/bank`) is a **dashboard**: one card per visible account showing
-the current balance and the **net change over the last 30 days** (sign-colored), plus a
-compact 30-day trend visualization (server-computed inline SVG sparkline — no charting
-library exists or is introduced). Bank employees see the accounts they hold grants on;
+The bank landing page (`/bank`) is a **dashboard** in the design system's **D1 card
+grid** layout (`proposals/bank-dashboard-varianten.html`): one `.kpi-card` per visible
+account showing the current balance and the **net change over the last 30 days**
+(sign-colored `.kpi-delta--pos/--neg`), plus a compact 30-day trend visualization
+(server-computed inline SVG sparkline — no charting library exists or is introduced;
+visual spec: `preview/components-kpi-sparkline.html`). Cards link to the account
+detail; closed accounts render dimmed (`.kpi-card--closed`). Management totals render
+as the `.kpi-total` aggregate strip. Bank employees see the accounts they hold grants on;
 bank management (and admins) see **all** accounts plus aggregate totals (sum of
 balances, total 30-day in/out). Itemized recent bookings deliberately live on the
 account **detail** page, not the dashboard — the dashboard shows the net change.
@@ -409,14 +415,24 @@ The entire bank UI (and both PDFs) follows the DAS KARTELL design system
 (`docs/specs/ui-design-system.md`; visual source of truth:
 `.claude/skills/das-kartell-design/README.md`): Lato-only typography, brand colors,
 square-first HUD styling, the four responsive device classes, and **no native browser
-dialogs** (KRT modals / `showKrtConfirm` only). Every user-visible string lives in
-`messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
+dialogs** (KRT modals / `showKrtConfirm` only). The design system additionally ships
+**final-draft mockups for all four bank pages** (`proposals/bank-dashboard-varianten.html`,
+`bank-konto-detail-varianten.html`, `bank-verwaltung-varianten.html`,
+`bank-admin-varianten.html`; submodule pin ≥ `2ba5678`) plus a dedicated bank component
+layer in `krt-components.css` (`.kpi-*`, `.holder-*`, `.stack-*`, `.matrix-flag`,
+`.krt-modal`, `.confirm-input` — documented in the submodule `README.md` "Bank
+patterns" block). The bank pages are **built to match these mockups** using the shipped
+component classes; deviations need an owner decision. Every user-visible string lives
+in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 `nav.bank.*` keys (umlauts as `\uXXXX` escapes in `.properties`).
 
 **Acceptance**
 
 - [ ] No hardcoded user-visible strings in templates/JS/Java (review + lint pass).
 - [ ] All confirmation flows (close account, wipe reset, reversal) use KRT modals.
+- [ ] Each bank page visually matches its final-draft mockup (dashboard D1, detail K1,
+  management W1 + G1/G2, admin A1 + A2) and reuses the design-system bank component
+  classes instead of bespoke CSS.
 
 **Enforced by:** _pending (Phases 2–4)_ · **Code:** _pending_ · **Issues:** #556
 
