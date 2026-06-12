@@ -35,7 +35,11 @@
             .details-row {
                 display: none;
             }
-            tr:has(details[open]) + .details-row {
+            /* Toggled per row by the inline details handler below. A
+               tr:has(details[open]) sibling rule here forced a style recalculation
+               across the whole table on every expand and visibly janked the UI
+               (same fix as blueprint-overview, REQ-INV-012). */
+            .details-row.sq-expanded {
                 display: table-row;
             }
             .details-row td {
@@ -71,11 +75,18 @@
             .sub-table tr:hover {
                 background-color: rgba(231, 126, 35, 0.05) !important;
             }
-            /* ---- Ship-type live filter ---- */
+            /* ---- Server-side ship-type filter above the table ---- */
+            .squadron-filter-form {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 1.25rem;
+            }
             .hangar-filter {
                 position: relative;
-                max-width: 360px;
-                margin-bottom: 1.25rem;
+                width: 360px;
+                max-width: 100%;
             }
             .hangar-filter .hangar-filter-icon {
                 position: absolute;
@@ -102,13 +113,25 @@
             Aggregation across all squadrons. Select a single squadron to filter.
         </div>
 
-        <div class="hangar-filter" th:if="${!#lists.isEmpty(overview)}">
-            <span class="hangar-filter-icon" aria-hidden="true">
-                <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
-            </span>
-            <input type="search" id="squadron-ship-filter" autocomplete="off"
-                   th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
-        </div>
+        <!-- Server-side filter: the form GETs back to this page (search resets to page 0 by
+             omitting the page param). It stays visible while a search yields nothing -
+             otherwise the filter could never be cleared. -->
+        <form th:if="${!#lists.isEmpty(overview) or search != null}"
+              id="squadron-filter-form" class="squadron-filter-form" role="search"
+              method="get" th:action="@{/hangar/squadron}">
+            <div class="hangar-filter">
+                <span class="hangar-filter-icon" aria-hidden="true">
+                    <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
+                </span>
+                <input type="search" id="squadron-ship-filter" name="search" autocomplete="off"
+                       th:value="${search}"
+                       th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
+                <input type="hidden" name="size" th:value="${pageSize}">
+            </div>
+            <a th:if="${search != null}" class="btn btn-ghost"
+               th:href="@{/hangar/squadron(size=${pageSize})}"
+               th:text="#{hangar.filter.clear}">Filter zur&uuml;cksetzen</a>
+        </form>
 
         <div class="table-responsive">
         <table class="data-table">
@@ -121,7 +144,7 @@
             </thead>
             <tbody>
             <th:block th:each="item : ${overview}">
-            <tr class="sq-row" th:attr="data-ship-filter=${#strings.toLowerCase((item.shipType.manufacturer != null ? item.shipType.manufacturer.name + ' ' : '') + item.shipType.name)}">
+            <tr class="sq-row">
                 <td th:text="${item.shipType.name}" style="vertical-align: top; padding-top: 1rem;">Typ</td>
                 <td th:text="${item.count} + ' (' + ${item.fittedCount} + ' ' + #{hangar.squadron.fitted} + ')'" style="vertical-align: top; padding-top: 1rem;">0 (0 gefittet)</td>
                 <td style="vertical-align: top; padding-top: 0.5rem;">
@@ -154,48 +177,41 @@
                 </td>
             </tr>
             </th:block>
-            <tr th:if="${#lists.isEmpty(overview)}">
+            <tr th:if="${#lists.isEmpty(overview) and search == null}">
                 <td colspan="3" class="text-center" th:text="#{hangar.squadron.empty}">Keine Schiffe in der Staffel vorhanden.</td>
             </tr>
-            <tr id="squadron-filter-empty" style="display: none;">
+            <tr th:if="${#lists.isEmpty(overview) and search != null}">
                 <td colspan="3" class="text-center" th:text="#{hangar.filter.no_results}">Keine Treffer für diese Suche.</td>
             </tr>
             </tbody>
         </table>
         </div>
+
+        <!-- Footer bar: size picker left, page-nav right (same pattern as the blueprint
+             overview). The base URL keeps the active search so paging and re-sizing
+             never drop the filter. -->
+        <div class="pagination-controls" th:if="${overviewPage != null}">
+            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+            <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl})}"></nav>
+        </div>
     </div>
 </main>
 
 <script th:attr="nonce=${cspNonce}">
-    // ---- Live filter: hide ship-type rows (and their detail rows) that do not match the query ----
+    // The ship-type filter is server-side (the search form GETs back to this page),
+    // so the only client behaviour left is the details toggle.
     document.addEventListener("DOMContentLoaded", function() {
-        const filterInput = document.getElementById("squadron-ship-filter");
-        if (!filterInput) {
-            return;
-        }
-        const typeRows = document.querySelectorAll("tr.sq-row");
-        const noResultsRow = document.getElementById("squadron-filter-empty");
-
-        filterInput.addEventListener("input", function() {
-            const query = this.value.trim().toLowerCase();
-            let anyVisible = false;
-            typeRows.forEach(function(row) {
-                const haystack = row.getAttribute("data-ship-filter") || "";
-                const match = query === "" || haystack.indexOf(query) !== -1;
-                row.style.display = match ? "" : "none";
-                // The optional admin/officer detail row sits directly after the type row;
-                // hide it in lockstep, but leave its open/closed state to the CSS when visible.
-                const details = row.nextElementSibling;
-                if (details && details.classList.contains("details-row")) {
-                    details.style.display = match ? "" : "none";
-                }
-                if (match) {
-                    anyVisible = true;
+        // Details toggle drives the companion row via a class; a
+        // tr:has(details[open]) sibling selector would force a table-wide
+        // style recalculation on every toggle and visibly jank on large tables.
+        document.querySelectorAll("tr.sq-row details").forEach(function(details) {
+            details.addEventListener("toggle", function() {
+                const row = details.closest("tr");
+                const detailsRow = row ? row.nextElementSibling : null;
+                if (detailsRow && detailsRow.classList.contains("details-row")) {
+                    detailsRow.classList.toggle("sq-expanded", details.open);
                 }
             });
-            if (noResultsRow) {
-                noResultsRow.style.display = (!anyVisible && query !== "") ? "" : "none";
-            }
         });
     });
 </script>

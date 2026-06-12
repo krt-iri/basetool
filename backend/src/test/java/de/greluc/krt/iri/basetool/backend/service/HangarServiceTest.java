@@ -291,7 +291,8 @@ class HangarServiceTest {
     // element type so the lone Object[] is one row, not three Object rows (varargs trap).
     Page<Object[]> counts =
         new PageImpl<>(List.<Object[]>of(new Object[] {fighter, 1L, 1L}), pageable, 1);
-    when(shipRepository.countShipsByType(false, squadronId, Set.of(), pageable)).thenReturn(counts);
+    when(shipRepository.countShipsByType(false, squadronId, Set.of(), null, pageable))
+        .thenReturn(counts);
 
     User owner = new User();
     owner.setId(UUID.randomUUID());
@@ -305,7 +306,7 @@ class HangarServiceTest {
     when(shipMapper.shipTypeToDto(any())).thenReturn(null);
 
     // When
-    var page = hangarService.getSquadronOverview(pageable, true);
+    var page = hangarService.getSquadronOverview(pageable, true, null);
 
     // Then the owner breakdown is loaded by the SCOPED query, fed the exact same scope triple as
     // the counts — never an unscoped lookup that would leak a foreign OrgUnit's ship of a shared
@@ -315,6 +316,32 @@ class HangarServiceTest {
     assertEquals(1L, page.getContent().get(0).count());
     assertEquals(1, page.getContent().get(0).details().size());
     assertEquals("pilot", page.getContent().get(0).details().get(0).ownerName());
+  }
+
+  @Test
+  void getSquadronOverview_normalizesBlankQueryToNullAndTrimsTerms() {
+    // covers REQ-HANGAR-001 — a blank filter means "no filter" (the repository's null contract),
+    // and surrounding whitespace from the search box never reaches the LIKE pattern.
+    UUID squadronId = UUID.randomUUID();
+    Pageable pageable = PageRequest.of(0, 10);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
+    Page<Object[]> empty = new PageImpl<>(List.of(), pageable, 0);
+    when(shipRepository.countShipsByType(
+            org.mockito.ArgumentMatchers.eq(false),
+            org.mockito.ArgumentMatchers.eq(squadronId),
+            org.mockito.ArgumentMatchers.eq(Set.of()),
+            any(),
+            org.mockito.ArgumentMatchers.eq(pageable)))
+        .thenReturn(empty);
+
+    // When the filter arrives blank / padded
+    hangarService.getSquadronOverview(pageable, false, "   ");
+    hangarService.getSquadronOverview(pageable, false, "  Cutlass ");
+
+    // Then the repository sees null for blank and the trimmed term otherwise
+    verify(shipRepository).countShipsByType(false, squadronId, Set.of(), null, pageable);
+    verify(shipRepository).countShipsByType(false, squadronId, Set.of(), "Cutlass", pageable);
   }
 
   // --- setHomeLocationForMyShips bulk action -------------------------------

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -146,11 +147,12 @@ class HangarControllerTest {
         new UsernamePasswordAuthenticationToken(
             "alice", "n/a", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(true))).thenReturn(page);
+    when(hangarService.getSquadronOverview(any(Pageable.class), eq(true), isNull()))
+        .thenReturn(page);
 
-    controller.getSquadronOverview(0, 20, null, admin);
+    controller.getSquadronOverview(0, 20, null, null, admin);
 
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(true));
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(true), isNull());
   }
 
   @Test
@@ -159,11 +161,12 @@ class HangarControllerTest {
         new UsernamePasswordAuthenticationToken(
             "bob", "n/a", List.of(new SimpleGrantedAuthority("ROLE_OFFICER")));
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(true))).thenReturn(page);
+    when(hangarService.getSquadronOverview(any(Pageable.class), eq(true), isNull()))
+        .thenReturn(page);
 
-    controller.getSquadronOverview(0, 20, null, officer);
+    controller.getSquadronOverview(0, 20, null, null, officer);
 
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(true));
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(true), isNull());
   }
 
   @Test
@@ -172,13 +175,14 @@ class HangarControllerTest {
         new UsernamePasswordAuthenticationToken(
             "carol", "n/a", List.of(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false))).thenReturn(page);
+    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false), isNull()))
+        .thenReturn(page);
 
-    controller.getSquadronOverview(0, 20, null, user);
+    controller.getSquadronOverview(0, 20, null, null, user);
 
     // Plain authenticated callers see only the aggregated counts — the per-ship owner is hidden
     // at the HTTP boundary so the service doesn't have to read SecurityContextHolder.
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false));
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
   }
 
   @Test
@@ -187,11 +191,12 @@ class HangarControllerTest {
         new AnonymousAuthenticationToken(
             "key", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false))).thenReturn(page);
+    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false), isNull()))
+        .thenReturn(page);
 
-    controller.getSquadronOverview(0, 20, null, anon);
+    controller.getSquadronOverview(0, 20, null, null, anon);
 
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false));
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
   }
 
   @Test
@@ -200,11 +205,12 @@ class HangarControllerTest {
     // documents the null-check explicitly and the test pins it so a future cleanup cannot delete
     // the guard without surfacing here.
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false))).thenReturn(page);
+    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false), isNull()))
+        .thenReturn(page);
 
-    controller.getSquadronOverview(0, 20, null, null);
+    controller.getSquadronOverview(0, 20, null, null, null);
 
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false));
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
   }
 
   // ── POST /ships ───────────────────────────────────────────────────────
@@ -421,10 +427,24 @@ class HangarControllerTest {
     // Sanity-check: the role-decision branch must continue to feed includeOwnerDetails even
     // when the page/size/sort params arrive as null (defaults applied by PaginationUtil).
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), anyBoolean())).thenReturn(page);
+    when(hangarService.getSquadronOverview(any(Pageable.class), anyBoolean(), isNull()))
+        .thenReturn(page);
 
-    controller.getSquadronOverview(null, null, null, null);
+    controller.getSquadronOverview(null, null, null, null, null);
 
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false));
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
+  }
+
+  @Test
+  void getSquadronOverview_forwardsSearchTermToService() {
+    // covers REQ-HANGAR-001 — the server-side ship-type filter travels from the HTTP boundary
+    // into the service untouched, so a filtered result is paginated across the whole fleet.
+    Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
+    when(hangarService.getSquadronOverview(any(Pageable.class), anyBoolean(), eq("Cutlass")))
+        .thenReturn(page);
+
+    controller.getSquadronOverview(0, 10, null, "Cutlass", null);
+
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), eq("Cutlass"));
   }
 }

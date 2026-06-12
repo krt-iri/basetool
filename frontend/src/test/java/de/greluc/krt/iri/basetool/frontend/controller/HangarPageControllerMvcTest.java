@@ -156,8 +156,9 @@ class HangarPageControllerMvcTest {
 
   @Test
   @WithMockUser
-  void viewSquadron_ShouldRenderShipTypeFilterWhenOverviewHasEntries() throws Exception {
-    // Given
+  void viewSquadron_ShouldRenderSearchFormAndPageSizePicker() throws Exception {
+    // Given a first page at the default size 50 with enough total entries (>10) for the
+    // page-size picker to render at all.
     ManufacturerDto manufacturer =
         new ManufacturerDto(
             UUID.randomUUID(), "Drake Interplanetary", "DRAK", null, null, null, false);
@@ -165,21 +166,65 @@ class HangarPageControllerMvcTest {
         new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", manufacturer, null, 0, false);
     SquadronShipOverviewDto overview = new SquadronShipOverviewDto(shipType, 3L, 1L, List.of());
     PageResponse<SquadronShipOverviewDto> page =
-        new PageResponse<>(List.of(overview), 0, 1000, 1, 1, List.of());
+        new PageResponse<>(List.of(overview), 0, 50, 12, 1, List.of());
 
     when(backendApiClient.get(
-            eq("/api/v1/hangar/squadron-overview?size=1000"),
+            eq("/api/v1/hangar/squadron-overview?page=0&size=50"),
             any(ParameterizedTypeReference.class)))
         .thenReturn(page);
 
-    // When & Then
+    // When & Then: the server-side search form and the 10/50/100 page-size picker render;
+    // the active size (50) is an inert span, the other sizes are links.
     mockMvc
         .perform(get("/hangar/squadron"))
         .andExpect(status().isOk())
         .andExpect(view().name("hangar-squadron"))
+        .andExpect(content().string(containsString("id=\"squadron-filter-form\"")))
         .andExpect(content().string(containsString("id=\"squadron-ship-filter\"")))
+        .andExpect(content().string(containsString("page-size-picker")))
+        .andExpect(content().string(containsString("/hangar/squadron?page=0&amp;size=10")))
+        .andExpect(content().string(containsString("/hangar/squadron?page=0&amp;size=100")))
+        .andExpect(content().string(containsString("Cutlass Black")));
+  }
+
+  @Test
+  @WithMockUser
+  void viewSquadron_ShouldSnapUnsupportedPageSizeToDefault() throws Exception {
+    // covers REQ-HANGAR-001 — a crafted ?size= outside 10/50/100 must not reach the backend;
+    // it snaps to the default page size (50) instead.
+    PageResponse<SquadronShipOverviewDto> page =
+        new PageResponse<>(List.of(), 0, 50, 0, 1, List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/hangar/squadron-overview?page=0&size=50"),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/hangar/squadron").param("size", "5000"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("hangar-squadron"));
+  }
+
+  @Test
+  @WithMockUser
+  void viewSquadron_ShouldForwardSearchAndKeepItInPaginationLinks() throws Exception {
+    // covers REQ-HANGAR-001 — the search term reaches the backend, and the page-size links
+    // carry it so switching the size never silently drops the active filter.
+    PageResponse<SquadronShipOverviewDto> page =
+        new PageResponse<>(List.of(), 0, 50, 12, 1, List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/hangar/squadron-overview?page=0&size=50&search=Cutlass"),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/hangar/squadron").param("search", "Cutlass"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("hangar-squadron"))
         .andExpect(
             content()
-                .string(containsString("data-ship-filter=\"drake interplanetary cutlass black\"")));
+                .string(containsString("/hangar/squadron?search=Cutlass&amp;page=0&amp;size=10")))
+        // the clear-filter link drops the search but keeps the page size
+        .andExpect(content().string(containsString("href=\"/hangar/squadron?size=50\"")));
   }
 }

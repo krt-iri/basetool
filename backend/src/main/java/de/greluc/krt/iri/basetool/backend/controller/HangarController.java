@@ -139,8 +139,15 @@ public class HangarController {
    * Per-ship-type aggregated count across the squadron. Admins and officers additionally see the
    * per-ship owner / location / fitted breakdown; everyone else sees only the totals — the
    * role-driven shaping happens at the HTTP boundary so the service stays free of {@code
-   * SecurityContextHolder} reads (the ArchUnit rule).
+   * SecurityContextHolder} reads (the ArchUnit rule). The optional {@code search} term filters the
+   * ship types server-side (case-insensitive contains on ship-type or manufacturer name), so a
+   * filtered result is still correctly paginated across the whole scoped fleet (REQ-HANGAR-001).
    *
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort parameter ({@code shipType.name} only)
+   * @param search optional ship-type/manufacturer name filter; blank means no filter
+   * @param authentication caller's authentication, used for the role-driven response shaping
    * @return paged overview DTOs
    */
   @GetMapping("/squadron-overview")
@@ -149,6 +156,7 @@ public class HangarController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String search,
       Authentication authentication) {
     // Role-based shaping of the response is decided HERE, at the HTTP boundary, so
     // the service stays pure business logic and does not need to read
@@ -162,7 +170,7 @@ public class HangarController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("shipType.name"), "shipType.name");
     Page<SquadronShipOverviewDto> p =
-        hangarService.getSquadronOverview(pageable, includeOwnerDetails);
+        hangarService.getSquadronOverview(pageable, includeOwnerDetails, search);
     return new PageResponse<>(
         p.getContent(),
         p.getNumber(),

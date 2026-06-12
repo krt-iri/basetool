@@ -282,21 +282,53 @@ public class HangarPageController {
   }
 
   /**
-   * Renders the squadron-wide hangar overview ({@code /hangar/squadron}). Backend aggregates counts
-   * per ship type; the page only sorts by ship-type name. Counts are always positive (the backend's
-   * GROUP BY drops zero rows by construction), so the {@code count >= 1} comment in the inline code
-   * is a reminder, not a runtime filter.
+   * Page sizes the squadron overview offers in its picker (REQ-HANGAR-001, same trio as the
+   * blueprint availability overview). Any other client-supplied {@code size} is snapped back to
+   * {@link #SQUADRON_DEFAULT_PAGE_SIZE} so a crafted URL cannot request an unbounded page from the
+   * backend.
+   */
+  private static final List<Integer> SQUADRON_PAGE_SIZES = List.of(10, 50, 100);
+
+  /** Page size applied when the request carries none (or a non-whitelisted one). */
+  private static final int SQUADRON_DEFAULT_PAGE_SIZE = 50;
+
+  /**
+   * Renders the squadron-wide hangar overview ({@code /hangar/squadron}), server-side paginated
+   * across every ship type in the caller's scope (REQ-HANGAR-001). The backend aggregates counts
+   * per ship type, sorted by ship-type name; page metadata, the page-size choice (10/50/100 — any
+   * other value snaps to the default) and the optional search term travel as query parameters and
+   * are echoed into the model so the pagination links and the filter form can reproduce the state.
    *
-   * @param model Thymeleaf model populated with the sorted overview list
+   * @param page zero-based page index, defaults to the first page; negatives are clamped to 0
+   * @param size page size, validated against {@link #SQUADRON_PAGE_SIZES}
+   * @param search optional ship-type/manufacturer filter, applied server-side by the backend
+   * @param model Thymeleaf model populated with the overview page, the picker options and the
+   *     pagination base URL (search-preserving)
    * @return the {@code hangar-squadron} view name
    */
   @GetMapping("/squadron")
-  public String viewSquadron(Model model) {
+  public String viewSquadron(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String search,
+      Model model) {
+    int effectiveSize =
+        size != null && SQUADRON_PAGE_SIZES.contains(size) ? size : SQUADRON_DEFAULT_PAGE_SIZE;
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    String effectiveSearch = search == null || search.isBlank() ? null : search.trim();
+
     List<SquadronShipOverviewDto> overview = new ArrayList<>();
+    PageResponse<SquadronShipOverviewDto> res = null;
     try {
-      PageResponse<SquadronShipOverviewDto> res =
-          backendApiClient.get(
-              "/api/v1/hangar/squadron-overview?size=1000", new ParameterizedTypeReference<>() {});
+      org.springframework.web.util.UriComponentsBuilder uriBuilder =
+          org.springframework.web.util.UriComponentsBuilder.fromPath(
+                  "/api/v1/hangar/squadron-overview")
+              .queryParam("page", effectivePage)
+              .queryParam("size", effectiveSize);
+      if (effectiveSearch != null) {
+        uriBuilder.queryParam("search", effectiveSearch);
+      }
+      res = backendApiClient.get(uriBuilder.toUriString(), new ParameterizedTypeReference<>() {});
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }
@@ -305,13 +337,22 @@ public class HangarPageController {
       model.addAttribute("error", "error.hangar.squadron.load");
     }
 
-    // Only show types where count is at least 1 (the backend query groups by existing ships, so
-    // count is always >= 1 anyway)
-    // Sort by ship type name
-    overview.sort(
-        Comparator.comparing(dto -> dto.shipType().name(), String.CASE_INSENSITIVE_ORDER));
+    // Page links must keep the active filter, so the fragment's base URL carries the search term
+    // percent-encoded (toUriString() encodes — a raw term could otherwise smuggle extra query
+    // params into every pagination link); page/size are appended by the fragment itself.
+    String paginationBaseUrl =
+        effectiveSearch == null
+            ? "/hangar/squadron"
+            : org.springframework.web.util.UriComponentsBuilder.fromPath("/hangar/squadron")
+                .queryParam("search", effectiveSearch)
+                .toUriString();
 
     model.addAttribute("overview", overview);
+    model.addAttribute("overviewPage", res);
+    model.addAttribute("search", effectiveSearch);
+    model.addAttribute("pageSizes", SQUADRON_PAGE_SIZES);
+    model.addAttribute("pageSize", effectiveSize);
+    model.addAttribute("paginationBaseUrl", paginationBaseUrl);
     return "hangar-squadron";
   }
 
