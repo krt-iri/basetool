@@ -686,6 +686,209 @@ public final class BackendSeeder {
   }
 
   /**
+   * Issues an authenticated {@code POST} as the given user and returns the raw response body,
+   * throwing on a non-2xx status — the bank-flow counterpart of {@link #seedEntity} for endpoints
+   * whose response is not a single {@code {id}} object (e.g. a grant with a composite key, or a
+   * {@code BankTransactionDto}).
+   *
+   * @param username the Keycloak username to authenticate as
+   * @param password the Keycloak password
+   * @param path the backend path beginning with {@code /}
+   * @param jsonBody the JSON request body
+   * @return the raw response body
+   */
+  public String postBody(String username, String password, String path, String jsonBody) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + path))
+              .header("Authorization", "Bearer " + token)
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+              .build();
+      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        throw new IllegalStateException(
+            "POST " + path + " failed: HTTP " + response.statusCode() + " " + response.body());
+      }
+      return response.body();
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.postBody(" + path + ") failed", e);
+    }
+  }
+
+  /**
+   * Issues an authenticated {@code POST} as the given user and returns only the HTTP status, so a
+   * bank test can assert a stable 409 (overdraft, self-transfer, closed account) or a 403 gate
+   * without the 2xx-or-throw behaviour of {@link #postBody}.
+   *
+   * @param username the Keycloak username to authenticate as
+   * @param password the Keycloak password
+   * @param path the backend path beginning with {@code /}
+   * @param jsonBody the JSON request body
+   * @return the HTTP status code
+   */
+  public int postForStatus(String username, String password, String path, String jsonBody) {
+    try {
+      return postStatus(passwordGrant(username, password), path, jsonBody);
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.postForStatus(" + path + ") failed", e);
+    }
+  }
+
+  /**
+   * Creates a bank account as a management user via {@code POST /api/v1/bank/accounts} and returns
+   * its id.
+   *
+   * @param username a {@code BANK_MANAGEMENT} (or admin) Keycloak username
+   * @param password the password
+   * @param name the account display name
+   * @param type the {@code BankAccountType} name (e.g. {@code SPECIAL})
+   * @return the created account id
+   */
+  public String createBankAccount(String username, String password, String name, String type) {
+    String body = "{\"name\":\"" + name + "\",\"type\":\"" + type + "\"}";
+    return JsonParser.parseString(postBody(username, password, "/api/v1/bank/accounts", body))
+        .getAsJsonObject()
+        .get("id")
+        .getAsString();
+  }
+
+  /**
+   * Registers a bank holder for the given tool user via {@code POST /api/v1/bank/holders} and
+   * returns the holder id.
+   *
+   * @param username a {@code BANK_MANAGEMENT} (or admin) Keycloak username
+   * @param password the password
+   * @param userId the tool user id to register as a holder
+   * @return the created holder id (the existing one when the user is already a holder)
+   */
+  public String registerBankHolder(String username, String password, String userId) {
+    // Idempotent across e2e classes that share the stack: a user is a holder at most once
+    // (V151 UNIQUE user_id). GET the registry first and reuse an existing row rather than POSTing a
+    // duplicate (which a sibling class's earlier registration would 409) — and never double-POST.
+    String existing = findHolderIdByUserId(username, password, userId);
+    if (existing != null) {
+      return existing;
+    }
+    String body = "{\"userId\":\"" + userId + "\"}";
+    return JsonParser.parseString(postBody(username, password, "/api/v1/bank/holders", body))
+        .getAsJsonObject()
+        .get("id")
+        .getAsString();
+  }
+
+  /**
+   * Resolves the holder id registered for the given tool user from {@code GET
+   * /api/v1/bank/holders}, or {@code null} when the user is not yet a holder.
+   *
+   * @param username a {@code BANK_MANAGEMENT} (or admin) Keycloak username
+   * @param password the password
+   * @param userId the tool user id whose holder row to find
+   * @return the matching holder id, or {@code null}
+   */
+  private String findHolderIdByUserId(String username, String password, String userId) {
+    var holders =
+        JsonParser.parseString(getBody(username, password, "/api/v1/bank/holders"))
+            .getAsJsonArray();
+    for (var element : holders) {
+      var holder = element.getAsJsonObject();
+      if (holder.has("userId")
+          && !holder.get("userId").isJsonNull()
+          && userId.equals(holder.get("userId").getAsString())) {
+        return holder.get("id").getAsString();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Grants a bank employee per-account capabilities via {@code POST /api/v1/bank/grants}.
+   *
+   * @param username a {@code BANK_MANAGEMENT} (or admin) Keycloak username
+   * @param password the password
+   * @param granteeUserId the employee's tool user id
+   * @param accountId the account to grant on
+   * @param canDeposit deposit capability
+   * @param canWithdraw withdraw capability
+   * @param canTransfer transfer capability
+   */
+  public void createBankGrant(
+      String username,
+      String password,
+      String granteeUserId,
+      String accountId,
+      boolean canDeposit,
+      boolean canWithdraw,
+      boolean canTransfer) {
+    String body =
+        "{\"userId\":\""
+            + granteeUserId
+            + "\",\"accountId\":\""
+            + accountId
+            + "\",\"canDeposit\":"
+            + canDeposit
+            + ",\"canWithdraw\":"
+            + canWithdraw
+            + ",\"canTransfer\":"
+            + canTransfer
+            + "}";
+    postBody(username, password, "/api/v1/bank/grants", body);
+  }
+
+  /**
+   * Books a deposit via {@code POST /api/v1/bank/deposits}.
+   *
+   * @param username the booking user's Keycloak username
+   * @param password the password
+   * @param accountId the target account
+   * @param holderId the credited holder
+   * @param amount the whole-aUEC amount
+   * @return the HTTP status (201 on success)
+   */
+  public int bankDeposit(
+      String username, String password, String accountId, String holderId, long amount) {
+    return postForStatus(
+        username, password, "/api/v1/bank/deposits", bookingBody(accountId, holderId, amount));
+  }
+
+  /**
+   * Books a withdrawal via {@code POST /api/v1/bank/withdrawals}.
+   *
+   * @param username the booking user's Keycloak username
+   * @param password the password
+   * @param accountId the source account
+   * @param holderId the debited holder
+   * @param amount the whole-aUEC amount
+   * @return the HTTP status (201 on success, 409 on overdraft)
+   */
+  public int bankWithdraw(
+      String username, String password, String accountId, String holderId, long amount) {
+    return postForStatus(
+        username, password, "/api/v1/bank/withdrawals", bookingBody(accountId, holderId, amount));
+  }
+
+  /**
+   * Builds a deposit/withdrawal JSON body.
+   *
+   * @param accountId the account
+   * @param holderId the holder
+   * @param amount the amount
+   * @return the JSON request body
+   */
+  private static String bookingBody(String accountId, String holderId, long amount) {
+    return "{\"accountId\":\""
+        + accountId
+        + "\",\"holderId\":\""
+        + holderId
+        + "\",\"amount\":"
+        + amount
+        + "}";
+  }
+
+  /**
    * Creates a Job Order via {@code POST /api/v1/orders} with a single material line and returns its
    * id, so the handover flow has an order to record a handover against. The material line's {@code
    * minQuality} must be at least 700 ({@code CreateJobOrderMaterialDto} constraint).
