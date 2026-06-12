@@ -100,12 +100,14 @@ public class UserController {
   }
 
   /**
-   * Lightweight typeahead projection (id + username + displayName).
+   * Lightweight typeahead projection (id + username + displayName). Widened by {@code
+   * BANK_MANAGEMENT} (REQ-BANK-009): bank managers resolve grantees and holders via this lookup and
+   * need not hold any org role (REQ-BANK-008).
    *
    * @return all users as reference DTOs
    */
   @GetMapping("/lookup")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER', 'BANK_MANAGEMENT')")
   @Transactional(readOnly = true)
   public List<de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto> lookupUsers() {
     return userService.findAllReference();

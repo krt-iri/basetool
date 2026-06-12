@@ -105,6 +105,20 @@ class DatabaseIndexMigrationTest {
     // case-variant rows for the same (source_system, external_name).
     assertIndexExists(
         jdbc, "material_external_alias", "uq_material_external_alias_source_lower_name");
+    // V150 (REQ-BANK-001): partial unique indexes enforcing one account per org unit and the
+    // CARTEL / CARTEL_BANK singletons at the database level.
+    assertIndexExists(jdbc, "bank_account", "uq_bank_account_org_unit");
+    assertIndexExists(jdbc, "bank_account", "uq_bank_account_singleton_cartel");
+    assertIndexExists(jdbc, "bank_account", "uq_bank_account_singleton_cartel_bank");
+    // V152 (REQ-BANK-009): reverse lookup powering the per-account grants matrix.
+    assertIndexExists(jdbc, "bank_account_grant", "idx_bank_account_grant_account");
+    // V153 (REQ-BANK-020): the compute-on-read balance, statement and holder-distribution paths.
+    assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_account_created");
+    assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_transaction");
+    assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_account_holder");
+    // V154 (REQ-BANK-012): the admin audit viewer (newest-first plus per-account filter).
+    assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_occurred");
+    assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_account");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {
