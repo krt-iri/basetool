@@ -78,13 +78,20 @@
 
     function wireDetails(details) {
         details.addEventListener('toggle', function () {
+            const row = details.closest('tr');
+            const detailsRow = row ? row.nextElementSibling : null;
+            if (!detailsRow || !detailsRow.classList.contains('details-row')) {
+                return;
+            }
+            // Show/hide the companion row via a class on it directly — a CSS
+            // tr:has(details[open]) sibling rule re-evaluates style across the
+            // whole table per toggle and janks the UI (REQ-INV-012).
+            detailsRow.classList.toggle('bp-expanded', details.open);
             if (!details.open) {
                 return;
             }
             const productKey = details.getAttribute('data-product-key');
-            const row = details.closest('tr');
-            const detailsRow = row ? row.nextElementSibling : null;
-            const panel = detailsRow ? detailsRow.querySelector('.bp-owners-panel') : null;
+            const panel = detailsRow.querySelector('.bp-owners-panel');
             if (!productKey || !panel) {
                 return;
             }

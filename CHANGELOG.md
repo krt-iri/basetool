@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Blueprint-Verfügbarkeit: Das Aufklappen der Detailansicht mit Nutzerliste ruckelt nicht mehr.** Das Ein-/Ausklappen schaltet jetzt gezielt nur die zugehörige Detailzeile um (vorher erzwang eine `:has()`-CSS-Regel bei jedem Klick eine Style-Neuberechnung über die gesamte Tabelle), und der Nutzer-Abruf im Admin-Modus fragt direkt per Produktschlüssel ab statt vorher alle Blueprint-Besitzer zu scannen.
+
 ### Changed
 
 - **Die Screenshot-Import-Warnung `SUM_MISMATCH` nennt jetzt beide möglichen Ursachen:** Neben einer falsch gelesenen Menge/einem falsch gelesenen Toggle kann auch ein nach GET QUOTE geänderter Auftrag die eingefrorene TO-REFINE-Kopfzeile übersteigen (das Spiel friert die Kopfzeilen beim Quote ein). Meldungstexte (DE/EN) mit Handlungsempfehlung umformuliert; Prüfung und Schwere unverändert.

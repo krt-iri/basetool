@@ -34,7 +34,10 @@
             .details-row {
                 display: none;
             }
-            tr:has(details[open]) + .details-row {
+            /* Toggled per row by blueprint-overview.js. A tr:has(details[open]) sibling
+               rule here forced a style recalculation across the whole (up to 1000-row)
+               table on every expand and visibly janked the UI (REQ-INV-012). */
+            .details-row.bp-expanded {
                 display: table-row;
             }
             .details-row td {

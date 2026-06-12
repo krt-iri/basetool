@@ -196,15 +196,15 @@ class PersonalBlueprintOverviewServiceTest {
     verify(userRepository, never()).findAllById(any());
   }
 
+  // covers REQ-INV-012 — the admin drill-down queries by product key alone, without the
+  // all-owners pre-scan + unbounded IN list that made every expand click slow.
   @Test
-  void owners_adminAllScope_listsOwnersAcrossEveryOrgUnit() {
+  void owners_adminAllScope_listsOwnersAcrossEveryOrgUnit_byProductKeyAlone() {
     when(ownerScopeService.currentBlueprintOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    // The drill-down for the admin "all org units" scope resolves owners the same way as the list:
-    // across every blueprint owner, not just org-unit members (#371 fix).
-    when(personalBlueprintRepository.findAllDistinctOwnerSubs())
-        .thenReturn(Set.of(USER_1.toString(), USER_2.toString()));
-    when(personalBlueprintRepository.findAllByProductKeyAndOwnerSubIn(eq("aurora"), any()))
+    // The drill-down for the admin "all org units" scope still spans every blueprint owner, not
+    // just org-unit members (#371 fix) — but via the direct product-key lookup.
+    when(personalBlueprintRepository.findAllByProductKey("aurora"))
         .thenReturn(List.of(bp("aurora", "Aurora MR", USER_1), bp("aurora", "Aurora MR", USER_2)));
     when(userRepository.findAllById(any()))
         .thenReturn(List.of(user(USER_1, "Bravo"), user(USER_2, "Alpha")));
@@ -215,5 +215,7 @@ class PersonalBlueprintOverviewServiceTest {
         List.of("Alpha", "Bravo"),
         owners.stream().map(BlueprintOverviewOwnerDto::ownerName).toList());
     verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
+    verify(personalBlueprintRepository, never()).findAllDistinctOwnerSubs();
+    verify(personalBlueprintRepository, never()).findAllByProductKeyAndOwnerSubIn(any(), any());
   }
 }
