@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintOverviewEntryDto;
@@ -47,27 +48,62 @@ class BlueprintOverviewPageControllerTest {
   @Mock private BackendApiClient backendApiClient;
   @InjectMocks private BlueprintOverviewPageController controller;
 
+  // covers REQ-INV-013 — defaults: page 0, size 50, no search parameter on the backend URI.
   @Test
-  void view_populatesOverview_andReturnsViewName() {
+  void view_populatesOverviewAndPageEnvelope_withDefaults() {
     PageResponse<BlueprintOverviewEntryDto> page =
         new PageResponse<>(
             List.of(new BlueprintOverviewEntryDto("aurora", "Aurora MR", 3L)),
             0,
-            1000,
+            50,
             1,
             1,
             List.of());
     when(backendApiClient.get(
-            contains("/api/v1/personal-blueprints/overview?size="),
+            contains("/api/v1/personal-blueprints/overview?page=0&size=50"),
             any(ParameterizedTypeReference.class)))
         .thenReturn(page);
 
     Model model = new ExtendedModelMap();
-    String view = controller.view(model);
+    String view = controller.view(null, null, null, model);
 
     assertEquals("blueprint-overview", view);
     Object overview = model.getAttribute("overview");
     assertTrue(overview instanceof List<?> && ((List<?>) overview).size() == 1);
+    assertEquals(page, model.getAttribute("overviewPage"));
+    assertEquals(List.of(10, 50, 100), model.getAttribute("pageSizes"));
+  }
+
+  // covers REQ-INV-013 — a size outside the 10/50/100 whitelist falls back to the default 50, so
+  // the query string cannot turn the page into an unbounded fetch again.
+  @Test
+  void view_nonWhitelistedSize_fallsBackToDefault() {
+    when(backendApiClient.get(contains("?page=2&size=50"), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 2, 50, 0, 0, List.of()));
+
+    controller.view(2, 1000, null, new ExtendedModelMap());
+
+    verify(backendApiClient)
+        .get(contains("?page=2&size=50"), any(ParameterizedTypeReference.class));
+  }
+
+  // covers REQ-INV-013 — the search is relayed as a URI template variable (percent-encoded by the
+  // WebClient) and echoed back to the model for the filter form.
+  @Test
+  void view_search_isRelayedAsUriVariable_andEchoedTrimmed() {
+    when(backendApiClient.get(
+            contains("&search={search}"), any(ParameterizedTypeReference.class), eq("Aurora")))
+        .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 0, 10, 0, 0, List.of()));
+
+    Model model = new ExtendedModelMap();
+    controller.view(0, 10, "  Aurora  ", model);
+
+    verify(backendApiClient)
+        .get(
+            contains("?page=0&size=10&search={search}"),
+            any(ParameterizedTypeReference.class),
+            eq("Aurora"));
+    assertEquals("Aurora", model.getAttribute("search"));
   }
 
   @Test
@@ -76,7 +112,7 @@ class BlueprintOverviewPageControllerTest {
         .thenThrow(new RuntimeException("boom"));
 
     Model model = new ExtendedModelMap();
-    String view = controller.view(model);
+    String view = controller.view(null, null, null, model);
 
     assertEquals("blueprint-overview", view);
     assertEquals("error.blueprintOverview.load", model.getAttribute("error"));

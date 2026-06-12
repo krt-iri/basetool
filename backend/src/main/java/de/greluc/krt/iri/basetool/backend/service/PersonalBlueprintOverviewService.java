@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -82,11 +83,20 @@ public class PersonalBlueprintOverviewService {
    * page when the caller oversees no org unit (the {@link
    * OwnerScopeService#canAccessBlueprintOverview()} gate already keeps non-leadership callers out).
    *
+   * <p>The optional {@code search} narrows the result to products whose display name contains the
+   * fragment case-insensitively. It is applied to the aggregated entries <em>before</em> sorting
+   * and pagination, so the returned page numbers always describe the filtered set — the
+   * availability page paginates server-side (REQ-INV-013) and the filter must span every entry, not
+   * just the visible page.
+   *
    * @param pageable page request whose sort is restricted to {@link #SORTABLE_FIELDS}
+   * @param search optional case-insensitive product-name fragment; {@code null} or blank matches
+   *     everything
    * @return a page of {@link BlueprintOverviewEntryDto}, sorted by product name then product key
    */
   @NotNull
-  public Page<BlueprintOverviewEntryDto> listAvailableBlueprints(@NotNull Pageable pageable) {
+  public Page<BlueprintOverviewEntryDto> listAvailableBlueprints(
+      @NotNull Pageable pageable, @Nullable String search) {
     Set<String> ownerSubs = inScopeOwnerSubs();
     if (ownerSubs.isEmpty()) {
       return new PageImpl<>(List.of(), pageable, 0);
@@ -98,8 +108,14 @@ public class PersonalBlueprintOverviewService {
           .owners
           .add(bp.getOwnerSub());
     }
+    String needle =
+        search == null || search.isBlank() ? null : search.trim().toLowerCase(Locale.ROOT);
     List<BlueprintOverviewEntryDto> all =
         byKey.entrySet().stream()
+            .filter(
+                entry ->
+                    needle == null
+                        || entry.getValue().productName.toLowerCase(Locale.ROOT).contains(needle))
             .map(
                 entry ->
                     new BlueprintOverviewEntryDto(
@@ -116,18 +132,31 @@ public class PersonalBlueprintOverviewService {
    * oversight scope server-side so a client cannot widen it through the query parameter. Returns an
    * empty list when the caller oversees no org unit or nobody in scope owns the product.
    *
+   * <p>This is the hot path behind every expand click on the availability page, so the admin "all
+   * org units" scope queries by product key alone (REQ-INV-012): pre-resolving every distinct
+   * {@code owner_sub} just to echo the full set back as an {@code IN} restriction added a
+   * table-wide scan plus an unbounded parameter list per click without narrowing anything. Scoped
+   * callers keep the owner-restricted lookup so the isolation contract is untouched.
+   *
    * @param productKey the normalized product key whose owners to resolve
    * @return the owning in-scope members' display names, sorted case-insensitively; never {@code
    *     null}
    */
   @NotNull
   public List<BlueprintOverviewOwnerDto> listOwnersForProduct(String productKey) {
-    Set<String> ownerSubs = inScopeOwnerSubs();
-    if (ownerSubs.isEmpty()) {
-      return List.of();
+    ScopePredicate scope = ownerScopeService.currentBlueprintOversightScope();
+    List<PersonalBlueprint> owned;
+    if (scope.adminAllScope()) {
+      owned = personalBlueprintRepository.findAllByProductKey(productKey);
+    } else {
+      Set<String> ownerSubs = oversightMemberSubs(scope);
+      if (ownerSubs.isEmpty()) {
+        return List.of();
+      }
+      owned = personalBlueprintRepository.findAllByProductKeyAndOwnerSubIn(productKey, ownerSubs);
     }
     Set<UUID> ownerIds =
-        personalBlueprintRepository.findAllByProductKeyAndOwnerSubIn(productKey, ownerSubs).stream()
+        owned.stream()
             .map(PersonalBlueprint::getOwnerSub)
             .map(PersonalBlueprintOverviewService::parseUuid)
             .filter(Objects::nonNull)
@@ -160,6 +189,19 @@ public class PersonalBlueprintOverviewService {
     if (scope.adminAllScope()) {
       return personalBlueprintRepository.findAllDistinctOwnerSubs();
     }
+    return oversightMemberSubs(scope);
+  }
+
+  /**
+   * Resolves the member {@code sub}s of a non-admin oversight scope: the pinned org unit's members
+   * when a valid pin is active, otherwise the union over all oversight org units (the {@code
+   * owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}).
+   *
+   * @param scope the caller's non-admin oversight scope
+   * @return the in-scope member {@code sub}s; empty when the caller oversees no org unit
+   */
+  @NotNull
+  private Set<String> oversightMemberSubs(@NotNull ScopePredicate scope) {
     Set<UUID> userIds;
     if (scope.activeOrgUnitId() != null) {
       userIds =

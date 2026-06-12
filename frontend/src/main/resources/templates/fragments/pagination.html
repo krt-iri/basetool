@@ -9,46 +9,73 @@
   the `.disabled` class additionally removes pointer-events and dims them. The
   whole bar is a <nav> with an accessible label; the visible "x / y" readout is
   aria-hidden and the page position is announced via the status aria-label.
+
+  `pageResponse` is the frontend PageResponse record — accessors are page(),
+  size(), totalElements(), totalPages(). `baseUrl` may already carry a query
+  string (e.g. '/blueprint-overview?search=x'); the Thymeleaf link expression
+  then appends the page/size parameters with '&'.
 -->
 <nav th:fragment="pagination(pageResponse, baseUrl)" class="pagination"
      th:if="${pageResponse != null and pageResponse.totalPages() > 1}"
      th:aria-label="#{general.pagination.aria}">
     <a class="page-btn"
-       th:classappend="${pageResponse.pageNumber() == 0} ? 'disabled' : ''"
-       th:href="${pageResponse.pageNumber() == 0} ? null : @{${baseUrl}(page=0, size=${pageResponse.pageSize()})}"
+       th:classappend="${pageResponse.page() == 0} ? 'disabled' : ''"
+       th:href="${pageResponse.page() == 0} ? null : @{${baseUrl}(page=0, size=${pageResponse.size()})}"
        th:aria-label="#{general.pagination.first}"
-       th:aria-disabled="${pageResponse.pageNumber() == 0} ? 'true' : null">
+       th:aria-disabled="${pageResponse.page() == 0} ? 'true' : null">
         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-left"/></svg>
         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-left"/></svg>
     </a>
     <a class="page-btn"
-       th:classappend="${pageResponse.pageNumber() == 0} ? 'disabled' : ''"
-       th:href="${pageResponse.pageNumber() == 0} ? null : @{${baseUrl}(page=${pageResponse.pageNumber() - 1}, size=${pageResponse.pageSize()})}"
+       th:classappend="${pageResponse.page() == 0} ? 'disabled' : ''"
+       th:href="${pageResponse.page() == 0} ? null : @{${baseUrl}(page=${pageResponse.page() - 1}, size=${pageResponse.size()})}"
        th:aria-label="#{general.pagination.previous}"
-       th:aria-disabled="${pageResponse.pageNumber() == 0} ? 'true' : null">
+       th:aria-disabled="${pageResponse.page() == 0} ? 'true' : null">
         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-left"/></svg>
     </a>
     <span class="page-status"
-          th:aria-label="#{general.pagination.status(${pageResponse.pageNumber() + 1}, ${pageResponse.totalPages()})}">
-        <b th:text="${pageResponse.pageNumber() + 1}" aria-hidden="true">1</b>
+          th:aria-label="#{general.pagination.status(${pageResponse.page() + 1}, ${pageResponse.totalPages()})}">
+        <b th:text="${pageResponse.page() + 1}" aria-hidden="true">1</b>
         <span aria-hidden="true">/</span>
         <span th:text="${pageResponse.totalPages()}" aria-hidden="true">1</span>
     </span>
     <a class="page-btn"
-       th:classappend="${pageResponse.pageNumber() + 1 >= pageResponse.totalPages()} ? 'disabled' : ''"
-       th:href="${pageResponse.pageNumber() + 1 >= pageResponse.totalPages()} ? null : @{${baseUrl}(page=${pageResponse.pageNumber() + 1}, size=${pageResponse.pageSize()})}"
+       th:classappend="${pageResponse.page() + 1 >= pageResponse.totalPages()} ? 'disabled' : ''"
+       th:href="${pageResponse.page() + 1 >= pageResponse.totalPages()} ? null : @{${baseUrl}(page=${pageResponse.page() + 1}, size=${pageResponse.size()})}"
        th:aria-label="#{general.pagination.next}"
-       th:aria-disabled="${pageResponse.pageNumber() + 1 >= pageResponse.totalPages()} ? 'true' : null">
+       th:aria-disabled="${pageResponse.page() + 1 >= pageResponse.totalPages()} ? 'true' : null">
         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
     </a>
     <a class="page-btn"
-       th:classappend="${pageResponse.pageNumber() + 1 >= pageResponse.totalPages()} ? 'disabled' : ''"
-       th:href="${pageResponse.pageNumber() + 1 >= pageResponse.totalPages()} ? null : @{${baseUrl}(page=${pageResponse.totalPages() - 1}, size=${pageResponse.pageSize()})}"
+       th:classappend="${pageResponse.page() + 1 >= pageResponse.totalPages()} ? 'disabled' : ''"
+       th:href="${pageResponse.page() + 1 >= pageResponse.totalPages()} ? null : @{${baseUrl}(page=${pageResponse.totalPages() - 1}, size=${pageResponse.size()})}"
        th:aria-label="#{general.pagination.last}"
-       th:aria-disabled="${pageResponse.pageNumber() + 1 >= pageResponse.totalPages()} ? 'true' : null">
+       th:aria-disabled="${pageResponse.page() + 1 >= pageResponse.totalPages()} ? 'true' : null">
         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
     </a>
+</nav>
+
+<!--
+  Page-size picker — square link group in the same `.page-btn` visual language
+  (design-system: square-first, no native select). Each size is a plain link
+  that jumps back to page 0; the active size renders as an inert <span> marked
+  `.active` + aria-current. Hidden while the total fits the smallest size, where
+  switching could never change anything. Shares `baseUrl` semantics with the
+  pagination fragment above (query string allowed).
+-->
+<nav th:fragment="pageSizePicker(pageResponse, baseUrl, sizes)" class="pagination page-size-picker"
+     th:if="${pageResponse != null and pageResponse.totalElements() > sizes[0]}"
+     th:aria-label="#{general.pagination.size.aria}">
+    <span class="page-size-label" th:text="#{general.pagination.size.label}">Entries per page</span>
+    <th:block th:each="s : ${sizes}">
+        <span th:if="${pageResponse.size() == s}" class="page-btn active" aria-current="true"
+              th:text="${s}">50</span>
+        <a th:if="${pageResponse.size() != s}" class="page-btn"
+           th:href="@{${baseUrl}(page=0, size=${s})}"
+           th:aria-label="#{general.pagination.size.option(${s})}"
+           th:text="${s}">50</a>
+    </th:block>
 </nav>
 </body>
 </html>
