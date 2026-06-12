@@ -86,6 +86,14 @@
                         <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
                     </div>
                 </details>
+                <details class="sidebar-group" data-group-key="bank" sec:authorize="hasRole('BANK_EMPLOYEE')">
+                    <summary th:text="#{nav.section.bank}">Bank</summary>
+                    <div class="sidebar-sublinks">
+                        <a th:href="@{/bank}" data-testid="nav-bank" th:text="#{nav.bank.dashboard}">Bank-Dashboard</a>
+                        <a th:href="@{/bank/manage}" sec:authorize="hasRole('BANK_MANAGEMENT')" data-testid="nav-bank-manage" th:text="#{nav.bank.manage}">Bankverwaltung</a>
+                        <a th:href="@{/bank/grants}" sec:authorize="hasRole('BANK_MANAGEMENT')" data-testid="nav-bank-grants" th:text="#{nav.bank.grants}">Berechtigungen</a>
+                    </div>
+                </details>
                 <details class="sidebar-group" data-group-key="admin" sec:authorize="hasRole('ADMIN')">
                     <summary th:text="#{nav.administration}">Administration</summary>
                     <div class="sidebar-sublinks">
@@ -102,6 +110,9 @@
                         <a th:href="@{/admin/blueprints}" th:text="#{nav.admin.blueprints}">Blueprints</a>
                         <a th:href="@{/admin/uex-data}" th:text="#{nav.admin.uex}">UEX-Daten</a>
                         <a th:href="@{/admin/p4k-import}" th:text="#{nav.admin.p4kImport}">P4K-Import</a>
+                        <span class="sidebar-subheading" th:text="#{nav.admin.group.bank}">Bank</span>
+                        <a th:href="@{/admin/bank}" data-testid="nav-admin-bank" th:text="#{nav.admin.bank}">Bank-Administration</a>
+                        <a th:href="@{/admin/bank-audit}" data-testid="nav-admin-bank-audit" th:text="#{nav.admin.bankAudit}">Bank-Audit-Log</a>
                         <span class="sidebar-subheading" th:text="#{nav.admin.group.system}">System &amp; Daten</span>
                         <a th:href="@{/admin/settings}" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
                         <a th:href="@{/admin/sync-reports}" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="${detail != null ? detail.account().name() : ''} + ' - ' + ${appTitle}">Konto - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main th:if="${detail != null}" th:with="acct=${detail.account()}, caps=${detail.capabilities()}"
+      th:attr="data-bank-generic-error=#{bank.error.network}">
+    <!-- K1 greeting: name + type chip + status pill + KB number; capability-gated booking actions. -->
+    <div class="greeting hud-box flex-between">
+        <div>
+            <h1 th:text="${acct.name()}">Staffel IRIDIUM</h1>
+            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;">
+                <span class="chip" style="font-size: 0.55rem;"
+                      th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
+                <span class="status-pill"
+                      th:classappend="${acct.status() == 'ACTIVE'} ? ' status-active' : ' status-completed'"
+                      th:text="#{'bank.account.status.' + ${acct.status()}}"
+                      data-testid="bank-account-status">Aktiv</span>
+                <span th:text="${acct.accountNo()}" data-testid="bank-account-no">KB-0001</span>
+            </p>
+        </div>
+        <div class="bank-head-actions">
+            <button type="button" class="btn btn--cta"
+                    th:if="${acct.status() == 'ACTIVE' and caps != null and caps.canDeposit()}"
+                    data-trigger="open-modal-display" data-modal-id="bank-deposit-modal"
+                    data-testid="bank-deposit-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bank-in"/></svg>
+                <span th:text="#{bank.action.deposit}">Einzahlen</span>
+            </button>
+            <button type="button" class="btn btn-outline"
+                    th:if="${acct.status() == 'ACTIVE' and caps != null and caps.canWithdraw()}"
+                    data-trigger="open-modal-display" data-modal-id="bank-withdraw-modal"
+                    data-testid="bank-withdraw-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bank-out"/></svg>
+                <span th:text="#{bank.action.withdraw}">Auszahlen</span>
+            </button>
+            <button type="button" class="btn btn-ghost"
+                    th:if="${acct.status() == 'ACTIVE' and caps != null and caps.canTransfer()}"
+                    data-trigger="open-modal-display" data-modal-id="bank-transfer-modal"
+                    data-testid="bank-transfer-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
+                <span th:text="#{bank.action.transfer}">Transfer</span>
+            </button>
+            <button type="button" class="btn btn-ghost"
+                    data-trigger="open-modal-display" data-modal-id="bank-statement-modal"
+                    data-testid="bank-statement-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                <span th:text="#{bank.action.statement}">Kontoauszug</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Facts strip: balance / 30d delta / holder count / booking count (K1). -->
+    <div class="bank-facts mt-2">
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.detail.balance}">Kontosaldo</div>
+            <div class="kpi-value" data-testid="bank-balance"
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.detail.delta30}">&#177; 30 Tage</div>
+            <div class="kpi-value"
+                 th:classappend="${detail.delta30d().signum() > 0} ? ' bank-amount--pos' : (${detail.delta30d().signum() < 0} ? ' bank-amount--neg' : '')"
+                 th:text="${detail.delta30d().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(detail.delta30d()), 1, 'POINT')}">+420.000</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.detail.holders}">Halter</div>
+            <div class="kpi-value" th:text="${detail.holderCount()}">3</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
+            <div class="kpi-value" th:text="${detail.bookingCount()}">128</div>
+        </div>
+    </div>
+
+    <div class="bank-cols mt-2">
+        <!-- Left column: booking history (K1 table). -->
+        <div class="bank-panel" data-testid="bank-bookings-panel">
+            <div class="bank-panel-head">
+                <h2 th:text="#{bank.detail.history}">Buchungshistorie</h2>
+            </div>
+            <div class="bank-panel-body">
+                <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
+                    <table class="data-table">
+                        <thead>
+                        <tr>
+                            <th th:text="#{bank.booking.date}">Datum</th>
+                            <th th:text="#{bank.booking.type}">Typ</th>
+                            <th th:text="#{bank.booking.holder}">Halter</th>
+                            <th th:text="#{bank.booking.note}">Notiz</th>
+                            <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
+                            <th sec:authorize="hasRole('BANK_MANAGEMENT')"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="b : ${bookings.content()}" data-testid="bank-booking-row"
+                            th:attr="data-transaction-id=${b.transactionId()}">
+                            <td><span class="utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span></td>
+                            <td th:switch="${b.type()}">
+                                <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
+                                <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
+                                <th:block th:case="'TRANSFER'">
+                                    <span class="chip" th:if="${b.intraAccount()}" th:text="#{bank.type.REBOOKING}">Umbuchung</span>
+                                    <span class="chip" th:unless="${b.intraAccount()}"
+                                          th:text="#{bank.type.TRANSFER} + (${b.counterAccountNo() != null} ? (${b.amount().signum() < 0} ? ' &#8594; ' : ' &#8592; ') + ${b.counterAccountNo()} : '')">Transfer &#8594; KB-0002</span>
+                                </th:block>
+                                <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
+                                <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
+                                <span th:case="*" class="chip" th:text="${b.type()}">?</span>
+                            </td>
+                            <td>
+                                <span th:if="${b.intraAccount() and b.counterHolderHandle() != null}"
+                                      th:text="${b.holderHandle()} + ' &#8594; ' + ${b.counterHolderHandle()}">A &#8594; B</span>
+                                <span th:unless="${b.intraAccount() and b.counterHolderHandle() != null}"
+                                      th:text="${b.holderHandle()}">greluc</span>
+                            </td>
+                            <td class="bank-note-cell" th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</td>
+                            <td class="text-right">
+                                <span th:if="${b.intraAccount()}" class="bank-amount bank-amount--zero"
+                                      th:text="'&#177; ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs()), 1, 'POINT')}">&#177; 100.000</span>
+                                <span th:unless="${b.intraAccount()}" class="bank-amount"
+                                      th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
+                                      th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
+                            </td>
+                            <td sec:authorize="hasRole('BANK_MANAGEMENT')" class="text-right">
+                                <button type="button" class="btn btn-ghost btn-sm bank-reverse-btn"
+                                        th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
+                                        data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"
+                                        th:attr="data-field-_id=${b.transactionId()}"
+                                        data-testid="bank-reverse-open"
+                                        th:text="#{bank.action.reverse}">Stornieren</button>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
+                   data-testid="bank-bookings-empty" th:text="#{bank.detail.history.empty}">Noch keine Buchungen.</p>
+                <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+            </div>
+        </div>
+
+        <!-- Right column: holder distribution + account info (K1). -->
+        <div class="bank-col-side">
+            <div class="bank-panel" data-testid="bank-distribution-panel">
+                <div class="bank-panel-head flex-between">
+                    <h2 th:text="#{bank.detail.distribution}">Halter-Verteilung</h2>
+                    <button type="button" class="btn btn-ghost btn-sm"
+                            th:if="${acct.status() == 'ACTIVE' and caps != null and caps.canTransfer() and !#lists.isEmpty(detail.holderDistribution())}"
+                            data-trigger="open-modal-display" data-modal-id="bank-rebook-modal"
+                            data-testid="bank-rebook-open" th:text="#{bank.action.rebook}">Umbuchen</button>
+                </div>
+                <div class="bank-panel-body">
+                    <th:block th:if="${!#lists.isEmpty(detail.holderDistribution())}">
+                        <div class="stack-bar" aria-hidden="true">
+                            <th:block th:each="slice, it : ${detail.holderDistribution()}">
+                                <div th:if="${it.index < 6 and distributionPercents.get(slice.holderId()) != null and distributionPercents.get(slice.holderId()) > 0}"
+                                     th:class="'stack-seg-' + ${it.index}"
+                                     th:style="'width: ' + ${distributionPercents.get(slice.holderId())} + '%;'"></div>
+                            </th:block>
+                        </div>
+                        <div class="bank-holder-list">
+                            <div class="holder-row" th:each="slice, it : ${detail.holderDistribution()}"
+                                 data-testid="bank-holder-row" th:attr="data-holder-handle=${slice.handle()}">
+                                <span class="holder-name"
+                                      th:text="${slice.handle()} + (${!slice.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</span>
+                                <span class="holder-bar" aria-hidden="true">
+                                    <span th:class="'holder-bar-fill stack-seg-' + ${it.index < 6 ? it.index : 5}"
+                                          th:style="'width: ' + ${distributionPercents.get(slice.holderId()) != null ? distributionPercents.get(slice.holderId()) : 0} + '%;'"></span>
+                                </span>
+                                <span class="holder-value"
+                                      th:text="${#numbers.formatInteger(@moneyFormat.round(slice.amount()), 1, 'POINT')}">1.000.000</span>
+                            </div>
+                        </div>
+                        <div class="holder-sum">
+                            <span th:text="#{bank.detail.distribution.sum}">Summe = Kontosaldo</span>
+                            <span th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</span>
+                        </div>
+                    </th:block>
+                    <p class="text-center text-muted" th:if="${#lists.isEmpty(detail.holderDistribution())}"
+                       data-testid="bank-distribution-empty" th:text="#{bank.detail.distribution.empty}">Keine Halter mit Bestand.</p>
+                </div>
+            </div>
+
+            <div class="bank-panel mt-2" data-testid="bank-info-panel">
+                <div class="bank-panel-head">
+                    <h2 th:text="#{bank.detail.info}">Konto-Info</h2>
+                </div>
+                <div class="bank-panel-body">
+                    <div class="bank-kv">
+                        <span class="bank-kv-key" th:text="#{bank.detail.info.no}">Kontonummer</span>
+                        <span class="bank-kv-value" th:text="${acct.accountNo()}">KB-0001</span>
+                    </div>
+                    <div class="bank-kv">
+                        <span class="bank-kv-key" th:text="#{bank.detail.info.type}">Typ</span>
+                        <span class="bank-kv-value" th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
+                    </div>
+                    <div class="bank-kv" th:if="${acct.orgUnit() != null}">
+                        <span class="bank-kv-key" th:text="#{bank.detail.info.orgUnit}">Org-Einheit</span>
+                        <span class="bank-kv-value" th:text="${acct.orgUnit().name()}">IRIDIUM</span>
+                    </div>
+                    <div class="bank-kv" th:if="${acct.areaName() != null}">
+                        <span class="bank-kv-key" th:text="#{bank.detail.info.area}">Bereich</span>
+                        <span class="bank-kv-value" th:text="${acct.areaName()}">Logistik</span>
+                    </div>
+                    <div class="bank-kv">
+                        <span class="bank-kv-key" th:text="#{bank.detail.info.status}">Status</span>
+                        <span class="bank-kv-value" th:text="#{'bank.account.status.' + ${acct.status()}}">Aktiv</span>
+                    </div>
+                    <div class="bank-kv">
+                        <span class="bank-kv-key" th:text="#{bank.detail.info.created}">Angelegt</span>
+                        <span class="bank-kv-value"><span class="utc-time" th:text="${acct.createdAt()}">2026-01-15T10:00:00Z</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Modals (open via data-trigger="open-modal-display") ============ -->
+
+    <!-- Deposit -->
+    <div class="krt-modal-overlay" id="bank-deposit-modal" th:if="${caps != null and caps.canDeposit()}">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.deposit.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.deposit.title}">Einzahlen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-deposit-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/deposits" data-method="POST"
+                  th:attr="data-account-id=${acct.id()}">
+                <div class="krt-modal-body">
+                    <div class="bank-form-row">
+                        <label for="bank-deposit-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
+                        <input type="number" id="bank-deposit-amount" name="amount" min="1" step="1" required
+                               data-testid="bank-deposit-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                        <span class="bank-field-hint" th:text="#{bank.field.amount.hint}">Nur ganze aUEC-Betr&auml;ge.</span>
+                        <span class="bank-field-error" data-error-for="amount"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-deposit-holder" th:text="#{bank.field.holder}">Halter</label>
+                        <select id="bank-deposit-holder" name="holderId" required data-testid="bank-deposit-holder">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="holderId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-deposit-note" th:text="#{bank.field.note}">Notiz</label>
+                        <input type="text" id="bank-deposit-note" name="note" maxlength="500"
+                               th:placeholder="#{bank.field.note.placeholder}">
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-deposit-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-deposit-submit"
+                            th:text="#{bank.action.deposit}">Einzahlen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Withdrawal -->
+    <div class="krt-modal-overlay" id="bank-withdraw-modal" th:if="${caps != null and caps.canWithdraw()}">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.withdraw.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.withdraw.title}">Auszahlen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-withdraw-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/withdrawals" data-method="POST"
+                  th:attr="data-account-id=${acct.id()}">
+                <div class="krt-modal-body">
+                    <div class="bank-form-row">
+                        <label for="bank-withdraw-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
+                        <input type="number" id="bank-withdraw-amount" name="amount" min="1" step="1" required
+                               data-testid="bank-withdraw-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                        <span class="bank-field-error" data-error-for="amount"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-withdraw-holder" th:text="#{bank.field.holder.source}">Von Halter</label>
+                        <select id="bank-withdraw-holder" name="holderId" required data-testid="bank-withdraw-holder">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="slice : ${detail.holderDistribution()}"
+                                    th:if="${slice.amount().signum() > 0}"
+                                    th:value="${slice.holderId()}"
+                                    th:text="${slice.handle()} + ' &#8212; ' + #{bank.field.available(${#numbers.formatInteger(@moneyFormat.round(slice.amount()), 1, 'POINT')})}">greluc &#8212; verf&uuml;gbar 1.000.000</option>
+                        </select>
+                        <span class="bank-field-hint" th:text="#{bank.field.holder.source.hint}">Nur Halter mit Bestand auf diesem Konto.</span>
+                        <span class="bank-field-error" data-error-for="holderId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-withdraw-note" th:text="#{bank.field.note}">Notiz</label>
+                        <input type="text" id="bank-withdraw-note" name="note" maxlength="500"
+                               th:placeholder="#{bank.field.note.placeholder}">
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-withdraw-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-withdraw-submit"
+                            th:text="#{bank.action.withdraw}">Auszahlen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transfer to another account -->
+    <div class="krt-modal-overlay" id="bank-transfer-modal" th:if="${caps != null and caps.canTransfer()}">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.transfer.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.transfer.title}">Transfer</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-transfer-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/transfers" data-method="POST"
+                  th:attr="data-account-id=${acct.id()}" data-account-id-field="sourceAccountId">
+                <div class="krt-modal-body">
+                    <div class="bank-form-row">
+                        <label for="bank-transfer-target" th:text="#{bank.field.targetAccount}">Zielkonto</label>
+                        <select id="bank-transfer-target" name="destinationAccountId" required
+                                data-testid="bank-transfer-target">
+                            <option value="" th:text="#{bank.field.targetAccount.placeholder}">Konto w&auml;hlen &hellip;</option>
+                            <option th:each="t : ${transferTargets}" th:value="${t.id()}"
+                                    th:text="${t.accountNo()} + ' &#8212; ' + ${t.name()}">KB-0002 &#8212; Staffel PHOENIX</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="destinationAccountId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-transfer-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
+                        <input type="number" id="bank-transfer-amount" name="amount" min="1" step="1" required
+                               data-testid="bank-transfer-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                        <span class="bank-field-error" data-error-for="amount"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-transfer-source-holder" th:text="#{bank.field.holder.source}">Von Halter</label>
+                        <select id="bank-transfer-source-holder" name="sourceHolderId" required
+                                data-testid="bank-transfer-source-holder">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="slice : ${detail.holderDistribution()}"
+                                    th:if="${slice.amount().signum() > 0}"
+                                    th:value="${slice.holderId()}"
+                                    th:text="${slice.handle()} + ' &#8212; ' + #{bank.field.available(${#numbers.formatInteger(@moneyFormat.round(slice.amount()), 1, 'POINT')})}">greluc &#8212; verf&uuml;gbar 1.000.000</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="sourceHolderId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-transfer-dest-holder" th:text="#{bank.field.holder.target}">An Halter (Zielkonto)</label>
+                        <select id="bank-transfer-dest-holder" name="destinationHolderId" required
+                                data-testid="bank-transfer-dest-holder">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                        </select>
+                        <span class="bank-field-hint" th:text="#{bank.field.holder.target.hint}">Gleicher Halter = Custody bleibt unver&auml;ndert.</span>
+                        <span class="bank-field-error" data-error-for="destinationHolderId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-transfer-note" th:text="#{bank.field.note}">Notiz</label>
+                        <input type="text" id="bank-transfer-note" name="note" maxlength="500"
+                               th:placeholder="#{bank.field.note.placeholder}">
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-transfer-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-transfer-submit"
+                            th:text="#{bank.action.transfer}">Transfer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Intra-account holder rebooking (same endpoint as transfer, destination = same account). -->
+    <div class="krt-modal-overlay" id="bank-rebook-modal" th:if="${caps != null and caps.canTransfer()}">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.rebook.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.rebook.title}">Umbuchen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-rebook-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/transfers" data-method="POST"
+                  th:attr="data-account-id=${acct.id()},data-fixed-destination=${acct.id()}"
+                  data-account-id-field="sourceAccountId">
+                <input type="hidden" name="destinationAccountId" th:value="${acct.id()}">
+                <div class="krt-modal-body">
+                    <p class="bank-field-hint" th:text="#{bank.modal.rebook.hint}">Verschiebt Custody zwischen Haltern &#8212; der Kontosaldo bleibt unver&auml;ndert.</p>
+                    <div class="bank-form-row">
+                        <label for="bank-rebook-source" th:text="#{bank.field.holder.source}">Von Halter</label>
+                        <select id="bank-rebook-source" name="sourceHolderId" required data-testid="bank-rebook-source">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="slice : ${detail.holderDistribution()}"
+                                    th:if="${slice.amount().signum() > 0}"
+                                    th:value="${slice.holderId()}"
+                                    th:text="${slice.handle()} + ' &#8212; ' + #{bank.field.available(${#numbers.formatInteger(@moneyFormat.round(slice.amount()), 1, 'POINT')})}">greluc &#8212; verf&uuml;gbar 1.000.000</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="sourceHolderId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-rebook-target" th:text="#{bank.field.holder.target}">An Halter</label>
+                        <select id="bank-rebook-target" name="destinationHolderId" required data-testid="bank-rebook-target">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="destinationHolderId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-rebook-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
+                        <input type="number" id="bank-rebook-amount" name="amount" min="1" step="1" required
+                               data-testid="bank-rebook-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                        <span class="bank-field-error" data-error-for="amount"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-rebook-note" th:text="#{bank.field.note}">Notiz</label>
+                        <input type="text" id="bank-rebook-note" name="note" maxlength="500"
+                               th:placeholder="#{bank.field.note.placeholder}">
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-rebook-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-rebook-submit"
+                            th:text="#{bank.action.rebook}">Umbuchen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reversal confirm (management only). -->
+    <div class="krt-modal-overlay" id="bank-reverse-modal" sec:authorize="hasRole('BANK_MANAGEMENT')">
+        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.reverse.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.reverse.title}">Buchung stornieren</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-reverse-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/transactions/{id}/reversal"
+                  data-method="POST">
+                <input type="hidden" name="_id">
+                <div class="krt-modal-body">
+                    <p th:text="#{bank.modal.reverse.text}">Erzeugt eine negierte Gegenbuchung. Die Originalbuchung bleibt unver&auml;ndert im Ledger.</p>
+                    <div class="bank-form-row">
+                        <label for="bank-reverse-note" th:text="#{bank.field.note}">Notiz</label>
+                        <input type="text" id="bank-reverse-note" name="note" maxlength="500"
+                               th:placeholder="#{bank.modal.reverse.note.placeholder}">
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-reverse-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" data-testid="bank-reverse-submit"
+                            th:text="#{bank.action.reverse}">Stornieren</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Statement export (REQ-BANK-014): period picker -> PDF blob download via the proxy. -->
+    <div class="krt-modal-overlay" id="bank-statement-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.statement.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.statement.title}">Kontoauszug exportieren</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-statement-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-download-form no-track"
+                  th:attr="data-endpoint='/api/proxy/bank/accounts/' + ${acct.id()} + '/statement',data-filename='kontoauszug-' + ${acct.accountNo()} + '.pdf',data-period-required=#{bank.error.periodRequired}">
+                <div class="krt-modal-body">
+                    <p class="bank-field-hint" th:text="#{bank.modal.statement.hint}">Zeitraum in deiner Lokalzeit; das PDF rendert die Zeitstempel ebenfalls lokal.</p>
+                    <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
+                        <label for="bank-statement-from-date" th:text="#{bank.field.period.from}">Von</label>
+                        <input type="hidden" name="from">
+                        <div class="bank-datetime-row">
+                            <input type="date" id="bank-statement-from-date" class="date-part"
+                                   data-testid="bank-statement-from-date">
+                            <input type="time" id="bank-statement-from-time" class="time-part"
+                                   th:aria-label="#{bank.field.period.from}">
+                        </div>
+                        <span class="bank-field-error" data-error-for="from"></span>
+                    </div>
+                    <div class="bank-form-row datetime-split-group" data-datetime-filter-role="end">
+                        <label for="bank-statement-to-date" th:text="#{bank.field.period.to}">Bis</label>
+                        <input type="hidden" name="to">
+                        <div class="bank-datetime-row">
+                            <input type="date" id="bank-statement-to-date" class="date-part"
+                                   data-testid="bank-statement-to-date">
+                            <input type="time" id="bank-statement-to-time" class="time-part"
+                                   th:aria-label="#{bank.field.period.to}">
+                        </div>
+                        <span class="bank-field-error" data-error-for="to"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-statement-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-statement-submit"
+                            th:text="#{bank.modal.statement.submit}">PDF herunterladen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{bank.manage.title} + ' - ' + ${appTitle}">Bank-Verwaltung - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main th:attr="data-bank-generic-error=#{bank.error.network}">
+    <div class="greeting hud-box flex-between">
+        <div>
+            <h1 th:text="#{bank.manage.title}">Bank-Verwaltung</h1>
+            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+               th:text="#{bank.manage.subtitle}">Konten-Lebenszyklus und Halter-Registry der Kartellbank.</p>
+        </div>
+        <div class="bank-head-actions">
+            <a th:href="@{/bank}" class="btn btn-ghost" data-testid="bank-back-link"
+               th:text="#{bank.manage.back}">Zur Bank</a>
+            <button type="button" class="btn btn--cta" th:if="${activeTab == 'konten'}"
+                    data-trigger="open-modal-display" data-modal-id="bank-create-account-modal"
+                    data-testid="bank-create-account-open" th:text="#{bank.manage.account.create}">+ Konto anlegen</button>
+            <button type="button" class="btn btn--cta" th:if="${activeTab == 'halter'}"
+                    data-trigger="open-modal-display" data-modal-id="bank-register-holder-modal"
+                    data-testid="bank-register-holder-open" th:text="#{bank.manage.holder.register}">+ Halter registrieren</button>
+        </div>
+    </div>
+
+    <!-- W1 tab switcher (server-side via query param, same pattern as mission detail). -->
+    <div class="tab-nav mt-2" role="tablist">
+        <a th:href="@{/bank/manage(tab='konten')}" class="tab" role="tab"
+           th:classappend="${activeTab == 'konten'} ? ' active' : ''"
+           th:aria-selected="${activeTab == 'konten'}" data-testid="bank-tab-accounts">
+            <span th:text="#{bank.manage.tab.accounts}">Konten</span>
+            <span class="tab-count" th:text="${#lists.size(accounts)}">7</span>
+        </a>
+        <a th:href="@{/bank/manage(tab='halter')}" class="tab" role="tab"
+           th:classappend="${activeTab == 'halter'} ? ' active' : ''"
+           th:aria-selected="${activeTab == 'halter'}" data-testid="bank-tab-holders">
+            <span th:text="#{bank.manage.tab.holders}">Halter</span>
+            <span class="tab-count" th:text="${#lists.size(holders)}">12</span>
+        </a>
+    </div>
+
+    <!-- ===================== Tab: Konten ===================== -->
+    <div class="bank-panel mt-2" th:if="${activeTab == 'konten'}" data-testid="bank-accounts-panel">
+        <div class="bank-panel-body">
+            <div class="table-responsive" th:if="${!#lists.isEmpty(accounts)}">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{bank.manage.account.no}">Nr.</th>
+                        <th th:text="#{bank.manage.account.name}">Name</th>
+                        <th th:text="#{bank.manage.account.type}">Typ</th>
+                        <th th:text="#{bank.manage.account.ref}">Org-Einheit / Bereich</th>
+                        <th class="text-right" th:text="#{bank.manage.account.balance}">Saldo</th>
+                        <th th:text="#{bank.manage.account.status}">Status</th>
+                        <th class="text-right" th:text="#{general.actions}">Aktionen</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="a : ${accounts}" data-testid="bank-account-row"
+                        th:attr="data-account-no=${a.accountNo()}">
+                        <td><a th:href="@{'/bank/accounts/' + ${a.id()}}" th:text="${a.accountNo()}">KB-0001</a></td>
+                        <td th:text="${a.name()}">Staffel IRIDIUM</td>
+                        <td><span class="chip" style="font-size: 0.55rem;"
+                                  th:text="#{'bank.account.type.' + ${a.type()}}">Staffel</span></td>
+                        <td th:text="${a.orgUnit() != null ? a.orgUnit().name() : (a.areaName() != null ? a.areaName() : '—')}">IRIDIUM</td>
+                        <td class="text-right"
+                            th:text="${#numbers.formatInteger(@moneyFormat.round(a.balance()), 1, 'POINT')}">1.850.000</td>
+                        <td>
+                            <span class="status-pill"
+                                  th:classappend="${a.status() == 'ACTIVE'} ? ' status-active' : ' status-completed'"
+                                  th:text="#{'bank.account.status.' + ${a.status()}}">Aktiv</span>
+                        </td>
+                        <td class="text-right">
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                    data-trigger="open-modal-display" data-modal-id="bank-rename-modal"
+                                    th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-name=${a.name()}"
+                                    data-testid="bank-rename-open" th:text="#{bank.manage.account.rename}">Umbenennen</button>
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                    th:if="${a.status() == 'ACTIVE' and a.balance().signum() == 0}"
+                                    data-trigger="open-modal-display" data-modal-id="bank-close-modal"
+                                    th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
+                                    data-testid="bank-close-open" th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
+                            <button type="button" class="btn btn-ghost btn-sm" disabled
+                                    th:if="${a.status() == 'ACTIVE' and a.balance().signum() != 0}"
+                                    th:title="#{bank.manage.account.close.blocked}"
+                                    data-testid="bank-close-blocked" th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                    th:if="${a.status() == 'CLOSED'}"
+                                    data-trigger="open-modal-display" data-modal-id="bank-reopen-modal"
+                                    th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
+                                    data-testid="bank-reopen-open" th:text="#{bank.manage.account.reopen}">Wieder&ouml;ffnen</button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-center text-muted" th:if="${#lists.isEmpty(accounts)}"
+               data-testid="bank-accounts-empty" th:text="#{bank.manage.accounts.empty}">Noch keine Konten angelegt.</p>
+        </div>
+    </div>
+
+    <!-- ===================== Tab: Halter ===================== -->
+    <div class="bank-panel mt-2" th:if="${activeTab == 'halter'}" data-testid="bank-holders-panel">
+        <div class="bank-panel-body">
+            <div class="table-responsive" th:if="${!#lists.isEmpty(holders)}">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{bank.manage.holder.handle}">Handle</th>
+                        <th th:text="#{bank.manage.holder.status}">Status</th>
+                        <th class="text-right" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</th>
+                        <th class="text-right" th:text="#{bank.manage.holder.accounts}">Konten</th>
+                        <th class="text-right" th:text="#{general.actions}">Aktionen</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="h : ${holders}" data-testid="bank-holder-registry-row"
+                        th:attr="data-holder-handle=${h.handle()}">
+                        <td th:text="${h.handle()}">greluc</td>
+                        <td>
+                            <span class="status-pill"
+                                  th:classappend="${h.active()} ? ' status-active' : ' status-completed'"
+                                  th:text="${h.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}">Aktiv</span>
+                        </td>
+                        <td class="text-right"
+                            th:text="${#numbers.formatInteger(@moneyFormat.round(h.totalHeld()), 1, 'POINT')}">1.000.000</td>
+                        <td class="text-right" th:text="${h.accountCount()}">2</td>
+                        <td class="text-right">
+                            <button type="button" class="btn btn-ghost btn-sm" th:if="${h.active()}"
+                                    data-trigger="open-modal-display" data-modal-id="bank-holder-deactivate-modal"
+                                    th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
+                                    data-testid="bank-holder-deactivate-open"
+                                    th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
+                            <button type="button" class="btn btn-ghost btn-sm" th:unless="${h.active()}"
+                                    data-trigger="open-modal-display" data-modal-id="bank-holder-reactivate-modal"
+                                    th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
+                                    data-testid="bank-holder-reactivate-open"
+                                    th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-center text-muted" th:if="${#lists.isEmpty(holders)}"
+               data-testid="bank-holders-empty" th:text="#{bank.manage.holders.empty}">Noch keine Halter registriert.</p>
+        </div>
+    </div>
+
+    <!-- ============ Modals ============ -->
+
+    <!-- Create account -->
+    <div class="krt-modal-overlay" id="bank-create-account-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.createAccount.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.createAccount.title}">Konto anlegen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-create-account-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/accounts" data-method="POST">
+                <div class="krt-modal-body">
+                    <div class="bank-form-row">
+                        <label for="bank-create-name" th:text="#{bank.field.accountName}">Kontoname</label>
+                        <input type="text" id="bank-create-name" name="name" maxlength="255" required
+                               data-testid="bank-create-name" th:placeholder="#{bank.field.accountName.placeholder}">
+                        <span class="bank-field-error" data-error-for="name"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-create-type" th:text="#{bank.field.accountType}">Kontotyp</label>
+                        <select id="bank-create-type" name="type" required data-role="bank-account-type"
+                                data-testid="bank-create-type">
+                            <option value="ORG_UNIT" th:text="#{bank.account.type.ORG_UNIT}">Org-Einheit</option>
+                            <option value="AREA" th:text="#{bank.account.type.AREA}">Bereich</option>
+                            <option value="CARTEL" th:text="#{bank.account.type.CARTEL}">Kartell</option>
+                            <option value="CARTEL_BANK" th:text="#{bank.account.type.CARTEL_BANK}">Kartellbank</option>
+                            <option value="SPECIAL" th:text="#{bank.account.type.SPECIAL}">Sonderkonto</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="type"></span>
+                    </div>
+                    <div class="bank-form-row bank-row-orgunit">
+                        <label for="bank-create-orgunit" th:text="#{bank.field.orgUnit}">Org-Einheit</label>
+                        <select id="bank-create-orgunit" name="orgUnitId" data-testid="bank-create-orgunit">
+                            <option value="" th:text="#{bank.field.orgUnit.placeholder}">Org-Einheit w&auml;hlen &hellip;</option>
+                            <option th:each="ou : ${orgUnits}" th:value="${ou.id()}"
+                                    th:text="${ou.name()} + (${ou.shorthand() != null} ? ' (' + ${ou.shorthand()} + ')' : '')">IRIDIUM</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="orgUnitId"></span>
+                    </div>
+                    <div class="bank-form-row bank-row-area" style="display: none;">
+                        <label for="bank-create-area" th:text="#{bank.field.areaName}">Bereichsname</label>
+                        <input type="text" id="bank-create-area" name="areaName" maxlength="255"
+                               data-testid="bank-create-area" th:placeholder="#{bank.field.areaName.placeholder}">
+                        <span class="bank-field-error" data-error-for="areaName"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-create-account-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-create-account-submit"
+                            th:text="#{bank.modal.createAccount.submit}">Anlegen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rename account -->
+    <div class="krt-modal-overlay" id="bank-rename-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.rename.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.rename.title}">Konto umbenennen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-rename-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/accounts/{id}" data-method="PATCH">
+                <input type="hidden" name="_id">
+                <input type="hidden" name="version">
+                <div class="krt-modal-body">
+                    <div class="bank-form-row">
+                        <label for="bank-rename-name" th:text="#{bank.field.accountName}">Kontoname</label>
+                        <input type="text" id="bank-rename-name" name="name" maxlength="255" required
+                               data-testid="bank-rename-name">
+                        <span class="bank-field-error" data-error-for="name"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-rename-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-rename-submit"
+                            th:text="#{general.save}">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Close account (zero balance enforced server-side too) -->
+    <div class="krt-modal-overlay" id="bank-close-modal">
+        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.close.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.close.title}">Konto schlie&szlig;en</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-close-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/accounts/{id}/close" data-method="POST">
+                <input type="hidden" name="_id">
+                <input type="hidden" name="version">
+                <div class="krt-modal-body">
+                    <p th:text="#{bank.modal.close.text}">Ein geschlossenes Konto nimmt keine Buchungen mehr an. Es kann jederzeit wieder ge&ouml;ffnet werden.</p>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-close-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" data-testid="bank-close-submit"
+                            th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reopen account -->
+    <div class="krt-modal-overlay" id="bank-reopen-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.reopen.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.reopen.title}">Konto wieder&ouml;ffnen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-reopen-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/accounts/{id}/reopen" data-method="POST">
+                <input type="hidden" name="_id">
+                <input type="hidden" name="version">
+                <div class="krt-modal-body">
+                    <p th:text="#{bank.modal.reopen.text}">Das Konto nimmt danach wieder Buchungen an.</p>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-reopen-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-reopen-submit"
+                            th:text="#{bank.manage.account.reopen}">Wieder&ouml;ffnen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Register holder -->
+    <div class="krt-modal-overlay" id="bank-register-holder-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.registerHolder.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.registerHolder.title}">Halter registrieren</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-register-holder-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/holders" data-method="POST">
+                <div class="krt-modal-body">
+                    <p class="bank-field-hint" th:text="#{bank.modal.registerHolder.hint}">Nur registrierte Tool-Nutzer k&ouml;nnen Halter werden. Das Handle wird beim Registrieren eingefroren.</p>
+                    <div class="bank-form-row">
+                        <label for="bank-holder-user" th:text="#{bank.field.user}">Nutzer</label>
+                        <select id="bank-holder-user" name="userId" required data-role="bank-holder-user"
+                                data-testid="bank-holder-user">
+                            <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
+                            <option th:each="u : ${users}" th:value="${u.id()}"
+                                    th:text="${u.effectiveName() != null ? u.effectiveName() : u.username()}">greluc</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="userId"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-register-holder-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-register-holder-submit"
+                            th:text="#{bank.modal.registerHolder.submit}">Registrieren</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Deactivate holder -->
+    <div class="krt-modal-overlay" id="bank-holder-deactivate-modal">
+        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderDeactivate.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.holderDeactivate.title}">Halter deaktivieren</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-holder-deactivate-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/holders/{id}" data-method="PATCH">
+                <input type="hidden" name="_id">
+                <input type="hidden" name="version">
+                <input type="hidden" name="active" value="false">
+                <div class="krt-modal-body">
+                    <p th:text="#{bank.modal.holderDeactivate.text}">Ein inaktiver Halter kann kein neues Geld mehr zugebucht bekommen. Bestehende Best&auml;nde bleiben abbuchbar.</p>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-holder-deactivate-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" data-testid="bank-holder-deactivate-submit"
+                            th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reactivate holder -->
+    <div class="krt-modal-overlay" id="bank-holder-reactivate-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderReactivate.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.holderReactivate.title}">Halter reaktivieren</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-holder-reactivate-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/holders/{id}" data-method="PATCH">
+                <input type="hidden" name="_id">
+                <input type="hidden" name="version">
+                <input type="hidden" name="active" value="true">
+                <div class="krt-modal-body">
+                    <p th:text="#{bank.modal.holderReactivate.text}">Der Halter kann danach wieder Geld zugebucht bekommen.</p>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-holder-reactivate-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-holder-reactivate-submit"
+                            th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

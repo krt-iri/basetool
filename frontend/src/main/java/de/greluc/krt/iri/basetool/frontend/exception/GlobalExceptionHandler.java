@@ -363,6 +363,17 @@ public class GlobalExceptionHandler {
     m.put("CONFLICT", "error.conflict.duplicate");
     m.put("DATA_INTEGRITY", "error.conflict.duplicate");
     m.put("LOCKED", "error.pessimisticLock");
+    // Kartell bank stable 409 codes (epic #556) — bank.js renders these inline at the
+    // booking-modal fields (K1 mockup: 409 never toast-only).
+    m.put("BANK_OVERDRAFT", "error.bank.overdraft");
+    m.put("BANK_HOLDER_OVERDRAFT", "error.bank.holderOverdraft");
+    m.put("BANK_ACCOUNT_NOT_EMPTY", "error.bank.accountNotEmpty");
+    m.put("BANK_ACCOUNT_CLOSED", "error.bank.accountClosed");
+    m.put("BANK_GRANTEE_MISSING_ROLE", "error.bank.granteeMissingRole");
+    m.put("BANK_SELF_TRANSFER", "error.bank.selfTransfer");
+    m.put("BANK_ALREADY_REVERSED", "error.bank.alreadyReversed");
+    m.put("BANK_HOLDER_INACTIVE", "error.bank.holderInactive");
+    m.put("DUPLICATE_ENTITY", "error.conflict.duplicate");
     m.put(BackendServiceException.CODE_SERVICE_UNAVAILABLE, "error.unavailable");
     m.put(BackendServiceException.CODE_BACKEND_TIMEOUT, "error.backendTimeout");
     m.put(BackendServiceException.CODE_UNKNOWN, "error.unexpected");

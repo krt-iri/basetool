@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{bank.dashboard.title} + ' - ' + ${appTitle}">Kartellbank - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main th:attr="data-bank-generic-error=#{bank.error.network}">
+    <div class="greeting hud-box flex-between">
+        <div>
+            <h1 th:text="#{bank.dashboard.title}">Kartellbank</h1>
+            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;">
+                <span th:if="${dashboard != null and dashboard.management()}"
+                      th:text="#{bank.dashboard.subtitle.management(${#lists.size(dashboard.accounts())})}">Ansicht: Bankleitung · 7 Konten</span>
+                <span th:if="${dashboard != null and !dashboard.management()}"
+                      th:text="#{bank.dashboard.subtitle.employee(${#lists.size(dashboard.accounts())})}">Ansicht: Bank-Mitarbeiter · 3 berechtigte Konten</span>
+                <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
+            </p>
+        </div>
+        <div class="bank-head-actions" sec:authorize="hasRole('BANK_MANAGEMENT')">
+            <a th:href="@{/bank/manage}" class="btn btn-ghost" data-testid="bank-manage-link">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-gear"/></svg>
+                <span th:text="#{bank.dashboard.manage}">Verwaltung</span>
+            </a>
+            <a th:href="@{/bank/grants}" class="btn btn-ghost" data-testid="bank-grants-link"
+               th:text="#{bank.dashboard.grants}">Berechtigungen</a>
+            <button type="button" class="btn btn-ghost bank-download-btn"
+                    data-download-url="/api/proxy/bank/export/three-month-report"
+                    data-filename="bank-3-monats-report.pdf"
+                    data-testid="bank-report-download">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                <span th:text="#{bank.dashboard.report}">3-Monats-Report</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Management-only aggregate strip (.kpi-total, D1 / REQ-BANK-016). -->
+    <div class="bank-totals mt-2" th:if="${dashboard != null and dashboard.totals() != null}"
+         data-testid="bank-totals">
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.dashboard.totals.balance}">Gesamtsaldo</div>
+            <div class="kpi-value"
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().totalBalance()), 1, 'POINT')} + ' aUEC'">4.812.500 aUEC</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.dashboard.totals.inflow}">Eing&auml;nge 30 T</div>
+            <div class="kpi-value bank-amount--pos"
+                 th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().inflow30d()), 1, 'POINT')}">+1.240.000</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.dashboard.totals.outflow}">Ausg&auml;nge 30 T</div>
+            <div class="kpi-value bank-amount--neg"
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().outflow30d()), 1, 'POINT')}">-385.000</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.dashboard.totals.accounts}">Aktive Konten</div>
+            <div class="kpi-value"
+                 th:text="${dashboard.totals().activeAccounts()} + ' / ' + ${dashboard.totals().closedAccounts()} + ' ' + #{bank.dashboard.totals.closed}">7 / 1 geschlossen</div>
+        </div>
+    </div>
+
+    <!-- D1 card grid: one .kpi-card per visible account; the whole card links to the detail. -->
+    <div class="bank-acc-grid mt-2" th:if="${!#lists.isEmpty(cards)}">
+        <a th:each="card : ${cards}" class="kpi-card"
+           th:classappend="${card.account().status() == 'CLOSED'} ? ' kpi-card--closed' : ''"
+           th:href="@{'/bank/accounts/' + ${card.account().id()}}"
+           data-testid="bank-account-card"
+           th:attr="data-account-no=${card.account().accountNo()}">
+            <div class="kpi-card-top">
+                <div>
+                    <div class="kpi-title" th:text="${card.account().name()}">Staffel IRIDIUM</div>
+                    <div class="kpi-sub" th:text="${card.account().accountNo()}">KB-0001</div>
+                </div>
+                <span class="chip" style="font-size: 0.55rem;"
+                      th:classappend="${card.account().status() == 'CLOSED'} ? ' chip--muted' : ''"
+                      th:text="${card.account().status() == 'CLOSED'} ? #{bank.account.status.CLOSED} : #{'bank.account.type.' + ${card.account().type()}}">Staffel</span>
+            </div>
+            <div class="kpi-value"
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(card.account().balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
+            <div class="kpi-card-foot">
+                <span class="kpi-delta"
+                      th:classappend="${card.account().delta30d().signum() > 0} ? ' kpi-delta--pos' : (${card.account().delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
+                      th:text="${card.account().delta30d().signum() > 0 ? '&#9650; +' : (card.account().delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(card.account().delta30d()), 1, 'POINT')} + ' ' + #{bank.dashboard.delta30}">&#9650; +420.000 / 30 T</span>
+                <svg th:if="${card.sparklinePoints() != null}" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">
+                    <polyline th:attr="points=${card.sparklinePoints()},stroke=${card.flat()} ? '#646464' : '#E77E23'"
+                              fill="none" stroke-width="1.5"/>
+                </svg>
+            </div>
+        </a>
+    </div>
+
+    <div class="hud-box mt-2" th:if="${#lists.isEmpty(cards)}">
+        <p class="text-center" data-testid="bank-dashboard-empty" th:text="#{bank.dashboard.empty}">
+            Noch keine Konten sichtbar. Berechtigungen vergibt die Bankleitung.
+        </p>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>
