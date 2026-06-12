@@ -1,5 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-07.
-> **Owner area:** INV · **Related ADRs:** none · **Plan:** `SC_WIKI_SYNC_PLAN.md` (historical)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
+> **Owner area:** INV · **Related ADRs:** [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
+> (its additive-v1 evolution rule is mirrored by REQ-INV-014) · **Plan:** `SC_WIKI_SYNC_PLAN.md` (historical)
 
 # Blueprint import — product name matching
 
@@ -12,8 +13,9 @@ Blueprint Extractor — is matched, by name, against the blueprint **product mas
 `BlueprintProductService` builds that master from `blueprint.output_name`, which
 `ScWikiBlueprintSyncService` syncs verbatim from the SC Wiki `/api/blueprints` feed. So the
 import only finds a product if the in-game name it sends equals a stored `output_name` — after
-both are normalized. This spec governs that name-matching contract and the correction layer that
-keeps it working when CIG mislabels a name at the source.
+both are normalized. This spec governs that name-matching contract, the correction layer that
+keeps it working when CIG mislabels a name at the source, and the tolerance rules for the
+uploaded export file's envelope.
 
 ## Requirements
 
@@ -83,6 +85,38 @@ of known upstream bugs that need the correct name in code review, not a runtime-
 `P4kImportServiceTest` · **Code:** `BlueprintOutputNameOverrides`,
 `ScWikiBlueprintSyncService.upsertBlueprintWithinTransaction`,
 `P4kImportService.maybeSeedBlueprint` · **Issues:**
+[#327](https://github.com/greluc/basetool/issues/327)
+
+### REQ-INV-014 — Tolerant export-envelope parsing (additive v1 evolution)
+
+The import accepts three upload shapes: a bare JSON array of entries, the SCMDB log-watcher
+document, and the Basetool Blueprint Extractor `BlueprintExport` document (`schemaVersion` 1).
+In the document forms only the top-level `blueprints` array is consumed; every other envelope
+field is tolerated and ignored (`@JsonIgnoreProperties(ignoreUnknown = true)` on
+`BlueprintExportFileDto`). The extractor evolves its export contract additively within schema
+version 1 — the same rule ADR-0008 fixes for the refinery extract (precedent: `capturedAt` on
+`sourceImages`, 2026-06-11) — so new nullable envelope fields appear without a version bump and
+must never break the import.
+
+The first such field is `additionalSourceFolders` (`List<String>`, nullable, default `null`):
+the extra game-channel folders the extractor scanned beside its primary `sourceFolder`
+(currently the `HOTFIX` sibling of `LIVE`). Because the extractor encodes defaults, the key is
+always present in its exports — as JSON `null` when only the primary folder was scanned. The
+field is mirrored on `BlueprintExportFileDto` for contract explicitness but is provenance only;
+the import does not consume it.
+
+**Acceptance**
+
+- [ ] Bare-array, SCMDB-document, and Extractor-document uploads all parse.
+- [ ] An Extractor export with `additionalSourceFolders` populated, explicitly `null`, or absent
+  (older extractor version) imports identically.
+- [ ] Unknown envelope fields never fail the parse.
+
+**Enforced by:** `BlueprintImportServiceTest` (`preview_acceptsBareArrayForm`,
+`preview_acceptsFullScmdbWatcherDocumentShape`, `preview_acceptsBpExtractorReceivedAtFormat`,
+`preview_acceptsBpExtractorWithAdditionalSourceFolders`,
+`preview_acceptsBpExtractorWithNullAdditionalSourceFolders`) · **Code:**
+`BlueprintExportFileDto`, `BlueprintImportService#parse` · **Issues:**
 [#327](https://github.com/greluc/basetool/issues/327)
 
 ## Out of scope
