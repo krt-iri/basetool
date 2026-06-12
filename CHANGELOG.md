@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.20](https://github.com/krt-iri/basetool/releases/tag/v0.4.20) - 2026-06-12
+
 ### Changed
 
 - **Der Blueprint-Import kennt das neue Extractor-Feld `additionalSourceFolders`.** Der Basetool Blueprint Extractor listet darin zusätzlich gescannte Channel-Ordner (z. B. HOTFIX neben LIVE); der Import akzeptiert Exporte mit und ohne das Feld unverändert — es wird nur mitgelesen, nicht ausgewertet.
