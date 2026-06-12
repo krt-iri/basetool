@@ -2,11 +2,15 @@
 
 ## [Unreleased]
 
+## [v0.4.19](https://github.com/krt-iri/basetool/releases/tag/v0.4.19) - 2026-06-12
+
 ### Changed
 
 - **Die Staffelübersicht im Hangar ist jetzt echt paginiert:** Die Tabelle blättert serverseitig über alle Schiffstypen (vorher wurden maximal 1000 Einträge auf einmal geladen), mit wählbarer Seitengröße 10/50/100 im KRT-Stil. Die Schiffstyp-Suche filtert jetzt serverseitig über die gesamte Flotte statt nur über die sichtbaren Zeilen.
 
 - **Blueprint-Verfügbarkeit: Die Tabelle ist jetzt echt seitenweise (10/50/100 Einträge pro Seite wählbar) statt einer einmaligen 1000er-Ladung.** Die Seitennavigation und der Seitengrößen-Wähler folgen dem KRT-Design-System; die Suche läuft jetzt serverseitig über alle Einträge (nicht nur die sichtbare Seite) und bleibt beim Blättern und Umschalten der Seitengröße erhalten.
+
+- **Die Screenshot-Import-Warnung `SUM_MISMATCH` nennt jetzt beide möglichen Ursachen:** Neben einer falsch gelesenen Menge/einem falsch gelesenen Toggle kann auch ein nach GET QUOTE geänderter Auftrag die eingefrorene TO-REFINE-Kopfzeile übersteigen (das Spiel friert die Kopfzeilen beim Quote ein). Meldungstexte (DE/EN) mit Handlungsempfehlung umformuliert; Prüfung und Schwere unverändert.
 
 ### Fixed
 
@@ -15,10 +19,6 @@
 - **Die Seitennavigation unter Listen (Mitglieder, Einsätze, Operationen, Lager) funktioniert wieder, sobald es mehr als eine Seite gibt.** Das gemeinsame Pagination-Fragment rief seit dem Design-System-Umbau nicht existierende Accessoren auf und ließ jede mehrseitige Liste mit einem Serverfehler abbrechen.
 
 - **Blueprint-Verfügbarkeit: Das Aufklappen der Detailansicht mit Nutzerliste ruckelt nicht mehr.** Das Ein-/Ausklappen schaltet jetzt gezielt nur die zugehörige Detailzeile um (vorher erzwang eine `:has()`-CSS-Regel bei jedem Klick eine Style-Neuberechnung über die gesamte Tabelle), und der Nutzer-Abruf im Admin-Modus fragt direkt per Produktschlüssel ab statt vorher alle Blueprint-Besitzer zu scannen.
-
-### Changed
-
-- **Die Screenshot-Import-Warnung `SUM_MISMATCH` nennt jetzt beide möglichen Ursachen:** Neben einer falsch gelesenen Menge/einem falsch gelesenen Toggle kann auch ein nach GET QUOTE geänderter Auftrag die eingefrorene TO-REFINE-Kopfzeile übersteigen (das Spiel friert die Kopfzeilen beim Quote ein). Meldungstexte (DE/EN) mit Handlungsempfehlung umformuliert; Prüfung und Schwere unverändert.
 
 ## [v0.4.18](https://github.com/krt-iri/basetool/releases/tag/v0.4.18) - 2026-06-11
 
