@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Raffinerieauftrag: In den Materialzeilen steht die Qualität jetzt vor der Eingangsmenge (Units).** Die Feldreihenfolge im Anlege- und Detailformular folgt damit der Reihenfolge im Spiel; die Ausgangszeile (Units, SCU) bleibt unverändert.
+
 ## [v0.4.20](https://github.com/krt-iri/basetool/releases/tag/v0.4.20) - 2026-06-12
 
 ### Changed
