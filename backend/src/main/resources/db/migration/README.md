@@ -82,9 +82,11 @@ something broke once.
    the bad change. Rolling a database back across multiple environments is
    strictly more expensive than rolling forward, every time.
 5. **PostgreSQL syntax only.** This project does not target any other database
-   in production. H2-specific dialect in tests is handled separately by the
-   test profile (which currently skips Flyway entirely; see the section
-   "Tests" below).
+   in production — and the tests run on the same engine: the test profile boots
+   a Testcontainers PostgreSQL container and applies every Flyway migration to
+   it (see the section "Tests" below). Postgres-specific syntax (JSONB, GIN,
+   `ON CONFLICT`, `gen_random_uuid()`, …) is therefore fine *and* exercised by
+   the test suite.
 
 ## Destructive operations (`DROP TABLE` / `DROP COLUMN`)
 
@@ -160,21 +162,33 @@ migrations are where things go subtly wrong.
 
 ## Tests
 
-The test profile (`application-test.yml`) currently runs against H2 and sets
-`flyway.enabled: false`, so Flyway scripts are **not** executed by the standard
-test suite. Moving tests onto Testcontainers + Postgres so migrations actually
-run there is an open follow-up. Until that lands:
+The test profile (`application-test.yml`) runs every `@SpringBootTest` against
+a real PostgreSQL 18 container started on demand by Testcontainers' JDBC-URL
+trick (`jdbc:tc:postgresql:18-alpine:///testdb`), with Flyway enabled
+(`spring.flyway.enabled: true`) and `ddl-auto: validate`. The backend has no
+H2 dependency at all. That
+means the standard test suite **does** execute every migration in this
+directory and then validates the resulting schema against the JPA entities —
+the same contract as prod:
 
-* Don't assume `./gradlew test` validated your migration. Run the dev
-  Compose stack at least once before merging:
+* `./gradlew :backend:test` is the primary check for a new migration. A
+  migration with broken SQL, or one that drifts from the entity annotations,
+  fails the suite at context startup with a Flyway or `ddl-auto=validate`
+  error. (Pure Mockito unit tests don't load the Spring context and start no
+  container, so they neither slow down nor validate anything here.)
+
+* Optionally, you can additionally boot the dev Compose stack to see the
+  migration run against a long-lived database (useful for eyeballing
+  backfilled data or testing against pre-existing rows that the throwaway
+  test container never has):
 
   ```bash
   docker compose --profile dev up -d db-backend-dev keycloak-dev redis-dev
   ./gradlew :backend:bootRun
   ```
 
-  The first boot after your migration must succeed without `ddl-auto=validate`
-  complaints.
+  This is extra verification, not the gate — the test suite already covers
+  the apply-and-validate path.
 
 * If you change the schema in a way that affects Hibernate's entity mapping
   (rename a column, change a type, add a constraint), update the entity in
@@ -211,7 +225,8 @@ comment should answer the obvious "why now?" question before they need to.
   without a phase-1 stop-writing predecessor in an earlier release.
 - [ ] Backfill (if any) is idempotent and inside the same migration file.
 - [ ] The matching JPA entity was updated in the same commit.
-- [ ] `./gradlew :backend:bootRun` against the dev Postgres started cleanly.
+- [ ] `./gradlew :backend:test` passed — the suite applies the migration to a
+  Testcontainers Postgres and validates the schema against the entities.
 - [ ] If indexes were added, [`DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/iri/basetool/backend/db/DatabaseIndexMigrationTest.java)
   knows about them.
 - [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
