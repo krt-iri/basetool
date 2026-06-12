@@ -27588,6 +27588,7 @@
       "get" : {
         "tags" : [ "Blueprint Availability" ],
         "summary" : "List blueprints available among the caller's oversight org-unit members.",
+        "description" : "Paginated; the optional product-name search filters before pagination so it spans every entry, not just the requested page.",
         "operationId" : "listAvailableBlueprints",
         "parameters" : [ {
           "name" : "page",
@@ -27607,6 +27608,13 @@
           }
         }, {
           "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "search",
           "in" : "query",
           "required" : false,
           "schema" : {

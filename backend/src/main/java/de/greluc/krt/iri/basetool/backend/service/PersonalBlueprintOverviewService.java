@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -82,11 +83,20 @@ public class PersonalBlueprintOverviewService {
    * page when the caller oversees no org unit (the {@link
    * OwnerScopeService#canAccessBlueprintOverview()} gate already keeps non-leadership callers out).
    *
+   * <p>The optional {@code search} narrows the result to products whose display name contains the
+   * fragment case-insensitively. It is applied to the aggregated entries <em>before</em> sorting
+   * and pagination, so the returned page numbers always describe the filtered set — the
+   * availability page paginates server-side (REQ-INV-013) and the filter must span every entry, not
+   * just the visible page.
+   *
    * @param pageable page request whose sort is restricted to {@link #SORTABLE_FIELDS}
+   * @param search optional case-insensitive product-name fragment; {@code null} or blank matches
+   *     everything
    * @return a page of {@link BlueprintOverviewEntryDto}, sorted by product name then product key
    */
   @NotNull
-  public Page<BlueprintOverviewEntryDto> listAvailableBlueprints(@NotNull Pageable pageable) {
+  public Page<BlueprintOverviewEntryDto> listAvailableBlueprints(
+      @NotNull Pageable pageable, @Nullable String search) {
     Set<String> ownerSubs = inScopeOwnerSubs();
     if (ownerSubs.isEmpty()) {
       return new PageImpl<>(List.of(), pageable, 0);
@@ -98,8 +108,14 @@ public class PersonalBlueprintOverviewService {
           .owners
           .add(bp.getOwnerSub());
     }
+    String needle =
+        search == null || search.isBlank() ? null : search.trim().toLowerCase(Locale.ROOT);
     List<BlueprintOverviewEntryDto> all =
         byKey.entrySet().stream()
+            .filter(
+                entry ->
+                    needle == null
+                        || entry.getValue().productName.toLowerCase(Locale.ROOT).contains(needle))
             .map(
                 entry ->
                     new BlueprintOverviewEntryDto(

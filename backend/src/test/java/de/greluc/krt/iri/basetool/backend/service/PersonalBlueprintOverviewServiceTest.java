@@ -101,7 +101,7 @@ class PersonalBlueprintOverviewServiceTest {
                 bp("aurora", "Aurora MR", USER_2),
                 bp("cutlass", "Cutlass Black", USER_1)));
 
-    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName());
+    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
 
     assertEquals(2, page.getTotalElements());
     assertEquals("Aurora MR", page.getContent().get(0).productName());
@@ -120,7 +120,7 @@ class PersonalBlueprintOverviewServiceTest {
     when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
         .thenReturn(List.of(bp("aurora", "Aurora MR", USER_1)));
 
-    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName());
+    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
 
     assertEquals(1, page.getTotalElements());
     verify(orgUnitMembershipRepository).findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A));
@@ -131,7 +131,7 @@ class PersonalBlueprintOverviewServiceTest {
     when(ownerScopeService.currentBlueprintOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
-    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName());
+    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
 
     assertTrue(page.getContent().isEmpty());
     assertEquals(0, page.getTotalElements());
@@ -149,10 +149,36 @@ class PersonalBlueprintOverviewServiceTest {
             List.of(bp("aurora", "Aurora MR", USER_1), bp("cutlass", "Cutlass Black", USER_1)));
 
     Page<BlueprintOverviewEntryDto> page =
-        service.listAvailableBlueprints(PageRequest.of(0, 50, Sort.by("productName").descending()));
+        service.listAvailableBlueprints(
+            PageRequest.of(0, 50, Sort.by("productName").descending()), null);
 
     assertEquals("Cutlass Black", page.getContent().get(0).productName());
     assertEquals("Aurora MR", page.getContent().get(1).productName());
+  }
+
+  // covers REQ-INV-013 — the search filters the aggregated entries BEFORE pagination, so the
+  // returned totals describe the filtered set and the filter spans every entry, not one page.
+  @Test
+  void list_search_filtersByProductNameCaseInsensitive_beforePagination() {
+    when(ownerScopeService.currentBlueprintOversightScope())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(personalBlueprintRepository.findAllDistinctOwnerSubs())
+        .thenReturn(Set.of(USER_1.toString()));
+    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+        .thenReturn(
+            List.of(
+                bp("aurora", "Aurora MR", USER_1),
+                bp("scattergun", "Scattergun", USER_1),
+                bp("caterpillar", "Caterpillar", USER_1)));
+
+    Page<BlueprintOverviewEntryDto> page =
+        service.listAvailableBlueprints(PageRequest.of(0, 1, Sort.by("productName")), "CAT");
+
+    // Two of three products match "CAT" (case-insensitive substring); page size 1 still reports
+    // the FILTERED total of 2, proving the filter ran before the page was cut.
+    assertEquals(2, page.getTotalElements());
+    assertEquals(1, page.getContent().size());
+    assertEquals("Caterpillar", page.getContent().get(0).productName());
   }
 
   @Test

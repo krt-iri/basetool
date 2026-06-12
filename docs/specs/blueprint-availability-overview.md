@@ -1,7 +1,7 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
 > **Owner area:** INV/UI · **Related ADRs:** none
 
-# Blueprint availability overview — owner drill-down hot path
+# Blueprint availability overview — list & drill-down contract
 
 ## Context & goal
 
@@ -44,6 +44,33 @@ outside the requested product.
 **Enforced by:** `PersonalBlueprintOverviewServiceTest` · **Code:**
 `PersonalBlueprintOverviewService`, `frontend/src/main/resources/static/js/blueprint-overview.js`
 · **Issues:** #364
+
+### REQ-INV-013 — True server-side pagination with selectable page size
+
+The availability list paginates server-side over **all** matching entries — the page never
+fetches more rows than it displays, and no entry is silently unreachable (the previous
+single `size=1000` fetch truncated anything beyond the first thousand products). The user
+chooses between 10, 50 and 100 entries per page.
+
+**Acceptance**
+
+- [ ] The frontend page relays `page`/`size` to the backend overview endpoint and renders
+  exactly one page; `size` is restricted to the whitelist {10, 50, 100} (fallback 50),
+  so a crafted query string cannot restore the unbounded fetch.
+- [ ] The page-nav (first/previous/next/last + "x / y" readout) and a 10/50/100 page-size
+  picker render from the shared design-system pagination component (`.pagination`,
+  square `.page-btn` link group — no native `<select>`); choosing a size jumps back to
+  page 0; the picker is hidden while the total fits the smallest size.
+- [ ] The product search executes server-side **before** pagination, so it spans every
+  entry (not just the visible page), and the reported page count describes the
+  filtered set.
+- [ ] Paging and re-sizing never drop an active search: every generated page-nav and
+  size-picker link carries the `search` parameter along.
+
+**Enforced by:** `PersonalBlueprintOverviewServiceTest`,
+`BlueprintOverviewPageControllerTest`, `BlueprintOverviewPageControllerMvcTest` ·
+**Code:** `PersonalBlueprintOverviewService`, `BlueprintOverviewPageController`,
+`fragments/pagination.html` · **Issues:** #364
 
 ## Out of scope
 

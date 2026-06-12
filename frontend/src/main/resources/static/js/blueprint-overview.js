@@ -101,36 +101,10 @@
         });
     }
 
-    function wireFilter() {
-        const input = document.getElementById('bp-overview-filter');
-        if (!input) {
-            return;
-        }
-        const rows = document.querySelectorAll('tr.bp-row');
-        const noResults = document.getElementById('bp-filter-empty');
-        input.addEventListener('input', function () {
-            const query = this.value.trim().toLowerCase();
-            let anyVisible = false;
-            rows.forEach(function (row) {
-                const haystack = row.getAttribute('data-bp-filter') || '';
-                const match = query === '' || haystack.indexOf(query) !== -1;
-                row.style.display = match ? '' : 'none';
-                const detailsRow = row.nextElementSibling;
-                if (detailsRow && detailsRow.classList.contains('details-row')) {
-                    detailsRow.style.display = match ? '' : 'none';
-                }
-                if (match) {
-                    anyVisible = true;
-                }
-            });
-            if (noResults) {
-                noResults.style.display = !anyVisible && query !== '' ? '' : 'none';
-            }
-        });
-    }
-
+    // The product search is server-side (REQ-INV-013): the table is paginated, so a
+    // client-side row filter would only ever see the current page. The search input is
+    // a plain GET form submitted on Enter - no JS wiring needed.
     document.addEventListener('DOMContentLoaded', function () {
-        wireFilter();
         document.querySelectorAll('details[data-product-key]').forEach(wireDetails);
     });
 })();

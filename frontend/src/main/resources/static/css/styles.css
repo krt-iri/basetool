@@ -2034,6 +2034,41 @@ input[type='radio']:focus {
     font-weight: var(--fw-bold);
 }
 
+/* Active page-size choice - same highlight as the aria-current page button,
+   but rendered as an inert <span class="page-btn active"> (a non-page use of
+   aria-current="true", so the [aria-current='page'] selector does not catch it). */
+.pagination .page-btn.active {
+    background-color: var(--color-primary);
+    color: var(--color-bg-black);
+    border-color: var(--color-primary);
+    font-weight: var(--fw-bold);
+    cursor: default;
+}
+
+/* Combined footer bar under paginated tables: page-size picker left, page-nav
+   right; wraps into stacked rows on narrow (smartphone) widths. The children
+   keep their own component styles - only their top margin moves to the bar. */
+.pagination-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--space-4);
+}
+
+.pagination-controls .pagination {
+    margin-top: 0;
+}
+
+.page-size-picker .page-size-label {
+    color: var(--color-gray-2);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-right: var(--space-2);
+}
+
 /* Key-value detail list - read-only "label : value" rows (profile, detail
    panels, org/finance summaries). Label is neutral uppercase; the VALUE is the
    bright thing (data, not action). Built on a 2-col grid so colons/values

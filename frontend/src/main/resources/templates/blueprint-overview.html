@@ -105,13 +105,18 @@
             Aggregation across all org units.
         </div>
 
-        <div class="bp-filter" th:if="${!#lists.isEmpty(overview)}">
+        <!-- Server-side search (REQ-INV-013): the table is paginated, so a client-side row
+             filter would only ever see the current page. Submitting reloads page 0 with the
+             search applied before pagination; the chosen page size is carried along. -->
+        <form class="bp-filter" method="get" th:action="@{/blueprint-overview}"
+              th:if="${overviewPage != null and (overviewPage.totalElements() > 0 or search != null)}">
             <span class="bp-filter-icon" aria-hidden="true">
                 <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
             </span>
-            <input type="search" id="bp-overview-filter" autocomplete="off"
+            <input type="search" id="bp-overview-filter" name="search" th:value="${search}" autocomplete="off"
                    th:attr="placeholder=#{blueprintOverview.filter.placeholder},aria-label=#{blueprintOverview.filter.placeholder}">
-        </div>
+            <input type="hidden" name="size" th:value="${overviewPage.size()}">
+        </form>
 
         <div class="table-responsive">
         <table class="data-table">
@@ -124,7 +129,7 @@
             </thead>
             <tbody>
             <th:block th:each="item : ${overview}">
-            <tr class="bp-row" th:attr="data-bp-filter=${#strings.toLowerCase(item.productName)}">
+            <tr class="bp-row">
                 <td th:text="${item.productName}" style="vertical-align: top; padding-top: 1rem;">Blueprint</td>
                 <td style="vertical-align: top; padding-top: 1rem;">
                     <span class="bp-owner-count" th:text="${item.ownerCount}">0</span>
@@ -141,14 +146,22 @@
                 </td>
             </tr>
             </th:block>
-            <tr th:if="${#lists.isEmpty(overview)}">
+            <tr th:if="${#lists.isEmpty(overview) and search == null}">
                 <td colspan="3" class="text-center" th:text="#{blueprintOverview.empty}">No blueprints recorded.</td>
             </tr>
-            <tr id="bp-filter-empty" style="display: none;">
+            <tr th:if="${#lists.isEmpty(overview) and search != null}">
                 <td colspan="3" class="text-center" th:text="#{blueprintOverview.filter.no_results}">No results for this search.</td>
             </tr>
             </tbody>
         </table>
+        </div>
+
+        <!-- Footer bar: size picker left, page-nav right (REQ-INV-013). The base URL keeps the
+             active search so paging and re-sizing never drop the filter. -->
+        <div class="pagination-controls" th:if="${overviewPage != null}"
+             th:with="bpBase=${search != null ? '/blueprint-overview?search=' + #uris.escapeQueryParam(search) : '/blueprint-overview'}">
+            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${bpBase}, sizes=${pageSizes})}"></nav>
+            <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${overviewPage}, baseUrl=${bpBase})}"></nav>
         </div>
     </div>
 </main>
