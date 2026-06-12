@@ -35,7 +35,11 @@
             .details-row {
                 display: none;
             }
-            tr:has(details[open]) + .details-row {
+            /* Toggled per row by the inline details handler below. A
+               tr:has(details[open]) sibling rule here forced a style recalculation
+               across the whole table on every expand and visibly janked the UI
+               (same fix as blueprint-overview, REQ-INV-012). */
+            .details-row.sq-expanded {
                 display: table-row;
             }
             .details-row td {
@@ -169,6 +173,19 @@
 <script th:attr="nonce=${cspNonce}">
     // ---- Live filter: hide ship-type rows (and their detail rows) that do not match the query ----
     document.addEventListener("DOMContentLoaded", function() {
+        // Details toggle drives the companion row via a class; a
+        // tr:has(details[open]) sibling selector would force a table-wide
+        // style recalculation on every toggle and visibly jank on large tables.
+        document.querySelectorAll("tr.sq-row details").forEach(function(details) {
+            details.addEventListener("toggle", function() {
+                const row = details.closest("tr");
+                const detailsRow = row ? row.nextElementSibling : null;
+                if (detailsRow && detailsRow.classList.contains("details-row")) {
+                    detailsRow.classList.toggle("sq-expanded", details.open);
+                }
+            });
+        });
+
         const filterInput = document.getElementById("squadron-ship-filter");
         if (!filterInput) {
             return;
