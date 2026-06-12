@@ -53,9 +53,10 @@ start.
   `realm-export.json` is gitignored, host-installed, and **not** auto-imported in prod
   (`start` without `--import-realm`) → prod realm changes are **manual admin-console
   steps + updating the host export file** (see `docs/deployment.md` §5.3).
-- **Membership-less detection:** `OwnerScopeService.currentMemberOrgUnitIds().isEmpty()`
-  (per-request memoised) — the primitive for the REQ-BANK-008 eligibility predicate.
-  `AuthHelperService.isMemberOrAbove()` is role-based and NOT usable for this.
+- **Org-unit independence (REQ-BANK-008):** bank gates consult only the two bank roles
+  and `bank_account_grant` rows. `OwnerScopeService` scoping, contextual
+  `ROLE_X@orgUnitId` authorities and the `X-Active-Org-Unit-Id` admin pin must have
+  **zero** influence on bank decisions — bank staff may or may not be org-unit members.
 - **PDF:** OpenPDF 3.0.5 (`org.openpdf.*`), used by `JobOrderHandoverReportService` +
   `JobOrderItemHandoverReportService` — KRT page background (`KrtPageBackground`),
   orange `#E77E23`, logo `backend/src/main/resources/META-INF/resources/logos/krt.png`
@@ -73,7 +74,14 @@ start.
   (canonical: `ship-data.html` reset-fitted); PRG with `successToast`/`errorToast`
   flash keys; AJAX via `/api/proxy/**` frontend controllers with CSRF meta headers.
 - **Dashboards/charts:** no charting library exists; 30-day trend = server-computed
-  inline SVG sparkline (only `--color-*` tokens). KPI-card precedent: home page cards.
+  inline SVG sparkline (only `--color-*` tokens). The design system (submodule pin
+  ≥ `2ba5678`) now **ships the bank component layer**: `.kpi-total`/`.kpi-card`
+  (+ `--closed`, `.kpi-value`, `.kpi-delta--pos/--neg`), `.holder-row`/`.holder-bar`/
+  `.holder-sum` + `.stack-bar`/`.stack-legend`, `.matrix-flag(.on)` + `tr.is-inert`,
+  the formalized `.krt-modal` head/body/foot frame and `.confirm-input`
+  (type-to-confirm). Specimens: `preview/components-kpi-sparkline.html`,
+  `preview/components-bank-patterns.html`; documented in the submodule `README.md`
+  ("Bank patterns" block). Do NOT hand-roll these — reuse the shipped classes.
 - **Pagination:** `PageResponse<T>` + `PaginationUtil.createPageRequest` with
   whitelisted sort fields (PII-path defense). Fragments
   `pagination`/`pageSizePicker` (freshest example: hangar squadron overview, #553).
@@ -163,9 +171,9 @@ Holder sub-balances are never stored — `SUM(amount) GROUP BY account_id, holde
 
 URL matrix addition (backend `SecurityConfig`):
 `.requestMatchers("/api/v1/bank/admin/**").hasRole("ADMIN")` before the catch-all; the
-rest rides `anyRequest().authenticated()` + method gates. Every check in
-`BankSecurityService` first applies the REQ-BANK-008 eligibility predicate (non-admins
-with any org-unit membership → deny).
+rest rides `anyRequest().authenticated()` + method gates. `BankSecurityService`
+evaluates only bank roles + grants — org-unit memberships, contextual authorities and
+the admin pin have no effect on bank gates (REQ-BANK-008).
 
 ## 4. Frontend surface
 
@@ -183,6 +191,24 @@ Sidebar: new group `data-group-key="bank"` gated
 admin pages join the existing admin group. New i18n key families: `nav.bank.*`,
 `bank.*`, `admin.bank.*` in all three `messages*.properties` (umlauts as `\uXXXX`).
 Page CSS: `static/css/bank.css` via the `extraLinks` head slot.
+
+### 4.1 Binding design mockups (design-system submodule, pin ≥ `2ba5678`)
+
+The design system contains **final-draft mockups for all four bank pages** under
+`.claude/skills/das-kartell-design/proposals/`. They are the **visual source of truth**
+for Phases 2 and 4 (REQ-BANK-017) — build the pages to match them, using the shipped
+component classes instead of bespoke CSS:
+
+|                Page                 |                          Mockup (final draft)                           |                                                                                                                                                                                               Key components / decisions                                                                                                                                                                                                |
+|-------------------------------------|-------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/bank` dashboard                   | `proposals/bank-dashboard-varianten.html` — **D1 card grid**            | one `.kpi-card` per visible account (balance · sign-colored ±30-day `.kpi-delta` · server-SVG sparkline · type chip; click opens detail; closed = `.kpi-card--closed`); management-only `.kpi-total` aggregate strip (sum, 30-day in/out); employees: granted accounts only, no totals strip                                                                                                                            |
+| `/bank/accounts/{id}` detail        | `proposals/bank-konto-detail-varianten.html` — **K1 two-column**        | actions rendered per capability flags; holder distribution via `.holder-row`/`.holder-bar` + `.stack-bar`/`.stack-legend` + `.holder-sum`; booking modals = `.krt-modal` (head/body/foot, one filled CTA each, 409 surfaced as inline field error)                                                                                                                                                                      |
+| `/bank/manage` + `/bank/grants`     | `proposals/bank-verwaltung-varianten.html` — **W1 + G1 with G2 toggle** | management page with clickable tabs *Konten \| Halter* (lifecycle + holder registry); grants flag matrix (`.matrix-flag(.on)`) grouped **per account** by default, toggleable to per-employee; `tr.is-inert` marks grants whose grantee currently lacks the `Bank Employee` role (the only inert case — the mockup's "ausgesetzte Grants" tweak predates the org-unit-independence correction and maps to exactly this) |
+| `/admin/bank` + `/admin/bank-audit` | `proposals/bank-admin-varianten.html` — **A1 + A2**                     | danger section (danger-card) with **type-to-confirm** wipe-reset modal (`.confirm-input`, danger-styled `.krt-modal`); audit log as paged, filterable table (period/actor/account/type); admin chrome (accent-dark header); bank management sees neither page                                                                                                                                                           |
+
+Component specimens: `preview/components-bank-patterns.html`,
+`preview/components-kpi-sparkline.html`; class documentation: submodule `README.md`
+("Bank patterns (KPI, custody, grants)" block).
 
 ## 5. Phases
 
@@ -218,7 +244,8 @@ Deliverables:
   mutators named with covered prefixes or explicit `@Transactional`),
   `service/BankHolderService` (registry, handle snapshot), `service/BankGrantService`,
   `service/BankAuditService` (same-TX append), `service/BankSecurityService`
-  (eligibility predicate + capability checks), `controller/Bank*Controller`, `dto/` +
+  (role + capability checks only — deliberately blind to org-unit memberships, the
+  admin pin and contextual authorities, REQ-BANK-008), `controller/Bank*Controller`, `dto/` +
   `dto/request/` records (server-managed fields excluded from request DTOs), MapStruct
   mappers, Javadoc everywhere.
 - Backend `SecurityConfig`: `/api/v1/bank/admin/**` URL gate.
@@ -226,13 +253,14 @@ Deliverables:
 - `ROLES_AND_PERMISSIONS.md`: bank section; `realm-export.e2e.json`: roles + synthetic
   `test-bank-employee` / `test-bank-management` users.
 - OpenAPI regenerated; backend `messages*.properties` problem keys for the new 409
-  codes (`BANK_OVERDRAFT`, `BANK_ACCOUNT_NOT_EMPTY`, `BANK_INELIGIBLE_GRANTEE`, …).
+  codes (`BANK_OVERDRAFT`, `BANK_ACCOUNT_NOT_EMPTY`, `BANK_GRANTEE_MISSING_ROLE`, …).
 - Widen the `GET /api/v1/users/lookup` gate (URL matrix + `@PreAuthorize`) by
   `'BANK_MANAGEMENT'` so the Phase 2 grants UI can resolve users (see §1 gate caveat).
 
 Tests (Gradle only): `BankLedgerServiceTest` (double-entry invariants, no-overdraft
 concurrency at account and holder level, append-only pin, holder-on-every-posting rule,
-holder-distribution sums), `BankSecurityServiceTest` (capability × eligibility matrix),
+holder-distribution sums), `BankSecurityServiceTest` (capability matrix; org-unit
+membership, admin pin and contextual authorities have no effect — both directions),
 `BankHolderServiceTest` (registry, handle snapshot on user deletion),
 `BankGrantServiceTest`, `BankAccountServiceTest` (lifecycle, uniqueness 409s),
 `BankAuditServiceTest` (one event per mutation, same-TX), controller tests per
@@ -258,8 +286,7 @@ controller, `DatabaseIndexMigrationTest` registration, `ArchitectureTest` green.
 employee/management dashboard (cards + totals + SVG sparkline), account detail with
 deposit/withdraw/transfer/holder-rebooking modals (KRT modals, `data-version` sync or
 reload-on-success) and the holder-distribution section, account administration + holder
-registry, grants administration with the user lookup, suspension notice for employees
-with memberships (REQ-BANK-008), full i18n de+en, `bank.css`.
+registry, grants administration with the user lookup, full i18n de+en, `bank.css`.
 
 Deliverables: `BankPageController`, `BankManagePageController`, `BankGrantsPageController`
 (+ `/api/proxy/bank/**` AJAX proxy controllers where needed), templates `bank/*.html`,
@@ -267,10 +294,19 @@ Deliverables: `BankPageController`, `BankManagePageController`, `BankGrantsPageC
 i18n keys, `data-testid` hooks for e2e (`nav-bank`, `bank-account-row`,
 `bank-transfer-submit`, …).
 
+Design / UI acceptance (binding, REQ-BANK-017): pages match the §4.1 mockups —
+dashboard = D1 card grid, detail = K1 two-column, management = W1 tabs, grants = G1
+matrix with G2 toggle — using the design-system component classes (`.kpi-*`,
+`.holder-*`, `.stack-*`, `.matrix-flag`, `.krt-modal`) from `krt-components.css`
+instead of bespoke CSS; the bank-pattern classes are consumed via `bank.css` in sync
+with the pinned submodule. Deviations from a mockup need an owner decision before
+implementation.
+
 Tests: frontend controller unit tests (MockWebServer for error paths), Playwright e2e:
 `BankDashboardE2eTest`, `BankBookingE2eTest` (deposit/withdraw/transfer incl. 409 paths),
-`BankPermissionsE2eTest` (visibility matrix incl. the member-sees-nothing row and the
-suspension case), seeded via `BackendSeeder`.
+`BankPermissionsE2eTest` (visibility matrix incl. the member-without-bank-role-sees-nothing
+row and a bank employee who is also an org-unit member working normally), seeded via
+`BackendSeeder`.
 
 **Deployment (Phase 2).**
 
@@ -312,9 +348,15 @@ render unchanged on the shared layer, proxy controller tests, access-matrix test
 ### Phase 4 — Admin area: wipe-reset button & audit-log viewer
 
 **Objective.** The admin carve-out surfaces: `/admin/bank` (danger section with the
-wipe-reset button + KRT confirm modal + idempotent no-op notice) and `/admin/bank-audit`
-(paged, filterable audit viewer: period, actor, account, event type). Admin sidebar
-entries in the existing admin group. Finalize `ROLES_AND_PERMISSIONS.md` matrix rows.
+wipe-reset button + **type-to-confirm** danger modal + idempotent no-op notice) and
+`/admin/bank-audit` (paged, filterable audit viewer: period, actor, account, event
+type). Admin sidebar entries in the existing admin group. Finalize
+`ROLES_AND_PERMISSIONS.md` matrix rows.
+
+Design / UI acceptance (binding, REQ-BANK-017): both pages match the §4.1 A1 + A2
+mockup (`proposals/bank-admin-varianten.html`) — danger-card section, danger-styled
+`.krt-modal` with `.confirm-input` type-to-confirm hurdle (reserved for
+wipe-reset-grade actions), audit log as filterable table.
 
 Deliverables: `AdminBankPageController`, `AdminBankAuditPageController`, templates,
 backend wipe-reset service path (`WIPE_RESET` transactions per REQ-BANK-013) + audit
@@ -359,7 +401,7 @@ ADRs were flipped to `Accepted` at the Phase 1 sign-off (their stated trigger).
 |--------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Keycloak prod realm drift (roles exist in dev export but not prod) | explicit manual step in Phase 1 deployment + smoke test that a bank-role login passes a bank gate                                                                            |
 | Concurrency bugs in booking (the project's known trap class)       | insert-only ledger avoids `@Version` churn; no-overdraft via atomic guard + dedicated concurrency test; CLAUDE.md `…WithinTransaction` rules honored in handover-style flows |
-| Eligibility bypass via admin pin or contextual roles               | `BankSecurityService` ignores org-unit pin semantics entirely; eligibility uses raw membership rows; matrix e2e pins it                                                      |
+| Org-unit scoping leaking into bank gates (pin / contextual roles)  | `BankSecurityService` evaluates only bank roles + grants; independence is test-pinned in both directions (matrix e2e)                                                        |
 | PDF refactor regresses the two shipped handover reports            | golden-text regression tests before switching them to `KrtPdfSupport`                                                                                                        |
 | Audit gaps (mutation without event)                                | audit append in the same transaction + per-endpoint "exactly one event" tests                                                                                                |
 | Sparkline scope creep toward a chart library                       | spec fixes server-rendered inline SVG; anything more is a new requirement                                                                                                    |

@@ -10,10 +10,12 @@
 ## Context
 
 Bank staff need (a) a coarse "is bank personnel" signal, (b) fine-grained per-account
-capabilities — view, deposit, withdraw, transfer — assignable per employee per account,
-and (c) a hard separation-of-duties rule: bank staff must hold a basetool account but
-**no org-unit membership** (no Staffel, no Spezialkommando). Admins must be able to see
-and edit everything in the bank; the audit log must be admin-only.
+capabilities — view, deposit, withdraw, transfer — assignable per employee per account.
+Bank membership is **fully independent of org-unit membership** (REQ-BANK-008): a bank
+employee or manager may, but need not, also belong to a Staffel or Spezialkommando, so
+bank authorization must not be derived from — or be influenced by — org-unit scoping.
+Admins must be able to see and edit everything in the bank; the audit log must be
+admin-only.
 
 Existing machinery:
 
@@ -45,12 +47,11 @@ We will split bank authorization into two layers:
    `@PreAuthorize` SpEL — e.g.
    `@PreAuthorize("hasRole('BANK_EMPLOYEE') and @bankSecurityService.canDeposit(#accountId, authentication)")`.
    `BANK_MANAGEMENT` and `ADMIN` short-circuit to allow inside the bean.
-3. **Eligibility predicate enforced at access time:** every `BankSecurityService` check
-   first requires `currentMemberOrgUnitIds().isEmpty()` (zero `org_unit_membership`
-   rows) for non-admin callers. Joining an org unit therefore *suspends* bank access
-   immediately without data changes; admins are exempt (maintenance carve-out, always
-   audited). Grant creation additionally validates eligibility so conflicts surface
-   early (409).
+3. **Org-unit independence by construction:** `BankSecurityService` evaluates **only**
+   the bank roles and the grant table. It never consults `OwnerScopeService` scoping,
+   contextual `ROLE_X@orgUnitId` authorities or the `X-Active-Org-Unit-Id` admin pin —
+   org-unit memberships have zero influence on bank decisions, in both directions
+   (they neither grant nor block anything). A test pins this independence.
 4. **Audit log is role-gated twice:** URL matcher `/api/v1/bank/admin/**` →
    `hasRole('ADMIN')` plus method-level `@PreAuthorize("hasRole('ADMIN')")` — bank
    management explicitly does **not** see it.
@@ -64,22 +65,26 @@ We will split bank authorization into two layers:
   naturally (`bankSecurityService` joins the accepted `@PreAuthorize` gate set).
 - **Harder / accepted:** two sources must align (role in Keycloak, grants in app); a
   user with grants but no role sees nothing — by design, the role is the kill switch.
-- **Accepted cost:** the eligibility check adds one membership lookup per bank request;
-  it reuses the per-request memoisation in `OwnerScopeService`.
+- **Easier:** no membership lookup on bank requests — gates read only authorities plus
+  one grant row; org-unit data stays entirely out of the bank's decision path.
 - Follow-up: `ROLES_AND_PERMISSIONS.md` gains the bank rows; the E2E realm export gains
-  the two roles plus synthetic bank users.
+  the two roles plus synthetic bank users (one of them also an org-unit member, to pin
+  the independence).
 
 ## Alternatives considered
 
 - **Per-account roles in Keycloak** — rejected: role explosion, no optimistic locking,
   no in-app audit, admin UX outside the tool.
-- **Reusing `org_unit_membership` with a "BANK" org unit** — rejected: would make bank
-  staff org-unit members, directly violating the separation-of-duties requirement and
-  polluting every membership-driven scope (orders, missions, promotion).
+- **Reusing `org_unit_membership` with a "BANK" org unit** — rejected: the bank is not
+  a tenancy org unit; a pseudo-membership would pollute every membership-driven scope
+  (orders, missions, promotion, picker stamping) and entangle bank access with the
+  org-unit machinery that REQ-BANK-008 explicitly keeps out of the bank.
 - **One `BANK` role + management flag in the app** — rejected: management visibility
   ("sees all accounts") is a coarse, org-level distinction exactly matching a realm
   role; modeling it as app data would weaken the kill-switch property.
-- **Enforcing eligibility only at grant time** — rejected: a later org-unit join would
-  leave a member with live bank access; access-time enforcement makes the invariant
-  continuous.
+- **A separation-of-duties rule (bank staff must hold no org-unit membership)** —
+  considered and rejected by the owner: bank work is open to org-unit members and
+  non-members alike; an eligibility predicate would add a lookup per request and an
+  operational trap (joining a Staffel would silently kill bank access) for no required
+  control.
 
