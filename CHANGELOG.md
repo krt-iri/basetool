@@ -18,7 +18,7 @@
 
 - **Listenfilter und Seitennavigation (Einsätze, Operationen) laufen jetzt über eine gemeinsame AJAX-Grundlage und aktualisieren nur den Ergebnisbereich.** Das Blättern in den gefilterten Ergebnissen lädt nicht mehr die ganze Seite neu.
 
-- **Das Bank-Audit-Log filtert und blättert jetzt ohne Seitenneuladen.** Gefilterte/geblätterte Listen (Einsätze, Operationen, Bank-Audit) halten den Filter beim Neuladen der Seite (die URL bleibt in Sync) und springen nicht mehr an den Seitenanfang; Zeitstempel in nachgeladenen Tabellenzeilen werden jetzt ebenfalls in lokale Zeit umgerechnet.
+- **Weitere Listen filtern und blättern jetzt ohne Seitenneuladen: Bank-Audit-Log, Mitgliederverwaltung und Raffinerieaufträge.** Gefilterte/geblätterte Listen (Einsätze, Operationen, Bank-Audit, Mitglieder, Raffinerieaufträge) halten den Filter beim Neuladen der Seite (die URL bleibt in Sync) und springen nicht mehr an den Seitenanfang; Zeitstempel in nachgeladenen Tabellenzeilen werden jetzt ebenfalls in lokale Zeit umgerechnet.
 
 ### Removed
 

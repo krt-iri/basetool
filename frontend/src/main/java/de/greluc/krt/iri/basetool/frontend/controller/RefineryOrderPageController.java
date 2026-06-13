@@ -115,16 +115,20 @@ public class RefineryOrderPageController {
    *
    * @param status optional list of statuses to include
    * @param onlyMine if true, restrict to the caller's own orders
+   * @param fragment when {@code "results"}, only the results-table fragment is rendered for an
+   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with {@code orders}, selected statuses and the full
    *     status list for the filter UI
    * @param principal authenticated OIDC user (used to derive the logistician hint)
-   * @return the {@code refinery-orders-index} view name
+   * @return the {@code refinery-orders-index} view name, or its {@code refineryOrdersResults}
+   *     fragment selector
    */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false) Boolean onlyMine,
+      @RequestParam(required = false) String fragment,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     if (status == null || status.isEmpty()) {
@@ -156,6 +160,9 @@ public class RefineryOrderPageController {
     model.addAttribute("selectedStatuses", status);
     model.addAttribute("onlyMine", Boolean.TRUE.equals(onlyMine));
     model.addAttribute("allStatuses", List.of("OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED"));
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "refinery-orders-index :: refineryOrdersResults";
+    }
     return "refinery-orders-index";
   }
 

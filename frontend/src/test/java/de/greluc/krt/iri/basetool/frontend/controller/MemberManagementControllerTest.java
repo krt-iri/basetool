@@ -107,7 +107,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(page);
 
-      String view = controller.listMembers(null, null, null, model);
+      String view = controller.listMembers(null, null, null, false, model);
 
       assertEquals("members", view);
       // SPEZIALKOMMANDO_PLAN.md §7.5: listMembers now also fetches per-user memberships for the
@@ -131,7 +131,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(newPage(List.of()));
 
-      controller.listMembers("alice", null, null, model);
+      controller.listMembers("alice", null, null, false, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
@@ -150,7 +150,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(newPage(List.of()));
 
-      controller.listMembers("   ", null, null, model);
+      controller.listMembers("   ", null, null, false, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
@@ -163,7 +163,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(newPage(List.of()));
 
-      controller.listMembers(null, 2, 25, model);
+      controller.listMembers(null, 2, 25, false, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
@@ -180,7 +180,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(null);
 
-      String view = controller.listMembers(null, null, null, model);
+      String view = controller.listMembers(null, null, null, false, model);
 
       assertEquals("members", view);
       assertNull(model.getAttribute("users"));
@@ -194,10 +194,24 @@ class MemberManagementControllerTest {
           .when(backendApiClient)
           .get(anyString(), any(ParameterizedTypeReference.class));
 
-      String view = controller.listMembers(null, null, null, model);
+      String view = controller.listMembers(null, null, null, false, model);
 
       assertEquals("members", view, "error path must NOT redirect — direct view render");
       assertEquals("error.members.load", model.getAttribute("error"));
+    }
+
+    @Test
+    void fragmentRequest_returnsResultsFragmentSelector() {
+      // Given — an AJAX swap request (fragment=true) for in-place filter/paging (#573).
+      Model model = new ConcurrentModel();
+      when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+          .thenReturn(newPage(List.of(newUser("alice"))));
+
+      // When
+      String view = controller.listMembers(null, null, null, true, model);
+
+      // Then — only the table fragment is rendered, not the full page.
+      assertEquals("members :: membersTableFragment", view);
     }
   }
 

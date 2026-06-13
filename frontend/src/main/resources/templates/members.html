@@ -27,7 +27,7 @@
 
     <div class="hud-box mt-2">
 
-        <form method="get" th:action="@{/members}" class="search-form no-track" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:1rem;">
+        <form id="members-filter-form" method="get" th:action="@{/members}" class="search-form no-track" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:1rem;">
             <label for="member-search" th:text="#{members.search}">Mitglied suchen</label>
             <div style="flex:1; min-width: 12rem; position: relative;">
                 <input type="text"
@@ -40,6 +40,8 @@
             </div>
             <button type="submit" class="btn btn-ghost" th:text="#{general.search}">Suche</button>
         </form>
+        <div id="members-results">
+        <th:block th:fragment="membersTableFragment">
         <div class="table-responsive">
         <table th:if="${users}">
             <thead>
@@ -114,6 +116,8 @@
         <div th:replace="~{fragments/pagination :: pagination(pageResponse=${usersPage}, baseUrl='/members')}"></div>
         
         <p th:if="${users == null && error == null}" th:text="#{members.empty}">Keine Mitglieder gefunden.</p>
+        </th:block>
+        </div>
     </div>
 
     <!-- Hidden form for deletion to support redirects with Flash-Messages -->
@@ -125,7 +129,44 @@
 <script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('member-search');
+        const filterForm = document.getElementById('members-filter-form');
+        const resultsContainer = document.getElementById('members-results');
+        let membersFilterTimer = null;
+
+        // In-place filter + pagination (epic #571 / #573). The GET form stays the no-JS fallback;
+        // the row actions (logistician/mission-manager toggle, delete) are delegated via krtEvents
+        // below, so they keep working after the results fragment is swapped.
+        function applyMembersFilter() {
+            if (!filterForm || !resultsContainer || !window.krtFetch) {
+                if (filterForm) filterForm.submit();
+                return;
+            }
+            const data = new FormData(filterForm);
+            const params = new URLSearchParams();
+            for (const [key, value] of data.entries()) {
+                if (value !== '') params.append(key, value);
+            }
+            const query = params.toString();
+            window.krtFetch.swap({
+                url: '/members' + (query ? '?' + query : ''),
+                container: resultsContainer,
+                history: true,
+            });
+        }
+
+        if (filterForm) {
+            filterForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                clearTimeout(membersFilterTimer);
+                applyMembersFilter();
+            });
+        }
+
         if (searchInput) {
+            searchInput.addEventListener('input', function () {
+                clearTimeout(membersFilterTimer);
+                membersFilterTimer = setTimeout(applyMembersFilter, 300);
+            });
             krtAutocomplete(searchInput, async (query) => {
                 if (query.length < 2) return [];
                 try {
@@ -141,8 +182,8 @@
             }, {
                 onSelect: function(item) {
                     searchInput.value = item;
-                    const form = searchInput.closest('form');
-                    if (form) form.submit();
+                    clearTimeout(membersFilterTimer);
+                    applyMembersFilter();
                 }
             });
         }
