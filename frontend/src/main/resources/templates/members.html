@@ -160,10 +160,7 @@
         try {
             const resp = await fetch(`/members/${userId}/logistician?isLogistician=${isLogistician}`, {
                 method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.content || ''
-                }
+                headers: window.krtCsrf.headers()
             });
             if (!resp.ok) {
                 const data = await resp.json();
@@ -183,10 +180,7 @@
         try {
             const resp = await fetch(`/members/${userId}/mission-manager?isMissionManager=${isMissionManager}`, {
                 method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.content || ''
-                }
+                headers: window.krtCsrf.headers()
             });
             if (!resp.ok) {
                 const data = await resp.json();

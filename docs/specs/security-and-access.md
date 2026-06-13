@@ -132,6 +132,23 @@ The frontend's `BotProtectionFilter` returns 404 directly for known scanner path
 `SsoReAuthenticationEntryPoint` gives legitimate paths with expired sessions a silent
 `prompt=none` Keycloak redirect.
 
+### REQ-SEC-010 — AJAX CSRF token refresh endpoint
+
+The frontend's session/meta CSRF setup is unchanged (`HttpSessionCsrfTokenRepository` +
+`XorCsrfTokenRequestAttributeHandler`). An additive authenticated endpoint `GET /csrf` returns
+`{headerName, token}` so the shared `krtCsrf` client (REQ-FE-004,
+[`frontend-ajax-mutations.md`](frontend-ajax-mutations.md)) can self-heal a bare-403 write with a
+single transparent token refresh + retry. The endpoint sits under the `authenticated()` catch-all —
+an anonymous caller is redirected to the OIDC entry point, never handed a token — so it widens no
+trust boundary and is not a change to the CSRF repository/handler (ADR-0012).
+
+**Acceptance**
+
+- [ ] `GET /csrf` returns the active header name + token for an authenticated session.
+- [ ] `GET /csrf` does not serve a token to an anonymous caller.
+
+**Enforced by:** `CsrfTokenControllerMvcTest` · **Code:** `CsrfTokenController` · **Issues:** #572
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

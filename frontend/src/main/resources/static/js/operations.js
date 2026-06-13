@@ -6,7 +6,9 @@
     const loadingIndicator = document.getElementById('operations-loading-indicator');
     const resetBtn = document.getElementById('operations-filter-reset');
 
-    if (!form || !resultsContainer) return;
+    // krtFetch (fragments/head.html) owns the fragment swap + the in-results pagination
+    // interception, so the whole list — filter, sort and paginate — stays in place.
+    if (!form || !resultsContainer || !window.krtFetch) return;
 
     let debounceTimer = null;
 
@@ -16,25 +18,16 @@
         for (const [key, value] of data.entries()) {
             if (value !== '') params.append(key, value);
         }
-        params.set('fragment', 'results');
         return params.toString();
     }
 
     function loadResults() {
-        if (loadingIndicator) loadingIndicator.style.display = 'block';
-        fetch('/operations?' + buildQueryString(), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        })
-            .then(function (res) {
-                return res.text();
-            })
-            .then(function (html) {
-                resultsContainer.innerHTML = html;
-                if (loadingIndicator) loadingIndicator.style.display = 'none';
-            })
-            .catch(function () {
-                if (loadingIndicator) loadingIndicator.style.display = 'none';
-            });
+        const query = buildQueryString();
+        window.krtFetch.swap({
+            url: '/operations' + (query ? '?' + query : ''),
+            container: resultsContainer,
+            indicator: loadingIndicator,
+        });
     }
 
     function onFilterChange() {

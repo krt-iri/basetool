@@ -141,7 +141,7 @@ class AssetAwareAuthenticationSuccessHandlerTest {
         "/sm/abcdef.map",
         "/sm/anything",
         "/SM/upper-case-prefix.map",
-        "/js/vendor/dompurify.min.js.map",
+        "/js/vendor/example.min.js.map",
         "/css/styles.css.map",
         "/favicon.ico",
         "/logos/krt.webp",

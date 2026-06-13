@@ -239,7 +239,8 @@ public class SecurityConfig {
         // Those routes are session-cookie-authenticated frontend handlers — exactly the surface
         // CSRF protects. `SameSite=Strict` on the session cookie mitigates classical cross-site
         // form-POSTs, but defence-in-depth wants the token check enabled too. AJAX call sites
-        // already attach `X-XSRF-TOKEN` (see `mission-subresource.js`); Thymeleaf forms with
+        // attach the CSRF header via the shared `krtCsrf` reader (see `krt-fetch.js`), which a
+        // bare-403 self-heals by refetching `GET /csrf` and retrying once; Thymeleaf forms with
         // `th:action` auto-include the `_csrf` hidden field through Spring Security's view
         // integration. The default Spring Security CSRF setup is therefore left intact, no
         // ignoringRequestMatchers needed.

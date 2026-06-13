@@ -129,6 +129,11 @@ KRT-styled modals/toasts instead.
 
 - [ ] No `confirm(` / `alert(` / `prompt(` calls in frontend JS.
 
+The shared `krtFetch` mutation layer (REQ-FE-001..005,
+[`frontend-ajax-mutations.md`](frontend-ajax-mutations.md)) surfaces every success / error /
+optimistic-lock outcome through the KRT toast/confirm infrastructure precisely so this rule holds
+app-wide; new AJAX call sites inherit it for free.
+
 **Enforced by:** code/design review + ESLint (mechanical grep-able rule).
 
 ### REQ-UI-009 — Responsive across four device classes
