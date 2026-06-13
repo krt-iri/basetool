@@ -6,6 +6,12 @@
 
 - **Weitere Listen filtern und blättern jetzt ohne Seitenneuladen: Bank-Audit-Log, Mitgliederverwaltung, Aufträge, Raffinerieaufträge, die Staffel-Hangarübersicht, die Lager-Gesamtübersicht, die Blueprint-Verfügbarkeit, die Admin-Blueprint-Liste, die eingebettete Missionsliste der Operationsdetailseite, die Buchungshistorie der Bankkonto-Detailseite, das persönliche Inventar (inkl. Admin-Ansicht; dort wechselt auch die Mitgliederauswahl ohne Neuladen) und die Admin-Spezialkommandoliste (Inaktive-Filter)** (inkl. Suche, Status-/Bereichsfilter, Seitengröße und Seitennavigation, soweit vorhanden). Gefilterte/geblätterte Listen (Einsätze, Operationen, Aufträge, Bank-Audit, Mitglieder, Raffinerieaufträge, Staffel-Hangar, Lagerübersicht, Blueprint-Verfügbarkeit, Admin-Blueprints, Operations-Missionsliste, Bank-Buchungshistorie, persönliches Inventar, Admin-Spezialkommandos) halten den Filter beim Neuladen der Seite (die URL bleibt in Sync) und springen nicht mehr an den Seitenanfang; das Sortieren der Auftragsprioritäten per Drag-and-drop bleibt dabei erhalten. Die Stat-Slider der Admin-Blueprint-Liste bleiben auch in nachgeladenen Tabellenzeilen interaktiv. Zeitstempel in nachgeladenen Tabellenzeilen werden jetzt ebenfalls in lokale Zeit umgerechnet.
 
+### Fixed
+
+- **Bank-Verwaltung: Das Auswahlfeld „Org-Einheit" im Dialog „Konto anlegen" zeigt wieder die Namen der Org-Einheiten statt „null".** Die Seite las die Org-Einheiten-Liste in das falsche DTO ein; dadurch fehlten Name und Id jeder Option (die Auswahl hätte zudem keine Org-Einheit übermittelt).
+
+- **Bank-Berechtigungen: Das Konten-Auswahlfeld in der Filterleiste ist jetzt genauso hoch wie der Tab-Kasten daneben** und schließt oben und unten bündig mit ihm ab (vorher saß das Dropdown rund 12 px zu hoch).
+
 ## [v0.4.21](https://github.com/krt-iri/basetool/releases/tag/v0.4.21) - 2026-06-13
 
 ### Added

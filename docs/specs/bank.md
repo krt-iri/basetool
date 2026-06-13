@@ -57,7 +57,7 @@ by partial unique indexes, not by application convention alone.
   `squadron_id` (ArchUnit rule
   `noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities`).
 
-**Enforced by:** `BankAccountServiceTest`, `BankControllerSecurityTest`, `DatabaseIndexMigrationTest` (V150 partial uniques) · **Code:** `model/BankAccount`, `service/BankAccountService`, `db/migration/V150` · **Issues:** #556
+**Enforced by:** `BankAccountServiceTest`, `BankControllerSecurityTest`, `DatabaseIndexMigrationTest` (V150 partial uniques), `BankManagePageControllerOrgUnitPickerMvcTest` (create-account org-unit picker renders names + ids, not `null`) · **Code:** `model/BankAccount`, `service/BankAccountService`, `db/migration/V150`, `controller/BankManagePageController` · **Issues:** #556
 
 ### REQ-BANK-002 — Dynamic account lifecycle, no hard delete
 

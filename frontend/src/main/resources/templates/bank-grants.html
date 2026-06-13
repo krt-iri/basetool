@@ -40,7 +40,7 @@
     </div>
 
     <!-- G2 grouping toggle + entity filter. -->
-    <div class="bank-filterbar mt-2">
+    <div class="bank-filterbar bank-filterbar--tabs mt-2">
         <div class="tab-nav" role="tablist">
             <a th:href="@{/bank/grants(view='account')}" class="tab" role="tab"
                th:classappend="${!byEmployee} ? ' active' : ''" th:aria-selected="${!byEmployee}"

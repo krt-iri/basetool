@@ -21,7 +21,7 @@ package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.BankHolderDto;
-import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitReferenceDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
@@ -65,10 +65,10 @@ public class BankManagePageController {
     List<BankHolderDto> holders =
         backendApiClient.get(
             "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
-    List<OrgUnitReferenceDto> orgUnits =
+    List<OrgUnitMembershipOptionDto> orgUnits =
         backendApiClient.get(
             "/api/v1/org-units/active",
-            new ParameterizedTypeReference<List<OrgUnitReferenceDto>>() {});
+            new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {});
     List<UserReferenceDto> users =
         backendApiClient.get(
             "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
@@ -76,7 +76,8 @@ public class BankManagePageController {
     model.addAttribute(
         "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
-    model.addAttribute("orgUnits", orgUnits == null ? List.<OrgUnitReferenceDto>of() : orgUnits);
+    model.addAttribute(
+        "orgUnits", orgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : orgUnits);
     model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
     model.addAttribute("activeTab", "halter".equalsIgnoreCase(tab) ? "halter" : "konten");
     return "bank-manage";
