@@ -31,7 +31,7 @@
             <a sec:authorize="hasRole('LOGISTICIAN')"
                th:if="${order.type == 'ITEM' and (order.itemHandovers == null or order.itemHandovers.isEmpty())}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-outline"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
-            <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
+            <form sec:authorize="hasRole('ADMIN')" id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                 <button type="submit" class="btn btn-quiet-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{orders.detail.delete}">Löschen</span></button>
             </form>
         </div>
@@ -1232,6 +1232,40 @@
         }));
     }
 
+    // Delete order in place (#575): add a KRT confirm (none existed — destructive + the
+    // no-native-dialogs rule), then krtFetch.write DELETE and navigate to the list. A backend
+    // rejection (e.g. the order still has linked inventory) keeps the user on the page with the
+    // error toast instead of a redirect-reflash. The classic POST form is the no-JS fallback.
+    const MSG_DELETE_TITLE = '[(#{info.delete.confirm.title})]';
+    const MSG_DELETE_MESSAGE = '[(#{info.delete.confirm.message})]';
+    const MSG_DELETE_CONFIRM = '[(#{orders.detail.delete})]';
+    const MSG_DELETE_CANCEL = '[(#{general.cancel})]';
+    const MSG_DELETE_ERROR = '[(#{error.joborder.delete.failed})]';
+    (function () {
+        const form = document.getElementById('delete-order-form');
+        if (!form) return;
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const orderId = form.getAttribute('data-order-id');
+            if (!orderId || typeof window.showKrtConfirm !== 'function' || !window.krtFetch) {
+                form.submit();
+                return;
+            }
+            const ok = await window.showKrtConfirm(
+                MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL);
+            if (!ok) return;
+            const res = await krtOrderWrite({
+                method: 'DELETE',
+                url: '/orders/' + orderId,
+                toast: false,
+                errorMessage: MSG_DELETE_ERROR
+            });
+            if (res.ok) {
+                window.location.assign('/orders');
+            }
+        });
+    })();
+
     // Material claim ("Eintragung") interaction (Phase 6, #346).
     const MSG_CLAIM_TITLE_ADD = '[(#{orders.claim.modal.title.add})]';
     const MSG_CLAIM_TITLE_EDIT = '[(#{orders.claim.modal.title.edit})]';
@@ -1883,10 +1917,14 @@
         const I18N_NOTE_FORBIDDEN = '[(#{orders.detail.assignees.note.forbidden})]';
         const I18N_NOTE_FOR = '[(#{orders.detail.assignees.note.for})]';
 
+        // CSRF header via the shared krtCsrf reader (#575) — retires the bespoke meta read. Not
+        // krtCsrf.headers(), because that forces Content-Type application/json; the assignee calls
+        // vary the content type (json / form / none) and accept an HTML fragment, so build just the
+        // CSRF header here and keep oaSend's per-path content-type logic.
         function oaCsrf() {
             const headers = {};
-            const token = document.querySelector('meta[name="_csrf"]')?.content;
-            const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+            const token = window.krtCsrf ? window.krtCsrf.token() : (document.querySelector('meta[name="_csrf"]')?.content);
+            const header = window.krtCsrf ? window.krtCsrf.headerName() : (document.querySelector('meta[name="_csrf_header"]')?.content);
             if (token && header) headers[header] = token;
             return headers;
         }
@@ -1898,19 +1936,29 @@
 
         async function oaSend(method, url, opts) {
             opts = opts || {};
-            const headers = oaCsrf();
-            headers['Accept'] = 'text/html';
-            const init = { method: method, headers: headers };
-            if (opts.json !== undefined) {
-                headers['Content-Type'] = 'application/json';
-                init.body = JSON.stringify(opts.json);
-            } else if (opts.form !== undefined) {
-                headers['Content-Type'] = 'application/x-www-form-urlencoded';
-                init.body = opts.form;
+            function buildInit() {
+                const headers = oaCsrf();
+                headers['Accept'] = 'text/html';
+                const init = { method: method, headers: headers };
+                if (opts.json !== undefined) {
+                    headers['Content-Type'] = 'application/json';
+                    init.body = JSON.stringify(opts.json);
+                } else if (opts.form !== undefined) {
+                    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                    init.body = opts.form;
+                }
+                return init;
             }
             let res;
             try {
-                res = await fetch(url, init);
+                res = await fetch(url, buildInit());
+                // A bare 403 is the CSRF filter rejecting a stale token (post-re-login / evicted
+                // session). Refresh the token once and retry before treating it as a domain
+                // "forbidden" (#575) — matches krtFetch.write's retry-on-403.
+                if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
+                    const refreshed = await window.krtCsrf.refresh();
+                    if (refreshed) res = await fetch(url, buildInit());
+                }
             } catch (e) {
                 showFrontendErrorToast(opts.errorMsg || I18N_NOTE_ERROR);
                 return false;
@@ -1932,6 +1980,11 @@
             const sec = document.getElementById('assignees-section');
             if (sec) {
                 sec.outerHTML = html;
+                // Let global enhancers re-process the swapped-in subtree (mirrors krtFetch.swap,
+                // which the bespoke outerHTML swap predates).
+                document.dispatchEvent(new CustomEvent('krt:swapped', {
+                    detail: { container: document.getElementById('assignees-section') }
+                }));
             }
             if (opts.successMsg) showFrontendSuccessToast(opts.successMsg);
             return true;

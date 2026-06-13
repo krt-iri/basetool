@@ -231,6 +231,31 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
+  @WithMockUser(roles = {"ADMIN"})
+  void deleteOrderAjax_AsAuthenticated_RelaysAndReturnsNoContent() throws Exception {
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc.perform(delete("/orders/" + orderId).with(csrf())).andExpect(status().isNoContent());
+
+    verify(backendApiClient).delete(eq("/api/v1/orders/" + orderId), eq(Void.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"ADMIN"})
+  void deleteOrderAjax_WhenBackendRejects_PropagatesProblemJson() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    // e.g. the order still has linked inventory → the page stays put with a toast, not a redirect.
+    doThrow(new BackendServiceException("in use", null, 409))
+        .when(backendApiClient)
+        .delete(eq("/api/v1/orders/" + orderId), eq(Void.class));
+
+    mockMvc
+        .perform(delete("/orders/" + orderId).with(csrf()))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+  }
+
+  @Test
   void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

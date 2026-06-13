@@ -1099,6 +1099,34 @@ public class JobOrderPageController {
   }
 
   /**
+   * AJAX twin of {@link #deleteOrder} (#575): cancels (soft-deletes) the order without a server
+   * redirect, so the order-detail JS can confirm via the KRT dialog and then navigate to the list
+   * itself. On a backend rejection (e.g. the order still has linked inventory) the RFC 7807 error
+   * is propagated so the page shows a toast and stays put instead of redirect-reflashing. The
+   * classic {@code POST}→redirect above stays the no-JS fallback.
+   *
+   * @param id the order to cancel
+   * @return 204 on success, or the propagated RFC 7807 backend error
+   */
+  @DeleteMapping("/{id}")
+  @PreAuthorize("isAuthenticated()")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
+    try {
+      backendApiClient.delete("/api/v1/orders/" + id, Void.class);
+      return org.springframework.http.ResponseEntity.noContent().build();
+    } catch (BackendServiceException bse) {
+      log.error("Failed to delete order {} (ajax): {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to delete order {} (ajax)", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * Adds an assignee to the job order and re-renders the Bearbeiter section as an AJAX fragment (no
    * full-page reload). The user-picker is fed by {@link UserProxyController}'s search endpoint.
    *
