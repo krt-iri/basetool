@@ -141,9 +141,21 @@ class MissionFinanceEntryE2eTest {
         modal.locator(".seg button[data-type-value='INCOME']").click();
         modal.locator("input[name='amount']").fill(FINANCE_AMOUNT);
 
-        // Submit: footer-safe click that awaits the POST and the redirect GET back to the detail
-        // page (Post/Redirect/Get), so the entry is provably persisted before we reload.
-        E2eSupport.clickSubmitClearingFooter(modal.locator("button[type='submit']"));
+        // Submit in place (#574): the finance add now swaps the Finanzen pane via AJAX — there is
+        // no
+        // Post/Redirect/Get navigation to await. Mark the window so we can prove no full reload
+        // happened, click submit, then web-first-wait for the new entry's edit button to appear in
+        // the re-rendered pane (which also proves the entry was persisted).
+        page.evaluate("window.__krtNoReload = true;");
+        modal.locator("button[type='submit']").click();
+        assertThat(
+                page.locator(
+                    "#pane-fin button.edit-finance-btn[data-amount='" + FINANCE_AMOUNT + "']"))
+            .isVisible();
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "finance add must swap in place — no full-page reload cleared the window marker");
 
         // Reopen the detail page. Before the th:with fix this 500'd: the populated finance loop
         // called @moneyFormat inside the restricted th:data-amount attribute and threw a

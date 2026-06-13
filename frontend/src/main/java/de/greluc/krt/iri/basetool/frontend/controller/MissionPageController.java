@@ -292,11 +292,26 @@ public class MissionPageController {
    * modals so the same controller method serves both fresh renders and post-flash re-renders after
    * a validation failure.
    *
-   * @return the {@code mission-detail} view name
+   * <p>When {@code fragment} is set the same fully populated model is rendered through a single
+   * Thymeleaf fragment instead of the whole page, so an in-place AJAX swap (epic #571) can
+   * re-render one section after a sub-mutation: {@code crew-board} → the crew board, {@code
+   * finance} → the finance &amp; payout pane, {@code mgmt} → the owner/manager management panel.
+   * The full model is still built for every fragment value, so the fragment never references a
+   * missing attribute.
+   *
+   * @param id the mission id
+   * @param model the Spring MVC model populated with the mission aggregate and form backers
+   * @param principal the authenticated user, or {@code null} for an anonymous/guest visitor
+   * @param fragment the optional section key selecting an in-place fragment render
+   * @return the {@code mission-detail} view name, or a {@code mission-detail :: <fragment>}
+   *     selector
    */
   @GetMapping("/{id}")
   public String missionDetail(
-      @PathVariable @NotNull UUID id, Model model, @AuthenticationPrincipal OidcUser principal) {
+      @PathVariable @NotNull UUID id,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal,
+      @RequestParam(required = false) String fragment) {
     try {
       MissionDto mission =
           backendApiClient.get(
@@ -663,6 +678,14 @@ public class MissionPageController {
 
     } catch (Exception e) {
       log.error("Error loading mission details", e);
+      if (fragment != null) {
+        // In-place fragment path (#571/#574): a redirect here would be followed by
+        // krtFetch.swap and the whole /missions page painted into the small section
+        // container. Answer with a section-sized inline error fragment instead — the swap
+        // renders it in place. (An expired-session login redirect happens in the security
+        // filter before this controller; krtFetch.swap catches that via res.redirected.)
+        return "mission-detail :: fragmentError";
+      }
       model.addAttribute("error", "error.mission.details.load");
       return "redirect:/missions?error=error.mission.details.load";
     }
@@ -674,6 +697,16 @@ public class MissionPageController {
     // NOT the Keycloak UUID. We must use principal.getSubject() to get the sub (UUID) that matches
     // p.user.id in the participant list.
     model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
+    // In-place AJAX swap (epic #571): re-render only the section the caller mutated. The full model
+    // is already built above, so each fragment renders with every attribute it needs.
+    if (fragment != null) {
+      return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
+        case "crew-board" -> "mission-detail :: crewBoard";
+        case "finance" -> "mission-detail :: financeSection";
+        case "mgmt" -> "mission-detail :: mgmtPanels";
+        default -> "mission-detail";
+      };
+    }
     return "mission-detail";
   }
 
@@ -694,7 +727,7 @@ public class MissionPageController {
     if (bindingResult.hasErrors()) {
       // Render directly; BindingResult stays request-scoped (see RedisSessionConfig).
       model.addAttribute("openModal", "participant-modal");
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -753,6 +786,7 @@ public class MissionPageController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/party-lead")
+  @PreAuthorize("isAuthenticated()")
   public String setPartyLead(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) UUID userId,
@@ -785,6 +819,50 @@ public class MissionPageController {
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.party_lead.update");
     }
     return "redirect:/missions/" + id;
+  }
+
+  /**
+   * AJAX variant of {@link #setPartyLead}: assigns or clears the party lead and returns the
+   * refreshed mission as JSON so the mission-detail page can patch the party-lead display + bumped
+   * {@code partyLeadVersion} in place without a full reload (#574). The classic form-POST above
+   * stays the no-JavaScript fallback; the 409 (ambiguous name / stale version) is passed through as
+   * RFC 7807 so the shared {@code krtFetch} conflict UX fires.
+   *
+   * @param id mission id (path)
+   * @param body party-lead JSON ({@code userId} and/or {@code guestName}, plus {@code version}); an
+   *     empty {@code userId}+{@code guestName} clears the lead
+   * @return {@code 200} with the refreshed mission, or the upstream RFC 7807 error passed through
+   */
+  @PutMapping(
+      value = "/{id}/party-lead/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> setPartyLeadAjax(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+    try {
+      Map<String, Object> out = new HashMap<>();
+      Object userId = body.get("userId");
+      if (userId != null && !String.valueOf(userId).isBlank()) {
+        out.put("userId", userId);
+      }
+      Object guestName = body.get("guestName");
+      if (guestName != null && !String.valueOf(guestName).isBlank()) {
+        out.put("guestName", guestName);
+      }
+      out.put("version", body.get("version") != null ? body.get("version") : 0L);
+      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class, false);
+      MissionDto mission =
+          backendApiClient.get(
+              "/api/v1/missions/" + id, new ParameterizedTypeReference<MissionDto>() {}, false);
+      return org.springframework.http.ResponseEntity.ok(mission);
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Set party lead (AJAX) failed: status={}", e.getStatusCode());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in setPartyLeadAjax for mission {}", id, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
   }
 
   /**
@@ -987,7 +1065,7 @@ public class MissionPageController {
       model.addAttribute("openModal", "edit-participant-modal");
       model.addAttribute(
           "modalAction", "/missions/" + id + "/participants/" + participantId + "/update");
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1148,7 +1226,7 @@ public class MissionPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "assign-crew-modal");
       model.addAttribute("modalAction", "/missions/" + id + "/units/" + unitId + "/crew");
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1187,7 +1265,7 @@ public class MissionPageController {
       model.addAttribute("openModal", "edit-crew-modal");
       model.addAttribute(
           "modalAction", "/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/update");
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1388,7 +1466,7 @@ public class MissionPageController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Instant meetingTime =
@@ -2165,7 +2243,9 @@ public class MissionPageController {
    * @param e parsed backend exception with status + RFC 7807 fields
    * @return problem+json response mirroring the upstream status and body
    */
-  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
+  // Package-private so the sibling MissionFinancePageController's /ajax handlers reuse the same
+  // RFC 7807 passthrough instead of duplicating it.
+  static org.springframework.http.ResponseEntity<Object> propagateBackendError(
       @NotNull de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
     Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("status", e.getStatusCode());

@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -35,12 +36,14 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.FinanceType;
 import de.greluc.krt.iri.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -91,7 +94,7 @@ class MissionFinancePageControllerTest {
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
-      when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal)))
+      when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal), isNull()))
           .thenReturn("mission-detail");
 
       String view =
@@ -185,7 +188,7 @@ class MissionFinancePageControllerTest {
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
-      when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal)))
+      when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal), isNull()))
           .thenReturn("mission-detail");
 
       String view =
@@ -290,6 +293,61 @@ class MissionFinancePageControllerTest {
       assertEquals(
           "error.finance.delete", redirectAttributes.getFlashAttributes().get("errorToast"));
       assertNull(redirectAttributes.getFlashAttributes().get("successToast"));
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // AJAX endpoints (#574): in-place create / update / delete
+  // ---------------------------------------------------------------
+
+  @Nested
+  class AjaxEndpointTests {
+
+    @Test
+    void addAjax_stampsMissionId_postsBody_andReturns200() {
+      Map<String, Object> body = new HashMap<>();
+      body.put("participantId", UUID.randomUUID().toString());
+      body.put("type", "INCOME");
+      body.put("amount", "250");
+      when(backendApiClient.post(eq("/api/v1/finance-entries"), any(), eq(Object.class), eq(false)))
+          .thenReturn(Map.of("id", ENTRY_ID.toString()));
+
+      ResponseEntity<Object> resp = controller.addFinanceEntryAjax(MISSION_ID, body, principal);
+
+      assertEquals(200, resp.getStatusCode().value());
+      assertEquals(MISSION_ID, body.get("missionId"), "missionId is stamped from the path");
+    }
+
+    @Test
+    void addAjax_anonymousCaller_passesIsPublicTrue() {
+      Map<String, Object> body = new HashMap<>();
+      controller.addFinanceEntryAjax(MISSION_ID, body, /* principal= */ null);
+      verify(backendApiClient)
+          .post(eq("/api/v1/finance-entries"), any(), eq(Object.class), eq(true));
+    }
+
+    @Test
+    void updateAjax_putsBodyVerbatim_andReturns200() {
+      Map<String, Object> body = new HashMap<>();
+      body.put("amount", "99");
+      body.put("version", 3);
+      when(backendApiClient.put(
+              eq("/api/v1/finance-entries/" + ENTRY_ID), any(), eq(Object.class), eq(false)))
+          .thenReturn(Map.of("id", ENTRY_ID.toString()));
+
+      ResponseEntity<Object> resp = controller.updateFinanceEntryAjax(MISSION_ID, ENTRY_ID, body);
+
+      assertEquals(200, resp.getStatusCode().value());
+      verify(backendApiClient)
+          .put(eq("/api/v1/finance-entries/" + ENTRY_ID), eq(body), eq(Object.class), eq(false));
+    }
+
+    @Test
+    void deleteAjax_callsBackendDelete_andReturns204() {
+      ResponseEntity<Object> resp = controller.deleteFinanceEntryAjax(MISSION_ID, ENTRY_ID);
+
+      assertEquals(204, resp.getStatusCode().value());
+      verify(backendApiClient).delete("/api/v1/finance-entries/" + ENTRY_ID, Void.class, false);
     }
   }
 

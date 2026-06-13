@@ -25,8 +25,8 @@
  *    anchors so paging stays in-place (fixes the known full-reload regression).
  *
  * No user-visible string is hardcoded here: callers pass already-localized
- * labels/messages (the MissionSubresource alias below sources them from
- * window.MISSION_SUBRES_I18N exactly as before). The few inline fallbacks only
+ * labels/messages (e.g. mission-detail's page-local krtMissionWrite wrapper
+ * sources them from window.MISSION_SUBRES_I18N). The few inline fallbacks only
  * ever surface if a caller forgets to pass a message AND its i18n dictionary is
  * missing — a developer error, not a user-facing path.
  */
@@ -358,6 +358,15 @@
      *                    flood the back-stack with intermediate keystrokes.
      *  - preserveScroll  unless false, the window scroll position is restored after
      *                    the swap so paging/filtering does not jump the page.
+     *  - errorMessage    optional, already-localized string shown as an error toast when
+     *                    the swap bails because the response was redirected or not OK (a
+     *                    whole-document body the swap must not inject); omit it to fail
+     *                    silently. The stale container is left untouched on this path.
+     *
+     * The swap injects the body only on a non-redirected 2xx response; a redirected or
+     * non-OK response (expired-session login bounce, error-handler redirect, 5xx) is
+     * treated as a whole-page body and skipped, so a fragment swap can never paint a
+     * login form or a nested page into the small results container.
      *
      * After the swap, a single delegated click listener is installed on the
      * container so in-container pagination/sort anchors (a.page-btn[href] and
@@ -386,13 +395,30 @@
         }
         return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (res) {
+                // A fragment swap must only ever paint section-sized HTML into a small
+                // container. If the request was redirected (an expired session bounced to
+                // the login page, or a controller error handler answered with a redirect)
+                // or the status is not OK, the body is a whole document, not a fragment —
+                // injecting it would dump a login form or a nested page into the results
+                // container. Bail without touching the DOM (#574 review must-fix).
+                if (res.redirected || !res.ok) {
+                    return null;
+                }
                 return res.text();
             })
             .then(function (html) {
-                container.innerHTML = html;
                 if (indicator) {
                     indicator.style.display = 'none';
                 }
+                if (html === null) {
+                    // Optional caller-supplied (already-localized) toast; krt-fetch.js never
+                    // hardcodes user-visible strings. The stale container is left as-is.
+                    if (opts.errorMessage) {
+                        errorToast(opts.errorMessage);
+                    }
+                    return false;
+                }
+                container.innerHTML = html;
                 bindSwapAnchorInterception(container, opts);
                 // Let page/global enhancers re-process the freshly swapped subtree
                 // (e.g. the .utc-time localiser in sidebar.html). A one-shot
@@ -467,63 +493,7 @@
         csrf: window.krtCsrf,
     };
 
-    // ----------------------------------------------- MissionSubresource alias
-
-    // Thin backward-compatibility shim so mission-detail.html keeps working
-    // unchanged (it is migrated to call krtFetch directly in the Missions child,
-    // #574). All mission-specific user-visible strings are sourced from
-    // window.MISSION_SUBRES_I18N here, preserving the exact prior behaviour.
-    function missionI18n(key, fallback) {
-        const dict = window.MISSION_SUBRES_I18N || {};
-        return text(dict[key], fallback);
-    }
-
-    function missionConflict() {
-        return {
-            title: missionI18n('mission.conflict.toast.title', 'Konflikt'),
-            reloadLabel: missionI18n('mission.conflict.action.reload', 'Aktuelle Werte laden'),
-            dismissLabel: missionI18n('mission.conflict.action.dismiss', 'Schliessen'),
-            reloadQuestion: missionI18n(
-                'mission.conflict.action.reload.question',
-                'Aktuelle Werte laden? Eingaben in anderen Bereichen bleiben erhalten (via Neuladen' +
-                    ' gehen sie verloren).',
-            ),
-            reloadDetailFallback: missionI18n(
-                'mission.conflict.toast.detail',
-                'Bitte Seite neu laden.',
-            ),
-        };
-    }
-
-    window.MissionSubresource = {
-        patchSubResource: function (opts) {
-            const key = opts.sectionKey;
-            return write(
-                Object.assign({}, opts, {
-                    sectionLabel: missionI18n('mission.save.section.' + key, key),
-                    conflictSectionLabel: missionI18n('mission.conflict.section.' + key, key),
-                    successMessage: missionI18n('mission.save.section.ok', 'Gespeichert.'),
-                    errorMessage: missionI18n(
-                        'mission.save.section.error',
-                        'Speichern fehlgeschlagen.',
-                    ),
-                    conflict: missionConflict(),
-                }),
-            );
-        },
-        syncVersion: syncVersion,
-        handleProblem: function (response, sectionKey, problem) {
-            return handleProblem(response, problem, {
-                conflictSectionLabel: missionI18n(
-                    'mission.conflict.section.' + sectionKey,
-                    sectionKey,
-                ),
-                errorMessage: missionI18n(
-                    'mission.save.section.error',
-                    'Speichern fehlgeschlagen.',
-                ),
-                conflict: missionConflict(),
-            });
-        },
-    };
+    // The former window.MissionSubresource alias was retired in #574; mission-detail.html now calls
+    // window.krtFetch.write directly through a small page-local krtMissionWrite wrapper, so this
+    // shared module carries no mission-specific code or strings.
 })();

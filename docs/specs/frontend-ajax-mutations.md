@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-13.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-14.
 > **Owner area:** FE/UI · **Related ADRs:** ADR-0012
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
@@ -101,9 +101,23 @@ navigation while filtering did not.
 - [ ] Changing a filter swaps the results without navigating.
 - [ ] Clicking a pagination/sort control inside the results container swaps in place (no full page
   load) and preserves the active filter query.
+- [ ] A swap whose GET is **redirected** (e.g. an expired session bounced to the login page) or
+  returns a **non-OK** status does not inject the body: `krtFetch.swap` bails, leaves the stale
+  container untouched, surfaces an optional caller-supplied error toast, and never paints a whole
+  page into the small results container. On a backend read failure the mission-detail fragment
+  branch returns a **section-sized inline error fragment (HTTP 200)**, not a `redirect:/missions`.
 
-**Enforced by:** lists/pagination e2e (#573) · **Code:** `krt-fetch.js` (`swap`), `missions.js`,
-`operations.js`, `fragments/pagination.html` · **Issues:** #572, #573
+The same fragment-swap mechanism also re-renders **non-list page sections** after a sub-mutation
+when an in-place DOM patch would be too fragile (structural add/delete, server-derived render state,
+or a value duplicated across panes). The mission-detail page (#574) does this: a crew/finance/owner-
+manager write re-renders just its section via `GET /missions/{id}?fragment={crew-board,finance,mgmt}`
+into a stable `#…-results` container, and every per-element handler inside (drag-drop, action
+buttons, role selects) is delegated on the persistent container so it survives the swap. The fresh
+`data-version` carried by the re-rendered fragment satisfies REQ-FE-003 for free.
+
+**Enforced by:** lists/pagination e2e (#573) + mission-detail fragment MVC tests (#574) · **Code:**
+`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
+`mission-detail.html` (`krtRefreshMissionSection`) · **Issues:** #572, #573, #574
 
 ## Out of scope
 
@@ -117,7 +131,12 @@ navigation while filtering did not.
 
 ## Open questions
 
-- None open. The `MissionSubresource` alias in `krt-fetch.js` is transitional; mission-detail is
-  migrated to call `krtFetch` directly in the Missions child (#574), after which the alias is
-  removed.
+- None open. The transitional `MissionSubresource` alias was **removed** in #574; mission-detail now
+  calls `krtFetch.write` through a small page-local `krtMissionWrite` wrapper, so `krt-fetch.js`
+  carries no page-specific code.
+- **Known carve-out (#574 → #589):** the mission core-edit form (`#mission-form`: name/description/
+  status/operation/schedule) still submits classic `POST→redirect`. It fans out into three section
+  PATCHes (core/schedule/flags) with server-side `@Valid` field-error rendering; converting it in
+  place needs a JSON field-error contract and is tracked as the follow-up issue **#589** so the
+  well-tested validation UX is not regressed. Every other mission-detail write is in-place.
 
