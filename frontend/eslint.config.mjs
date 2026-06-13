@@ -2,8 +2,8 @@ import js from "@eslint/js";
 import globals from "globals";
 
 // ESLint flat config for the frontend's hand-written browser scripts under
-// static/js. The vendored, minified third-party bundles (Alpine, DOMPurify,
-// marked) are excluded — they are not ours to lint and would drown the report.
+// static/js. The vendored, minified third-party bundles (DOMPurify, marked)
+// are excluded — they are not ours to lint and would drown the report.
 export default [
   {
     ignores: [
@@ -22,7 +22,6 @@ export default [
       globals: {
         ...globals.browser,
         // Globals provided by the vendored libraries / inline bootstrap.
-        Alpine: "readonly",
         DOMPurify: "readonly",
         marked: "readonly",
         // Cross-file helpers declared at script scope in escape-html.js and
