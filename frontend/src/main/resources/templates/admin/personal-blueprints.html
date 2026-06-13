@@ -91,6 +91,14 @@
                 </form>
             </div>
 
+            <!-- AJAX swap target (REQ-FE-002): the search filter re-renders only this table via
+                 personal-inventory-blueprints.js + krtFetch (same user, so the per-user endpoints
+                 stay valid). Row edit/delete are krtEvents-delegated and modals live outside, so
+                 swapped-in rows stay live; .utc-time cells re-localise on krt:swapped. The member
+                 <select> stays a full reload by design (it changes the per-user endpoint context).
+                 No-JS GET fallback reloads the page. -->
+            <div id="bp-results">
+            <th:block th:fragment="results">
             <div class="table-responsive krt-pi-table-wrapper">
                 <table class="krt-table krt-pi-table">
                     <thead>
@@ -134,6 +142,8 @@
                     </tr>
                     </tbody>
                 </table>
+            </div>
+            </th:block>
             </div>
         </div>
     </th:block>

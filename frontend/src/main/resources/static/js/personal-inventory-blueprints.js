@@ -82,6 +82,27 @@
         });
         if (addSelectedBtn) addSelectedBtn.addEventListener('click', addSelected);
         renderStaging();
+        wireAdminSwap();
+    }
+
+    /**
+     * Admin-page only: the owned-blueprint search filter re-renders just the #bp-results table in
+     * place (REQ-FE-002) instead of reloading the page. Guarded on #bp-results so it is a no-op on
+     * the user page (which has no such container) and without krtFetch (no-JS GET fallback). The
+     * submit is delegated on document so it survives the table being re-rendered inside the swap.
+     * The member <select> is intentionally NOT swapped here — switching the member changes the
+     * per-user endpoints embedded in the page's inline script, which a fragment swap cannot refresh,
+     * so it stays a full reload by design.
+     */
+    function wireAdminSwap() {
+        if (!window.krtFetch || !document.getElementById('bp-results')) return;
+        document.addEventListener('submit', function (e) {
+            if (!e.target.classList || !e.target.classList.contains('krt-pi-filter')) return;
+            e.preventDefault();
+            const params = new URLSearchParams(new FormData(e.target)).toString();
+            const url = e.target.getAttribute('action') + (params ? '?' + params : '');
+            window.krtFetch.swap({ url: url, container: '#bp-results', history: true });
+        });
     }
 
     /* ----------------------------------------------------------------- search */

@@ -552,6 +552,23 @@
         }
         if (filterInput) {
             filterInput.addEventListener('input', applyClientFilter);
+            // #573 (REQ-FE-002): every blueprint is already rendered and filtered client-side on
+            // each keystroke, so the master filter must never trigger a full-page reload. Intercept
+            // Enter and the wrapping <form>'s submit to re-filter in place instead of submitting the
+            // ?q= server form (which reloaded the whole master-detail page and dropped the selection).
+            filterInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyClientFilter();
+                }
+            });
+            const filterForm = filterInput.closest('form');
+            if (filterForm) {
+                filterForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    applyClientFilter();
+                });
+            }
         }
         if (backBtn) {
             backBtn.addEventListener('click', function () {

@@ -57,7 +57,7 @@
                 <form th:action="@{/admin/mission-data}" method="get" id="squadron-filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
-                    <input type="checkbox" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}" data-trigger="submit-form-by-id" data-form-id="squadron-filter-form">
+                    <input type="checkbox" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}">
                     <label for="includeInactiveSquadrons" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-squadron-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/squadrons}" th:text="#{admin.squadron.create}">Neue Staffel</button>
@@ -65,7 +65,12 @@
             </div>
         </div>
         
-        <div class="box-content">
+        <!-- AJAX swap target (REQ-FE-002): the include-inactive toggle re-renders only this
+             section's table via krtFetch. Per-row edit/delete are document-delegated (survive),
+             so nothing needs re-init. The toggle is JS-driven (it was already JS-only before this
+             change); a manual refresh of the swap-synced URL reproduces the filtered state. -->
+        <div class="box-content" id="squadrons-results">
+            <th:block th:fragment="squadrons-results">
             <div class="table-responsive">
             <table>
                 <thead>
@@ -104,6 +109,7 @@
                 </tbody>
             </table>
             </div>
+            </th:block>
         </div>
     </div>
 
@@ -115,7 +121,7 @@
                 <form th:action="@{/admin/mission-data}" method="get" id="filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
-                    <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}" data-trigger="submit-form-by-id" data-form-id="filter-form">
+                    <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}">
                     <label for="includeInactiveJobTypes" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-jobtype-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/job-types}" th:text="#{admin.job_type.create}">Neuer Job</button>
@@ -123,7 +129,9 @@
             </div>
         </div>
 
-        <div class="box-content">
+        <!-- AJAX swap target (REQ-FE-002): include-inactive toggle re-renders only this section. -->
+        <div class="box-content" id="jobtypes-results">
+            <th:block th:fragment="jobtypes-results">
             <div class="table-responsive">
             <table>
                 <thead>
@@ -165,6 +173,7 @@
                 </tbody>
             </table>
             </div>
+            </th:block>
         </div>
     </div>
 
@@ -177,7 +186,7 @@
                 <form th:action="@{/admin/mission-data}" method="get" id="freqtype-filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
-                    <input type="checkbox" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}" data-trigger="submit-form-by-id" data-form-id="freqtype-filter-form">
+                    <input type="checkbox" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}">
                     <label for="includeInactiveFrequencyTypes" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-freqtype-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/frequency-types}" th:text="#{admin.frequency_type.create}">Neuer Frequenztyp</button>
@@ -185,7 +194,11 @@
             </div>
         </div>
 
-        <div class="box-content">
+        <!-- AJAX swap target (REQ-FE-002): include-inactive toggle re-renders only this section.
+             Drag-drop reorder is rebound to this stable #freqtypes-results container (not the
+             swapped inner tbody), so it survives the swap. -->
+        <div class="box-content" id="freqtypes-results">
+            <th:block th:fragment="freqtypes-results">
             <div class="table-responsive">
             <table>
                 <thead>
@@ -195,7 +208,7 @@
                         <th>Aktion</th>
                     </tr>
                 </thead>
-                <tbody id="freq-table-body">
+                <tbody>
                     <tr th:each="freq : ${frequencyTypes}" th:style="${!freq.active} ? 'opacity: 0.6;' : ''"
                         draggable="true" class="draggable-row" th:data-id="${freq.id}" style="cursor: grab;">
                         <td>
@@ -222,6 +235,7 @@
                 </tbody>
             </table>
             </div>
+            </th:block>
         </div>
     </div>
 
@@ -347,17 +361,17 @@
             }
         }
         
-        document.querySelectorAll('.edit-squadron-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const id = this.getAttribute('data-id');
-                sqForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), sqForm.action);
-                sqTitle.innerText = '[[#{admin.edit}]]';
-                document.getElementById('sq-name').value = this.getAttribute('data-name');
-                document.getElementById('sq-shorthand').value = this.getAttribute('data-shorthand');
-                document.getElementById('sq-desc').value = this.getAttribute('data-desc');
-                document.getElementById('edit-squadron-version').value = this.getAttribute('data-version');
-                sqModal.style.display = "flex";
-            });
+        // Delegated on document so swapped-in rows (AJAX filter) keep working with zero re-init.
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.edit-squadron-btn');
+            if (!btn) return;
+            sqForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), sqForm.action);
+            sqTitle.innerText = '[[#{admin.edit}]]';
+            document.getElementById('sq-name').value = btn.getAttribute('data-name');
+            document.getElementById('sq-shorthand').value = btn.getAttribute('data-shorthand');
+            document.getElementById('sq-desc').value = btn.getAttribute('data-desc');
+            document.getElementById('edit-squadron-version').value = btn.getAttribute('data-version');
+            sqModal.style.display = "flex";
         });
 
         if (sqClose) sqClose.onclick = () => sqModal.style.display = "none";
@@ -399,19 +413,19 @@
             }
         }
         
-        document.querySelectorAll('.edit-jobtype-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const id = this.getAttribute('data-id');
-                jtForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), jtForm.action);
-                jtTitle.innerText = '[[#{admin.edit}]]';
-                document.getElementById('jt-name').value = this.getAttribute('data-name');
-                document.getElementById('jt-desc').value = this.getAttribute('data-desc');
-                document.getElementById('jt-archetype').value = this.getAttribute('data-archetype');
-                document.getElementById('jt-leadership').checked = this.getAttribute('data-leadership') === 'true';
-                document.getElementById('edit-jobtype-version').value = this.getAttribute('data-version');
-                updateLeadershipVisibility();
-                jtModal.style.display = "flex";
-            });
+        // Delegated on document so swapped-in rows (AJAX filter) keep working with zero re-init.
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.edit-jobtype-btn');
+            if (!btn) return;
+            jtForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), jtForm.action);
+            jtTitle.innerText = '[[#{admin.edit}]]';
+            document.getElementById('jt-name').value = btn.getAttribute('data-name');
+            document.getElementById('jt-desc').value = btn.getAttribute('data-desc');
+            document.getElementById('jt-archetype').value = btn.getAttribute('data-archetype');
+            document.getElementById('jt-leadership').checked = btn.getAttribute('data-leadership') === 'true';
+            document.getElementById('edit-jobtype-version').value = btn.getAttribute('data-version');
+            updateLeadershipVisibility();
+            jtModal.style.display = "flex";
         });
 
         if (jtClose) jtClose.onclick = () => jtModal.style.display = "none";
@@ -435,16 +449,16 @@
             }
         }
         
-        document.querySelectorAll('.edit-freqtype-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const id = this.getAttribute('data-id');
-                ftForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), ftForm.action);
-                ftTitle.innerText = '[[#{admin.edit}]]';
-                document.getElementById('ft-name').value = this.getAttribute('data-name');
-                document.getElementById('ft-desc').value = this.getAttribute('data-desc');
-                document.getElementById('edit-freqtype-version').value = this.getAttribute('data-version');
-                ftModal.style.display = "flex";
-            });
+        // Delegated on document so swapped-in rows (AJAX filter) keep working with zero re-init.
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.edit-freqtype-btn');
+            if (!btn) return;
+            ftForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), ftForm.action);
+            ftTitle.innerText = '[[#{admin.edit}]]';
+            document.getElementById('ft-name').value = btn.getAttribute('data-name');
+            document.getElementById('ft-desc').value = btn.getAttribute('data-desc');
+            document.getElementById('edit-freqtype-version').value = btn.getAttribute('data-version');
+            ftModal.style.display = "flex";
         });
 
         if (ftClose) ftClose.onclick = () => ftModal.style.display = "none";
@@ -460,11 +474,12 @@
         const deleteClose = document.querySelectorAll('.close-delete-modal');
 
         if (deleteModal) {
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    deleteForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), deleteForm.action);
-                    deleteModal.style.display = 'flex';
-                });
+            // Delegated: one listener serves all three sections' swapped-in delete buttons.
+            document.addEventListener('click', function(e) {
+                const btn = e.target.closest('.delete-btn');
+                if (!btn) return;
+                deleteForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
+                deleteModal.style.display = 'flex';
             });
 
             deleteClose.forEach(btn => {
@@ -516,14 +531,15 @@
         }
     }
 
-    // Drag and Drop Logic
-    function setupDragAndDrop(tableBodyId, reorderUrl) {
-        const tableBody = document.getElementById(tableBodyId);
-        if (!tableBody) return;
+    // Drag and Drop Logic. Bound on the STABLE swap container (#freqtypes-results) — NOT the
+    // swapped inner <tbody> — so reorder survives the include-inactive filter swap with no re-init.
+    function setupDragAndDrop(containerId, reorderUrl) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
 
         let draggedRow = null;
 
-        tableBody.addEventListener('dragstart', function(e) {
+        container.addEventListener('dragstart', function(e) {
             draggedRow = e.target.closest('tr.draggable-row');
             if (!draggedRow) return;
             draggedRow.style.opacity = '0.5';
@@ -531,11 +547,11 @@
             e.dataTransfer.setData('text/plain', draggedRow.dataset.id);
         });
 
-        tableBody.addEventListener('dragend', function(e) {
+        container.addEventListener('dragend', function(e) {
             if (!draggedRow) return;
             draggedRow.style.opacity = '1';
 
-            const rows = Array.from(tableBody.querySelectorAll('tr.draggable-row'));
+            const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
             const newOrderIds = rows.map(row => row.dataset.id);
 
             fetch(reorderUrl, {
@@ -558,7 +574,7 @@
             draggedRow = null;
         });
 
-        tableBody.addEventListener('dragover', function(e) {
+        container.addEventListener('dragover', function(e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             const targetRow = e.target.closest('tr.draggable-row');
@@ -573,13 +589,13 @@
             }
         });
 
-        tableBody.addEventListener('drop', function(e) {
+        container.addEventListener('drop', function(e) {
             e.preventDefault();
         });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        setupDragAndDrop('freq-table-body', '/admin/mission-data/frequency-types/reorder');
+        setupDragAndDrop('freqtypes-results', '/admin/mission-data/frequency-types/reorder');
     });
 
     // CSP-safe delegated bindings (replaces onclick="toggleBox(event, '<box>')" and
@@ -589,11 +605,32 @@
             toggleBox(event, el.getAttribute('data-box-id'));
         });
     }
-    // Note: the three filter-form checkboxes now use the global submit-form-by-id handler
-    // from common-handlers.js (which submits a form by id when the checkbox changes — wired
-    // for the `click` event there but also covers checkbox `change` via the change-listener
-    // counterpart below, ensuring keyboard activation still submits the filter form).
-    // Triggered via data-trigger="submit-form-by-id" data-form-id="…" on the checkbox.
+
+    // Include-inactive filters -> in-place swap of just the affected section (REQ-FE-002),
+    // replacing the former data-trigger="submit-form-by-id" full reload. Each swap URL carries
+    // all three include-inactive values so the address bar / no-JS refresh reproduce full state.
+    if (window.krtFetch) {
+        const filterParams = function () {
+            return 'includeInactiveSquadrons=' + document.getElementById('includeInactiveSquadrons').checked
+                + '&includeInactiveJobTypes=' + document.getElementById('includeInactiveJobTypes').checked
+                + '&includeInactiveFrequencyTypes=' + document.getElementById('includeInactiveFrequencyTypes').checked;
+        };
+        const wireFilter = function (checkboxId, sectionId) {
+            const cb = document.getElementById(checkboxId);
+            if (!cb) return;
+            cb.addEventListener('change', function () {
+                window.krtFetch.swap({
+                    url: '/admin/mission-data?' + filterParams(),
+                    container: '#' + sectionId,
+                    fragmentValue: sectionId,
+                    history: true
+                });
+            });
+        };
+        wireFilter('includeInactiveSquadrons', 'squadrons-results');
+        wireFilter('includeInactiveJobTypes', 'jobtypes-results');
+        wireFilter('includeInactiveFrequencyTypes', 'freqtypes-results');
+    }
 </script>
 </body>
 </html>

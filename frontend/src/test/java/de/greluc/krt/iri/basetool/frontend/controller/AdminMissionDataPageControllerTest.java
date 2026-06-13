@@ -75,7 +75,7 @@ class AdminMissionDataPageControllerTest {
         .thenReturn(squadronsPage);
 
     // Act
-    controller.listData(false, false, false, model);
+    controller.listData(false, false, false, null, model);
 
     // Assert
     @SuppressWarnings("unchecked")
