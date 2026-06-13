@@ -18,6 +18,8 @@
 
 - **Die ungenutzte Alpine.js-Bibliothek wurde entfernt.** Sie wurde nur noch auf der Missions-Detailseite geladen, aber von keiner Stelle mehr verwendet; die Seite lädt dadurch ein Skript weniger. Keine sichtbare Funktionsänderung.
 
+- **Die JS-Bibliotheken marked und DOMPurify wurden entfernt.** Die Dashboard-Ankündigung wird jetzt – wie schon die Missionsbeschreibung – serverseitig als Markdown gerendert (CommonMark mit escaptem Roh-HTML und entfernten unsicheren Links) statt im Browser. Das Dashboard lädt damit zwei Skripte weniger; keine sichtbare Funktionsänderung.
+
 ## [v0.4.20](https://github.com/krt-iri/basetool/releases/tag/v0.4.20) - 2026-06-12
 
 ### Changed

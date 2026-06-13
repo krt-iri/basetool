@@ -2,10 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${appTitle}">Profit Basetool</title>
-    <th:block th:fragment="extraLinks">
-<script th:src="@{/js/vendor/marked-18.0.3.min.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/vendor/dompurify-3.4.2.min.js}" th:attr="nonce=${cspNonce}"></script>
-    </th:block>
+    <th:block th:fragment="extraLinks"></th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -49,7 +46,12 @@
         </div>
         
         <div id="info-body" th:style="${unreadAnnouncement ? 'display:block;' : 'display:none;'}">
-            <div id="info-content" th:data-markdown="${announcement.content}"></div>
+            <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
+                 link protocols. Bean call bound via th:with — th:utext is a restricted expression
+                 context in Thymeleaf 3.1 where @bean references are forbidden (cf. @moneyFormat). -->
+            <div id="info-content" class="markdown-content"
+                 th:with="announcementHtml=${@markdown.render(announcement.content)}"
+                 th:utext="${announcementHtml}"></div>
         </div>
     </div>
 
@@ -100,26 +102,6 @@
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'index-toggle-info', toggleInfo);
     }
-
-    document.addEventListener('DOMContentLoaded', function() {
-
-        // Markdown Render
-        const infoContent = document.getElementById('info-content');
-        if (infoContent && window.marked) {
-            const raw = infoContent.getAttribute('data-markdown');
-            if (raw) {
-                if (window.DOMPurify) {
-                    infoContent.innerHTML = DOMPurify.sanitize(marked.parse(raw));
-                } else {
-                    // DOMPurify unavailable (CDN blocked / adblocker / network issue):
-                    // fall back to plain text instead of injecting unsanitized markup,
-                    // since announcements are admin-controlled and could contain HTML.
-                    console.warn('DOMPurify not loaded; rendering announcement as plain text.');
-                    infoContent.textContent = raw;
-                }
-            }
-        }
-    });
 </script>
 </body>
 </html>
