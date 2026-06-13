@@ -71,16 +71,20 @@ public class BlueprintOverviewPageController {
    * @param page zero-based page index, defaulted/clamped to 0
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured
    * @param search optional case-insensitive product-name fragment
+   * @param fragment when {@code "results"} only the table + pagination fragment is rendered (AJAX
+   *     filter/paging swap, REQ-FE-002); otherwise the full page is returned
    * @param model Thymeleaf model populated with the page content, the page envelope ({@code
    *     overviewPage}), and the echoed {@code search}/{@code pageSizes} for the filter form and
    *     size picker
-   * @return the {@code blueprint-overview} view name
+   * @return the {@code blueprint-overview} view name, or its {@code results} fragment for an AJAX
+   *     swap request
    */
   @GetMapping
   public String view(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String search,
+      @RequestParam(required = false) String fragment,
       Model model) {
     int effectivePage = page == null || page < 0 ? 0 : page;
     int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
@@ -106,7 +110,7 @@ public class BlueprintOverviewPageController {
     model.addAttribute("overviewPage", res);
     model.addAttribute("search", trimmedSearch);
     model.addAttribute("pageSizes", PAGE_SIZES);
-    return "blueprint-overview";
+    return "results".equals(fragment) ? "blueprint-overview :: results" : "blueprint-overview";
   }
 
   /**

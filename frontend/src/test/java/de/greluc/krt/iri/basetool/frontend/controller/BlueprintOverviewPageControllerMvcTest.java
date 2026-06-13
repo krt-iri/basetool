@@ -131,6 +131,24 @@ class BlueprintOverviewPageControllerMvcTest {
                     containsString("/blueprint-overview?search=Aurora&amp;page=0&amp;size=50")));
   }
 
+  // covers REQ-FE-002 — an AJAX swap request (fragment=results) renders only the inner table +
+  // pagination fragment: the data table is present, but the surrounding page chrome (the filter
+  // form and the swap-target wrapper div, both outside the fragment) is not.
+  @Test
+  @WithMockUser
+  void view_fragmentResults_rendersOnlyTableFragment() throws Exception {
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(page(0, 50, 120));
+
+    mockMvc
+        .perform(get("/blueprint-overview").param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("class=\"data-table\"")))
+        .andExpect(content().string(containsString("class=\"pagination\"")))
+        .andExpect(content().string(not(containsString("id=\"bp-overview-results\""))))
+        .andExpect(content().string(not(containsString("class=\"bp-filter\""))));
+  }
+
   // covers REQ-INV-013 — a single short page needs neither page-nav nor size picker.
   @Test
   @WithMockUser
