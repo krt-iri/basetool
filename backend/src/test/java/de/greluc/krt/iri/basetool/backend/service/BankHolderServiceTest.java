@@ -41,7 +41,6 @@ import de.greluc.krt.iri.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -131,7 +130,7 @@ class BankHolderServiceTest {
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
     when(holderRepository.save(any(BankHolder.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
-    when(postingRepository.holderTotals()).thenReturn(List.of());
+    when(postingRepository.holderTotal(holderId)).thenReturn(BigDecimal.ZERO);
 
     // When
     bankHolderService.updateHolder(holderId, new UpdateBankHolderRequest(false, 4L));
