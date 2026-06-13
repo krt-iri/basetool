@@ -604,6 +604,12 @@
                     <div class="kpanel-head" th:text="#{mission.details}">Details</div>
                     <div class="kpanel-body">
 
+                    <!-- #574 carve-out: this core-edit form still submits classic POST->redirect.
+                         It fans out into three section PATCHes (core/schedule/flags) with server-side
+                         @Valid field-error rendering; an in-place conversion needs a JSON field-error
+                         contract and is deferred to a follow-up so the validation UX is not regressed.
+                         Every OTHER mission-detail write (crew board, finance, party-lead, owner/
+                         managers, actual-time, frequency, payout) is in-place. -->
                     <form id="mission-form" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}">
                         <input type="hidden" id="mission-version" name="version" th:field="*{version}">
                         <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
