@@ -94,6 +94,11 @@ class BankAuditLogE2eTest {
         page.waitForLoadState();
         assertThat(page.locator("[data-testid='bank-audit-panel']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        // Web-first wait before the one-shot count(): rows paint shortly after the panel, and on
+        // slower engines (webkit) a bare count() races that paint and reads 0. isVisible
+        // auto-retries.
+        assertThat(page.locator("[data-testid='bank-audit-row']").first())
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertTrue(
             page.locator("[data-testid='bank-audit-row']").count() >= 1,
             "the audit viewer lists at least one event");
@@ -103,6 +108,9 @@ class BankAuditLogE2eTest {
         E2eSupport.awaitFormPost(
             page, () -> page.locator("[data-testid='bank-audit-filter-apply']").click());
         page.waitForLoadState();
+        // Same web-first wait after the filter form-post before reading count() (the webkit flake).
+        assertThat(page.locator("[data-testid='bank-audit-row']").first())
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertTrue(
             page.locator("[data-testid='bank-audit-row']").count() >= 1,
             "filtering by DEPOSIT_BOOKED still lists the seeded deposit");
