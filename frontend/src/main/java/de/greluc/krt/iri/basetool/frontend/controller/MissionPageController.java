@@ -813,6 +813,51 @@ public class MissionPageController {
   }
 
   /**
+   * AJAX variant of {@link #setPartyLead}: assigns or clears the party lead and returns the
+   * refreshed mission as JSON so the mission-detail page can patch the party-lead display + bumped
+   * {@code partyLeadVersion} in place without a full reload (#574). The classic form-POST above
+   * stays the no-JavaScript fallback; the 409 (ambiguous name / stale version) is passed through as
+   * RFC 7807 so the shared {@code krtFetch} conflict UX fires.
+   *
+   * @param id mission id (path)
+   * @param body party-lead JSON ({@code userId} and/or {@code guestName}, plus {@code version}); an
+   *     empty {@code userId}+{@code guestName} clears the lead
+   * @return {@code 200} with the refreshed mission, or the upstream RFC 7807 error passed through
+   */
+  @org.springframework.web.bind.annotation.PutMapping(
+      value = "/{id}/party-lead/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> setPartyLeadAjax(
+      @PathVariable @NotNull UUID id,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Map<String, Object> out = new HashMap<>();
+      Object userId = body.get("userId");
+      if (userId != null && !String.valueOf(userId).isBlank()) {
+        out.put("userId", userId);
+      }
+      Object guestName = body.get("guestName");
+      if (guestName != null && !String.valueOf(guestName).isBlank()) {
+        out.put("guestName", guestName);
+      }
+      out.put("version", body.get("version") != null ? body.get("version") : 0L);
+      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class, false);
+      MissionDto mission =
+          backendApiClient.get(
+              "/api/v1/missions/" + id, new ParameterizedTypeReference<MissionDto>() {}, false);
+      return org.springframework.http.ResponseEntity.ok(mission);
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Set party lead (AJAX) failed: status={}", e.getStatusCode());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in setPartyLeadAjax for mission {}", id, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
    * Form-post endpoint that marks a participant as checked in. Public for the guest-flow.
    *
    * @return redirect to {@code /missions/{id}}

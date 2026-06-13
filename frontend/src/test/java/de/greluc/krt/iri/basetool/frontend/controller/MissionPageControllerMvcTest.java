@@ -2139,4 +2139,144 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("<strong>Sammeln</strong>")))
         .andExpect(content().string(not(containsString("<script>alert"))));
   }
+
+  // --- #574: in-place section fragment branches --------------------------
+
+  /** Minimal editable mission (canEdit + canManageManagers) for the fragment-render assertions. */
+  private static MissionDto editableMission(UUID id) {
+    return new MissionDto(
+        id,
+        "Frag Mission",
+        null,
+        null,
+        "PLANNED",
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        Collections.emptySet(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        Collections.emptySet(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        null,
+        null,
+        Collections.emptySet(),
+        true,
+        true,
+        1L,
+        1L,
+        1L,
+        1L,
+        0,
+        0,
+        null,
+        null,
+        null,
+        0L);
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_CrewBoardFragment_RendersBoardOnly() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "crew-board"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: crewBoard"))
+        .andExpect(content().string(containsString("id=\"board-pool\"")))
+        // The fragment must NOT carry the page chrome (sticky head / tab nav / sibling panes).
+        .andExpect(content().string(not(containsString("mission-head-sticky"))))
+        .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_FinanceFragment_RendersFinancePaneOnly() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "finance"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: financeSection"))
+        .andExpect(content().string(containsString("id=\"finance-count-meta\"")))
+        .andExpect(content().string(not(containsString("mission-head-sticky"))))
+        .andExpect(content().string(not(containsString("id=\"pane-crew\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_MgmtFragment_RendersManagementPanelOnly() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "mgmt"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: mgmtPanels"))
+        .andExpect(content().string(containsString("new-manager-id")))
+        .andExpect(content().string(not(containsString("mission-head-sticky"))))
+        .andExpect(content().string(not(containsString("id=\"board-pool\""))));
+  }
+
+  // --- #574: party-lead AJAX endpoint ------------------------------------
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void setPartyLeadAjax_Success_ReturnsRefreshedMission() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/missions/" + missionId + "/party-lead"), any(), eq(Void.class), eq(false)))
+        .thenReturn(null);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(editableMission(missionId));
+
+    String body = "{\"guestName\":\"Lead Guy\",\"version\":0}";
+    mockMvc
+        .perform(
+            put("/missions/" + missionId + "/party-lead/ajax")
+                .with(csrf())
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void setPartyLeadAjax_BackendConflict_Returns409() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/missions/" + missionId + "/party-lead"), any(), eq(Void.class), eq(false)))
+        .thenThrow(
+            new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException(
+                "Conflict", null, 409));
+
+    String body = "{\"guestName\":\"Ambiguous\",\"version\":0}";
+    mockMvc
+        .perform(
+            put("/missions/" + missionId + "/party-lead/ajax")
+                .with(csrf())
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isConflict());
+  }
 }
