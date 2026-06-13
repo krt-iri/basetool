@@ -146,9 +146,11 @@ public class JobOrderPageController {
    * @param activeSquadronId active squadron context surfaced by {@code SquadronContextAdvice}; used
    *     to translate {@code scope=mine} into a backend {@code squadronId} param.
    * @param response servlet response, used to update the persistence cookies
+   * @param fragment when {@code "results"}, only the results-table fragment is rendered for an
+   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with orders, selected filters and the aging thresholds
    *     for the row-color rendering
-   * @return the {@code orders-index} view name
+   * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
    */
   @GetMapping
   @PreAuthorize("isAuthenticated()")
@@ -160,6 +162,7 @@ public class JobOrderPageController {
       @ModelAttribute("activeSquadronId") UUID activeSquadronId,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       HttpServletResponse response,
+      @RequestParam(required = false) String fragment,
       Model model) {
     if (!canViewJobOrders) {
       // Non-profit members (anyone without a profit-eligible org unit, and not an admin) are not
@@ -267,6 +270,9 @@ public class JobOrderPageController {
     model.addAttribute("scopeFilterApplied", filterToOwnSquadron);
     model.addAttribute("ageYellowDays", yellowDays);
     model.addAttribute("ageRedDays", redDays);
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "orders-index :: ordersResults";
+    }
     return "orders-index";
   }
 

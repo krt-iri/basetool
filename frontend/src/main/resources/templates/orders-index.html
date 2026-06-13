@@ -27,7 +27,7 @@
     </div>
 
     <div class="hud-box mt-2">
-        <form id="filter-form" class="no-track" method="get" th:action="@{/orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
+        <form id="orders-filter-form" class="no-track" method="get" th:action="@{/orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
             <span th:text="#{orders.index.filter.status}" style="font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1);">Status:</span>
             <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
@@ -70,6 +70,8 @@
             <p th:text="#{__${success}__}">Erfolg</p>
         </div>
 
+        <div id="orders-results">
+        <th:block th:fragment="ordersResults">
         <div class="table-responsive">
         <table class="data-table">
             <colgroup>
@@ -184,6 +186,8 @@
             </tbody>
         </table>
         </div>
+        </th:block>
+        </div>
     </div>
     <form id="priority-update-form" th:action="@{/orders/dummy}" method="post" style="display: none;">
         <input type="hidden" name="priority" id="priority-update-input" value="">
@@ -192,40 +196,78 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', () => {
-        const yellowDays = /*[[${ageYellowDays}]]*/ 30;
-        const redDays = /*[[${ageRedDays}]]*/ 90;
-        const now = new Date();
+    const KRT_ORDERS_AGE_YELLOW = /*[[${ageYellowDays}]]*/ 30;
+    const KRT_ORDERS_AGE_RED = /*[[${ageRedDays}]]*/ 90;
 
-        document.querySelectorAll('.order-id-display').forEach(el => {
+    // Age-colour the order ids. Extracted so it can re-run on `krt:swapped` — the row colours are
+    // otherwise only applied on the initial load and would be lost on a fragment swap (#573).
+    function colorOrderAges(root) {
+        const now = new Date();
+        (root || document).querySelectorAll('.order-id-display').forEach(el => {
             const utcDateStr = el.getAttribute('data-utc');
             if (utcDateStr) {
                 const date = new Date(utcDateStr);
                 if (!isNaN(date)) {
-                    const diffTime = now.getTime() - date.getTime();
-                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                    
-                    if (diffDays >= redDays) {
+                    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays >= KRT_ORDERS_AGE_RED) {
                         el.classList.add('text-danger');
                         el.style.fontWeight = 'bold';
-                    } else if (diffDays >= yellowDays) {
+                    } else if (diffDays >= KRT_ORDERS_AGE_YELLOW) {
                         el.classList.add('text-warning');
                         el.style.fontWeight = 'bold';
                     }
                 }
             }
         });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        colorOrderAges(document);
+
+        // In-place status/scope filter (epic #571 / #573). The form id was renamed off the generic
+        // "filter-form" so the sidebar's generic change->submit auto-reload no longer fires here.
+        const filterForm = document.getElementById('orders-filter-form');
+        const resultsContainer = document.getElementById('orders-results');
+        if (filterForm && resultsContainer && window.krtFetch) {
+            const applyFilter = () => {
+                const data = new FormData(filterForm);
+                const params = new URLSearchParams();
+                for (const [key, value] of data.entries()) {
+                    if (value !== '') params.append(key, value);
+                }
+                const query = params.toString();
+                window.krtFetch.swap({
+                    url: '/orders' + (query ? '?' + query : ''),
+                    container: resultsContainer,
+                    history: true,
+                });
+            };
+            filterForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                applyFilter();
+            });
+            filterForm.querySelectorAll('input').forEach((el) => {
+                el.addEventListener('change', applyFilter);
+            });
+        }
+    });
+
+    document.addEventListener('krt:swapped', (e) => {
+        colorOrderAges(e && e.detail ? e.detail.container : document);
     });
 </script>
 <script sec:authorize="hasRole('LOGISTICIAN')" th:attr="nonce=${cspNonce}">
+// Bind the drag-reorder to the STABLE #orders-results container (not the <tbody>) so the
+// delegation survives a filter fragment swap that replaces the table (#573). The handlers
+// already use e.target.closest('tr.draggable-row'), so container-level delegation is equivalent.
 document.addEventListener('DOMContentLoaded', () => {
-    const tableBody = document.querySelector('.data-table tbody');
-    if (!tableBody) return;
-    
+    const container = document.getElementById('orders-results');
+    if (!container) return;
+
     let draggedRow = null;
     let oldIndex = -1;
 
-    tableBody.addEventListener('dragstart', function(e) {
+    container.addEventListener('dragstart', function(e) {
         draggedRow = e.target.closest('tr.draggable-row');
         if (!draggedRow) return;
         
@@ -233,18 +275,18 @@ document.addEventListener('DOMContentLoaded', () => {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', draggedRow.dataset.id);
         
-        const rows = Array.from(tableBody.querySelectorAll('tr.draggable-row'));
+        const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
         oldIndex = rows.indexOf(draggedRow);
     });
 
-    tableBody.addEventListener('dragend', function(e) {
+    container.addEventListener('dragend', function(e) {
         if (!draggedRow) return;
         draggedRow.style.opacity = '1';
         draggedRow = null;
         oldIndex = -1;
     });
 
-    tableBody.addEventListener('dragover', function(e) {
+    container.addEventListener('dragover', function(e) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         
@@ -261,11 +303,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    tableBody.addEventListener('drop', function(e) {
+    container.addEventListener('drop', function(e) {
         e.preventDefault();
         if (!draggedRow || oldIndex === -1) return;
         
-        const rows = Array.from(tableBody.querySelectorAll('tr.draggable-row'));
+        const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
         const newIndex = rows.indexOf(draggedRow);
         
         if (newIndex === oldIndex) return;
