@@ -119,6 +119,17 @@ public final class KrtPdfSupport {
   }
 
   /**
+   * The embedded Lato-Regular {@link BaseFont}, exposed for direct canvas text drawing (e.g. the
+   * axis labels of the three-month report's balance chart) where a {@link Font} wrapper is not
+   * enough.
+   *
+   * @return the Lato-Regular base font
+   */
+  public static @NotNull BaseFont regularBaseFont() {
+    return LATO_REGULAR;
+  }
+
+  /**
    * A Lato-Bold font instance (real bold glyphs, not simulated).
    *
    * @param size point size

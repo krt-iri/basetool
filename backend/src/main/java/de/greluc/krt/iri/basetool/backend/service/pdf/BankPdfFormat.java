@@ -51,6 +51,17 @@ public final class BankPdfFormat {
   }
 
   /**
+   * German-grouped whole-number rendering without the unit suffix — the compact form used for the
+   * balance chart's axis labels, where the {@code aUEC} suffix would not fit.
+   *
+   * @param value the amount
+   * @return the grouped digits, no unit
+   */
+  public static @NotNull String groupedAmount(@NotNull BigDecimal value) {
+    return grouped(value);
+  }
+
+  /**
    * Formats a posting amount signed for the booking column, e.g. {@code +250.000} / {@code
    * -100.000}.
    *

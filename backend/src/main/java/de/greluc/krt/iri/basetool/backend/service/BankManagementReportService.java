@@ -26,6 +26,7 @@ import de.greluc.krt.iri.basetool.backend.model.projection.BankBookingRow;
 import de.greluc.krt.iri.basetool.backend.model.projection.BankHolderBalance;
 import de.greluc.krt.iri.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.iri.basetool.backend.repository.BankPostingRepository;
+import de.greluc.krt.iri.basetool.backend.service.pdf.BankBalanceChart;
 import de.greluc.krt.iri.basetool.backend.service.pdf.BankPdfFormat;
 import de.greluc.krt.iri.basetool.backend.service.pdf.KrtPdfSupport;
 import java.awt.Color;
@@ -67,6 +68,10 @@ public class BankManagementReportService {
   private static final DateTimeFormatter DATE_TIME_PATTERN =
       DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
+  /** Date-only pattern for the balance chart's compact x-axis labels; zone bound per request. */
+  private static final DateTimeFormatter DATE_ONLY_PATTERN =
+      DateTimeFormatter.ofPattern("dd.MM.yy");
+
   private final BankAccountRepository bankAccountRepository;
   private final BankPostingRepository bankPostingRepository;
   private final BankAuditService bankAuditService;
@@ -103,6 +108,7 @@ public class BankManagementReportService {
       @Nullable ZoneId userZone) {
     ZoneId zone = userZone != null ? userZone : ZoneOffset.UTC;
     DateTimeFormatter stamp = DATE_TIME_PATTERN.withZone(zone);
+    DateTimeFormatter dateOnly = DATE_ONLY_PATTERN.withZone(zone);
 
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
       KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos);
@@ -124,8 +130,15 @@ public class BankManagementReportService {
         krt.document().add(empty);
       }
 
+      // Each account starts on its own page so a section never shares a page with the previous
+      // account's tail (REQ-BANK-015 readability); the first follows the title/period meta.
+      boolean firstAccount = true;
       for (BankAccount account : accounts) {
-        addAccountSection(krt, account, from, to, stamp);
+        if (!firstAccount) {
+          krt.document().newPage();
+        }
+        addAccountSection(krt, account, from, to, stamp, dateOnly);
+        firstAccount = false;
       }
 
       KrtPdfSupport.addFooter(krt);
@@ -145,13 +158,15 @@ public class BankManagementReportService {
    * @param from window start (inclusive)
    * @param to window end (inclusive)
    * @param stamp the zone-bound timestamp formatter
+   * @param dateOnly the zone-bound date-only formatter for the chart's x-axis labels
    */
   private void addAccountSection(
       @NotNull KrtPdfSupport.KrtDocument krt,
       @NotNull BankAccount account,
       @NotNull Instant from,
       @NotNull Instant to,
-      @NotNull DateTimeFormatter stamp) {
+      @NotNull DateTimeFormatter stamp,
+      @NotNull DateTimeFormatter dateOnly) {
     BigDecimal opening = bankPostingRepository.accountBalanceBefore(account.getId(), from);
     List<BankBookingRow> rows =
         bankPostingRepository.findBookingsInPeriod(account.getId(), from, to);
@@ -185,6 +200,14 @@ public class BankManagementReportService {
     KrtPdfSupport.addMetaRow(
         summary, label("pdf.bank.report.closing"), BankPdfFormat.amount(closing));
     krt.document().add(summary);
+
+    // Balance-over-time chart: the running balance across the three-month window as a step line.
+    KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.report.chart"));
+    krt.document()
+        .add(
+            BankBalanceChart.render(
+                krt.writer(), opening, rows, from, to, dateOnly.format(from), dateOnly.format(to)));
+    krt.document().add(new Paragraph(" "));
 
     PdfPTable table = new PdfPTable(5);
     table.setWidthPercentage(100);

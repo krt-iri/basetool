@@ -21,6 +21,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -200,8 +201,42 @@ class BankReportServiceTest {
     assertTrue(text.contains("Endsaldo"), "summary closing label present");
     assertTrue(text.contains("+750"), "itemized booking present");
     assertTrue(text.contains(holderHandle), "closing distribution names the holder");
+    assertTrue(text.contains("Kontostandverlauf"), "per-account balance chart caption present");
     assertEquals(
         auditBefore + 1, auditEventRepository.count(), "exactly one MANAGEMENT_REPORT_EXPORTED");
+  }
+
+  @Test
+  void threeMonthReport_startsEachAccountOnItsOwnPage() throws IOException {
+    // Given a second account so the report has two account sections
+    BankAccount second = newAccount("Report Konto 2 " + UUID.randomUUID());
+    bankLedgerService.bookDeposit(
+        new BankDepositRequest(second.getId(), holder.getId(), new BigDecimal("321"), null));
+    deposit("750");
+
+    // When
+    byte[] pdf = managementReportService.generateThreeMonthReport(null);
+
+    // Then: the two account numbers render on different pages (page break before each account)
+    try (PdfReader reader = new PdfReader(pdf)) {
+      PdfTextExtractor extractor = new PdfTextExtractor(reader);
+      int firstAccountPage = -1;
+      int secondAccountPage = -1;
+      for (int i = 1; i <= reader.getNumberOfPages(); i++) {
+        String page = extractor.getTextFromPage(i);
+        if (page.contains(account.getAccountNo())) {
+          firstAccountPage = i;
+        }
+        if (page.contains(second.getAccountNo())) {
+          secondAccountPage = i;
+        }
+      }
+      assertTrue(firstAccountPage > 0 && secondAccountPage > 0, "both account sections present");
+      assertNotEquals(
+          firstAccountPage,
+          secondAccountPage,
+          "each account section starts on its own page (no shared page)");
+    }
   }
 
   /**
