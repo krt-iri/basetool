@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.bank.title} + ' - ' + ${appTitle}">Bank-Administration - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.bank.title}">Bank-Administration</h1>
+        <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+           th:text="#{admin.bank.subtitle}">Gef&auml;hrliche Wartungsaktionen der Kartellbank.</p>
+    </div>
+
+    <!-- Flash banners: success counts / idempotent no-op / error. -->
+    <div th:if="${wipeResult != null}" class="hud-box mt-2" style="border-color: var(--color-success);"
+         data-testid="bank-wipe-success">
+        <p th:text="#{admin.bank.wipe.success(${wipeResult.accountsReset()}, ${wipeResult.holderStashesZeroed()})}">
+            5 Konten und 12 Halter-Best&auml;nde auf 0 gesetzt.</p>
+    </div>
+    <div th:if="${wipeNoop != null}" class="hud-box mt-2" data-testid="bank-wipe-noop">
+        <p th:text="#{admin.bank.wipe.noop}">Alle Salden waren bereits 0 — nichts zu tun.</p>
+    </div>
+    <div th:if="${error != null}" class="hud-box mt-2" style="border-color: var(--color-danger);"
+         data-testid="bank-wipe-error">
+        <p th:text="#{${error}}">Fehler.</p>
+    </div>
+
+    <!-- A1 danger card. -->
+    <div class="bank-danger-card mt-2" data-testid="bank-wipe-card">
+        <div class="bank-danger-head">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-reset"/></svg>
+            <h2 th:text="#{admin.bank.wipe.title}">Wipe-Reset</h2>
+        </div>
+        <p th:text="#{admin.bank.wipe.text}">Setzt nach einem Star-Citizen-Wipe alle Kontosalden und Halter-Best&auml;nde der gesamten Kartellbank auf 0. Die Aktion ist nicht umkehrbar; das Hauptbuch beh&auml;lt die historischen Buchungen, erg&auml;nzt um eine WIPE_RESET-Gegenbuchung je Bestand.</p>
+        <button type="button" class="btn btn-danger" data-trigger="open-modal-display"
+                data-modal-id="bank-wipe-modal" data-testid="bank-wipe-open"
+                th:text="#{admin.bank.wipe.button}">Wipe-Reset ausf&uuml;hren</button>
+    </div>
+
+    <!-- Type-to-confirm danger modal (reserved for wipe-reset-grade actions). -->
+    <div class="krt-modal-overlay" id="bank-wipe-modal">
+        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true"
+             th:aria-label="#{admin.bank.wipe.modal.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{admin.bank.wipe.modal.title}">Wipe-Reset best&auml;tigen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-wipe-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form method="post" th:action="@{/admin/bank/wipe-reset}" class="no-track">
+                <div class="krt-modal-body">
+                    <p th:text="#{admin.bank.wipe.modal.text}">Diese Aktion setzt die gesamte Kartellbank auf 0. Tippe WIPE, um zu best&auml;tigen.</p>
+                    <div class="bank-form-row">
+                        <label for="bank-wipe-confirm" th:text="#{admin.bank.wipe.modal.label}">Best&auml;tigung</label>
+                        <input type="text" id="bank-wipe-confirm" name="confirm" class="confirm-input"
+                               autocomplete="off" data-confirm-token="WIPE"
+                               data-confirm-submit="bank-wipe-submit"
+                               data-testid="bank-wipe-confirm" placeholder="WIPE">
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-wipe-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" id="bank-wipe-submit"
+                            data-testid="bank-wipe-submit" disabled
+                            th:text="#{admin.bank.wipe.button}">Wipe-Reset ausf&uuml;hren</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

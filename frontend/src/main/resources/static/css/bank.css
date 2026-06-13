@@ -1,0 +1,655 @@
+/*
+ * KRT "DAS KARTELL" Corporate Design styling for the Kartell bank (epic #556).
+ * Ports the design-system bank component layer (krt-components.css, submodule pin
+ * >= 2ba5678): .kpi-total/.kpi-card, .holder-row/.holder-bar/.holder-sum,
+ * .stack-bar/.stack-legend, .matrix-flag(.on) + tr.is-inert, the formalized
+ * .krt-modal frame and .confirm-input — plus the D1/K1/W1/G1 page scaffolding.
+ * Typography: Lato only; square-first HUD style; responsive across the four
+ * device classes (<=768, <=1024, default, >=1600).
+ */
+
+/* ---- Dashboard tiles (D1): .kpi-total aggregate strip + .kpi-card per account ---- */
+.bank-totals {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.kpi-total {
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    border-left: 4px solid var(--color-primary);
+    padding: 10px 14px;
+}
+
+.kpi-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-gray-2);
+    font-weight: var(--fw-bold);
+}
+
+.kpi-value {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 1.2rem;
+    color: var(--color-white);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.bank-acc-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.kpi-card {
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    color: inherit;
+    text-decoration: none;
+}
+
+.kpi-card:hover {
+    border-color: var(--color-primary);
+}
+
+.kpi-card:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.kpi-card .kpi-title {
+    font-weight: var(--fw-bold);
+    color: var(--color-white);
+    font-size: 0.85rem;
+}
+
+.kpi-card .kpi-sub {
+    font-size: 0.66rem;
+    color: var(--color-gray-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.kpi-card .kpi-value {
+    font-size: 1.3rem;
+}
+
+.kpi-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.kpi-card-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.kpi-delta {
+    font-size: 0.72rem;
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+}
+
+.kpi-delta--pos {
+    color: var(--color-success);
+}
+
+.kpi-delta--neg {
+    color: var(--color-danger-text);
+}
+
+.kpi-delta--flat {
+    color: var(--color-gray-2);
+}
+
+.kpi-card--closed {
+    opacity: 0.55;
+}
+
+/* 30-day trend sparkline: design-system tokens, not inline hex (KRT orange / muted grey). */
+.kpi-sparkline {
+    stroke: var(--color-primary);
+}
+
+.kpi-sparkline--flat {
+    stroke: var(--color-gray-2);
+}
+
+/* ---- Holder distribution (K1): rows with track bars + the proportional stack bar ---- */
+.holder-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--color-surface-input);
+}
+
+.holder-row:last-child {
+    border-bottom: none;
+}
+
+.holder-row .holder-name {
+    font-weight: var(--fw-bold);
+    color: var(--color-white);
+    font-size: 0.8rem;
+    min-width: 80px;
+}
+
+.holder-row .holder-bar {
+    flex: 1;
+    height: 9px;
+    background: var(--color-surface-input);
+    position: relative;
+}
+
+.holder-row .holder-bar i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--color-primary);
+}
+
+.holder-row .holder-value {
+    font-size: 0.76rem;
+    min-width: 110px;
+    text-align: right;
+    color: var(--color-gray-1);
+    font-variant-numeric: tabular-nums;
+}
+
+.holder-sum {
+    border-top: var(--border-hairline);
+    margin-top: 7px;
+    padding-top: 7px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.76rem;
+}
+
+.stack-bar {
+    display: flex;
+    height: 14px;
+    border: var(--border-hairline);
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.stack-bar i {
+    display: block;
+    height: 100%;
+}
+
+.stack-seg-0 {
+    background: var(--color-primary);
+}
+
+.stack-seg-1 {
+    background: var(--color-accent-light);
+}
+
+.stack-seg-2 {
+    background: var(--color-accent-dark);
+}
+
+.stack-seg-3 {
+    background: var(--color-dept-profit);
+}
+
+.stack-seg-4 {
+    background: var(--color-dept-raumueberlegenheit);
+}
+
+.stack-seg-5 {
+    background: var(--color-dept-forschung);
+}
+
+.stack-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 0.7rem;
+    color: var(--color-gray-2);
+    margin-top: 8px;
+}
+
+.stack-legend .sw {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 5px;
+    vertical-align: -1px;
+}
+
+/* ---- Permission flag matrix (G1): row existence = view right ---- */
+.matrix-flag {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    border: var(--border-hairline);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: var(--color-surface-input);
+    color: transparent;
+    font-size: 0.7rem;
+    padding: 0;
+}
+
+.matrix-flag.on {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-bg-black);
+    font-weight: var(--fw-black);
+}
+
+.matrix-flag:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.matrix-flag[disabled] {
+    cursor: default;
+}
+
+tr.is-inert td {
+    opacity: 0.5;
+}
+
+/* ---- KRT modal frame (formalized head/body/foot) + type-to-confirm ---- */
+.krt-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgb(0 0 0 / 80%);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 3000;
+}
+
+.krt-modal {
+    width: 100%;
+    max-width: 440px;
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    border-top: 3px solid var(--color-primary);
+    position: relative;
+    box-shadow: var(--glow-primary-lg);
+}
+
+.krt-modal::before,
+.krt-modal::after {
+    content: '';
+    position: absolute;
+    width: 13px;
+    height: 13px;
+    border: 2px solid var(--color-primary);
+}
+
+.krt-modal::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.krt-modal::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+}
+
+.krt-modal--danger {
+    border-top-color: var(--color-danger);
+    box-shadow: var(--glow-danger-lg);
+}
+
+.krt-modal--danger::before,
+.krt-modal--danger::after {
+    border-color: var(--color-danger);
+}
+
+.krt-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: var(--border-hairline);
+}
+
+.krt-modal-head h2 {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 0.85rem;
+    color: var(--color-white);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0;
+}
+
+.krt-modal--danger .krt-modal-head h2 {
+    color: var(--color-danger-text);
+}
+
+.krt-modal-body {
+    padding: 14px 16px;
+}
+
+.krt-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: var(--border-hairline);
+}
+
+.krt-modal .confirm-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--color-surface-input);
+    color: var(--color-gray-1);
+    border: var(--border-hairline);
+    padding: 7px 9px;
+    font-size: 0.8rem;
+    margin-top: 8px;
+    font-family: var(--font-body);
+}
+
+.krt-modal .confirm-input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: var(--glow-primary);
+}
+
+/* ---- Admin danger card (A1: wipe-reset) ---- */
+.bank-danger-card {
+    background: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-danger);
+    border-left: 4px solid var(--color-danger);
+    padding: 16px 18px;
+}
+
+.bank-danger-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.bank-danger-head h2 {
+    margin: 0;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-danger-text);
+}
+
+.bank-danger-head .krt-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--color-danger-text);
+}
+
+.bank-danger-card p {
+    color: var(--color-gray-1);
+    font-size: 0.85rem;
+    line-height: 1.45;
+    margin: 0 0 14px;
+}
+
+/* ---- Audit filter bar action cluster ---- */
+.bank-filter-actions {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+/* ---- Bank page scaffolding (screen panels, facts strip, two-column detail) ---- */
+.bank-head-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.bank-facts {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    background: var(--color-surface-input);
+    border: var(--border-hairline);
+    font-size: 0.78rem;
+    margin-bottom: 12px;
+}
+
+.bank-facts .fact-key {
+    color: var(--color-gray-2);
+    text-transform: uppercase;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    font-weight: var(--fw-bold);
+    margin-right: 5px;
+}
+
+.bank-facts .fact-value {
+    color: var(--color-white);
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+}
+
+.bank-cols {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: 12px;
+    align-items: start;
+}
+
+.bank-col-side {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bank-panel {
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+}
+
+.bank-panel-head {
+    padding: 8px 12px;
+    background: var(--color-surface-input);
+    border-bottom: 2px solid var(--color-primary);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.bank-panel-body {
+    padding: 10px 12px;
+}
+
+.bank-kv {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.78rem;
+    padding: 2px 0;
+}
+
+.bank-kv .bank-kv-key {
+    color: var(--color-gray-2);
+}
+
+.bank-kv .bank-kv-value {
+    color: var(--color-white);
+    font-variant-numeric: tabular-nums;
+}
+
+.bank-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.bank-form-row label {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-2);
+}
+
+.bank-check-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--color-white);
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.bank-datetime-row {
+    display: flex;
+    gap: 8px;
+}
+
+.bank-datetime-row .date-part {
+    flex: 1.4;
+}
+
+.bank-datetime-row .time-part {
+    flex: 1;
+}
+
+.bank-field-hint {
+    font-size: 0.66rem;
+    color: var(--color-gray-2);
+    margin-top: 3px;
+}
+
+.bank-field-error {
+    font-size: 0.72rem;
+    color: var(--color-danger-text);
+    margin-top: 4px;
+    display: none;
+}
+
+.bank-field-error.visible {
+    display: block;
+}
+
+.bank-amount {
+    font-variant-numeric: tabular-nums;
+}
+
+.bank-amount--pos {
+    color: var(--color-success);
+}
+
+.bank-amount--neg {
+    color: var(--color-danger-text);
+}
+
+.bank-amount--zero {
+    color: var(--color-gray-2);
+}
+
+.bank-note-cell {
+    color: var(--color-gray-2);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bank-filterbar {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.bank-filterbar .bank-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.bank-filterbar label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-2);
+}
+
+/* ---- Small shared utilities scoped to the bank pages ---- */
+.btn-sm {
+    padding: 3px 9px;
+    font-size: 0.62rem;
+}
+
+.text-right {
+    text-align: right;
+}
+
+/* ---- Responsive: tablet and smartphone device classes ---- */
+@media (width <= 1024px) {
+    .bank-acc-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .bank-cols {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (width <= 768px) {
+    .bank-totals {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .bank-acc-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .bank-form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .holder-row .holder-value {
+        min-width: 90px;
+    }
+}
+
+@media (width >= 1600px) {
+    .bank-acc-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}

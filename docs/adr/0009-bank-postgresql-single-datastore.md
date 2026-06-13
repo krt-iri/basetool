@@ -1,6 +1,6 @@
 # ADR-0009 — PostgreSQL stays the single datastore for the Kartell bank
 
-- **Status:** Proposed — becomes Accepted with the Phase 1 sign-off of epic #556
+- **Status:** Accepted (epic #556 delivered, 2026-06-13)
 - **Date:** 2026-06-12
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-BANK-018, REQ-BANK-020 (`docs/specs/bank.md`) · ADR-0010 ·

@@ -73,6 +73,11 @@ app:
       realm: test
       client-id: test-client
       client-secret: test-secret
+  bank:
+    integrity:
+      # The scheduled sweep is disabled under test; BankLedgerIntegrityServiceTest drives verify()
+      # directly so the schedule never races the synthetic-corruption assertions.
+      enabled: false
 
 # Disable the KeycloakHealthIndicator under @SpringBootTest. The test issuer URI
 # (http://keycloak.example.com) is a non-resolvable placeholder; leaving the

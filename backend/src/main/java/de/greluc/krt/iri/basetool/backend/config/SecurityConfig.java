@@ -153,6 +153,8 @@ public class SecurityConfig {
         ROLE_OFFICER > ROLE_LOGISTICIAN
         ROLE_ADMIN > ROLE_MISSION_MANAGER
         ROLE_OFFICER > ROLE_MISSION_MANAGER
+        ROLE_ADMIN > ROLE_BANK_MANAGEMENT
+        ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
         """);
   }
 
@@ -395,8 +397,11 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/users/search")
                     .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
+                    // BANK_MANAGEMENT widening (REQ-BANK-009): the grants UI resolves grantees
+                    // via the user lookup, and bank staff need not hold any org-role
+                    // (REQ-BANK-008) — without this, a pure bank manager would receive 403 here.
                     .requestMatchers("/api/v1/users/lookup")
-                    .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
+                    .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER", "BANK_MANAGEMENT")
                     .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/users")
@@ -456,6 +461,12 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/uex/locations/**")
                     .authenticated()
                     .requestMatchers("/api/v1/admin/**")
+                    .hasRole("ADMIN")
+                    // Bank admin carve-out (REQ-BANK-010/-012): wipe reset and the audit log are
+                    // URL-gated to ADMIN on top of the method-level @PreAuthorize — bank
+                    // management explicitly does NOT pass. The rest of /api/v1/bank/** rides the
+                    // authenticated() catch-all plus the BankSecurityService method gates.
+                    .requestMatchers("/api/v1/bank/admin/**")
                     .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())

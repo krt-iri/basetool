@@ -117,6 +117,11 @@ app:
       realm: ${KEYCLOAK_REALM:iri}
       client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
       client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+  bank:
+    integrity:
+      # Scheduled ledger-integrity sweep (REQ-BANK-020). Disable or retune per environment.
+      enabled: ${APP_BANK_INTEGRITY_ENABLED:true}
+      interval: ${APP_BANK_INTEGRITY_INTERVAL:PT1H}
   rate-limit:
     enabled: true
     paths:

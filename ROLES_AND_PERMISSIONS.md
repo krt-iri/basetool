@@ -153,10 +153,14 @@ ROLE_ADMIN   > ROLE_LOGISTICIAN
 ROLE_OFFICER > ROLE_LOGISTICIAN
 ROLE_ADMIN   > ROLE_MISSION_MANAGER
 ROLE_OFFICER > ROLE_MISSION_MANAGER
+ROLE_ADMIN           > ROLE_BANK_MANAGEMENT
+ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
 ```
 
 Admins und Officer erfüllen damit automatisch jeden `LOGISTICIAN`- und
-`MISSION_MANAGER`-Check.
+`MISSION_MANAGER`-Check. Admins erfüllen zusätzlich jeden Bank-Check
+(`BANK_MANAGEMENT` und transitiv `BANK_EMPLOYEE`); die Bankleitung erfüllt jeden
+`BANK_EMPLOYEE`-Check (REQ-BANK-007).
 
 ### Geseedete Authorities
 
@@ -166,6 +170,8 @@ Admins und Officer erfüllen damit automatisch jeden `LOGISTICIAN`- und
 | **Officer**         | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie)                |
 | **Squadron Member** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`                                                                                                                     |
 | **Guest**           | *(keine — leeres Set)*                                                                                                                                            |
+| **Bank Employee**   | *(keine — die Feinrechte sind app-verwaltete Grant-Zeilen, REQ-BANK-009)*                                                                                         |
+| **Bank Management** | *(keine — Sichtbarkeit "alles" kommt aus der Rolle selbst, ADR-0011)*                                                                                             |
 
 `USER_MANAGE` bleibt aus historischen Gründen im Officer-Set, wird aber von
 keinem Endpunkt mehr geprüft (effektiv inert — alle Member-Management-Endpunkte
@@ -427,6 +433,35 @@ Welche Stammdaten anonym lesbar sind, legt allein die `permitAll`-Liste in
 einige Tabellen (Städte, Stationen, Outposts, POIs, Aliase, Blueprints) sind
 schon zum **Lesen** Admin-only. **Schreiben ist bei allen Stammdaten
 Admin-only.**
+
+### 3.11 Kartellbank (epic #556)
+
+Die Bank hängt an zwei eigenen Keycloak-Rollen (`Bank Employee` →
+`ROLE_BANK_EMPLOYEE`, `Bank Management` → `ROLE_BANK_MANAGEMENT`) plus
+app-verwalteten **Grant-Zeilen** pro (Mitarbeiter, Konto)
+(`bank_account_grant`: Zeile = Lese-Recht; Flags = einzahlen / auszahlen /
+transferieren). **Bankmitarbeit ist völlig unabhängig von
+OrgUnit-Mitgliedschaften** (REQ-BANK-008): `BankSecurityService` wertet
+ausschließlich Bankrollen + Grants aus — `OwnerScopeService`, kontextuelle
+Rollen und der Admin-Pin haben keinerlei Einfluss, in beide Richtungen.
+Spalten hier: **Member** = beliebige Org-Rolle ohne Bankrolle · **Bank-MA** =
+`Bank Employee` (mit Grants) · **Bankleitung** = `Bank Management`.
+
+| Funktion (Gate)                                                                                        | Anonym | Member |  Bank-MA  | Bankleitung | Admin |
+|:-------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:-----------:|:-----:|
+| Bankbereich betreten, Dashboard, Konten **mit Grant-Zeile** sehen (`hasRole('BANK_EMPLOYEE')` + Grant) |   ❌    |   ❌    |     ✅     |      ✅      |   ✅   |
+| **Alle** Konten/Halter/Grants sehen (`hasRole('BANK_MANAGEMENT')`)                                     |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Einzahlen / Auszahlen / Transfer (`@bankSecurityService.canDeposit/Withdraw/Transfer`, je Konto-Flag)  |   ❌    |   ❌    | ✅ je Flag |      ✅      |   ✅   |
+| Konten anlegen/umbenennen/schließen/wiedereröffnen, Halter-Registry, Grants verwalten                  |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Storno (`POST /bank/transactions/{id}/reversal`, `hasRole('BANK_MANAGEMENT')`)                         |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Kontoauszug-PDF (gesehene Konten) / 3-Monats-Report (`BANK_MANAGEMENT`)                                |   ❌    |   ❌    |   ✅ / ❌   |      ✅      |   ✅   |
+| **Audit-Log** lesen (`/api/v1/bank/admin/audit`, URL- **und** Methoden-Gate `hasRole('ADMIN')`)        |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
+| **Wipe-Reset** (`/api/v1/bank/admin/wipe-reset`, `hasRole('ADMIN')`)                                   |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
+
+Die Bankleitung sieht das Audit-Log **nicht** — es ist bewusst Admin-only
+(REQ-BANK-012). Grants können nur an Nutzer mit der Rolle `Bank Employee`
+vergeben werden (409 `BANK_GRANTEE_MISSING_ROLE`); ob die Person zusätzlich in
+einer Staffel/einem SK ist, spielt keine Rolle.
 
 ---
 

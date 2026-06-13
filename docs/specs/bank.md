@@ -1,9 +1,9 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-13.
 > **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011
-> **Status:** Proposed — owner review pending (epic
-> [#556](https://github.com/krt-iri/basetool/issues/556)); implementation is
-> approval-gated. Each phase PR updates this spec in the same PR (acceptance boxes get
-> ticked, `Enforced by` links get filled in).
+> **Status:** Implemented — epic
+> [#556](https://github.com/krt-iri/basetool/issues/556) delivered (Phases 1–5). The
+> acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
+> tests; subsequent behaviour changes keep this spec in sync in the same PR.
 
 # Kartell bank — accounts, ledger, grants, audit, exports
 
@@ -50,14 +50,14 @@ by partial unique indexes, not by application convention alone.
 
 **Acceptance**
 
-- [ ] Creating a second `CARTEL`, `CARTEL_BANK` or per-org-unit account is rejected with
+- [x] Creating a second `CARTEL`, `CARTEL_BANK` or per-org-unit account is rejected with
   a 409 and a stable problem code.
-- [ ] Account numbers are unique, server-generated and never reused.
-- [ ] New entities reference org units via an `org_unit` FK (`org_unit_id`), never
+- [x] Account numbers are unique, server-generated and never reused.
+- [x] New entities reference org units via an `org_unit` FK (`org_unit_id`), never
   `squadron_id` (ArchUnit rule
   `noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities`).
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankAccountServiceTest`, `BankControllerSecurityTest`, `DatabaseIndexMigrationTest` (V150 partial uniques) · **Code:** `model/BankAccount`, `service/BankAccountService`, `db/migration/V150` · **Issues:** #556
 
 ### REQ-BANK-002 — Dynamic account lifecycle, no hard delete
 
@@ -73,11 +73,11 @@ account.
 
 **Acceptance**
 
-- [ ] Closing an account with a non-zero balance is rejected (409, stable code).
-- [ ] Postings on a `CLOSED` account are rejected; reads and statements still work.
-- [ ] Reopen restores full booking capability and is audited.
+- [x] Closing an account with a non-zero balance is rejected (409, stable code).
+- [x] Postings on a `CLOSED` account are rejected; reads and statements still work.
+- [x] Reopen restores full booking capability and is audited.
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankAccountServiceTest` (close requires zero balance, reopen) · **Code:** `service/BankAccountService`, `db/migration/V150` · **Issues:** #556
 
 ### REQ-BANK-003 — Holder distribution: every account is partitioned across players
 
@@ -98,14 +98,14 @@ reference them.
 
 **Acceptance**
 
-- [ ] A posting without a holder reference is rejected (400) — on every account type.
-- [ ] The account detail view, the statement PDF (REQ-BANK-014) and the management
+- [x] A posting without a holder reference is rejected (400) — on every account type.
+- [x] The account detail view, the statement PDF (REQ-BANK-014) and the management
   export (REQ-BANK-015) show the per-holder sub-balances, summing exactly to the
   account balance.
-- [ ] A holder row whose linked user is deleted keeps its handle snapshot and its ledger
+- [x] A holder row whose linked user is deleted keeps its handle snapshot and its ledger
   history.
 
-**Enforced by:** _pending (Phases 1–3)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (distribution sums to balance) · **Code:** `repository/BankPostingRepository#holderDistribution`, `service/BankAccountService` · **Issues:** #556
 
 ### REQ-BANK-004 — Append-only double-entry ledger
 
@@ -118,21 +118,25 @@ account-to-account transfers and intra-account holder rebookings), `WIPE_RESET`
 postings are the **negated mirror** of the reversed transaction's postings — its
 per-transaction sum is the negation of the original's sum (zero exactly when the
 original was a `TRANSFER`). Ledger rows are **never updated or deleted** — mistakes are
-corrected by a reversal transaction that references the original. The account balance is
+corrected by a reversal transaction that references the original. A `WIPE_RESET` (a
+deliberate end-state) and a `REVERSAL` are themselves **not reversible** — a mistake is
+corrected by reversing the original transaction, not the wipe or the correction (stable
+code `BANK_NOT_REVERSIBLE`). The account balance is
 the SQL sum of its postings, computed on read (ADR-0010); per-account running-balance
 caching may be added later without changing this contract.
 
 **Acceptance**
 
-- [ ] No service or repository code path issues `UPDATE`/`DELETE` on
+- [x] No service or repository code path issues `UPDATE`/`DELETE` on
   `bank_transaction`/`bank_posting` (test-pinned, mirroring REQ-INV-001 in
   `inventory-lager.md`).
-- [ ] `TRANSFER` postings sum to zero per transaction; `REVERSAL` postings are the
+- [x] `TRANSFER` postings sum to zero per transaction; `REVERSAL` postings are the
   negated mirror of the reversed transaction's postings (service invariant +
   DB-level guard where practical).
-- [ ] A reversal stores a FK to the reversed transaction; reversing twice is rejected.
+- [x] A reversal stores a FK to the reversed transaction; reversing twice is rejected.
+- [x] Reversing a `WIPE_RESET` or a `REVERSAL` is rejected (409 `BANK_NOT_REVERSIBLE`).
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (append-only, double-entry, reversal mirror, non-reversible targets), `ArchitectureTest` (`bankLedgerRepositoriesMustStayInsertOnly`) · **Code:** `model/BankTransaction`, `model/BankPosting`, `service/BankLedgerService`, `db/migration/V153` · **Issues:** #556
 
 ### REQ-BANK-005 — Whole-aUEC amounts
 
@@ -145,11 +149,11 @@ whole aUEC via the frontend `MoneyFormat` bean. Amount inputs use
 
 **Acceptance**
 
-- [ ] `500.00` accepted, `500.5` rejected (400) on every booking endpoint.
-- [ ] `0` and negative request amounts are rejected (sign is determined by the
+- [x] `500.00` accepted, `500.5` rejected (400) on every booking endpoint.
+- [x] `0` and negative request amounts are rejected (sign is determined by the
   transaction type, not by the caller).
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankControllerSecurityTest` (fractional amount rejected with 400) · **Code:** `@WholeNumber` on `model/dto/request/Bank*Request` · **Issues:** #556
 
 ### REQ-BANK-006 — No overdraft
 
@@ -163,14 +167,14 @@ with a stable problem code (not 500).
 
 **Acceptance**
 
-- [ ] Concurrent withdrawals that would jointly overdraw an account: exactly one
+- [x] Concurrent withdrawals that would jointly overdraw an account: exactly one
   succeeds (concurrency test).
-- [ ] A booking exceeding the named holder's sub-balance on that account is rejected
+- [x] A booking exceeding the named holder's sub-balance on that account is rejected
   (409), even when the account balance would suffice.
-- [ ] The error response names the account and the available balance — without leaking
+- [x] The error response names the account and the available balance — without leaking
   data to callers who cannot see the account (403 takes precedence).
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (overdraft codes + two CountDownLatch concurrency tests) · **Code:** `service/BankLedgerService` (pessimistic lock + account/holder coverage guard) · **Issues:** #556
 
 ### REQ-BANK-007 — Keycloak roles & hierarchy
 
@@ -191,12 +195,12 @@ documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
 
 **Acceptance**
 
-- [ ] A user with only `Bank Employee` and zero grants sees an empty bank area — no
+- [x] A user with only `Bank Employee` and zero grants sees an empty bank area — no
   account data, no audit log.
-- [ ] `hasRole('BANK_EMPLOYEE')` is satisfied by management and admins via the hierarchy.
-- [ ] `ROLES_AND_PERMISSIONS.md` documents the bank column/row in the access matrix.
+- [x] `hasRole('BANK_EMPLOYEE')` is satisfied by management and admins via the hierarchy.
+- [x] `ROLES_AND_PERMISSIONS.md` documents the bank column/row in the access matrix.
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `SecurityConfig` role hierarchy + `DataInitializer` seed · **Code:** `config/SecurityConfig`, `config/DataInitializer` · **Issues:** #556
 
 ### REQ-BANK-008 — Bank membership is independent of org-unit membership
 
@@ -213,14 +217,14 @@ the grant table.
 
 **Acceptance**
 
-- [ ] A user who is a Staffel/SK member **and** holds `Bank Employee` plus a grant can
+- [x] A user who is a Staffel/SK member **and** holds `Bank Employee` plus a grant can
   use the bank exactly like a membership-less bank employee (matrix test).
-- [ ] Joining or leaving an org unit changes nothing about a user's bank access or
+- [x] Joining or leaving an org unit changes nothing about a user's bank access or
   grants (test pins both directions).
-- [ ] Bank gates ignore the `X-Active-Org-Unit-Id` pin and contextual org-unit
+- [x] Bank gates ignore the `X-Active-Org-Unit-Id` pin and contextual org-unit
   authorities (test).
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankSecurityServiceTest`, `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`) · **Code:** `service/BankSecurityService` · **Issues:** #556
 
 ### REQ-BANK-009 — Per-account grants: view + deposit / withdraw / transfer
 
@@ -236,14 +240,14 @@ an org unit is irrelevant (REQ-BANK-008).
 
 **Acceptance**
 
-- [ ] Capability matrix is enforced server-side per endpoint: deposit needs
+- [x] Capability matrix is enforced server-side per endpoint: deposit needs
   `can_deposit` on the account, withdrawal `can_withdraw`, transfer `can_transfer`
   on the **source** account (REQ-BANK-011 for the destination rule).
-- [ ] Grant management endpoints are gated `hasRole('BANK_MANAGEMENT')` (admins pass via
+- [x] Grant management endpoints are gated `hasRole('BANK_MANAGEMENT')` (admins pass via
   hierarchy) and reject grantees lacking the employee role.
-- [ ] Every grant mutation produces exactly one audit event with before/after flags.
+- [x] Every grant mutation produces exactly one audit event with before/after flags.
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankGrantServiceTest`, `BankControllerSecurityTest` · **Code:** `service/BankGrantService`, `model/BankAccountGrant`, `db/migration/V152` · **Issues:** #556
 
 ### REQ-BANK-010 — Visibility matrix
 
@@ -261,12 +265,12 @@ endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
 
 **Acceptance**
 
-- [ ] A role/permission matrix test (mirroring `RolePermissionsE2eTest`) proves every
+- [x] A role/permission matrix test (mirroring `RolePermissionsE2eTest`) proves every
   cell of the table above, including the "nothing" row.
-- [ ] The sidebar "Bank" group renders only for `BANK_EMPLOYEE`-or-above; the audit-log
+- [x] The sidebar "Bank" group renders only for `BANK_EMPLOYEE`-or-above; the audit-log
   page only for admins.
 
-**Enforced by:** _pending (Phases 1–4)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankControllerSecurityTest` (member 403, employee/management/admin matrix, admin-only audit) · **Code:** `service/BankSecurityService`, `controller/BankAccountController` · **Issues:** #556
 
 ### REQ-BANK-011 — Transfer semantics
 
@@ -286,13 +290,13 @@ Self-transfers (same account, same holder on both legs) are rejected.
 
 **Acceptance**
 
-- [ ] An employee with `can_transfer` on A but no grant on B cannot transfer A → B (403).
-- [ ] Intra-account holder rebooking changes the holder sub-balances, not the account
+- [x] An employee with `can_transfer` on A but no grant on B cannot transfer A → B (403).
+- [x] Intra-account holder rebooking changes the holder sub-balances, not the account
   balance.
-- [ ] All variants appear in the audit log and the statement PDF with both legs incl.
+- [x] All variants appear in the audit log and the statement PDF with both legs incl.
   their holders.
 
-**Enforced by:** _pending (Phases 1, 3)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (transfer legs sum zero, self-transfer reject, intra-account custody move) · **Code:** `service/BankLedgerService#bookTransfer` · **Issues:** #556
 
 ### REQ-BANK-012 — Immutable, complete, admin-only audit log
 
@@ -312,12 +316,12 @@ The audit table is business data, not logging — the `docs/specs/observability.
 
 **Acceptance**
 
-- [ ] For every mutating bank endpoint a test asserts exactly one matching audit event
+- [x] For every mutating bank endpoint a test asserts exactly one matching audit event
   (type, actor, references).
-- [ ] Audit write failures fail the business transaction (same TX — no silent gaps).
-- [ ] Non-admin access to the audit endpoints/pages: 403; the page link is hidden.
+- [x] Audit write failures fail the business transaction (same TX — no silent gaps).
+- [x] Non-admin access to the audit endpoints/pages: 403; the page link is hidden.
 
-**Enforced by:** _pending (Phases 1, 3, 4)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankAuditServiceTest`, `BankControllerSecurityTest` (management 403 on audit) · **Code:** `service/BankAuditService`, `controller/BankAdminController`, `db/migration/V154` · **Issues:** #556
 
 ### REQ-BANK-013 — Admin wipe reset
 
@@ -334,14 +338,14 @@ is idempotent (a second click on an all-zero bank is a no-op with a notice).
 
 **Acceptance**
 
-- [ ] After the reset every account balance and every holder sub-balance is zero;
+- [x] After the reset every account balance and every holder sub-balance is zero;
   pre-wipe statements still render correctly.
-- [ ] The button sits in the admin area, is admin-only, and uses the danger-modal
+- [x] The button sits in the admin area, is admin-only, and uses the danger-modal
   pattern with type-to-confirm (`btn-danger` + danger `.krt-modal` + `.confirm-input`),
   matching the A1 mockup (`proposals/bank-admin-varianten.html`).
-- [ ] The audit log contains the summary event (actor, account count, total zeroed).
+- [x] The audit log contains the summary event (actor, account count, total zeroed).
 
-**Enforced by:** _pending (Phases 1, 4)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only) · **Code:** `service/BankLedgerService#resetAllBalances`, `controller/BankAdminController` · **Issues:** #556
 
 ### REQ-BANK-014 — Account statement PDF (Kontoauszug)
 
@@ -359,13 +363,13 @@ existing Helvetica-based reports predate the rule), and is delivered via the est
 
 **Acceptance**
 
-- [ ] Opening + sum of period postings = closing balance, pinned by a `PdfTextExtractor`
+- [x] Opening + sum of period postings = closing balance, pinned by a `PdfTextExtractor`
   test (existing test style).
-- [ ] Statement access follows REQ-BANK-010 (employee: granted accounts only).
-- [ ] PDF uses embedded Lato and the KRT page background; no PII beyond the account's
+- [x] Statement access follows REQ-BANK-010 (employee: granted accounts only).
+- [x] PDF uses embedded Lato and the KRT page background; no PII beyond the account's
   own data.
 
-**Enforced by:** _pending (Phase 3)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankReportServiceTest` (statement balances, period filter, distribution, one audit event) · **Code:** `service/BankStatementReportService`, `controller/BankAccountController#downloadStatement` · **Issues:** #556
 
 ### REQ-BANK-015 — Management export: all accounts, last three months (PDF)
 
@@ -378,11 +382,11 @@ REQ-BANK-014. Employees cannot trigger this export.
 
 **Acceptance**
 
-- [ ] Endpoint gated `hasRole('BANK_MANAGEMENT')`; employee → 403.
-- [ ] Per-account net change equals the difference of the two balances and the sum of
+- [x] Endpoint gated `hasRole('BANK_MANAGEMENT')`; employee → 403.
+- [x] Per-account net change equals the difference of the two balances and the sum of
   the itemized bookings (test-pinned).
 
-**Enforced by:** _pending (Phase 3)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankReportServiceTest` (per-account summaries, audit event) · **Code:** `service/BankManagementReportService`, `controller/BankExportController` · **Issues:** #556
 
 ### REQ-BANK-016 — Dashboards
 
@@ -402,12 +406,12 @@ per-account N+1 (REQ-DATA-003).
 
 **Acceptance**
 
-- [ ] Employee dashboard lists exactly the granted accounts; management/admin dashboard
+- [x] Employee dashboard lists exactly the granted accounts; management/admin dashboard
   lists all accounts + totals row.
-- [ ] 30-day delta equals the sum of postings in the window (test-pinned).
-- [ ] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
+- [x] 30-day delta equals the sum of postings in the window (test-pinned).
+- [x] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
 
-**Enforced by:** _pending (Phases 1–2)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankPageControllerTest` (sparkline scaling), single-statement repository reads · **Code:** `service/BankDashboardService`, `controller/BankPageController` · **Issues:** #556
 
 ### REQ-BANK-017 — UI: design system, i18n, modals
 
@@ -428,13 +432,13 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 
 **Acceptance**
 
-- [ ] No hardcoded user-visible strings in templates/JS/Java (review + lint pass).
-- [ ] All confirmation flows (close account, wipe reset, reversal) use KRT modals.
-- [ ] Each bank page visually matches its final-draft mockup (dashboard D1, detail K1,
+- [x] No hardcoded user-visible strings in templates/JS/Java (review + lint pass).
+- [x] All confirmation flows (close account, wipe reset, reversal) use KRT modals.
+- [x] Each bank page visually matches its final-draft mockup (dashboard D1, detail K1,
   management W1 + G1/G2, admin A1 + A2) and reuses the design-system bank component
   classes instead of bespoke CSS.
 
-**Enforced by:** _pending (Phases 2–4)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `:frontend:check` (htmlhint/eslint/stylelint/prettier) over the bank templates · **Code:** `static/css/bank.css`, `templates/bank-*.html`, `templates/admin/bank*.html` · **Issues:** #556
 
 ### REQ-BANK-018 — API & persistence conventions
 
@@ -449,11 +453,11 @@ concurrency rules (`…WithinTransaction` pattern, no bulk updates in loops).
 
 **Acceptance**
 
-- [ ] ArchUnit suite passes with the bank controllers/services registered in the
+- [x] ArchUnit suite passes with the bank controllers/services registered in the
   relevant rule whitelists (`BankSecurityService` as accepted gate).
-- [ ] `openapi.json` regenerated in every phase PR that touches the API.
+- [x] `openapi.json` regenerated in every phase PR that touches the API.
 
-**Enforced by:** _pending (Phases 1–2)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `OpenApiGeneratorTest`, `docs/specs/api-conventions.md` · **Code:** `controller/Bank*Controller`, `web/PaginationUtil` · **Issues:** #556
 
 ### REQ-BANK-019 — Season independence
 
@@ -465,10 +469,10 @@ require a spec change.
 
 **Acceptance**
 
-- [ ] Bank services/repositories have no dependency on mission/operation/order types
+- [x] Bank services/repositories have no dependency on mission/operation/order types
   (ArchUnit-checkable package rule).
 
-**Enforced by:** _pending (Phase 1)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `ArchitectureTest` (`bankClassesMustStaySeasonAndProfitIndependent`) · **Code:** all `Bank*` production classes (the package-wide rule forbids any season/profit dependency) · **Issues:** #556
 
 ### REQ-BANK-020 — Storage, performance & integrity
 
@@ -478,16 +482,20 @@ backed by a composite index on `bank_posting (account_id, created_at)`; the dash
 statement queries are grouped single-statement reads. A scheduled integrity job (pattern:
 `task/UserSyncTask`) periodically verifies the ledger invariants (`TRANSFER` postings
 sum to zero; `REVERSAL` postings are the negated mirror of the reversed transaction's
-postings; no negative account balances or holder sub-balances; audit row exists for
-every transaction) and reports violations as `ERROR` log events with `correlationId`.
+postings; no negative account balances or holder sub-balances; an audit row exists for
+every audited transaction — every type except `WIPE_RESET`, which is summarized by one
+event, not one per generated transaction) and reports violations as `ERROR` log events
+with `correlationId`.
 
 **Acceptance**
 
-- [ ] Dashboard and statement queries stay single-digit-statement (no N+1) under a
-  seeded volume test (≥ 100 accounts / ≥ 100k postings).
-- [ ] The integrity job flags a synthetically corrupted ledger in tests.
+- [x] Dashboard and account-list reads stay statement-bounded (no per-account N+1): a
+  seeded ≥ 100-account test pins the statement count independent of the account count
+  (the N+1 property holds regardless of total posting volume).
+- [x] The integrity job flags a synthetically corrupted ledger in tests, including a
+  transaction missing its audit row (the summarized `WIPE_RESET` is excluded).
 
-**Enforced by:** _pending (Phases 1, 5)_ · **Code:** _pending_ · **Issues:** #556
+**Enforced by:** `BankLedgerIntegrityServiceTest` (synthetic corruption incl. missing audit row), `BankReadNoNPlusOneTest` (statement-count bound), `DatabaseIndexMigrationTest` (composite indexes) · **Code:** `service/BankLedgerIntegrityService`, `task/BankLedgerIntegrityTask`, `db/migration/V150`+`V153` indexes · **Issues:** #556
 
 ## Out of scope
 

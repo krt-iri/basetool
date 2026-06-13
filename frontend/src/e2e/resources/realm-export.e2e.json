@@ -30,7 +30,9 @@
       { "name": "Logistician", "description": "E2E test role" },
       { "name": "Mission Manager", "description": "E2E test role" },
       { "name": "Squadron Member", "description": "E2E test role" },
-      { "name": "Guest", "description": "E2E test role" }
+      { "name": "Guest", "description": "E2E test role" },
+      { "name": "Bank Employee", "description": "E2E test role" },
+      { "name": "Bank Management", "description": "E2E test role" }
     ]
   },
   "clients": [
@@ -130,6 +132,36 @@
         { "type": "password", "value": "test-both-pw", "temporary": false }
       ],
       "realmRoles": ["Squadron Member"]
+    },
+    {
+      "username": "test-bank-employee",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-bank-employee@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-bank-employee-pw", "temporary": false }
+      ],
+      "realmRoles": ["Bank Employee"]
+    },
+    {
+      "username": "test-bank-management",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-bank-management@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-bank-management-pw", "temporary": false }
+      ],
+      "realmRoles": ["Bank Management"]
+    },
+    {
+      "username": "test-bank-member",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-bank-member@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-bank-member-pw", "temporary": false }
+      ],
+      "realmRoles": ["Bank Employee", "Squadron Member"]
     }
   ]
 }

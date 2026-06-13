@@ -1,6 +1,6 @@
 # ADR-0010 — Bank ledger: append-only double-entry with compute-on-read balances
 
-- **Status:** Proposed — becomes Accepted with the Phase 1 sign-off of epic #556
+- **Status:** Accepted (epic #556 delivered, 2026-06-13)
 - **Date:** 2026-06-12
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-BANK-003..006, REQ-BANK-013 (`docs/specs/bank.md`) · ADR-0003 ·

@@ -1581,4 +1581,99 @@ class ArchitectureTest {
             })
         .check(CLASSES);
   }
+
+  /**
+   * REQ-BANK-019 (season independence): the bank is a standalone ledger with no coupling to
+   * seasons, price lines, mission finance, operation payouts or job-order profit flows. No bank
+   * production class may depend on those aggregates — an integration (e.g. auto-booking operation
+   * payouts) is explicitly out of scope and would require a spec change first.
+   */
+  @Test
+  void bankClassesMustStaySeasonAndProfitIndependent() {
+    DescribedPredicate<JavaClass> profitFlowTypes =
+        new DescribedPredicate<>(
+            "mission/operation/job-order/price-line/season aggregates (REQ-BANK-019)") {
+          @Override
+          public boolean test(JavaClass input) {
+            String name = input.getSimpleName();
+            return input.getPackageName().startsWith("de.greluc.krt.iri.basetool.backend")
+                && (name.startsWith("Mission")
+                    || name.startsWith("Operation")
+                    || name.startsWith("JobOrder")
+                    || name.startsWith("PriceLine")
+                    || name.startsWith("Season"));
+          }
+        };
+    noClasses()
+        .that()
+        .haveSimpleNameStartingWith("Bank")
+        .should()
+        .dependOnClassesThat(profitFlowTypes)
+        .because(
+            "the bank has no coupling to seasons, price lines or profit flows (REQ-BANK-019);"
+                + " integrations require a spec change first")
+        .check(CLASSES);
+  }
+
+  /**
+   * REQ-BANK-008 (org-unit independence): bank authorization evaluates only the two bank roles and
+   * the grant table. No bank class may consult {@code OwnerScopeService} — org-unit scoping,
+   * contextual authorities and the admin pin must have zero influence on bank decisions, by
+   * construction. (The {@code BankAccount.orgUnit} reference is an owner <em>label</em> resolved
+   * via {@code OrgUnitRepository}, not a scope, and stays allowed.)
+   */
+  @Test
+  void bankClassesMustNotConsultOrgUnitScope() {
+    noClasses()
+        .that()
+        .haveSimpleNameStartingWith("Bank")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName("de.greluc.krt.iri.basetool.backend.service.OwnerScopeService")
+        .because(
+            "bank gates are independent of org-unit membership in both directions"
+                + " (REQ-BANK-008); only bank roles and bank_account_grant rows decide")
+        .check(CLASSES);
+  }
+
+  /**
+   * REQ-BANK-004 / ADR-0010 (append-only ledger): {@code bank_transaction} and {@code bank_posting}
+   * rows are never updated or deleted — corrections are {@code REVERSAL} transactions. Two static
+   * pins: the ledger repositories declare no {@code @Modifying} methods, and no production class
+   * calls a {@code delete*} method on them (the inherited {@code JpaRepository} deleters exist but
+   * must stay unused).
+   */
+  @Test
+  void bankLedgerRepositoriesMustStayInsertOnly() {
+    Set<String> ledgerRepositories =
+        Set.of(
+            "de.greluc.krt.iri.basetool.backend.repository.BankTransactionRepository",
+            "de.greluc.krt.iri.basetool.backend.repository.BankPostingRepository");
+    noMethods()
+        .that()
+        .areDeclaredInClassesThat(
+            new DescribedPredicate<>("the bank ledger repositories") {
+              @Override
+              public boolean test(JavaClass input) {
+                return ledgerRepositories.contains(input.getFullName());
+              }
+            })
+        .should()
+        .beAnnotatedWith("org.springframework.data.jpa.repository.Modifying")
+        .because("ledger rows are insert-only (ADR-0010) — no UPDATE/DELETE query may exist")
+        .check(CLASSES);
+    noClasses()
+        .should()
+        .callMethodWhere(
+            new DescribedPredicate<>(
+                "a delete method on a bank ledger repository (append-only, ADR-0010)") {
+              @Override
+              public boolean test(com.tngtech.archunit.core.domain.JavaMethodCall input) {
+                return ledgerRepositories.contains(input.getTargetOwner().getFullName())
+                    && input.getTarget().getName().startsWith("delete");
+              }
+            })
+        .because("corrections are REVERSAL transactions, never deletes (REQ-BANK-004)")
+        .check(CLASSES);
+  }
 }

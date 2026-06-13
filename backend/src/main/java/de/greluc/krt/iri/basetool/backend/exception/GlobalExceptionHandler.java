@@ -566,6 +566,35 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
+  /**
+   * Maps {@link BankConflictException} to 409 with the <em>bank-specific</em> stable code the
+   * exception carries (e.g. {@code BANK_OVERDRAFT}, {@code BANK_ACCOUNT_NOT_EMPTY} — epic #556,
+   * REQ-BANK-002/-006/-009). Title and detail resolve from the per-code bundle keys ({@code
+   * problem.bank_overdraft.title} etc.); the exception's structured, PII-free properties (account
+   * number, available balance, holder handle) are copied onto the problem response so the frontend
+   * can render a localized inline field error without parsing the human-readable detail.
+   *
+   * @param ex thrown {@link BankConflictException}
+   * @param request servlet request for instance URI + access-log enrichment
+   * @return RFC 7807 response with status 409 and the bank-specific stable code
+   */
+  @ExceptionHandler(BankConflictException.class)
+  public ResponseEntity<ProblemDetail> handleBankConflict(
+      BankConflictException ex, HttpServletRequest request) {
+    String keyBase = "problem." + ex.getCode().toLowerCase(Locale.ROOT);
+    ProblemDetail pd =
+        problem(
+            HttpStatus.CONFLICT,
+            tr(keyBase + ".title"),
+            resolveDetail(ex.getMessage(), keyBase + ".detail"),
+            request,
+            ex.getCode().toLowerCase(Locale.ROOT).replace('_', '-'),
+            ex.getCode());
+    ex.getProperties().forEach(pd::setProperty);
+    logProblem(request, pd, "Bank conflict", Map.of("bankCode", ex.getCode()));
+    return toEntity(pd);
+  }
+
   // --- 400 Bad request (service-layer validation/business rule violations) --------------
 
   /**

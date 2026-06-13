@@ -83,6 +83,10 @@ public class DataInitializer {
               "USER_MANAGE",
               "ROLE_MANAGE"));
       createRoleIfNotFound("GUEST", "Guest", Set.of());
+      // Kartell bank (epic #556, REQ-BANK-007): two coarse roles; the fine-grained per-account
+      // capabilities are app-managed grant rows (bank_account_grant), not permission strings.
+      createRoleIfNotFound("BANK_EMPLOYEE", "Bank Employee", Set.of());
+      createRoleIfNotFound("BANK_MANAGEMENT", "Bank Management", Set.of());
 
       seedIridiumIfMissing();
     };

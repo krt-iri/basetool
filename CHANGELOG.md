@@ -2,7 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Kartellbank (Epic #556):** Neuer Bank-Bereich für die Organisation. Konten je Org-Einheit/Bereich plus Kartell- und Kartellbank-Sonderkonten, mit Halter-Verteilung statt Einzelkonten — jede Buchung ist einem Halter zugeordnet, der Kontosaldo ist die Summe aller Halter-Bestände. Bank-Mitarbeiter sehen und bebuchen nur freigegebene Konten (Einzahlen/Auszahlen/Transfer je Konto einzeln berechtigt), die Bankleitung verwaltet Konten, Halter und Berechtigungen. Ein- und Auszahlungen, Konto-zu-Konto-Transfers und Halter-Umbuchungen laufen über ein fälschungssicheres, nur-anhängendes Hauptbuch; Korrekturen erfolgen als Storno-Gegenbuchung (Bankleitung). Der Bank-Zugang ist unabhängig von der Staffel-/Org-Zugehörigkeit. Kontoauszug (Zeitraum frei wählbar) und 3-Monats-Report als PDF im KRT-Design. Ein Wipe-Reset und ein Storno selbst sind nicht stornierbar — korrigiert wird stets die Ursprungsbuchung.
+
 ### Changed
+
+- **Alle PDF-Exporte (Übergabeprotokoll, Kontoauszug, 3-Monats-Report) folgen jetzt strenger dem KRT-Design-System.** Orange dient nur noch als Akzent für Überschriften und Identität (Titel, Abschnitte, eine Linie unter den Tabellenköpfen, die Diagrammlinie, ein dünner oberer Seitenbalken, das Logo). Tabellenköpfe und Zeilengitter sind jetzt neutral dunkelgrau statt vollflächig orange, damit das Orange nicht überhandnimmt; Inhalt und Daten der Reporte bleiben unverändert.
+
+- **Die Fußzeile aller PDF-Exporte nennt jetzt den Erstellungszeitpunkt in UTC** – „Generiert von Profit Basetool am TT.MM.JJJJ HH:MM UTC" – als eindeutiger, zeitzonenunabhängiger Audit-Stempel.
 
 - **Raffinerieauftrag: In den Materialzeilen steht die Qualität jetzt vor der Eingangsmenge (Units).** Die Feldreihenfolge im Anlege- und Detailformular folgt damit der Reihenfolge im Spiel; die Ausgangszeile (Units, SCU) bleibt unverändert.
 
