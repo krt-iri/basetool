@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **In-Place-Listen und -Bereiche: Bricht eine Aktualisierung ab (abgelaufene Sitzung, kurzzeitig nicht erreichbares Backend), wird nicht mehr eine ganze Seite — etwa die Login- oder die Missionsliste — in den kleinen Ergebnisbereich gerendert.** Der bisherige Inhalt bleibt erhalten und es erscheint ein KRT-Hinweis; die Missionsdetailseite zeigt stattdessen einen passenden Inline-Fehler im betroffenen Bereich.
+
 - **Admin › Spezialkommandos: Der Löschen-Button (Papierkorb) in der Listenansicht funktioniert wieder.** Er war bisher folgenlos (kein Formular, keine Verdrahtung); jetzt öffnet er einen KRT-Bestätigungsdialog und deaktiviert das Spezialkommando anschließend (reversibel über „Inaktive anzeigen" → „Aktivieren").
 
 - **Bank-Verwaltung: Das Auswahlfeld „Org-Einheit" im Dialog „Konto anlegen" zeigt wieder die Namen der Org-Einheiten statt „null".** Die Seite las die Org-Einheiten-Liste in das falsche DTO ein; dadurch fehlten Name und Id jeder Option (die Auswahl hätte zudem keine Org-Einheit übermittelt).
