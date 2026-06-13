@@ -102,6 +102,7 @@
                                         th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                                 <button th:if="${sc.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                         th:data-action="@{/admin/special-commands/{id}/delete(id=${sc.id})}"
+                                        th:data-name="${sc.name}"
                                         th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 <form th:if="${!sc.active}" th:action="@{/admin/special-commands/{id}/activate(id=${sc.id})}" method="post" class="m-0">
                                     <button type="submit" class="btn btn-ghost" th:text="#{admin.specialcommands.activate}">Aktivieren</button>
@@ -139,6 +140,23 @@
             </div>
             <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
         </form>
+    </div>
+</div>
+
+<!-- Delete confirmation modal — the per-row trash button is a soft-delete (deactivate, reversible
+     via "Aktivieren"); the form action is set to the clicked SK's delete URL by the script below.
+     No native confirm() per the design system's "no native browser dialogs" rule. -->
+<div id="sc-delete-modal" class="modal" style="display:none;">
+    <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
+        <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
+        <p th:text="#{admin.specialcommands.delete.confirm}" class="mb-2">Möchten Sie dieses Spezialkommando wirklich löschen?</p>
+        <p class="mb-2"><strong id="sc-delete-name" style="color: var(--color-primary);"></strong></p>
+        <div class="flex-center-gap">
+            <button type="button" class="btn btn-ghost close-sc-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
+            <form id="sc-delete-form" th:action="@{/admin/special-commands}" method="post" class="m-0">
+                <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -181,10 +199,31 @@
         modal.style.display = 'none';
     }
 
+    // --- Delete (soft-deactivate) confirmation ---
+    const deleteModal = document.getElementById('sc-delete-modal');
+    const deleteForm = document.getElementById('sc-delete-form');
+    const deleteNameEl = document.getElementById('sc-delete-name');
+
+    function openDelete(btn) {
+        if (!deleteModal || !deleteForm) return;
+        deleteForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
+        if (deleteNameEl) deleteNameEl.textContent = btn.getAttribute('data-name') || '';
+        deleteModal.style.display = 'flex';
+    }
+
+    function closeDelete() {
+        if (deleteModal) deleteModal.style.display = 'none';
+    }
+
     document.getElementById('add-sc-btn').addEventListener('click', openCreate);
     document.querySelectorAll('.edit-sc-btn').forEach(btn => btn.addEventListener('click', () => openEdit(btn)));
+    document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', () => openDelete(btn)));
     document.querySelector('#specialcommand-modal .close-sc-modal').addEventListener('click', closeModal);
+    document.querySelectorAll('#sc-delete-modal .close-sc-delete-modal').forEach(btn => btn.addEventListener('click', closeDelete));
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    if (deleteModal) {
+        deleteModal.addEventListener('click', e => { if (e.target === deleteModal) closeDelete(); });
+    }
 })();
 </script>
 </body>
