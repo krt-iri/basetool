@@ -289,11 +289,14 @@ public class JobOrderPageController {
       @PathVariable UUID id,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       Model model,
-      @AuthenticationPrincipal OidcUser principal) {
+      @AuthenticationPrincipal OidcUser principal,
+      @RequestParam(required = false) String fragment) {
     if (!canViewJobOrders) {
       // Non-profit members may not open order details — the backend returns 403 for them anyway.
-      // Route to the create form (their only order surface) so a stray bookmark/link is graceful.
-      return "redirect:/orders/create";
+      // Route to the create form (their only order surface) so a stray bookmark/link is graceful;
+      // a section-swap caller gets a section-sized error fragment instead of a redirect it would
+      // otherwise follow into a small results container (#571/#575, mirrors the #574 fix).
+      return fragment != null ? "orders-detail :: fragmentError" : "redirect:/orders/create";
     }
     try {
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
@@ -394,8 +397,20 @@ public class JobOrderPageController {
     } catch (Exception e) {
       log.error("Failed to fetch order", e);
       log.error("Failed to load job order", e);
+      if (fragment != null) {
+        return "orders-detail :: fragmentError";
+      }
       model.addAttribute("error", "error.joborder.load.details");
       return "redirect:/orders";
+    }
+    // In-place section swap (#571/#575): re-render only the section the caller mutated. The full
+    // model is already built above, so each fragment renders with every attribute it needs.
+    if (fragment != null) {
+      return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
+        case "materials" -> "orders-detail :: materialsSection";
+        case "aggregated" -> "orders-detail :: aggregatedSection";
+        default -> "orders-detail";
+      };
     }
     return "orders-detail";
   }

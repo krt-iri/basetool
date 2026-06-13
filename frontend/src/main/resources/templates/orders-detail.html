@@ -105,6 +105,12 @@
              linked-inventory drill-down). ITEM orders render the ordered-items table plus the
              internal aggregated-materials view further below instead. -->
         <th:block th:if="${order.type != 'ITEM'}">
+        <!-- In-place AJAX swap container (#571/#575): a claim create/edit/withdraw re-renders this
+             section via GET /orders/{id}?fragment=materials. The #order-materials-results wrapper
+             persists (only its innerHTML is replaced); the claim/inventory triggers inside are
+             document-delegated (window.krtEvents), so they survive the swap. The swap is mandatory
+             because the per-bucket "Offen" open-amount is a backend aggregate not returned per claim. -->
+        <div id="order-materials-results"><th:block th:fragment="materialsSection">
         <h3 class="section-title" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders, detected by the backend
@@ -190,6 +196,7 @@
             </tbody>
         </table>
         </div>
+        </th:block></div>
         </th:block>
 
         <!-- ITEM orders: (1) the ordered finished items with delivery progress and sub-assembly
@@ -247,6 +254,9 @@
             </ul>
         </div>
 
+        <!-- In-place AJAX swap container (#571/#575): for ITEM orders the claims live on the
+             aggregated table; a claim create/edit/withdraw re-renders it via ?fragment=aggregated. -->
+        <div id="order-aggregated-results"><th:block th:fragment="aggregatedSection">
         <h3 class="section-title" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders (backend populates
@@ -330,7 +340,17 @@
             </tbody>
         </table>
         </div>
+        </th:block></div>
         </th:block>
+
+        <!-- Section-refresh error fragment (#575, mirrors the #574 fix): returned (HTTP 200) by
+             GET /orders/{id}?fragment=… when the backend read fails, so an in-place swap shows a
+             section-sized inline notice instead of a full-page redirect being followed into the
+             small #…-results container. Held in an inert <template> so it never renders in the
+             normal full page; the fragment selector extracts only the inner <p>. -->
+        <template>
+            <p th:fragment="fragmentError" class="text-muted" role="alert" th:text="#{error.joborder.load.details}">The section could not be refreshed. Please reload the page.</p>
+        </template>
 
         <!-- Bearbeiter (assignees) section. Re-rendered as a self-contained AJAX fragment by the
              enroll / unenroll / note endpoints so the whole list refreshes in place (no reload, no
@@ -1189,6 +1209,29 @@
     const MSG_STATUS_ERROR   = '[(#{orders.status.update.error})]';
     const MSG_STATUS_CONFLICT = '[(#{orders.status.update.conflict})]';
 
+    // Page-local krtFetch.write wrapper (#571 / #575): injects the already-localized order conflict
+    // strings so every order write shares ONE optimistic-lock UX (krtFetch hardcodes no user text),
+    // and retires the four bespoke CSRF readers on this page (krtFetch.write reads window.krtCsrf
+    // internally + retries once on a stale-token 403).
+    const ORDER_CONFLICT = {
+        title: '[(#{orders.conflict.toast.title})]',
+        detail: '[(#{orders.conflict.toast.detail})]',
+        reload: '[(#{orders.conflict.action.reload})]',
+        reloadQuestion: '[(#{orders.conflict.action.reload.question})]',
+        dismiss: '[(#{orders.conflict.action.dismiss})]'
+    };
+    function krtOrderWrite(opts) {
+        return window.krtFetch.write(Object.assign({}, opts, {
+            conflict: {
+                title: ORDER_CONFLICT.title,
+                reloadLabel: ORDER_CONFLICT.reload,
+                reloadQuestion: ORDER_CONFLICT.reloadQuestion,
+                dismissLabel: ORDER_CONFLICT.dismiss,
+                reloadDetailFallback: ORDER_CONFLICT.detail
+            }
+        }));
+    }
+
     // Material claim ("Eintragung") interaction (Phase 6, #346).
     const MSG_CLAIM_TITLE_ADD = '[(#{orders.claim.modal.title.add})]';
     const MSG_CLAIM_TITLE_EDIT = '[(#{orders.claim.modal.title.edit})]';
@@ -1204,11 +1247,23 @@
     const MSG_CLAIM_VALIDATION_AMOUNT = '[(#{orders.claim.validation.amount})]';
     const MSG_CLAIM_VALIDATION_OVERCLAIM = '[(#{orders.claim.validation.overclaim})]';
 
-    function _claimCsrf() {
-        return {
-            token: document.querySelector('meta[name="_csrf"]')?.content || '',
-            header: document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'
-        };
+    // Re-render the claims section in place (#575) after a claim create/edit/withdraw. The "Offen"
+    // open-amount is a backend per-bucket aggregate not returned per claim, so a partial DOM patch
+    // would desync it — re-pull the whole table fragment instead. MATERIAL orders carry the claims
+    // on #order-materials-results, ITEM orders on #order-aggregated-results; swap whichever exists.
+    function _refreshClaimSection() {
+        const orderId = document.getElementById('claim-order-id').value;
+        const mat = document.getElementById('order-materials-results');
+        const agg = document.getElementById('order-aggregated-results');
+        const container = mat || agg;
+        if (!container || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
+        return window.krtFetch.swap({
+            url: '/orders/' + orderId,
+            container: container,
+            fragmentValue: mat ? 'materials' : 'aggregated',
+            history: false,
+            preserveScroll: true
+        });
     }
 
     function _openClaimModal(opts) {
@@ -1271,51 +1326,56 @@
         if (!squadronId) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_SQUADRON); return; }
         if (!(amount > 0)) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_AMOUNT); return; }
         if (amount > max + 1e-9) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_OVERCLAIM); return; }
-        const csrf = _claimCsrf();
-        fetch('/orders/' + orderId + '/claims', {
+        krtOrderWrite({
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', [csrf.header]: csrf.token },
-            body: JSON.stringify({ materialId: materialId, qualityRequirement: quality, claimingOrgUnitId: squadronId, amount: amount })
-        }).then(res => {
-            if (res.status === 409) { showFrontendErrorToast(MSG_CLAIM_CONFLICT); setTimeout(() => window.location.reload(), 1500); return; }
-            if (res.status === 403) { showFrontendErrorToast(MSG_CLAIM_FORBIDDEN); return; }
-            if (!res.ok) { showFrontendErrorToast(MSG_CLAIM_ERROR); return; }
-            showFrontendSuccessToast(MSG_CLAIM_SUCCESS); setTimeout(() => window.location.reload(), 800);
-        }).catch(() => showFrontendErrorToast(MSG_CLAIM_ERROR));
+            url: '/orders/' + orderId + '/claims',
+            payload: { materialId: materialId, qualityRequirement: quality, claimingOrgUnitId: squadronId, amount: amount },
+            toast: false,
+            errorMessage: MSG_CLAIM_ERROR,
+            onSuccess: function () {
+                document.getElementById('claim-modal').style.display = 'none';
+                showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
+                _refreshClaimSection();
+            }
+        });
     }
 
     function withdrawClaimAction() {
         const orderId = document.getElementById('claim-order-id').value;
         const claimId = document.getElementById('claim-id').value;
         if (!claimId) { return; }
-        const csrf = _claimCsrf();
-        fetch('/orders/' + orderId + '/claims/' + claimId + '/withdraw', {
+        krtOrderWrite({
             method: 'POST',
-            headers: { [csrf.header]: csrf.token }
-        }).then(res => {
-            if (res.status === 409) { showFrontendErrorToast(MSG_CLAIM_CONFLICT); setTimeout(() => window.location.reload(), 1500); return; }
-            if (res.status === 403) { showFrontendErrorToast(MSG_CLAIM_FORBIDDEN); return; }
-            if (!res.ok) { showFrontendErrorToast(MSG_CLAIM_ERROR); return; }
-            showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS); setTimeout(() => window.location.reload(), 800);
-        }).catch(() => showFrontendErrorToast(MSG_CLAIM_ERROR));
+            url: '/orders/' + orderId + '/claims/' + claimId + '/withdraw',
+            toast: false,
+            errorMessage: MSG_CLAIM_ERROR,
+            onSuccess: function () {
+                document.getElementById('claim-modal').style.display = 'none';
+                showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
+                _refreshClaimSection();
+            }
+        });
     }
 
     let _pendingStatus = null;
     let _previousStatus = null;
 
+    // The last successfully-saved status of the select, read from data-saved-status (set on every
+    // successful in-place change) and falling back to the server-rendered selected option. Replaces
+    // the reload the old flow relied on to reset the control after a change.
+    function _knownStatus(selectElement) {
+        return selectElement.dataset.savedStatus
+            || (selectElement.querySelector('option[selected]') || {}).value
+            || selectElement.options[0].value;
+    }
+
     function updateStatus(selectElement) {
         const newStatus = selectElement.value;
         if (newStatus === 'COMPLETED' || newStatus === 'REJECTED') {
             _pendingStatus = newStatus;
-            _previousStatus = Array.from(selectElement.options)
-                .find(o => o.defaultSelected || o.selected && o.value !== newStatus)?.value
-                || selectElement.dataset.previousValue
-                || selectElement.options[0].value;
-            // Store previous for cancel
-            selectElement.dataset.previousValue = _previousStatus;
+            _previousStatus = _knownStatus(selectElement);
             document.getElementById('status-warning-modal').style.display = 'flex';
         } else {
-            selectElement.dataset.previousValue = newStatus;
             _doStatusUpdate(selectElement.dataset.orderId, newStatus, parseInt(selectElement.dataset.version, 10), selectElement);
         }
     }
@@ -1340,31 +1400,37 @@
     }
 
     function _doStatusUpdate(orderId, status, version, selectElement) {
-        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || '';
-        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
-        fetch('/orders/' + orderId + '/status', {
+        // In-place (#575): no reload. Capture the last-good status up front so a failed change can
+        // revert the optimistic <select>; krtOrderWrite reads CSRF via krtCsrf (+ retry-on-403) and
+        // surfaces the 409 conflict reload-prompt itself.
+        const savedStatus = selectElement ? _knownStatus(selectElement) : null;
+        krtOrderWrite({
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
-            body: JSON.stringify({ status: status, version: version })
-        }).then(res => {
-            if (res.status === 409) {
-                showFrontendErrorToast(MSG_STATUS_CONFLICT);
-                setTimeout(() => window.location.reload(), 1500);
-                return;
-            }
-            if (!res.ok) {
-                showFrontendErrorToast(MSG_STATUS_ERROR);
-                return;
-            }
-            return res.json().then(data => {
-                if (selectElement && data && data.version !== undefined) {
+            url: '/orders/' + orderId + '/status',
+            payload: { status: status, version: version },
+            toast: false,
+            errorMessage: MSG_STATUS_ERROR,
+            onSuccess: function (data) {
+                // Patch ONLY the two elements carrying the ORDER @Version — the status select (next
+                // status change) and the edit-modal hidden input (next edit save). The assignee
+                // edges carry their own per-edge version and must NOT be overwritten here.
+                if (data && data.version != null && selectElement) {
                     selectElement.dataset.version = data.version;
+                    const editVer = document.querySelector('#edit-modal input[name="version"]');
+                    if (editVer) editVer.value = data.version;
+                }
+                if (selectElement) selectElement.dataset.savedStatus = status;
+                // COMPLETED/REJECTED detach linked inventory server-side; drop any open drill-down so
+                // a stale list is not shown (it is lazily re-fetched on the next row click).
+                if (status === 'COMPLETED' || status === 'REJECTED') {
+                    document.querySelectorAll('.inventory-details-row').forEach(function (r) { r.remove(); });
                 }
                 showFrontendSuccessToast(MSG_STATUS_SUCCESS);
-                setTimeout(() => window.location.reload(), 1000);
-            });
-        }).catch(() => {
-            showFrontendErrorToast(MSG_STATUS_ERROR);
+            }
+        }).then(function (res) {
+            if (selectElement && (!res || !res.ok)) {
+                selectElement.value = savedStatus;
+            }
         });
     }
 
