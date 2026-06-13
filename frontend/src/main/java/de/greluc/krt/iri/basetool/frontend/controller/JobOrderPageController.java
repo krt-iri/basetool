@@ -1334,6 +1334,42 @@ public class JobOrderPageController {
   }
 
   /**
+   * AJAX twin of {@link #unlinkInventoryItem} (#575): detaches the inventory item and returns the
+   * refreshed order so the detail page can re-render the material section in place AND pick up the
+   * bumped order {@code @Version} (the detach mutates the aggregate, so a subsequent status/
+   * handover write would otherwise 409). The classic {@code POST}→redirect above stays the no-JS
+   * fallback.
+   *
+   * @param id the order id
+   * @param inventoryItemId the inventory item to detach
+   * @return the refreshed order on success, or the propagated RFC 7807 backend error
+   */
+  @DeleteMapping("/{id}/inventory/{inventoryItemId}/unlink/ajax")
+  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> unlinkInventoryItemAjax(
+      @PathVariable UUID id, @PathVariable UUID inventoryItemId) {
+    try {
+      backendApiClient.delete(
+          "/api/v1/orders/" + id + "/inventory/" + inventoryItemId + "/unlink", Void.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(order);
+    } catch (BackendServiceException bse) {
+      log.error(
+          "Failed to unlink inventory item {} from order {} (ajax): {}",
+          inventoryItemId,
+          id,
+          bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to unlink inventory item {} from order {} (ajax)", inventoryItemId, id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * Removes an assignee from the job order and re-renders the Bearbeiter section as an AJAX
    * fragment (no full-page reload).
    *

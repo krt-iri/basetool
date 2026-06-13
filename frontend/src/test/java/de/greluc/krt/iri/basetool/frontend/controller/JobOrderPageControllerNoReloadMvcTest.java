@@ -23,12 +23,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -177,6 +179,55 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isForbidden());
 
     verify(backendApiClient, never()).put(any(String.class), any(), eq(JobOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void unlinkInventoryItemAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID invId = UUID.randomUUID();
+    // After the detach the endpoint re-fetches the order so the bumped @Version flows to the
+    // client.
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 9L));
+
+    mockMvc
+        .perform(delete("/orders/" + orderId + "/inventory/" + invId + "/unlink/ajax").with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(9));
+
+    verify(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/" + orderId + "/inventory/" + invId + "/unlink"), eq(Void.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void unlinkInventoryItemAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID invId = UUID.randomUUID();
+    doThrow(new BackendServiceException("conflict", null, 409))
+        .when(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/" + orderId + "/inventory/" + invId + "/unlink"), eq(Void.class));
+
+    mockMvc
+        .perform(delete("/orders/" + orderId + "/inventory/" + invId + "/unlink/ajax").with(csrf()))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER"})
+  void unlinkInventoryItemAjax_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID invId = UUID.randomUUID();
+
+    mockMvc
+        .perform(delete("/orders/" + orderId + "/inventory/" + invId + "/unlink/ajax").with(csrf()))
+        .andExpect(status().isForbidden());
+
+    verify(backendApiClient, never()).delete(any(String.class), eq(Void.class));
   }
 
   @Test

@@ -1247,22 +1247,49 @@
     const MSG_CLAIM_VALIDATION_AMOUNT = '[(#{orders.claim.validation.amount})]';
     const MSG_CLAIM_VALIDATION_OVERCLAIM = '[(#{orders.claim.validation.overclaim})]';
 
-    // Re-render the claims section in place (#575) after a claim create/edit/withdraw. The "Offen"
-    // open-amount is a backend per-bucket aggregate not returned per claim, so a partial DOM patch
-    // would desync it — re-pull the whole table fragment instead. MATERIAL orders carry the claims
-    // on #order-materials-results, ITEM orders on #order-aggregated-results; swap whichever exists.
-    function _refreshClaimSection() {
-        const orderId = document.getElementById('claim-order-id').value;
+    // Re-render the material section in place (#575) after a claim create/edit/withdraw OR an
+    // inventory unlink. The "Offen" open-amount + the per-row stock/status cells are backend-derived
+    // and not returned per write, so a partial DOM patch would desync them — re-pull the whole table
+    // fragment instead. MATERIAL orders render the requirement table on #order-materials-results,
+    // ITEM orders the aggregated table on #order-aggregated-results; swap whichever exists.
+    function _refreshMaterialsSection(orderId) {
+        orderId = orderId || (document.getElementById('claim-order-id') || {}).value;
         const mat = document.getElementById('order-materials-results');
         const agg = document.getElementById('order-aggregated-results');
         const container = mat || agg;
-        if (!container || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
+        if (!orderId || !container || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
         return window.krtFetch.swap({
             url: '/orders/' + orderId,
             container: container,
             fragmentValue: mat ? 'materials' : 'aggregated',
             history: false,
             preserveScroll: true
+        });
+    }
+
+    // Detach a linked inventory item in place (#575): the AJAX twin re-fetches the order so we can
+    // patch the bumped ORDER @Version (the detach mutates the aggregate, so the next status/handover
+    // write would otherwise 409) and then re-render the material section (stock/status recompute; the
+    // open drill-down collapses with the swap). Delegated on the button, so it survives the swap.
+    async function unlinkInventoryItem(btn) {
+        const orderId = btn.getAttribute('data-order-id');
+        const invId = btn.getAttribute('data-inventory-item-id');
+        if (!orderId || !invId) return;
+        await krtOrderWrite({
+            method: 'DELETE',
+            url: '/orders/' + orderId + '/inventory/' + invId + '/unlink/ajax',
+            toast: false,
+            errorMessage: MSG_INVENTORY_UNLINK_ERROR,
+            onSuccess: function (data) {
+                if (data && data.version != null) {
+                    const sel = document.getElementById('status-select');
+                    if (sel) sel.dataset.version = data.version;
+                    const editVer = document.querySelector('#edit-modal input[name="version"]');
+                    if (editVer) editVer.value = data.version;
+                }
+                showFrontendSuccessToast(MSG_INVENTORY_UNLINK_SUCCESS);
+                _refreshMaterialsSection(orderId);
+            }
         });
     }
 
@@ -1335,7 +1362,7 @@
             onSuccess: function () {
                 document.getElementById('claim-modal').style.display = 'none';
                 showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
-                _refreshClaimSection();
+                _refreshMaterialsSection();
             }
         });
     }
@@ -1352,7 +1379,7 @@
             onSuccess: function () {
                 document.getElementById('claim-modal').style.display = 'none';
                 showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
-                _refreshClaimSection();
+                _refreshMaterialsSection();
             }
         });
     }
@@ -1670,6 +1697,8 @@
     const MSG_LOADING_INVENTORY = '[(#{orders.detail.inventory.loading})]';
     const MSG_EMPTY_INVENTORY = '[(#{orders.detail.inventory.empty})]';
     const MSG_INVENTORY_UNLINK_TOOLTIP = '[(#{orders.detail.inventory.unlink.tooltip})]';
+    const MSG_INVENTORY_UNLINK_SUCCESS = '[(#{orders.detail.inventory.unlink.success})]';
+    const MSG_INVENTORY_UNLINK_ERROR = '[(#{orders.detail.inventory.unlink.error})]';
     const IS_LOGISTICIAN = /*[[${isLogistician}]]*/ false;
     // Order's requesting-squadron id is used to flag cross-squadron inventory rows in the
     // AJAX-rendered per-material item table. When the inventory item's owningSquadron differs
@@ -1737,7 +1766,6 @@
                 const locationName = item.location ? item.location.name : '-';
                 const quality = item.quality !== null ? item.quality : '-';
                 const quantity = (item.amount !== null ? item.amount.toFixed(3) : '0.000') + ' ' + (amountType ? amountType : '');
-                const csrfTokenValue = document.querySelector('meta[name="_csrf"]')?.content || '';
                 const itemSquadron = item.owningSquadron || null;
                 const itemSquadronId = itemSquadron ? itemSquadron.id : null;
                 const itemSquadronShorthand = itemSquadron ? itemSquadron.shorthand : null;
@@ -1754,13 +1782,12 @@
                     : `<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
                 const unlinkCell = IS_LOGISTICIAN ? `
                                         <td data-trigger="stop-propagation">
-                                            <form method="post" action="/orders/${escapeAttr(orderId)}/inventory/${escapeAttr(item.id)}/unlink" class="m-0"
-                                                  data-trigger="od-disable-submit">
-                                                <input type="hidden" name="_csrf" value="${escapeAttr(csrfTokenValue)}">
-                                                <button type="submit" class="btn btn-quiet-danger"
-                                                        style="padding: 0.1rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
-                                                        title="${escapeAttr(MSG_INVENTORY_UNLINK_TOOLTIP)}">&times;</button>
-                                            </form>
+                                            <button type="button" class="btn btn-quiet-danger"
+                                                    data-trigger="od-unlink-inventory"
+                                                    data-order-id="${escapeAttr(orderId)}"
+                                                    data-inventory-item-id="${escapeAttr(item.id)}"
+                                                    style="padding: 0.1rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
+                                                    title="${escapeAttr(MSG_INVENTORY_UNLINK_TOOLTIP)}">&times;</button>
                                         </td>` : '';
 
                 html += `
@@ -1801,13 +1828,15 @@
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('change', 'od-update-status', function (el) { updateStatus(el); });
         window.krtEvents.on('click', 'od-toggle-inventory', function (el, ev) {
-            // Skip the row inventory-toggle when the click originated on a claim control (the claim
-            // buttons live inside the clickable material row), so the modal opens without also
-            // expanding the inventory drill-down.
+            // Skip the row inventory-toggle when the click originated on a claim control or the
+            // in-drill-down unlink button (both live inside the clickable material row); krtEvents
+            // fires each data-trigger independently, so without this guard the unlink click would
+            // also collapse the drill-down.
             if (ev && ev.target && typeof ev.target.closest === 'function'
-                && ev.target.closest('[data-claim-control]')) { return; }
+                && ev.target.closest('[data-claim-control], [data-trigger="od-unlink-inventory"]')) { return; }
             toggleInventory(el);
         });
+        window.krtEvents.on('click', 'od-unlink-inventory', function (el) { unlinkInventoryItem(el); });
         window.krtEvents.on('click', 'claim-add', function (el) { openClaimCreate(el); });
         window.krtEvents.on('click', 'claim-edit', function (el) { openClaimEdit(el); });
         window.krtEvents.on('click', 'claim-submit', function () { submitClaim(); });
