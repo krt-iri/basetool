@@ -234,15 +234,17 @@ public class BankLedgerService {
   /**
    * Reverses a transaction (REQ-BANK-004): books a {@code REVERSAL} whose legs are the negated
    * mirror of the original's legs (ADR-0010), referencing the original. A transaction can be
-   * reversed at most once; the reversal itself must satisfy the no-overdraft rule (undoing a
-   * deposit whose money has meanwhile moved on is rejected, not forced negative).
+   * reversed at most once; a {@code WIPE_RESET} (a deliberate end-state) and a {@code REVERSAL}
+   * itself are not reversible — a mistake is corrected by reversing the original, not the
+   * correction. The reversal itself must satisfy the no-overdraft rule (undoing a deposit whose
+   * money has meanwhile moved on is rejected, not forced negative).
    *
    * @param transactionId the transaction to reverse
    * @param note optional correction note
    * @return acknowledgement of the created reversal
    * @throws NotFoundException when the transaction does not exist
-   * @throws BankConflictException with {@code BANK_ALREADY_REVERSED}, {@code BANK_ACCOUNT_CLOSED},
-   *     {@code BANK_OVERDRAFT} or {@code BANK_HOLDER_OVERDRAFT}
+   * @throws BankConflictException with {@code BANK_NOT_REVERSIBLE}, {@code BANK_ALREADY_REVERSED},
+   *     {@code BANK_ACCOUNT_CLOSED}, {@code BANK_OVERDRAFT} or {@code BANK_HOLDER_OVERDRAFT}
    */
   @Transactional
   public BankTransactionDto reverseTransaction(@NotNull UUID transactionId, @Nullable String note) {
@@ -250,6 +252,13 @@ public class BankLedgerService {
         transactionRepository
             .findById(transactionId)
             .orElseThrow(() -> new NotFoundException("Bank transaction not found"));
+    if (original.getType() == BankTransactionType.WIPE_RESET
+        || original.getType() == BankTransactionType.REVERSAL) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_NOT_REVERSIBLE,
+          "Wipe resets and reversals cannot themselves be reversed",
+          Map.of("transactionType", original.getType().name()));
+    }
     if (transactionRepository.existsByReversedTransactionId(transactionId)) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_ALREADY_REVERSED,
@@ -554,6 +563,7 @@ public class BankLedgerService {
    */
   private static String shortId(@NotNull UUID id) {
     String s = id.toString();
-    return s.substring(0, s.indexOf('-'));
+    int dash = s.indexOf('-');
+    return dash < 0 ? s : s.substring(0, dash);
   }
 }

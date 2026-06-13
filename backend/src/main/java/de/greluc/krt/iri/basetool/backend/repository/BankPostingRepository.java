@@ -115,6 +115,17 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
   List<BankHolderBalance> holderTotals();
 
   /**
+   * One holder's total custody across ALL accounts — the targeted single-holder form of {@link
+   * #holderTotals()} for the holder-update response, avoiding a bank-wide aggregate just to read
+   * one holder's total.
+   *
+   * @param holderId the holder
+   * @return the holder's total across the whole bank, never {@code null}
+   */
+  @Query("SELECT COALESCE(SUM(p.amount), 0) FROM BankPosting p WHERE p.holder.id = :holderId")
+  BigDecimal holderTotal(@Param("holderId") UUID holderId);
+
+  /**
    * Per-holder count of accounts with a non-zero sub-balance, batched over all holders — the
    * "Konten" column of the holder registry.
    *

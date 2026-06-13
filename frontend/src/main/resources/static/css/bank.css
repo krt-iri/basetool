@@ -119,6 +119,15 @@
     opacity: 0.55;
 }
 
+/* 30-day trend sparkline: design-system tokens, not inline hex (KRT orange / muted grey). */
+.kpi-sparkline {
+    stroke: var(--color-primary);
+}
+
+.kpi-sparkline--flat {
+    stroke: var(--color-gray-2);
+}
+
 /* ---- Holder distribution (K1): rows with track bars + the proportional stack bar ---- */
 .holder-row {
     display: flex;

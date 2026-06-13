@@ -120,6 +120,34 @@ class BankControllerSecurityTest {
   }
 
   @Test
+  void bankGates_ignoreTheActiveOrgUnitPinHeader() throws Exception {
+    // REQ-BANK-008: the X-Active-Org-Unit-Id admin pin influences no bank gate, in either
+    // direction — it neither grants a member access nor alters a bank employee's.
+    String pinnedOrgUnit = UUID.randomUUID().toString();
+
+    // A member with the pin set still sees no bank surface.
+    mockMvc
+        .perform(
+            get("/api/v1/bank/accounts")
+                .header("X-Active-Org-Unit-Id", pinnedOrgUnit)
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+        .andExpect(status().isForbidden());
+
+    // A bank employee with the same pin set still passes (no org-unit scoping is applied).
+    when(bankAccountService.getAccounts(org.mockito.ArgumentMatchers.anyBoolean(), any(), any()))
+        .thenReturn(org.springframework.data.domain.Page.empty());
+    mockMvc
+        .perform(
+            get("/api/v1/bank/accounts")
+                .header("X-Active-Org-Unit-Id", pinnedOrgUnit)
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void accountCreate_employee_isForbidden() throws Exception {
     mockMvc
         .perform(

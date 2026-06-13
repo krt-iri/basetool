@@ -29,6 +29,7 @@ import de.greluc.krt.iri.basetool.backend.model.BankAccount;
 import de.greluc.krt.iri.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.iri.basetool.backend.model.BankAccountType;
 import de.greluc.krt.iri.basetool.backend.model.BankHolder;
+import de.greluc.krt.iri.basetool.backend.model.BankTransaction;
 import de.greluc.krt.iri.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.iri.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.BankWipeResetResultDto;
@@ -43,6 +44,7 @@ import de.greluc.krt.iri.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.iri.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.iri.basetool.backend.repository.BankTransactionRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -339,6 +341,38 @@ class BankLedgerServiceTest {
             BankConflictException.class,
             () -> bankLedgerService.reverseTransaction(deposit.id(), null));
     assertEquals(BankConflictException.CODE_BANK_HOLDER_OVERDRAFT, ex.getCode());
+  }
+
+  @Test
+  void reverseTransaction_rejectsReversingAWipeReset() {
+    // Given: a WIPE_RESET transaction (a deliberate end-state, REQ-BANK-013)
+    BankTransaction wipe =
+        transactionRepository.save(
+            BankTransaction.builder()
+                .type(BankTransactionType.WIPE_RESET)
+                .createdAt(Instant.now())
+                .build());
+
+    // When / Then: it cannot itself be reversed (REQ-BANK-004)
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () -> bankLedgerService.reverseTransaction(wipe.getId(), null));
+    assertEquals(BankConflictException.CODE_BANK_NOT_REVERSIBLE, ex.getCode());
+  }
+
+  @Test
+  void reverseTransaction_rejectsReversingAReversal() {
+    // Given: a deposit and its reversal
+    BankTransactionDto deposit = deposit(account, holderA, "100");
+    BankTransactionDto reversal = bankLedgerService.reverseTransaction(deposit.id(), null);
+
+    // When / Then: the reversal itself is not reversible — reverse the original instead
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () -> bankLedgerService.reverseTransaction(reversal.id(), null));
+    assertEquals(BankConflictException.CODE_BANK_NOT_REVERSIBLE, ex.getCode());
   }
 
   @Test

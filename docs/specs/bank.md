@@ -118,7 +118,10 @@ account-to-account transfers and intra-account holder rebookings), `WIPE_RESET`
 postings are the **negated mirror** of the reversed transaction's postings — its
 per-transaction sum is the negation of the original's sum (zero exactly when the
 original was a `TRANSFER`). Ledger rows are **never updated or deleted** — mistakes are
-corrected by a reversal transaction that references the original. The account balance is
+corrected by a reversal transaction that references the original. A `WIPE_RESET` (a
+deliberate end-state) and a `REVERSAL` are themselves **not reversible** — a mistake is
+corrected by reversing the original transaction, not the wipe or the correction (stable
+code `BANK_NOT_REVERSIBLE`). The account balance is
 the SQL sum of its postings, computed on read (ADR-0010); per-account running-balance
 caching may be added later without changing this contract.
 
@@ -131,8 +134,9 @@ caching may be added later without changing this contract.
   negated mirror of the reversed transaction's postings (service invariant +
   DB-level guard where practical).
 - [x] A reversal stores a FK to the reversed transaction; reversing twice is rejected.
+- [x] Reversing a `WIPE_RESET` or a `REVERSAL` is rejected (409 `BANK_NOT_REVERSIBLE`).
 
-**Enforced by:** `BankLedgerServiceTest` (append-only, double-entry, reversal mirror), `ArchitectureTest` (`bankLedgerRepositoriesMustStayInsertOnly`) · **Code:** `model/BankTransaction`, `model/BankPosting`, `service/BankLedgerService`, `db/migration/V153` · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (append-only, double-entry, reversal mirror, non-reversible targets), `ArchitectureTest` (`bankLedgerRepositoriesMustStayInsertOnly`) · **Code:** `model/BankTransaction`, `model/BankPosting`, `service/BankLedgerService`, `db/migration/V153` · **Issues:** #556
 
 ### REQ-BANK-005 — Whole-aUEC amounts
 
@@ -196,7 +200,7 @@ documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
 - [x] `hasRole('BANK_EMPLOYEE')` is satisfied by management and admins via the hierarchy.
 - [x] `ROLES_AND_PERMISSIONS.md` documents the bank column/row in the access matrix.
 
-**Enforced by:** `SecurityConfig` role hierarchy + `DataInitializer` seed · **Code:** `config/SecurityConfig`, `service/DataInitializer` · **Issues:** #556
+**Enforced by:** `SecurityConfig` role hierarchy + `DataInitializer` seed · **Code:** `config/SecurityConfig`, `config/DataInitializer` · **Issues:** #556
 
 ### REQ-BANK-008 — Bank membership is independent of org-unit membership
 
@@ -468,7 +472,7 @@ require a spec change.
 - [x] Bank services/repositories have no dependency on mission/operation/order types
   (ArchUnit-checkable package rule).
 
-**Enforced by:** `ArchitectureTest` (`bankClassesMustStaySeasonAndProfitIndependent`) · **Code:** `service/BankSecurityService` (no season/profit dependency) · **Issues:** #556
+**Enforced by:** `ArchitectureTest` (`bankClassesMustStaySeasonAndProfitIndependent`) · **Code:** all `Bank*` production classes (the package-wide rule forbids any season/profit dependency) · **Issues:** #556
 
 ### REQ-BANK-020 — Storage, performance & integrity
 
@@ -478,16 +482,20 @@ backed by a composite index on `bank_posting (account_id, created_at)`; the dash
 statement queries are grouped single-statement reads. A scheduled integrity job (pattern:
 `task/UserSyncTask`) periodically verifies the ledger invariants (`TRANSFER` postings
 sum to zero; `REVERSAL` postings are the negated mirror of the reversed transaction's
-postings; no negative account balances or holder sub-balances; audit row exists for
-every transaction) and reports violations as `ERROR` log events with `correlationId`.
+postings; no negative account balances or holder sub-balances; an audit row exists for
+every audited transaction — every type except `WIPE_RESET`, which is summarized by one
+event, not one per generated transaction) and reports violations as `ERROR` log events
+with `correlationId`.
 
 **Acceptance**
 
-- [x] Dashboard and statement queries stay single-digit-statement (no N+1) under a
-  seeded volume test (≥ 100 accounts / ≥ 100k postings).
-- [x] The integrity job flags a synthetically corrupted ledger in tests.
+- [x] Dashboard and account-list reads stay statement-bounded (no per-account N+1): a
+  seeded ≥ 100-account test pins the statement count independent of the account count
+  (the N+1 property holds regardless of total posting volume).
+- [x] The integrity job flags a synthetically corrupted ledger in tests, including a
+  transaction missing its audit row (the summarized `WIPE_RESET` is excluded).
 
-**Enforced by:** `BankLedgerIntegrityServiceTest` (synthetic corruption flagged), `DatabaseIndexMigrationTest` (composite indexes) · **Code:** `service/BankLedgerIntegrityService`, `task/BankLedgerIntegrityTask`, `db/migration/V150`+`V153` indexes · **Issues:** #556
+**Enforced by:** `BankLedgerIntegrityServiceTest` (synthetic corruption incl. missing audit row), `BankReadNoNPlusOneTest` (statement-count bound), `DatabaseIndexMigrationTest` (composite indexes) · **Code:** `service/BankLedgerIntegrityService`, `task/BankLedgerIntegrityTask`, `db/migration/V150`+`V153` indexes · **Issues:** #556
 
 ## Out of scope
 

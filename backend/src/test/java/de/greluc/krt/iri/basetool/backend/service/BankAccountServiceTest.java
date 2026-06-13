@@ -209,6 +209,43 @@ class BankAccountServiceTest {
             eq("'Alt' -> 'Neu'"));
   }
 
+  @Test
+  void reopenAccount_restoresActiveStatusAndAuditsReopen() {
+    // Given: a closed account
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = accountWithVersion(accountId, 2L);
+    account.setStatus(BankAccountStatus.CLOSED);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(accountRepository.save(any(BankAccount.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(postingRepository.accountBalance(accountId)).thenReturn(BigDecimal.ZERO);
+
+    // When
+    bankAccountService.reopenAccount(accountId, new BankAccountLifecycleRequest(2L));
+
+    // Then: status flips back to ACTIVE and the reopen is audited (REQ-BANK-002)
+    ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
+    verify(accountRepository).save(saved.capture());
+    assertEquals(BankAccountStatus.ACTIVE, saved.getValue().getStatus());
+    verify(bankAuditService)
+        .record(eq(BankAuditEventType.ACCOUNT_REOPENED), eq(accountId), any(), any(), any());
+  }
+
+  @Test
+  void reopenAccount_staleVersionFailsFastWith409() {
+    // Given
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = accountWithVersion(accountId, 5L);
+    account.setStatus(BankAccountStatus.CLOSED);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+    // When / Then
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> bankAccountService.reopenAccount(accountId, new BankAccountLifecycleRequest(4L)));
+    verify(accountRepository, never()).save(any());
+  }
+
   /** Builds a SPECIAL account stub with a given version (reflection-free, via setters). */
   private static BankAccount accountWithVersion(UUID id, Long version) {
     BankAccount account = new BankAccount();
