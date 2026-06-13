@@ -125,7 +125,8 @@ fragment, never a redirect the swap would follow into the container.
 order-detail fragment/endpoint MVC tests (#575) · **Code:** `krt-fetch.js` (`swap`), `missions.js`,
 `operations.js`, `fragments/pagination.html`, `mission-detail.html` (`krtRefreshMissionSection`),
 `orders-index.html`, `orders-detail.html`, `JobOrderPageController` · **Issues:** #572, #573, #574,
-#575
+
+# 575
 
 ## Out of scope
 
