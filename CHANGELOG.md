@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- **Admin › Spezialkommandos: Der Löschen-Button (Papierkorb) in der Listenansicht funktioniert wieder.** Er war bisher folgenlos (kein Formular, keine Verdrahtung); jetzt öffnet er einen KRT-Bestätigungsdialog und deaktiviert das Spezialkommando anschließend (reversibel über „Inaktive anzeigen" → „Aktivieren").
+
 - **Bank-Verwaltung: Das Auswahlfeld „Org-Einheit" im Dialog „Konto anlegen" zeigt wieder die Namen der Org-Einheiten statt „null".** Die Seite las die Org-Einheiten-Liste in das falsche DTO ein; dadurch fehlten Name und Id jeder Option (die Auswahl hätte zudem keine Org-Einheit übermittelt).
 
 - **Bank-Berechtigungen: Das Konten-Auswahlfeld in der Filterleiste ist jetzt genauso hoch wie der Tab-Kasten daneben** und schließt oben und unten bündig mit ihm ab (vorher saß das Dropdown rund 12 px zu hoch).
