@@ -110,8 +110,7 @@ class BlueprintOverviewPageControllerTest {
   // pagination fragment, not the full page, while the model is populated identically.
   @Test
   void view_fragmentResults_returnsResultsFragmentView() {
-    when(backendApiClient.get(
-            contains("?page=0&size=50"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("?page=0&size=50"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 0, 50, 0, 0, List.of()));
 
     Model model = new ExtendedModelMap();
