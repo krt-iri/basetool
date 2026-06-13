@@ -129,9 +129,9 @@ buttons, role selects) is delegated on the persistent container so it survives t
 - None open. The transitional `MissionSubresource` alias was **removed** in #574; mission-detail now
   calls `krtFetch.write` through a small page-local `krtMissionWrite` wrapper, so `krt-fetch.js`
   carries no page-specific code.
-- **Known carve-out (#574):** the mission core-edit form (`#mission-form`: name/description/status/
-  operation/schedule) still submits classic `POST→redirect`. It fans out into three section PATCHes
-  (core/schedule/flags) with server-side `@Valid` field-error rendering; converting it in place
-  needs a JSON field-error contract and is deferred to a focused follow-up so the well-tested
-  validation UX is not regressed. Every other mission-detail write is in-place.
+- **Known carve-out (#574 → #589):** the mission core-edit form (`#mission-form`: name/description/
+  status/operation/schedule) still submits classic `POST→redirect`. It fans out into three section
+  PATCHes (core/schedule/flags) with server-side `@Valid` field-error rendering; converting it in
+  place needs a JSON field-error contract and is tracked as the follow-up issue **#589** so the
+  well-tested validation UX is not regressed. Every other mission-detail write is in-place.
 
