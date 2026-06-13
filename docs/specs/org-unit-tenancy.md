@@ -90,7 +90,13 @@ from system setting `job_order.intake_special_command_id` for guest creations);
 
 Admin area is admin-only (post-Phase-4 lockdown), with carve-outs: Stammdaten,
 user-management, announcement writes, system settings and **SK lifecycle**
-(`/admin/special-commands`) are `hasRole('ADMIN')`. SK **member management** is open to ADMIN
+(`/admin/special-commands`) are `hasRole('ADMIN')`. **SK delete is a soft-delete
+(deactivate): it flips `active=false`, never hard-deletes** — memberships and any aggregate
+already owned by the SK survive; only the active-list dropdowns and owner picker hide the row.
+It is reversible via the activate endpoint, and `includeInactive=true` (ADMIN-only) surfaces
+deactivated rows with a reactivate control. The list page's per-row trash button confirms
+through a KRT modal (no native `confirm()`, per [`ui-design-system.md`](ui-design-system.md))
+before POSTing the deactivate. SK **member management** is open to ADMIN
 or an `is_lead` user of that SK (`SpecialCommandSecurityService.canManageMembers`); the
 Lead-toggle stays ADMIN-only (no self-escalation). **Promotion-system maintenance** is
 re-opened to OFFICER under an org-unit-scope gate (`canEditSquadron(topic.owningSquadron.id)`).
