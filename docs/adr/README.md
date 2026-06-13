@@ -49,4 +49,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0009](0009-bank-postgresql-single-datastore.md)      | PostgreSQL stays the single datastore for the Kartell bank                            | Proposed                          |
 | [0010](0010-bank-double-entry-append-only-ledger.md)  | Bank ledger: append-only double-entry with compute-on-read balances                   | Proposed                          |
 | [0011](0011-bank-authorization-model.md)              | Bank authorization: coarse Keycloak roles + app-managed per-account grants            | Proposed                          |
+| [0012](0012-frontend-krtfetch-json-mutations-csrf-retry.md) | Standardize frontend mutations on krtFetch + JSON with session/meta CSRF + retry-on-403 | Accepted |
 

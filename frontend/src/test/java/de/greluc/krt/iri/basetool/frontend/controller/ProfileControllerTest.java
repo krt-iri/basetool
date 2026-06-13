@@ -38,6 +38,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.MessageSource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.ui.ConcurrentModel;
@@ -66,6 +68,7 @@ class ProfileControllerTest {
   @Mock private OidcUser principal;
   @Mock private RedirectAttributes redirectAttributes;
   @Mock private BindingResult bindingResult;
+  @Mock private MessageSource messageSource;
 
   @InjectMocks private ProfileController controller;
 
@@ -452,6 +455,70 @@ class ProfileControllerTest {
 
     assertEquals("redirect:/profile", view);
     verify(redirectAttributes).addFlashAttribute("errorToast", "error.profile.update.failed");
+  }
+
+  // ── POST /profile/description (AJAX / krtFetch — epic #571) ───────────────
+
+  @Test
+  void updateDescriptionAjax_happyPath_returns200WithRefreshedVersion() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    // refreshedUserVersion() re-fetches /me for the bumped row version after the write.
+    when(backendApiClient.<Map<String, Object>>get(
+            eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenReturn(Map.of("version", 5L));
+
+    ProfileDescriptionForm form = new ProfileDescriptionForm("New desc", "New DN", 4L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updateDescriptionAjax(form, bindingResult, principal);
+
+    assertEquals(200, response.getStatusCode().value());
+    Map<String, Object> body = response.getBody();
+    assertNotNull(body);
+    assertEquals(5L, body.get("version"));
+    assertEquals("New desc", body.get("description"));
+    assertEquals("New DN", body.get("displayName"));
+    verify(backendApiClient).put(eq("/api/v1/users/me/description"), any(), eq(Void.class));
+  }
+
+  @Test
+  void updateDescriptionAjax_optimisticLockConflict_returns409WithOptimisticLockCode() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    // Same spy-on-the-exception trick as the redirect path: stub the discriminator the controller
+    // actually reads instead of replicating the WebClient ProblemDetail decode.
+    BackendServiceException conflict =
+        org.mockito.Mockito.spy(
+            new BackendServiceException(
+                "concurrency-conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), null));
+    org.mockito.Mockito.doReturn("concurrency-conflict").when(conflict).getProblemType();
+    doThrow(conflict)
+        .when(backendApiClient)
+        .put(eq("/api/v1/users/me/description"), any(), eq(Void.class));
+    when(messageSource.getMessage(any(), any(), any(), any())).thenReturn("conflict-message");
+
+    ProfileDescriptionForm form = new ProfileDescriptionForm("d", "n", 1L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updateDescriptionAjax(form, bindingResult, principal);
+
+    assertEquals(409, response.getStatusCode().value());
+    assertNotNull(response.getBody());
+    assertEquals("OPTIMISTIC_LOCK", response.getBody().get("code"));
+    assertEquals("conflict-message", response.getBody().get("detail"));
+  }
+
+  @Test
+  void updateDescriptionAjax_validationError_returns400WithoutBackendCall() {
+    when(bindingResult.hasErrors()).thenReturn(true);
+    when(bindingResult.getFieldErrors()).thenReturn(List.of());
+    when(messageSource.getMessage(any(), any(), any(), any())).thenReturn("validation-failed");
+
+    ProfileDescriptionForm form = new ProfileDescriptionForm("x", "y", 1L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updateDescriptionAjax(form, bindingResult, principal);
+
+    assertEquals(400, response.getStatusCode().value());
+    assertNotNull(response.getBody());
+    assertEquals("validation-failed", response.getBody().get("detail"));
+    verify(backendApiClient, never()).put(any(), any(), any());
   }
 
   // ── POST /profile/payout-preference ──────────────────────────────────────
