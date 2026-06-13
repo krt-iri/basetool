@@ -68,45 +68,61 @@
 
     // ----------------------------------------------------------- filter swap
 
-    // The search filter re-renders only #pi-results in place (REQ-FE-002) instead of reloading
-    // the page. The form lives OUTSIDE the swap container, so a single binding here survives every
-    // swap; the row edit/delete buttons inside the container are krtEvents-delegated and need no
-    // re-init. After each swap the header subtitle + active tab-count are resynced from the hidden
-    // total the fragment carries. Without krtFetch (or JS disabled) the GET form reloads as before.
+    // The search filter (and, on the admin variant, the member <select>) re-render only the
+    // #pi-results block in place (REQ-FE-002) instead of reloading the page. Listeners are
+    // DELEGATED on document so they survive the filter form / table being re-rendered inside the
+    // swapped fragment — the admin page nests the filter form INSIDE the swap target, so a direct
+    // binding would be lost after the first swap. The row edit/delete buttons are krtEvents-
+    // delegated and the modals live outside the container, so swapped-in rows stay live with no
+    // re-init. After each swap the header counts are resynced from the hidden total the fragment
+    // carries (user page only). Without krtFetch (JS disabled) the GET forms reload as before.
     function wireFilterSwap() {
-        const filterForm = document.querySelector('form.krt-pi-filter');
-        // This module is shared by the user page and the admin variant. Only wire the in-place
-        // swap where the results container is actually present; otherwise leave the GET form to
-        // reload as before (guards against preventDefault()-ing a submit we cannot swap).
-        if (!filterForm || !window.krtFetch || !document.getElementById('pi-results')) {
+        if (!window.krtFetch || !document.getElementById('pi-results')) {
             return;
         }
         let timer = null;
-        function doSwap() {
-            const params = new URLSearchParams(new FormData(filterForm)).toString();
-            const url = filterForm.getAttribute('action') + (params ? '?' + params : '');
+        function swapFromForm(formEl) {
+            if (!formEl) {
+                return;
+            }
+            const params = new URLSearchParams(new FormData(formEl)).toString();
+            const url = formEl.getAttribute('action') + (params ? '?' + params : '');
             window.krtFetch.swap({ url: url, container: '#pi-results', history: true });
         }
-        filterForm.addEventListener('submit', function (e) {
+        document.addEventListener('submit', function (e) {
+            if (!e.target.classList || !e.target.classList.contains('krt-pi-filter')) {
+                return;
+            }
             e.preventDefault();
             if (timer) {
                 clearTimeout(timer);
                 timer = null;
             }
-            doSwap();
+            swapFromForm(e.target);
         });
-        const searchField = filterForm.querySelector('input[type="search"]');
-        if (searchField) {
-            searchField.addEventListener('input', function () {
-                if (timer) {
-                    clearTimeout(timer);
-                }
-                timer = setTimeout(function () {
-                    timer = null;
-                    doSwap();
-                }, 300);
-            });
-        }
+        document.addEventListener('input', function (e) {
+            const t = e.target;
+            if (!t.matches || !t.matches('form.krt-pi-filter input[type="search"]')) {
+                return;
+            }
+            const formEl = t.form;
+            if (timer) {
+                clearTimeout(timer);
+            }
+            timer = setTimeout(function () {
+                timer = null;
+                swapFromForm(formEl);
+            }, 300);
+        });
+        // Admin variant: selecting a member swaps in their inventory in place, replacing the
+        // legacy data-trigger="submit-form" full reload (removed from that <select>).
+        document.addEventListener('change', function (e) {
+            const sel = e.target;
+            if (!sel.matches || !sel.matches('form.krt-pi-userform select[name="userSub"]')) {
+                return;
+            }
+            swapFromForm(sel.form);
+        });
         document.addEventListener('krt:swapped', function (e) {
             const c = e.detail && e.detail.container;
             if (c && c.id === 'pi-results') {

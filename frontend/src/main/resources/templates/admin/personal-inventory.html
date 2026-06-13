@@ -31,9 +31,12 @@
 
     <div class="hud-box krt-personal-inventory mt-2">
 
+        <!-- The member <select> auto-swaps via personal-inventory.js (change -> krtFetch). The
+             legacy data-trigger="submit-form" (full reload) is intentionally removed; the page
+             already required JS for this select, so the no-JS baseline is unchanged. -->
         <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-userform no-track">
             <label for="krt-pi-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-            <select id="krt-pi-user-select" name="userSub" data-trigger="submit-form">
+            <select id="krt-pi-user-select" name="userSub">
                 <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
                 <option th:each="u : ${users}"
                         th:value="${u.id}"
@@ -42,6 +45,11 @@
             </select>
         </form>
 
+        <!-- AJAX swap target (REQ-FE-002): the member select and the search filter re-render only
+             this block via krtFetch; the no-JS GET fallback reloads the page. Row buttons are
+             krtEvents-delegated and modals live outside, so swapped-in rows stay live. -->
+        <div id="pi-results">
+        <th:block th:fragment="results">
         <div th:if="${selectedUserSub == null or #strings.isEmpty(selectedUserSub)}" class="krt-pi-empty"
              th:text="#{admin.personalInventory.userSelect.empty}">Bitte zunaechst ein Mitglied auswaehlen.</div>
 
@@ -113,6 +121,8 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+        </th:block>
         </div>
     </div>
 </main>

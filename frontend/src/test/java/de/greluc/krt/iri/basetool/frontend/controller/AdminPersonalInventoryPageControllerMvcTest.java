@@ -19,11 +19,18 @@
 
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -32,6 +39,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalInventoryItemDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,5 +96,34 @@ class AdminPersonalInventoryPageControllerMvcTest {
         .perform(get("/admin/personal-inventory"))
         .andExpect(status().isOk())
         .andExpect(view().name("admin/personal-inventory"));
+  }
+
+  // covers REQ-FE-002 — an AJAX swap (fragment=results) for a selected member renders only the
+  // item-list fragment (the member <select> and admin banner live outside it) and skips the
+  // (up to 1000-row) user-list fetch the full page does.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_fragmentResults_rendersOnlyResultsFragment_andSkipsUserListFetch() throws Exception {
+    String userSub = UUID.randomUUID().toString();
+    PageResponse<PersonalInventoryItemDto> items =
+        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
+    when(backendApiClient.get(
+            contains("/api/v1/admin/personal-inventory/"), any(ParameterizedTypeReference.class)))
+        .thenReturn(items);
+
+    mockMvc
+        .perform(
+            get("/admin/personal-inventory").param("userSub", userSub).param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/personal-inventory :: results"))
+        .andExpect(content().string(containsString("krt-pi-table")))
+        // Member dropdown, banner and the swap-target wrapper are outside the fragment.
+        .andExpect(content().string(not(containsString("krt-pi-userform"))))
+        .andExpect(content().string(not(containsString("id=\"pi-results\""))))
+        .andExpect(content().string(not(containsString("krt-admin-banner"))));
+
+    // The fragment path must not query the user list.
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class));
   }
 }

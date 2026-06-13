@@ -80,8 +80,12 @@ public class AdminPersonalInventoryPageController {
    * @param page zero-based page index
    * @param size page size, defaults to 50
    * @param sort optional sort spec
+   * @param fragment when {@code "results"} only the item-list fragment is rendered (AJAX member-
+   *     select / filter swap, REQ-FE-002); the member dropdown sits outside the swap target, so the
+   *     user list is then not fetched. Otherwise the full page is returned
    * @param model Thymeleaf model populated with users, items, page metadata and the admin banner
-   * @return the {@code admin/personal-inventory} view name
+   * @return the {@code admin/personal-inventory} view name, or its {@code results} fragment for an
+   *     AJAX swap
    */
   @GetMapping
   public String view(
@@ -90,13 +94,19 @@ public class AdminPersonalInventoryPageController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String fragment,
       Model model) {
     if (!model.containsAttribute("personalInventoryForm")) {
       model.addAttribute("personalInventoryForm", new PersonalInventoryForm());
     }
+    boolean isFragment = "results".equals(fragment);
 
-    List<UserDto> users = fetchUsers();
-    model.addAttribute("users", users);
+    // The member <select> (and the selectedUser it drives) live OUTSIDE the swap target, so an
+    // AJAX results swap neither re-renders the dropdown nor needs the (up to 1000-row) user list.
+    List<UserDto> users = isFragment ? List.of() : fetchUsers();
+    if (!isFragment) {
+      model.addAttribute("users", users);
+    }
     model.addAttribute("selectedUserSub", userSub);
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("adminMode", Boolean.TRUE);
@@ -105,17 +115,19 @@ public class AdminPersonalInventoryPageController {
       PageResponse<PersonalInventoryItemDto> items = fetchItems(userSub, q, page, size, sort);
       model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
       model.addAttribute("page", items);
-      UserDto selected =
-          users.stream()
-              .filter(u -> u.id() != null && userSub.equals(u.id().toString()))
-              .findFirst()
-              .orElse(null);
-      model.addAttribute("selectedUser", selected);
+      if (!isFragment) {
+        UserDto selected =
+            users.stream()
+                .filter(u -> u.id() != null && userSub.equals(u.id().toString()))
+                .findFirst()
+                .orElse(null);
+        model.addAttribute("selectedUser", selected);
+      }
     } else {
       model.addAttribute("items", Collections.emptyList());
     }
 
-    return "admin/personal-inventory";
+    return isFragment ? "admin/personal-inventory :: results" : "admin/personal-inventory";
   }
 
   /**
