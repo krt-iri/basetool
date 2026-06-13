@@ -113,9 +113,9 @@
     <script th:src="@{/js/common-handlers.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
       Shared AJAX/CSRF foundation (epic #571, spec REQ-FE-*). Loaded synchronously
-      (no `defer`) so `window.krtFetch` / `window.krtCsrf` and the MissionSubresource
-      alias exist before any inline `<script>` at the bottom of a body runs and before
-      page-specific helpers (missions.js, operations.js, …) call `krtFetch.swap(...)`.
+      (no `defer`) so `window.krtFetch` / `window.krtCsrf` exist before any inline
+      `<script>` at the bottom of a body runs and before page-specific helpers
+      (missions.js, operations.js, …) call `krtFetch.swap(...)`.
       Single source of truth for CSRF headers (the freshest `_csrf` meta tags),
       retry-on-403, RFC7807 409 handling, syncVersion, and fragment swaps.
     -->

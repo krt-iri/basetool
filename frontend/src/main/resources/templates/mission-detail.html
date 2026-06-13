@@ -225,7 +225,7 @@
         <div class="tab-nav" role="tablist" th:aria-label="#{mission.details}">
             <button class="tab" id="tab-ueb" type="button" role="tab" aria-selected="false" aria-controls="pane-ueb" data-tab="ueb" th:text="#{mission.tab.overview}">&Uuml;bersicht</button>
             <button class="tab" id="tab-crew" type="button" role="tab" aria-selected="false" aria-controls="pane-crew" data-tab="crew"><span th:text="#{mission.tab.crew}">Teilnehmer &amp; Einheiten</span> <span class="tab-count" th:text="|${mission.checkedInParticipants}/${mission.registeredParticipants}|" th:title="#{mission.participants.count.tooltip}">0/0</span></button>
-            <button class="tab" id="tab-fin" type="button" role="tab" aria-selected="false" aria-controls="pane-fin" data-tab="fin"><span th:text="#{mission.tab.finance}">Finanzen &amp; Auszahlung</span> <span class="tab-count" th:if="${financeSum != null}" th:text="${financeIncomeCount + financeExpenseCount}">0</span></button>
+            <button class="tab" id="tab-fin" type="button" role="tab" aria-selected="false" aria-controls="pane-fin" data-tab="fin"><span th:text="#{mission.tab.finance}">Finanzen &amp; Auszahlung</span> <span id="finance-tab-count" class="tab-count" th:if="${financeSum != null}" th:text="${financeIncomeCount + financeExpenseCount}">0</span></button>
             <button class="tab" id="tab-verw" type="button" role="tab" aria-selected="false" aria-controls="pane-verw" data-tab="verw" th:if="${mission.canEdit or mission.canManageManagers}" th:text="#{mission.tab.admin}">Verwaltung</button>
         </div>
     </div>
@@ -264,9 +264,9 @@
                             <dt th:text="#{mission.meeting_time}">TS-Treffen</dt>
                             <dd><span class="krt-local-dt" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
                             <dt th:text="#{mission.actual_start}">Tats&auml;chlicher Start</dt>
-                            <dd><span class="krt-local-dt" th:attr="data-utc=${mission.actualStartTime != null ? mission.actualStartTime.toEpochMilli() : 'null'}" th:text="${mission.actualStartTime != null ? #temporals.format(mission.actualStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
+                            <dd><span id="overview-actual-start" class="krt-local-dt" th:attr="data-utc=${mission.actualStartTime != null ? mission.actualStartTime.toEpochMilli() : 'null'}" th:text="${mission.actualStartTime != null ? #temporals.format(mission.actualStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
                             <dt th:text="#{mission.actual_end}">Tats&auml;chliches Ende</dt>
-                            <dd><span class="krt-local-dt" th:attr="data-utc=${mission.actualEndTime != null ? mission.actualEndTime.toEpochMilli() : 'null'}" th:text="${mission.actualEndTime != null ? #temporals.format(mission.actualEndTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
+                            <dd><span id="overview-actual-end" class="krt-local-dt" th:attr="data-utc=${mission.actualEndTime != null ? mission.actualEndTime.toEpochMilli() : 'null'}" th:text="${mission.actualEndTime != null ? #temporals.format(mission.actualEndTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
                             <dt th:text="#{mission.operation}">Operation</dt>
                             <dd th:text="${mission.operation != null ? mission.operation.name : '&mdash;'}">&mdash;</dd>
                             <dt th:if="${mission.canEdit and mission.isInternal != null and mission.isInternal}" th:text="#{mission.is_internal}">Intern</dt>
@@ -276,7 +276,7 @@
                                 <dd><span th:each="p, iter : ${participantsByLeadType[#strings.toString(leadType.id)]}" th:text="${(p['user'] != null ? p['user']['effectiveName'] : p['guestName']) + (!iter.last ? ', ' : '')}">User</span></dd>
                             </th:block>
                             <dt th:text="#{mission.party_lead}">Einsatzleiter</dt>
-                            <dd>
+                            <dd id="overview-party-lead">
                                 <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead</span>
                                 <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
                                 <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
@@ -299,8 +299,22 @@
             <!-- No jump cards: every aggregate (Teilnehmer/Finanzen/Wirtschaft) is reachable via
                  the tab nav itself, duplicate cards added no information (owner feedback). -->
         </section>
+        <!-- Section-refresh error fragment (#574 review must-fix): returned with HTTP 200 by
+             GET /missions/{id}?fragment=… when the backend read fails, so an in-place swap paints
+             a section-sized inline notice instead of a full-page redirect being followed into the
+             small #…-results container. Held in an inert <template> so it never shows in the normal
+             full-page render; the fragment selector extracts only the inner <p>, which krtFetch.swap
+             then injects. Renders from message bundles only (no model attributes). -->
+        <template>
+            <p th:fragment="fragmentError" class="desc" role="alert" th:text="#{mission.section.refresh.error}">The section could not be refreshed. Please reload the page.</p>
+        </template>
         <!-- ================= Tab 2: Teilnehmer & Einheiten (crew board) ================= -->
         <section th:unless="${isNew}" id="pane-crew" class="tab-pane" role="tabpanel" aria-labelledby="tab-crew">
+            <!-- In-place AJAX swap container (epic #571 / #574): a crew sub-mutation re-renders this
+                 fragment via GET /missions/{id}?fragment=crew-board. The #crew-board-results wrapper
+                 persists (only its innerHTML is replaced), so the board drag-drop / button handlers
+                 are delegated on it and survive every swap. -->
+            <div id="crew-board-results"><th:block th:fragment="crewBoard">
             <div class="sec-h">
                 <h2><span th:text="#{mission.crew.planning}">Crew-Planung</span> &middot; <span class="warn" th:text="|${unassignedParticipants.size()} ${#messages.msg('mission.overview.without_unit')}|">0 ohne Einheit</span></h2>
                 <span class="legend" th:if="${mission.canEdit}" th:text="#{mission.crew.legend}">Ziehen oder ausw&auml;hlen und Ziel anklicken</span>
@@ -371,9 +385,18 @@
                     <button th:if="${mission.canEdit}" id="add-unit-btn" type="button" class="btn btn-ghost btn-xs2 board-add-unit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.unit.add}">Einheit hinzuf&uuml;gen</span></button>
                 </div>
             </div>
+            </th:block></div>
         </section>
         <!-- ================= Tab 3: Finanzen & Auszahlung ================= -->
         <section th:unless="${isNew}" id="pane-fin" class="tab-pane" role="tabpanel" aria-labelledby="tab-fin">
+            <!-- In-place AJAX swap container (#571/#574): finance add/edit/delete re-render this
+                 fragment via ?fragment=finance. It spans the sumstrip + ledger + payout table so the
+                 totals, per-share and participant rows all refresh together. Edit/delete triggers
+                 inside are krtEvents-delegated on document and survive the innerHTML swap. -->
+            <div id="finance-results"><th:block th:fragment="financeSection">
+            <!-- Carries the current entry count so an in-place finance swap can patch the Finanzen
+                 tab badge (which lives in the tab nav, outside this fragment). -->
+            <span id="finance-count-meta" hidden th:text="${(financeIncomeCount ?: 0) + (financeExpenseCount ?: 0)}"></span>
 
             <!-- Summary strip (member+ only: aggregates come from the finance ledger) -->
             <div class="sumstrip" th:if="${financeSum != null}" sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
@@ -579,6 +602,7 @@
                     </div>
                 </details>
             </th:block>
+            </th:block></div>
         </section>
         <!-- ================= Tab 4: Verwaltung (role-gated; sole pane on the create page) ================= -->
         <section id="pane-verw" class="tab-pane" role="tabpanel" aria-labelledby="tab-verw"
@@ -589,6 +613,12 @@
                     <div class="kpanel-head" th:text="#{mission.details}">Details</div>
                     <div class="kpanel-body">
 
+                    <!-- #574 carve-out (tracked in #589): this core-edit form still submits classic
+                         POST->redirect. It fans out into three section PATCHes (core/schedule/flags)
+                         with server-side @Valid field-error rendering; an in-place conversion needs a
+                         JSON field-error contract and is deferred so the validation UX is not
+                         regressed. Every OTHER mission-detail write (crew board, finance, party-lead,
+                         owner/managers, actual-time, frequency, payout) is in-place. -->
                     <form id="mission-form" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}">
                         <input type="hidden" id="mission-version" name="version" th:field="*{version}">
                         <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
@@ -731,7 +761,7 @@
                             <div class="form-group">
                                 <label th:text="#{mission.party_lead}">Partyleiter</label>
                                 <div style="display: flex; gap: 0.5rem; flex-direction: column;">
-                                    <div class="data-value" style="background: var(--color-surface-input); padding: 0.5rem; display: block;">
+                                    <div id="party-lead-display" class="data-value" style="background: var(--color-surface-input); padding: 0.5rem; display: block;" th:data-none-label="#{general.none}">
                                         <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead Name</span>
                                         <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
                                         <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
@@ -739,7 +769,7 @@
                                     <form th:if="${mission.canEdit}" id="party-lead-form" autocomplete="off"
                                           th:action="@{/missions/{id}/party-lead(id=${mission.id})}" method="post"
                                           style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-start;">
-                                        <input type="hidden" name="version" th:value="${mission.partyLeadVersion}">
+                                        <input type="hidden" id="party-lead-version" name="version" th:value="${mission.partyLeadVersion}">
                                         <input type="hidden" id="party-lead-user-id" name="userId" th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.id : ''}">
                                         <div style="position: relative; flex: 1; min-width: 12rem;">
                                             <input type="text" id="party-lead-search-input" name="guestName" autocomplete="off"
@@ -780,7 +810,11 @@
                         </div>
                     </div>
 
-                    <!-- Owner & Manager -->
+                    <!-- Owner & Manager — in-place AJAX swap container (#571/#574): an owner change
+                         or manager add/remove re-renders this fragment via ?fragment=mgmt. The
+                         triggers inside are krtEvents-delegated on document, so they survive the
+                         innerHTML swap of #mission-mgmt-results with no re-init. -->
+                    <div id="mission-mgmt-results"><th:block th:fragment="mgmtPanels">
                     <div class="kpanel" th:if="${!isNew and mission.canManageManagers}">
                         <div class="kpanel-head" th:text="#{mission.management_rights}">Verwaltungsrechte</div>
                         <div class="kpanel-body">
@@ -823,6 +857,7 @@
                             </div>
                         </div>
                     </div>
+                    </th:block></div>
                 </div>
             </div>
 
@@ -1268,7 +1303,7 @@
                 <h2 th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</h2>
                 <button type="button" class="btn btn-ghost btn-icon close-finance-modal close-modal" data-modal-dismiss data-trigger="close-modal-display" data-modal-id="finance-modal" th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
-            <form th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
+            <form id="add-finance-form" th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
                 <div class="krt-modal-body">
                 <div class="form-group">
                     <label th:text="#{mission.finance.type}">Typ</label>
@@ -1378,7 +1413,8 @@
     const MSG_CONFIRM_OWNER_CHANGE = /*[[#{mission.confirm.owner.change}]]*/ 'Are you sure you want to change the owner of this mission?';
     const MSG_CONFIRM_MANAGER_REMOVE = /*[[#{mission.confirm.manager.remove}]]*/ 'Do you really want to remove this manager?';
     const MSG_ERROR_USER_REQUIRED = /*[[#{error.mission.manager.user_required}]]*/ 'Please select a user';
-    // i18n dictionary consumed by krt-fetch.js (MissionSubresource alias: patchSubResource/syncVersion/handleProblem).
+    // i18n dictionary consumed by the local krtMissionWrite wrapper (#574, defined below) which feeds
+    // the already-localized section/conflict strings into window.krtFetch.write.
     // All user-visible strings must come from messages.properties (AGENTS.md: no hardcoded UI text).
     window.MISSION_SUBRES_I18N = {
         'mission.save.section.ok': /*[[#{mission.save.section.ok}]]*/ 'Saved.',
@@ -1389,6 +1425,7 @@
         'mission.save.section.frequency': /*[[#{mission.save.section.frequency}]]*/ 'Frequency',
         'mission.save.section.manager': /*[[#{mission.save.section.manager}]]*/ 'Manager',
         'mission.save.section.owner': /*[[#{mission.save.section.owner}]]*/ 'Owner',
+        'mission.save.section.party_lead': /*[[#{mission.save.section.party_lead}]]*/ 'Party lead',
         'mission.save.section.core': /*[[#{mission.save.section.core}]]*/ 'Core data',
         'mission.save.section.schedule': /*[[#{mission.save.section.schedule}]]*/ 'Schedule',
         'mission.save.section.flags': /*[[#{mission.save.section.flags}]]*/ 'Flags',
@@ -1400,9 +1437,11 @@
         'mission.conflict.section.frequency': /*[[#{mission.conflict.section.frequency}]]*/ 'Frequency',
         'mission.conflict.section.manager': /*[[#{mission.conflict.section.manager}]]*/ 'Manager',
         'mission.conflict.section.owner': /*[[#{mission.conflict.section.owner}]]*/ 'Owner',
+        'mission.conflict.section.party_lead': /*[[#{mission.conflict.section.party_lead}]]*/ 'Party lead',
         'mission.conflict.section.core': /*[[#{mission.conflict.section.core}]]*/ 'Core data',
         'mission.conflict.section.schedule': /*[[#{mission.conflict.section.schedule}]]*/ 'Schedule',
         'mission.conflict.section.flags': /*[[#{mission.conflict.section.flags}]]*/ 'Flags',
+        'mission.section.refresh.error': /*[[#{mission.section.refresh.error}]]*/ 'The section could not be refreshed. Please reload the page.',
         'mission.conflict.action.reload': /*[[#{mission.conflict.action.reload}]]*/ 'Load current values',
         'mission.conflict.action.reload.question': /*[[#{mission.conflict.action.reload.question}]]*/ 'Load current values?',
         'mission.conflict.action.dismiss': /*[[#{mission.conflict.action.dismiss}]]*/ 'Dismiss'
@@ -1427,6 +1466,66 @@
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionId = missionId;
     window.missionCanEdit = /*[[${!isNew and mission != null and mission.canEdit}]]*/ false;
+
+    // ---- #574 in-place AJAX seam (retires window.MissionSubresource) -----------------
+    // krtMissionWrite wraps window.krtFetch.write and sources the already-localized section/conflict
+    // strings from MISSION_SUBRES_I18N exactly as the retired MissionSubresource alias did, so every
+    // call site stays a one-liner while the shared krt-fetch.js carries no mission-specific code.
+    window.krtMissionWrite = function (opts) {
+        const dict = window.MISSION_SUBRES_I18N || {};
+        function t(key, fallback) {
+            return dict[key] != null && dict[key] !== '' ? dict[key] : fallback;
+        }
+        const key = opts.sectionKey || '';
+        return window.krtFetch.write(Object.assign({}, opts, {
+            sectionLabel: t('mission.save.section.' + key, key),
+            conflictSectionLabel: t('mission.conflict.section.' + key, key),
+            successMessage: t('mission.save.section.ok', 'Gespeichert.'),
+            errorMessage: t('mission.save.section.error', 'Speichern fehlgeschlagen.'),
+            conflict: {
+                title: t('mission.conflict.toast.title', 'Konflikt'),
+                reloadLabel: t('mission.conflict.action.reload', 'Aktuelle Werte laden'),
+                dismissLabel: t('mission.conflict.action.dismiss', 'Schliessen'),
+                reloadQuestion: t('mission.conflict.action.reload.question', 'Aktuelle Werte laden?'),
+                reloadDetailFallback: t('mission.conflict.toast.detail', 'Bitte Seite neu laden.')
+            }
+        }));
+    };
+
+    // krtRefreshMissionSection re-renders one or more mission sections in place via server-rendered
+    // fragment swaps, replacing the former window.location.reload() after a successful sub-mutation
+    // (#571/#574): 'crew' -> crew board (#crew-board-results), 'finance' -> finance & payout pane
+    // (#finance-results), 'mgmt' -> owner/manager panel (#mission-mgmt-results). Participant writes
+    // pass ['crew','finance'] because a participant also renders in the payout table (list, share and
+    // participation %). Accepts a single key or an array; returns a Promise resolving when all swaps
+    // complete so callers can close a modal afterwards.
+    window.krtRefreshMissionSection = function (sectionKeys) {
+        const keys = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
+        const map = {
+            crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
+            finance: { container: '#finance-results', fragmentValue: 'finance' },
+            mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' }
+        };
+        return Promise.all(keys.map(function (sectionKey) {
+            const cfg = map[sectionKey];
+            if (!cfg || !window.missionId || !document.querySelector(cfg.container)) {
+                return Promise.resolve(false);
+            }
+            return window.krtFetch.swap({
+                url: '/missions/' + window.missionId,
+                container: cfg.container,
+                fragmentValue: cfg.fragmentValue,
+                history: false,
+                preserveScroll: true,
+                // Surfaced as a toast when a swap bails on a redirect/non-OK response (e.g. an
+                // expired session bounced to the login page): krtFetch.swap then leaves the
+                // stale section untouched rather than painting a full page into the container.
+                errorMessage:
+                    (window.MISSION_SUBRES_I18N
+                        && window.MISSION_SUBRES_I18N['mission.section.refresh.error']) || ''
+            });
+        }));
+    };
 </script>
 <script th:attr="nonce=${cspNonce}">
     // ---- KRT modal helpers: open with focus, dismiss buttons, Esc, focus trap. ----
@@ -1528,7 +1627,13 @@
         const eComment = document.getElementById('edit-comment');
 
         if (eModal) {
+            // .edit-participant-btn live inside the crew board, which an in-place swap re-renders
+            // (#571/#574). Re-bind on krt:swapped; the dataset guard skips buttons that persist
+            // across a swap so they are never double-bound.
+            function bindEditParticipantButtons() {
             document.querySelectorAll('.edit-participant-btn').forEach(btn => {
+                if (btn.dataset.epBound) return;
+                btn.dataset.epBound = '1';
                 btn.addEventListener('click', function() {
                     eForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), eForm.action);
                     eForm.setAttribute('data-participant-id', this.getAttribute('data-participant-id') || '');
@@ -1598,6 +1703,9 @@
                     window.krtModalOpen(eModal);
                 });
             });
+            }
+            bindEditParticipantButtons();
+            document.addEventListener('krt:swapped', bindEditParticipantButtons);
 
             if (eForm) {
                 eForm.addEventListener('submit', function(e) {
@@ -1659,7 +1767,7 @@
                 frequencyForm.addEventListener('submit', async function (event) {
                     event.preventDefault();
                     const url = frequencyForm.getAttribute('data-action');
-                    if (!url || !window.MissionSubresource) {
+                    if (!url || !window.krtMissionWrite) {
                         frequencyForm.submit();
                         return;
                     }
@@ -1669,7 +1777,7 @@
                     if (!typeId || Number.isNaN(parsed)) {
                         return;
                     }
-                    const result = await window.MissionSubresource.patchSubResource({
+                    const result = await window.krtMissionWrite({
                         method: 'PUT',
                         url: url,
                         payload: { frequencyTypeId: typeId, value: parsed },
@@ -1723,7 +1831,16 @@
                 msg = msg.replace('{count}', btn.getAttribute('data-crew-count') || '0');
                 return msg;
             }
+            // The delete openers live across the crew board and finance pane (both re-rendered by an
+            // in-place swap) plus the static admin area; re-bind on krt:swapped with a dataset guard
+            // so swapped-in buttons get wired without double-binding the persistent ones (#571/#574).
+            // NOTE: .delete-crew-btn (and the data-sub-section="crew" branches below + in the shared
+            // delete-confirm submit handler) currently match nothing — crew removal happens via
+            // drag-to-pool in moveParticipant() — and are kept as a dormant forward-compatible hook.
+            function bindDeleteOpeners() {
             document.querySelectorAll('.delete-participant-btn, .delete-unit-btn, .delete-crew-btn, .delete-mission-btn, .delete-finance-btn').forEach(btn => {
+                if (btn.dataset.delBound) return;
+                btn.dataset.delBound = '1';
                 btn.addEventListener('click', function() {
                     deleteForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), deleteForm.action);
                     // Paket 3C: propagate AJAX-capable sub-section metadata so the
@@ -1751,15 +1868,23 @@
                     window.krtModalOpen(deleteModal);
                 });
             });
+            }
+            bindDeleteOpeners();
+            document.addEventListener('krt:swapped', bindDeleteOpeners);
         }
 
-        // Add Unit & Crew Logic
+        // Add Unit & Crew Logic — #add-unit-btn lives inside the crew board, so re-bind it on
+        // krt:swapped (dataset-guarded) after the board re-renders (#571/#574).
         const addUnitModal = document.getElementById('add-unit-modal');
-        const addUnitBtn = document.getElementById('add-unit-btn');
-
-        if (addUnitBtn && addUnitModal) {
-            addUnitBtn.onclick = function() { window.krtModalOpen(addUnitModal); }
+        function bindAddUnitButton() {
+            const addUnitBtn = document.getElementById('add-unit-btn');
+            if (addUnitBtn && addUnitModal && !addUnitBtn.dataset.auBound) {
+                addUnitBtn.dataset.auBound = '1';
+                addUnitBtn.addEventListener('click', function() { window.krtModalOpen(addUnitModal); });
+            }
         }
+        bindAddUnitButton();
+        document.addEventListener('krt:swapped', bindAddUnitButton);
 
         const editUnitModal = document.getElementById('edit-unit-modal');
         const editUnitForm = document.getElementById('edit-unit-form');
@@ -1768,7 +1893,12 @@
         const editUnitHvu = document.getElementById('edit-unit-hvu');
 
         if (editUnitModal) {
+            // .edit-unit-btn live inside the crew board, which an in-place swap re-renders; re-bind
+            // on krt:swapped (dataset-guarded) so swapped-in buttons stay wired (#571/#574).
+            function bindEditUnitButtons() {
             document.querySelectorAll('.edit-unit-btn').forEach(btn => {
+                if (btn.dataset.euBound) return;
+                btn.dataset.euBound = '1';
                 btn.addEventListener('click', function() {
                     editUnitForm.action = window.safeSameOriginUrl(this.getAttribute('data-action'), editUnitForm.action);
                     editUnitForm.setAttribute('data-unit-id', this.getAttribute('data-unit-id') || '');
@@ -1800,6 +1930,9 @@
                     window.krtModalOpen(editUnitModal);
                 });
             });
+            }
+            bindEditUnitButtons();
+            document.addEventListener('krt:swapped', bindEditUnitButtons);
         }
 
         // --- Paket 3C: Units via AJAX (MissionSubresource) -----------------------
@@ -1810,7 +1943,7 @@
         // when a sub-aggregate is written (Option A), concurrent users editing OTHER
         // sub-panels keep their in-flight changes and are not hit by a spurious 409.
         (function wireUnitAjax() {
-            if (!window.MissionSubresource || !window.missionId) {
+            if (!window.krtMissionWrite || !window.missionId) {
                 return;
             }
             const addForm = document.getElementById('add-unit-form');
@@ -1827,14 +1960,15 @@
                         responsibleUserId: fd.get('responsibleUserId') || null,
                         note: fd.get('note') || null
                     };
-                    const res = await window.MissionSubresource.patchSubResource({
+                    const res = await window.krtMissionWrite({
                         method: 'POST',
                         url: '/missions/' + window.missionId + '/units/ajax',
                         payload: payload,
                         sectionKey: 'unit'
                     });
                     if (res.ok) {
-                        window.location.reload();
+                        window.krtModalClose(addForm.closest('.krt-modal-overlay'));
+                        window.krtRefreshMissionSection('crew');
                     }
                 });
             }
@@ -1859,14 +1993,15 @@
                         responsibleUserId: fd.get('responsibleUserId') || null,
                         note: fd.get('note') || null
                     };
-                    const res = await window.MissionSubresource.patchSubResource({
+                    const res = await window.krtMissionWrite({
                         method: 'PUT',
                         url: '/missions/' + window.missionId + '/units/' + unitId + '/ajax',
                         payload: payload,
                         sectionKey: 'unit'
                     });
                     if (res.ok) {
-                        window.location.reload();
+                        window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                        window.krtRefreshMissionSection('crew');
                     }
                 });
             }
@@ -1882,13 +2017,14 @@
                         return; // let the classical POST run for non-unit deletes
                     }
                     ev.preventDefault();
-                    const res = await window.MissionSubresource.patchSubResource({
+                    const res = await window.krtMissionWrite({
                         method: 'DELETE',
                         url: '/missions/' + window.missionId + '/units/' + subId + '/ajax',
                         sectionKey: 'unit'
                     });
                     if (res.ok) {
-                        window.location.reload();
+                        window.krtModalClose(dForm.closest('.krt-modal-overlay'));
+                        window.krtRefreshMissionSection('crew');
                     }
                 });
             }
@@ -1904,7 +2040,7 @@
         // via dedicated frontend /ajax proxy routes. On success the page is reloaded
         // so the server-rendered Thymeleaf view reflects the new state.
         (function wireParticipantAjax() {
-            if (!window.MissionSubresource || !window.missionId) {
+            if (!window.krtMissionWrite || !window.missionId) {
                 return;
             }
 
@@ -1928,14 +2064,18 @@
                         comment: fd.get('comment') || null,
                         payoutPreference: fd.get('payoutPreference') || null
                     };
-                    const res = await window.MissionSubresource.patchSubResource({
+                    const res = await window.krtMissionWrite({
                         method: 'POST',
                         url: '/missions/' + window.missionId + '/participants/ajax',
                         payload: payload,
                         sectionKey: 'participant'
                     });
                     if (res.ok) {
-                        window.location.reload();
+                        window.krtModalClose(addForm.closest('.krt-modal-overlay'));
+                        addForm.reset();
+                        const addUserId = addForm.querySelector('#participant-user-id');
+                        if (addUserId) { addUserId.value = ''; }
+                        window.krtRefreshMissionSection(['crew', 'finance']);
                     }
                 });
             }
@@ -1961,36 +2101,41 @@
                         endTime: fd.get('endTime') || null,
                         version: versionRaw ? parseInt(versionRaw, 10) : null
                     };
-                    const res = await window.MissionSubresource.patchSubResource({
+                    const res = await window.krtMissionWrite({
                         method: 'PUT',
                         url: '/missions/' + window.missionId + '/participants/' + pId + '/ajax',
                         payload: payload,
                         sectionKey: 'participant'
                     });
                     if (res.ok) {
-                        window.location.reload();
+                        window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                        window.krtRefreshMissionSection(['crew', 'finance']);
                     }
                 });
             }
 
-            // Check-in / Check-out forms (delegated): POST .../check-in/ajax resp. /check-out/ajax
-            document.querySelectorAll('form.participant-action-form').forEach(function (f) {
-                f.addEventListener('submit', async function (ev) {
-                    const pId = f.getAttribute('data-participant-id');
-                    const action = f.getAttribute('data-participant-action');
-                    if (!pId || (action !== 'check-in' && action !== 'check-out')) {
-                        return; // fall back to classical submit
-                    }
-                    ev.preventDefault();
-                    const res = await window.MissionSubresource.patchSubResource({
-                        method: 'POST',
-                        url: '/missions/' + window.missionId + '/participants/' + pId + '/' + action + '/ajax',
-                        sectionKey: 'participant'
-                    });
-                    if (res.ok) {
-                        window.location.reload();
-                    }
+            // Check-in / Check-out forms: ONE document-delegated submit listener so the forms keep
+            // working after the crew board is re-rendered by an in-place swap (the per-form binding
+            // they used before died on the first innerHTML swap). POST .../check-in|check-out/ajax.
+            document.addEventListener('submit', async function (ev) {
+                const f = ev.target;
+                if (!f || typeof f.matches !== 'function' || !f.matches('form.participant-action-form')) {
+                    return;
+                }
+                const pId = f.getAttribute('data-participant-id');
+                const action = f.getAttribute('data-participant-action');
+                if (!pId || (action !== 'check-in' && action !== 'check-out')) {
+                    return; // fall back to classical submit
+                }
+                ev.preventDefault();
+                const res = await window.krtMissionWrite({
+                    method: 'POST',
+                    url: '/missions/' + window.missionId + '/participants/' + pId + '/' + action + '/ajax',
+                    sectionKey: 'participant'
                 });
+                if (res.ok) {
+                    window.krtRefreshMissionSection(['crew', 'finance']);
+                }
             });
 
             // Delete flow: intercept the shared delete-confirm form when triggered by a
@@ -2004,13 +2149,14 @@
                         return; // let the classical POST (or unit handler) run
                     }
                     ev.preventDefault();
-                    const res = await window.MissionSubresource.patchSubResource({
+                    const res = await window.krtMissionWrite({
                         method: 'DELETE',
                         url: '/missions/' + window.missionId + '/participants/' + subId + '/ajax',
                         sectionKey: 'participant'
                     });
                     if (res.ok) {
-                        window.location.reload();
+                        window.krtModalClose(dForm.closest('.krt-modal-overlay'));
+                        window.krtRefreshMissionSection(['crew', 'finance']);
                     }
                 });
             }
@@ -2052,7 +2198,7 @@
         // /slim crew endpoints via dedicated frontend /ajax proxies. Crew ADD now
         // happens through the board (drop / click / keyboard) instead of a modal.
         (function wireCrewAjax() {
-            if (!window.MissionSubresource || !window.missionId) {
+            if (!window.krtMissionWrite || !window.missionId) {
                 return;
             }
 
@@ -2076,14 +2222,15 @@
                     const payload = {
                         jobTypeIds: collectJobTypeIds(editForm)
                     };
-                    const res = await window.MissionSubresource.patchSubResource({
+                    const res = await window.krtMissionWrite({
                         method: 'PUT',
                         url: ajaxUrl,
                         payload: payload,
                         sectionKey: 'crew'
                     });
                     if (res.ok) {
-                        window.location.reload();
+                        window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                        window.krtRefreshMissionSection('crew');
                     }
                 });
             }
@@ -2100,13 +2247,14 @@
                         return; // let the classical POST (or unit/participant handlers) run
                     }
                     ev.preventDefault();
-                    const res = await window.MissionSubresource.patchSubResource({
+                    const res = await window.krtMissionWrite({
                         method: 'DELETE',
                         url: '/missions/' + window.missionId + '/units/' + unitId + '/crew/' + crewId + '/ajax',
                         sectionKey: 'crew'
                     });
                     if (res.ok) {
-                        window.location.reload();
+                        window.krtModalClose(dForm.closest('.krt-modal-overlay'));
+                        window.krtRefreshMissionSection('crew');
                     }
                 });
             }
@@ -2262,10 +2410,50 @@
 
         if (partyLeadClearBtn && partyLeadForm && partyLeadInput && partyLeadUserId) {
             partyLeadClearBtn.addEventListener('click', function() {
-                // Submit empty userId + guestName so the backend clears the party lead.
+                // Clear the inputs and submit empty userId + guestName so the backend clears the
+                // party lead. requestSubmit() fires the 'submit' event (unlike .submit()) so the
+                // in-place interceptor below handles it.
                 partyLeadInput.value = '';
                 partyLeadUserId.value = '';
-                partyLeadForm.submit();
+                partyLeadForm.requestSubmit();
+            });
+        }
+
+        // In-place party-lead set/clear (#574): patch the display + bumped partyLeadVersion without a
+        // reload. The autocomplete form is not re-rendered, so its per-element handlers stay valid.
+        if (partyLeadForm && partyLeadInput && partyLeadUserId) {
+            partyLeadForm.addEventListener('submit', async function (ev) {
+                ev.preventDefault();
+                const versionInput = document.getElementById('party-lead-version');
+                const res = await window.krtMissionWrite({
+                    method: 'PUT',
+                    url: '/missions/' + window.missionId + '/party-lead/ajax',
+                    payload: {
+                        userId: partyLeadUserId.value || null,
+                        guestName: partyLeadInput.value || null,
+                        version: versionInput && versionInput.value !== '' ? parseInt(versionInput.value, 10) : 0
+                    },
+                    sectionKey: 'party_lead'
+                });
+                if (!res.ok || !res.body) {
+                    return;
+                }
+                const dto = res.body;
+                const display = document.getElementById('party-lead-display');
+                const overview = document.getElementById('overview-party-lead');
+                const noneLabel = (display && display.getAttribute('data-none-label')) || '';
+                const resolvedName = dto.partyLeadUser
+                    ? (dto.partyLeadUser.effectiveName || '')
+                    : (dto.partyLeadGuestName || noneLabel);
+                if (display) display.textContent = resolvedName;
+                if (overview) overview.textContent = resolvedName;
+                if (versionInput && dto.partyLeadVersion != null) {
+                    versionInput.value = dto.partyLeadVersion;
+                }
+                partyLeadUserId.value = dto.partyLeadUser ? (dto.partyLeadUser.id || '') : '';
+                partyLeadInput.value = dto.partyLeadUser
+                    ? (dto.partyLeadUser.effectiveName || '')
+                    : (dto.partyLeadGuestName || '');
             });
         }
     });
@@ -2297,14 +2485,13 @@
             input.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        // Nur für actualStartTime/actualEndTime wird sofort gespeichert + Reload
-        // (siehe AGENTS.md: Optimistic Locking via Version aus dem DOM)
+        // actualStartTime/actualEndTime are persisted immediately and patched in place (#574).
         if (inputId === 'actualStartTime' || inputId === 'actualEndTime') {
-            saveActualTimeAndReload(inputId, now);
+            saveActualTimeInPlace(inputId, now);
         }
     }
 
-    async function saveActualTimeAndReload(field, nowDate) {
+    async function saveActualTimeInPlace(field, nowDate) {
         const currentMissionId = window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
         if (!currentMissionId) {
             console.error('[mission-detail] Mission ID nicht gefunden');
@@ -2324,47 +2511,36 @@
             return;
         }
 
-        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
-        const headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        };
-        if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
-            headers[csrfHeader] = csrfToken;
-        }
-
-        try {
-            const resp = await fetch(`/missions/${encodeURIComponent(currentMissionId)}/actual-time`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify({
-                    field: field,
-                    value: nowDate.toISOString(), // UTC ISO-8601 (Instant)
-                    version: Number(version)
-                })
-            });
-            if (resp.ok) {
-                window.location.reload();
-                return;
-            }
-            if (resp.status === 409) {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(window.MSG_MISSION_ACTUAL_TIME_CONFLICT || 'Konflikt: Bitte Seite neu laden.');
+        // Routed through krtMissionWrite (#574): CSRF construction + retry-once-on-403 and the shared
+        // OPTIMISTIC_LOCK reload-confirm replace the former hand-rolled fetch + unconditional reload.
+        await window.krtMissionWrite({
+            method: 'POST',
+            url: '/missions/' + encodeURIComponent(currentMissionId) + '/actual-time',
+            payload: { field: field, value: nowDate.toISOString(), version: Number(version) },
+            sectionKey: 'schedule',
+            toast: false,
+            onSuccess: function (dto) {
+                // actual-time PATCHes /schedule, so the schedule version (and the top-level version)
+                // bump — write them back so a follow-up schedule edit / actual-time set does not 409.
+                if (dto && dto.scheduleVersion != null && versionInput) {
+                    versionInput.value = dto.scheduleVersion;
                 }
-                // Seite neu laden, damit frische Version geholt wird
-                setTimeout(() => window.location.reload(), 1200);
-                return;
+                const topVersionInput = document.getElementById('mission-version');
+                if (dto && dto.version != null && topVersionInput) {
+                    topVersionInput.value = dto.version;
+                }
+                // Patch the Tab-1 overview display for the field just set and re-localise it.
+                const span = document.getElementById(field === 'actualStartTime' ? 'overview-actual-start' : 'overview-actual-end');
+                if (span) {
+                    span.setAttribute('data-utc', String(nowDate.getTime()));
+                    if (typeof window.krtLocalizeDates === 'function') {
+                        window.krtLocalizeDates(span.parentNode || span);
+                    }
+                }
+                // Participation % in the payout table is derived from the actual times — refresh it.
+                window.krtRefreshMissionSection('finance');
             }
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(window.MSG_MISSION_ACTUAL_TIME_ERROR || 'Fehler beim Speichern.');
-            }
-        } catch (err) {
-            console.error('[mission-detail] saveActualTimeAndReload error', err);
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(window.MSG_MISSION_ACTUAL_TIME_ERROR || 'Fehler beim Speichern.');
-            }
-        }
+        });
     }
 
     async function changeMissionOwner() {
@@ -2395,13 +2571,13 @@
             const cleanMissionId = String(currentMissionId).trim();
             const cleanUserId = String(userId).trim();
 
-            const result = await window.MissionSubresource.patchSubResource({
+            const result = await window.krtMissionWrite({
                 method: 'PUT',
                 url: `/missions/${cleanMissionId}/owner/${cleanUserId}`,
                 sectionKey: 'owner'
             });
             if (result.ok) {
-                setTimeout(() => location.reload(), 800);
+                window.krtRefreshMissionSection('mgmt');
             }
         } catch (err) {
             showFrontendErrorToast(`${typeof MSG_ERROR_OWNER_CHANGE !== 'undefined' ? MSG_ERROR_OWNER_CHANGE : 'Fehler beim Ändern des Besitzers'} (Error: ${err.message})`);
@@ -2423,13 +2599,13 @@
                 return;
             }
 
-            const result = await window.MissionSubresource.patchSubResource({
+            const result = await window.krtMissionWrite({
                 method: 'DELETE',
                 url: `/missions/${currentMissionId}/managers/${userId}`,
                 sectionKey: 'manager'
             });
             if (result.ok) {
-                setTimeout(() => location.reload(), 800);
+                window.krtRefreshMissionSection('mgmt');
             }
         } catch (err) {
             console.error(err);
@@ -2453,13 +2629,13 @@
 
             const cleanMissionId = String(currentMissionId).trim();
             const cleanUserId = String(userId).trim();
-            const result = await window.MissionSubresource.patchSubResource({
+            const result = await window.krtMissionWrite({
                 method: 'POST',
                 url: `/missions/${cleanMissionId}/managers/${cleanUserId}`,
                 sectionKey: 'manager'
             });
             if (result.ok) {
-                setTimeout(() => location.reload(), 800);
+                window.krtRefreshMissionSection('mgmt');
             }
         } catch (err) {
             console.error('Network or unexpected error:', err);
@@ -2467,75 +2643,160 @@
         }
     }
 
-    function updatePayoutPreference(selectElement) {
+    async function updatePayoutPreference(selectElement) {
         const url = selectElement.getAttribute('data-payout-url');
         const value = selectElement.value;
-        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
-
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-        if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
-            headers[csrfHeader] = csrfToken;
-        }
-
-        fetch(url, {
+        // Routed through krtFetch.write (#574): gains CSRF construction + retry-once-on-403 (a stale
+        // tab no longer silently fails) and unified problem+json handling. Stays a pure in-place
+        // patch — a single preference toggle changes no list structure, so no fragment swap.
+        const result = await window.krtFetch.write({
             method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ preference: value })
-        })
-        .then(response => {
-            if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                    showFrontendErrorToast(MSG_ERROR_PERMISSION_DENIED);
-                } else {
-                    showFrontendErrorToast(MSG_ERROR_PAYOUT_UPDATE);
-                }
-                selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';
-                return null;
-            }
-            return response.json();
-        })
-        .then(missionDto => {
-            if (!missionDto) return;
-            selectElement.setAttribute('data-original-value', value);
-            const participantId = selectElement.getAttribute('data-participant-id');
-            if (participantId && missionDto.participants) {
-                const updatedParticipant = missionDto.participants.find(p => p.id === participantId);
-                if (updatedParticipant) {
-                    // Update the payout preference on the edit-button(s) so the next modal
-                    // pre-fills with the new value.
-                    document.querySelectorAll('.edit-participant-btn[data-participant-id="' + participantId + '"]').forEach(btn => {
-                        btn.setAttribute('data-payout-preference', value);
-                    });
-                    // Container-wide data-version sync: the participant's version renders on the
-                    // payout <tr> AND on its board person-row (plus their action buttons/modals).
-                    // Every container carrying the participant id is synced so a follow-up click
-                    // anywhere in the page never ships a stale version (spurious 409).
-                    if (window.MissionSubresource && updatedParticipant.version !== undefined) {
-                        document.querySelectorAll('[data-participant-id="' + participantId + '"]').forEach(container => {
-                            window.MissionSubresource.syncVersion(container, updatedParticipant.version);
-                        });
-                    }
-                }
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            showFrontendErrorToast(MSG_ERROR_PAYOUT_UPDATE);
+            url: url,
+            payload: { preference: value },
+            toast: false,
+            errorMessage: (typeof MSG_ERROR_PAYOUT_UPDATE !== 'undefined' ? MSG_ERROR_PAYOUT_UPDATE : 'Speichern fehlgeschlagen.')
         });
+        if (!result.ok) {
+            // krtFetch already surfaced the error toast; roll the select back to its last value.
+            selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';
+            return;
+        }
+        const missionDto = result.body;
+        if (!missionDto) return;
+        selectElement.setAttribute('data-original-value', value);
+        const participantId = selectElement.getAttribute('data-participant-id');
+        if (participantId && missionDto.participants) {
+            const updatedParticipant = missionDto.participants.find(p => p.id === participantId);
+            if (updatedParticipant) {
+                // Update the payout preference on the edit-button(s) so the next modal pre-fills
+                // with the new value.
+                document.querySelectorAll('.edit-participant-btn[data-participant-id="' + participantId + '"]').forEach(btn => {
+                    btn.setAttribute('data-payout-preference', value);
+                });
+                // Container-wide data-version sync: the participant's version renders on the payout
+                // <tr> AND on its board person-row (plus their action buttons/modals). Every container
+                // carrying the participant id is synced so a follow-up click anywhere in the page
+                // never ships a stale version (spurious 409).
+                if (updatedParticipant.version !== undefined) {
+                    document.querySelectorAll('[data-participant-id="' + participantId + '"]').forEach(container => {
+                        window.krtFetch.syncVersion(container, updatedParticipant.version);
+                    });
+                }
+            }
+        }
     }
     </script>
     <script th:inline="javascript" th:if="${!isNew}" th:attr="nonce=${cspNonce}">
     function openEditFinanceModal(id, note, type, amount, version) {
         document.getElementById('edit-finance-form').action = window.safeSameOriginUrl('/missions/[[${mission?.id?.toString()}]]/finance-entries/' + id + '/update', document.getElementById('edit-finance-form').action);
+        // Stash the entry id so the AJAX submit interceptor can build the /ajax URL (#574).
+        document.getElementById('edit-finance-form').setAttribute('data-entry-id', id);
         document.getElementById('edit-finance-note').value = note && note !== 'null' ? note : '';
         window.krtSegSet('edit-finance-type', type === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
         document.getElementById('edit-finance-amount').value = amount;
         document.getElementById('edit-finance-version').value = version;
         window.krtModalOpen(document.getElementById('edit-finance-entry-modal'));
     }
+    </script>
+    <script th:attr="nonce=${cspNonce}">
+    // --- Finance entries via AJAX (#574): add/edit/delete swap the finance pane in place instead
+    //     of POST->redirect. The classic forms/links remain the no-JavaScript fallback. ---
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!window.krtMissionWrite || !window.missionId) {
+            return;
+        }
+        const financeMissionId = window.missionId;
+
+        // After a finance swap, patch the Finanzen tab badge (it lives in the tab nav, outside the
+        // swapped fragment) from the count the fragment exposes in #finance-count-meta.
+        function refreshFinanceAndBadge() {
+            window.krtRefreshMissionSection('finance').then(function () {
+                const meta = document.getElementById('finance-count-meta');
+                const badge = document.getElementById('finance-tab-count');
+                if (meta && badge) {
+                    badge.textContent = (meta.textContent || '0').trim();
+                }
+            });
+        }
+
+        const addForm = document.getElementById('add-finance-form');
+        if (addForm) {
+            addForm.addEventListener('submit', async function (ev) {
+                ev.preventDefault();
+                const fd = new FormData(addForm);
+                const res = await window.krtMissionWrite({
+                    method: 'POST',
+                    url: '/missions/' + financeMissionId + '/finance-entries/ajax',
+                    payload: {
+                        participantId: fd.get('participantId') || null,
+                        type: fd.get('type') || 'INCOME',
+                        amount: fd.get('amount') || null,
+                        note: fd.get('note') || null
+                    },
+                    sectionKey: 'finance'
+                });
+                if (res.ok) {
+                    window.krtModalClose(addForm.closest('.krt-modal-overlay'));
+                    addForm.reset();
+                    refreshFinanceAndBadge();
+                }
+            });
+        }
+
+        const editForm = document.getElementById('edit-finance-form');
+        if (editForm) {
+            editForm.addEventListener('submit', async function (ev) {
+                const entryId = editForm.getAttribute('data-entry-id');
+                if (!entryId) {
+                    return; // no AJAX target -> classic submit
+                }
+                ev.preventDefault();
+                const fd = new FormData(editForm);
+                const versionRaw = fd.get('version');
+                const res = await window.krtMissionWrite({
+                    method: 'PUT',
+                    url: '/missions/' + financeMissionId + '/finance-entries/' + entryId + '/ajax',
+                    payload: {
+                        type: fd.get('type') || 'INCOME',
+                        amount: fd.get('amount') || null,
+                        note: fd.get('note') || null,
+                        version: versionRaw ? parseInt(versionRaw, 10) : null
+                    },
+                    sectionKey: 'finance'
+                });
+                if (res.ok) {
+                    window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                    refreshFinanceAndBadge();
+                }
+            });
+        }
+
+        // Delete: extend the shared delete-confirm-form chain with a finance branch (the entry id is
+        // parsed from the action the opener set, since the finance button carries no data-sub-id).
+        const dForm = document.getElementById('delete-confirm-form');
+        if (dForm) {
+            dForm.addEventListener('submit', async function (ev) {
+                if (dForm.getAttribute('data-sub-section') !== 'finance') {
+                    return; // let the unit/participant/crew handlers or the classic POST run
+                }
+                ev.preventDefault();
+                const match = (dForm.getAttribute('action') || '').match(/finance-entries\/([^/]+)\/delete/);
+                const entryId = match ? match[1] : null;
+                if (!entryId) {
+                    return;
+                }
+                const res = await window.krtMissionWrite({
+                    method: 'DELETE',
+                    url: '/missions/' + financeMissionId + '/finance-entries/' + entryId + '/ajax',
+                    sectionKey: 'finance'
+                });
+                if (res.ok) {
+                    window.krtModalClose(dForm.closest('.krt-modal-overlay'));
+                    refreshFinanceAndBadge();
+                }
+            });
+        }
+    });
     </script>
     <script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
@@ -2749,16 +3010,24 @@
     // Drop on a unit = the same backend action as the old "Crew zuweisen" modal
     // (POST crew, empty function set — the function is picked via the chip-select);
     // drop on the pool = remove the assignment; unit→unit = remove + add.
+    //
+    // All handlers are DELEGATED on the stable #crew-board-results wrapper (#571/#574): an in-place
+    // crew swap replaces the wrapper's innerHTML but the wrapper itself persists, so a single set of
+    // container-level listeners keeps the board fully operable after every swap with no re-init. The
+    // native drag events (dragstart/dragover/drop) bubble, so one listener per type covers all rows
+    // and zones. The dragged/selected closure state is cleared on krt:swapped (the swapped-out nodes
+    // are detached) so a follow-up action never references a stale row.
     (function () {
         if (!window.missionCanEdit) {
             return; // the board is read-only without edit permission
         }
+        const board = document.getElementById('crew-board-results');
+        if (!board) {
+            return;
+        }
 
         let dragged = null;
         let selected = null;
-
-        function rows() { return Array.from(document.querySelectorAll('#pane-crew .person-row')); }
-        function zones() { return Array.from(document.querySelectorAll('#pane-crew .drop-zone')); }
 
         function setSelected(row) {
             if (selected) {
@@ -2772,8 +3041,13 @@
             }
         }
 
+        // Refreshes the 'crew' section only — NOT ['crew','finance'] like the other participant
+        // writes. A crew move mutates the Crew join entities, not the Participant entity, so the
+        // participant's @Version is unchanged and the payout <tr> in #finance-results (which carries
+        // data-version=${p.version}) stays in sync without a re-render. If a future backend change
+        // ever bumps the Participant @Version on a crew move, switch this to ['crew','finance'].
         async function moveParticipant(row, zone) {
-            if (!window.MissionSubresource || !window.missionId) return;
+            if (!window.krtMissionWrite || !window.missionId) return;
             const participantId = row.getAttribute('data-participant-id');
             const srcCrewId = row.getAttribute('data-crew-id') || '';
             const srcUnitId = row.getAttribute('data-unit-id') || '';
@@ -2781,115 +3055,142 @@
             if (!participantId || srcUnitId === targetUnitId) return;
 
             if (srcCrewId && srcUnitId) {
-                const del = await window.MissionSubresource.patchSubResource({
+                const del = await window.krtMissionWrite({
                     method: 'DELETE',
                     url: '/missions/' + window.missionId + '/units/' + srcUnitId + '/crew/' + srcCrewId + '/ajax',
                     sectionKey: 'crew'
                 });
                 if (!del.ok) return;
                 if (!targetUnitId) {
-                    window.location.reload();
+                    window.krtRefreshMissionSection('crew');
                     return;
                 }
             }
             if (targetUnitId) {
-                await window.MissionSubresource.patchSubResource({
+                await window.krtMissionWrite({
                     method: 'POST',
                     url: '/missions/' + window.missionId + '/units/' + targetUnitId + '/crew/ajax',
                     payload: { participantId: participantId, jobTypeIds: [] },
                     sectionKey: 'crew'
                 });
-                // Reload regardless of the add outcome: after a successful delete the
-                // server state has already changed and the page must re-render it.
-                window.location.reload();
+                // Re-render regardless of the add outcome: after a successful delete the server
+                // state already changed and the board must reflect it.
+                window.krtRefreshMissionSection('crew');
             }
         }
 
-        rows().forEach(row => {
-            row.addEventListener('dragstart', function (e) {
-                dragged = row;
-                e.dataTransfer.effectAllowed = 'move';
-            });
-            row.addEventListener('dragend', function () { dragged = null; });
-            // Click fallback: select the person, then click the target zone.
-            row.addEventListener('click', function (e) {
+        // Drag start/end on a row (delegated — drag events bubble to the container).
+        board.addEventListener('dragstart', function (e) {
+            const row = e.target.closest('.person-row');
+            if (!row || !board.contains(row)) return;
+            dragged = row;
+            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        });
+        board.addEventListener('dragend', function () { dragged = null; });
+
+        // Click: a row toggles its selection; a zone (empty space) receives the selected person.
+        board.addEventListener('click', function (e) {
+            const row = e.target.closest('.person-row');
+            if (row && board.contains(row)) {
                 if (e.target.closest('button') || e.target.closest('select') || e.target.closest('form') || e.target.closest('a')) return;
                 setSelected(selected === row ? null : row);
-            });
-            // Keyboard: Enter/Space toggles the selection on the focused row.
-            row.addEventListener('keydown', function (e) {
-                if (e.target !== row) return;
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setSelected(selected === row ? null : row);
-                }
-            });
-        });
-
-        zones().forEach(zone => {
-            zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('is-over'); });
-            zone.addEventListener('dragleave', function () { zone.classList.remove('is-over'); });
-            zone.addEventListener('drop', function (e) {
-                e.preventDefault();
-                zone.classList.remove('is-over');
-                if (dragged && !zone.contains(dragged)) {
-                    moveParticipant(dragged, zone);
-                }
-            });
-            zone.addEventListener('click', function (e) {
-                if (e.target.closest('.person-row') || e.target.closest('button') || e.target.closest('select') || e.target.closest('a')) return;
+                return;
+            }
+            const zone = e.target.closest('.drop-zone');
+            if (zone && board.contains(zone)) {
+                if (e.target.closest('button') || e.target.closest('select') || e.target.closest('a')) return;
                 if (selected && !zone.contains(selected)) {
-                    const row = selected;
+                    const sel = selected;
                     setSelected(null);
-                    moveParticipant(row, zone);
+                    moveParticipant(sel, zone);
                 }
-            });
-            // Keyboard: Enter/Space on a focused zone assigns the selected person.
-            zone.addEventListener('keydown', function (e) {
-                if (e.target !== zone) return;
-                if ((e.key === 'Enter' || e.key === ' ') && selected && !zone.contains(selected)) {
-                    e.preventDefault();
-                    const row = selected;
-                    setSelected(null);
-                    moveParticipant(row, zone);
-                }
-            });
+            }
         });
 
-        // On-board function chip-select: quick single-function change via the existing
-        // crew update endpoint; "__edit" opens the multi-select crew modal instead.
-        document.querySelectorAll('.crew-role-select').forEach(function (sel) {
-            sel.addEventListener('change', async function () {
-                const value = sel.value;
-                if (value === '__edit') {
-                    sel.value = sel.getAttribute('data-current') || '';
-                    if (typeof window.krtOpenEditCrewModal === 'function') {
-                        window.krtOpenEditCrewModal(sel);
-                    }
-                    return;
+        // Keyboard: Enter/Space toggles a focused row or, on a focused zone, assigns the selection.
+        board.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            if (!e.target || typeof e.target.closest !== 'function') return;
+            const row = e.target.closest('.person-row');
+            if (row && e.target === row) {
+                e.preventDefault();
+                setSelected(selected === row ? null : row);
+                return;
+            }
+            const zone = e.target.closest('.drop-zone');
+            if (zone && e.target === zone && selected && !zone.contains(selected)) {
+                e.preventDefault();
+                const sel = selected;
+                setSelected(null);
+                moveParticipant(sel, zone);
+            }
+        });
+
+        // Drag over/leave/drop on a zone (delegated).
+        board.addEventListener('dragover', function (e) {
+            const zone = e.target.closest('.drop-zone');
+            if (!zone || !board.contains(zone)) return;
+            e.preventDefault();
+            zone.classList.add('is-over');
+        });
+        board.addEventListener('dragleave', function (e) {
+            const zone = e.target.closest('.drop-zone');
+            if (!zone || !board.contains(zone)) return;
+            zone.classList.remove('is-over');
+        });
+        board.addEventListener('drop', function (e) {
+            const zone = e.target.closest('.drop-zone');
+            if (!zone || !board.contains(zone)) return;
+            e.preventDefault();
+            zone.classList.remove('is-over');
+            if (dragged && !zone.contains(dragged)) {
+                moveParticipant(dragged, zone);
+            }
+        });
+
+        // On-board function chip-select (delegated): quick single-function change via the crew
+        // update endpoint; "__edit" opens the multi-select crew modal, "__multi" is a no-op label.
+        board.addEventListener('change', async function (e) {
+            const sel = e.target.closest('.crew-role-select');
+            if (!sel || !board.contains(sel)) return;
+            const value = sel.value;
+            if (value === '__edit') {
+                sel.value = sel.getAttribute('data-current') || '';
+                if (typeof window.krtOpenEditCrewModal === 'function') {
+                    window.krtOpenEditCrewModal(sel);
                 }
-                if (value === '__multi') {
-                    return;
-                }
-                const ajaxUrl = sel.getAttribute('data-action-ajax');
-                if (!ajaxUrl || !window.MissionSubresource) return;
-                const res = await window.MissionSubresource.patchSubResource({
-                    method: 'PUT',
-                    url: ajaxUrl,
-                    payload: { jobTypeIds: value ? [value] : [] },
-                    sectionKey: 'crew'
-                });
-                if (res.ok) {
-                    window.location.reload();
-                } else {
-                    sel.value = sel.getAttribute('data-current') || '';
-                }
+                return;
+            }
+            if (value === '__multi') {
+                return;
+            }
+            const ajaxUrl = sel.getAttribute('data-action-ajax');
+            if (!ajaxUrl || !window.krtMissionWrite) return;
+            const res = await window.krtMissionWrite({
+                method: 'PUT',
+                url: ajaxUrl,
+                payload: { jobTypeIds: value ? [value] : [] },
+                sectionKey: 'crew'
             });
+            if (res.ok) {
+                window.krtRefreshMissionSection('crew');
+            } else {
+                sel.value = sel.getAttribute('data-current') || '';
+            }
+        });
+
+        // After an in-place board swap the previously selected/dragged nodes are detached; clear the
+        // closure state so a follow-up action never references a stale row.
+        document.addEventListener('krt:swapped', function (ev) {
+            if (ev.detail && ev.detail.container === board) {
+                selected = null;
+                dragged = null;
+            }
         });
     })();
 </script>
-<!-- window.MissionSubresource (patchSubResource/syncVersion/handleProblem) is now provided
-     globally by krt-fetch.js, loaded in fragments/head.html (epic #571). -->
+<!-- Mission sub-writes go through the local krtMissionWrite wrapper around window.krtFetch.write
+     (#574); the former window.MissionSubresource alias has been retired from krt-fetch.js. -->
 <!-- Mission detail presence/awareness client (Stufe 3). -->
 <script th:src="@{/js/mission-presence.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:if="${!isNew and authUserId != null}" th:attr="nonce=${cspNonce}" th:inline="javascript">
@@ -2930,9 +3231,14 @@
         el.innerText = '—';
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.krt-local-dt').forEach(krtFormatLocalDateTime);
-        document.querySelectorAll('.refinery-endsat-local').forEach(function (el) {
+    // Localises every UTC timestamp under root (default: document). Exposed on window so the
+    // actual-time in-place patch can re-localise its display, and re-run on krt:swapped so swapped-in
+    // fragments (finance refinery times, crew board) are localised too — a one-shot DOMContentLoaded
+    // pass would otherwise leave swapped content showing raw UTC (#571/#574).
+    window.krtLocalizeDates = function (root) {
+        const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+        scope.querySelectorAll('.krt-local-dt').forEach(krtFormatLocalDateTime);
+        scope.querySelectorAll('.refinery-endsat-local').forEach(function (el) {
             const utcMsStr = el.getAttribute('data-utc');
             if (utcMsStr && utcMsStr !== 'null') {
                 krtFormatLocalDateTime(el);
@@ -2940,6 +3246,13 @@
                 el.innerText = '-';
             }
         });
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        window.krtLocalizeDates(document);
+    });
+    document.addEventListener('krt:swapped', function (ev) {
+        window.krtLocalizeDates((ev.detail && ev.detail.container) || document);
     });
 </script>
 </body>
