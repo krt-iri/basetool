@@ -19,11 +19,14 @@
 
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -82,5 +85,27 @@ class PersonalInventoryPageControllerMvcTest {
         .andExpect(view().name("personal-inventory"))
         .andExpect(model().attributeExists("personalInventoryForm"))
         .andExpect(model().attributeExists("items"));
+  }
+
+  // covers REQ-FE-002 — an AJAX filter swap (fragment=results) renders only the item-list fragment:
+  // the total marker is present, but the swap-target wrapper, the filter form and the modals (all
+  // outside the fragment) are not.
+  @Test
+  @WithMockUser
+  void view_fragmentResults_rendersOnlyResultsFragment() throws Exception {
+    PageResponse<PersonalInventoryItemDto> empty =
+        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(empty);
+
+    mockMvc
+        .perform(get("/personal-inventory").param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("personal-inventory :: results"))
+        .andExpect(content().string(containsString("id=\"pi-total-meta\"")))
+        .andExpect(content().string(containsString("empty-state")))
+        .andExpect(content().string(not(containsString("id=\"pi-results\""))))
+        .andExpect(content().string(not(containsString("krt-pi-filter"))))
+        .andExpect(content().string(not(containsString("id=\"krt-pi-modal\""))));
   }
 }

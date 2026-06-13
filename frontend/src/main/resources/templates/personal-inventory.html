@@ -54,6 +54,15 @@
             </form>
         </div>
 
+        <!-- AJAX swap target (REQ-FE-002): the search filter re-renders only this block via
+             personal-inventory.js + krtFetch; the no-JS GET fallback still reloads the page. The
+             row edit/delete buttons are krtEvents-delegated, so swapped-in rows stay live. The
+             hidden total drives the header subtitle + tab-count resync after a swap. -->
+        <div id="pi-results">
+        <th:block th:fragment="results">
+        <span id="pi-total-meta" hidden
+              th:attr="data-total=${page != null ? page.totalElements : items.size()}"></span>
+
         <div th:if="${#lists.isEmpty(items)}" class="empty-state">
             <span class="empty-title" th:text="#{personalInventory.collection.emptyTitle}">Noch keine Eintr&auml;ge</span>
             <span class="empty-text" th:text="#{personalInventory.empty}">Noch keine Eintr&auml;ge vorhanden.</span>
@@ -107,6 +116,8 @@
                 </tr>
                 </tbody>
             </table>
+        </div>
+        </th:block>
         </div>
     </div>
 </main>
@@ -198,7 +209,8 @@
         editTitle:   /*[[#{personalInventory.modal.edit.title}]]*/   'Eintrag bearbeiten',
         confirmBody: /*[[#{personalInventory.action.delete.confirm.body}]]*/ 'Wirklich loeschen?',
         searching:   /*[[#{personalInventory.field.location.searching}]]*/   'Suche...',
-        noResults:   /*[[#{personalInventory.field.location.empty}]]*/       'Keine Treffer'
+        noResults:   /*[[#{personalInventory.field.location.empty}]]*/       'Keine Treffer',
+        factsCount:  /*[[#{personalInventory.facts.count}]]*/                 'Eintraege'
     };
     window.krtPersonalInventoryEndpoints = {
         uexSearch: /*[[@{/personal-inventory/uex-search}]]*/ '/personal-inventory/uex-search'

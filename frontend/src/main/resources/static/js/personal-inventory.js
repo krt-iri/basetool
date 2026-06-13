@@ -63,6 +63,76 @@
                 closeDelete();
             }
         });
+        wireFilterSwap();
+    }
+
+    // ----------------------------------------------------------- filter swap
+
+    // The search filter re-renders only #pi-results in place (REQ-FE-002) instead of reloading
+    // the page. The form lives OUTSIDE the swap container, so a single binding here survives every
+    // swap; the row edit/delete buttons inside the container are krtEvents-delegated and need no
+    // re-init. After each swap the header subtitle + active tab-count are resynced from the hidden
+    // total the fragment carries. Without krtFetch (or JS disabled) the GET form reloads as before.
+    function wireFilterSwap() {
+        const filterForm = document.querySelector('form.krt-pi-filter');
+        // This module is shared by the user page and the admin variant. Only wire the in-place
+        // swap where the results container is actually present; otherwise leave the GET form to
+        // reload as before (guards against preventDefault()-ing a submit we cannot swap).
+        if (!filterForm || !window.krtFetch || !document.getElementById('pi-results')) {
+            return;
+        }
+        let timer = null;
+        function doSwap() {
+            const params = new URLSearchParams(new FormData(filterForm)).toString();
+            const url = filterForm.getAttribute('action') + (params ? '?' + params : '');
+            window.krtFetch.swap({ url: url, container: '#pi-results', history: true });
+        }
+        filterForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
+            doSwap();
+        });
+        const searchField = filterForm.querySelector('input[type="search"]');
+        if (searchField) {
+            searchField.addEventListener('input', function () {
+                if (timer) {
+                    clearTimeout(timer);
+                }
+                timer = setTimeout(function () {
+                    timer = null;
+                    doSwap();
+                }, 300);
+            });
+        }
+        document.addEventListener('krt:swapped', function (e) {
+            const c = e.detail && e.detail.container;
+            if (c && c.id === 'pi-results') {
+                syncCounts(c);
+            }
+        });
+    }
+
+    // Mirrors the freshly filtered total (carried by the #pi-total-meta marker inside the swapped
+    // fragment) into the header subtitle ("<n> Eintraege") and the active tab's count badge, so the
+    // counts never drift from the visible list after a filter swap.
+    function syncCounts(root) {
+        const meta = (root || document).querySelector('#pi-total-meta');
+        if (!meta) {
+            return;
+        }
+        const total = meta.getAttribute('data-total') || '0';
+        const tabCount = document.querySelector('.tab-nav .tab.active .tab-count');
+        if (tabCount) {
+            tabCount.textContent = total;
+        }
+        const subtitle = document.querySelector('.krt-personal-inventory-header .krt-subtitle');
+        const i18n = window.krtPersonalInventoryI18n || {};
+        if (subtitle && i18n.factsCount) {
+            subtitle.textContent = total + ' ' + i18n.factsCount;
+        }
     }
 
     function openCreate(btn) {
