@@ -18,22 +18,11 @@ services:
   db-backend-dev:
     volumes: !override
       - iri-e2e-db-backend:/var/lib/postgresql/data
-    # Drop the dev-profile host-port publication (127.0.0.1:15432): the backend reaches Postgres
-    # over the net-db-backend Docker network by service name, never from the host, so the throwaway
-    # E2E stack does not need — and must not contend for — the shared host port. This lets the
-    # suite run alongside another worktree's dev stack that already holds 15432/15433/6379.
-    ports: !override []
   db-keycloak-dev:
     volumes: !override
       - iri-e2e-db-keycloak:/var/lib/postgresql/data
-    # Drop the dev-profile host-port publication (127.0.0.1:15433); Keycloak reaches its DB over the
-    # net-db-keycloak network by service name. See db-backend-dev above.
-    ports: !override []
   redis-dev:
     volumes: !override []
-    # Drop the dev-profile host-port publication (127.0.0.1:6379); the frontend reaches Redis over
-    # the net-redis-frontend network by service name. See db-backend-dev above.
-    ports: !override []
   keycloak-dev:
     # KC 26 hostname-v2 rejected the browser's plain-HTTP OIDC auth request with
     # "This combination of host and port requires TLS" when KC_HOSTNAME was the
