@@ -10,6 +10,8 @@
 
 - **Alle PDF-Exporte (Übergabeprotokoll, Kontoauszug, 3-Monats-Report) folgen jetzt strenger dem KRT-Design-System.** Orange dient nur noch als Akzent für Überschriften und Identität (Titel, Abschnitte, eine Linie unter den Tabellenköpfen, die Diagrammlinie, ein dünner oberer Seitenbalken, das Logo). Tabellenköpfe und Zeilengitter sind jetzt neutral dunkelgrau statt vollflächig orange, damit das Orange nicht überhandnimmt; Inhalt und Daten der Reporte bleiben unverändert.
 
+- **Die Fußzeile aller PDF-Exporte nennt jetzt den Erstellungszeitpunkt in UTC** – „Generiert von Profit Basetool am TT.MM.JJJJ HH:MM UTC" – als eindeutiger, zeitzonenunabhängiger Audit-Stempel.
+
 - **Raffinerieauftrag: In den Materialzeilen steht die Qualität jetzt vor der Eingangsmenge (Units).** Die Feldreihenfolge im Anlege- und Detailformular folgt damit der Reihenfolge im Spiel; die Ausgangszeile (Units, SCU) bleibt unverändert.
 
 ## [v0.4.20](https://github.com/krt-iri/basetool/releases/tag/v0.4.20) - 2026-06-12

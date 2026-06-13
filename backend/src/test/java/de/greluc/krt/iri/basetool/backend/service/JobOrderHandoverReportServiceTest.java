@@ -358,7 +358,7 @@ class JobOrderHandoverReportServiceTest {
   }
 
   @Test
-  void generateHandoverReport_pdfContainsFooter() throws IOException {
+  void generateHandoverReport_pdfContainsFooterWithUtcTimestamp() throws IOException {
     // Given
     Material material = buildMaterial("Laranite", QuantityType.SCU);
     JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
@@ -368,8 +368,11 @@ class JobOrderHandoverReportServiceTest {
     // When
     String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
 
-    // Then
-    assertTrue(text.contains("Generiert von Profit Basetool"), "Footer must appear");
+    // Then: footer carries the generation date+time, always in UTC
+    assertTrue(
+        text.matches(
+            "(?s).*Generiert von Profit Basetool am \\d{2}\\.\\d{2}\\.\\d{4} \\d{2}:\\d{2} UTC.*"),
+        "Footer must show the generation timestamp in UTC");
   }
 
   @Test

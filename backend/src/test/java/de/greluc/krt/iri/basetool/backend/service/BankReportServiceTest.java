@@ -103,6 +103,9 @@ class BankReportServiceTest {
     assertTrue(text.contains("Auszahlung"), "withdrawal type label present");
     assertTrue(text.contains(holderHandle), "holder handle present");
     assertTrue(text.contains("HALTER-VERTEILUNG ZUM STICHTAG"), "distribution section present");
+    assertTrue(
+        text.contains("Generiert von Profit Basetool am ") && text.contains(" UTC"),
+        "footer carries the UTC generation timestamp");
   }
 
   @Test

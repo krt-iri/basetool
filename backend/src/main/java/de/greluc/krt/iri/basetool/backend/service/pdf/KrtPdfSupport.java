@@ -22,6 +22,9 @@ package de.greluc.krt.iri.basetool.backend.service.pdf;
 import java.awt.Color;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.openpdf.text.Document;
@@ -108,6 +111,13 @@ public final class KrtPdfSupport {
 
   /** Embedded Lato Bold — loaded once per JVM from the bundled TTF. */
   private static final BaseFont LATO_BOLD = loadFont("fonts/Lato-Bold.ttf");
+
+  /**
+   * Footer generation-timestamp format. Always UTC and zone-independent so the footer is an
+   * unambiguous audit stamp regardless of the per-request user zone used elsewhere in the document.
+   */
+  private static final DateTimeFormatter FOOTER_TIMESTAMP =
+      DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(ZoneOffset.UTC);
 
   private KrtPdfSupport() {}
 
@@ -334,13 +344,20 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * Adds the centered "Generiert von Profit Basetool" footer line preceded by a spacer.
+   * Adds the centered footer line {@code "Generiert von Profit Basetool am <date> <time> UTC"},
+   * preceded by a spacer. The generation timestamp is always rendered in UTC — independent of any
+   * per-request user zone used for the document's other timestamps — so the footer is an
+   * unambiguous audit stamp.
    *
    * @param krt the open document handle
    */
   public static void addFooter(@NotNull KrtDocument krt) {
     krt.document().add(new Paragraph(" ", regular(10, COLOR_WHITE)));
-    Paragraph footer = new Paragraph("Generiert von Profit Basetool", regular(8, COLOR_LIGHT_GRAY));
+    String generatedAt = FOOTER_TIMESTAMP.format(Instant.now());
+    Paragraph footer =
+        new Paragraph(
+            "Generiert von Profit Basetool am " + generatedAt + " UTC",
+            regular(8, COLOR_LIGHT_GRAY));
     footer.setAlignment(Element.ALIGN_CENTER);
     krt.document().add(footer);
   }
