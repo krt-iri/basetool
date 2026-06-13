@@ -121,12 +121,10 @@ every sibling's priority). The fresh `data-version` carried by the re-rendered f
 REQ-FE-003 for free, and on a backend read failure the fragment branch returns a section-sized error
 fragment, never a redirect the swap would follow into the container.
 
-**Enforced by:** lists/pagination e2e (#573) + mission-detail fragment MVC tests (#574) +
-order-detail fragment/endpoint MVC tests (#575) · **Code:** `krt-fetch.js` (`swap`), `missions.js`,
-`operations.js`, `fragments/pagination.html`, `mission-detail.html` (`krtRefreshMissionSection`),
-`orders-index.html`, `orders-detail.html`, `JobOrderPageController` · **Issues:** #572, #573, #574,
-
-# 575
+**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574) and order-detail (#575)
+fragment/endpoint MVC tests · **Issues:** #572 to #575 · **Code:** `krt-fetch.js` (`swap`),
+`missions.js`, `operations.js`, `fragments/pagination.html`, `mission-detail.html`,
+`orders-index.html`, `orders-detail.html`, `JobOrderPageController`.
 
 ## Out of scope
 
