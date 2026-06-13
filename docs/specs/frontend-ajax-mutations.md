@@ -126,6 +126,37 @@ fragment/endpoint MVC tests · **Issues:** #572 to #575 · **Code:** `krt-fetch.
 `missions.js`, `operations.js`, `fragments/pagination.html`, `mission-detail.html`,
 `orders-index.html`, `orders-detail.html`, `JobOrderPageController`.
 
+### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
+
+Some write flows finish by landing the user on a **different** page — creating an entity navigates
+to its detail page or the list, and the refinery detail-page actions (save / store / cancel) redirect
+to the refinery-order list. For these flows the no-reload guarantee of REQ-FE-001 applies to the
+**failure path**: a client-side validation error or a backend save error keeps the user on the page
+with their entered data and shows an inline KRT toast, instead of the classic full reload that
+discards a half-filled form. On success the handler deliberately navigates to the server-returned
+`{"targetUrl": …}` JSON — the navigation **is** the user's intended outcome, so this is a refinement
+of REQ-FE-001, not a violation (there is no in-place reload that would lose work).
+
+The AJAX twin is routed by an `X-Requested-With=XMLHttpRequest` header (more specific than the classic
+`@PostMapping`, so Spring dispatches header-bearing requests to it) and submits a `FormData` of the
+real `<form>`, which lets the browser serialize the page's dynamic editors (order item lines, refinery
+goods / store items) and omit the disabled inactive-mode controls without hand-rolled JSON. The
+classic `POST→redirect` handler stays untouched as the no-JS fallback, and the twin reuses the same
+DTO-building / backend call as the classic path. Optimistic-lock and other backend errors are
+re-emitted as `application/problem+json` (the `propagateBackendError` helper) so the page-local
+submit helper can surface them inline.
+
+**Acceptance**
+
+- [ ] A client-side or backend validation/save error on a create / refinery-finalize submit keeps the
+  document on the same URL with the entered data intact and shows an inline toast — no full reload.
+- [ ] On success the page navigates exactly once to the server-supplied `targetUrl`.
+- [ ] With JavaScript disabled the classic form still `POST→redirect`s (the twin is header-gated).
+
+**Enforced by:** create/refinery navigate-after-AJAX MVC tests (`X-Requested-With` twins return
+`{targetUrl}` / `400`) · **Issues:** #575 · **Code:** `orders-create.html`, `refinery-orders-details.html`,
+`JobOrderPageController`, `RefineryOrderPageController` (`*Ajax` twins, `propagateBackendError`).
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
