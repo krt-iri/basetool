@@ -865,6 +865,68 @@ public class JobOrderPageController {
   }
 
   /**
+   * AJAX twin of {@link #updatePriority}: persists a drag-drop reorder without a full-page reload
+   * (epic #571 / #575). Returns the dragged order so the caller can confirm success; the
+   * order-index JS then re-renders the whole queue via a {@code ?fragment=results} swap, because
+   * the backend reshuffles <em>every</em> active order's priority slot (not just this one), so
+   * sibling rows' {@code data-priority} attributes must refresh or the next drag computes a stale
+   * target slot. The gate is tightened to {@code LOGISTICIAN} to match the backend so a
+   * non-logistician gets a clean propagated 403 toast instead of a redirect.
+   *
+   * @param id the order whose priority slot changed
+   * @param priority the new 1-based target slot
+   * @return the updated order on success, or the propagated RFC 7807 backend error
+   */
+  @PutMapping("/{id}/priority/ajax")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> updatePriorityAjax(
+      @PathVariable UUID id, @RequestParam Integer priority) {
+    try {
+      JobOrderDto result =
+          backendApiClient.put(
+              "/api/v1/orders/" + id + "/priority?priority=" + priority, null, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (BackendServiceException bse) {
+      log.error("Failed to update priority (ajax) for order {}: {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to update priority (ajax) for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * Re-emits a backend {@link BackendServiceException} as an {@code application/problem+json}
+   * response preserving the stable {@code code} and human-readable {@code detail} from the upstream
+   * RFC 7807 body. The order-detail / order-index AJAX layer ({@code krt-fetch.js}) reads {@code
+   * code} to decide between a "stale data, reload?" prompt (only {@code OPTIMISTIC_LOCK} / {@code
+   * PESSIMISTIC_LOCK}) and a plain error toast for domain conflicts; returning {@code .build()}
+   * with only the status would strip that signal and make every 409 look like an optimistic-lock
+   * conflict.
+   *
+   * @param e parsed backend exception with status + RFC 7807 fields
+   * @return problem+json response mirroring the upstream status and body
+   */
+  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
+      BackendServiceException e) {
+    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
+        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
+  }
+
+  /**
    * AJAX status transition endpoint. Updates the job order's status (OPEN → IN_PROGRESS →
    * COMPLETED, REJECTED). Backend enforces the state machine and rejects illegal transitions with a
    * 400.
@@ -874,7 +936,7 @@ public class JobOrderPageController {
   @PostMapping("/{id}/status")
   @PreAuthorize("isAuthenticated()")
   @org.springframework.web.bind.annotation.ResponseBody
-  public org.springframework.http.ResponseEntity<JobOrderDto> updateStatus(
+  public org.springframework.http.ResponseEntity<Object> updateStatus(
       @PathVariable UUID id, @RequestBody UpdateJobOrderStatusDto dto) {
     try {
       JobOrderDto result =
@@ -882,7 +944,7 @@ public class JobOrderPageController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (BackendServiceException bse) {
       log.error("Failed to update status for order {}: {}", id, bse.getMessage());
-      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+      return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to update status for order {}", id, e);
       return org.springframework.http.ResponseEntity.status(
@@ -906,7 +968,7 @@ public class JobOrderPageController {
   @PostMapping("/{id}/claims")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<ClaimDto> upsertClaim(
+  public org.springframework.http.ResponseEntity<Object> upsertClaim(
       @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
     try {
       ClaimDto result =
@@ -916,7 +978,7 @@ public class JobOrderPageController {
           .body(result);
     } catch (BackendServiceException bse) {
       log.error("Failed to upsert claim on order {}: {}", id, bse.getMessage());
-      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+      return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to upsert claim on order {}", id, e);
       return org.springframework.http.ResponseEntity.status(
@@ -937,14 +999,14 @@ public class JobOrderPageController {
   @PostMapping("/{id}/claims/{claimId}/withdraw")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Void> withdrawClaim(
+  public org.springframework.http.ResponseEntity<Object> withdrawClaim(
       @PathVariable UUID id, @PathVariable UUID claimId) {
     try {
       backendApiClient.delete("/api/v1/orders/" + id + "/claims/" + claimId, Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (BackendServiceException bse) {
       log.error("Failed to withdraw claim {} on order {}: {}", claimId, id, bse.getMessage());
-      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+      return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to withdraw claim {} on order {}", claimId, id, e);
       return org.springframework.http.ResponseEntity.status(

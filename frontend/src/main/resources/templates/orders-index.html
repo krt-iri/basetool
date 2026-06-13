@@ -256,10 +256,61 @@
         colorOrderAges(e && e.detail ? e.detail.container : document);
     });
 </script>
-<script sec:authorize="hasRole('LOGISTICIAN')" th:attr="nonce=${cspNonce}">
+<script sec:authorize="hasRole('LOGISTICIAN')" th:inline="javascript" th:attr="nonce=${cspNonce}">
 // Bind the drag-reorder to the STABLE #orders-results container (not the <tbody>) so the
 // delegation survives a filter fragment swap that replaces the table (#573). The handlers
 // already use e.target.closest('tr.draggable-row'), so container-level delegation is equivalent.
+
+// Localized strings for the in-place reorder (#575). krtFetch.write takes already-localized text.
+const KRT_ORDERS_REORDER_I18N = {
+    success: /*[[#{success.joborder.priority}]]*/ 'Priority updated.',
+    error: /*[[#{error.joborder.priority.failed}]]*/ 'Could not update priority.',
+    conflict: {
+        title: /*[[#{orders.conflict.toast.title}]]*/ 'Conflict',
+        detail: /*[[#{orders.conflict.toast.detail}]]*/ 'The data changed in the meantime.',
+        reloadLabel: /*[[#{orders.conflict.action.reload}]]*/ 'Load current values',
+        reloadQuestion: /*[[#{orders.conflict.action.reload.question}]]*/ 'Load current values?',
+        dismissLabel: /*[[#{orders.conflict.action.dismiss}]]*/ 'Cancel'
+    }
+};
+
+// Persist a drag-reorder in place (#571 / #575): krtFetch.write the new slot, then re-render the
+// WHOLE queue via a ?fragment=results swap. The backend reshuffles every active order's priority,
+// so the swap is mandatory to refresh all siblings' data-priority (a partial DOM patch would make
+// the next drag compute a stale target). The swap also reverts the optimistic dragover move when
+// the write failed, keeping the visible order consistent with the persisted one.
+async function persistOrderReorder(orderId, targetPriority) {
+    const container = document.getElementById('orders-results');
+    let res = { ok: false };
+    if (window.krtFetch) {
+        res = await window.krtFetch.write({
+            method: 'PUT',
+            url: '/orders/' + orderId + '/priority/ajax?priority=' + targetPriority,
+            toast: false,
+            errorMessage: KRT_ORDERS_REORDER_I18N.error,
+            conflict: {
+                title: KRT_ORDERS_REORDER_I18N.conflict.title,
+                reloadLabel: KRT_ORDERS_REORDER_I18N.conflict.reloadLabel,
+                reloadQuestion: KRT_ORDERS_REORDER_I18N.conflict.reloadQuestion,
+                dismissLabel: KRT_ORDERS_REORDER_I18N.conflict.dismissLabel,
+                reloadDetailFallback: KRT_ORDERS_REORDER_I18N.conflict.detail
+            }
+        });
+    }
+    if (container && window.krtFetch && window.krtFetch.swap) {
+        await window.krtFetch.swap({
+            url: window.location.pathname + window.location.search,
+            container: container,
+            fragmentValue: 'results',
+            history: false,
+            preserveScroll: true
+        });
+    }
+    if (res.ok && typeof window.showFrontendSuccessToast === 'function') {
+        window.showFrontendSuccessToast(KRT_ORDERS_REORDER_I18N.success);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('orders-results');
     if (!container) return;
@@ -320,11 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         if (targetPriority) {
-            const orderId = draggedRow.dataset.id;
-            const form = document.getElementById('priority-update-form');
-            form.action = `/orders/${orderId}/priority`;
-            document.getElementById('priority-update-input').value = targetPriority;
-            form.submit();
+            // Read the order id synchronously before the async write (dragend nulls draggedRow).
+            persistOrderReorder(draggedRow.dataset.id, targetPriority);
         }
     });
 });
