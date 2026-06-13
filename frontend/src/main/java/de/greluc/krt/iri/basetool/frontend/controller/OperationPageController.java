@@ -199,9 +199,13 @@ public class OperationPageController {
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
    * @param size page size for the embedded missions table (default 10)
+   * @param fragment when {@code "missions"} only the embedded missions sub-table fragment is
+   *     rendered (AJAX pager swap, REQ-FE-002), skipping the finance/payout round-trips; otherwise
+   *     the full page is returned
    * @param authentication current user's authentication (used for {@code canEdit})
    * @param model Thymeleaf model populated with operation, missions, finance and payouts
-   * @return the {@code operation-detail} view name, or redirect on backend failure
+   * @return the {@code operation-detail} view name, its {@code missions} fragment for an AJAX swap,
+   *     or a redirect on backend failure of the full-page load
    */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
@@ -209,24 +213,18 @@ public class OperationPageController {
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "10") Integer size,
+      @RequestParam(required = false) String fragment,
       Authentication authentication,
       Model model) {
+    if ("missions".equals(fragment)) {
+      return missionsFragment(id, page, size, model);
+    }
     try {
       OperationDto operation =
           backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false);
       model.addAttribute("operation", operation);
 
-      PageResponse<MissionListDto> missionsPage =
-          backendApiClient.get(
-              "/api/v1/missions/search?operationId="
-                  + id
-                  + "&page="
-                  + page
-                  + "&size="
-                  + size
-                  + "&sort=plannedStartTime,asc",
-              new ParameterizedTypeReference<PageResponse<MissionListDto>>() {},
-              false);
+      PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
 
@@ -261,6 +259,57 @@ public class OperationPageController {
       return "redirect:/operations";
     }
     return "operation-detail";
+  }
+
+  /**
+   * Renders just the embedded missions sub-table for an AJAX pager swap (REQ-FE-002). Fetches only
+   * the operation (needed for the pagination base URL) and the requested missions page — the
+   * finance/payout round-trips the full page does are skipped. Unlike the full-page load this never
+   * redirects: a backend failure degrades to an empty missions list so the swapped-in fragment
+   * shows its empty state rather than injecting an unrelated redirect target into the sub-table.
+   *
+   * @param id operation id
+   * @param page zero-based page index for the embedded missions table
+   * @param size page size for the embedded missions table
+   * @param model Thymeleaf model populated with {@code operation}, {@code missions} and {@code
+   *     missionsPage}
+   * @return the {@code operation-detail :: missions} fragment view
+   */
+  private String missionsFragment(UUID id, Integer page, Integer size, Model model) {
+    try {
+      model.addAttribute(
+          "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false));
+      PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
+      model.addAttribute("missions", missionsPage.content());
+      model.addAttribute("missionsPage", missionsPage);
+    } catch (Exception e) {
+      log.error("Error loading missions fragment for operation {}", id, e);
+      model.addAttribute("missions", List.of());
+    }
+    return "operation-detail :: missions";
+  }
+
+  /**
+   * Fetches one page of the operation's missions from the backend search endpoint, ordered by
+   * planned start time ascending — the single source of the missions-table query shared by the
+   * full-page render and the {@link #missionsFragment} AJAX swap.
+   *
+   * @param id operation id whose missions to page through
+   * @param page zero-based page index
+   * @param size page size
+   * @return the requested missions page envelope
+   */
+  private PageResponse<MissionListDto> fetchMissionsPage(UUID id, Integer page, Integer size) {
+    return backendApiClient.get(
+        "/api/v1/missions/search?operationId="
+            + id
+            + "&page="
+            + page
+            + "&size="
+            + size
+            + "&sort=plannedStartTime,asc",
+        new ParameterizedTypeReference<PageResponse<MissionListDto>>() {},
+        false);
   }
 
   private static boolean hasMissionManagerRole(Authentication authentication) {
