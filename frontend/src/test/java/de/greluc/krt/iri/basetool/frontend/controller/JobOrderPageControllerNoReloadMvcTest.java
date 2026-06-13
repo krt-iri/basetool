@@ -32,6 +32,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -253,6 +254,62 @@ class JobOrderPageControllerNoReloadMvcTest {
         .perform(delete("/orders/" + orderId).with(csrf()))
         .andExpect(status().isConflict())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+  }
+
+  private static String editBody(UUID materialId) {
+    return "{\"requestingOrgUnitId\":\""
+        + UUID.randomUUID()
+        + "\",\"handle\":\"h\",\"comment\":\"c\",\"version\":1,\"materials\":[{\"materialId\":\""
+        + materialId
+        + "\",\"minQuality\":700,\"amount\":5.0}]}";
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void updateOrderAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(eq("/api/v1/orders/" + orderId), any(), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 4L));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/update")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(editBody(UUID.randomUUID())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(4));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void updateOrderAjax_EmptyMaterials_Returns400WithoutCallingBackend() throws Exception {
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/update")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"handle\":\"h\",\"version\":1,\"materials\":[]}"))
+        .andExpect(status().isBadRequest());
+
+    verify(backendApiClient, never())
+        .put(eq("/api/v1/orders/" + orderId), any(), eq(JobOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER"})
+  void updateOrderAjax_AsPlainMember_Returns403() throws Exception {
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/update")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(editBody(UUID.randomUUID())))
+        .andExpect(status().isForbidden());
   }
 
   @Test

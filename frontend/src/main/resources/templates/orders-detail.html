@@ -38,6 +38,11 @@
     </div>
 
     <div class="hud-box mt-2">
+        <!-- In-place AJAX swap container (#571/#575): the edit modal re-renders this kv-list header
+             (requesting unit / handle / comment + the status select with its fresh @Version) via
+             GET /orders/{id}?fragment=header. The status select's handler is document-delegated and
+             the date spans re-localize on krt:swapped, so both survive the swap. -->
+        <div id="order-header-results"><th:block th:fragment="orderHeader">
         <dl class="kv-list kv-ruled" style="margin-bottom: 2rem;">
             <dt th:text="#{orders.index.id}">ID</dt>
             <dd><span id="order-display-id" th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}"></span></dd>
@@ -100,6 +105,7 @@
                 <dd class="kv-row-wide kv-row-self-start" style="white-space: pre-wrap;" th:text="${order.comment}">Kommentar</dd>
             </th:block>
         </dl>
+        </th:block></div>
 
         <!-- MATERIAL orders: the direct material-requirement table (click a row to expand the
              linked-inventory drill-down). ITEM orders render the ordered-items table plus the
@@ -600,7 +606,7 @@
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="edit-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
         
-        <form th:action="@{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
+        <form id="edit-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
             <input type="hidden" th:field="*{version}">
             
             <div class="form-group mb-1">
@@ -1037,13 +1043,17 @@
 </script>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', () => {
-        const dateSpan = document.getElementById('created-date-span');
-        const daysSpan = document.getElementById('elapsed-days-span');
-        const daysContainer = document.getElementById('elapsed-days-container');
-        const yellowDays = /*[[${ageYellowDays}]]*/ 30;
-        const redDays = /*[[${ageRedDays}]]*/ 90;
-        
+    const ORDER_AGE_YELLOW = /*[[${ageYellowDays}]]*/ 30;
+    const ORDER_AGE_RED = /*[[${ageRedDays}]]*/ 90;
+
+    // Localize the created-date + elapsed-days (kv-list header) and every handover timestamp.
+    // Extracted so it re-runs after a header / handover fragment swap (#575) — it was a one-shot
+    // DOMContentLoaded enhancer, so swapped-in dates would otherwise stay raw ISO strings.
+    function localizeOrderDates(root) {
+        const scope = root || document;
+        const dateSpan = scope.querySelector('#created-date-span');
+        const daysSpan = scope.querySelector('#elapsed-days-span');
+        const daysContainer = scope.querySelector('#elapsed-days-container');
         if (dateSpan && daysSpan) {
             const utcDateStr = dateSpan.getAttribute('data-utc');
             if (utcDateStr) {
@@ -1051,21 +1061,18 @@
                 if (!isNaN(date)) {
                     dateSpan.textContent = date.toLocaleDateString();
                     const now = new Date();
-                    const diffTime = now.getTime() - date.getTime();
-                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
                     daysSpan.textContent = diffDays > 0 ? diffDays : 0;
-                    
                     const targetEl = daysContainer || daysSpan;
-                    if (diffDays >= redDays) {
+                    if (diffDays >= ORDER_AGE_RED) {
                         targetEl.classList.add('text-danger');
-                    } else if (diffDays >= yellowDays) {
+                    } else if (diffDays >= ORDER_AGE_YELLOW) {
                         targetEl.classList.add('text-warning');
                     }
                 }
             }
         }
-        
-        document.querySelectorAll('.handover-time-span').forEach(el => {
+        scope.querySelectorAll('.handover-time-span').forEach(el => {
             const utcDateStr = el.getAttribute('data-utc');
             if (utcDateStr) {
                 const dateObj = new Date(utcDateStr);
@@ -1077,6 +1084,13 @@
                 }
             }
         });
+    }
+    document.addEventListener('krt:swapped', (e) => {
+        localizeOrderDates(e && e.detail ? e.detail.container : document);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        localizeOrderDates(document);
 
         // Material Row Management
         const materialsContainer = document.getElementById('materials-container');
@@ -1263,6 +1277,74 @@
             if (res.ok) {
                 window.location.assign('/orders');
             }
+        });
+    })();
+
+    // Edit order in place (#575): serialize the modal form (header fields + the dynamic material
+    // editor) and krtFetch.write the JSON twin, then re-render the kv-list header and the material
+    // requirement section in place — no reload. The edit modal lives outside both swap containers,
+    // so its material editor survives; its hidden @Version input is patched from the returned order
+    // (the status select gets its fresh version from the header swap). Classic POST is the fallback.
+    const MSG_UPDATE_SUCCESS = '[(#{success.joborder.update})]';
+    const MSG_UPDATE_ERROR = '[(#{error.joborder.update.failed})]';
+    const MSG_MATERIAL_INVALID = '[(#{error.joborder.material.invalid})]';
+    function _serializeEditForm() {
+        const materials = [];
+        document.querySelectorAll('#materials-container .material-row').forEach(function (row) {
+            const matSel = row.querySelector('[name$=".materialId"]');
+            const qualSel = row.querySelector('[name$=".minQuality"]');
+            const amtInput = row.querySelector('[name$=".amount"]');
+            const materialId = matSel ? matSel.value : '';
+            const amount = (amtInput && window.krtScuInput)
+                ? window.krtScuInput.parse(amtInput.value)
+                : (amtInput ? parseFloat(amtInput.value) : NaN);
+            if (!materialId || !(amount > 0)) return;
+            materials.push({
+                materialId: materialId,
+                minQuality: (qualSel && qualSel.value) ? parseInt(qualSel.value, 10) : null,
+                amount: amount
+            });
+        });
+        const versionInput = document.querySelector('#edit-modal input[name="version"]');
+        return {
+            requestingOrgUnitId: (document.getElementById('requestingOrgUnitId') || {}).value || null,
+            handle: (document.getElementById('handle') || {}).value || '',
+            comment: (document.getElementById('edit-comment') || {}).value || '',
+            version: versionInput ? parseInt(versionInput.value, 10) : null,
+            materials: materials
+        };
+    }
+    (function () {
+        const form = document.getElementById('edit-order-form');
+        if (!form) return;
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const orderId = form.getAttribute('data-order-id');
+            if (!orderId || !window.krtFetch) { form.submit(); return; }
+            const payload = _serializeEditForm();
+            if (!payload.materials.length) { showFrontendErrorToast(MSG_MATERIAL_INVALID); return; }
+            await krtOrderWrite({
+                method: 'POST',
+                url: '/orders/' + orderId + '/update',
+                payload: payload,
+                toast: false,
+                errorMessage: MSG_UPDATE_ERROR,
+                onSuccess: function (dto) {
+                    const editVer = document.querySelector('#edit-modal input[name="version"]');
+                    if (editVer && dto && dto.version != null) editVer.value = dto.version;
+                    const modal = document.getElementById('edit-modal');
+                    if (modal) modal.style.display = 'none';
+                    showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
+                    const header = document.getElementById('order-header-results');
+                    if (header && window.krtFetch.swap) {
+                        window.krtFetch.swap({
+                            url: '/orders/' + orderId, container: header,
+                            fragmentValue: 'header', history: false, preserveScroll: true
+                        });
+                    }
+                    _refreshMaterialsSection(orderId);
+                }
+            });
         });
     })();
 

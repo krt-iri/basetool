@@ -409,6 +409,7 @@ public class JobOrderPageController {
       return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
         case "materials" -> "orders-detail :: materialsSection";
         case "aggregated" -> "orders-detail :: aggregatedSection";
+        case "header" -> "orders-detail :: orderHeader";
         default -> "orders-detail";
       };
     }
@@ -1075,6 +1076,57 @@ public class JobOrderPageController {
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
       redirectAttributes.addFlashAttribute("jobOrderForm", form);
       return "redirect:/orders/" + id;
+    }
+  }
+
+  /**
+   * AJAX twin of {@link #updateOrder} (#575): edits a MATERIAL order's requesting unit / handle /
+   * comment / materials and returns the updated order so the detail page can re-render the header +
+   * material sections in place (and pick up the bumped {@code @Version}) instead of a full reload.
+   * Distinguished from the classic form-POST handler by {@code consumes=application/json}; that one
+   * stays the no-JS fallback. An empty material list is a 400 (the client also pre-validates).
+   *
+   * @param id the order to update
+   * @param form the edit payload (requestingOrgUnitId, handle, comment, version, materials[])
+   * @return the updated order on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(
+      value = "/{id}/update",
+      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> updateOrderAjax(
+      @PathVariable UUID id, @RequestBody JobOrderForm form) {
+    List<CreateJobOrderMaterialDto> materials =
+        form.getMaterials().stream()
+            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
+            .map(
+                m ->
+                    new CreateJobOrderMaterialDto(
+                        m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+            .collect(Collectors.toList());
+    if (materials.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderDto dto =
+          new CreateJobOrderDto(
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              materials,
+              form.getVersion());
+      JobOrderDto updated = backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(updated);
+    } catch (BackendServiceException bse) {
+      log.error("Failed to update order {} (ajax): {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to update order {} (ajax)", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
     }
   }
 
