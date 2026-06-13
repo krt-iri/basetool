@@ -199,8 +199,8 @@
                         <label for="bank-create-orgunit" th:text="#{bank.field.orgUnit}">Org-Einheit</label>
                         <select id="bank-create-orgunit" name="orgUnitId" data-testid="bank-create-orgunit">
                             <option value="" th:text="#{bank.field.orgUnit.placeholder}">Org-Einheit w&auml;hlen &hellip;</option>
-                            <option th:each="ou : ${orgUnits}" th:value="${ou.id()}"
-                                    th:text="${ou.name()} + (${ou.shorthand() != null} ? ' (' + ${ou.shorthand()} + ')' : '')">IRIDIUM</option>
+                            <option th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId()}"
+                                    th:text="${ou.orgUnitName()} + (${ou.orgUnitShorthand() != null} ? ' (' + ${ou.orgUnitShorthand()} + ')' : '')">IRIDIUM</option>
                         </select>
                         <span class="bank-field-error" data-error-for="orgUnitId"></span>
                     </div>
