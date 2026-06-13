@@ -58,7 +58,7 @@ class InventoryPageControllerTest {
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
 
-    String view = controller.viewAggregatedInventory(null, null, model);
+    String view = controller.viewAggregatedInventory(null, null, null, model);
 
     assertEquals("inventory-index", view);
     assertTrue(model.containsAttribute("aggregated"));
@@ -71,10 +71,25 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenThrow(new RuntimeException("Backend error"));
 
-    String view = controller.viewAggregatedInventory(null, null, model);
+    String view = controller.viewAggregatedInventory(null, null, null, model);
 
     assertEquals("inventory-index", view);
     assertEquals("error.inventory.aggregate.load", model.getAttribute("error"));
+  }
+
+  @Test
+  void viewAggregatedInventory_fragmentResults_returnsResultsFragmentSelector() {
+    // Given — an AJAX swap request (fragment=results) for in-place pagination (#573).
+    Model model = new ConcurrentModel();
+    PageResponse<AggregatedInventoryDto> page =
+        new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+
+    // When
+    String view = controller.viewAggregatedInventory(null, null, "results", model);
+
+    // Then — only the results fragment is rendered, not the full page.
+    assertEquals("inventory-index :: inventoryResults", view);
   }
 
   @Test

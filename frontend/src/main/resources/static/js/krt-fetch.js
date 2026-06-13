@@ -441,9 +441,27 @@
         });
     }
 
+    /**
+     * Binds the in-container pagination/sort anchor interception WITHOUT performing an
+     * initial fetch — for pagination-only lists (no filter) where nothing else calls
+     * swap() on load. Clicking a contained a.page-btn[href] / a[data-swap][href] then
+     * re-swaps the container in place, reusing the given opts (history, indicator, …).
+     */
+    function bindSwap(opts) {
+        const container =
+            typeof opts.container === 'string'
+                ? document.querySelector(opts.container)
+                : opts.container;
+        if (!container) {
+            return;
+        }
+        bindSwapAnchorInterception(container, opts);
+    }
+
     window.krtFetch = {
         write: write,
         swap: swap,
+        bindSwap: bindSwap,
         syncVersion: syncVersion,
         handleProblem: handleProblem,
         csrf: window.krtCsrf,

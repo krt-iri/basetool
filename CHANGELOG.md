@@ -18,7 +18,7 @@
 
 - **Listenfilter und Seitennavigation (Einsätze, Operationen) laufen jetzt über eine gemeinsame AJAX-Grundlage und aktualisieren nur den Ergebnisbereich.** Das Blättern in den gefilterten Ergebnissen lädt nicht mehr die ganze Seite neu.
 
-- **Weitere Listen filtern und blättern jetzt ohne Seitenneuladen: Bank-Audit-Log, Mitgliederverwaltung, Raffinerieaufträge und die Staffel-Hangarübersicht** (inkl. Suche, Seitengröße und Seitennavigation). Gefilterte/geblätterte Listen (Einsätze, Operationen, Bank-Audit, Mitglieder, Raffinerieaufträge, Staffel-Hangar) halten den Filter beim Neuladen der Seite (die URL bleibt in Sync) und springen nicht mehr an den Seitenanfang; Zeitstempel in nachgeladenen Tabellenzeilen werden jetzt ebenfalls in lokale Zeit umgerechnet.
+- **Weitere Listen filtern und blättern jetzt ohne Seitenneuladen: Bank-Audit-Log, Mitgliederverwaltung, Raffinerieaufträge, die Staffel-Hangarübersicht und die Lager-Gesamtübersicht** (inkl. Suche, Seitengröße und Seitennavigation, soweit vorhanden). Gefilterte/geblätterte Listen (Einsätze, Operationen, Bank-Audit, Mitglieder, Raffinerieaufträge, Staffel-Hangar, Lagerübersicht) halten den Filter beim Neuladen der Seite (die URL bleibt in Sync) und springen nicht mehr an den Seitenanfang; Zeitstempel in nachgeladenen Tabellenzeilen werden jetzt ebenfalls in lokale Zeit umgerechnet.
 
 ### Removed
 
