@@ -73,4 +73,19 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
               + "   GROUP BY p.account_id, p.holder_id HAVING SUM(p.amount) <> 0)",
       nativeQuery = true)
   List<UUID> findReversalTransactionsNotMirrored();
+
+  /**
+   * Integrity check (REQ-BANK-020): ids of audited transactions that lack their mandatory audit row
+   * (REQ-BANK-012). {@code WIPE_RESET} transactions are excluded by design — a wipe writes a single
+   * summarizing {@code WIPE_RESET_EXECUTED} event for the whole run, not one audit row per
+   * generated {@code WIPE_RESET} transaction; every other transaction type carries its own audit
+   * row that references it.
+   *
+   * @return the violating transaction ids (empty when every audited type has its row)
+   */
+  @Query(
+      "SELECT t.id FROM BankTransaction t WHERE t.type <>"
+          + " de.greluc.krt.iri.basetool.backend.model.BankTransactionType.WIPE_RESET"
+          + " AND NOT EXISTS (SELECT 1 FROM BankAuditEvent e WHERE e.transactionId = t.id)")
+  List<UUID> findTransactionsWithoutAuditEvent();
 }

@@ -31,11 +31,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Verifies the append-only bank ledger's invariants (REQ-BANK-020, epic #556 Phase 5): no negative
- * account balance, no negative holder sub-balance, every {@code TRANSFER} nets to zero, and every
- * {@code REVERSAL} is the negated mirror of the transaction it reverses (ADR-0010). Pure reads — it
- * never mutates the ledger. Violations are reported as {@code ERROR} log lines (carrying the
- * correlation id of the run) so monitoring can alert; the returned {@link IntegrityReport} lets
- * tests and callers inspect the findings.
+ * account balance, no negative holder sub-balance, every {@code TRANSFER} nets to zero, every
+ * {@code REVERSAL} is the negated mirror of the transaction it reverses (ADR-0010), and every
+ * audited transaction carries its audit row (REQ-BANK-012; {@code WIPE_RESET} is summarized once,
+ * not per row). Pure reads — it never mutates the ledger. Violations are reported as {@code ERROR}
+ * log lines (carrying the correlation id of the run) so monitoring can alert; the returned {@link
+ * IntegrityReport} lets tests and callers inspect the findings.
  */
 @Service
 @RequiredArgsConstructor
@@ -53,12 +54,15 @@ public class BankLedgerIntegrityService {
    * @param unbalancedTransfers transfer transaction ids whose legs do not sum to zero
    * @param brokenReversals reversal transaction ids that are not the negated mirror of their
    *     original
+   * @param transactionsWithoutAudit ids of audited transaction types that lack their mandatory
+   *     audit row (REQ-BANK-012); {@code WIPE_RESET} is excluded (summarized once, not per row)
    */
   public record IntegrityReport(
       @NotNull List<UUID> negativeAccountBalances,
       @NotNull List<Object[]> negativeHolderBalances,
       @NotNull List<UUID> unbalancedTransfers,
-      @NotNull List<UUID> brokenReversals) {
+      @NotNull List<UUID> brokenReversals,
+      @NotNull List<UUID> transactionsWithoutAudit) {
 
     /**
      * Whether the ledger is sound (no violation in any category).
@@ -69,7 +73,8 @@ public class BankLedgerIntegrityService {
       return negativeAccountBalances.isEmpty()
           && negativeHolderBalances.isEmpty()
           && unbalancedTransfers.isEmpty()
-          && brokenReversals.isEmpty();
+          && brokenReversals.isEmpty()
+          && transactionsWithoutAudit.isEmpty();
     }
 
     /**
@@ -81,7 +86,8 @@ public class BankLedgerIntegrityService {
       return negativeAccountBalances.size()
           + negativeHolderBalances.size()
           + unbalancedTransfers.size()
-          + brokenReversals.size();
+          + brokenReversals.size()
+          + transactionsWithoutAudit.size();
     }
   }
 
@@ -99,10 +105,16 @@ public class BankLedgerIntegrityService {
     List<UUID> unbalancedTransfers =
         bankTransactionRepository.findTransferTransactionsWithNonZeroSum();
     List<UUID> brokenReversals = bankTransactionRepository.findReversalTransactionsNotMirrored();
+    List<UUID> transactionsWithoutAudit =
+        bankTransactionRepository.findTransactionsWithoutAuditEvent();
 
     IntegrityReport report =
         new IntegrityReport(
-            negativeAccounts, negativeHolders, unbalancedTransfers, brokenReversals);
+            negativeAccounts,
+            negativeHolders,
+            unbalancedTransfers,
+            brokenReversals,
+            transactionsWithoutAudit);
 
     if (report.isSound()) {
       log.debug("Bank ledger integrity check passed — no violations.");
@@ -127,6 +139,9 @@ public class BankLedgerIntegrityService {
           "Bank integrity violation: reversal transaction {} is not the negated mirror of its"
               + " original",
           transactionId);
+    }
+    for (UUID transactionId : transactionsWithoutAudit) {
+      log.error("Bank integrity violation: transaction {} has no audit row", transactionId);
     }
     log.error("Bank ledger integrity check found {} violation(s).", report.violationCount());
     return report;

@@ -67,8 +67,9 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
       Pageable pageable);
 
   /**
-   * Probes whether a transaction has its audit row — the integrity job's "audit row exists for
-   * every transaction" invariant (REQ-BANK-020).
+   * Probes whether a transaction has its audit row — a targeted helper for tests and callers. The
+   * scheduled integrity sweep uses the set-based {@code
+   * BankTransactionRepository#findTransactionsWithoutAuditEvent()} instead (REQ-BANK-012/-020).
    *
    * @param transactionId the transaction id
    * @return {@code true} when an audit event references the transaction

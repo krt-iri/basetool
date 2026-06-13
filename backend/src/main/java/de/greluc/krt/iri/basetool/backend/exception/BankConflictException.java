@@ -69,6 +69,13 @@ public class BankConflictException extends RuntimeException {
   /** Booking attempt naming a deactivated holder (REQ-BANK-003). */
   public static final String CODE_BANK_HOLDER_INACTIVE = "BANK_HOLDER_INACTIVE";
 
+  /**
+   * Reversal attempt on a transaction that is not itself reversible — a {@code WIPE_RESET} (a
+   * deliberate end-state) or a {@code REVERSAL} (a mistake is corrected by reversing the original,
+   * never the correction). REQ-BANK-004.
+   */
+  public static final String CODE_BANK_NOT_REVERSIBLE = "BANK_NOT_REVERSIBLE";
+
   /** The stable machine-readable problem code, one of the {@code CODE_BANK_*} constants. */
   private final String code;
 

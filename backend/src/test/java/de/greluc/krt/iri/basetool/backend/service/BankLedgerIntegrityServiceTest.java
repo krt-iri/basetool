@@ -141,6 +141,45 @@ class BankLedgerIntegrityServiceTest {
         "the one-legged transfer must be flagged as not summing to zero");
   }
 
+  @Test
+  void verify_flagsATransactionWithoutAnAuditRow() {
+    // Given: a DEPOSIT transaction inserted raw, bypassing the audit write (REQ-BANK-012)
+    BankTransaction tx =
+        transactionRepository.save(
+            BankTransaction.builder()
+                .type(BankTransactionType.DEPOSIT)
+                .createdAt(Instant.now())
+                .build());
+
+    // When
+    BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
+
+    // Then
+    assertTrue(
+        report.transactionsWithoutAudit().contains(tx.getId()),
+        "an audited transaction type without its audit row must be flagged");
+  }
+
+  @Test
+  void verify_excludesWipeResetFromTheAuditRowInvariant() {
+    // Given: a WIPE_RESET transaction with no per-transaction audit row — a wipe is audited once
+    // with a summarizing event, not per generated transaction (REQ-BANK-013)
+    BankTransaction wipe =
+        transactionRepository.save(
+            BankTransaction.builder()
+                .type(BankTransactionType.WIPE_RESET)
+                .createdAt(Instant.now())
+                .build());
+
+    // When
+    BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
+
+    // Then
+    assertFalse(
+        report.transactionsWithoutAudit().contains(wipe.getId()),
+        "WIPE_RESET transactions are summarized once, not flagged per row");
+  }
+
   private BankAccount newAccount(String name) {
     BankAccount a = new BankAccount();
     a.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));

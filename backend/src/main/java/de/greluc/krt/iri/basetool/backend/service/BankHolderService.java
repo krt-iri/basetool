@@ -145,12 +145,7 @@ public class BankHolderService {
           saved.getUser() != null ? saved.getUser().getId() : null,
           saved.getHandle());
     }
-    BigDecimal total =
-        postingRepository.holderTotals().stream()
-            .filter(t -> t.holderId().equals(holderId))
-            .map(BankHolderBalance::amount)
-            .findFirst()
-            .orElse(BigDecimal.ZERO);
+    BigDecimal total = postingRepository.holderTotal(holderId);
     return bankHolderMapper.toDto(saved, total, 0L);
   }
 }

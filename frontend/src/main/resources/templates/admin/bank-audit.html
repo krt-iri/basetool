@@ -27,7 +27,7 @@
     <div class="greeting hud-box">
         <h1 th:text="#{admin.bank.audit.title}">Bank-Audit-Log</h1>
         <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
-           th:text="#{admin.bank.audit.subtitle}">Jede Bank-Mutation, lückenlos protokolliert.</p>
+           th:text="#{admin.bank.audit.subtitle}">Jede Bank-Mutation, l&uuml;ckenlos protokolliert.</p>
     </div>
 
     <div th:if="${error != null}" class="hud-box mt-2" style="border-color: var(--color-danger);"
@@ -71,7 +71,7 @@
             <button type="submit" class="btn btn--cta" data-testid="bank-audit-filter-apply"
                     th:text="#{admin.bank.audit.filter.apply}">Filtern</button>
             <a th:href="@{/admin/bank-audit}" class="btn btn-ghost"
-               th:text="#{admin.bank.audit.filter.reset}">Zurücksetzen</a>
+               th:text="#{admin.bank.audit.filter.reset}">Zur&uuml;cksetzen</a>
         </div>
     </form>
 
