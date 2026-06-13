@@ -410,6 +410,7 @@ public class JobOrderPageController {
         case "materials" -> "orders-detail :: materialsSection";
         case "aggregated" -> "orders-detail :: aggregatedSection";
         case "header" -> "orders-detail :: orderHeader";
+        case "handovers" -> "orders-detail :: materialHandoverSection";
         default -> "orders-detail";
       };
     }
@@ -1359,6 +1360,134 @@ public class JobOrderPageController {
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
     }
     return "redirect:/orders/" + id;
+  }
+
+  /**
+   * Parses the client-supplied handover time (a UTC ISO-Instant produced by datetime-splitter.js),
+   * falling back to local-datetime parsing and finally {@code now()} so a malformed value never
+   * blocks the handover. Extracted so the AJAX handover twins share the classic handlers' exact
+   * timezone handling.
+   *
+   * @param raw the raw {@code handoverTime} form value (may be null/blank)
+   * @return the parsed instant, or {@code Instant.now()} when absent/unparseable
+   */
+  private Instant parseHandoverTime(String raw) {
+    if (raw != null && !raw.isBlank()) {
+      try {
+        return Instant.parse(raw);
+      } catch (Exception eiso) {
+        try {
+          return LocalDateTime.parse(raw, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+              .atZone(ZoneId.systemDefault())
+              .toInstant();
+        } catch (Exception elocal) {
+          log.warn("Could not parse handoverTime {}, using now()", raw);
+        }
+      }
+    }
+    return Instant.now();
+  }
+
+  /**
+   * AJAX twin of {@link #createHandover} (#575): records a material handover and returns the
+   * refreshed order so the detail page can re-render the material requirement table, the handover
+   * history and the header (status + bumped {@code @Version}) in place instead of a full reload.
+   * The backend's {@code …WithinTransaction} bulk-update pattern is unchanged (one proxied call).
+   * Empty items → 400 (the client pre-validates); other failures propagate RFC 7807. Classic POST
+   * kept.
+   *
+   * @param id the order id
+   * @param form the handover payload (handoverTime, recipientHandle, recipientSquadron, items[])
+   * @return the refreshed order on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(
+      value = "/{id}/handovers",
+      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createHandoverAjax(
+      @PathVariable UUID id, @RequestBody JobOrderHandoverForm form) {
+    List<JobOrderHandoverItemCreateDto> items =
+        form.getItems().stream()
+            .filter(
+                item ->
+                    item.getInventoryItemId() != null
+                        && item.getAmount() != null
+                        && item.getAmount() > 0)
+            .map(
+                item ->
+                    new JobOrderHandoverItemCreateDto(item.getInventoryItemId(), item.getAmount()))
+            .collect(Collectors.toList());
+    if (items.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      JobOrderHandoverCreateDto dto =
+          new JobOrderHandoverCreateDto(
+              parseHandoverTime(form.getHandoverTime()),
+              form.getRecipientHandle(),
+              form.getRecipientSquadron(),
+              items);
+      backendApiClient.post("/api/v1/orders/" + id + "/handovers", dto, JobOrderHandoverDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(order);
+    } catch (BackendServiceException bse) {
+      de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+          log, "POST /api/v1/orders/{id}/handovers (ajax)", id, bse);
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create handover (ajax) for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * AJAX twin of {@link #createItemHandover} (#575): records an item handover and returns the
+   * refreshed order so the detail page can re-render the ordered-items table
+   * (delivered/outstanding), the item-handover history, the modal (rows for the still-outstanding
+   * lines) and the header in place. Empty entries → 400; other failures propagate RFC 7807. Classic
+   * POST kept as the no-JS fallback.
+   *
+   * @param id the item order id
+   * @param form the item-handover payload (handoverTime, recipientHandle, entries[])
+   * @return the refreshed order on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(
+      value = "/{id}/item-handovers",
+      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createItemHandoverAjax(
+      @PathVariable UUID id, @RequestBody JobOrderItemHandoverForm form) {
+    List<JobOrderItemHandoverEntryCreateDto> entries =
+        form.getEntries().stream()
+            .filter(
+                e -> e.getJobOrderItemId() != null && e.getAmount() != null && e.getAmount() > 0)
+            .map(e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
+            .collect(Collectors.toList());
+    if (entries.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      JobOrderItemHandoverCreateDto dto =
+          new JobOrderItemHandoverCreateDto(
+              parseHandoverTime(form.getHandoverTime()), form.getRecipientHandle(), entries);
+      backendApiClient.post(
+          "/api/v1/orders/" + id + "/item-handovers", dto, JobOrderItemHandoverDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(order);
+    } catch (BackendServiceException bse) {
+      de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+          log, "POST /api/v1/orders/{id}/item-handovers (ajax)", id, bse);
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create item handover (ajax) for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
   }
 
   /**

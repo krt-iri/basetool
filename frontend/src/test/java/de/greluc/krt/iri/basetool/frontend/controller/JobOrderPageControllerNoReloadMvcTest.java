@@ -312,6 +312,78 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isForbidden());
   }
 
+  private static String handoverBody(UUID inventoryItemId) {
+    return "{\"handoverTime\":\"2026-04-25T10:00:00Z\",\"recipientHandle\":\"r\","
+        + "\"recipientSquadron\":\"\",\"items\":[{\"inventoryItemId\":\""
+        + inventoryItemId
+        + "\",\"amount\":5.0}]}";
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void createHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 3L));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/handovers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(handoverBody(UUID.randomUUID())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(3));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void createHandoverAjax_EmptyItems_Returns400() throws Exception {
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/handovers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recipientHandle\":\"r\",\"items\":[]}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER"})
+  void createHandoverAjax_AsPlainMember_Returns403() throws Exception {
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/handovers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(handoverBody(UUID.randomUUID())))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void createItemHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 6L));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/item-handovers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"handoverTime\":\"2026-04-25T10:00:00Z\",\"recipientHandle\":\"r\",\"entries\":[{\"jobOrderItemId\":\""
+                        + UUID.randomUUID()
+                        + "\",\"amount\":2}]}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(6));
+  }
+
   @Test
   void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
     UUID orderId = UUID.randomUUID();

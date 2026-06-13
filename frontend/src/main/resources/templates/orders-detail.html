@@ -490,6 +490,11 @@
         <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
              phase; for now the material-specific handover protocol is hidden for item orders. -->
         <th:block th:if="${order.type != 'ITEM'}">
+        <!-- In-place AJAX swap container (#575): a material handover re-renders this section (the
+             handover history gains a row) via GET /orders/{id}?fragment=handovers. The "Übergabe
+             protokollieren" button + the per-row report-download are document-delegated, so they
+             survive the swap; the requirement table and header are swapped separately. -->
+        <div id="order-handovers-results"><th:block th:fragment="materialHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -540,6 +545,7 @@
                 </table>
             </div>
         </div>
+        </th:block></div>
         </th:block>
 
         <!-- ITEM orders: handover workflow. Logisticians log per-line whole-unit deliveries; the
@@ -782,7 +788,7 @@
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="handover-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
 
-        <form data-testid="order-handover-form" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
+        <form data-testid="order-handover-form" id="handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                 <label for="handoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
@@ -883,6 +889,31 @@
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     let cachedInventoryItems = [];
     let isInventoryCached = false;
+
+    const MSG_HANDOVER_SUCCESS = '[(#{success.joborder.handover})]';
+    const MSG_HANDOVER_FAILED = '[(#{error.joborder.handover.failed})]';
+    const MSG_HANDOVER_NOITEMS = '[(#{error.joborder.handover.noitems})]';
+
+    // Serialize the material-handover modal form to the JSON its AJAX twin binds (#575).
+    function _serializeHandoverForm() {
+        const items = [];
+        document.querySelectorAll('#handover-items-container .handover-item-row').forEach(function (row) {
+            const sel = row.querySelector('select[name$=".inventoryItemId"]');
+            const amtInput = row.querySelector('input[name$=".amount"]');
+            const inventoryItemId = sel ? sel.value : '';
+            const amount = (amtInput && window.krtScuInput)
+                ? window.krtScuInput.parse(amtInput.value)
+                : (amtInput ? parseFloat(amtInput.value) : NaN);
+            if (!inventoryItemId || !(amount > 0)) return;
+            items.push({ inventoryItemId: inventoryItemId, amount: amount });
+        });
+        return {
+            handoverTime: (document.getElementById('handoverTime') || {}).value || '',
+            recipientHandle: (document.getElementById('recipientHandle') || {}).value || '',
+            recipientSquadron: (document.getElementById('recipientSquadron') || {}).value || '',
+            items: items
+        };
+    }
 
     async function openHandoverModal() {
         document.getElementById('handover-modal').style.display = 'flex';
@@ -1023,12 +1054,45 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const handoverForm = document.querySelector('#handover-modal form');
+        const handoverForm = document.getElementById('handover-form');
         if (handoverForm) {
-            handoverForm.addEventListener('submit', (e) => {
-                if (!validateHandoverAmounts()) {
-                    e.preventDefault();
+            handoverForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!validateHandoverAmounts()) return;
+                const orderId = handoverForm.getAttribute('data-order-id');
+                if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
+                    handoverForm.submit();
+                    return;
                 }
+                const payload = _serializeHandoverForm();
+                if (!payload.items.length) { showFrontendErrorToast(MSG_HANDOVER_NOITEMS); return; }
+                await krtOrderWrite({
+                    method: 'POST',
+                    url: '/orders/' + orderId + '/handovers',
+                    payload: payload,
+                    toast: false,
+                    errorMessage: MSG_HANDOVER_FAILED,
+                    onSuccess: function (order) {
+                        // Patch the edit-modal @Version (the handover may auto-complete + bump it);
+                        // the status select gets its fresh version from the header swap below.
+                        const editVer = document.querySelector('#edit-modal input[name="version"]');
+                        if (editVer && order && order.version != null) editVer.value = order.version;
+                        const modal = document.getElementById('handover-modal');
+                        if (modal) modal.style.display = 'none';
+                        // The handover spent stock → the cached inventory + the modal's rows are
+                        // stale; drop them so a reopen re-fetches and starts clean.
+                        isInventoryCached = false;
+                        cachedInventoryItems = [];
+                        const itemsContainer = document.getElementById('handover-items-container');
+                        if (itemsContainer) itemsContainer.innerHTML = '';
+                        showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
+                        // Re-render the requirement table (stock/status), the handover history (new
+                        // row) and the header (status select + version, if the order auto-completed).
+                        _refreshMaterialsSection(orderId);
+                        _swapOrderSection(orderId, 'order-handovers-results', 'handovers');
+                        _swapOrderSection(orderId, 'order-header-results', 'header');
+                    }
+                });
             });
         }
         const itemHandoverForm = document.querySelector('#item-handover-modal form');
@@ -1380,6 +1444,18 @@
             fragmentValue: mat ? 'materials' : 'aggregated',
             history: false,
             preserveScroll: true
+        });
+    }
+
+    // Swap one order-detail section by container id + fragment value (#575). Used by the handover
+    // flow to re-render the handover history + the header (status select carrying the fresh
+    // @Version) in place.
+    function _swapOrderSection(orderId, containerId, fragmentValue) {
+        const c = document.getElementById(containerId);
+        if (!c || !orderId || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
+        return window.krtFetch.swap({
+            url: '/orders/' + orderId, container: c, fragmentValue: fragmentValue,
+            history: false, preserveScroll: true
         });
     }
 
