@@ -299,6 +299,15 @@
             <!-- No jump cards: every aggregate (Teilnehmer/Finanzen/Wirtschaft) is reachable via
                  the tab nav itself, duplicate cards added no information (owner feedback). -->
         </section>
+        <!-- Section-refresh error fragment (#574 review must-fix): returned with HTTP 200 by
+             GET /missions/{id}?fragment=… when the backend read fails, so an in-place swap paints
+             a section-sized inline notice instead of a full-page redirect being followed into the
+             small #…-results container. Held in an inert <template> so it never shows in the normal
+             full-page render; the fragment selector extracts only the inner <p>, which krtFetch.swap
+             then injects. Renders from message bundles only (no model attributes). -->
+        <template>
+            <p th:fragment="fragmentError" class="desc" role="alert" th:text="#{mission.section.refresh.error}">The section could not be refreshed. Please reload the page.</p>
+        </template>
         <!-- ================= Tab 2: Teilnehmer & Einheiten (crew board) ================= -->
         <section th:unless="${isNew}" id="pane-crew" class="tab-pane" role="tabpanel" aria-labelledby="tab-crew">
             <!-- In-place AJAX swap container (epic #571 / #574): a crew sub-mutation re-renders this
@@ -1432,6 +1441,7 @@
         'mission.conflict.section.core': /*[[#{mission.conflict.section.core}]]*/ 'Core data',
         'mission.conflict.section.schedule': /*[[#{mission.conflict.section.schedule}]]*/ 'Schedule',
         'mission.conflict.section.flags': /*[[#{mission.conflict.section.flags}]]*/ 'Flags',
+        'mission.section.refresh.error': /*[[#{mission.section.refresh.error}]]*/ 'The section could not be refreshed. Please reload the page.',
         'mission.conflict.action.reload': /*[[#{mission.conflict.action.reload}]]*/ 'Load current values',
         'mission.conflict.action.reload.question': /*[[#{mission.conflict.action.reload.question}]]*/ 'Load current values?',
         'mission.conflict.action.dismiss': /*[[#{mission.conflict.action.dismiss}]]*/ 'Dismiss'
@@ -1506,7 +1516,13 @@
                 container: cfg.container,
                 fragmentValue: cfg.fragmentValue,
                 history: false,
-                preserveScroll: true
+                preserveScroll: true,
+                // Surfaced as a toast when a swap bails on a redirect/non-OK response (e.g. an
+                // expired session bounced to the login page): krtFetch.swap then leaves the
+                // stale section untouched rather than painting a full page into the container.
+                errorMessage:
+                    (window.MISSION_SUBRES_I18N
+                        && window.MISSION_SUBRES_I18N['mission.section.refresh.error']) || ''
             });
         }));
     };
@@ -1818,6 +1834,9 @@
             // The delete openers live across the crew board and finance pane (both re-rendered by an
             // in-place swap) plus the static admin area; re-bind on krt:swapped with a dataset guard
             // so swapped-in buttons get wired without double-binding the persistent ones (#571/#574).
+            // NOTE: .delete-crew-btn (and the data-sub-section="crew" branches below + in the shared
+            // delete-confirm submit handler) currently match nothing — crew removal happens via
+            // drag-to-pool in moveParticipant() — and are kept as a dormant forward-compatible hook.
             function bindDeleteOpeners() {
             document.querySelectorAll('.delete-participant-btn, .delete-unit-btn, .delete-crew-btn, .delete-mission-btn, .delete-finance-btn').forEach(btn => {
                 if (btn.dataset.delBound) return;
@@ -3022,6 +3041,11 @@
             }
         }
 
+        // Refreshes the 'crew' section only — NOT ['crew','finance'] like the other participant
+        // writes. A crew move mutates the Crew join entities, not the Participant entity, so the
+        // participant's @Version is unchanged and the payout <tr> in #finance-results (which carries
+        // data-version=${p.version}) stays in sync without a re-render. If a future backend change
+        // ever bumps the Participant @Version on a crew move, switch this to ['crew','finance'].
         async function moveParticipant(row, zone) {
             if (!window.krtMissionWrite || !window.missionId) return;
             const participantId = row.getAttribute('data-participant-id');
@@ -3111,7 +3135,8 @@
         });
         board.addEventListener('dragleave', function (e) {
             const zone = e.target.closest('.drop-zone');
-            if (zone) zone.classList.remove('is-over');
+            if (!zone || !board.contains(zone)) return;
+            zone.classList.remove('is-over');
         });
         board.addEventListener('drop', function (e) {
             const zone = e.target.closest('.drop-zone');

@@ -678,6 +678,14 @@ public class MissionPageController {
 
     } catch (Exception e) {
       log.error("Error loading mission details", e);
+      if (fragment != null) {
+        // In-place fragment path (#571/#574): a redirect here would be followed by
+        // krtFetch.swap and the whole /missions page painted into the small section
+        // container. Answer with a section-sized inline error fragment instead — the swap
+        // renders it in place. (An expired-session login redirect happens in the security
+        // filter before this controller; krtFetch.swap catches that via res.redirected.)
+        return "mission-detail :: fragmentError";
+      }
       model.addAttribute("error", "error.mission.details.load");
       return "redirect:/missions?error=error.mission.details.load";
     }
@@ -778,6 +786,7 @@ public class MissionPageController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/party-lead")
+  @PreAuthorize("isAuthenticated()")
   public String setPartyLead(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) UUID userId,
@@ -824,14 +833,13 @@ public class MissionPageController {
    *     empty {@code userId}+{@code guestName} clears the lead
    * @return {@code 200} with the refreshed mission, or the upstream RFC 7807 error passed through
    */
-  @org.springframework.web.bind.annotation.PutMapping(
+  @PutMapping(
       value = "/{id}/party-lead/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> setPartyLeadAjax(
-      @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Map<String, Object> out = new HashMap<>();
       Object userId = body.get("userId");

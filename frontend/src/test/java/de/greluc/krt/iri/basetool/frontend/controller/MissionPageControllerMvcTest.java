@@ -2237,6 +2237,28 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"board-pool\""))));
   }
 
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_FragmentBackendError_RendersInlineErrorFragmentNotRedirect() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    // The backend read fails mid-swap (circuit-breaker open / timeout / 5xx). The fragment path
+    // must answer with a section-sized inline error fragment (HTTP 200), never the classic
+    // redirect:/missions — krtFetch.swap would otherwise follow the 302 and paint the whole
+    // missions page into the small #crew-board-results container (#574 review must-fix).
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenThrow(new RuntimeException("backend unavailable"));
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "crew-board"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: fragmentError"))
+        .andExpect(content().string(containsString("role=\"alert\"")))
+        // Section-sized: no page chrome, no full board markup.
+        .andExpect(content().string(not(containsString("mission-head-sticky"))))
+        .andExpect(content().string(not(containsString("id=\"board-pool\""))));
+  }
+
   // --- #574: party-lead AJAX endpoint ------------------------------------
 
   @Test

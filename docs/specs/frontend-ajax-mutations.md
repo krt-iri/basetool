@@ -101,6 +101,11 @@ navigation while filtering did not.
 - [ ] Changing a filter swaps the results without navigating.
 - [ ] Clicking a pagination/sort control inside the results container swaps in place (no full page
   load) and preserves the active filter query.
+- [ ] A swap whose GET is **redirected** (e.g. an expired session bounced to the login page) or
+  returns a **non-OK** status does not inject the body: `krtFetch.swap` bails, leaves the stale
+  container untouched, surfaces an optional caller-supplied error toast, and never paints a whole
+  page into the small results container. On a backend read failure the mission-detail fragment
+  branch returns a **section-sized inline error fragment (HTTP 200)**, not a `redirect:/missions`.
 
 The same fragment-swap mechanism also re-renders **non-list page sections** after a sub-mutation
 when an in-place DOM patch would be too fragile (structural add/delete, server-derived render state,
