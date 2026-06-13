@@ -37,7 +37,7 @@
 
     /**
      * Builds the JSON + CSRF request headers from the page's meta tags (same
-     * convention as mission-subresource.js).
+     * convention as krt-fetch.js; bank.js is migrated onto krtCsrf in #579).
      *
      * @returns {Object<string,string>} headers for a same-origin JSON fetch
      */

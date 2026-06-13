@@ -72,8 +72,8 @@ class SecurityConfigStaticAssetPermitAllTest {
    * The asset paths exercised here cover the reasons such a request can show up in the wild:
    *
    * <ul>
-   *   <li>{@code /js/vendor/dompurify-3.4.2.min.js.map} — DevTools sourcemap lookup against a
-   *       vendor bundle shipped without sourcemaps.
+   *   <li>{@code /js/vendor/example-1.0.0.min.js.map} — DevTools sourcemap lookup for a {@code
+   *       /js/vendor/} bundle path that 404s (vendored bundles ship without sourcemaps).
    *   <li>{@code /sm/abcdef123456.map} — Sentry-Replay / browser-extension sourcemap probe with
    *       arbitrary hash.
    *   <li>{@code /favicon.ico} — no favicon shipped in {@code static/}.
@@ -94,7 +94,7 @@ class SecurityConfigStaticAssetPermitAllTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "/js/vendor/dompurify-3.4.2.min.js.map",
+        "/js/vendor/example-1.0.0.min.js.map",
         "/sm/abcdef123456.map",
         "/favicon.ico",
         "/robots.txt",

@@ -48,7 +48,7 @@
 
             <dt class="kv-row-self-start" th:text="#{profile.custom_data}">Custom Data</dt>
             <dd>
-                <form th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}">
+                <form id="profile-description-form" th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}">
                     <input type="hidden" name="version" th:field="*{version}">
                     <div class="form-group">
                         <label for="displayName" class="form-label" th:text="#{profile.display_name}">Display Name</label>
@@ -88,9 +88,63 @@
         </div>
     </div>
 </main>
-<script th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function() {
-    });
+<!-- KRT toast / confirm infrastructure (showFrontendSuccessToast / showFrontendErrorToast /
+     showKrtConfirm) used by the in-place description save below. -->
+<th:block th:replace="~{fragments/toast :: toast}" />
+<!--
+  In-place description save (epic #571, REQ-FE-001). Intercepts the description form submit and
+  routes it through window.krtFetch.write — no page navigation on success. The form keeps its
+  th:action/method=post so a script-disabled browser still posts and hits the redirect handler
+  (ProfileController#updateDescription), i.e. progressive enhancement with a no-JS fallback.
+-->
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    (function () {
+        'use strict';
+        var form = document.getElementById('profile-description-form');
+        if (!form || !window.krtFetch) {
+            return;
+        }
+        var i18n = {
+            saved: /*[[#{frontend.ajax.saved}]]*/ 'Saved successfully.',
+            error: /*[[#{error.profile.update.failed}]]*/ 'Update failed.',
+            conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
+            conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
+            conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
+            conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
+            conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
+        };
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var versionInput = form.querySelector('input[name="version"]');
+            window.krtFetch.write({
+                method: 'POST',
+                url: form.getAttribute('action'),
+                payload: {
+                    description: form.querySelector('#description').value,
+                    displayName: form.querySelector('#displayName').value,
+                    version: versionInput ? Number(versionInput.value) : 0
+                },
+                successMessage: i18n.saved,
+                errorMessage: i18n.error,
+                conflict: {
+                    title: i18n.conflictTitle,
+                    reloadLabel: i18n.conflictReload,
+                    dismissLabel: i18n.conflictDismiss,
+                    reloadQuestion: i18n.conflictQuestion,
+                    reloadDetailFallback: i18n.conflictDetail
+                },
+                onSuccess: function (body) {
+                    if (body && body.version != null) {
+                        // The description form and the payout-preference form share one user-row
+                        // version; sync both hidden inputs so the next save does not 409.
+                        document.querySelectorAll('input[name="version"]').forEach(function (input) {
+                            input.value = String(body.version);
+                        });
+                    }
+                }
+            });
+        });
+    })();
 </script>
 </body>
 </html>

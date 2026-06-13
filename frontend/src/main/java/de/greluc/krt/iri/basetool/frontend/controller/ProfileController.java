@@ -26,11 +26,17 @@ import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
@@ -39,6 +45,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -58,6 +65,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class ProfileController {
 
   private final BackendApiClient backendApiClient;
+  private final MessageSource messageSource;
 
   @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}")
   private String issuerUri;
@@ -226,6 +234,71 @@ public class ProfileController {
   }
 
   /**
+   * AJAX variant of {@link #updateDescription}: performs the same update but answers with JSON
+   * instead of a redirect, so the profile page saves in place (epic #571, REQ-FE-001). It is
+   * selected over the form handler only for the {@code krtFetch.write} call, which sends {@code
+   * X-Requested-With: XMLHttpRequest} with a JSON body; a script-disabled browser still posts the
+   * HTML form and lands on {@link #updateDescription}, so the redirect path stays the no-JS
+   * fallback.
+   *
+   * <p>On success the user row's bumped {@code version} is read back from {@code /me} and returned
+   * so the client can write it into every {@code version} field on the page — the description form
+   * and the payout-preference form share one row version, so without this the next save would 409.
+   * A backend 409 with problem type {@code concurrency-conflict} is mapped to an {@code
+   * OPTIMISTIC_LOCK}-coded 409 so {@code krtFetch} shows the reload-confirm; validation errors map
+   * to 400 and any other failure to a 5xx, each carrying a localized {@code detail}.
+   *
+   * @param form validated JSON payload (description, displayName, version)
+   * @param bindingResult validation-errors carrier for the bound JSON body
+   * @param principal authenticated OIDC user
+   * @return 200 with {@code {version, description, displayName}} on success; otherwise a 4xx/5xx
+   *     body carrying a localized {@code detail} (plus a {@code code} for the optimistic-lock case)
+   */
+  @PostMapping(
+      value = "/profile/description",
+      headers = "X-Requested-With=XMLHttpRequest",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity<Map<String, Object>> updateDescriptionAjax(
+      @Valid @RequestBody ProfileDescriptionForm form,
+      BindingResult bindingResult,
+      @AuthenticationPrincipal OidcUser principal) {
+    if (principal == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    }
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
+    }
+    try {
+      backendApiClient.put(
+          "/api/v1/users/me/description",
+          Map.of(
+              "description", form.description() == null ? "" : form.description(),
+              "displayName", form.displayName() == null ? "" : form.displayName(),
+              "version", form.version() == null ? 0L : form.version()),
+          Void.class);
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.error("AJAX profile description update failed", e);
+      if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of("code", "OPTIMISTIC_LOCK", "detail", msg("error.concurrency.conflict")));
+      }
+      return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    } catch (Exception e) {
+      log.error("AJAX profile description update failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    }
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("version", refreshedUserVersion(form.version()));
+    body.put("description", form.description() == null ? "" : form.description());
+    body.put("displayName", form.displayName() == null ? "" : form.displayName());
+    return ResponseEntity.ok(body);
+  }
+
+  /**
    * Handles the default-payout-preference selector post. Kept as a separate form (and backend
    * endpoint) from the description update so the central {@code UserDto} contract stays untouched;
    * both forms echo the same user-row {@code version}, so the post-redirect-GET refresh after
@@ -278,6 +351,56 @@ public class ProfileController {
       return "redirect:/profile";
     }
     return "redirect:/profile";
+  }
+
+  /**
+   * Reads the user row's current {@code version} back from {@code /api/v1/users/me} after a write
+   * so the client can sync the freshly bumped value into the page's {@code version} fields. Falls
+   * back to {@code priorVersion + 1} when the re-fetch is unavailable — the description update
+   * bumps the version by exactly one, so this still prevents a spurious 409 on the next save if the
+   * backend round-trip hiccups.
+   *
+   * @param priorVersion the version the client submitted (may be {@code null})
+   * @return the current user-row version, or a best-effort {@code priorVersion + 1}
+   */
+  private Long refreshedUserVersion(Long priorVersion) {
+    try {
+      Map<String, Object> me =
+          backendApiClient.get(
+              "/api/v1/users/me", new ParameterizedTypeReference<Map<String, Object>>() {});
+      if (me != null && me.get("version") != null) {
+        return parseLong(me.get("version"));
+      }
+    } catch (Exception ignored) {
+      // Re-fetch failed — fall through to the best-effort increment below.
+    }
+    return (priorVersion == null ? 0L : priorVersion) + 1;
+  }
+
+  /**
+   * Resolves a message-bundle key against the current request locale, returning the key itself when
+   * unmapped so a missing translation degrades visibly rather than throwing.
+   *
+   * @param key the {@code messages.properties} key
+   * @return the localized message, or {@code key} if no translation exists
+   */
+  private String msg(String key) {
+    return messageSource.getMessage(key, null, key, LocaleContextHolder.getLocale());
+  }
+
+  /**
+   * Returns the first field error's localized default message for a failed JSON bind, or the
+   * generic update-failed message when none carries text.
+   *
+   * @param bindingResult the validation result carrying at least one error
+   * @return a localized, user-presentable validation message
+   */
+  private String firstFieldError(BindingResult bindingResult) {
+    return bindingResult.getFieldErrors().stream()
+        .map(org.springframework.validation.FieldError::getDefaultMessage)
+        .filter(message -> message != null && !message.isBlank())
+        .findFirst()
+        .orElseGet(() -> msg("error.profile.update.failed"));
   }
 
   private static Long parseLong(Object o) {

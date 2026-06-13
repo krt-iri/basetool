@@ -2156,8 +2156,8 @@ public class MissionPageController {
    * as an {@code application/problem+json} response that preserves the stable {@code code} and
    * human-readable {@code detail} from the upstream RFC 7807 body.
    *
-   * <p>The mission-detail AJAX layer (see {@code mission-subresource.js}) reads {@code code} to
-   * decide between a "stale data, reload?" prompt (only for {@code OPTIMISTIC_LOCK} / {@code
+   * <p>The mission-detail AJAX layer (see {@code krt-fetch.js}) reads {@code code} to decide
+   * between a "stale data, reload?" prompt (only for {@code OPTIMISTIC_LOCK} / {@code
    * PESSIMISTIC_LOCK}) and a plain error toast for domain conflicts ({@code DUPLICATE_ENTITY},
    * {@code BUSINESS_CONFLICT}, …). Returning {@code .build()} with only the status code stripped
    * that signal and made every 409 look like an optimistic-lock conflict.

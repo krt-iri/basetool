@@ -8,6 +8,8 @@
 
 - **Kartellbank (Epic #556):** Neuer Bank-Bereich für die Organisation. Konten je Org-Einheit/Bereich plus Kartell- und Kartellbank-Sonderkonten, mit Halter-Verteilung statt Einzelkonten — jede Buchung ist einem Halter zugeordnet, der Kontosaldo ist die Summe aller Halter-Bestände. Bank-Mitarbeiter sehen und bebuchen nur freigegebene Konten (Einzahlen/Auszahlen/Transfer je Konto einzeln berechtigt), die Bankleitung verwaltet Konten, Halter und Berechtigungen. Ein- und Auszahlungen, Konto-zu-Konto-Transfers und Halter-Umbuchungen laufen über ein fälschungssicheres, nur-anhängendes Hauptbuch; Korrekturen erfolgen als Storno-Gegenbuchung (Bankleitung). Der Bank-Zugang ist unabhängig von der Staffel-/Org-Zugehörigkeit. Kontoauszug (Zeitraum frei wählbar) und 3-Monats-Report als PDF im KRT-Design. Ein Wipe-Reset und ein Storno selbst sind nicht stornierbar — korrigiert wird stets die Ursprungsbuchung.
 
+- **Profil: Anzeigename und Beschreibung werden jetzt ohne Seitenneuladen gespeichert** (In-Place mit KRT-Hinweis statt Seitenwechsel). Erster Baustein des seitenweiten Umbaus auf In-Place-Aktualisierung (Epic #571); ohne JavaScript speichert das Formular unverändert weiter.
+
 ### Changed
 
 - **Alle PDF-Exporte (Übergabeprotokoll, Kontoauszug, 3-Monats-Report) folgen jetzt strenger dem KRT-Design-System.** Orange dient nur noch als Akzent für Überschriften und Identität (Titel, Abschnitte, eine Linie unter den Tabellenköpfen, die Diagrammlinie, ein dünner oberer Seitenbalken, das Logo). Tabellenköpfe und Zeilengitter sind jetzt neutral dunkelgrau statt vollflächig orange, damit das Orange nicht überhandnimmt; Inhalt und Daten der Reporte bleiben unverändert.
@@ -15,6 +17,18 @@
 - **Die Fußzeile aller PDF-Exporte nennt jetzt den Erstellungszeitpunkt in UTC** – „Generiert von Profit Basetool am TT.MM.JJJJ HH:MM UTC" – als eindeutiger, zeitzonenunabhängiger Audit-Stempel.
 
 - **Raffinerieauftrag: In den Materialzeilen steht die Qualität jetzt vor der Eingangsmenge (Units).** Die Feldreihenfolge im Anlege- und Detailformular folgt damit der Reihenfolge im Spiel; die Ausgangszeile (Units, SCU) bleibt unverändert.
+
+- **Listenfilter und Seitennavigation (Einsätze, Operationen) laufen jetzt über eine gemeinsame AJAX-Grundlage und aktualisieren nur den Ergebnisbereich.** Das Blättern in den gefilterten Ergebnissen lädt nicht mehr die ganze Seite neu.
+
+### Removed
+
+- **Die ungenutzte Alpine.js-Bibliothek wurde entfernt.** Sie wurde nur noch auf der Missions-Detailseite geladen, aber von keiner Stelle mehr verwendet; die Seite lädt dadurch ein Skript weniger. Keine sichtbare Funktionsänderung.
+
+- **Die JS-Bibliotheken marked und DOMPurify wurden entfernt.** Die Dashboard-Ankündigung wird jetzt – wie schon die Missionsbeschreibung – serverseitig als Markdown gerendert (CommonMark mit escaptem Roh-HTML und entfernten unsicheren Links) statt im Browser. Das Dashboard lädt damit zwei Skripte weniger; keine sichtbare Funktionsänderung.
+
+### Fixed
+
+- **AJAX-Aktionen scheitern nicht mehr mit einem 403, wenn der Browser-Tab lange offen war oder man sich zwischendurch neu angemeldet hat.** Das CSRF-Token wird in diesem Fall automatisch erneuert und die Aktion einmal wiederholt.
 
 ## [v0.4.20](https://github.com/krt-iri/basetool/releases/tag/v0.4.20) - 2026-06-12
 

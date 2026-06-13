@@ -3,7 +3,6 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Mission Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<script defer th:src="@{/js/vendor/alpinejs-3.15.12.min.js}" th:attr="nonce=${cspNonce}"></script>
     <style th:attr="nonce=${cspNonce}">
         label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; }
         input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"], input[type="number"] { width: 100%; padding: 0.8rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
@@ -1379,7 +1378,7 @@
     const MSG_CONFIRM_OWNER_CHANGE = /*[[#{mission.confirm.owner.change}]]*/ 'Are you sure you want to change the owner of this mission?';
     const MSG_CONFIRM_MANAGER_REMOVE = /*[[#{mission.confirm.manager.remove}]]*/ 'Do you really want to remove this manager?';
     const MSG_ERROR_USER_REQUIRED = /*[[#{error.mission.manager.user_required}]]*/ 'Please select a user';
-    // i18n dictionary consumed by mission-subresource.js (patchSubResource/syncVersion/handleProblem).
+    // i18n dictionary consumed by krt-fetch.js (MissionSubresource alias: patchSubResource/syncVersion/handleProblem).
     // All user-visible strings must come from messages.properties (AGENTS.md: no hardcoded UI text).
     window.MISSION_SUBRES_I18N = {
         'mission.save.section.ok': /*[[#{mission.save.section.ok}]]*/ 'Saved.',
@@ -2889,8 +2888,8 @@
         });
     })();
 </script>
-<!-- Mission sub-resource helper (patchSubResource/syncVersion/handleProblem + KRT confirm/toast). -->
-<script th:src="@{/js/mission-subresource.js}" defer th:attr="nonce=${cspNonce}"></script>
+<!-- window.MissionSubresource (patchSubResource/syncVersion/handleProblem) is now provided
+     globally by krt-fetch.js, loaded in fragments/head.html (epic #571). -->
 <!-- Mission detail presence/awareness client (Stufe 3). -->
 <script th:src="@{/js/mission-presence.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:if="${!isNew and authUserId != null}" th:attr="nonce=${cspNonce}" th:inline="javascript">
