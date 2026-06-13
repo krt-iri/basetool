@@ -1,0 +1,206 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.iri.basetool.frontend.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.iri.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
+import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * MVC tests for the #575 no-reload additions to {@link JobOrderPageController}: the AJAX priority
+ * reorder endpoint ({@code PUT /orders/{id}/priority/ajax}) and the {@code ?fragment=} section-swap
+ * support on the order-detail GET. Verifies the LOGISTICIAN gate, the {@code propagateBackendError}
+ * RFC 7807 passthrough that {@code krt-fetch.js} needs for its conflict UX, and that the fragment
+ * error path answers with a section-sized fragment instead of a redirect a swap would follow.
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+class JobOrderPageControllerNoReloadMvcTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    // Profit-eligible viewer so the order-detail gate does not redirect to /orders/create.
+    when(backendApiClient.get(
+            "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
+  }
+
+  private OAuth2AuthenticationToken logisticianToken(UUID userId) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put(IdTokenClaimNames.SUB, userId.toString());
+    claims.put("preferred_username", "logistician");
+    OidcIdToken idToken =
+        new OidcIdToken("token-value", Instant.now(), Instant.now().plusSeconds(3600), claims);
+    OidcUser oidcUser =
+        new DefaultOidcUser(
+            Collections.singletonList(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")), idToken);
+    return new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
+  }
+
+  private static JobOrderDto materialOrder(UUID id, long version) {
+    return new JobOrderDto(
+        id,
+        7,
+        null,
+        null,
+        "Handle",
+        null,
+        1,
+        "OPEN",
+        "MATERIAL",
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        Instant.now(),
+        version);
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void updatePriorityAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/orders/" + orderId + "/priority?priority=2"),
+            isNull(),
+            eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 5L));
+
+    mockMvc
+        .perform(put("/orders/" + orderId + "/priority/ajax").param("priority", "2").with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(5));
+
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/orders/" + orderId + "/priority?priority=2"),
+            isNull(),
+            eq(JobOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void updatePriorityAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/orders/" + orderId + "/priority?priority=3"),
+            isNull(),
+            eq(JobOrderDto.class)))
+        .thenThrow(new BackendServiceException("conflict", null, 409));
+
+    // propagateBackendError must answer application/problem+json (not a bare status) so krtFetch
+    // can
+    // read the RFC 7807 code and drive its conflict UX.
+    mockMvc
+        .perform(put("/orders/" + orderId + "/priority/ajax").param("priority", "3").with(csrf()))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER"})
+  void updatePriorityAjax_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc
+        .perform(put("/orders/" + orderId + "/priority/ajax").param("priority", "2").with(csrf()))
+        .andExpect(status().isForbidden());
+
+    verify(backendApiClient, never()).put(any(String.class), any(), eq(JobOrderDto.class));
+  }
+
+  @Test
+  void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    // The backend read fails mid section-swap (circuit-breaker open / timeout / 5xx). The fragment
+    // path must answer with a section-sized error fragment (HTTP 200), never the classic
+    // redirect:/orders — krtFetch.swap would otherwise follow the 302 into the small results
+    // container (#575, mirrors the #574 fix).
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenThrow(new RuntimeException("backend unavailable"));
+
+    var result =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "materials")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    String html = result.getResponse().getContentAsString();
+    assertThat(html).as("section-sized inline error, not a page").contains("role=\"alert\"");
+    assertThat(html).as("no page chrome in the error fragment").doesNotContain("<main");
+  }
+}

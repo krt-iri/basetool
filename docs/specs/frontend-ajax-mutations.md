@@ -102,8 +102,19 @@ navigation while filtering did not.
 - [ ] Clicking a pagination/sort control inside the results container swaps in place (no full page
   load) and preserves the active filter query.
 
-**Enforced by:** lists/pagination e2e (#573) · **Code:** `krt-fetch.js` (`swap`), `missions.js`,
-`operations.js`, `fragments/pagination.html` · **Issues:** #572, #573
+The same fragment-swap mechanism also re-renders **non-list page sections** after a sub-mutation
+when an in-place DOM patch would be too fragile (a value derived as a server-side aggregate). The
+order-detail page (#575) does this: a claim create/edit/withdraw re-renders just the claims table via
+`GET /orders/{id}?fragment={materials,aggregated}` into a stable `#order-…-results` container (the
+"Offen" open-amount is a backend aggregate, so a partial patch would desync); the order-list
+drag-drop priority reorder re-renders the whole queue the same way (the backend reshuffles every
+sibling's priority). Per-element handlers inside are delegated on the persistent container so they
+survive the swap, and on a backend read failure the fragment branch returns a section-sized error
+fragment, never a redirect the swap would follow into the container.
+
+**Enforced by:** lists/pagination e2e (#573) + order-detail fragment/endpoint MVC tests (#575) ·
+**Code:** `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
+`orders-index.html`, `orders-detail.html`, `JobOrderPageController` · **Issues:** #572, #573, #575
 
 ## Out of scope
 
