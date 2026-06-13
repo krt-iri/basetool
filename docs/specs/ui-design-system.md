@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-13.
 > **Owner area:** UI · **Related ADRs:** none yet · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
@@ -39,10 +39,20 @@ The primary brand colour is **`#E77E23`** (orange). The logo appears **only** in
 orange, white, or black. Orange marks *action and identity* (CTAs, badges, headings),
 never plain data values.
 
+This action-hierarchy is **surface-agnostic** — it governs generated documents (the PDF
+exports: handover protocol, bank statement, three-month report) exactly as it governs
+screens. In those PDFs orange is reserved for the title, the section headers, a single
+accent line under each table header, the balance-chart line, the thin page top-accent bar
+and the logo; page surfaces and the data-cell grid stay neutral (black / `#141414` /
+`#1C1C1C` fills, `#282828` hairlines), so the orange never overwhelms the document.
+
 **Acceptance**
 
 - [ ] Logo renders only in `#E77E23` / white / black.
 - [ ] The single filled-orange CTA marks the one primary action per context.
+- [ ] Generated PDFs use orange only as a heading/identity accent (title, section headers,
+  one table-header accent line, chart line, top bar, logo); table-head fills and data-cell
+  grids are neutral dark/gray, never a full orange fill or an all-orange grid.
 
 ### REQ-UI-003 — Dark-only surfaces
 

@@ -43,8 +43,14 @@ import org.openpdf.text.pdf.PdfWriter;
  * Shared KRT-corporate-design layer for every PDF the backend renders (handover reports, bank
  * statement, bank three-month report — epic #556 Phase 3). Centralizes what the two handover
  * services used to duplicate: the DAS KARTELL color palette, the page-background event (dark fill,
- * orange accent bars, bottom-right logo), the meta/table cell helpers and — new with this layer —
- * the embedded Lato fonts (design-system typography, REQ-BANK-017).
+ * a thin orange top-accent bar, bottom-right logo), the meta/table cell helpers and — new with this
+ * layer — the embedded Lato fonts (design-system typography, REQ-BANK-017).
+ *
+ * <p>Colour usage follows the design system's action hierarchy (REQ-UI-002 / REQ-UI-003): orange is
+ * an <em>accent</em> for headings and identity only (title, section headers, the single line under
+ * a table header, the chart line, the top bar, the logo); surfaces are black / {@link
+ * #COLOR_DARK_GRAY} / {@link #COLOR_SURFACE_INPUT} and every data-cell grid line is the neutral
+ * {@link #COLOR_HAIRLINE}, so the orange never overwhelms the document.
  *
  * <p>Lato is embedded with {@link BaseFont#WINANSI} encoding on purpose: WinAnsi keeps the text
  * operators byte-readable in the (uncompressed, see {@link #open(OutputStream)}) content stream, so
@@ -60,14 +66,39 @@ public final class KrtPdfSupport {
   /** Panel background for meta rows and odd table rows. */
   public static final Color COLOR_DARK_GRAY = new Color(0x14, 0x14, 0x14);
 
-  /** DAS KARTELL primary orange — titles, section headers, accents, table borders. */
+  /**
+   * DAS KARTELL primary orange (design token {@code --color-primary}). Per the design system's
+   * action hierarchy (REQ-UI-002) orange marks <em>action and identity</em> only: the title, the
+   * section headings, the single accent line under each table header, the balance-chart line, the
+   * thin page top-accent bar and the logo. It is deliberately <strong>not</strong> used for surface
+   * fills or the borders framing plain data cells — those are {@link #COLOR_SURFACE_INPUT} and
+   * {@link #COLOR_HAIRLINE} — so the orange stays an accent and never overwhelms the page.
+   */
   public static final Color COLOR_ORANGE = new Color(0xE7, 0x7E, 0x23);
 
-  /** Default body text color on the dark background. */
+  /** Default body / data-value text on the dark background (design token {@code --data-fg}). */
   public static final Color COLOR_WHITE = new Color(0xFF, 0xFF, 0xFF);
 
-  /** Muted text color — footers and empty-state hints. */
+  /** Muted text — footers, empty-state hints and chart axis labels (≈ Grau 1). */
   public static final Color COLOR_LIGHT_GRAY = new Color(0xCC, 0xCC, 0xCC);
+
+  /**
+   * Muted key/meta-label gray (design token Grau 2 {@code #646464}). Field labels in the meta and
+   * summary blocks are labels, not headings, so they take this neutral gray — never orange.
+   */
+  public static final Color COLOR_LABEL = new Color(0x64, 0x64, 0x64);
+
+  /**
+   * Half-step surface that reads just above the {@link #COLOR_DARK_GRAY} panel, used for table-head
+   * fills (design token {@code --color-surface-input} {@code #1C1C1C}) instead of an orange fill.
+   */
+  public static final Color COLOR_SURFACE_INPUT = new Color(0x1C, 0x1C, 0x1C);
+
+  /**
+   * Neutral hairline border / grid color (design token Grau 3 {@code #282828}). Frames every data
+   * cell so the table grid is quiet, with orange reserved for the single header-underline accent.
+   */
+  public static final Color COLOR_HAIRLINE = new Color(0x28, 0x28, 0x28);
 
   /** Alternating (even) table row background. */
   public static final Color COLOR_TABLE_ROW_ALT = new Color(0x1E, 0x1E, 0x1E);
@@ -190,8 +221,8 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * Adds one label/value row to a meta table — orange bold label, white value, dark-gray cells
-   * without borders.
+   * Adds one label/value row to a meta table — muted-gray bold label (a field label, not a heading,
+   * so not orange), white value, dark-gray cells without borders.
    *
    * @param table the meta table
    * @param label the (uppercase) label
@@ -199,7 +230,7 @@ public final class KrtPdfSupport {
    */
   public static void addMetaRow(
       @NotNull PdfPTable table, @NotNull String label, @NotNull String value) {
-    PdfPCell labelCell = new PdfPCell(new Phrase(label, bold(9, COLOR_ORANGE)));
+    PdfPCell labelCell = new PdfPCell(new Phrase(label, bold(9, COLOR_LABEL)));
     labelCell.setBackgroundColor(COLOR_DARK_GRAY);
     labelCell.setBorder(Rectangle.NO_BORDER);
     labelCell.setPadding(6f);
@@ -226,22 +257,28 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * Adds an orange header cell to a data table (black bold text on orange fill).
+   * Adds a header cell to a data table: white bold uppercase text on the dark half-step surface
+   * fill, framed by the neutral hairline grid, with the table's single orange brand accent drawn as
+   * a thicker line along the bottom edge. This keeps the header readable and on-brand without the
+   * full orange fill that would make orange dominate the page (REQ-UI-002 / REQ-UI-003).
    *
    * @param table the data table
    * @param text the (uppercase) column label
    */
   public static void addTableHeader(@NotNull PdfPTable table, @NotNull String text) {
-    PdfPCell cell = new PdfPCell(new Phrase(text, bold(9, COLOR_BLACK)));
-    cell.setBackgroundColor(COLOR_ORANGE);
-    cell.setBorderColor(COLOR_ORANGE);
+    PdfPCell cell = new PdfPCell(new Phrase(text, bold(9, COLOR_WHITE)));
+    cell.setBackgroundColor(COLOR_SURFACE_INPUT);
+    cell.setUseVariableBorders(true);
+    cell.setBorderColor(COLOR_HAIRLINE);
     cell.setBorderWidth(0.3f);
+    cell.setBorderColorBottom(COLOR_ORANGE);
+    cell.setBorderWidthBottom(1.2f);
     cell.setPadding(7f);
     table.addCell(cell);
   }
 
   /**
-   * Adds a body cell to a data table (white 9pt text, orange hairline border).
+   * Adds a body cell to a data table (white 9pt text, neutral gray hairline border).
    *
    * @param table the data table
    * @param text the cell text
@@ -270,7 +307,7 @@ public final class KrtPdfSupport {
       @NotNull Color textColor) {
     PdfPCell cell = new PdfPCell(new Phrase(text, regular(9, textColor)));
     cell.setBackgroundColor(background);
-    cell.setBorderColor(COLOR_ORANGE);
+    cell.setBorderColor(COLOR_HAIRLINE);
     cell.setBorderWidth(0.3f);
     cell.setPadding(6f);
     if (centered) {
@@ -290,7 +327,7 @@ public final class KrtPdfSupport {
     PdfPCell cell = new PdfPCell(new Phrase(text, italic(10, COLOR_LIGHT_GRAY)));
     cell.setColspan(colspan);
     cell.setBackgroundColor(COLOR_DARK_GRAY);
-    cell.setBorderColor(COLOR_ORANGE);
+    cell.setBorderColor(COLOR_HAIRLINE);
     cell.setBorderWidth(0.3f);
     cell.setPadding(8f);
     table.addCell(cell);
@@ -340,10 +377,14 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * PdfPageEvent painting the KRT corporate-design background on every page: dark fill, orange
-   * top/bottom/left accent bars and the KRT logo bottom-right — identical on pages 2+.
+   * PdfPageEvent painting the KRT corporate-design background on every page: black fill, a single
+   * thin orange top-accent bar (the brand marker — the bottom/left bars were dropped so orange
+   * stays an accent, not a frame) and the KRT logo bottom-right — identical on pages 2+.
    */
   private static class KrtPageBackground extends PdfPageEventHelper {
+
+    /** Height of the thin orange top-accent bar, in points. */
+    private static final float TOP_ACCENT_HEIGHT = 3f;
 
     @Override
     public void onStartPage(PdfWriter writer, Document document) {
@@ -354,15 +395,11 @@ public final class KrtPdfSupport {
       canvas.fill();
 
       canvas.setColorFill(COLOR_ORANGE);
-      canvas.rectangle(0, PageSize.A4.getHeight() - 8, PageSize.A4.getWidth(), 8);
-      canvas.fill();
-
-      canvas.setColorFill(COLOR_ORANGE);
-      canvas.rectangle(0, 0, PageSize.A4.getWidth(), 4);
-      canvas.fill();
-
-      canvas.setColorFill(COLOR_ORANGE);
-      canvas.rectangle(0, 0, 4, PageSize.A4.getHeight());
+      canvas.rectangle(
+          0,
+          PageSize.A4.getHeight() - TOP_ACCENT_HEIGHT,
+          PageSize.A4.getWidth(),
+          TOP_ACCENT_HEIGHT);
       canvas.fill();
 
       try (InputStream logoStream =

@@ -124,11 +124,11 @@ public final class BankBalanceChart {
       final double axisMin = lo - pad;
       final double axisRange = (hi + pad) - axisMin;
 
-      // Panel + border.
+      // Panel + neutral hairline border (orange is reserved for the step line, the one accent).
       cb.setColorFill(KrtPdfSupport.COLOR_DARK_GRAY);
       cb.rectangle(0, 0, WIDTH, HEIGHT);
       cb.fill();
-      cb.setColorStroke(KrtPdfSupport.COLOR_ORANGE);
+      cb.setColorStroke(KrtPdfSupport.COLOR_HAIRLINE);
       cb.setLineWidth(0.5f);
       cb.rectangle(0.5f, 0.5f, WIDTH - 1, HEIGHT - 1);
       cb.stroke();
