@@ -36,18 +36,18 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 
 ## Index
 
-|                          ADR                          |                                         Title                                         |              Status               |
-|-------------------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------|
-| [0001](0001-frontend-confidential-oauth2-client.md)   | Frontend as a confidential OAuth2 client (PKCE + secret)                              | Accepted — implementation pending |
-| [0002](0002-whole-number-amounts.md)                  | Whole-number amounts: value-based validation, reject-not-round, display-only rounding | Accepted                          |
-| [0003](0003-inventory-append-only-group-on-read.md)   | Inventory: append-only entries with group-on-read display                             | Accepted                          |
-| [0004](0004-ownerless-leadership-missions.md)         | Ownerless leadership ("Bereichsleitung") missions                                     | Accepted                          |
-| [0005](0005-ownerless-leadership-operations.md)       | Ownerless leadership ("Bereichsleitung") operations                                   | Accepted                          |
-| [0006](0006-operation-participant-visibility.md)      | Operation visibility for mission participants                                         | Accepted                          |
-| [0007](0007-client-side-vlm-screenshot-extraction.md) | Client-side VLM screenshot extraction with manual JSON upload (epic #439)             | Accepted                          |
-| [0008](0008-refinery-extract-json-contract.md)        | `RefineryExtract` JSON as the frozen cross-repo contract                              | Accepted                          |
-| [0009](0009-bank-postgresql-single-datastore.md)      | PostgreSQL stays the single datastore for the Kartell bank                            | Proposed                          |
-| [0010](0010-bank-double-entry-append-only-ledger.md)  | Bank ledger: append-only double-entry with compute-on-read balances                   | Proposed                          |
-| [0011](0011-bank-authorization-model.md)              | Bank authorization: coarse Keycloak roles + app-managed per-account grants            | Proposed                          |
-| [0012](0012-frontend-krtfetch-json-mutations-csrf-retry.md) | Standardize frontend mutations on krtFetch + JSON with session/meta CSRF + retry-on-403 | Accepted |
+|                             ADR                             |                                          Title                                          |              Status               |
+|-------------------------------------------------------------|-----------------------------------------------------------------------------------------|-----------------------------------|
+| [0001](0001-frontend-confidential-oauth2-client.md)         | Frontend as a confidential OAuth2 client (PKCE + secret)                                | Accepted — implementation pending |
+| [0002](0002-whole-number-amounts.md)                        | Whole-number amounts: value-based validation, reject-not-round, display-only rounding   | Accepted                          |
+| [0003](0003-inventory-append-only-group-on-read.md)         | Inventory: append-only entries with group-on-read display                               | Accepted                          |
+| [0004](0004-ownerless-leadership-missions.md)               | Ownerless leadership ("Bereichsleitung") missions                                       | Accepted                          |
+| [0005](0005-ownerless-leadership-operations.md)             | Ownerless leadership ("Bereichsleitung") operations                                     | Accepted                          |
+| [0006](0006-operation-participant-visibility.md)            | Operation visibility for mission participants                                           | Accepted                          |
+| [0007](0007-client-side-vlm-screenshot-extraction.md)       | Client-side VLM screenshot extraction with manual JSON upload (epic #439)               | Accepted                          |
+| [0008](0008-refinery-extract-json-contract.md)              | `RefineryExtract` JSON as the frozen cross-repo contract                                | Accepted                          |
+| [0009](0009-bank-postgresql-single-datastore.md)            | PostgreSQL stays the single datastore for the Kartell bank                              | Proposed                          |
+| [0010](0010-bank-double-entry-append-only-ledger.md)        | Bank ledger: append-only double-entry with compute-on-read balances                     | Proposed                          |
+| [0011](0011-bank-authorization-model.md)                    | Bank authorization: coarse Keycloak roles + app-managed per-account grants              | Proposed                          |
+| [0012](0012-frontend-krtfetch-json-mutations-csrf-retry.md) | Standardize frontend mutations on krtFetch + JSON with session/meta CSRF + retry-on-403 | Accepted                          |
 

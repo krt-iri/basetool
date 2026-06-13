@@ -31,9 +31,9 @@ reload via `showKrtConfirm`.
 **Acceptance**
 
 - [ ] After the action, the URL and document are unchanged and the affected node(s) reflect the new
-      state (badges, totals and status cells re-derived in the success handler, not by a reload).
+  state (badges, totals and status cells re-derived in the success handler, not by a reload).
 - [ ] No `location.reload()` runs on the success path; the only reload is a user-accepted
-      optimistic-lock confirm.
+  optimistic-lock confirm.
 
 **Enforced by:** per-area Playwright e2e (no-navigation assertion) · **Code:** `krt-fetch.js`,
 the converted page handlers · **Issues:** #571, #572
@@ -63,7 +63,7 @@ version. This is the client half of the `@Version` rules in `CLAUDE.md`.
 **Acceptance**
 
 - [ ] A second consecutive action on the same row/aggregate after a successful write does not
-      produce a 409.
+  produce a 409.
 - [ ] All related `[data-version]` attributes in the DOM context hold the new version after success.
 
 **Enforced by:** per-area e2e "double-action" assertion · **Code:** `krt-fetch.js` (`syncVersion`)
@@ -81,9 +81,9 @@ change (ADR-0012).
 **Acceptance**
 
 - [ ] `GET /csrf` returns the current header name + token for an authenticated session and does not
-      serve an anonymous caller a token.
+  serve an anonymous caller a token.
 - [ ] A write with a stale token succeeds after exactly one transparent token-refresh + retry; a
-      genuinely failing write still surfaces its error (no infinite retry).
+  genuinely failing write still surfaces its error (no infinite retry).
 
 **Enforced by:** `CsrfTokenControllerMvcTest` + forced-stale-token e2e · **Code:**
 `CsrfTokenController`, `krt-fetch.js` (`krtCsrf.refresh`, retry path) · **Issues:** #572
@@ -100,7 +100,7 @@ navigation while filtering did not.
 
 - [ ] Changing a filter swaps the results without navigating.
 - [ ] Clicking a pagination/sort control inside the results container swaps in place (no full page
-      load) and preserves the active filter query.
+  load) and preserves the active filter query.
 
 **Enforced by:** lists/pagination e2e (#573) · **Code:** `krt-fetch.js` (`swap`), `missions.js`,
 `operations.js`, `fragments/pagination.html` · **Issues:** #572, #573
@@ -120,3 +120,4 @@ navigation while filtering did not.
 - None open. The `MissionSubresource` alias in `krt-fetch.js` is transitional; mission-detail is
   migrated to call `krtFetch` directly in the Missions child (#574), after which the alias is
   removed.
+
