@@ -63,8 +63,10 @@ public class AdminSyncReportsPageController {
    */
   @GetMapping("/admin/sync-reports")
   public String combined(
-      @RequestParam(required = false, defaultValue = "0") int page, Model model) {
-    return render(null, "ALL", "/admin/sync-reports", page, model);
+      @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    return render(null, "ALL", "/admin/sync-reports", page, fragment, model);
   }
 
   /**
@@ -75,8 +77,11 @@ public class AdminSyncReportsPageController {
    * @return the {@code admin/sync-reports} view name
    */
   @GetMapping("/admin/sync-reports/scwiki")
-  public String scwiki(@RequestParam(required = false, defaultValue = "0") int page, Model model) {
-    return render("SCWIKI", "SCWIKI", "/admin/sync-reports/scwiki", page, model);
+  public String scwiki(
+      @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    return render("SCWIKI", "SCWIKI", "/admin/sync-reports/scwiki", page, fragment, model);
   }
 
   /**
@@ -87,8 +92,11 @@ public class AdminSyncReportsPageController {
    * @return the {@code admin/sync-reports} view name
    */
   @GetMapping("/admin/sync-reports/uex")
-  public String uex(@RequestParam(required = false, defaultValue = "0") int page, Model model) {
-    return render("UEX", "UEX", "/admin/sync-reports/uex", page, model);
+  public String uex(
+      @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    return render("UEX", "UEX", "/admin/sync-reports/uex", page, fragment, model);
   }
 
   /**
@@ -159,10 +167,14 @@ public class AdminSyncReportsPageController {
    *     {@code "UEX"})
    * @param basePath the page's own path, used to build pager links
    * @param page zero-based page index
+   * @param fragment when {@code "results"} only the table + pager fragment is rendered (AJAX pager
+   *     swap, REQ-FE-002); otherwise the full page is returned
    * @param model Thymeleaf model
-   * @return the {@code admin/sync-reports} view name
+   * @return the {@code admin/sync-reports} view name, or its {@code results} fragment for an AJAX
+   *     swap
    */
-  private String render(String source, String activeTab, String basePath, int page, Model model) {
+  private String render(
+      String source, String activeTab, String basePath, int page, String fragment, Model model) {
     int safePage = Math.max(page, 0);
     String uri = "/api/v1/sync-reports?page=" + safePage + "&size=" + PAGE_SIZE;
     if (source != null) {
@@ -187,7 +199,7 @@ public class AdminSyncReportsPageController {
     }
     model.addAttribute("activeTab", activeTab);
     model.addAttribute("basePath", basePath);
-    return "admin/sync-reports";
+    return "results".equals(fragment) ? "admin/sync-reports :: results" : "admin/sync-reports";
   }
 
   /**
