@@ -542,6 +542,84 @@ public class JobOrderPageController {
   }
 
   /**
+   * Builds the validated {@link CreateJobOrderItemLineDto} list from an item-order form, dropping
+   * lines without a game item, blueprint or positive amount, and per-line materials without a
+   * material id or quality. Shared by the item create + edit AJAX twins.
+   *
+   * @param form the bound item-order form
+   * @return the filtered item-line DTOs (preserving the client line + parent ids)
+   */
+  private static List<CreateJobOrderItemLineDto> buildItemLineDtos(JobOrderItemForm form) {
+    return form.getItems().stream()
+        .filter(
+            l ->
+                l.getGameItemId() != null
+                    && l.getBlueprintId() != null
+                    && l.getAmount() != null
+                    && l.getAmount() > 0)
+        .map(
+            l ->
+                new CreateJobOrderItemLineDto(
+                    l.getGameItemId(),
+                    l.getBlueprintId(),
+                    l.getAmount(),
+                    l.getMaterials().stream()
+                        .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
+                        .map(
+                            m ->
+                                new CreateJobOrderItemMaterialDto(
+                                    m.getMaterialId(), m.getQuality()))
+                        .collect(Collectors.toList()),
+                    l.getClientLineId(),
+                    l.getParentClientLineId()))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * AJAX twin of {@link #createItemOrder} (#575): creates an item order from the form-encoded body
+   * and returns the post-create navigation target as JSON. Routed by the {@code X-Requested-With}
+   * header; the classic handler stays the no-JS fallback. Empty lines → 400.
+   *
+   * @param form the bound item-order form
+   * @param canViewJobOrders whether the caller may browse the order queue
+   * @param principal the authenticated caller, or null for a guest
+   * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(value = "/items", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createItemOrderAjax(
+      @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
+      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      @AuthenticationPrincipal OidcUser principal) {
+    List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
+    if (lines.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderItemRequestDto dto =
+          new CreateJobOrderItemRequestDto(
+              form.getResponsibleOrgUnitId(),
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              lines,
+              form.getVersion());
+      backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
+      return org.springframework.http.ResponseEntity.ok(
+          java.util.Map.of(
+              "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+    } catch (BackendServiceException bse) {
+      log.error("Failed to create item order (ajax): {}", bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create item order (ajax)", e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * Renders the item-order edit page — the create form reused in edit mode. Loads the order, blocks
    * non-item orders and orders that already have an item-handover (those are frozen), prefills the
    * metadata form, and injects the existing item lines as {@code window.EDIT_ITEMS} so the create
@@ -705,6 +783,47 @@ public class JobOrderPageController {
   }
 
   /**
+   * AJAX twin of {@link #updateItemOrder} (#575): saves an item-order edit and returns the detail-
+   * page URL as JSON so the editor navigates itself. Routed by the {@code X-Requested-With} header;
+   * the classic handler stays the no-JS fallback. Empty lines → 400.
+   *
+   * @param id the item-order id
+   * @param form the bound item-order form
+   * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(value = "/{id}/items/update", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> updateItemOrderAjax(
+      @PathVariable UUID id, @ModelAttribute("jobOrderItemForm") JobOrderItemForm form) {
+    List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
+    if (lines.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderItemRequestDto dto =
+          new CreateJobOrderItemRequestDto(
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              lines,
+              form.getVersion());
+      backendApiClient.put("/api/v1/orders/" + id + "/items", dto, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(
+          java.util.Map.of("targetUrl", "/orders/" + id));
+    } catch (BackendServiceException bse) {
+      log.error("Failed to update item order {} (ajax): {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to update item order {} (ajax)", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * JSON proxy for the create form's blueprint picker: returns the blueprints that produce the
    * given orderable item. Relays to the backend item-catalog endpoint.
    *
@@ -856,6 +975,85 @@ public class JobOrderPageController {
       redirectAttributes.addFlashAttribute("jobOrderForm", form);
       return "redirect:/orders/create"
           + (form.getSource() != null ? "?source=" + form.getSource() : "");
+    }
+  }
+
+  /**
+   * Shared post-create navigation target (#575): viewers go to the order list, anonymous guests and
+   * non-profit members stay on the create form (mirrors the classic {@link #createOrder} / {@link
+   * #createItemOrder} redirects, since they cannot browse the queue).
+   *
+   * @param principal the caller (null for an anonymous guest)
+   * @param canViewJobOrders whether the caller may browse the order queue
+   * @param source the create-page source param to carry on the stay-on-create target
+   * @return the URL the AJAX caller should navigate to on success
+   */
+  private static String postCreateTarget(
+      OidcUser principal, boolean canViewJobOrders, String source) {
+    if (principal == null || !canViewJobOrders) {
+      return "/orders/create" + (source != null ? "?source=" + source : "");
+    }
+    return "/orders";
+  }
+
+  /**
+   * Builds the validated {@link CreateJobOrderMaterialDto} list from a material-order form,
+   * dropping rows without a material id or a positive amount.
+   *
+   * @param form the bound material-order form
+   * @return the filtered material requirement DTOs
+   */
+  private static List<CreateJobOrderMaterialDto> buildMaterialDtos(JobOrderForm form) {
+    return form.getMaterials().stream()
+        .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
+        .map(
+            m -> new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * AJAX twin of {@link #createOrder} (#575): creates a material order from the form-encoded body
+   * and returns the post-create navigation target as JSON, so the create page navigates itself
+   * instead of a server redirect (and stays put with an inline toast on a validation/backend
+   * failure). Routed by the {@code X-Requested-With} header so the classic form-POST handler stays
+   * the no-JS fallback. Empty materials → 400 (the page also pre-validates).
+   *
+   * @param form the bound material-order form
+   * @param canViewJobOrders whether the caller may browse the order queue (decides the target)
+   * @param principal the authenticated caller, or null for a guest
+   * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createOrderAjax(
+      @ModelAttribute("jobOrderForm") JobOrderForm form,
+      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      @AuthenticationPrincipal OidcUser principal) {
+    List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
+    if (materials.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderDto dto =
+          new CreateJobOrderDto(
+              form.getResponsibleOrgUnitId(),
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              materials,
+              form.getVersion());
+      backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
+      return org.springframework.http.ResponseEntity.ok(
+          java.util.Map.of(
+              "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+    } catch (BackendServiceException bse) {
+      log.error("Failed to create order (ajax): {}", bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create order (ajax)", e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
     }
   }
 

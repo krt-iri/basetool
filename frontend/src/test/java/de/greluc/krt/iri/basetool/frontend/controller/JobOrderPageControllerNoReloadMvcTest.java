@@ -385,6 +385,64 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void createOrderAjax_ValidMaterial_ReturnsNavigationTarget() throws Exception {
+    // Routed by X-Requested-With; returns the post-create navigation target as JSON (the page
+    // navigates itself) instead of a server redirect.
+    mockMvc
+        .perform(
+            post("/orders/create")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("handle", "Pilot")
+                .param("requestingOrgUnitId", UUID.randomUUID().toString())
+                .param("materials[0].materialId", UUID.randomUUID().toString())
+                .param("materials[0].amount", "5"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.targetUrl").exists());
+
+    verify(backendApiClient).post(eq("/api/v1/orders"), any(), eq(JobOrderDto.class), eq(true));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void createOrderAjax_EmptyMaterials_Returns400WithoutCallingBackend() throws Exception {
+    mockMvc
+        .perform(
+            post("/orders/create")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("handle", "Pilot"))
+        .andExpect(status().isBadRequest());
+
+    verify(backendApiClient, never())
+        .post(eq("/api/v1/orders"), any(), eq(JobOrderDto.class), eq(true));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  void createItemOrderAjax_ValidLine_ReturnsNavigationTarget() throws Exception {
+    mockMvc
+        .perform(
+            post("/orders/items")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("handle", "Pilot")
+                .param("requestingOrgUnitId", UUID.randomUUID().toString())
+                .param("items[0].gameItemId", UUID.randomUUID().toString())
+                .param("items[0].blueprintId", UUID.randomUUID().toString())
+                .param("items[0].amount", "2")
+                .param("items[0].clientLineId", "1")
+                .param("items[0].materials[0].materialId", UUID.randomUUID().toString())
+                .param("items[0].materials[0].quality", "700"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.targetUrl").exists());
+
+    verify(backendApiClient)
+        .post(eq("/api/v1/orders/items"), any(), eq(JobOrderDto.class), eq(true));
+  }
+
+  @Test
   void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
