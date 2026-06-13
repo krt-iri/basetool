@@ -181,7 +181,12 @@
         <!-- Screenshot-extract import (#435): file picker posts the RefineryExtract JSON to the
              proxy, which flashes the pre-filled form + review flags back onto this page.
              no-track: picking the file must not arm the unsaved-changes guard - the import
-             replaces the form wholesale, so there is nothing on this page worth protecting. -->
+             replaces the form wholesale, so there is nothing on this page worth protecting.
+             No-reload carve-out (#575 -> #591): this is the one refinery interaction still doing a
+             classic POST->redirect. It is not a write (persists nothing) and the reload is benign
+             (the form is replaced wholesale); converting it in place needs an idempotent per-group
+             re-init seam in the shared datetime-splitter.js plus the other one-shot enhancers, so it
+             is tracked separately. Every refinery WRITE is already navigate-after-AJAX (REQ-FE-006). -->
         <div class="import-extract-bar" data-testid="refinery-import-box">
             <form id="refineryImportForm" class="no-track" th:action="@{/refinery-orders/import}" method="post" enctype="multipart/form-data">
                 <input type="file" id="refineryImportFile" name="file" accept=".json,application/json" hidden data-trigger="rfc-import-file" data-testid="refinery-import-file">

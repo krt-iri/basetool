@@ -178,4 +178,14 @@ twins, `propagateBackendError`).
   PATCHes (core/schedule/flags) with server-side `@Valid` field-error rendering; converting it in
   place needs a JSON field-error contract and is tracked as the follow-up issue **#589** so the
   well-tested validation UX is not regressed. Every other mission-detail write is in-place.
+- **Known carve-out (#575 → #591):** the refinery **screenshot-extract import**
+  (`refinery-orders-create.html` → `RefineryImportProxyController`, `POST /refinery-orders/import`)
+  still submits classic `POST→redirect`. It is **not a write** (it persists nothing — it relays the
+  uploaded extract and flashes a non-persisted pre-filled form + review flags back), and the reload
+  is benign because the import deliberately replaces the whole form (`no-track`), so no entered work
+  is lost. Converting it in place re-renders the entire create form and so needs an idempotent
+  per-group `init` seam extracted from the shared `datetime-splitter.js` (currently one-shot:
+  re-running double-binds listeners and appends duplicate error divs) plus re-init of the other
+  one-shot create-page enhancers — a larger, shared-file change tracked as **#591**. Every refinery
+  **write** (create/update/store/cancel) is in-place (REQ-FE-006).
 
