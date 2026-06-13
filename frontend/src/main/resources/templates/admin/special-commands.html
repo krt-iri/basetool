@@ -59,15 +59,22 @@
         <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h2 th:text="#{admin.specialcommands.title}" class="m-0">Spezialkommandos</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
+                <!-- The include-inactive toggle swaps the SK list in place via the inline script
+                     below (krtFetch); it already required JS (the old data-trigger="submit-form-
+                     by-id" was a JS-driven reload), so the no-JS baseline is unchanged. -->
                 <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track m-0 flex-gap-sm">
-                    <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}" data-trigger="submit-form-by-id" data-form-id="sc-filter-form">
+                    <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}">
                     <label for="includeInactive" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-sc-btn" class="btn btn--cta" th:data-action="@{/admin/special-commands}" th:text="#{admin.specialcommands.create}">Neues Spezialkommando</button>
             </div>
         </div>
 
-        <div class="box-content">
+        <!-- AJAX swap target (REQ-FE-002): the include-inactive toggle re-renders only this block
+             via krtFetch. The per-row Edit buttons are per-element-bound, so they are re-wired on
+             krt:swapped. The no-JS GET fallback reloads the page. -->
+        <div class="box-content" id="sc-results">
+            <th:block th:fragment="results">
             <div th:if="${specialCommands == null or #lists.isEmpty(specialCommands)}" style="color: var(--color-gray-2); padding: 1rem 0;" th:text="#{admin.specialcommands.empty}">
                 Noch keine Spezialkommandos angelegt.
             </div>
@@ -111,6 +118,7 @@
                     </tbody>
                 </table>
             </div>
+            </th:block>
         </div>
     </div>
 </main>
@@ -181,10 +189,36 @@
         modal.style.display = 'none';
     }
 
+    // The Edit buttons live inside the AJAX swap target (#sc-results), so they are re-bound after
+    // every swap. The data-sc-wired marker keeps the re-bind idempotent for any row that survived.
+    function bindEditButtons(root) {
+        (root || document).querySelectorAll('.edit-sc-btn').forEach(function (btn) {
+            if (btn.dataset.scWired === '1') return;
+            btn.dataset.scWired = '1';
+            btn.addEventListener('click', function () { openEdit(btn); });
+        });
+    }
+
+    // The add button, modal close and overlay live OUTSIDE the swap target — bound once.
     document.getElementById('add-sc-btn').addEventListener('click', openCreate);
-    document.querySelectorAll('.edit-sc-btn').forEach(btn => btn.addEventListener('click', () => openEdit(btn)));
     document.querySelector('#specialcommand-modal .close-sc-modal').addEventListener('click', closeModal);
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    bindEditButtons(document);
+
+    // Include-inactive toggle -> in-place swap of the SK list (REQ-FE-002), with the URL kept in
+    // sync so a refresh re-renders the same filter. Re-wire the swapped-in Edit buttons afterwards.
+    const includeInactive = document.getElementById('includeInactive');
+    if (includeInactive && window.krtFetch) {
+        includeInactive.addEventListener('change', function () {
+            const url = '/admin/special-commands' + (includeInactive.checked ? '?includeInactive=true' : '');
+            window.krtFetch.swap({ url: url, container: '#sc-results', history: true });
+        });
+    }
+    document.addEventListener('krt:swapped', function (e) {
+        if (e.detail && e.detail.container && e.detail.container.id === 'sc-results') {
+            bindEditButtons(e.detail.container);
+        }
+    });
 })();
 </script>
 </body>

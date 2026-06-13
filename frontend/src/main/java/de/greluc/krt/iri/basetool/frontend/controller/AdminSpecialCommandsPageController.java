@@ -88,12 +88,16 @@ public class AdminSpecialCommandsPageController {
    * soft-deleted SKs so the admin can reactivate them.
    *
    * @param includeInactive show soft-deleted SKs.
+   * @param fragment when {@code "results"} only the SK-list fragment is rendered (AJAX
+   *     include-inactive filter swap, REQ-FE-002); otherwise the full page is returned.
    * @param model Thymeleaf model populated with the SK list, the form and the toggle.
-   * @return the {@code admin/special-commands} view name.
+   * @return the {@code admin/special-commands} view name, or its {@code results} fragment for an
+   *     AJAX swap.
    */
   @GetMapping
   public String listSpecialCommands(
       @RequestParam(required = false, defaultValue = "false") boolean includeInactive,
+      @RequestParam(required = false) String fragment,
       Model model) {
     if (!model.containsAttribute("specialCommandForm")) {
       model.addAttribute("specialCommandForm", new SpecialCommandForm("", "", "", 0L));
@@ -107,7 +111,9 @@ public class AdminSpecialCommandsPageController {
       model.addAttribute("specialCommands", List.of());
       model.addAttribute("error", "error.admin.specialcommands.load");
     }
-    return "admin/special-commands";
+    return "results".equals(fragment)
+        ? "admin/special-commands :: results"
+        : "admin/special-commands";
   }
 
   /**
@@ -165,7 +171,7 @@ public class AdminSpecialCommandsPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "specialcommand-modal");
       model.addAttribute("modalAction", "/admin/special-commands");
-      return listSpecialCommands(false, model);
+      return listSpecialCommands(false, null, model);
     }
     try {
       SpecialCommandDto body =
@@ -208,7 +214,7 @@ public class AdminSpecialCommandsPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "specialcommand-modal");
       model.addAttribute("modalAction", "/admin/special-commands/" + id + "/update");
-      return listSpecialCommands(false, model);
+      return listSpecialCommands(false, null, model);
     }
     try {
       SpecialCommandDto body =
