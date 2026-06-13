@@ -225,7 +225,7 @@
         <div class="tab-nav" role="tablist" th:aria-label="#{mission.details}">
             <button class="tab" id="tab-ueb" type="button" role="tab" aria-selected="false" aria-controls="pane-ueb" data-tab="ueb" th:text="#{mission.tab.overview}">&Uuml;bersicht</button>
             <button class="tab" id="tab-crew" type="button" role="tab" aria-selected="false" aria-controls="pane-crew" data-tab="crew"><span th:text="#{mission.tab.crew}">Teilnehmer &amp; Einheiten</span> <span class="tab-count" th:text="|${mission.checkedInParticipants}/${mission.registeredParticipants}|" th:title="#{mission.participants.count.tooltip}">0/0</span></button>
-            <button class="tab" id="tab-fin" type="button" role="tab" aria-selected="false" aria-controls="pane-fin" data-tab="fin"><span th:text="#{mission.tab.finance}">Finanzen &amp; Auszahlung</span> <span class="tab-count" th:if="${financeSum != null}" th:text="${financeIncomeCount + financeExpenseCount}">0</span></button>
+            <button class="tab" id="tab-fin" type="button" role="tab" aria-selected="false" aria-controls="pane-fin" data-tab="fin"><span th:text="#{mission.tab.finance}">Finanzen &amp; Auszahlung</span> <span id="finance-tab-count" class="tab-count" th:if="${financeSum != null}" th:text="${financeIncomeCount + financeExpenseCount}">0</span></button>
             <button class="tab" id="tab-verw" type="button" role="tab" aria-selected="false" aria-controls="pane-verw" data-tab="verw" th:if="${mission.canEdit or mission.canManageManagers}" th:text="#{mission.tab.admin}">Verwaltung</button>
         </div>
     </div>
@@ -385,6 +385,9 @@
                  totals, per-share and participant rows all refresh together. Edit/delete triggers
                  inside are krtEvents-delegated on document and survive the innerHTML swap. -->
             <div id="finance-results"><th:block th:fragment="financeSection">
+            <!-- Carries the current entry count so an in-place finance swap can patch the Finanzen
+                 tab badge (which lives in the tab nav, outside this fragment). -->
+            <span id="finance-count-meta" hidden th:text="${(financeIncomeCount ?: 0) + (financeExpenseCount ?: 0)}"></span>
 
             <!-- Summary strip (member+ only: aggregates come from the finance ledger) -->
             <div class="sumstrip" th:if="${financeSum != null}" sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
@@ -1285,7 +1288,7 @@
                 <h2 th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</h2>
                 <button type="button" class="btn btn-ghost btn-icon close-finance-modal close-modal" data-modal-dismiss data-trigger="close-modal-display" data-modal-id="finance-modal" th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
-            <form th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
+            <form id="add-finance-form" th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
                 <div class="krt-modal-body">
                 <div class="form-group">
                     <label th:text="#{mission.finance.type}">Typ</label>
@@ -2619,12 +2622,114 @@
     <script th:inline="javascript" th:if="${!isNew}" th:attr="nonce=${cspNonce}">
     function openEditFinanceModal(id, note, type, amount, version) {
         document.getElementById('edit-finance-form').action = window.safeSameOriginUrl('/missions/[[${mission?.id?.toString()}]]/finance-entries/' + id + '/update', document.getElementById('edit-finance-form').action);
+        // Stash the entry id so the AJAX submit interceptor can build the /ajax URL (#574).
+        document.getElementById('edit-finance-form').setAttribute('data-entry-id', id);
         document.getElementById('edit-finance-note').value = note && note !== 'null' ? note : '';
         window.krtSegSet('edit-finance-type', type === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
         document.getElementById('edit-finance-amount').value = amount;
         document.getElementById('edit-finance-version').value = version;
         window.krtModalOpen(document.getElementById('edit-finance-entry-modal'));
     }
+    </script>
+    <script th:attr="nonce=${cspNonce}">
+    // --- Finance entries via AJAX (#574): add/edit/delete swap the finance pane in place instead
+    //     of POST->redirect. The classic forms/links remain the no-JavaScript fallback. ---
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!window.krtMissionWrite || !window.missionId) {
+            return;
+        }
+        const financeMissionId = window.missionId;
+
+        // After a finance swap, patch the Finanzen tab badge (it lives in the tab nav, outside the
+        // swapped fragment) from the count the fragment exposes in #finance-count-meta.
+        function refreshFinanceAndBadge() {
+            window.krtRefreshMissionSection('finance').then(function () {
+                const meta = document.getElementById('finance-count-meta');
+                const badge = document.getElementById('finance-tab-count');
+                if (meta && badge) {
+                    badge.textContent = (meta.textContent || '0').trim();
+                }
+            });
+        }
+
+        const addForm = document.getElementById('add-finance-form');
+        if (addForm) {
+            addForm.addEventListener('submit', async function (ev) {
+                ev.preventDefault();
+                const fd = new FormData(addForm);
+                const res = await window.krtMissionWrite({
+                    method: 'POST',
+                    url: '/missions/' + financeMissionId + '/finance-entries/ajax',
+                    payload: {
+                        participantId: fd.get('participantId') || null,
+                        type: fd.get('type') || 'INCOME',
+                        amount: fd.get('amount') || null,
+                        note: fd.get('note') || null
+                    },
+                    sectionKey: 'finance'
+                });
+                if (res.ok) {
+                    window.krtModalClose(addForm.closest('.krt-modal-overlay'));
+                    addForm.reset();
+                    refreshFinanceAndBadge();
+                }
+            });
+        }
+
+        const editForm = document.getElementById('edit-finance-form');
+        if (editForm) {
+            editForm.addEventListener('submit', async function (ev) {
+                const entryId = editForm.getAttribute('data-entry-id');
+                if (!entryId) {
+                    return; // no AJAX target -> classic submit
+                }
+                ev.preventDefault();
+                const fd = new FormData(editForm);
+                const versionRaw = fd.get('version');
+                const res = await window.krtMissionWrite({
+                    method: 'PUT',
+                    url: '/missions/' + financeMissionId + '/finance-entries/' + entryId + '/ajax',
+                    payload: {
+                        type: fd.get('type') || 'INCOME',
+                        amount: fd.get('amount') || null,
+                        note: fd.get('note') || null,
+                        version: versionRaw ? parseInt(versionRaw, 10) : null
+                    },
+                    sectionKey: 'finance'
+                });
+                if (res.ok) {
+                    window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                    refreshFinanceAndBadge();
+                }
+            });
+        }
+
+        // Delete: extend the shared delete-confirm-form chain with a finance branch (the entry id is
+        // parsed from the action the opener set, since the finance button carries no data-sub-id).
+        const dForm = document.getElementById('delete-confirm-form');
+        if (dForm) {
+            dForm.addEventListener('submit', async function (ev) {
+                if (dForm.getAttribute('data-sub-section') !== 'finance') {
+                    return; // let the unit/participant/crew handlers or the classic POST run
+                }
+                ev.preventDefault();
+                const match = (dForm.getAttribute('action') || '').match(/finance-entries\/([^/]+)\/delete/);
+                const entryId = match ? match[1] : null;
+                if (!entryId) {
+                    return;
+                }
+                const res = await window.krtMissionWrite({
+                    method: 'DELETE',
+                    url: '/missions/' + financeMissionId + '/finance-entries/' + entryId + '/ajax',
+                    sectionKey: 'finance'
+                });
+                if (res.ok) {
+                    window.krtModalClose(dForm.closest('.krt-modal-overlay'));
+                    refreshFinanceAndBadge();
+                }
+            });
+        }
+    });
     </script>
     <script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {

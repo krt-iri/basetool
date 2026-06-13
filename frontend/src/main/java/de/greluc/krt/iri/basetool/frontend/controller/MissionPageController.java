@@ -2190,7 +2190,9 @@ public class MissionPageController {
    * @param e parsed backend exception with status + RFC 7807 fields
    * @return problem+json response mirroring the upstream status and body
    */
-  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
+  // Package-private so the sibling MissionFinancePageController's /ajax handlers reuse the same
+  // RFC 7807 passthrough instead of duplicating it.
+  static org.springframework.http.ResponseEntity<Object> propagateBackendError(
       @NotNull de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
     Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("status", e.getStatusCode());
