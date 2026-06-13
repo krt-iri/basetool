@@ -27,6 +27,7 @@
             url: '/operations' + (query ? '?' + query : ''),
             container: resultsContainer,
             indicator: loadingIndicator,
+            history: true,
         });
     }
 

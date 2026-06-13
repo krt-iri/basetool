@@ -86,14 +86,19 @@ public class AdminMissionDataPageController {
    * @param includeInactiveJobTypes show soft-deleted job types
    * @param includeInactiveSquadrons show soft-deleted squadrons
    * @param includeInactiveFrequencyTypes show soft-deleted frequency types
+   * @param fragment when one of {@code "squadrons-results"} / {@code "jobtypes-results"} / {@code
+   *     "freqtypes-results"} only that section's table fragment is rendered (AJAX include-inactive
+   *     filter swap, REQ-FE-002); otherwise the full page is returned
    * @param model Thymeleaf model populated with all three lists, all three forms and the toggles
-   * @return the {@code admin/mission-data} view name
+   * @return the {@code admin/mission-data} view name, or one section's {@code results} fragment for
+   *     an AJAX swap
    */
   @GetMapping
   public String listData(
       @RequestParam(required = false, defaultValue = "false") boolean includeInactiveJobTypes,
       @RequestParam(required = false, defaultValue = "false") boolean includeInactiveSquadrons,
       @RequestParam(required = false, defaultValue = "false") boolean includeInactiveFrequencyTypes,
+      @RequestParam(required = false) String fragment,
       Model model) {
     if (!model.containsAttribute("jobTypeForm")) {
       model.addAttribute("jobTypeForm", new JobTypeForm("", "", "", false, 0L));
@@ -151,7 +156,12 @@ public class AdminMissionDataPageController {
     if (anyFailure.get()) {
       model.addAttribute("error", "error.admin.mission.data.load");
     }
-    return "admin/mission-data";
+    return switch (fragment == null ? "" : fragment) {
+      case "squadrons-results" -> "admin/mission-data :: squadrons-results";
+      case "jobtypes-results" -> "admin/mission-data :: jobtypes-results";
+      case "freqtypes-results" -> "admin/mission-data :: freqtypes-results";
+      default -> "admin/mission-data";
+    };
   }
 
   /**
@@ -257,7 +267,7 @@ public class AdminMissionDataPageController {
       // through a Redis-serialised FlashMap (see RedisSessionConfig).
       model.addAttribute("openModal", "jobtype-modal");
       model.addAttribute("modalAction", "/admin/mission-data/job-types");
-      return listData(false, false, false, model);
+      return listData(false, false, false, null, model);
     }
     try {
       JobTypeDto body =
@@ -309,7 +319,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "jobtype-modal");
       model.addAttribute("modalAction", "/admin/mission-data/job-types/" + id + "/update");
-      return listData(false, false, false, model);
+      return listData(false, false, false, null, model);
     }
     try {
       JobTypeDto body =
@@ -417,7 +427,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "squadron-modal");
       model.addAttribute("modalAction", "/admin/mission-data/squadrons");
-      return listData(false, false, false, model);
+      return listData(false, false, false, null, model);
     }
     try {
       SquadronDto body =
@@ -461,7 +471,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "squadron-modal");
       model.addAttribute("modalAction", "/admin/mission-data/squadrons/" + id + "/update");
-      return listData(false, false, false, model);
+      return listData(false, false, false, null, model);
     }
     try {
       SquadronDto body =
@@ -564,7 +574,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "frequency-type-modal");
       model.addAttribute("modalAction", "/admin/mission-data/frequency-types");
-      return listData(false, false, false, model);
+      return listData(false, false, false, null, model);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -605,7 +615,7 @@ public class AdminMissionDataPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "frequency-type-modal");
       model.addAttribute("modalAction", "/admin/mission-data/frequency-types/" + id + "/update");
-      return listData(false, false, false, model);
+      return listData(false, false, false, null, model);
     }
     try {
       Map<String, Object> body = new HashMap<>();

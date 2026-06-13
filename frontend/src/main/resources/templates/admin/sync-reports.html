@@ -71,6 +71,11 @@
 
         <p class="event-detail" th:text="#{admin.syncReports.total} + ': ' + ${totalElements}">Gesamt: 0</p>
 
+        <!-- AJAX swap target (REQ-FE-002): the prev/next pager re-renders only this block via
+             krtFetch within the active tab; the total above stays correct (paging keeps the same
+             source filter). Tabs remain plain navigation. The no-JS pager links reload the page. -->
+        <div id="sync-results">
+        <th:block th:fragment="results">
         <div class="table-responsive">
         <table id="syncReportsTable">
             <thead>
@@ -100,13 +105,15 @@
         </div>
 
         <div class="pager" th:if="${totalPages > 1}">
-            <a th:if="${currentPage > 0}" class="btn btn-secondary"
+            <a th:if="${currentPage > 0}" class="btn btn-secondary" data-swap
                th:href="@{${basePath}(page=${currentPage - 1})}"
                th:text="#{general.pagination.previous}">Zurück</a>
             <span th:text="${currentPage + 1} + ' / ' + ${totalPages}">1 / 1</span>
-            <a th:if="${currentPage + 1 < totalPages}" class="btn btn-secondary"
+            <a th:if="${currentPage + 1 < totalPages}" class="btn btn-secondary" data-swap
                th:href="@{${basePath}(page=${currentPage + 1})}"
                th:text="#{general.pagination.next}">Weiter</a>
+        </div>
+        </th:block>
         </div>
     </div>
 
@@ -141,6 +148,13 @@
 </main>
 <script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function () {
+        // Intercept the prev/next pager anchors inside #sync-results so paging swaps in place
+        // (REQ-FE-002). The table rows carry no per-element handlers, so nothing needs re-init on
+        // krt:swapped. Independent of the purge-modal wiring below (which may early-return).
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({ container: '#sync-results', history: true });
+        }
+
         const form = document.getElementById('purge-form');
         const daysInput = document.getElementById('purge-days');
         const modal = document.getElementById('purge-confirm-modal');

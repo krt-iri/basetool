@@ -274,6 +274,56 @@ class OperationPageControllerMvcTest {
         .andExpect(content().string(containsString("status-cancelled")));
   }
 
+  // covers REQ-FE-002 — an AJAX missions-pager swap (fragment=missions) renders only the embedded
+  // missions sub-table fragment: the mission row + page-nav are present, but the swap-target
+  // wrapper and the other detail columns (outside the fragment) are not. The finance/payout
+  // endpoints are intentionally NOT stubbed — the fragment path must not call them.
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_fragmentMissions_rendersOnlyMissionsFragment() throws Exception {
+    UUID opId = UUID.randomUUID();
+    OperationDto operation =
+        new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null);
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
+        .thenReturn(operation);
+
+    MissionListDto mission =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Frag Mission",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0L);
+    // Two pages so the embedded pager renders.
+    when(backendApiClient.get(
+            contains("/api/v1/missions/search?operationId=" + opId),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
+        .thenReturn(
+            new PageResponse<>(List.of(mission), 0, 10, 15L, 2, List.of("plannedStartTime,asc")));
+
+    mockMvc
+        .perform(get("/operations/" + opId).param("fragment", "missions").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Frag Mission")))
+        .andExpect(content().string(containsString("class=\"pagination\"")))
+        // The page-nav links page the embedded table in place against /operations/{id}.
+        .andExpect(content().string(containsString("/operations/" + opId + "?page=1")))
+        // Wrapper div and sibling detail columns live outside the fragment.
+        .andExpect(content().string(not(containsString("id=\"op-missions-results\""))))
+        .andExpect(content().string(not(containsString("id=\"col-payout\""))));
+  }
+
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationDetail_rendersDonationTotals_whenParticipantsDonate() throws Exception {

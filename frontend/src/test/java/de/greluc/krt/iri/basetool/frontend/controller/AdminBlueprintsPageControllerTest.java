@@ -48,12 +48,30 @@ class AdminBlueprintsPageControllerTest {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
     Model model = new ConcurrentModel();
 
-    String view = controller.listBlueprints("omni", 0, model);
+    String view = controller.listBlueprints("omni", 0, null, model);
 
     assertEquals("admin/blueprints", view);
     assertEquals(1, ((List<?>) model.getAttribute("blueprints")).size());
     assertEquals("omni", model.getAttribute("search"));
     assertEquals(1, model.getAttribute("totalPages"));
+  }
+
+  // covers REQ-FE-002 — an AJAX swap request (fragment=results) renders only the toolbar + table +
+  // pager fragment, with the model populated identically.
+  @Test
+  void listBlueprints_fragmentResults_returnsResultsFragmentView() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
+    PageResponse<BlueprintDto> page =
+        new PageResponse<>(List.of(minimalDto()), 0, 25, 1, 1, List.of());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    Model model = new ConcurrentModel();
+
+    String view = controller.listBlueprints("omni", 0, "results", model);
+
+    assertEquals("admin/blueprints :: results", view);
+    assertEquals(1, ((List<?>) model.getAttribute("blueprints")).size());
+    assertEquals("omni", model.getAttribute("search"));
   }
 
   @Test
@@ -64,7 +82,7 @@ class AdminBlueprintsPageControllerTest {
     AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
     Model model = new ConcurrentModel();
 
-    String view = controller.listBlueprints(null, 0, model);
+    String view = controller.listBlueprints(null, 0, null, model);
 
     assertEquals("admin/blueprints", view);
     assertEquals("error.admin.blueprints.load", model.getAttribute("error"));

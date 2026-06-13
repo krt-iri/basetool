@@ -67,12 +67,17 @@
     </div>
 
     <div class="hud-box mt-2">
+        <!-- AJAX swap target (REQ-FE-002): search, reset and the prev/next pager re-render only
+             this block via the page script + krtFetch; the live total count rides along inside
+             the fragment. The no-JS GET fallback still reloads the whole page. -->
+        <div id="admin-bp-results">
+        <th:block th:fragment="results">
         <div class="bp-toolbar">
-            <form method="get" th:action="@{/admin/blueprints}" class="bp-filter">
+            <form method="get" th:action="@{/admin/blueprints}" class="bp-filter" id="admin-bp-filter">
                 <input type="text" name="search" th:value="${search}"
                        th:placeholder="#{admin.blueprints.search.placeholder}" autocomplete="off">
                 <button type="submit" class="btn btn--cta" th:text="#{admin.blueprints.search.button}">Suchen</button>
-                <a th:if="${search != null and !search.isEmpty()}" th:href="@{/admin/blueprints}"
+                <a th:if="${search != null and !search.isEmpty()}" th:href="@{/admin/blueprints}" data-swap
                    class="btn btn-ghost" th:text="#{admin.blueprints.reset}">Zur&uuml;cksetzen</a>
             </form>
             <span class="bp-count" th:text="#{admin.blueprints.total} + ': ' + ${totalElements}">Gesamt: 0</span>
@@ -173,13 +178,15 @@
         </div>
 
         <div class="pager" th:if="${totalPages > 1}">
-            <a th:if="${currentPage > 0}" class="btn btn-secondary"
+            <a th:if="${currentPage > 0}" class="btn btn-secondary" data-swap
                th:href="@{/admin/blueprints(page=${currentPage - 1}, search=${search})}"
                th:text="#{general.pagination.previous}">Zur&uuml;ck</a>
             <span th:text="${currentPage + 1} + ' / ' + ${totalPages}">1 / 1</span>
-            <a th:if="${currentPage + 1 < totalPages}" class="btn btn-secondary"
+            <a th:if="${currentPage + 1 < totalPages}" class="btn btn-secondary" data-swap
                th:href="@{/admin/blueprints(page=${currentPage + 1}, search=${search})}"
                th:text="#{general.pagination.next}">Weiter</a>
+        </div>
+        </th:block>
         </div>
     </div>
 </main>
@@ -236,14 +243,52 @@
       if (qOut) { qOut.textContent = String(Math.round(q)); }
       if (vOut) { vOut.textContent = '×' + (value === null ? '?' : value.toFixed(2)); }
     }
-    var sliders = document.querySelectorAll('.bp-slider');
-    for (var i = 0; i < sliders.length; i++) {
-      (function (s) {
-        var r = s.querySelector('.bp-range');
-        if (r) { r.addEventListener('input', function () { compute(s); }); }
-        compute(s);
-      })(sliders[i]);
+
+    var RESULTS_ID = 'admin-bp-results';
+
+    // Initial display for every slider in root: the range starts at max, so its output
+    // must be computed once even before the user drags it.
+    function computeAll(root) {
+      var sliders = (root || document).querySelectorAll('.bp-slider');
+      for (var i = 0; i < sliders.length; i++) { compute(sliders[i]); }
     }
+
+    // Delegated slider input: ONE listener on document survives the AJAX table swap, so
+    // sliders in swapped-in rows stay live without per-element re-binding.
+    document.addEventListener('input', function (e) {
+      var t = e.target;
+      if (t && t.classList && t.classList.contains('bp-range')) {
+        var slider = t.closest('.bp-slider');
+        if (slider) { compute(slider); }
+      }
+    });
+
+    // Search submit -> in-place swap of the results block (REQ-FE-002). Delegated on
+    // document so it survives the form being re-rendered inside the swapped fragment.
+    // The page index is dropped so a new search lands on page 0. Reset and the prev/next
+    // pager are plain anchors marked data-swap; krtFetch intercepts them after bindSwap.
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!form || form.id !== 'admin-bp-filter') { return; }
+      e.preventDefault();
+      var input = form.querySelector('input[name="search"]');
+      var search = input ? input.value.trim() : '';
+      var url = form.getAttribute('action') + (search ? '?search=' + encodeURIComponent(search) : '');
+      if (window.krtFetch) {
+        window.krtFetch.swap({ url: url, container: '#' + RESULTS_ID, history: true });
+      } else {
+        window.location.assign(url);
+      }
+    });
+
+    computeAll(document);
+    if (window.krtFetch) {
+      window.krtFetch.bindSwap({ container: '#' + RESULTS_ID, history: true });
+    }
+    document.addEventListener('krt:swapped', function (e) {
+      var c = e.detail && e.detail.container;
+      if (c && c.id === RESULTS_ID) { computeAll(c); }
+    });
   })();
 </script>
 </body>

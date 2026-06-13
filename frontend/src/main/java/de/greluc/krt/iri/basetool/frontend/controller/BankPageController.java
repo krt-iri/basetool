@@ -106,23 +106,26 @@ public class BankPageController {
    *
    * @param id the account id
    * @param page zero-based booking page
+   * @param fragment when {@code "bookings"} only the paged booking-history fragment is rendered
+   *     (AJAX pager swap, REQ-FE-002), skipping the holder/account round-trips the modals need;
+   *     otherwise the full page is returned
    * @param model Spring MVC model
-   * @return the detail template
+   * @return the detail template, or its {@code bookings} fragment for an AJAX swap
    */
   @GetMapping("/bank/accounts/{id}")
   @PreAuthorize("hasRole('BANK_EMPLOYEE')")
   public String accountDetail(
-      @PathVariable @NotNull UUID id, @RequestParam(required = false) Integer page, Model model) {
+      @PathVariable @NotNull UUID id,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    if ("bookings".equals(fragment)) {
+      return bookingsFragment(id, page, model);
+    }
     int effectivePage = page == null || page < 0 ? 0 : page;
     BankAccountDetailDto detail =
         backendApiClient.get("/api/v1/bank/accounts/" + id, BankAccountDetailDto.class);
-    PageResponse<BankBookingDto> bookings =
-        backendApiClient.get(
-            UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/transactions")
-                .queryParam("page", effectivePage)
-                .queryParam("size", 20)
-                .toUriString(),
-            new ParameterizedTypeReference<>() {});
+    PageResponse<BankBookingDto> bookings = fetchBookings(id, effectivePage);
     List<BankHolderDto> holders =
         backendApiClient.get(
             "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
@@ -150,6 +153,51 @@ public class BankPageController {
     model.addAttribute("distributionPercents", distributionPercents(detail, balance));
     model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
     return "bank-account-detail";
+  }
+
+  /**
+   * Renders just the paged booking-history block for an AJAX pager swap (REQ-FE-002). Fetches only
+   * the requested bookings page — the account detail, holder registry and transfer-target accounts
+   * the full page loads (only the modals need them) are skipped. A backend failure degrades to an
+   * empty page so the swapped-in fragment shows its empty state rather than injecting an error page
+   * into the sub-table; the reverse-button (delegated) and {@code .utc-time} localiser (re-run on
+   * {@code krt:swapped}) keep working on the swapped-in rows.
+   *
+   * @param id the account id
+   * @param page zero-based booking page (clamped to 0)
+   * @param model Spring MVC model populated with {@code bookings} and {@code paginationBaseUrl}
+   * @return the {@code bank-account-detail :: bookings} fragment view
+   */
+  private String bookingsFragment(UUID id, Integer page, Model model) {
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    PageResponse<BankBookingDto> bookings;
+    try {
+      bookings = fetchBookings(id, effectivePage);
+    } catch (Exception e) {
+      log.error("Error loading bookings fragment for account {}", id, e);
+      bookings = null;
+    }
+    model.addAttribute("bookings", bookings);
+    model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
+    return "bank-account-detail :: bookings";
+  }
+
+  /**
+   * Fetches one page of an account's booking history (page size 20) from the backend transactions
+   * endpoint — the single source of the booking query shared by the full-page render and the {@link
+   * #bookingsFragment} AJAX swap.
+   *
+   * @param id the account id whose transactions to page through
+   * @param page zero-based, already-clamped page index
+   * @return the requested bookings page envelope
+   */
+  private PageResponse<BankBookingDto> fetchBookings(UUID id, int page) {
+    return backendApiClient.get(
+        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/transactions")
+            .queryParam("page", page)
+            .queryParam("size", 20)
+            .toUriString(),
+        new ParameterizedTypeReference<>() {});
   }
 
   /**

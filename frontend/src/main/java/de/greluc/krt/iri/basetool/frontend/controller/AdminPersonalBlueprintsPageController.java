@@ -92,16 +92,25 @@ public class AdminPersonalBlueprintsPageController {
    *
    * @param userSub target user's Keycloak {@code sub}, or {@code null} for the bare picker
    * @param q optional case-insensitive product-name filter
+   * @param fragment when {@code "results"} only the owned-blueprint table fragment is rendered
+   *     (AJAX filter swap, REQ-FE-002); the member picker sits outside the swap target, so the user
+   *     list is then not fetched. Otherwise the full page is returned
    * @param model Thymeleaf model populated with users, the selection and the blueprint list
-   * @return the {@code admin/personal-blueprints} view name
+   * @return the {@code admin/personal-blueprints} view name, or its {@code results} fragment for an
+   *     AJAX swap
    */
   @GetMapping
   public String view(
       @RequestParam(required = false) String userSub,
       @RequestParam(required = false) String q,
+      @RequestParam(required = false) String fragment,
       Model model) {
-    List<UserDto> users = fetchUsers();
-    model.addAttribute("users", users);
+    boolean isFragment = "results".equals(fragment);
+    // The member <select> (and the user list it needs) live OUTSIDE the swap target, so a same-user
+    // filter swap does not re-render the picker.
+    if (!isFragment) {
+      model.addAttribute("users", fetchUsers());
+    }
     model.addAttribute("selectedUserSub", userSub);
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("adminMode", Boolean.TRUE);
@@ -113,7 +122,7 @@ public class AdminPersonalBlueprintsPageController {
     } else {
       model.addAttribute("blueprints", Collections.emptyList());
     }
-    return "admin/personal-blueprints";
+    return isFragment ? "admin/personal-blueprints :: results" : "admin/personal-blueprints";
   }
 
   /**

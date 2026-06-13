@@ -131,7 +131,13 @@ class AdminBankPageControllerTest {
     // When
     String view =
         controller.bankAudit(
-            "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z", "acc-1", "DEPOSIT_BOOKED", 0, model);
+            "2026-01-01T00:00:00Z",
+            "2026-02-01T00:00:00Z",
+            "acc-1",
+            "DEPOSIT_BOOKED",
+            0,
+            null,
+            model);
 
     // Then
     assertEquals("admin/bank-audit", view);
@@ -152,7 +158,7 @@ class AdminBankPageControllerTest {
         .thenThrow(new RuntimeException("down"));
 
     // When
-    controller.bankAudit(null, null, null, null, 0, model);
+    controller.bankAudit(null, null, null, null, 0, null, model);
 
     // Then
     assertEquals("admin.bank.audit.error.load", model.getAttribute("error"));
@@ -166,10 +172,24 @@ class AdminBankPageControllerTest {
         .thenReturn(new PageResponse<BankAuditEventDto>(List.of(), 0, 50, 0, 0, List.of()));
 
     // When
-    controller.bankAudit(null, null, null, null, 0, model);
+    controller.bankAudit(null, null, null, null, 0, null, model);
 
     // Then
     assertEquals("/admin/bank-audit", model.getAttribute("paginationBaseUrl"));
+  }
+
+  @Test
+  void bankAudit_fragmentResults_returnsResultsFragmentSelector() {
+    // Given — an AJAX swap request (fragment=results) for in-place filter/paging (#573).
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<BankAuditEventDto>(List.of(), 0, 50, 0, 0, List.of()));
+
+    // When
+    String view = controller.bankAudit(null, null, null, null, 0, "results", model);
+
+    // Then — only the results fragment is rendered, not the full page.
+    assertEquals("admin/bank-audit :: auditResults", view);
   }
 
   @Test

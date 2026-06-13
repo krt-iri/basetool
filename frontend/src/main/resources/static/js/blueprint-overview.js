@@ -77,6 +77,14 @@
     }
 
     function wireDetails(details) {
+        // Idempotent: the table is an AJAX swap target, so wireDetails runs again on
+        // krt:swapped over freshly rendered rows. The guard stops a re-swap from
+        // double-binding the toggle handler on rows that survived (none do today, but
+        // the marker keeps this safe if the swap ever becomes a partial update).
+        if (details.dataset.bpWired === '1') {
+            return;
+        }
+        details.dataset.bpWired = '1';
         details.addEventListener('toggle', function () {
             const row = details.closest('tr');
             const detailsRow = row ? row.nextElementSibling : null;
@@ -101,10 +109,95 @@
         });
     }
 
+    const RESULTS_ID = 'bp-overview-results';
+
+    function wireDetailsIn(root) {
+        (root || document).querySelectorAll('details[data-product-key]').forEach(wireDetails);
+    }
+
     // The product search is server-side (REQ-INV-013): the table is paginated, so a
-    // client-side row filter would only ever see the current page. The search input is
-    // a plain GET form submitted on Enter - no JS wiring needed.
+    // client-side row filter would only ever see the current page. The form carries the
+    // active page size in a hidden input; submitting it (or typing, debounced) rebuilds
+    // the URL and swaps only the results block in place (REQ-FE-002) instead of reloading.
+    // The page-size picker sits INSIDE the swap container, so after a re-size the form's
+    // hidden size input is stale. Take the active size from the address bar (kept current
+    // by the history-synced swap) and fall back to the hidden input on first load. The
+    // page index is intentionally dropped so a new search always lands on page 0.
+    function activeSize(form) {
+        const fromUrl = new URLSearchParams(window.location.search).get('size');
+        if (fromUrl) {
+            return fromUrl;
+        }
+        const hidden = form.querySelector('input[name="size"]');
+        return hidden ? hidden.value : '';
+    }
+
+    function buildSearchUrl(form) {
+        const input = form.querySelector('input[type="search"]');
+        const params = new URLSearchParams();
+        const search = input ? input.value.trim() : '';
+        if (search) {
+            params.set('search', search);
+        }
+        const size = activeSize(form);
+        if (size) {
+            params.set('size', size);
+        }
+        const query = params.toString();
+        return form.getAttribute('action') + (query ? '?' + query : '');
+    }
+
+    function swapResults(url) {
+        if (!window.krtFetch) {
+            window.location.assign(url);
+            return;
+        }
+        window.krtFetch.swap({ url: url, container: '#' + RESULTS_ID, history: true });
+    }
+
+    function wireFilter() {
+        const form = document.querySelector('form.bp-filter');
+        if (!form) {
+            return;
+        }
+        let debounce = null;
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            if (debounce) {
+                window.clearTimeout(debounce);
+                debounce = null;
+            }
+            swapResults(buildSearchUrl(form));
+        });
+        const input = form.querySelector('input[type="search"]');
+        if (input) {
+            input.addEventListener('input', function () {
+                if (debounce) {
+                    window.clearTimeout(debounce);
+                }
+                debounce = window.setTimeout(function () {
+                    debounce = null;
+                    swapResults(buildSearchUrl(form));
+                }, 300);
+            });
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('details[data-product-key]').forEach(wireDetails);
+        wireDetailsIn(document);
+        wireFilter();
+        // Intercept the size picker / page-nav anchors inside the results block so paging
+        // swaps in place. No initial fetch — the server already rendered page 0.
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({ container: '#' + RESULTS_ID, history: true });
+        }
+    });
+
+    // Re-bind the per-element <details> toggle handlers over rows that came in via a swap.
+    document.addEventListener('krt:swapped', function (event) {
+        const container = event.detail && event.detail.container;
+        if (container && container.id === RESULTS_ID) {
+            wireDetailsIn(container);
+        }
     });
 })();

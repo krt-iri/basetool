@@ -468,6 +468,11 @@
             </button>
             <div class="col-content" id="col-missions-content">
                 <div class="hud-box">
+                    <!-- AJAX swap target (REQ-FE-002): the embedded missions pager re-renders only
+                         this block via krtFetch (fragment=missions); the no-JS page-btn links still
+                         reload the whole operation page. -->
+                    <div id="op-missions-results">
+                    <th:block th:fragment="missions">
                     <div class="table-responsive">
                         <table th:if="${missions != null and !missions.isEmpty()}">
                             <thead>
@@ -495,6 +500,8 @@
                         <div th:replace="~{fragments/pagination :: pagination(pageResponse=${missionsPage}, baseUrl='/operations/' + ${operation.id})}"></div>
                     </div>
                     <p th:if="${missions == null or missions.isEmpty()}" th:text="#{mission.empty}">No missions.</p>
+                    </th:block>
+                    </div>
                 </div>
             </div>
         </div>
@@ -757,6 +764,18 @@
                 }
             }
         });
+
+        // Embedded missions pager -> in-place swap (REQ-FE-002). The page-btn links inside
+        // #op-missions-results point at /operations/{id}?page=N; krtFetch intercepts them and
+        // re-renders only that block via fragment=missions. The sub-table carries no per-element
+        // handlers, so nothing needs re-init on krt:swapped. No-JS fallback reloads the page.
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({
+                container: '#op-missions-results',
+                fragmentValue: 'missions',
+                history: true
+            });
+        }
     });
 
     // CSP-safe delegated bindings (replace onclick="openDeleteModal(...)" and

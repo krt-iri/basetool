@@ -71,9 +71,12 @@ public class PersonalInventoryPageController {
    * @param page zero-based page index
    * @param size page size, defaults to 50
    * @param sort optional sort spec ({@code field,asc|desc}); whitelisted by the backend
+   * @param fragment when {@code "results"} only the item-list fragment is rendered (AJAX filter
+   *     swap, REQ-FE-002); otherwise the full page is returned
    * @param model Thymeleaf model populated with the form, the filter query, the item list and page
    *     metadata
-   * @return the {@code personal-inventory} view name
+   * @return the {@code personal-inventory} view name, or its {@code results} fragment for an AJAX
+   *     filter swap
    */
   @GetMapping
   public String view(
@@ -81,12 +84,13 @@ public class PersonalInventoryPageController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String fragment,
       Model model) {
     if (!model.containsAttribute("personalInventoryForm")) {
       model.addAttribute("personalInventoryForm", new PersonalInventoryForm());
     }
     populateListing(model, q, page, size, sort);
-    return "personal-inventory";
+    return "results".equals(fragment) ? "personal-inventory :: results" : "personal-inventory";
   }
 
   /**

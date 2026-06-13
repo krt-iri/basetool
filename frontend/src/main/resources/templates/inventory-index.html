@@ -64,6 +64,8 @@
             Aggregation across all squadrons. Select a single squadron to filter.
         </div>
         <div class="overflow-x-auto">
+            <div id="inventory-results">
+            <th:block th:fragment="inventoryResults">
             <div class="table-responsive">
             <table class="krt-table">
                 <thead>
@@ -93,10 +95,22 @@
             </div>
             
             <div th:replace="~{fragments/pagination :: pagination(pageResponse=${inventoryPage}, baseUrl='/inventory')}"></div>
-            
+            </th:block>
+            </div>
+
         </div>
     </div>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
+<script th:attr="nonce=${cspNonce}">
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.krtFetch) {
+            // Pagination-only list (no filter): bind the in-place pager so paging stays in place
+            // (epic #571 / #573). The clickable rows use the delegated navigate-href trigger, so
+            // they keep working after a swap.
+            window.krtFetch.bindSwap({ container: '#inventory-results', history: true });
+        }
+    });
+</script>
 </body>
 </html>

@@ -59,15 +59,22 @@
         <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h2 th:text="#{admin.specialcommands.title}" class="m-0">Spezialkommandos</h2>
             <div style="display: flex; gap: 1rem; align-items: center;">
+                <!-- The include-inactive toggle swaps the SK list in place via the inline script
+                     below (krtFetch); it already required JS (the old data-trigger="submit-form-
+                     by-id" was a JS-driven reload), so the no-JS baseline is unchanged. -->
                 <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track m-0 flex-gap-sm">
-                    <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}" data-trigger="submit-form-by-id" data-form-id="sc-filter-form">
+                    <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}">
                     <label for="includeInactive" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-sc-btn" class="btn btn--cta" th:data-action="@{/admin/special-commands}" th:text="#{admin.specialcommands.create}">Neues Spezialkommando</button>
             </div>
         </div>
 
-        <div class="box-content">
+        <!-- AJAX swap target (REQ-FE-002): the include-inactive toggle re-renders only this block
+             via krtFetch. The per-row Edit + Delete buttons are document-delegated, so swapped-in
+             rows survive with no re-init. The toggle is JS-driven (it was already JS-only). -->
+        <div class="box-content" id="sc-results">
+            <th:block th:fragment="results">
             <div th:if="${specialCommands == null or #lists.isEmpty(specialCommands)}" style="color: var(--color-gray-2); padding: 1rem 0;" th:text="#{admin.specialcommands.empty}">
                 Noch keine Spezialkommandos angelegt.
             </div>
@@ -112,6 +119,7 @@
                     </tbody>
                 </table>
             </div>
+            </th:block>
         </div>
     </div>
 </main>
@@ -199,7 +207,7 @@
         modal.style.display = 'none';
     }
 
-    // --- Delete (soft-deactivate) confirmation ---
+    // --- Delete (soft-deactivate) confirmation (#587) ---
     const deleteModal = document.getElementById('sc-delete-modal');
     const deleteForm = document.getElementById('sc-delete-form');
     const deleteNameEl = document.getElementById('sc-delete-name');
@@ -215,14 +223,32 @@
         if (deleteModal) deleteModal.style.display = 'none';
     }
 
+    // The Edit and Delete buttons live INSIDE the AJAX swap target (#sc-results), so they are bound
+    // via ONE document-delegated click listener (e.target.closest) that survives the include-inactive
+    // filter swap with zero re-init. The add button + modal close live outside the swap (bound once).
     document.getElementById('add-sc-btn').addEventListener('click', openCreate);
-    document.querySelectorAll('.edit-sc-btn').forEach(btn => btn.addEventListener('click', () => openEdit(btn)));
-    document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', () => openDelete(btn)));
+    document.addEventListener('click', function (e) {
+        const editBtn = e.target.closest('.edit-sc-btn');
+        if (editBtn) { openEdit(editBtn); return; }
+        const deleteBtn = e.target.closest('.delete-btn');
+        if (deleteBtn) openDelete(deleteBtn);
+    });
     document.querySelector('#specialcommand-modal .close-sc-modal').addEventListener('click', closeModal);
     document.querySelectorAll('#sc-delete-modal .close-sc-delete-modal').forEach(btn => btn.addEventListener('click', closeDelete));
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
     if (deleteModal) {
         deleteModal.addEventListener('click', e => { if (e.target === deleteModal) closeDelete(); });
+    }
+
+    // Include-inactive toggle -> in-place swap of the SK list (REQ-FE-002), with the URL kept in
+    // sync so a refresh re-renders the same filter. Edit/Delete are document-delegated above, so the
+    // swapped-in rows need no re-init.
+    const includeInactive = document.getElementById('includeInactive');
+    if (includeInactive && window.krtFetch) {
+        includeInactive.addEventListener('change', function () {
+            const url = '/admin/special-commands' + (includeInactive.checked ? '?includeInactive=true' : '');
+            window.krtFetch.swap({ url: url, container: '#sc-results', history: true });
+        });
     }
 })();
 </script>

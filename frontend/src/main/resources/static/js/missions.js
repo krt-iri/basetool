@@ -27,6 +27,7 @@
             url: '/missions' + (query ? '?' + query : ''),
             container: resultsContainer,
             indicator: loadingIndicator,
+            history: true,
         });
     }
 

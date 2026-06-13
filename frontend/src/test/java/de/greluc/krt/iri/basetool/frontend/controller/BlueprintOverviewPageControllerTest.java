@@ -65,7 +65,7 @@ class BlueprintOverviewPageControllerTest {
         .thenReturn(page);
 
     Model model = new ExtendedModelMap();
-    String view = controller.view(null, null, null, model);
+    String view = controller.view(null, null, null, null, model);
 
     assertEquals("blueprint-overview", view);
     Object overview = model.getAttribute("overview");
@@ -81,7 +81,7 @@ class BlueprintOverviewPageControllerTest {
     when(backendApiClient.get(contains("?page=2&size=50"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 2, 50, 0, 0, List.of()));
 
-    controller.view(2, 1000, null, new ExtendedModelMap());
+    controller.view(2, 1000, null, null, new ExtendedModelMap());
 
     verify(backendApiClient)
         .get(contains("?page=2&size=50"), any(ParameterizedTypeReference.class));
@@ -96,7 +96,7 @@ class BlueprintOverviewPageControllerTest {
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 0, 10, 0, 0, List.of()));
 
     Model model = new ExtendedModelMap();
-    controller.view(0, 10, "  Aurora  ", model);
+    controller.view(0, 10, "  Aurora  ", null, model);
 
     verify(backendApiClient)
         .get(
@@ -106,13 +106,27 @@ class BlueprintOverviewPageControllerTest {
     assertEquals("Aurora", model.getAttribute("search"));
   }
 
+  // covers REQ-FE-002 — an AJAX swap request (fragment=results) renders only the table +
+  // pagination fragment, not the full page, while the model is populated identically.
+  @Test
+  void view_fragmentResults_returnsResultsFragmentView() {
+    when(backendApiClient.get(contains("?page=0&size=50"), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 0, 50, 0, 0, List.of()));
+
+    Model model = new ExtendedModelMap();
+    String view = controller.view(null, null, null, "results", model);
+
+    assertEquals("blueprint-overview :: results", view);
+    assertEquals(List.of(10, 50, 100), model.getAttribute("pageSizes"));
+  }
+
   @Test
   void view_onBackendError_setsErrorKey_andEmptyOverview() {
     when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
         .thenThrow(new RuntimeException("boom"));
 
     Model model = new ExtendedModelMap();
-    String view = controller.view(null, null, null, model);
+    String view = controller.view(null, null, null, null, model);
 
     assertEquals("blueprint-overview", view);
     assertEquals("error.blueprintOverview.load", model.getAttribute("error"));

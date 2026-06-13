@@ -28,6 +28,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.BankAccountDetailDto;
@@ -183,7 +185,7 @@ class BankPageControllerTest {
                 List.of(self, activeOther, closedOther), 0, 500, 3, 1, Collections.emptyList()));
 
     // When
-    String view = controller.accountDetail(accountId, null, model);
+    String view = controller.accountDetail(accountId, null, null, model);
 
     // Then
     assertEquals("bank-account-detail", view);
@@ -224,7 +226,7 @@ class BankPageControllerTest {
         .thenReturn(null);
 
     // When
-    controller.accountDetail(accountId, -3, model);
+    controller.accountDetail(accountId, -3, null, model);
 
     // Then
     Map<UUID, Integer> percents = (Map<UUID, Integer>) model.getAttribute("distributionPercents");
@@ -232,6 +234,36 @@ class BankPageControllerTest {
     assertTrue(percents.isEmpty());
     assertEquals(List.of(), model.getAttribute("transferTargets"));
     assertEquals(List.of(), model.getAttribute("activeHolders"));
+  }
+
+  // covers REQ-FE-002 — an AJAX swap request (fragment=bookings) renders only the booking-history
+  // fragment and fetches ONLY the transactions page: the account-detail, holders and accounts
+  // round-trips the full page does are skipped, and the model carries just bookings +
+  // paginationBaseUrl.
+  @Test
+  void accountDetail_fragmentBookings_rendersOnlyBookingsFragment_andSkipsOtherFetches() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankPageController controller = new BankPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    UUID accountId = UUID.randomUUID();
+    PageResponse<BankBookingDto> bookings =
+        new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
+    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+        .thenReturn(bookings);
+
+    // When
+    String view = controller.accountDetail(accountId, 2, "bookings", model);
+
+    // Then
+    assertEquals("bank-account-detail :: bookings", view);
+    assertEquals(bookings, model.getAttribute("bookings"));
+    assertEquals("/bank/accounts/" + accountId, model.getAttribute("paginationBaseUrl"));
+    // The fragment path must not load the account detail, holder registry or accounts list.
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class));
   }
 
   private static BankAccountDto account(UUID id, String no, String status, String balance) {

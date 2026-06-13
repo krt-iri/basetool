@@ -131,8 +131,10 @@ public class AdminBankPageController {
    * @param accountId account filter, or absent
    * @param eventType event-type filter, or absent
    * @param page zero-based page index
+   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
+   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model
-   * @return the {@code admin/bank-audit} view name
+   * @return the {@code admin/bank-audit} view name, or its {@code auditResults} fragment selector
    */
   @GetMapping("/admin/bank-audit")
   public String bankAudit(
@@ -141,6 +143,7 @@ public class AdminBankPageController {
       @RequestParam(required = false) String accountId,
       @RequestParam(required = false) String eventType,
       @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false) String fragment,
       Model model) {
     UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/bank/admin/audit")
@@ -177,6 +180,9 @@ public class AdminBankPageController {
     model.addAttribute("filterAccountId", accountId);
     model.addAttribute("filterEventType", eventType);
     model.addAttribute("paginationBaseUrl", buildBaseUrl(from, to, accountId, eventType));
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "admin/bank-audit :: auditResults";
+    }
     return "admin/bank-audit";
   }
 

@@ -100,6 +100,12 @@
                 <h2 th:text="#{bank.detail.history}">Buchungshistorie</h2>
             </div>
             <div class="bank-panel-body">
+                <!-- AJAX swap target (REQ-FE-002): the booking-history pager re-renders only this
+                     block via krtFetch (fragment=bookings). The reverse button is delegated and the
+                     .utc-time cells are re-localised on krt:swapped, so swapped-in rows stay live.
+                     The no-JS page-btn links still reload the whole page. -->
+                <div id="bank-bookings-results">
+                <th:block th:fragment="bookings">
                 <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
                     <table class="data-table">
                         <thead>
@@ -157,6 +163,8 @@
                 <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
                    data-testid="bank-bookings-empty" th:text="#{bank.detail.history.empty}">Noch keine Buchungen.</p>
                 <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+                </th:block>
+                </div>
             </div>
         </div>
 
@@ -528,5 +536,19 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:attr="nonce=${cspNonce}">
+    // Booking-history pager -> in-place swap (REQ-FE-002). The page-btn links inside
+    // #bank-bookings-results point at /bank/accounts/{id}?page=N; krtFetch intercepts them and
+    // re-renders only that block via fragment=bookings. The reverse button is document-delegated
+    // (bank.js) and .utc-time cells re-localise on krt:swapped, so swapped-in rows stay live and
+    // nothing needs re-init here. No-JS fallback reloads the page.
+    if (window.krtFetch) {
+        window.krtFetch.bindSwap({
+            container: '#bank-bookings-results',
+            fragmentValue: 'bookings',
+            history: true
+        });
+    }
+</script>
 </body>
 </html>

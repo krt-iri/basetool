@@ -330,14 +330,34 @@
     }
 
     /**
+     * Strips the internal fragment query parameter and returns the user-facing
+     * same-origin path+query — the URL shown in the address bar after a swap, so a
+     * refresh or a copied deep-link re-renders the same filtered / paged state
+     * server-side.
+     */
+    function withoutFragmentParam(url, paramName) {
+        const resolved = new URL(url, window.location.origin);
+        resolved.searchParams.delete(paramName);
+        const query = resolved.searchParams.toString();
+        return resolved.pathname + (query ? '?' + query : '');
+    }
+
+    /**
      * Loads a server-rendered HTML fragment and swaps it into a container.
      *
      * opts:
-     *  - url            source URL (fragment param is added if missing)
-     *  - container      target element or selector
-     *  - indicator      optional loading element/selector toggled during the fetch
-     *  - fragmentParam  query param name (default "fragment")
-     *  - fragmentValue  query param value (default "results")
+     *  - url             source URL (fragment param is added if missing)
+     *  - container       target element or selector
+     *  - indicator       optional loading element/selector toggled during the fetch
+     *  - fragmentParam   query param name (default "fragment")
+     *  - fragmentValue   query param value (default "results")
+     *  - history         when true, the address-bar URL is kept in sync via
+     *                    history.replaceState (minus the internal fragment param)
+     *                    so a refresh / deep-link re-renders the same state. We use
+     *                    replaceState, not pushState, so a debounced filter does not
+     *                    flood the back-stack with intermediate keystrokes.
+     *  - preserveScroll  unless false, the window scroll position is restored after
+     *                    the swap so paging/filtering does not jump the page.
      *
      * After the swap, a single delegated click listener is installed on the
      * container so in-container pagination/sort anchors (a.page-btn[href] and
@@ -360,6 +380,7 @@
         const paramName = opts.fragmentParam || 'fragment';
         const paramValue = opts.fragmentValue || 'results';
         const url = withFragmentParam(opts.url, paramName, paramValue);
+        const scrollY = window.scrollY;
         if (indicator) {
             indicator.style.display = 'block';
         }
@@ -373,6 +394,22 @@
                     indicator.style.display = 'none';
                 }
                 bindSwapAnchorInterception(container, opts);
+                // Let page/global enhancers re-process the freshly swapped subtree
+                // (e.g. the .utc-time localiser in sidebar.html). A one-shot
+                // DOMContentLoaded enhancer would otherwise miss swapped-in content.
+                document.dispatchEvent(
+                    new CustomEvent('krt:swapped', { detail: { container: container } }),
+                );
+                if (opts.history) {
+                    window.history.replaceState(
+                        window.history.state,
+                        '',
+                        withoutFragmentParam(opts.url, paramName),
+                    );
+                }
+                if (opts.preserveScroll !== false) {
+                    window.scrollTo(0, scrollY);
+                }
                 return true;
             })
             .catch(function () {
@@ -404,9 +441,27 @@
         });
     }
 
+    /**
+     * Binds the in-container pagination/sort anchor interception WITHOUT performing an
+     * initial fetch — for pagination-only lists (no filter) where nothing else calls
+     * swap() on load. Clicking a contained a.page-btn[href] / a[data-swap][href] then
+     * re-swaps the container in place, reusing the given opts (history, indicator, …).
+     */
+    function bindSwap(opts) {
+        const container =
+            typeof opts.container === 'string'
+                ? document.querySelector(opts.container)
+                : opts.container;
+        if (!container) {
+            return;
+        }
+        bindSwapAnchorInterception(container, opts);
+    }
+
     window.krtFetch = {
         write: write,
         swap: swap,
+        bindSwap: bindSwap,
         syncVersion: syncVersion,
         handleProblem: handleProblem,
         csrf: window.krtCsrf,

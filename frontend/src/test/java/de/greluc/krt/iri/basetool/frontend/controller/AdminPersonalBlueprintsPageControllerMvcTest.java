@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -31,9 +32,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -99,6 +103,42 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
                 .param("userSub", "00000000-0000-0000-0000-000000000009"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("ID_PLACEHOLDER")));
+  }
+
+  // covers REQ-FE-002 — an AJAX filter swap (fragment=results) for a selected user renders only the
+  // owned-blueprint table fragment: the row is present, but the swap-target wrapper, the admin
+  // banner and the edit modal (all outside the fragment) are not.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_fragmentResults_rendersOnlyTableFragment() throws Exception {
+    PersonalBlueprintDto bp =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "arclight",
+            "Arclight Pistol",
+            UUID.randomUUID(),
+            Instant.parse("2026-01-01T00:00:00Z"),
+            "n",
+            0L,
+            null,
+            null);
+    // On the fragment path the controller skips the user-list fetch, so the only backend call is
+    // fetchOwned — the single stub returns this blueprint page for it.
+    PageResponse<PersonalBlueprintDto> page =
+        new PageResponse<>(List.of(bp), 0, 200, 1L, 1, List.of());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+
+    mockMvc
+        .perform(
+            get("/admin/personal-blueprints")
+                .param("userSub", "00000000-0000-0000-0000-000000000009")
+                .param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/personal-blueprints :: results"))
+        .andExpect(content().string(containsString("Arclight Pistol")))
+        .andExpect(content().string(not(containsString("id=\"bp-results\""))))
+        .andExpect(content().string(not(containsString("id=\"krt-bp-edit-modal\""))))
+        .andExpect(content().string(not(containsString("krt-admin-banner"))));
   }
 
   @Test

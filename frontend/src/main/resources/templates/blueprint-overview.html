@@ -118,6 +118,11 @@
             <input type="hidden" name="size" th:value="${overviewPage.size()}">
         </form>
 
+        <!-- AJAX swap target (REQ-FE-002): filter, paging and the size picker re-render only
+             this block via blueprint-overview.js + krtFetch; the no-JS GET fallback still
+             reloads the whole page. -->
+        <div id="bp-overview-results">
+        <th:block th:fragment="results">
         <div class="table-responsive">
         <table class="data-table">
             <thead>
@@ -162,6 +167,8 @@
              th:with="bpBase=${search != null ? '/blueprint-overview?search=' + #uris.escapeQueryParam(search) : '/blueprint-overview'}">
             <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${bpBase}, sizes=${pageSizes})}"></nav>
             <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${overviewPage}, baseUrl=${bpBase})}"></nav>
+        </div>
+        </th:block>
         </div>
     </div>
 </main>

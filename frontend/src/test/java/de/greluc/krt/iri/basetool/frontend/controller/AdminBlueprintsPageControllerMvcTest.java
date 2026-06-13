@@ -23,20 +23,14 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalInventoryItemDto;
-import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
@@ -52,12 +46,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies admin role enforcement for {@link AdminPersonalInventoryPageController}: a regular user
- * must be denied access (403), while an ADMIN gets the admin view rendered. Backend calls are
- * mocked because this test focuses on routing and security, not backend behavior.
+ * MVC-level render test for {@link AdminBlueprintsPageController}: proves the AJAX swap fragment
+ * (REQ-FE-002) actually resolves and renders. A pure unit test only pins the {@code
+ * admin/blueprints :: results} view-name string; this test fails if that fragment selector is
+ * misspelled or the {@code <th:block th:fragment="results">} block is malformed, which a unit test
+ * cannot catch.
  */
 @SpringBootTest
-class AdminPersonalInventoryPageControllerMvcTest {
+class AdminBlueprintsPageControllerMvcTest {
 
   private MockMvc mockMvc;
 
@@ -74,56 +70,64 @@ class AdminPersonalInventoryPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  @Test
-  @WithMockUser(roles = "USER")
-  void view_shouldDenyAccess_whenUserIsNotAdmin() throws Exception {
-    mockMvc.perform(get("/admin/personal-inventory")).andExpect(status().isForbidden());
+  /**
+   * Builds a one-row blueprint page envelope as the mocked backend answer.
+   *
+   * @param total total number of matching blueprints to report
+   * @return a single-page envelope holding one minimal blueprint row
+   */
+  private static PageResponse<BlueprintDto> page(int total) {
+    BlueprintDto dto =
+        new BlueprintDto(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "BP_OMNI",
+            "Omnisky",
+            540,
+            false,
+            2,
+            1,
+            "4.8",
+            null,
+            null,
+            null,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            0L);
+    int totalPages = total == 0 ? 0 : (int) Math.ceil(total / 25.0);
+    return new PageResponse<>(List.of(dto), 0, 25, total, totalPages, List.of());
   }
 
+  // covers REQ-FE-002 — the full page renders the swap-target wrapper and the toolbar.
   @Test
   @WithMockUser(roles = "ADMIN")
-  void view_shouldRenderAdminView_whenUserIsAdmin() throws Exception {
-    // Given
-    PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of());
-    PageResponse<PersonalInventoryItemDto> empty =
-        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
+  void list_fullPage_rendersSwapWrapper() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(users)
-        .thenReturn(empty);
+        .thenReturn(page(1));
 
-    // When & Then
     mockMvc
-        .perform(get("/admin/personal-inventory"))
+        .perform(get("/admin/blueprints"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/personal-inventory"));
+        .andExpect(content().string(containsString("id=\"admin-bp-results\"")))
+        .andExpect(content().string(containsString("id=\"admin-bp-filter\"")));
   }
 
-  // covers REQ-FE-002 — an AJAX swap (fragment=results) for a selected member renders only the
-  // item-list fragment (the member <select> and admin banner live outside it) and skips the
-  // (up to 1000-row) user-list fetch the full page does.
+  // covers REQ-FE-002 — fragment=results renders only the inner toolbar + table block: the table
+  // and the live total are present, but the swap-target wrapper (outside the fragment) is not.
   @Test
   @WithMockUser(roles = "ADMIN")
-  void view_fragmentResults_rendersOnlyResultsFragment_andSkipsUserListFetch() throws Exception {
-    String userSub = UUID.randomUUID().toString();
-    PageResponse<PersonalInventoryItemDto> items =
-        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/admin/personal-inventory/"), any(ParameterizedTypeReference.class)))
-        .thenReturn(items);
+  void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(page(60));
 
     mockMvc
-        .perform(
-            get("/admin/personal-inventory").param("userSub", userSub).param("fragment", "results"))
+        .perform(get("/admin/blueprints").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/personal-inventory :: results"))
-        .andExpect(content().string(containsString("krt-pi-table")))
-        // Member dropdown, banner and the swap-target wrapper are outside the fragment.
-        .andExpect(content().string(not(containsString("krt-pi-userform"))))
-        .andExpect(content().string(not(containsString("id=\"pi-results\""))))
-        .andExpect(content().string(not(containsString("krt-admin-banner"))));
-
-    // The fragment path must not query the user list.
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class));
+        .andExpect(content().string(containsString("class=\"bp-table\"")))
+        .andExpect(content().string(containsString("class=\"bp-count\"")))
+        .andExpect(content().string(containsString("class=\"pager\"")))
+        .andExpect(content().string(not(containsString("id=\"admin-bp-results\""))));
   }
 }

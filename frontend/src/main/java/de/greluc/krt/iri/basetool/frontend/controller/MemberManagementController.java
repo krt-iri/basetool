@@ -69,14 +69,17 @@ public class MemberManagementController {
    *     {@code /users/search}
    * @param page zero-based page index
    * @param size page size
+   * @param fragment when {@code true}, only the results+pagination fragment is rendered for an
+   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with users, page metadata and the echoed search query
-   * @return the {@code members} view name
+   * @return the {@code members} view name, or its {@code membersTableFragment} selector
    */
   @GetMapping
   public String listMembers(
       @RequestParam(required = false) String search,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
+      @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     try {
       // L-1: build the URI via UriComponentsBuilder so query-param encoding is correct and a
@@ -134,6 +137,9 @@ public class MemberManagementController {
     } catch (Exception e) {
       log.error("Could not fetch members", e);
       model.addAttribute("error", "error.members.load");
+    }
+    if (fragment) {
+      return "members :: membersTableFragment";
     }
     return "members";
   }

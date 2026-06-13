@@ -22,19 +22,20 @@ package de.greluc.krt.iri.basetool.frontend.controller;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalInventoryItemDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,12 +48,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link PersonalInventoryPageController}: verifies that the user-area personal
- * inventory page renders for an authenticated user with model attributes filled from the (mocked)
- * backend.
+ * MVC-level render test for the {@code bank-account-detail :: bookings} AJAX fragment (REQ-FE-002):
+ * proves the booking-history pager fragment actually resolves and renders one booking row + its
+ * page-nav through the real {@code @moneyFormat} bean. A pure unit test only pins the view-name
+ * string; this fails if the fragment selector is misspelled or the booking markup breaks.
  */
 @SpringBootTest
-class PersonalInventoryPageControllerMvcTest {
+class BankAccountDetailFragmentMvcTest {
 
   private MockMvc mockMvc;
 
@@ -69,43 +71,39 @@ class PersonalInventoryPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
+  // covers REQ-FE-002 — fragment=bookings renders only the booking-history block: the booking row
+  // and page-nav are present, but the swap-target wrapper and the page's modals (outside the
+  // fragment) are not.
   @Test
-  @WithMockUser
-  void view_shouldRenderPersonalInventoryView_whenAuthenticated() throws Exception {
-    // Given
-    PageResponse<PersonalInventoryItemDto> empty =
-        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(empty);
-
-    // When & Then
-    mockMvc
-        .perform(get("/personal-inventory"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("personal-inventory"))
-        .andExpect(model().attributeExists("personalInventoryForm"))
-        .andExpect(model().attributeExists("items"));
-  }
-
-  // covers REQ-FE-002 — an AJAX filter swap (fragment=results) renders only the item-list fragment:
-  // the total marker is present, but the swap-target wrapper, the filter form and the modals (all
-  // outside the fragment) are not.
-  @Test
-  @WithMockUser
-  void view_fragmentResults_rendersOnlyResultsFragment() throws Exception {
-    PageResponse<PersonalInventoryItemDto> empty =
-        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(empty);
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void accountDetail_fragmentBookings_rendersOnlyBookingsFragment() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    BankBookingDto booking =
+        new BankBookingDto(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "DEPOSIT",
+            new BigDecimal("250000"),
+            "alpha",
+            "Fragment note",
+            Instant.parse("2026-06-10T18:30:00Z"),
+            null,
+            null,
+            null,
+            null,
+            false);
+    // Two pages so the embedded pager renders.
+    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<>(List.of(booking), 0, 20, 25L, 2, List.of()));
 
     mockMvc
-        .perform(get("/personal-inventory").param("fragment", "results"))
+        .perform(get("/bank/accounts/" + accountId).param("fragment", "bookings"))
         .andExpect(status().isOk())
-        .andExpect(view().name("personal-inventory :: results"))
-        .andExpect(content().string(containsString("id=\"pi-total-meta\"")))
-        .andExpect(content().string(containsString("empty-state")))
-        .andExpect(content().string(not(containsString("id=\"pi-results\""))))
-        .andExpect(content().string(not(containsString("krt-pi-filter"))))
-        .andExpect(content().string(not(containsString("id=\"krt-pi-modal\""))));
+        .andExpect(content().string(containsString("Fragment note")))
+        .andExpect(content().string(containsString("class=\"pagination\"")))
+        .andExpect(content().string(containsString("/bank/accounts/" + accountId + "?page=1")))
+        // Wrapper div and the page's modals live outside the fragment.
+        .andExpect(content().string(not(containsString("id=\"bank-bookings-results\""))))
+        .andExpect(content().string(not(containsString("bank-statement-submit"))));
   }
 }

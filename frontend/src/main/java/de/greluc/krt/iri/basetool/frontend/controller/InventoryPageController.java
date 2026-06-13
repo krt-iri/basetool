@@ -86,13 +86,17 @@ public class InventoryPageController {
    *
    * @param page zero-based page index
    * @param size page size
+   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
+   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with the page, aggregated items and material catalog
-   * @return the {@code inventory-index} view name
+   * @return the {@code inventory-index} view name, or its {@code inventoryResults} fragment
+   *     selector
    */
   @GetMapping
   public String viewAggregatedInventory(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String fragment,
       Model model) {
     List<AggregatedInventoryDto> aggregated = new ArrayList<>();
     try {
@@ -123,6 +127,9 @@ public class InventoryPageController {
 
     model.addAttribute("aggregated", aggregated);
     model.addAttribute("materials", materials);
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "inventory-index :: inventoryResults";
+    }
     return "inventory-index";
   }
 

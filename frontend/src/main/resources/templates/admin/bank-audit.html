@@ -35,8 +35,9 @@
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
-    <!-- A2 filter bar: period (split datetime), account, event type. -->
-    <form method="get" th:action="@{/admin/bank-audit}" class="bank-filterbar mt-2 no-track">
+    <!-- A2 filter bar: period (split datetime), account, event type. Filtering + paging are
+         in-place via bank-audit.js (krtFetch.swap); the GET form is the no-JS fallback. -->
+    <form id="bank-audit-filter-form" method="get" th:action="@{/admin/bank-audit}" class="bank-filterbar mt-2 no-track">
         <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
             <label for="bank-audit-from-date" th:text="#{admin.bank.audit.filter.from}">Von</label>
             <input type="hidden" name="from" th:value="${filterFrom}">
@@ -70,13 +71,15 @@
         <div class="bank-filter-actions">
             <button type="submit" class="btn btn--cta" data-testid="bank-audit-filter-apply"
                     th:text="#{admin.bank.audit.filter.apply}">Filtern</button>
-            <a th:href="@{/admin/bank-audit}" class="btn btn-ghost"
+            <a id="bank-audit-filter-reset" th:href="@{/admin/bank-audit}" class="btn btn-ghost"
                th:text="#{admin.bank.audit.filter.reset}">Zur&uuml;cksetzen</a>
         </div>
     </form>
 
     <div class="bank-panel mt-2" data-testid="bank-audit-panel">
         <div class="bank-panel-body">
+            <div id="bank-audit-results">
+            <th:block th:fragment="auditResults">
             <div class="table-responsive" th:if="${events != null and !#lists.isEmpty(events.content())}">
                 <table class="data-table">
                     <thead>
@@ -107,10 +110,13 @@
                data-testid="bank-audit-empty" th:text="#{admin.bank.audit.empty}">Keine Ereignisse.</p>
             <nav th:if="${events != null}"
                  th:replace="~{fragments/pagination :: pagination(${events}, ${paginationBaseUrl})}"></nav>
+            </th:block>
+            </div>
         </div>
     </div>
 </main>
 
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/bank-audit.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

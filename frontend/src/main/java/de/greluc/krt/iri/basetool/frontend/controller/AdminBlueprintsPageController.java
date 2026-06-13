@@ -62,13 +62,17 @@ public class AdminBlueprintsPageController {
    *
    * @param search optional case-insensitive output-name / key filter
    * @param page zero-based page index
+   * @param fragment when {@code "results"} only the toolbar + table + pager fragment is rendered
+   *     (AJAX filter/paging swap, REQ-FE-002); otherwise the full page is returned
    * @param model Thymeleaf model
-   * @return the {@code admin/blueprints} view name
+   * @return the {@code admin/blueprints} view name, or its {@code results} fragment for an AJAX
+   *     swap request
    */
   @GetMapping
   public String listBlueprints(
       @RequestParam(required = false) String search,
       @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false) String fragment,
       Model model) {
     int safePage = Math.max(page, 0);
     String trimmed = (search == null || search.isBlank()) ? null : search.trim();
@@ -102,7 +106,7 @@ public class AdminBlueprintsPageController {
       populateEmpty(model);
     }
     model.addAttribute("search", trimmed == null ? "" : trimmed);
-    return "admin/blueprints";
+    return "results".equals(fragment) ? "admin/blueprints :: results" : "admin/blueprints";
   }
 
   /**
