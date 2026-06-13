@@ -355,19 +355,28 @@
                 link.addEventListener('click', closeSidebar);
             });
 
-            document.querySelectorAll('.utc-time').forEach(el => {
-                const text = el.textContent.trim();
-                if (text && (text.endsWith('Z') || text.includes('T'))) {
-                    let dateStr = text;
-                    if (!dateStr.endsWith('Z')) dateStr += 'Z';
-                    const date = new Date(dateStr);
-                    if (!isNaN(date)) {
-                        el.textContent = new Intl.DateTimeFormat(undefined, { 
-                            year: 'numeric', month: '2-digit', day: '2-digit', 
-                            hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' 
-                        }).format(date);
+            // Localise UTC timestamps. Extracted into a function and also re-run on
+            // `krt:swapped` so fragment-swapped content (krtFetch.swap) is formatted too —
+            // a one-shot DOMContentLoaded pass would leave swapped-in rows raw (#573).
+            function formatUtcTimes(root) {
+                (root || document).querySelectorAll('.utc-time').forEach(el => {
+                    const text = el.textContent.trim();
+                    if (text && (text.endsWith('Z') || text.includes('T'))) {
+                        let dateStr = text;
+                        if (!dateStr.endsWith('Z')) dateStr += 'Z';
+                        const date = new Date(dateStr);
+                        if (!isNaN(date)) {
+                            el.textContent = new Intl.DateTimeFormat(undefined, {
+                                year: 'numeric', month: '2-digit', day: '2-digit',
+                                hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin'
+                            }).format(date);
+                        }
                     }
-                }
+                });
+            }
+            formatUtcTimes(document);
+            document.addEventListener('krt:swapped', function (e) {
+                formatUtcTimes(e && e.detail ? e.detail.container : document);
             });
 
             // Auto-submit the admin-only squadron switcher when the dropdown
