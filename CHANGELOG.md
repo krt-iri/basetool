@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Weitere Listen filtern und blättern jetzt ohne Seitenneuladen: Bank-Audit-Log, Mitgliederverwaltung, Raffinerieaufträge, die Staffel-Hangarübersicht und die Lager-Gesamtübersicht** (inkl. Suche, Seitengröße und Seitennavigation, soweit vorhanden). Gefilterte/geblätterte Listen (Einsätze, Operationen, Bank-Audit, Mitglieder, Raffinerieaufträge, Staffel-Hangar, Lagerübersicht) halten den Filter beim Neuladen der Seite (die URL bleibt in Sync) und springen nicht mehr an den Seitenanfang; Zeitstempel in nachgeladenen Tabellenzeilen werden jetzt ebenfalls in lokale Zeit umgerechnet.
+
+## [v0.4.21](https://github.com/krt-iri/basetool/releases/tag/v0.4.21) - 2026-06-13
+
 ### Added
 
 - **Kartellbank (Epic #556):** Neuer Bank-Bereich für die Organisation. Konten je Org-Einheit/Bereich plus Kartell- und Kartellbank-Sonderkonten, mit Halter-Verteilung statt Einzelkonten — jede Buchung ist einem Halter zugeordnet, der Kontosaldo ist die Summe aller Halter-Bestände. Bank-Mitarbeiter sehen und bebuchen nur freigegebene Konten (Einzahlen/Auszahlen/Transfer je Konto einzeln berechtigt), die Bankleitung verwaltet Konten, Halter und Berechtigungen. Ein- und Auszahlungen, Konto-zu-Konto-Transfers und Halter-Umbuchungen laufen über ein fälschungssicheres, nur-anhängendes Hauptbuch; Korrekturen erfolgen als Storno-Gegenbuchung (Bankleitung). Der Bank-Zugang ist unabhängig von der Staffel-/Org-Zugehörigkeit. Kontoauszug (Zeitraum frei wählbar) und 3-Monats-Report als PDF im KRT-Design. Ein Wipe-Reset und ein Storno selbst sind nicht stornierbar — korrigiert wird stets die Ursprungsbuchung.
@@ -17,8 +23,6 @@
 - **Raffinerieauftrag: In den Materialzeilen steht die Qualität jetzt vor der Eingangsmenge (Units).** Die Feldreihenfolge im Anlege- und Detailformular folgt damit der Reihenfolge im Spiel; die Ausgangszeile (Units, SCU) bleibt unverändert.
 
 - **Listenfilter und Seitennavigation (Einsätze, Operationen) laufen jetzt über eine gemeinsame AJAX-Grundlage und aktualisieren nur den Ergebnisbereich.** Das Blättern in den gefilterten Ergebnissen lädt nicht mehr die ganze Seite neu.
-
-- **Weitere Listen filtern und blättern jetzt ohne Seitenneuladen: Bank-Audit-Log, Mitgliederverwaltung, Raffinerieaufträge, die Staffel-Hangarübersicht und die Lager-Gesamtübersicht** (inkl. Suche, Seitengröße und Seitennavigation, soweit vorhanden). Gefilterte/geblätterte Listen (Einsätze, Operationen, Bank-Audit, Mitglieder, Raffinerieaufträge, Staffel-Hangar, Lagerübersicht) halten den Filter beim Neuladen der Seite (die URL bleibt in Sync) und springen nicht mehr an den Seitenanfang; Zeitstempel in nachgeladenen Tabellenzeilen werden jetzt ebenfalls in lokale Zeit umgerechnet.
 
 ### Removed
 
