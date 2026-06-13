@@ -302,15 +302,18 @@ public class HangarPageController {
    * @param page zero-based page index, defaults to the first page; negatives are clamped to 0
    * @param size page size, validated against {@link #SQUADRON_PAGE_SIZES}
    * @param search optional ship-type/manufacturer filter, applied server-side by the backend
+   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
+   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with the overview page, the picker options and the
    *     pagination base URL (search-preserving)
-   * @return the {@code hangar-squadron} view name
+   * @return the {@code hangar-squadron} view name, or its {@code squadronResults} fragment selector
    */
   @GetMapping("/squadron")
   public String viewSquadron(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String search,
+      @RequestParam(required = false) String fragment,
       Model model) {
     int effectiveSize =
         size != null && SQUADRON_PAGE_SIZES.contains(size) ? size : SQUADRON_DEFAULT_PAGE_SIZE;
@@ -353,6 +356,9 @@ public class HangarPageController {
     model.addAttribute("pageSizes", SQUADRON_PAGE_SIZES);
     model.addAttribute("pageSize", effectiveSize);
     model.addAttribute("paginationBaseUrl", paginationBaseUrl);
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "hangar-squadron :: squadronResults";
+    }
     return "hangar-squadron";
   }
 
