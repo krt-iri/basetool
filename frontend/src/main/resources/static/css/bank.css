@@ -609,6 +609,26 @@ tr.is-inert td {
     color: var(--color-gray-2);
 }
 
+/*
+ * Grants view only: the account/employee filter <select> sits directly beside
+ * the .tab-nav group (its label is .visually-hidden, so the form row is just
+ * the select). Stretch both children to a shared height and drop the form-row's
+ * bottom margin so the two dark-gray surfaces — the tab box and the dropdown —
+ * line up flush at their top and bottom edges. Scoped to the --tabs modifier so
+ * the multi-row audit filter bar keeps its flex-end baseline alignment.
+ */
+.bank-filterbar--tabs {
+    align-items: stretch;
+}
+
+.bank-filterbar--tabs .bank-form-row {
+    margin-bottom: 0;
+}
+
+.bank-filterbar--tabs .bank-form-row select {
+    height: 100%;
+}
+
 /* ---- Small shared utilities scoped to the bank pages ---- */
 .btn-sm {
     padding: 3px 9px;

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bank-Verwaltung: Das Auswahlfeld „Org-Einheit" im Dialog „Konto anlegen" zeigt wieder die Namen der Org-Einheiten statt „null".** Die Seite las die Org-Einheiten-Liste in das falsche DTO ein; dadurch fehlten Name und Id jeder Option (die Auswahl hätte zudem keine Org-Einheit übermittelt).
+
+- **Bank-Berechtigungen: Das Konten-Auswahlfeld in der Filterleiste ist jetzt genauso hoch wie der Tab-Kasten daneben** und schließt oben und unten bündig mit ihm ab (vorher saß das Dropdown rund 12 px zu hoch).
+
 ## [v0.4.21](https://github.com/krt-iri/basetool/releases/tag/v0.4.21) - 2026-06-13
 
 ### Added
