@@ -244,110 +244,20 @@ public class RefineryOrderPageController {
           + (form.getSource() != null ? "?source=" + form.getSource() : "");
     }
     try {
-      List<de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto> goodsDto =
-          new ArrayList<>();
-      for (RefineryGoodForm g : form.getGoods()) {
-        if (g.getInputMaterialId() != null && g.getInputQuantity() != null) {
-          de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto inMat =
-              new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(
-                  g.getInputMaterialId(),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null);
-          de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto outMat =
-              g.getOutputMaterialId() != null
-                  ? new de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto(
-                      g.getOutputMaterialId(),
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null)
-                  : null;
-          goodsDto.add(
-              new de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto(
-                  null,
-                  inMat,
-                  g.getInputQuantity(),
-                  outMat,
-                  g.getOutputQuantity(),
-                  g.getQuality() != null ? g.getQuality() : 0,
-                  null));
-        }
-      }
+      RefineryOrderDto orderDto = buildRefineryOrderDto(null, form, form.getOwningOrgUnitId());
 
-      if (goodsDto.isEmpty()) {
+      if (orderDto.goods().isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.material.invalid");
         redirectAttributes.addFlashAttribute("refineryOrderForm", form);
         return "redirect:/refinery-orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }
 
-      java.time.Instant startedAtTime = parseStartedAt(form.getStartedAt());
-
-      RefineryOrderDto orderDto =
-          new RefineryOrderDto(
-              null,
-              form.getOwnerId() != null
-                  ? new de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto(
-                      form.getOwnerId(), null, null, null, null)
-                  : null,
-              form.getLocationId() != null
-                  ? new de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto(
-                      form.getLocationId(), null, null, false, false, null)
-                  : null,
-              form.getMissionId() != null
-                  ? new de.greluc.krt.iri.basetool.frontend.model.dto.MissionReferenceDto(
-                      form.getMissionId(), null, null, null)
-                  : null,
-              startedAtTime,
-              (long)
-                  ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60
-                      + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
-              nullToZero(form.getExpenses()),
-              nullToZero(form.getOtherExpenses()),
-              nullToZero(form.getOreSales()),
-              null,
-              form.getRefiningMethodId() != null
-                  ? new de.greluc.krt.iri.basetool.frontend.model.dto.RefiningMethodDto(
-                      form.getRefiningMethodId(), null, null, null, null, null, null)
-                  : null,
-              goodsDto,
-              form.getStatus() != null
-                  ? form.getStatus()
-                  : de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
-              null,
-              form.getVersion(),
-              form.getOwningOrgUnitId());
-
       log.info("Sending refinery order DTO: {}", orderDto);
 
       backendApiClient.post("/api/v1/refinery-orders", orderDto, RefineryOrderDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.create");
 
-      if ("index".equals(form.getSource())) {
-        return "redirect:/refinery-orders";
-      }
       return "redirect:/refinery-orders";
     } catch (Exception e) {
       log.error("Failed to create refinery order", e);
@@ -599,7 +509,7 @@ public class RefineryOrderPageController {
       return "redirect:/refinery-orders/" + id;
     }
     try {
-      RefineryOrderDto orderDto = buildRefineryOrderDto(id, form);
+      RefineryOrderDto orderDto = buildRefineryOrderDto(id, form, null);
       if (orderDto.goods().isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.material.invalid");
         redirectAttributes.addFlashAttribute("refineryOrderForm", form);
@@ -678,15 +588,19 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Builds the {@link RefineryOrderDto} from an edit form (goods stubs + metadata), shared by the
-   * classic {@link #updateOrder} and its AJAX twin. Goods rows without an input material/quantity
-   * are dropped; on the edit path the owning org-unit stamp is preserved (passed null).
+   * Builds the {@link RefineryOrderDto} from a create/edit form (goods stubs + metadata), shared by
+   * the classic {@link #createOrder} / {@link #updateOrder} handlers and their AJAX twins. Goods
+   * rows without an input material/quantity are dropped. The create path passes a {@code null} id
+   * plus the form's {@code owningOrgUnitId} to stamp the owner; the edit path passes the real
+   * {@code id} and a {@code null} stamp so the backend preserves the original org-unit.
    *
-   * @param id the refinery order id
-   * @param form the bound edit form
-   * @return the order DTO ready to PUT
+   * @param id the refinery order id, or {@code null} when building a create DTO
+   * @param form the bound create/edit form
+   * @param owningOrgUnitId the owning org-unit stamp ({@code null} on the edit path)
+   * @return the order DTO ready to POST/PUT
    */
-  private RefineryOrderDto buildRefineryOrderDto(UUID id, RefineryOrderForm form) {
+  private RefineryOrderDto buildRefineryOrderDto(
+      UUID id, RefineryOrderForm form, UUID owningOrgUnitId) {
     List<de.greluc.krt.iri.basetool.frontend.model.dto.RefineryGoodDto> goodsDto =
         new ArrayList<>();
     for (RefineryGoodForm g : form.getGoods()) {
@@ -771,7 +685,7 @@ public class RefineryOrderPageController {
             : de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStatus.OPEN,
         null,
         form.getVersion(),
-        null);
+        owningOrgUnitId);
   }
 
   /**
@@ -844,7 +758,7 @@ public class RefineryOrderPageController {
     if (bindingResult.hasErrors()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
-    RefineryOrderDto orderDto = buildRefineryOrderDto(id, form);
+    RefineryOrderDto orderDto = buildRefineryOrderDto(id, form, null);
     if (orderDto.goods().isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
@@ -921,6 +835,45 @@ public class RefineryOrderPageController {
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to cancel refinery order {} (ajax)", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * AJAX twin of {@link #createOrder} (#575): persists a new refinery order and returns the
+   * post-create navigation target as JSON, so the create page navigates itself on success and stays
+   * put with an inline toast (keeping the entered data) on a validation / empty-goods / backend
+   * failure instead of a server redirect. Routed by the {@code X-Requested-With} header; the
+   * classic form-POST handler stays the no-JS fallback. Binding / empty-goods errors → 400.
+   *
+   * @param form the bound create form
+   * @param bindingResult the binding/validation result
+   * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("isAuthenticated()")
+  @org.springframework.web.bind.annotation.ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createOrderAjax(
+      @Valid @ModelAttribute("refineryOrderForm") RefineryOrderForm form,
+      BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    RefineryOrderDto orderDto = buildRefineryOrderDto(null, form, form.getOwningOrgUnitId());
+    if (orderDto.goods().isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      backendApiClient.post("/api/v1/refinery-orders", orderDto, RefineryOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(
+          java.util.Map.of("targetUrl", "/refinery-orders"));
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException bse) {
+      log.error("Failed to create refinery order (ajax): {}", bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create refinery order (ajax)", e);
       return org.springframework.http.ResponseEntity.status(
               org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
           .build();

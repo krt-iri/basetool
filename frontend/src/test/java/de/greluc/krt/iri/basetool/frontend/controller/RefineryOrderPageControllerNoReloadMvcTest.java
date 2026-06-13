@@ -125,6 +125,37 @@ class RefineryOrderPageControllerNoReloadMvcTest {
 
   @Test
   @WithMockUser(roles = {"MEMBER"})
+  void createOrderAjax_ValidForm_ReturnsListTarget() throws Exception {
+    mockMvc
+        .perform(
+            post("/refinery-orders/create")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("goods[0].inputMaterialId", UUID.randomUUID().toString())
+                .param("goods[0].inputQuantity", "100")
+                .param("goods[0].outputQuantity", "50"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.targetUrl").value("/refinery-orders"));
+
+    verify(backendApiClient).post(eq("/api/v1/refinery-orders"), any(), eq(RefineryOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER"})
+  void createOrderAjax_EmptyGoods_Returns400WithoutCallingBackend() throws Exception {
+    mockMvc
+        .perform(
+            post("/refinery-orders/create")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isBadRequest());
+
+    verify(backendApiClient, never())
+        .post(eq("/api/v1/refinery-orders"), any(), eq(RefineryOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"MEMBER"})
   void deleteOrderAjax_ReturnsListTarget() throws Exception {
     UUID id = UUID.randomUUID();
 
