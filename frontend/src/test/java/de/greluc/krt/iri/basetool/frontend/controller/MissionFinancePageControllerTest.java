@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -91,7 +92,7 @@ class MissionFinancePageControllerTest {
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
-      when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal)))
+      when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal), isNull()))
           .thenReturn("mission-detail");
 
       String view =
@@ -185,7 +186,7 @@ class MissionFinancePageControllerTest {
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
-      when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal)))
+      when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal), isNull()))
           .thenReturn("mission-detail");
 
       String view =

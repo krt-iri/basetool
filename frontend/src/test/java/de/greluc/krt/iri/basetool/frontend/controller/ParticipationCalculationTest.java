@@ -109,7 +109,7 @@ class ParticipationCalculationTest {
     Model model = new ConcurrentModel();
 
     // Act
-    controller.missionDetail(missionId, model, null);
+    controller.missionDetail(missionId, model, null, null);
 
     // Assert
     Map<UUID, Double> percentages =
@@ -207,7 +207,7 @@ class ParticipationCalculationTest {
     Model model = new ConcurrentModel();
 
     // Act
-    controller.missionDetail(missionId, model, null);
+    controller.missionDetail(missionId, model, null, null);
 
     // Assert
     Map<UUID, Double> percentages =

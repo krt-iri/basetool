@@ -417,7 +417,7 @@ class MissionPageControllerTest {
         .thenReturn(Collections.emptyList());
 
     // Act
-    String view = controller.missionDetail(id, model, null);
+    String view = controller.missionDetail(id, model, null, null);
 
     // Assert
     assertEquals("mission-detail", view);
@@ -498,7 +498,7 @@ class MissionPageControllerTest {
         .thenReturn(Collections.emptyList());
 
     // Act
-    controller.missionDetail(id, model, null);
+    controller.missionDetail(id, model, null, null);
 
     // Assert
     verify(backendApiClient, never())

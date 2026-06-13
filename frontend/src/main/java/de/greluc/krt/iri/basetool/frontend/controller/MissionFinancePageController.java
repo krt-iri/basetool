@@ -82,7 +82,7 @@ public class MissionFinancePageController {
       @AuthenticationPrincipal OidcUser principal) {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "finance-entry-modal");
-      return missionPageController.missionDetail(id, model, principal);
+      return missionPageController.missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -128,7 +128,7 @@ public class MissionFinancePageController {
       model.addAttribute("openModal", "edit-finance-entry-modal");
       model.addAttribute(
           "modalAction", "/missions/" + id + "/finance-entries/" + entryId + "/update");
-      return missionPageController.missionDetail(id, model, principal);
+      return missionPageController.missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();

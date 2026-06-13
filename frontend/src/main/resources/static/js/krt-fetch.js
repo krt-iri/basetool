@@ -467,63 +467,7 @@
         csrf: window.krtCsrf,
     };
 
-    // ----------------------------------------------- MissionSubresource alias
-
-    // Thin backward-compatibility shim so mission-detail.html keeps working
-    // unchanged (it is migrated to call krtFetch directly in the Missions child,
-    // #574). All mission-specific user-visible strings are sourced from
-    // window.MISSION_SUBRES_I18N here, preserving the exact prior behaviour.
-    function missionI18n(key, fallback) {
-        const dict = window.MISSION_SUBRES_I18N || {};
-        return text(dict[key], fallback);
-    }
-
-    function missionConflict() {
-        return {
-            title: missionI18n('mission.conflict.toast.title', 'Konflikt'),
-            reloadLabel: missionI18n('mission.conflict.action.reload', 'Aktuelle Werte laden'),
-            dismissLabel: missionI18n('mission.conflict.action.dismiss', 'Schliessen'),
-            reloadQuestion: missionI18n(
-                'mission.conflict.action.reload.question',
-                'Aktuelle Werte laden? Eingaben in anderen Bereichen bleiben erhalten (via Neuladen' +
-                    ' gehen sie verloren).',
-            ),
-            reloadDetailFallback: missionI18n(
-                'mission.conflict.toast.detail',
-                'Bitte Seite neu laden.',
-            ),
-        };
-    }
-
-    window.MissionSubresource = {
-        patchSubResource: function (opts) {
-            const key = opts.sectionKey;
-            return write(
-                Object.assign({}, opts, {
-                    sectionLabel: missionI18n('mission.save.section.' + key, key),
-                    conflictSectionLabel: missionI18n('mission.conflict.section.' + key, key),
-                    successMessage: missionI18n('mission.save.section.ok', 'Gespeichert.'),
-                    errorMessage: missionI18n(
-                        'mission.save.section.error',
-                        'Speichern fehlgeschlagen.',
-                    ),
-                    conflict: missionConflict(),
-                }),
-            );
-        },
-        syncVersion: syncVersion,
-        handleProblem: function (response, sectionKey, problem) {
-            return handleProblem(response, problem, {
-                conflictSectionLabel: missionI18n(
-                    'mission.conflict.section.' + sectionKey,
-                    sectionKey,
-                ),
-                errorMessage: missionI18n(
-                    'mission.save.section.error',
-                    'Speichern fehlgeschlagen.',
-                ),
-                conflict: missionConflict(),
-            });
-        },
-    };
+    // The former window.MissionSubresource alias was retired in #574; mission-detail.html now calls
+    // window.krtFetch.write directly through a small page-local krtMissionWrite wrapper, so this
+    // shared module carries no mission-specific code or strings.
 })();

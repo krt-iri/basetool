@@ -292,11 +292,26 @@ public class MissionPageController {
    * modals so the same controller method serves both fresh renders and post-flash re-renders after
    * a validation failure.
    *
-   * @return the {@code mission-detail} view name
+   * <p>When {@code fragment} is set the same fully populated model is rendered through a single
+   * Thymeleaf fragment instead of the whole page, so an in-place AJAX swap (epic #571) can
+   * re-render one section after a sub-mutation: {@code crew-board} → the crew board, {@code
+   * finance} → the finance &amp; payout pane, {@code mgmt} → the owner/manager management panel.
+   * The full model is still built for every fragment value, so the fragment never references a
+   * missing attribute.
+   *
+   * @param id the mission id
+   * @param model the Spring MVC model populated with the mission aggregate and form backers
+   * @param principal the authenticated user, or {@code null} for an anonymous/guest visitor
+   * @param fragment the optional section key selecting an in-place fragment render
+   * @return the {@code mission-detail} view name, or a {@code mission-detail :: <fragment>}
+   *     selector
    */
   @GetMapping("/{id}")
   public String missionDetail(
-      @PathVariable @NotNull UUID id, Model model, @AuthenticationPrincipal OidcUser principal) {
+      @PathVariable @NotNull UUID id,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal,
+      @RequestParam(required = false) String fragment) {
     try {
       MissionDto mission =
           backendApiClient.get(
@@ -674,6 +689,16 @@ public class MissionPageController {
     // NOT the Keycloak UUID. We must use principal.getSubject() to get the sub (UUID) that matches
     // p.user.id in the participant list.
     model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
+    // In-place AJAX swap (epic #571): re-render only the section the caller mutated. The full model
+    // is already built above, so each fragment renders with every attribute it needs.
+    if (fragment != null) {
+      return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
+        case "crew-board" -> "mission-detail :: crewBoard";
+        case "finance" -> "mission-detail :: financeSection";
+        case "mgmt" -> "mission-detail :: mgmtPanels";
+        default -> "mission-detail";
+      };
+    }
     return "mission-detail";
   }
 
@@ -694,7 +719,7 @@ public class MissionPageController {
     if (bindingResult.hasErrors()) {
       // Render directly; BindingResult stays request-scoped (see RedisSessionConfig).
       model.addAttribute("openModal", "participant-modal");
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -987,7 +1012,7 @@ public class MissionPageController {
       model.addAttribute("openModal", "edit-participant-modal");
       model.addAttribute(
           "modalAction", "/missions/" + id + "/participants/" + participantId + "/update");
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1148,7 +1173,7 @@ public class MissionPageController {
     if (bindingResult.hasErrors()) {
       model.addAttribute("openModal", "assign-crew-modal");
       model.addAttribute("modalAction", "/missions/" + id + "/units/" + unitId + "/crew");
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1187,7 +1212,7 @@ public class MissionPageController {
       model.addAttribute("openModal", "edit-crew-modal");
       model.addAttribute(
           "modalAction", "/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/update");
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1388,7 +1413,7 @@ public class MissionPageController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      return missionDetail(id, model, principal);
+      return missionDetail(id, model, principal, null);
     }
     try {
       Instant meetingTime =
