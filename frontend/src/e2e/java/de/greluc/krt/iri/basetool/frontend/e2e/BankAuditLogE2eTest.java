@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
@@ -27,6 +28,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -103,17 +105,28 @@ class BankAuditLogE2eTest {
             page.locator("[data-testid='bank-audit-row']").count() >= 1,
             "the audit viewer lists at least one event");
 
+        // Mark the live document: a full navigation/reload wipes it. The audit filter now swaps
+        // the results in place (REQ-FE-002), so there is no form-post navigation to await — the
+        // old awaitFormPost() waited for a navigation that the AJAX swap never makes and timed out.
+        page.evaluate("() => { window.__krtNoReload = true; }");
+
         // Filter to DEPOSIT_BOOKED and apply — the seeded deposit keeps the table non-empty.
         page.locator("[data-testid='bank-audit-filter-event']").selectOption("DEPOSIT_BOOKED");
-        E2eSupport.awaitFormPost(
-            page, () -> page.locator("[data-testid='bank-audit-filter-apply']").click());
-        page.waitForLoadState();
-        // Same web-first wait after the filter form-post before reading count() (the webkit flake).
+        page.locator("[data-testid='bank-audit-filter-apply']").click();
+        // Web-first wait after the in-place swap before reading count() (the webkit flake).
         assertThat(page.locator("[data-testid='bank-audit-row']").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertTrue(
             page.locator("[data-testid='bank-audit-row']").count() >= 1,
             "filtering by DEPOSIT_BOOKED still lists the seeded deposit");
+
+        // The filter ran in place — no page reload — and the URL carries the filter (history sync),
+        // which only happens after a successful swap.
+        assertThat(page).hasURL(Pattern.compile(".*[?&]eventType=DEPOSIT_BOOKED.*"));
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("() => window.__krtNoReload === true"),
+            "Filtering the audit log must update in place — no page reload.");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "bank-audit-viewer");
         throw failure;
