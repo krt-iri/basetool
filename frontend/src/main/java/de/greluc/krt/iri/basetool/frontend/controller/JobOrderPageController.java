@@ -411,6 +411,9 @@ public class JobOrderPageController {
         case "aggregated" -> "orders-detail :: aggregatedSection";
         case "header" -> "orders-detail :: orderHeader";
         case "handovers" -> "orders-detail :: materialHandoverSection";
+        case "items" -> "orders-detail :: itemsSection";
+        case "item-handovers" -> "orders-detail :: itemHandoverSection";
+        case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
         default -> "orders-detail";
       };
     }

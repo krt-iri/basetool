@@ -210,6 +210,9 @@
              material, and (3) the internal aggregated-materials view (one row per material+quality,
              unit-formatted by quantityType). Mirrors the material layout as closely as possible. -->
         <th:block th:if="${order.type == 'ITEM'}">
+        <!-- In-place AJAX swap container (#575): an item handover re-renders the ordered-items
+             table (delivered/outstanding per row) via GET /orders/{id}?fragment=items. -->
+        <div id="order-items-results"><th:block th:fragment="itemsSection">
         <h3 class="section-title" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
         <div class="table-responsive">
         <table class="data-table">
@@ -248,6 +251,7 @@
             </tbody>
         </table>
         </div>
+        </th:block></div>
 
         <!-- Items whose blueprint resolved to no procurable material (empty materials list). The
              persisted order keeps only resolved requirements, so an empty list is the detail-time
@@ -552,6 +556,10 @@
              backend decrements outstanding amounts and auto-completes the order once every line is
              fully delivered. Each persisted handover offers a PDF delivery note. -->
         <th:block th:if="${order.type == 'ITEM'}">
+        <!-- In-place AJAX swap container (#575): an item handover re-renders this section (history
+             gains a row; the open button hides once every line is delivered) via
+             GET /orders/{id}?fragment=item-handovers. -->
+        <div id="order-item-handovers-results"><th:block th:fragment="itemHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
 
         <!-- Handover toolbar — mirrors the MATERIAL handover toolbar by sitting the
@@ -603,6 +611,7 @@
                 </table>
             </div>
         </div>
+        </th:block></div>
         </th:block>
     </div>
 </main>
@@ -838,7 +847,7 @@
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="item-handover-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
 
-        <form data-testid="item-handover-form" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
+        <form data-testid="item-handover-form" id="item-handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                 <label for="itemHandoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="itemHandoverTime" th:field="*{handoverTime}">
@@ -856,6 +865,12 @@
             <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.lines}">Übergebene Items</h3>
             <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.hint}">Trage je Item die übergebene Stückzahl ein (maximal die ausstehende Menge).</p>
 
+            <!-- The outstanding-line rows are an in-place swap target (#575): an item handover
+                 re-renders them (fresh max=) via GET /orders/{id}?fragment=item-handover-lines so a
+                 consecutive handover uses the updated caps. ONLY the rows swap — the datetime widget
+                 + recipient above stay put, so the form's submit listener and the one-shot datetime
+                 enhancer both survive. -->
+            <div id="item-handover-lines"><th:block th:fragment="itemHandoverLines">
             <!-- One row per outstanding ordered-item line. Inputs are named by request-param index so
                  Spring binds them onto itemHandoverForm.entries; the controller drops empty rows. The
                  outstanding value is computed once on the iterating th:block (th:with runs after
@@ -877,6 +892,7 @@
                     </div>
                 </div>
             </th:block>
+            </th:block></div>
 
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
                 <button type="button" class="btn btn-ghost" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="item-handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
@@ -912,6 +928,24 @@
             recipientHandle: (document.getElementById('recipientHandle') || {}).value || '',
             recipientSquadron: (document.getElementById('recipientSquadron') || {}).value || '',
             items: items
+        };
+    }
+
+    // Serialize the item-handover modal's per-line whole-unit amounts to the JSON its twin binds.
+    function _serializeItemHandoverForm() {
+        const entries = [];
+        document.querySelectorAll('#item-handover-modal .item-handover-line').forEach(function (line) {
+            const idInput = line.querySelector('input[name$=".jobOrderItemId"]');
+            const amtInput = line.querySelector('input[name$=".amount"]');
+            const jobOrderItemId = idInput ? idInput.value : '';
+            const amount = amtInput ? parseInt(amtInput.value, 10) : NaN;
+            if (!jobOrderItemId || !(amount > 0)) return;
+            entries.push({ jobOrderItemId: jobOrderItemId, amount: amount });
+        });
+        return {
+            handoverTime: (document.getElementById('itemHandoverTime') || {}).value || '',
+            recipientHandle: (document.getElementById('itemRecipientHandle') || {}).value || '',
+            entries: entries
         };
     }
 
@@ -1095,12 +1129,40 @@
                 });
             });
         }
-        const itemHandoverForm = document.querySelector('#item-handover-modal form');
+        const itemHandoverForm = document.getElementById('item-handover-form');
         if (itemHandoverForm) {
-            itemHandoverForm.addEventListener('submit', (e) => {
-                if (typeof validateItemHandoverForm === 'function' && !validateItemHandoverForm()) {
-                    e.preventDefault();
+            itemHandoverForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (typeof validateItemHandoverForm === 'function' && !validateItemHandoverForm()) return;
+                const orderId = itemHandoverForm.getAttribute('data-order-id');
+                if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
+                    itemHandoverForm.submit();
+                    return;
                 }
+                const payload = _serializeItemHandoverForm();
+                if (!payload.entries.length) { showFrontendErrorToast(MSG_HANDOVER_NOITEMS); return; }
+                await krtOrderWrite({
+                    method: 'POST',
+                    url: '/orders/' + orderId + '/item-handovers',
+                    payload: payload,
+                    toast: false,
+                    errorMessage: MSG_HANDOVER_FAILED,
+                    onSuccess: function (order) {
+                        const editVer = document.querySelector('#edit-modal input[name="version"]');
+                        if (editVer && order && order.version != null) editVer.value = order.version;
+                        const modal = document.getElementById('item-handover-modal');
+                        if (modal) modal.style.display = 'none';
+                        showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
+                        // Re-render the ordered-items table (delivered/outstanding), the history (new
+                        // row + button-gating), the modal's outstanding-line rows (fresh max=) and the
+                        // header (status, if auto-completed). The datetime widget + recipient stay put,
+                        // so the form binding and the one-shot datetime enhancer survive.
+                        _swapOrderSection(orderId, 'order-items-results', 'items');
+                        _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
+                        _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
+                        _swapOrderSection(orderId, 'order-header-results', 'header');
+                    }
+                });
             });
         }
     });
