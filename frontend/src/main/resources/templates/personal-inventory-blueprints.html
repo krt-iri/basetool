@@ -68,8 +68,16 @@
         </a>
     </nav>
 
-    <!-- Collection: master list left, permanent recipe/stat detail right (V3). -->
-    <div class="hud-box krt-personal-inventory mt-2">
+    <!-- Collection: master list left, permanent recipe/stat detail right (V3). The card is an
+         in-place AJAX swap target (epic #571 / REQ-FE-005): a batch add, an import-apply and a
+         blueprint removal re-render this fragment via GET /personal-inventory/blueprints?fragment=
+         list instead of reloading the page. The hidden meta drives the header subtitle + tab-count
+         resync after a swap; the master-row/filter wiring (recipe.js) re-inits on krt:swapped. -->
+    <div class="hud-box krt-personal-inventory mt-2" id="krt-bp-list">
+    <th:block th:fragment="blueprintList">
+        <span id="krt-bp-total-meta" hidden
+              th:attr="data-total=${blueprints.size()},
+                       data-notecount=${blueprints.?[note != null and !note.isBlank()].size()}"></span>
         <div th:if="${#lists.isEmpty(blueprints)}" class="empty-state">
             <span class="empty-title" th:text="#{personalInventory.blueprints.collection.emptyTitle}">Noch keine Blueprints</span>
             <span class="empty-text" th:text="#{personalInventory.blueprints.empty}">Du hast noch keine Blueprints hinzugef&uuml;gt.</span>
@@ -142,6 +150,7 @@
                 </div>
             </div>
         </div>
+    </th:block>
     </div>
 </main>
 
@@ -231,7 +240,18 @@
         addedToast:   /*[[#{personalInventory.blueprints.toast.added}]]*/  'Blueprints hinzugefuegt.',
         skippedLabel: /*[[#{personalInventory.blueprints.toast.skipped}]]*/ 'uebersprungen',
         addedLabel:   /*[[#{personalInventory.blueprints.toast.addedLabel}]]*/ 'hinzugefuegt',
-        errorToast:   /*[[#{personalInventory.blueprints.error.add}]]*/    'Hinzufuegen fehlgeschlagen.'
+        errorToast:   /*[[#{personalInventory.blueprints.error.add}]]*/    'Hinzufuegen fehlgeschlagen.',
+        noteUpdated:  /*[[#{personalInventory.blueprints.toast.noteUpdated}]]*/ 'Notiz aktualisiert.',
+        removed:      /*[[#{personalInventory.blueprints.toast.removed}]]*/ 'Blueprint entfernt.',
+        editError:    /*[[#{personalInventory.blueprints.error.update}]]*/ 'Speichern fehlgeschlagen.',
+        removeError:  /*[[#{personalInventory.blueprints.error.remove}]]*/ 'Entfernen fehlgeschlagen.',
+        conflictTitle:    /*[[#{frontend.ajax.conflict.title}]]*/  'Konflikt',
+        conflictDetail:   /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+        conflictReload:   /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        conflictDismiss:  /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?',
+        factsCount:    /*[[#{personalInventory.blueprints.facts.count}]]*/    'Blueprints',
+        factsWithNote: /*[[#{personalInventory.blueprints.facts.withNote}]]*/ 'mit Notiz'
     };
     window.krtBlueprintsImportI18n = {
         groupMatched:    /*[[#{personalInventory.blueprints.import.group.matched}]]*/    'Automatisch zugeordnet',

@@ -172,11 +172,43 @@ backend reject) — renders inline in the swapped region, never a redirect; the 
 datetime group app-wide — re-initialises exactly once after a swap (no double-bound listeners, no
 duplicate error div).
 
-**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574), order-detail (#575) and
-refinery-import (#591) fragment/endpoint MVC + e2e tests · **Issues:** #572 to #575, #591 · **Code:**
-`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
-`mission-detail.html`, `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`,
-`datetime-splitter.js`, `JobOrderPageController`, `RefineryOrderPageController`.
+The asset-management area (#578) — **hangar**, **ship-data** and the **personal-inventory** /
+**blueprints** pages — combines the twin + fragment-swap patterns through a set of `X-Requested-With`
+write twins beside the classic `POST→redirect` fallbacks. **Hangar** create/edit (the modal form),
+delete and the bulk home-location set submit through `krtFetch.write` to header-gated twins
+(`addShipAjax` / `updateShipAjax` / `deleteShipAjax` / `setHomeLocationAjax`) and re-render the ship
+table via the existing `GET /hangar?fragment=results` swap (the server multi-key sort makes a
+client-side row insert too fragile); the import + delete-all flows drop their post-action
+`location.reload()` for the same swap and their two hand-rolled CSRF reads move onto `krtCsrf` (the
+multipart import keeps a bespoke `fetch` minus the JSON `Content-Type`). Because the action + per-row
+edit buttons live inside the swapped `#hangar-results` fragment they are bound through `krtEvents`
+`data-trigger` delegation (and the live ship-type filter is a delegated document listener) so they
+survive every re-swap. **Ship-data** flips each visibility toggle in place (button label + secondary
+style + dimmed opacity, the hidden input updated so the next toggle sends the opposite value) and the
+admin reset-all-fitted toasts + closes its modal, all without navigating. **Personal-inventory**
+add/edit/delete go through JSON twins that re-render the existing `#pi-results` list fragment.
+**Blueprints** note-edit returns the fresh blueprint from its twin so the master row (note + version
++ note-marker badge) and the detail pane are patched in place (the selection and the loaded recipe
+survive); remove, batch-add and import-apply re-render the new `#krt-bp-list` fragment (`recipe.js`
+re-inits its master/detail wiring and `personal-inventory-blueprints.js` resyncs the header counts on
+`krt:swapped`), and the variant CSRF helpers in `personal-inventory-blueprints.js` /
+`-import.js` were replaced by `krtCsrf` / `krtFetch`. Every twin relays a backend failure as
+`problem+json` (the shared `propagateBackendError` helper) so an `OPTIMISTIC_LOCK` drives the
+sanctioned reload-confirm; a missing required field on a create twin is a `422` `VALIDATION`
+`problem+json` rather than the 500 the frontend `@ControllerAdvice` would make of a `@Valid`
+`@RequestBody` bind failure.
+
+**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574), order-detail (#575),
+refinery-import (#591) and the asset-management twin/fragment MVC tests (#578) · **Issues:** #572 to
+
+# 578, #591 · **Code:** `krt-fetch.js` (`swap`), `missions.js`, `operations.js`,
+
+`fragments/pagination.html`, `mission-detail.html`, `orders-index.html`, `orders-detail.html`,
+`refinery-orders-create.html`, `datetime-splitter.js`, `hangar.html`, `ship-data.html`,
+`personal-inventory.html`, `personal-inventory-blueprints.html`, `personal-inventory*.js`,
+`JobOrderPageController`, `RefineryOrderPageController`, `HangarPageController`,
+`ShipDataPageController`, `PersonalInventoryPageController`,
+`PersonalInventoryBlueprintsPageController`.
 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 

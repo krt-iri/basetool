@@ -171,14 +171,21 @@
 
     <div class="hud-box mt-2">
 
-        <div class="data-section">
+        <!-- In-place AJAX swap target (epic #571 / REQ-FE-005): ship create/edit/delete, the
+             home-location bulk set and the Fleetview import all re-render this fragment via
+             GET /hangar?fragment=results instead of reloading the page. The action buttons + the
+             per-row edit buttons use data-trigger so the krtEvents delegation survives each swap;
+             the modals live outside the fragment and persist. -->
+        <div class="data-section" id="hangar-results">
+        <th:block th:fragment="hangarResults">
             <div class="flex-between-mb">
                 <h2 th:text="#{hangar.my_ships}">Meine Schiffe</h2>
                 <div class="flex-gap-xs">
                     <button id="set-home-location-btn" type="button" class="btn btn-outline"
+                            data-trigger="hangar-open-home"
                             th:if="${!#lists.isEmpty(myShips)}"
                             th:text="#{hangar.home_location.btn}">Home-Location setzen</button>
-                    <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
+                    <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" data-trigger="hangar-add-ship" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
                 </div>
             </div>
 
@@ -231,6 +238,7 @@
                         </td>
                         <td class="flex-gap-xs">
                             <button class="btn btn-ghost btn-icon edit-ship-btn"
+                                    data-trigger="hangar-edit-ship"
                                     th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
                                     th:data-id="${ship.id}"
                                     th:data-name="${ship.name}"
@@ -251,6 +259,7 @@
                 </tbody>
             </table>
             </div>
+        </th:block>
         </div>
     </div>
 
@@ -430,12 +439,40 @@
     </div>
 </main>
 
-<script th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    /*<![CDATA[*/
     document.addEventListener("DOMContentLoaded", function() {
         const modal = document.getElementById("ship-modal");
         const closeBtn = document.querySelector(".close-modal");
         const form = document.getElementById("ship-form");
         const modalTitle = document.getElementById("modal-title");
+
+        // In-place AJAX (epic #571 / REQ-FE-005): ship create/edit/delete, the home-location bulk
+        // set and the Fleetview import all go through krtFetch and re-render the #hangar-results
+        // fragment instead of reloading. Localized toast + conflict strings come from the bundle.
+        var hangarI18n = {
+            addSuccess:    /*[[#{notification.success.ship_add}]]*/ 'Schiff hinzugefuegt.',
+            updateSuccess: /*[[#{notification.success.ship_update}]]*/ 'Schiff aktualisiert.',
+            deleteSuccess: /*[[#{notification.success.ship_delete}]]*/ 'Schiff geloescht.',
+            homeSuccess:   /*[[#{notification.success.home_location_set}]]*/ 'Home-Location gesetzt.',
+            addError:      /*[[#{error.hangar.ship.add}]]*/ 'Hinzufuegen fehlgeschlagen.',
+            updateError:   /*[[#{error.hangar.ship.update}]]*/ 'Aktualisieren fehlgeschlagen.',
+            deleteError:   /*[[#{error.hangar.ship.delete}]]*/ 'Loeschen fehlgeschlagen.',
+            homeError:     /*[[#{error.hangar.home_location.set}]]*/ 'Setzen fehlgeschlagen.'
+        };
+        var hangarConflict = {
+            title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+            reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+            reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+            dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+            reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+        };
+
+        function reswapHangar() {
+            if (window.krtFetch) {
+                window.krtFetch.swap({ url: '/hangar', container: '#hangar-results', history: false });
+            }
+        }
 
         function openModal() {
             modal.style.display = "flex";
@@ -459,66 +496,77 @@
             if (deleteModal && e.target === deleteModal) deleteModal.style.display = 'none';
         });
 
-        // Add
-        const addBtn = document.getElementById("add-ship-btn");
         const modalDeleteBtn = document.getElementById("modal-delete-btn");
-        
-        if (addBtn) {
-            addBtn.addEventListener('click', () => {
-                modalTitle.textContent = modal.getAttribute("data-title-add");
-                form.action = window.safeSameOriginUrl(addBtn.getAttribute("data-action"), form.action);
-                document.getElementById("ship-name").value = "";
-                document.getElementById("ship-type").value = "";
-                document.getElementById("ship-insurance").value = "";
-                document.getElementById("ship-location").value = "";
-                document.getElementById("ship-fitted").checked = false;
-                document.getElementById("ship-version").value = "";
-                modalDeleteBtn.style.display = "none";
-                openModal();
-            });
+
+        function openAddModal(btn) {
+            modalTitle.textContent = modal.getAttribute("data-title-add");
+            form.action = window.safeSameOriginUrl(btn.getAttribute("data-action"), form.action);
+            document.getElementById("ship-name").value = "";
+            document.getElementById("ship-type").value = "";
+            document.getElementById("ship-insurance").value = "";
+            document.getElementById("ship-location").value = "";
+            document.getElementById("ship-fitted").checked = false;
+            document.getElementById("ship-version").value = "";
+            modalDeleteBtn.style.display = "none";
+            openModal();
         }
 
-        // Edit
-        document.querySelectorAll(".edit-ship-btn").forEach(btn => {
-            btn.addEventListener('click', () => {
-                modalTitle.textContent = modal.getAttribute("data-title-edit");
-                form.action = window.safeSameOriginUrl(btn.getAttribute("data-action"), form.action);
-                document.getElementById("ship-name").value = btn.getAttribute("data-name");
-                document.getElementById("ship-type").value = btn.getAttribute("data-type");
-                document.getElementById("ship-insurance").value = btn.getAttribute("data-ins");
-                document.getElementById("ship-location").value = btn.getAttribute("data-loc") || "";
-                document.getElementById("ship-fitted").checked = btn.getAttribute("data-fitted") === 'true';
-                document.getElementById("ship-version").value = btn.getAttribute("data-version");
-                
-                // Set up delete button
-                const shipId = btn.getAttribute("data-id");
-                // The URL is implicit in the form.action logic or we can construct it
-                // We need to trigger the delete modal, which needs an action URL.
-                // The edit button has th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
-                // We can construct delete URL: /hangar/{id}/delete
-                // Or just get it from the edit action? 
-                // Wait, the edit button has data-action: /hangar/{id}/update
-                // We can replace "/update" with "/delete"
-                const action = btn.getAttribute("data-action");
-                modalDeleteBtn.setAttribute("data-action", action.replace("/update", "/delete"));
-                modalDeleteBtn.style.display = "block";
-                
-                openModal();
-            });
-        });
-        
+        function openEditModal(btn) {
+            modalTitle.textContent = modal.getAttribute("data-title-edit");
+            form.action = window.safeSameOriginUrl(btn.getAttribute("data-action"), form.action);
+            document.getElementById("ship-name").value = btn.getAttribute("data-name");
+            document.getElementById("ship-type").value = btn.getAttribute("data-type");
+            document.getElementById("ship-insurance").value = btn.getAttribute("data-ins");
+            document.getElementById("ship-location").value = btn.getAttribute("data-loc") || "";
+            document.getElementById("ship-fitted").checked = btn.getAttribute("data-fitted") === 'true';
+            document.getElementById("ship-version").value = btn.getAttribute("data-version");
+            // The edit action is /hangar/{id}/update; the delete twin lives at /hangar/{id}/delete.
+            const action = btn.getAttribute("data-action");
+            modalDeleteBtn.setAttribute("data-action", action.replace("/update", "/delete"));
+            modalDeleteBtn.style.display = "block";
+            openModal();
+        }
+
+        // data-trigger delegation (krtEvents): the add + per-row edit buttons live INSIDE the
+        // #hangar-results fragment, so a delegated binding is what keeps them working after each
+        // in-place re-swap (a direct addEventListener would be lost on the re-rendered nodes).
+        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+            window.krtEvents.on('click', 'hangar-add-ship', openAddModal);
+            window.krtEvents.on('click', 'hangar-edit-ship', openEditModal);
+        }
+
         modalDeleteBtn.addEventListener('click', () => {
             deleteForm.action = window.safeSameOriginUrl(modalDeleteBtn.getAttribute('data-action'), deleteForm.action);
             deleteModal.style.display = 'flex';
         });
         
         if (deleteModal) {
-            // Remove old listeners from table buttons if they existed (they don't anymore)
-            
             closeDeleteBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
                     deleteModal.style.display = 'none';
                 });
+            });
+        }
+
+        // Delete confirm submit -> krtFetch (REQ-FE-001): remove the ship in place; the classic
+        // POST→redirect stays the no-JS fallback (the twin is gated on X-Requested-With).
+        if (deleteForm) {
+            deleteForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const submitBtn = deleteForm.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+                window.krtFetch.write({
+                    method: 'POST',
+                    url: window.safeSameOriginUrl(deleteForm.getAttribute('action'), deleteForm.action),
+                    successMessage: hangarI18n.deleteSuccess,
+                    errorMessage: hangarI18n.deleteError,
+                    conflict: hangarConflict,
+                    onSuccess: function() {
+                        if (deleteModal) deleteModal.style.display = 'none';
+                        closeModal();
+                        reswapHangar();
+                    }
+                }).then(function() { if (submitBtn) submitBtn.disabled = false; });
             });
         }
 
@@ -575,8 +623,9 @@
             if (closeResultBtn) {
                 closeResultBtn.addEventListener('click', function() {
                     resultModal.style.display = 'none';
+                    // In-place: re-render the ship table instead of reloading the page (REQ-FE-001).
                     if (document.getElementById('import-res-imported').textContent !== '0') {
-                        window.location.reload();
+                        reswapHangar();
                     }
                 });
             }
@@ -600,10 +649,14 @@
                     importBtn.disabled = true;
                     showStatus(importBtn.getAttribute('data-uploading'));
 
-                    const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-                    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
-                    const reqHeaders = { 'Accept': 'application/json' };
-                    if (csrfToken) { reqHeaders[csrfHeader] = csrfToken; }
+                    // CSRF via the shared krtCsrf seam (REQ-FE-002), replacing the hand-rolled
+                    // meta-tag read. A multipart upload cannot go through krtFetch.write (JSON-only),
+                    // so this keeps a bespoke fetch; the browser must set its own multipart boundary,
+                    // so the JSON Content-Type krtCsrf adds by default is removed.
+                    const reqHeaders = window.krtCsrf
+                        ? window.krtCsrf.headers({ 'Accept': 'application/json' })
+                        : { 'Accept': 'application/json' };
+                    delete reqHeaders['Content-Type'];
 
                     fetch('/hangar/import/ships', {
                         method: 'POST',
@@ -660,30 +713,24 @@
                 deleteAllConfirmBtn.disabled = true;
                 deleteAllCancelBtn.disabled = true;
 
-                const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-                const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
-                const reqHeaders = {};
-                if (csrfToken) { reqHeaders[csrfHeader] = csrfToken; }
-
-                fetch('/hangar/ships/all', { method: 'DELETE', headers: reqHeaders, credentials: 'same-origin' })
-                    .then(function(resp) {
-                        if (!resp.ok) {
-                            throw new Error(resp.status);
-                        }
-                        deleteAllModal.style.display = 'none';
-                        window.location.reload();
-                    })
-                    .catch(function(err) {
-                        deleteAllModal.style.display = 'none';
-                        const errMsg = deleteAllBtn.getAttribute('data-error-failed') + (err.message ? ' (' + err.message + ')' : '');
-                        const statusEl = document.getElementById('fleetview-status');
-                        if (statusEl) {
-                            statusEl.textContent = errMsg;
-                            statusEl.style.color = 'var(--color-danger)';
-                            statusEl.style.display = 'block';
+                // krtFetch.write (REQ-FE-002): CSRF + retry-on-403 + problem handling; on success the
+                // ship table re-renders in place instead of reloading the page (REQ-FE-001).
+                window.krtFetch
+                    .write({
+                        method: 'DELETE',
+                        url: '/hangar/ships/all',
+                        toast: false,
+                        errorMessage: deleteAllBtn.getAttribute('data-error-failed'),
+                        conflict: hangarConflict,
+                        onSuccess: function() {
+                            deleteAllModal.style.display = 'none';
+                            reswapHangar();
+                            if (window.showFrontendSuccessToast) {
+                                window.showFrontendSuccessToast(deleteAllBtn.getAttribute('data-success'));
+                            }
                         }
                     })
-                    .finally(function() {
+                    .then(function() {
                         deleteAllConfirmBtn.disabled = false;
                         deleteAllCancelBtn.disabled = false;
                     });
@@ -692,41 +739,83 @@
 
         // ---- Set Home Location ----
         (function() {
-            const openBtn = document.getElementById('set-home-location-btn');
             const homeModal = document.getElementById('home-location-modal');
-            if (!openBtn || !homeModal) return;
+            if (!homeModal) return;
 
-            const cancelEls = homeModal.querySelectorAll('.close-home-cancel, .close-modal-home');
+            function closeHome() { homeModal.style.display = 'none'; }
 
-            openBtn.addEventListener('click', function() {
-                homeModal.style.display = 'flex';
-            });
-            cancelEls.forEach(function(el) {
-                el.addEventListener('click', function() {
-                    homeModal.style.display = 'none';
+            // The open button lives in the swapped #hangar-results fragment -> delegate via krtEvents.
+            if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+                window.krtEvents.on('click', 'hangar-open-home', function() {
+                    homeModal.style.display = 'flex';
                 });
+            }
+
+            homeModal.querySelectorAll('.close-home-cancel, .close-modal-home').forEach(function(el) {
+                el.addEventListener('click', closeHome);
             });
             window.addEventListener('click', function(e) {
-                if (e.target === homeModal) {
-                    homeModal.style.display = 'none';
-                }
+                if (e.target === homeModal) { closeHome(); }
             });
 
             const homeForm = document.getElementById('home-location-form');
             if (homeForm) {
-                homeForm.addEventListener('submit', function() {
+                homeForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
                     const submitBtn = homeForm.querySelector('button[type="submit"]');
+                    const select = homeForm.querySelector('select[name="locationId"]');
+                    const locationId = select ? select.value : '';
+                    if (!locationId) { return; }
                     if (submitBtn) submitBtn.disabled = true;
+                    window.krtFetch.write({
+                        method: 'POST',
+                        url: window.safeSameOriginUrl(homeForm.getAttribute('action'), homeForm.action),
+                        payload: { locationId: locationId },
+                        successMessage: hangarI18n.homeSuccess,
+                        errorMessage: hangarI18n.homeError,
+                        conflict: hangarConflict,
+                        onSuccess: function() {
+                            closeHome();
+                            reswapHangar();
+                        }
+                    }).then(function() { if (submitBtn) submitBtn.disabled = false; });
                 });
             }
         })();
 
-        // Prevent double submit
-        form.addEventListener('submit', function() {
-            const btn = form.querySelector('button[type="submit"]');
-            if (btn) {
-                btn.disabled = true;
-            }
+        // Ship create/edit submit -> krtFetch (REQ-FE-001/002). The classic POST→redirect stays the
+        // no-JS fallback (the AJAX twin is gated on X-Requested-With, which krtFetch always sends).
+        // HTML5 `required` on the ship-type + insurance selects blocks an empty submit before this
+        // handler runs; on success the modal closes and #hangar-results re-renders in place.
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const action = form.getAttribute('action') || form.action;
+            const isUpdate = /\/update$/.test(action);
+            const versionRaw = document.getElementById('ship-version').value;
+            const ownerSel = form.querySelector('[name="owningOrgUnitId"]');
+            const payload = {
+                name: document.getElementById('ship-name').value || null,
+                shipTypeId: document.getElementById('ship-type').value || null,
+                insurance: document.getElementById('ship-insurance').value || null,
+                locationId: document.getElementById('ship-location').value || null,
+                fitted: document.getElementById('ship-fitted').checked,
+                version: isUpdate && versionRaw ? Number(versionRaw) : null,
+                owningOrgUnitId: isUpdate ? null : (ownerSel && ownerSel.value ? ownerSel.value : null)
+            };
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+            window.krtFetch.write({
+                method: 'POST',
+                url: window.safeSameOriginUrl(action, action),
+                payload: payload,
+                successMessage: isUpdate ? hangarI18n.updateSuccess : hangarI18n.addSuccess,
+                errorMessage: isUpdate ? hangarI18n.updateError : hangarI18n.addError,
+                conflict: hangarConflict,
+                onSuccess: function() {
+                    closeModal();
+                    reswapHangar();
+                }
+            }).then(function() { if (submitBtn) submitBtn.disabled = false; });
         });
 
         // Filter ship types by manufacturer
@@ -753,31 +842,31 @@
         });
 
         // ---- Live filter: hide ship rows whose ship type does not match the query ----
-        (function() {
-            const filterInput = document.getElementById("hangar-ship-filter");
-            if (!filterInput) {
+        // Delegated on document (matching the filter input by id) and querying rows fresh on each
+        // keystroke, so it keeps working after the #hangar-results fragment is re-swapped.
+        document.addEventListener("input", function(e) {
+            const filterInput = e.target;
+            if (!filterInput || filterInput.id !== "hangar-ship-filter") {
                 return;
             }
+            const query = filterInput.value.trim().toLowerCase();
             const shipRows = document.querySelectorAll("tr[data-ship-filter]");
             const noResultsRow = document.getElementById("hangar-filter-empty");
-
-            filterInput.addEventListener("input", function() {
-                const query = this.value.trim().toLowerCase();
-                let anyVisible = false;
-                shipRows.forEach(function(row) {
-                    const haystack = row.getAttribute("data-ship-filter") || "";
-                    const match = query === "" || haystack.indexOf(query) !== -1;
-                    row.style.display = match ? "" : "none";
-                    if (match) {
-                        anyVisible = true;
-                    }
-                });
-                if (noResultsRow) {
-                    noResultsRow.style.display = (!anyVisible && query !== "") ? "" : "none";
+            let anyVisible = false;
+            shipRows.forEach(function(row) {
+                const haystack = row.getAttribute("data-ship-filter") || "";
+                const match = query === "" || haystack.indexOf(query) !== -1;
+                row.style.display = match ? "" : "none";
+                if (match) {
+                    anyVisible = true;
                 }
             });
-        })();
+            if (noResultsRow) {
+                noResultsRow.style.display = (!anyVisible && query !== "") ? "" : "none";
+            }
+        });
     });
+    /*]]>*/
 </script>
 </body>
 </html>

@@ -81,6 +81,18 @@
             }
         });
         if (addSelectedBtn) addSelectedBtn.addEventListener('click', addSelected);
+        // The edit/remove modals live outside the swapped #krt-bp-list fragment, so their forms
+        // persist and a direct submit binding survives every list re-render.
+        if (editForm) editForm.addEventListener('submit', submitEditNote);
+        if (deleteForm) deleteForm.addEventListener('submit', submitDeleteBp);
+        // After a list swap (batch add / import / remove), resync the header counts from the fresh
+        // rows (recipe.js separately re-inits the master/detail wiring on the same event).
+        document.addEventListener('krt:swapped', function (e) {
+            const c = e.detail && e.detail.container;
+            if (c && c.id === 'krt-bp-list') {
+                recountAndSync();
+            }
+        });
         renderStaging();
         wireAdminSwap();
     }
@@ -234,58 +246,97 @@
         if (addSelectedBtn) addSelectedBtn.disabled = staged.size === 0;
     }
 
-    function csrfHeaders() {
-        const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
-        const token = document.querySelector('meta[name="_csrf"]');
-        const header = document.querySelector('meta[name="_csrf_header"]');
-        if (token && header && token.content && header.content) {
-            headers[header.content] = token.content;
-        }
-        return headers;
+    // krtFetch conflict strings (REQ-FE-003) for the write paths below.
+    function conflictObj() {
+        const i = i18n();
+        return {
+            title: i.conflictTitle,
+            reloadDetailFallback: i.conflictDetail,
+            reloadLabel: i.conflictReload,
+            dismissLabel: i.conflictDismiss,
+            reloadQuestion: i.conflictQuestion,
+        };
     }
 
+    // Re-render the #krt-bp-list collection card in place (REQ-FE-005) for the active server filter,
+    // without touching the URL again. recipe.js re-inits the master/detail wiring on krt:swapped.
+    function reswapList() {
+        if (!window.krtFetch) {
+            return;
+        }
+        window.krtFetch.swap({
+            url: window.location.pathname + window.location.search,
+            container: '#krt-bp-list',
+            fragmentValue: 'list',
+            history: false,
+        });
+    }
+
+    // Recompute the header subtitle + active tab-count from the rendered master rows so the
+    // "<n> Blueprints · <m> mit Notiz" facts never drift after an in-place note edit or a list swap.
+    function recountAndSync() {
+        const rows = document.querySelectorAll('#krt-bp-master-rows .master-row');
+        let withNote = 0;
+        rows.forEach(function (r) {
+            const n = r.getAttribute('data-note');
+            if (n && n !== 'null' && n.trim() !== '') {
+                withNote++;
+            }
+        });
+        const total = rows.length;
+        const tabCount = document.querySelector('.tab-nav .tab.active .tab-count');
+        if (tabCount) {
+            tabCount.textContent = String(total);
+        }
+        const subtitle = document.querySelector('.krt-personal-inventory-header .krt-subtitle');
+        const i = i18n();
+        if (subtitle && i.factsCount && i.factsWithNote) {
+            subtitle.textContent =
+                total + ' ' + i.factsCount + ' · ' + withNote + ' ' + i.factsWithNote;
+        }
+    }
+
+    // Multi-select batch add -> krtFetch (REQ-FE-002), then re-render the list in place instead of
+    // the former AJAX-then-reload. The hand-rolled CSRF reader was dropped for krtCsrf (via krtFetch).
     function addSelected() {
-        if (staged.size === 0) return;
-        const keys = Array.from(staged.keys());
-        if (addSelectedBtn) addSelectedBtn.disabled = true;
-        fetch(endpoints().addSelected || '/personal-inventory/blueprints/add-selected', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: csrfHeaders(),
-            body: JSON.stringify(keys),
-        })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
-            .then(function (result) {
-                if (!result) {
-                    showError();
-                    return;
-                }
-                const msg =
-                    (i18n().addedLabel || 'added') +
-                    ': ' +
-                    (result.added || 0) +
-                    ', ' +
-                    (i18n().skippedLabel || 'skipped') +
-                    ': ' +
-                    ((result.skippedAlreadyOwned || 0) + (result.skippedUnresolved || 0));
-                if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg);
-                // Reload so the new owned rows render and owned-flags refresh.
-                setTimeout(function () {
-                    window.location.reload();
-                }, 600);
-            })
-            .catch(function () {
-                showError();
-            });
-    }
-
-    function showError() {
-        if (addSelectedBtn) addSelectedBtn.disabled = staged.size === 0;
-        if (window.showFrontendErrorToast) {
-            window.showFrontendErrorToast(i18n().errorToast || 'Error');
+        if (staged.size === 0 || !window.krtFetch) {
+            return;
         }
+        const keys = Array.from(staged.keys());
+        if (addSelectedBtn) {
+            addSelectedBtn.disabled = true;
+        }
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: endpoints().addSelected || '/personal-inventory/blueprints/add-selected',
+                payload: keys,
+                toast: false,
+                errorMessage: i18n().errorToast,
+                conflict: conflictObj(),
+                onSuccess: function (result) {
+                    const res = result || {};
+                    const msg =
+                        (i18n().addedLabel || 'added') +
+                        ': ' +
+                        (res.added || 0) +
+                        ', ' +
+                        (i18n().skippedLabel || 'skipped') +
+                        ': ' +
+                        ((res.skippedAlreadyOwned || 0) + (res.skippedUnresolved || 0));
+                    if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(msg);
+                    }
+                    staged.clear();
+                    renderStaging();
+                    reswapList();
+                },
+            })
+            .then(function () {
+                if (addSelectedBtn) {
+                    addSelectedBtn.disabled = staged.size === 0;
+                }
+            });
     }
 
     /* ----------------------------------------------------------------- modals */
@@ -334,6 +385,130 @@
     // treat that (and blank) as "no timestamp" so the hidden field stays empty.
     function normalizeAcquired(value) {
         return !value || value === 'null' ? '' : value;
+    }
+
+    /* ------------------------------------------------------------- in-place writes */
+
+    // Note edit -> krtFetch (REQ-FE-001/002): the twin returns the fresh blueprint, so the master
+    // row's note + version and the detail pane are patched in place (the selection and the loaded
+    // recipe survive). The classic POST→redirect stays the no-JS fallback.
+    function submitEditNote(e) {
+        e.preventDefault();
+        if (!editForm || !window.krtFetch) {
+            return;
+        }
+        const noteEl = $('krt-bp-edit-note');
+        const versionEl = $('krt-bp-edit-version');
+        const acquiredEl = $('krt-bp-edit-acquired');
+        const payload = {
+            note: noteEl ? noteEl.value : '',
+            acquiredAt: acquiredEl && acquiredEl.value ? acquiredEl.value : null,
+            version: versionEl && versionEl.value ? Number(versionEl.value) : null,
+        };
+        const submitBtn = editForm.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: window.safeSameOriginUrl(editForm.getAttribute('action'), editForm.action),
+                payload: payload,
+                successMessage: i18n().noteUpdated,
+                errorMessage: i18n().editError,
+                conflict: conflictObj(),
+                onSuccess: function (dto) {
+                    closeEdit();
+                    patchBlueprintRow(dto);
+                },
+            })
+            .then(function () {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                }
+            });
+    }
+
+    // Patch the edited blueprint's master row (note + version + note-marker badge) and, if it is the
+    // active selection, the detail pane — then resync the header counts. Mirrors the trap note in
+    // #578 (data-version sync + recompute per-blueprint badges in the success handler).
+    function patchBlueprintRow(dto) {
+        if (!dto || !dto.id) {
+            return;
+        }
+        const newNote = dto.note == null ? '' : dto.note;
+        let row = null;
+        document.querySelectorAll('#krt-bp-master-rows .master-row').forEach(function (r) {
+            if (r.getAttribute('data-id') === dto.id) {
+                row = r;
+            }
+        });
+        if (row) {
+            row.setAttribute('data-note', newNote);
+            if (dto.version != null) {
+                row.setAttribute('data-version', String(dto.version));
+            }
+            let marker = row.querySelector('.master-row-note');
+            if (newNote.trim() !== '') {
+                if (!marker) {
+                    marker = document.createElement('span');
+                    marker.className = 'master-row-note';
+                    marker.setAttribute('aria-hidden', 'true');
+                    marker.textContent = '✎';
+                    row.appendChild(marker);
+                }
+            } else if (marker) {
+                marker.remove();
+            }
+            if (row.classList.contains('is-active')) {
+                const editBtn = $('krt-bp-detail-edit');
+                if (editBtn) {
+                    editBtn.setAttribute('data-note', newNote);
+                    if (dto.version != null) {
+                        editBtn.setAttribute('data-version', String(dto.version));
+                    }
+                }
+                const noteText = $('krt-bp-detail-note');
+                const noteSection = $('krt-bp-detail-note-section');
+                if (noteText) {
+                    noteText.textContent = newNote;
+                }
+                if (noteSection) {
+                    noteSection.hidden = newNote.trim() === '';
+                }
+            }
+        }
+        recountAndSync();
+    }
+
+    // Remove -> krtFetch (REQ-FE-001): on success re-render the list in place (resyncing counts and
+    // the empty state). The classic POST→redirect stays the no-JS fallback.
+    function submitDeleteBp(e) {
+        e.preventDefault();
+        if (!deleteForm || !window.krtFetch) {
+            return;
+        }
+        const submitBtn = deleteForm.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: window.safeSameOriginUrl(deleteForm.getAttribute('action'), deleteForm.action),
+                successMessage: i18n().removed,
+                errorMessage: i18n().removeError,
+                conflict: conflictObj(),
+                onSuccess: function () {
+                    closeDelete();
+                    reswapList();
+                },
+            })
+            .then(function () {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                }
+            });
     }
 
     if (document.readyState === 'loading') {

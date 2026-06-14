@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -78,10 +79,12 @@ class HangarAddShipE2eTest {
 
   /**
    * Opens the add-ship modal, picks the seeded ship type + an insurance, saves, and asserts the
-   * ship then appears in the hangar list.
+   * ship then appears in the hangar list <em>in place</em> — the #578 conversion submits through
+   * {@code krtFetch} to the {@code /hangar/add} twin and re-renders the ship table without
+   * reloading the page, so the new row must show up without any navigation (REQ-FE-001).
    */
   @Test
-  void addsAShipThroughTheUi() {
+  void addsAShipThroughTheUiInPlace() {
     String baseUrl = STACK.baseUrl();
     Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
     try (BrowserContext context =
@@ -97,15 +100,25 @@ class HangarAddShipE2eTest {
         // The add-ship modal opens via JS; the ship-type / insurance selects are server-rendered.
         page.locator("#ship-type").selectOption(new SelectOption().setLabel("E2E Ship Type"));
         page.locator("#ship-insurance").selectOption("LTI");
-        // Footer-safe submit: the position:fixed footer can cover the modal's save button (seen on
-        // WebKit, where the coordinate click hit the footer and the ship was never created).
-        E2eSupport.clickSubmitClearingFooter(page.getByTestId("hangar-ship-submit"));
-        page.waitForLoadState();
 
-        // Back on the hangar, the new ship row must show the selected ship type. Post-submit GET
-        // via the retry helper — WebKit can abort it (HTTP/2 INTERNAL_ERROR) even after the
-        // redirect settled. See E2eSupport#navigate.
-        E2eSupport.navigate(page, baseUrl + "/hangar");
+        // In-place AJAX (#578): mark the window and drop the position:fixed footer (it can
+        // intercept
+        // the trusted click on WebKit), then submit and wait on the XHR POST to /hangar/add so the
+        // backend has provably answered before we read the table back.
+        page.evaluate("window.__krtNoReload = true;");
+        page.evaluate(
+            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                + " 'none'; } }");
+        page.waitForResponse(
+            r -> r.url().contains("/hangar/add") && "POST".equals(r.request().method()),
+            () -> page.getByTestId("hangar-ship-submit").click());
+
+        // The page must not have reloaded, and the new row must appear via the in-place table
+        // re-swap — no re-navigation. The web-first assertion auto-retries while the swap settles.
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "adding a ship must not reload the page");
         assertThat(
                 page.getByTestId("hangar-ship-row")
                     .filter(new Locator.FilterOptions().setHasText("E2E Ship Type")))
