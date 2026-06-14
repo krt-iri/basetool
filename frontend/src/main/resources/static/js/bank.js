@@ -5,10 +5,14 @@
  *  - modal field priming: `data-field-*` attributes on an open-modal trigger are
  *    copied into the modal form before it opens (row-scoped id/version/name),
  *  - AJAX forms (`form.bank-ajax-form`): JSON POST/PATCH/DELETE against
- *    /api/proxy/bank/**, CSRF from the page's meta tags, success = full reload
- *    (keeps every @Version attribute in sync, see CLAUDE.md concurrency rules),
- *    errors = localized inline message next to the field the conflict names,
+ *    /api/proxy/bank/**, CSRF via the shared window.krtCsrf with retry-once-on-403,
+ *    success = in-place server-fragment swap of the region named by the form's
+ *    `data-refresh` attribute (accountBody / manageBody / grantsMatrix) so balances,
+ *    holder distribution, tab-counts and every @Version stay server-authoritative
+ *    without a page reload (#579, REQ-FE-005); errors = localized inline message
+ *    next to the field the conflict names,
  *  - grants matrix toggles: one PATCH per flag click with all three flags + version,
+ *    applied in place (button pressed state + row data-can-* + synced data-version),
  *  - grants filter selects: navigate to the grouped view on change,
  *  - account-create type switch: org-unit vs. area name dependent fields,
  *  - searchable user selects (holder registration / grant creation).
@@ -36,22 +40,85 @@
     };
 
     /**
-     * Builds the JSON + CSRF request headers from the page's meta tags (same
-     * convention as krt-fetch.js; bank.js is migrated onto krtCsrf in #579).
+     * Maps a form's `data-refresh` token to the stable swap container on each bank page and whether
+     * the current query string is preserved on the in-place re-render (#579, REQ-FE-005):
+     *  - accountBody  -> the account-detail body; query dropped so the booking history resets to
+     *                    page 0 and the just-booked row shows newest-first,
+     *  - manageBody   -> the manage tab-nav + active panel; `?tab=` preserved,
+     *  - grantsMatrix -> the grants matrix; `?view=/accountId=/userId=` filter preserved (#573).
+     */
+    const REFRESH_TARGETS = {
+        accountBody: { container: '#bank-account-results', preserveQuery: false },
+        manageBody: { container: '#bank-manage-results', preserveQuery: true },
+        grantsMatrix: { container: '#bank-grants-results', preserveQuery: true },
+    };
+
+    /** Maps a grant flag name onto the row attribute the next toggle click reads. */
+    const FLAG_ATTR = {
+        canDeposit: 'data-can-deposit',
+        canWithdraw: 'data-can-withdraw',
+        canTransfer: 'data-can-transfer',
+    };
+
+    /**
+     * Builds the JSON + CSRF request headers via the shared window.krtCsrf (#579 migration; replaces
+     * bank.js's former bespoke meta-tag reader). Degrades to a minimal meta-tag read only if
+     * krt-fetch.js is somehow absent, so a write still attempts rather than silently dropping the
+     * token. The added X-Requested-With does not change the bank error body — the frontend
+     * GlobalExceptionHandler already answers JSON because bank requests send Accept: application/json.
      *
+     * @param {Object<string,string>} [base] optional base headers merged under the CSRF header
      * @returns {Object<string,string>} headers for a same-origin JSON fetch
      */
-    function csrfHeaders() {
-        const headers = {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-        };
+    function csrfHeaders(base) {
+        if (window.krtCsrf && typeof window.krtCsrf.headers === 'function') {
+            return window.krtCsrf.headers(base);
+        }
+        const headers = Object.assign(
+            { Accept: 'application/json', 'Content-Type': 'application/json' },
+            base || {},
+        );
         const token = document.querySelector('meta[name="_csrf"]')?.content;
         const header = document.querySelector('meta[name="_csrf_header"]')?.content;
         if (token && header && header !== 'undefined' && token !== 'undefined') {
             headers[header] = token;
         }
         return headers;
+    }
+
+    /**
+     * Sends a bank write with the shared CSRF headers and the epic's retry-once-on-403 semantics: a
+     * bare 403 means the CSRF token went stale (post-re-login session rotation, maximumSessions
+     * eviction), so the token is refreshed from GET /csrf via window.krtCsrf.refresh() and the write
+     * retried exactly once. Headers are rebuilt each attempt so the retry picks up the fresh token.
+     * Returns the final Response, or null on a network error — matching the legacy behavior so the
+     * caller's generic-error branch still fires.
+     *
+     * @param {string} url the request URL
+     * @param {RequestInit} baseInit method + optional body (headers are built here, not by the caller)
+     * @returns {Promise<Response|null>} the response, or null when the network call threw
+     */
+    async function bankWrite(url, baseInit) {
+        function withHeaders() {
+            return Object.assign({}, baseInit, { headers: csrfHeaders() });
+        }
+        let response;
+        try {
+            response = await fetch(url, withHeaders());
+            if (
+                response.status === 403 &&
+                window.krtCsrf &&
+                typeof window.krtCsrf.refresh === 'function'
+            ) {
+                const refreshed = await window.krtCsrf.refresh();
+                if (refreshed) {
+                    response = await fetch(url, withHeaders());
+                }
+            }
+        } catch {
+            response = null;
+        }
+        return response;
     }
 
     /**
@@ -171,7 +238,8 @@
      * Serializes and sends one bank AJAX form: `_`-prefixed fields fill the
      * endpoint's `{placeholder}` slots instead of the body, `data-account-id`
      * is injected under `data-account-id-field` (default `accountId`), success
-     * reloads the page, errors render inline.
+     * runs the in-place refresh ({@link handleBankSuccess}: close modal + swap the
+     * `data-refresh` fragment), errors render inline.
      *
      * @param {HTMLFormElement} form the submitted form
      */
@@ -205,7 +273,7 @@
                 return filled !== undefined ? encodeURIComponent(filled) : match;
             });
 
-        const init = { method: method, headers: csrfHeaders() };
+        const init = { method: method };
         if (method !== 'GET' && method !== 'DELETE') {
             init.body = JSON.stringify(body);
         }
@@ -213,14 +281,15 @@
         if (submitButton) {
             submitButton.disabled = true;
         }
-        let response;
-        try {
-            response = await fetch(endpoint, init);
-        } catch {
-            response = null;
-        }
+        const response = await bankWrite(endpoint, init);
         if (response && response.ok) {
-            window.location.reload();
+            // Re-enable before the swap: the manage/grants modals live OUTSIDE the swapped region and
+            // are reused per row, so a left-disabled submit button would break the next open. On the
+            // detail page the button sits inside the swapped accountBody and is replaced anyway.
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+            handleBankSuccess(form);
             return;
         }
         if (submitButton) {
@@ -254,6 +323,72 @@
         showError(form, field, message);
     }
 
+    /**
+     * The in-place success path for a bank AJAX form (#579, REQ-FE-005): closes the form's modal,
+     * shows the localized success toast and re-renders the server fragment named by the form's
+     * `data-refresh` attribute (accountBody / manageBody / grantsMatrix). Re-rendering server-side
+     * keeps money aggregates (balance, holder distribution, tab-counts) and every trigger button's
+     * fresh `data-field-version` authoritative — the page never recomputes them in JS. The swap is
+     * given the dedicated `data-bank-refresh-error` message (NOT the generic "action failed" text):
+     * the write already succeeded, so if only the follow-up refresh GET bounces the user must be told
+     * "saved, but reload" rather than "action failed, retry" — the latter could prompt a second money
+     * booking. Falls back to a full reload if the swap helper or the refresh target is missing.
+     *
+     * @param {HTMLFormElement} form the form whose write just succeeded
+     */
+    function handleBankSuccess(form) {
+        const modal = form.closest('.krt-modal-overlay');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        const main = document.querySelector('main[data-bank-saved]');
+        const savedMessage = main ? main.getAttribute('data-bank-saved') : null;
+        if (savedMessage && typeof window.showFrontendSuccessToast === 'function') {
+            window.showFrontendSuccessToast(savedMessage);
+        }
+        const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];
+        if (!spec || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+            window.location.reload();
+            return;
+        }
+        const refreshError = main ? main.getAttribute('data-bank-refresh-error') : null;
+        const url = spec.preserveQuery
+            ? window.location.pathname + window.location.search
+            : window.location.pathname;
+        // Freeze the about-to-be-replaced open-modal trigger buttons for the duration of the
+        // in-flight swap. The swap is async, so until its fresh DOM lands the old triggers still
+        // carry a now-stale data-field-version; a rapid re-open + submit would prime a modal with it
+        // and 409 (the manage/holder lifecycle race the old full reload dodged by navigating away).
+        // It also blocks an accidental rapid double money booking. On a successful swap they are
+        // replaced by fresh enabled buttons; if the swap bails (rare expired-session bounce, DOM left
+        // untouched) we re-enable exactly the ones we froze.
+        const container = document.querySelector(spec.container);
+        const frozen = container
+            ? Array.from(
+                  container.querySelectorAll(
+                      'button[data-trigger="open-modal-display"]:not([disabled])',
+                  ),
+              )
+            : [];
+        frozen.forEach(function (button) {
+            button.disabled = true;
+        });
+        window.krtFetch
+            .swap({
+                url: url,
+                container: spec.container,
+                fragmentValue: form.getAttribute('data-refresh'),
+                errorMessage: refreshError || genericError(),
+            })
+            .then(function (swapped) {
+                if (!swapped) {
+                    frozen.forEach(function (button) {
+                        button.disabled = false;
+                    });
+                }
+            });
+    }
+
     document.addEventListener('submit', function (event) {
         const form = event.target.closest('form.bank-ajax-form');
         if (!form) {
@@ -264,9 +399,41 @@
     });
 
     /**
-     * Grants matrix: clicking a flag cell PATCHes the grant with the toggled flag
-     * plus the row's other two flags and its optimistic-lock version, then reloads
-     * so every row shows the fresh version (CLAUDE.md DOM-version-sync rule).
+     * Applies a successful grant flag PATCH in place (#579): flips the clicked button's pressed
+     * state, mirrors the new value onto the row's data-can-<flag> attribute (read by the next click)
+     * and syncs the row's data-version from the BankGrantDto response so an immediate second toggle
+     * on the same row does not 409.
+     *
+     * @param {HTMLButtonElement} button the clicked matrix-flag button
+     * @param {HTMLTableRowElement} row the grant row carrying the flag + version attributes
+     * @param {string} flag the toggled flag name (canDeposit / canWithdraw / canTransfer)
+     * @param {boolean} newValue the value the flag was toggled to
+     * @param {Object} payload the BankGrantDto response body (carries the fresh version)
+     */
+    function applyGrantFlagResult(button, row, flag, newValue, payload) {
+        button.classList.toggle('on', newValue);
+        button.setAttribute('aria-pressed', String(newValue));
+        const attr = FLAG_ATTR[flag];
+        if (attr) {
+            row.setAttribute(attr, String(newValue));
+        }
+        const version = payload ? payload.version : null;
+        if (version == null) {
+            return;
+        }
+        if (window.krtFetch && typeof window.krtFetch.syncVersion === 'function') {
+            window.krtFetch.syncVersion(row, version);
+        } else {
+            row.setAttribute('data-version', String(version));
+        }
+    }
+
+    /**
+     * Grants matrix: clicking a flag cell PATCHes the grant with the toggled flag plus the row's
+     * other two flags and its optimistic-lock version, then applies the result IN PLACE (#579) via
+     * {@link applyGrantFlagResult}. This is the one isolated single-row write in the bank area (no
+     * aggregate, count or structural change on screen), so a precise dom-patch beats a whole-matrix
+     * re-render that would reset focus and feel heavy on rapid toggling.
      */
     document.addEventListener('click', async function (event) {
         const flagButton = event.target.closest('button.matrix-flag[data-flag]');
@@ -291,21 +458,21 @@
             encodeURIComponent(row.getAttribute('data-user-id')) +
             '/' +
             encodeURIComponent(row.getAttribute('data-account-id'));
-        let response;
-        try {
-            response = await fetch(endpoint, {
-                method: 'PATCH',
-                headers: csrfHeaders(),
-                body: JSON.stringify(flags),
-            });
-        } catch {
-            response = null;
-        }
+        const response = await bankWrite(endpoint, {
+            method: 'PATCH',
+            body: JSON.stringify(flags),
+        });
+        flagButton.disabled = false;
         if (response && response.ok) {
-            window.location.reload();
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch {
+                // a malformed/empty body leaves payload null; applyGrantFlagResult tolerates it
+            }
+            applyGrantFlagResult(flagButton, row, flag, flags[flag], payload);
             return;
         }
-        flagButton.disabled = false;
         let message = genericError();
         if (response) {
             try {

@@ -39,8 +39,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 /**
  * Bank booking flows end to end (REQ-BANK-004/-006/-011, epic #556): deposit / withdrawal /
  * transfer happy paths plus the stable 409 rejections (holder overdraft, self-transfer), asserted
- * against the compute-on-read balances. One deposit is additionally driven through the real K1
- * modal to prove the AJAX → {@code /api/proxy/bank} → backend → reload chain.
+ * against the compute-on-read balances. Two consecutive deposits are additionally driven through
+ * the real K1 modal to prove the AJAX → {@code /api/proxy/bank} → backend → in-place account-body
+ * swap chain (#579, REQ-FE-001): the success path re-renders the money region without a reload, and
+ * the immediate second deposit cannot 409 (money bookings carry no client {@code @Version}).
  */
 @Tag("e2e")
 class BankBookingE2eTest {
@@ -205,9 +207,16 @@ class BankBookingE2eTest {
         MGMT_USER, MGMT_PASSWORD, name + " " + java.util.UUID.randomUUID(), "SPECIAL");
   }
 
-  /** Drives a deposit through the K1 modal as the granted employee and verifies the new balance. */
+  /**
+   * Drives two consecutive deposits through the K1 modal as the granted employee and proves the
+   * #579 in-place behaviour: the success path swaps the account body via {@code
+   * fragment=accountBody} instead of reloading, so the {@code window.__krtNoReload} marker set
+   * before the first deposit survives BOTH writes, the visible balance updates in place each time,
+   * and the immediate second deposit (no reload between) is accepted — money bookings carry no
+   * client {@code @Version}, so a stale-version 409 is structurally impossible.
+   */
   @Test
-  void uiDepositThroughModalUpdatesBalance() {
+  void uiDepositThroughModalUpdatesBalanceInPlace() {
     String baseUrl = STACK.baseUrl();
     BigDecimal before = balance(uiAccountId);
     try (BrowserContext context =
@@ -217,15 +226,24 @@ class BankBookingE2eTest {
         E2eSupport.login(page, baseUrl, EMPLOYEE_USER, EMPLOYEE_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/bank/accounts/" + uiAccountId);
         page.waitForLoadState();
-        page.locator("[data-testid='bank-deposit-open']")
-            .click(new com.microsoft.playwright.Locator.ClickOptions().setTimeout(20_000));
-        page.locator("[data-testid='bank-deposit-amount']").fill("777");
-        // The holder select carries the registered holder options; pick the employee's holder.
-        page.locator("[data-testid='bank-deposit-holder']").selectOption(uiHolderId);
-        E2eSupport.awaitFormPost(
-            page, () -> page.locator("[data-testid='bank-deposit-submit']").click());
-        page.waitForLoadState();
-        // After the success reload the facts strip shows the new balance.
+        // Marker + drop the position:fixed footer (it can intercept the trusted submit click on
+        // WebKit). A full reload wipes the marker; an in-place swap leaves it intact.
+        page.evaluate("window.__krtNoReload = true;");
+        page.evaluate(
+            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                + " 'none'; } }");
+
+        depositInPlace(page, "777");
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "the first deposit must not reload the page");
+        depositInPlace(page, "777");
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "the immediate second deposit must not reload either (no stale-version 409)");
+        // The facts strip is still present after the in-place swaps (never a full navigation).
         assertThat(page.locator("[data-testid='bank-balance']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
@@ -235,8 +253,36 @@ class BankBookingE2eTest {
     }
     assertEquals(
         0,
-        balance(uiAccountId).compareTo(before.add(new BigDecimal("777"))),
-        "the UI deposit increased the balance by 777");
+        balance(uiAccountId).compareTo(before.add(new BigDecimal("1554"))),
+        "both in-place UI deposits increased the balance by 777 each");
+  }
+
+  /**
+   * Opens the deposit modal, books the given amount to the UI holder and waits for the account-body
+   * swap to repaint the balance in place — without any page navigation. Captures the pre-deposit
+   * balance text and waits on the XHR POST plus the post-swap DOM change, so the assertion is
+   * independent of locale number formatting.
+   *
+   * @param page the active page
+   * @param amount the whole-aUEC amount to deposit
+   */
+  private static void depositInPlace(Page page, String amount) {
+    String balanceBefore = page.locator("[data-testid='bank-balance']").textContent().trim();
+    page.locator("[data-testid='bank-deposit-open']")
+        .click(new com.microsoft.playwright.Locator.ClickOptions().setTimeout(20_000));
+    page.locator("[data-testid='bank-deposit-amount']").fill(amount);
+    // The holder select carries the registered holder options; pick the employee's holder.
+    page.locator("[data-testid='bank-deposit-holder']").selectOption(uiHolderId);
+    page.waitForResponse(
+        r -> r.url().contains("/api/proxy/bank/deposits") && "POST".equals(r.request().method()),
+        () -> page.locator("[data-testid='bank-deposit-submit']").click());
+    // The accountBody swap repaints the facts strip; wait for the balance text to actually change
+    // so
+    // the proof is that the money region updated IN PLACE, not via a reload.
+    page.waitForFunction(
+        "old => { const el = document.querySelector('[data-testid=\"bank-balance\"]');"
+            + " return el && el.textContent.trim() !== old; }",
+        balanceBefore);
   }
 
   /**

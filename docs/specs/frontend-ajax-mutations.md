@@ -198,6 +198,27 @@ sanctioned reload-confirm; a missing required field on a create twin is a `422` 
 `problem+json` rather than the 500 the frontend `@ControllerAdvice` would make of a `@Valid`
 `@RequestBody` bind failure.
 
+The bank area (#579) converts the last AJAX-then-`location.reload()` writes — money operations and
+the account / holder / grant lifecycle — to in-place fragment swaps without touching the already
+complete `BankProxyController`. The generic `bank.js` form dispatcher keeps its bespoke inline
+field-error rendering (`.bank-field-error` slots + the `CODE_FIELD` overdraft / self-transfer /
+holder-inactive mapping — bank 409s render at the field, never as a reload-confirm toast) but moves
+its CSRF onto the shared `krtCsrf` with retry-on-403, and replaces the success reload with a server
+re-render of the region named by the form's `data-refresh` attribute. The account-detail money writes
+(deposit / withdraw / transfer / rebook / reverse) swap the whole `accountBody`
+(`GET /bank/accounts/{id}?fragment=accountBody`) because the balance, the holder distribution and the
+booking modals' distribution-derived holder selects are all backend aggregates a JS patch would
+desync — and the money forms carry no `@Version` (the ledger is append-only), so an immediate second
+booking cannot 409. The manage lifecycle writes swap `manageBody` (tab-nav + active panel together, so
+the `.tab-count` aggregates and every trigger button's fresh `data-field-version` re-render
+atomically, fixing the shared deactivate/reactivate-modal stale-version trap), and grant create /
+revoke swap `grantsMatrix` honouring the active `view` / `accountId` / `userId` filter (#573). The one
+genuinely isolated single-row write — a grant capability flag toggle — stays a precise dom-patch
+(`button.on` + the row's `data-can-*` + `krtFetch.syncVersion` from the `BankGrantDto` response). If a
+write succeeds but only its follow-up refresh GET bounces, the swap surfaces a dedicated "saved, but
+reload" message rather than the generic "action failed" text, so a committed money booking is never
+mistaken for a failure.
+
 The **promotion** admin + management pages (#580) drop their last `AJAX-then-location.reload()`
 writes for in-place fragment swaps. The two admin pages re-render their list region after every
 mutation: **topics/categories** create / edit / delete and the up/down **reorder** swap
@@ -215,17 +236,18 @@ state is restored on `krt:swapped`). All three pages' bespoke `getCsrfToken` / `
 `apiCall` helpers were retired onto `krtCsrf` (shared reader + retry-once-on-403); the client-side
 rank filter and the manage CSV export are untouched.
 
-**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574), order-detail (#575),
-refinery-import (#591), the asset-management twin/fragment MVC tests (#578) and the promotion
-fragment MVC tests (#580). **Issues:** the #571 epic children (#572 through #580, plus #591).
-**Code:** `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
-`mission-detail.html`, `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`,
-`datetime-splitter.js`, `hangar.html`, `ship-data.html`, `personal-inventory.html`,
-`personal-inventory-blueprints.html`, `personal-inventory*.js`, `promotion-admin-topics.html`,
+**Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
+refinery-import (#591), asset-management (#578), bank (#579) and promotion (#580) twin / fragment /
+endpoint MVC + e2e tests. **Issues:** the epic children #572 through #591 (most recently #578, #579
+and #580). **Code:** `krt-fetch.js` (`swap`), `missions.js`, `operations.js`,
+`fragments/pagination.html`, `mission-detail.html`, `orders-index.html`, `orders-detail.html`,
+`refinery-orders-create.html`, `datetime-splitter.js`, `hangar.html`, `ship-data.html`,
+`personal-inventory.html`, `personal-inventory-blueprints.html`, `personal-inventory*.js`, `bank.js`,
+`bank-account-detail.html`, `bank-manage.html`, `bank-grants.html`, `promotion-admin-topics.html`,
 `promotion-admin-rank-requirements.html`, `promotion-manage.html`, `JobOrderPageController`,
 `RefineryOrderPageController`, `HangarPageController`, `ShipDataPageController`,
-`PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`,
-`PromotionPageController`.
+`PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`, `BankPageController`,
+`BankManagePageController`, `BankGrantsPageController`, `PromotionPageController`.
 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 

@@ -463,6 +463,12 @@
                 return;
             }
             event.preventDefault();
+            // Nested swap containers (e.g. bank-account-detail's #bank-bookings-results pager sits
+            // inside the #bank-account-results accountBody region, both bound here): the click
+            // bubbles innermost-first, so the CLOSEST swap container handles its own pagination
+            // anchor and stops the event — otherwise an enclosing container would ALSO swap, firing
+            // a redundant full-section re-render on top of the intended sub-table page change.
+            event.stopPropagation();
             swap(Object.assign({}, opts, { url: anchor.getAttribute('href') }));
         });
     }

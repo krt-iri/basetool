@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,7 +63,7 @@ class BankGrantsPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
 
     // When
-    String view = controller.grants(null, accountId, null, model);
+    String view = controller.grants(null, accountId, null, null, model);
 
     // Then
     assertEquals("bank-grants", view);
@@ -99,7 +100,7 @@ class BankGrantsPageControllerTest {
         .thenReturn(List.of());
 
     // When
-    controller.grants("employee", null, userId, model);
+    controller.grants("employee", null, userId, null, model);
 
     // Then
     assertEquals(Boolean.TRUE, model.getAttribute("byEmployee"));
@@ -109,5 +110,37 @@ class BankGrantsPageControllerTest {
     assertEquals(2, grantees.size());
     assertEquals("alpha", grantees.get(userId));
     assertEquals("bravo", grantees.get(otherUser));
+  }
+
+  // covers REQ-FE-005 (#579) — an in-place re-render (fragment=grantsMatrix) returns only the
+  // matrix
+  // fragment honouring the active filter, and skips the all-grants / accounts / users lookups that
+  // feed the filter selectors and the create modal (all outside the swapped region).
+  @Test
+  void grants_fragmentGrantsMatrix_rendersOnlyMatrixFragment_andSkipsFilterAndModalLookups() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    UUID accountId = UUID.randomUUID();
+    UUID user = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/bank/grants?accountId=" + accountId),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(grant(user, "alpha", accountId)));
+
+    // When
+    String view = controller.grants(null, accountId, null, "grantsMatrix", model);
+
+    // Then
+    assertEquals("bank-grants :: grantsMatrix", view);
+    List<BankGrantDto> grants = (List<BankGrantDto>) model.getAttribute("grants");
+    assertNotNull(grants);
+    assertEquals(1, grants.size());
+    // The fragment path must not load the filter selectors / create-modal lookups.
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
   }
 }
