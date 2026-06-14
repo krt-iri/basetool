@@ -22,7 +22,6 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,11 +34,12 @@ import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository
 import de.greluc.krt.iri.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -48,10 +48,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Mockito unit tests for {@link PersonalBlueprintOverviewService} — the in-Java aggregation and
- * scope-driven owner resolution. The oversight {@link ScopePredicate} is supplied by a mocked
- * {@link OwnerScopeService}; the persona-specific predicate construction itself is covered by
- * {@code OwnerScopeServiceTest}.
+ * Mockito unit tests for {@link PersonalBlueprintOverviewService} — the in-Java
+ * <em>variant-family</em> aggregation (a base item and its cosmetic variants collapse onto one
+ * availability row) and the family-aware, scope-driven owner drill-down (the family key is expanded
+ * to its product keys via a mocked {@link BlueprintVariantFamilyCatalog}, then owners are fetched
+ * by that product-key set). The real {@link BlueprintVariantFamilyResolver} is wired in so the
+ * family grouping runs end-to-end; the oversight {@link ScopePredicate} is supplied by a mocked
+ * {@link OwnerScopeService} (its persona-specific construction is covered by {@code
+ * OwnerScopeServiceTest}).
  */
 @ExtendWith(MockitoExtension.class)
 class PersonalBlueprintOverviewServiceTest {
@@ -60,7 +64,24 @@ class PersonalBlueprintOverviewServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private UserRepository userRepository;
-  @InjectMocks private PersonalBlueprintOverviewService service;
+  @Mock private BlueprintVariantFamilyCatalog familyCatalog;
+
+  private PersonalBlueprintOverviewService service;
+
+  @BeforeEach
+  void setUp() {
+    // Real family resolver (so grouping is exercised) + mocked family catalog (so the drill-down's
+    // family-expansion is controllable); constructed after Mockito populates the mocks.
+    service =
+        new PersonalBlueprintOverviewService(
+            ownerScopeService,
+            orgUnitMembershipRepository,
+            personalBlueprintRepository,
+            userRepository,
+            new BlueprintVariantFamilyResolver(
+                new BlueprintNameNormalizer(), new BlueprintVariantAliasOverrides()),
+            familyCatalog);
+  }
 
   private static final UUID USER_1 = UUID.randomUUID();
   private static final UUID USER_2 = UUID.randomUUID();
@@ -109,6 +130,28 @@ class PersonalBlueprintOverviewServiceTest {
     assertEquals("Cutlass Black", page.getContent().get(1).productName());
     assertEquals(1L, page.getContent().get(1).ownerCount());
     verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
+  }
+
+  @Test
+  void list_collapsesCosmeticVariantsIntoOneFamilyRow() {
+    when(ownerScopeService.currentBlueprintOversightScope())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(personalBlueprintRepository.findAllDistinctOwnerSubs())
+        .thenReturn(Set.of(USER_1.toString(), USER_2.toString()));
+    // USER_1 owns the base, USER_2 owns a cosmetic variant — one family row, count 2, base label.
+    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+        .thenReturn(
+            List.of(
+                bp("fresnel energy lmg", "Fresnel Energy LMG", USER_1),
+                bp("fresnel \"molten\" energy lmg", "Fresnel \"Molten\" Energy LMG", USER_2)));
+
+    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
+
+    assertEquals(1, page.getTotalElements());
+    BlueprintOverviewEntryDto row = page.getContent().get(0);
+    assertEquals("fresnel energy lmg", row.productKey());
+    assertEquals("Fresnel Energy LMG", row.productName());
+    assertEquals(2L, row.ownerCount());
   }
 
   @Test
@@ -182,17 +225,24 @@ class PersonalBlueprintOverviewServiceTest {
   }
 
   @Test
-  void owners_returnsDistinctMembersByDisplayNameSorted() {
+  void owners_scoped_expandsFamilyAndListsVariantOwnersByDisplayNameSorted() {
+    // The family "custodian smg" expands to its base + a cosmetic variant; USER_1 owns the base,
+    // USER_2 owns the variant — both surface for the family, sorted by display name.
+    when(familyCatalog.familyIndex())
+        .thenReturn(Map.of("custodian smg", Set.of("custodian smg", "custodian \"midnight\" smg")));
     when(ownerScopeService.currentBlueprintOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1, USER_2));
-    when(personalBlueprintRepository.findAllByProductKeyAndOwnerSubIn(eq("aurora"), any()))
-        .thenReturn(List.of(bp("aurora", "Aurora MR", USER_1), bp("aurora", "Aurora MR", USER_2)));
+    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(any(), any()))
+        .thenReturn(
+            List.of(
+                bp("custodian smg", "Custodian SMG", USER_1),
+                bp("custodian \"midnight\" smg", "Custodian \"Midnight\" SMG", USER_2)));
     when(userRepository.findAllById(any()))
         .thenReturn(List.of(user(USER_1, "Bravo"), user(USER_2, "Alpha")));
 
-    List<BlueprintOverviewOwnerDto> owners = service.listOwnersForProduct("aurora");
+    List<BlueprintOverviewOwnerDto> owners = service.listOwnersForProduct("custodian smg");
 
     assertEquals(
         List.of("Alpha", "Bravo"),
@@ -200,48 +250,65 @@ class PersonalBlueprintOverviewServiceTest {
   }
 
   @Test
-  void owners_emptyOversight_returnsEmptyWithoutQueries() {
-    when(ownerScopeService.currentBlueprintOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+  void owners_unknownFamily_returnsEmptyWithoutScopeOrQueries() {
+    // The family is absent from the cached index (e.g. owned only via a soft-deleted variant) — the
+    // drill-down short-circuits before resolving scope or querying owners.
+    when(familyCatalog.familyIndex()).thenReturn(Map.of());
 
-    assertTrue(service.listOwnersForProduct("aurora").isEmpty());
-    verify(personalBlueprintRepository, never()).findAllByProductKeyAndOwnerSubIn(any(), any());
+    assertTrue(service.listOwnersForProduct("gone").isEmpty());
+    verify(ownerScopeService, never()).currentBlueprintOversightScope();
+    verify(personalBlueprintRepository, never()).findAllByProductKeyInAndOwnerSubIn(any(), any());
     verify(userRepository, never()).findAllById(any());
   }
 
   @Test
-  void owners_nobodyInScopeOwnsProduct_returnsEmpty() {
+  void owners_emptyOversight_returnsEmptyWithoutOwnerQueries() {
+    when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
+    when(ownerScopeService.currentBlueprintOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+
+    assertTrue(service.listOwnersForProduct("aurora mr").isEmpty());
+    verify(personalBlueprintRepository, never()).findAllByProductKeyInAndOwnerSubIn(any(), any());
+    verify(userRepository, never()).findAllById(any());
+  }
+
+  @Test
+  void owners_nobodyInScopeOwnsFamily_returnsEmpty() {
+    when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
     when(ownerScopeService.currentBlueprintOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
-    when(personalBlueprintRepository.findAllByProductKeyAndOwnerSubIn(eq("aurora"), any()))
+    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(any(), any()))
         .thenReturn(List.of());
 
-    assertTrue(service.listOwnersForProduct("aurora").isEmpty());
+    assertTrue(service.listOwnersForProduct("aurora mr").isEmpty());
     verify(userRepository, never()).findAllById(any());
   }
 
-  // covers REQ-INV-012 — the admin drill-down queries by product key alone, without the
-  // all-owners pre-scan + unbounded IN list that made every expand click slow.
+  // covers REQ-INV-012 — the admin drill-down queries by the family's product-key set, without the
+  // all-owners pre-scan that made every expand click slow.
   @Test
-  void owners_adminAllScope_listsOwnersAcrossEveryOrgUnit_byProductKeyAlone() {
+  void owners_adminAllScope_listsOwnersAcrossEveryOrgUnit_byFamilyProductKeys() {
+    when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
     when(ownerScopeService.currentBlueprintOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     // The drill-down for the admin "all org units" scope still spans every blueprint owner, not
-    // just org-unit members (#371 fix) — but via the direct product-key lookup.
-    when(personalBlueprintRepository.findAllByProductKey("aurora"))
-        .thenReturn(List.of(bp("aurora", "Aurora MR", USER_1), bp("aurora", "Aurora MR", USER_2)));
+    // just
+    // org-unit members (#371 fix) — but via the bounded product-key-set lookup.
+    when(personalBlueprintRepository.findAllByProductKeyIn(any()))
+        .thenReturn(
+            List.of(bp("aurora mr", "Aurora MR", USER_1), bp("aurora mr", "Aurora MR", USER_2)));
     when(userRepository.findAllById(any()))
         .thenReturn(List.of(user(USER_1, "Bravo"), user(USER_2, "Alpha")));
 
-    List<BlueprintOverviewOwnerDto> owners = service.listOwnersForProduct("aurora");
+    List<BlueprintOverviewOwnerDto> owners = service.listOwnersForProduct("aurora mr");
 
     assertEquals(
         List.of("Alpha", "Bravo"),
         owners.stream().map(BlueprintOverviewOwnerDto::ownerName).toList());
     verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
     verify(personalBlueprintRepository, never()).findAllDistinctOwnerSubs();
-    verify(personalBlueprintRepository, never()).findAllByProductKeyAndOwnerSubIn(any(), any());
+    verify(personalBlueprintRepository, never()).findAllByProductKeyInAndOwnerSubIn(any(), any());
   }
 }

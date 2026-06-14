@@ -54,7 +54,10 @@ import org.springframework.transaction.annotation.Transactional;
  * cross-type SQL join between the {@code String owner_sub} and the {@code UUID} membership key): it
  * resolves the in-scope member user ids from {@link OrgUnitMembershipRepository} using the
  * oversight {@link ScopePredicate} from {@link OwnerScopeService#currentBlueprintOversightScope()},
- * then loads and groups those members' owned-blueprint rows by product.
+ * then loads and groups those members' owned-blueprint rows by <em>variant family</em> (via {@link
+ * BlueprintVariantFamilyResolver}, so a base item and its cosmetic variants collapse onto one row
+ * whose count spans the whole family). The lazy owner drill-down expands a family back to its
+ * product keys through the cached {@link BlueprintVariantFamilyCatalog} to stay bounded.
  *
  * <p>Owner identity never leaves the service except as a display name in the drill-down — the list
  * view exposes only product + owner count, and the drill-down exposes only {@link
@@ -76,11 +79,13 @@ public class PersonalBlueprintOverviewService {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final UserRepository userRepository;
+  private final BlueprintVariantFamilyResolver familyResolver;
+  private final BlueprintVariantFamilyCatalog familyCatalog;
 
   /**
-   * Lists the distinct blueprints available among the members of the caller's oversight org units,
-   * one row per product with the count of distinct in-scope members that own it. Returns an empty
-   * page when the caller oversees no org unit (the {@link
+   * Lists the blueprints available among the members of the caller's oversight org units, one row
+   * per variant family with the count of distinct in-scope members that own the base item or any of
+   * its cosmetic variants. Returns an empty page when the caller oversees no org unit (the {@link
    * OwnerScopeService#canAccessBlueprintOverview()} gate already keeps non-leadership callers out).
    *
    * <p>The optional {@code search} narrows the result to products whose display name contains the
@@ -101,10 +106,21 @@ public class PersonalBlueprintOverviewService {
     if (ownerSubs.isEmpty()) {
       return new PageImpl<>(List.of(), pageable, 0);
     }
+    // Group owned rows by variant family (not raw product key), so a base item and its cosmetic
+    // variants collapse onto one availability row whose count spans the whole family; magazines
+    // stay
+    // atomic. The row's display label is the case-preserving base name derived from the first-seen
+    // member's blueprint, so a family owned only via a variant still reads as its base.
     Map<String, ProductAggregate> byKey = new LinkedHashMap<>();
     for (PersonalBlueprint bp : personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs)) {
+      String familyKey = familyResolver.familyKey(bp.getProductName());
+      if (familyKey.isEmpty()) {
+        continue;
+      }
       byKey
-          .computeIfAbsent(bp.getProductKey(), key -> new ProductAggregate(bp.getProductName()))
+          .computeIfAbsent(
+              familyKey,
+              key -> new ProductAggregate(familyResolver.displayBaseName(bp.getProductName())))
           .owners
           .add(bp.getOwnerSub());
     }
@@ -128,32 +144,40 @@ public class PersonalBlueprintOverviewService {
   }
 
   /**
-   * Lists the in-scope members that own the given product, by display name. Re-resolves the
+   * Lists the in-scope members that own the given variant family, by display name. Re-resolves the
    * oversight scope server-side so a client cannot widen it through the query parameter. Returns an
-   * empty list when the caller oversees no org unit or nobody in scope owns the product.
+   * empty list when the caller oversees no org unit, the family is unknown to the active master, or
+   * nobody in scope owns any product in the family.
    *
-   * <p>This is the hot path behind every expand click on the availability page, so the admin "all
-   * org units" scope queries by product key alone (REQ-INV-012): pre-resolving every distinct
-   * {@code owner_sub} just to echo the full set back as an {@code IN} restriction added a
-   * table-wide scan plus an unbounded parameter list per click without narrowing anything. Scoped
+   * <p>This is the hot path behind every expand click on the availability page, so it stays bounded
+   * (REQ-INV-012): the family key is expanded to its concrete product keys once via the cached
+   * {@link BlueprintVariantFamilyCatalog} (a base plus its cosmetic variants — usually a handful),
+   * and the admin "all org units" scope then fetches owners by that product-key set alone ({@link
+   * PersonalBlueprintRepository#findAllByProductKeyIn}), never enumerating all owners. Scoped
    * callers keep the owner-restricted lookup so the isolation contract is untouched.
    *
-   * @param productKey the normalized product key whose owners to resolve
+   * @param familyKey the variant family key (the availability row's {@code productKey}) whose
+   *     owners to resolve
    * @return the owning in-scope members' display names, sorted case-insensitively; never {@code
    *     null}
    */
   @NotNull
-  public List<BlueprintOverviewOwnerDto> listOwnersForProduct(String productKey) {
+  public List<BlueprintOverviewOwnerDto> listOwnersForProduct(String familyKey) {
+    Set<String> productKeys = familyCatalog.familyIndex().getOrDefault(familyKey, Set.of());
+    if (productKeys.isEmpty()) {
+      return List.of();
+    }
     ScopePredicate scope = ownerScopeService.currentBlueprintOversightScope();
     List<PersonalBlueprint> owned;
     if (scope.adminAllScope()) {
-      owned = personalBlueprintRepository.findAllByProductKey(productKey);
+      owned = personalBlueprintRepository.findAllByProductKeyIn(productKeys);
     } else {
       Set<String> ownerSubs = oversightMemberSubs(scope);
       if (ownerSubs.isEmpty()) {
         return List.of();
       }
-      owned = personalBlueprintRepository.findAllByProductKeyAndOwnerSubIn(productKey, ownerSubs);
+      owned =
+          personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(productKeys, ownerSubs);
     }
     Set<UUID> ownerIds =
         owned.stream()
@@ -270,17 +294,17 @@ public class PersonalBlueprintOverviewService {
   }
 
   /**
-   * Mutable per-product accumulator used while grouping owned-blueprint rows: holds the display
-   * name and the set of distinct owner {@code sub}s seen for one product key.
+   * Mutable per-family accumulator used while grouping owned-blueprint rows: holds the family's
+   * display label and the set of distinct owner {@code sub}s seen across the family.
    */
   private static final class ProductAggregate {
     private final String productName;
     private final Set<String> owners = new LinkedHashSet<>();
 
     /**
-     * Starts an accumulator for one product.
+     * Starts an accumulator for one variant family.
      *
-     * @param productName the product's display spelling
+     * @param productName the family's display label (case-preserving base name)
      */
     ProductAggregate(String productName) {
       this.productName = productName;
