@@ -489,16 +489,32 @@
         if (!btn) return;
         var id = btn.getAttribute('data-id');
         var version = btn.getAttribute('data-version');
-        var csrfToken = (document.querySelector('meta[name="_csrf"]') || {}).content;
-        var csrfHeader = (document.querySelector('meta[name="_csrf_header"]') || {}).content;
-        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (csrfToken && csrfHeader) headers[csrfHeader] = csrfToken;
+        // #577: CSRF via the shared krtCsrf single source of truth (REQ-FE-002) with a one-shot
+        // retry-on-403 (REQ-FE-004) instead of a hand-rolled meta read.
+        var headers = window.krtCsrf
+            ? window.krtCsrf.headers({ 'Accept': 'application/json' })
+            : { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+        var noteBody = JSON.stringify({ note: noteValue, version: version == null ? null : Number(version) });
 
-        fetch('/inventory/' + id + '/note', {
-            method: 'PUT',
-            headers: headers,
-            credentials: 'same-origin',
-            body: JSON.stringify({ note: noteValue, version: version == null ? null : Number(version) })
+        function sendNote() {
+            return fetch('/inventory/' + id + '/note', {
+                method: 'PUT', headers: headers, credentials: 'same-origin', body: noteBody
+            });
+        }
+
+        sendNote().then(function (resp) {
+            // A bare 403 may be a stale CSRF token; refresh once and retry before treating it as a
+            // real authorization failure.
+            if (resp.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
+                return window.krtCsrf.refresh().then(function (ok) {
+                    if (ok) {
+                        headers = window.krtCsrf.headers({ 'Accept': 'application/json' });
+                        return sendNote();
+                    }
+                    return resp;
+                });
+            }
+            return resp;
         }).then(function (resp) {
             if (resp.ok) {
                 return resp.json().then(function (updated) {
@@ -506,16 +522,12 @@
                     var isEmpty = trimmed.length === 0;
                     showInventoryToast('success', isEmpty ? noteI18n.removed : noteI18n.saved);
                     closeNoteModal();
-                    // CRITICAL JUNIE RULE - FRONTEND DOM VERSION SYNC:
-                    // Update data-version on every element in the same DOM context
-                    // so subsequent edits send the current version and avoid 409 Conflict.
-                    var newVersion = (updated && updated.version != null) ? String(updated.version) : null;
-                    if (newVersion !== null) {
-                        document.querySelectorAll('[data-id="' + id + '"]').forEach(function (el) {
-                            if (el.hasAttribute('data-version')) {
-                                el.setAttribute('data-version', newVersion);
-                            }
-                        });
+                    // FRONTEND DOM VERSION SYNC (CLAUDE.md): propagate the incremented version to
+                    // every data-version control in the leaf row (note + book-out buttons, the two
+                    // association selects) so a subsequent edit does not 409 — replaces the former
+                    // document-wide [data-id] loop with the shared syncVersion.
+                    if (updated && updated.version != null && window.krtFetch) {
+                        window.krtFetch.syncVersion(btn.closest('.tree-row--leaf'), updated.version);
                     }
                     document.querySelectorAll('button.inventory-note-btn[data-id="' + id + '"]').forEach(function (b) {
                         b.setAttribute('data-note', isEmpty ? '' : (updated && updated.note != null ? updated.note : trimmed));
@@ -1161,38 +1173,31 @@
             }
         });
 
-        confirmBtn.addEventListener('click', function() {
+        confirmBtn.addEventListener('click', async function() {
+            if (!window.krtFetch) return;
             confirmBtn.disabled = true;
             cancelBtn.disabled = true;
-
-            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
-            const reqHeaders = {};
-            if (csrfToken) { reqHeaders[csrfHeader] = csrfToken; }
-
-            fetch('/inventory/all', { method: 'DELETE', headers: reqHeaders, credentials: 'same-origin' })
-                .then(function(resp) {
-                    if (!resp.ok) {
-                        throw new Error(resp.status);
+            try {
+                // #577: delete-all in place via the shared krtFetch (CSRF + retry-on-403). On
+                // success everything is gone, so re-render the (now empty) grouped table via the
+                // existing filter swap instead of a full-page reload.
+                await window.krtFetch.write({
+                    method: 'DELETE',
+                    url: '/inventory/all',
+                    toast: false,
+                    errorMessage: deleteBtn.getAttribute('data-error-failed'),
+                    onSuccess: function() {
+                        if (typeof showInventoryToast === 'function') {
+                            showInventoryToast('success', deleteBtn.getAttribute('data-success'));
+                        }
+                        if (typeof filterInventory === 'function') filterInventory();
                     }
-                    closeModal();
-                    if (typeof showInventoryToast === 'function') {
-                        showInventoryToast('success', deleteBtn.getAttribute('data-success'));
-                    }
-                    setTimeout(function() { window.location.reload(); }, 600);
-                })
-                .catch(function(err) {
-                    closeModal();
-                    const errMsg = deleteBtn.getAttribute('data-error-failed')
-                        + (err && err.message ? ' (' + err.message + ')' : '');
-                    if (typeof showInventoryToast === 'function') {
-                        showInventoryToast('error', errMsg);
-                    }
-                })
-                .finally(function() {
-                    confirmBtn.disabled = false;
-                    cancelBtn.disabled = false;
                 });
+                closeModal();
+            } finally {
+                confirmBtn.disabled = false;
+                cancelBtn.disabled = false;
+            }
         });
     })();
 
@@ -1230,30 +1235,32 @@
             version: version
         };
 
-        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-        if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
-            headers[csrfHeader] = csrfToken;
+        // #577: CSRF via the shared krtCsrf single source of truth (REQ-FE-002) with retry-on-403.
+        let headers = window.krtCsrf ? window.krtCsrf.headers() : { 'Content-Type': 'application/json' };
+
+        function sendAssoc() {
+            return fetch('/inventory/' + id + '/update-associations', {
+                method: 'PUT', headers: headers, body: JSON.stringify(dto)
+            });
         }
 
         try {
-            const response = await fetch('/inventory/' + id + '/update-associations', {
-                method: 'PUT',
-                headers: headers,
-                body: JSON.stringify(dto)
-            });
+            let response = await sendAssoc();
+            if (response.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
+                const refreshed = await window.krtCsrf.refresh();
+                if (refreshed) { headers = window.krtCsrf.headers(); response = await sendAssoc(); }
+            }
 
             if (response.ok) {
-                allSelects.forEach(s => s.setAttribute('data-version', version + 1));
-                
-                const bookOutBtn = tr.querySelector('button[data-trigger="inv-admin-bookout"]');
-                if (bookOutBtn) {
-                    bookOutBtn.setAttribute('data-version', version + 1);
+                // Propagate the AUTHORITATIVE new version (from the response DTO) to every
+                // data-version control in the leaf row via the shared syncVersion — replaces the
+                // brittle client-side version+1 on the selects + book-out button.
+                let updated = null;
+                try { updated = await response.json(); } catch (e) { /* tolerate empty body */ }
+                if (updated && updated.version != null && window.krtFetch) {
+                    window.krtFetch.syncVersion(selectElement.closest('.tree-row--leaf'), updated.version);
                 }
-                
+
                 if (typeof window.showFrontendSuccessToast === 'function') {
                     window.showFrontendSuccessToast('[[#{success.inventory.update}]]');
                 } else {

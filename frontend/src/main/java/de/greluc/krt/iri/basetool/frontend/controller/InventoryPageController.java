@@ -672,6 +672,118 @@ public class InventoryPageController {
   }
 
   /**
+   * AJAX twin of {@link #addInventoryItem} (#577): books an item into the inventory in place.
+   * Routed by the {@code X-Requested-With} header (the classic {@code POST /inventory/input}
+   * redirect stays the no-JavaScript fallback). The form is multipart/form-encoded (the create page
+   * has the SCU-decimal amount + the owner-picker), so it binds the same {@code @ModelAttribute}
+   * the classic handler does. On success it returns the source listing URL the client navigates to
+   * (navigate-after-AJAX, REQ-FE-006 — book-in is a standalone page with no local list to patch); a
+   * cross-field or bind error returns {@code 422} {@code problem+json} with a {@code code} the
+   * client maps to an inline toast, and a backend failure is propagated as {@code problem+json}.
+   *
+   * @param form the bound inventory form
+   * @param bindingResult the binding/validation result
+   * @return {@code 200} with {@code {targetUrl}}, {@code 422} on validation, or the propagated
+   *     error
+   */
+  @PostMapping(value = "/input", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> addInventoryItemAjax(
+      @Valid @ModelAttribute("inventoryForm") InventoryForm form, BindingResult bindingResult) {
+    if (Boolean.TRUE.equals(form.getPersonal())
+        && (form.getJobOrderId() != null || form.getMissionId() != null)) {
+      return inventoryValidationError("INVENTORY_PERSONAL_ASSIGNMENT");
+    }
+    if (bindingResult.hasErrors()) {
+      return inventoryValidationError("VALIDATION");
+    }
+    try {
+      InventoryItemCreateDto request =
+          new InventoryItemCreateDto(
+              Boolean.TRUE.equals(form.getIsGlobal()) ? form.getUserId() : null,
+              form.getMaterialId(),
+              form.getLocationId(),
+              form.getQuality(),
+              form.getAmount(),
+              form.getPersonal(),
+              form.getMissionId(),
+              form.getJobOrderId(),
+              form.getOwningOrgUnitId());
+      backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
+      return org.springframework.http.ResponseEntity.ok(
+          java.util.Map.of("targetUrl", inventorySourceTarget(form.getSource())));
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.error("Failed to add inventory item (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to add inventory item (ajax)", e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Maps the create form's {@code source} marker to the listing the client navigates to after an
+   * in-place book-in, mirroring the redirect targets of the classic {@link #addInventoryItem}.
+   *
+   * @param source the form's {@code source} field ({@code my} / {@code admin} / {@code aggregated})
+   * @return the same-origin listing path
+   */
+  private static String inventorySourceTarget(String source) {
+    if ("my".equals(source)) {
+      return "/inventory/my";
+    }
+    if ("admin".equals(source)) {
+      return "/inventory/all";
+    }
+    return "/inventory";
+  }
+
+  /**
+   * Builds a {@code 422} {@code problem+json} response carrying a stable {@code code} the inventory
+   * pages map to a localized inline toast — used by {@link #addInventoryItemAjax} for the
+   * server-side cross-field rule (a personal entry cannot carry an order/mission) and for a bind
+   * failure, so the create page surfaces the error without a navigation.
+   *
+   * @param code the validation code ({@code INVENTORY_PERSONAL_ASSIGNMENT} / {@code VALIDATION})
+   * @return a {@code 422} {@code problem+json} response
+   */
+  private static org.springframework.http.ResponseEntity<Object> inventoryValidationError(
+      String code) {
+    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("status", 422);
+    body.put("code", code);
+    return org.springframework.http.ResponseEntity.unprocessableEntity()
+        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
+  }
+
+  /**
+   * Translates a {@link de.greluc.krt.iri.basetool.frontend.service.BackendServiceException} into
+   * an RFC 7807 {@code problem+json} {@link org.springframework.http.ResponseEntity}, preserving
+   * the backend status, {@code code} (e.g. {@code OPTIMISTIC_LOCK}), {@code detail} and correlation
+   * id so the client's {@code krtFetch.handleProblem} can drive the conflict reload-confirm or an
+   * error toast. Mirrors the helper in the mission / job-order / operation controllers.
+   *
+   * @param e the backend failure to relay
+   * @return a {@code problem+json} response carrying the backend status and code
+   */
+  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
+      de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
+        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
+  }
+
+  /**
    * Books out an inventory item (consume / transfer / sell). The {@code type} field on the form
    * selects the operation; the backend computes the resulting state changes (decrement, transfer to
    * another user/location, or sell with terminal + price).
@@ -791,7 +903,7 @@ public class InventoryPageController {
    */
   @PostMapping("/{id}/transfer")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<InventoryItemDto> transferInventoryItem(
+  public org.springframework.http.ResponseEntity<Object> transferInventoryItem(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemBookOutDto dto) {
     try {
       InventoryItemDto result =
@@ -805,7 +917,7 @@ public class InventoryPageController {
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.error(
           "Failed to transfer inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to transfer inventory item", e);
       return org.springframework.http.ResponseEntity.status(500).build();
@@ -884,7 +996,7 @@ public class InventoryPageController {
    */
   @PatchMapping("/{id}/delivered")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<InventoryItemDto> updateDelivered(
+  public org.springframework.http.ResponseEntity<Object> updateDelivered(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid
           de.greluc.krt.iri.basetool.frontend.model.dto.UpdateDeliveredRequest request) {
@@ -896,7 +1008,7 @@ public class InventoryPageController {
     } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
       log.error(
           "Failed to update delivered status: status={}, {}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return propagateBackendError(e);
     } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
       log.error("Failed to update delivered status: {}", e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
