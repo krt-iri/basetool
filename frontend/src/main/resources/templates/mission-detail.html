@@ -613,13 +613,15 @@
                     <div class="kpanel-head" th:text="#{mission.details}">Details</div>
                     <div class="kpanel-body">
 
-                    <!-- #574 carve-out (tracked in #589): this core-edit form still submits classic
-                         POST->redirect. It fans out into three section PATCHes (core/schedule/flags)
-                         with server-side @Valid field-error rendering; an in-place conversion needs a
-                         JSON field-error contract and is deferred so the validation UX is not
-                         regressed. Every OTHER mission-detail write (crew board, finance, party-lead,
-                         owner/managers, actual-time, frequency, payout) is in-place. -->
-                    <form id="mission-form" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}">
+                    <!-- #589: the core-edit form saves IN PLACE via an X-Requested-With AJAX twin
+                         (POST /missions/{id}); the classic POST->redirect stays the no-JS fallback.
+                         data-mission-edit gates the JS interceptor so only the EDIT path is in-place —
+                         the CREATE path (isNew, posts to /missions) keeps its classic navigate-to-the-
+                         new-mission behaviour. On a 422 the JS renders the {field:message} map into the
+                         per-field .field-error[data-error-for] slots; on success it writes the four
+                         fresh versions back into the hidden inputs (no navigation). -->
+                    <form id="mission-form" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}"
+                          th:attr="data-mission-edit=${isNew} ? null : 'true'">
                         <input type="hidden" id="mission-version" name="version" th:field="*{version}">
                         <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
                         <input type="hidden" id="mission-schedule-version" name="scheduleVersion" th:field="*{scheduleVersion}">
@@ -629,7 +631,7 @@
                 <label th:text="#{mission.name}">Name</label>
                 <input type="text" name="name" data-testid="mission-name-input" th:value="*{name}" required
                        th:disabled="${!isNew and !mission.canEdit}">
-                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
+                <div class="field-error" data-error-for="name" th:text="${#fields.hasErrors('name') ? #fields.errors('name')[0] : ''}"></div>
             </div>
 
             <div class="form-group" sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
@@ -637,7 +639,7 @@
                 <textarea name="description" rows="5" th:text="*{description}"
                           th:disabled="${!isNew and !mission.canEdit}"></textarea>
                 <small class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterst&uuml;tzt.</small>
-                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
+                <div class="field-error" data-error-for="description" th:text="${#fields.hasErrors('description') ? #fields.errors('description')[0] : ''}"></div>
             </div>
 
             <div class="form-group">
@@ -649,7 +651,7 @@
                        th:href="*{calendarLink}" target="_blank" rel="noopener noreferrer"
                        class="btn btn-ghost nowrap"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{mission.calendar_link_open}">&Ouml;ffnen</span></a>
                 </div>
-                <div th:if="${#fields.hasErrors('calendarLink')}" th:errors="*{calendarLink}" class="field-error"></div>
+                <div class="field-error" data-error-for="calendarLink" th:text="${#fields.hasErrors('calendarLink') ? #fields.errors('calendarLink')[0] : ''}"></div>
             </div>
 
             <div class="form-row">
@@ -661,7 +663,7 @@
                     <option value="COMPLETED" th:selected="*{status == 'COMPLETED'}">COMPLETED</option>
                     <option value="CANCELLED" th:selected="*{status == 'CANCELLED'}">CANCELLED</option>
                 </select>
-                <div th:if="${#fields.hasErrors('status')}" th:errors="*{status}" class="field-error"></div>
+                <div class="field-error" data-error-for="status" th:text="${#fields.hasErrors('status') ? #fields.errors('status')[0] : ''}"></div>
             </div>
 
             <div class="form-group">
@@ -2959,8 +2961,12 @@
             if (q && validKeys.includes(q)) return q;
             const h = (window.location.hash.match(/tab=([\w-]+)/) || [])[1];
             if (h && validKeys.includes(h)) return h;
-            // A re-render with server-side validation errors must land on the form.
-            if (document.querySelector('#pane-verw .field-error') && validKeys.includes('verw')) return 'verw';
+            // A re-render with server-side validation errors must land on the form. Scope to
+            // :not(:empty) because #589 made the core-edit .field-error divs always-present (empty
+            // when there is no error) so the client can fill them — a bare `.field-error` would now
+            // always match and wrongly pin every load to the Verwaltung tab.
+            if (document.querySelector('#pane-verw #mission-form .field-error:not(:empty)') && validKeys.includes('verw'))
+                return 'verw';
             if (useStore) {
                 try {
                     const s = localStorage.getItem(storeKey);
@@ -3003,6 +3009,125 @@
         }
         window.addEventListener('resize', syncStickyOffset);
         syncStickyOffset();
+    })();
+</script>
+<script th:inline="none" th:attr="nonce=${cspNonce}">
+    // #589: in-place save of the mission core-edit form. The classic POST->redirect (updateMission)
+    // stays the no-JS fallback; this intercepts the EDIT form (data-mission-edit) and posts to the
+    // X-Requested-With twin (updateMissionAjax). On 200 it writes the four fresh versions back into
+    // the hidden inputs (so a second consecutive save does not 409) and toasts success WITHOUT a
+    // navigation; on 422 it renders the {field:message} map into the per-field .field-error slots; on
+    // 409 it offers the sanctioned conflict reload. The CREATE form (no data-mission-edit) keeps its
+    // classic navigate-to-the-new-mission submit. The pane-verw 'submit' listener (above) still fires
+    // through preventDefault, so the unsaved-changes tab guard is cleared exactly as before.
+    (function () {
+        const form = document.getElementById('mission-form');
+        if (!form || form.dataset.missionEdit !== 'true') return;
+        const D = window.MISSION_SUBRES_I18N || {};
+        function msg(key, fallback) { return D[key] != null && D[key] !== '' ? D[key] : fallback; }
+        const SAVED = msg('mission.save.section.ok', 'Gespeichert.');
+        const FAILED = msg('mission.save.section.error', 'Speichern fehlgeschlagen.');
+
+        function buildHeaders() {
+            const h = { 'X-Requested-With': 'XMLHttpRequest' };
+            if (window.krtCsrf) {
+                const t = window.krtCsrf.token();
+                const n = window.krtCsrf.headerName();
+                if (t && n) h[n] = t;
+            }
+            return h;
+        }
+        function writeVersions(v) {
+            if (!v) return;
+            function set(id, val) {
+                const el = document.getElementById(id);
+                if (el && val != null) el.value = val;
+            }
+            set('mission-version', v.version);
+            set('mission-core-version', v.coreVersion);
+            set('mission-schedule-version', v.scheduleVersion);
+            set('mission-flags-version', v.flagsVersion);
+        }
+        function clearFieldErrors() {
+            form.querySelectorAll('.field-error[data-error-for]').forEach(function (el) { el.textContent = ''; });
+        }
+        function renderFieldErrors(map) {
+            clearFieldErrors();
+            Object.keys(map || {}).forEach(function (field) {
+                const slot = form.querySelector('.field-error[data-error-for="' + field + '"]');
+                if (slot) slot.textContent = map[field];
+                // No matching slot (e.g. a future backend-added constraint) -> toast so the validation
+                // message is never silently dropped.
+                else if (window.showFrontendErrorToast) window.showFrontendErrorToast(map[field]);
+            });
+        }
+        function handleConflict(problem) {
+            const code = problem && problem.code;
+            if (code === 'OPTIMISTIC_LOCK' || code === 'PESSIMISTIC_LOCK') {
+                if (typeof window.showKrtConfirm === 'function') {
+                    window.showKrtConfirm(
+                        msg('mission.conflict.toast.title', 'Konflikt'),
+                        msg('mission.conflict.action.reload.question', ''),
+                        msg('mission.conflict.action.reload', ''),
+                        msg('mission.conflict.action.dismiss', '')
+                    ).then(function (ok) { if (ok) window.location.reload(); });
+                } else {
+                    window.location.reload();
+                }
+            } else if (window.showFrontendErrorToast) {
+                window.showFrontendErrorToast((problem && problem.detail) || msg('mission.conflict.toast.detail', FAILED));
+            }
+        }
+        let inFlight = false;
+        async function submitInPlace() {
+            if (!window.krtCsrf) { form.submit(); return; }
+            if (inFlight) return; // ignore a rapid second submit while one is still in flight
+            inFlight = true;
+            const submitBtn = document.querySelector('button[type="submit"][form="mission-form"]');
+            if (submitBtn) submitBtn.disabled = true;
+            try {
+                const fd = new FormData(form);
+                let res;
+                try {
+                    res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+                    if (res.status === 403 && window.krtCsrf.refresh) {
+                        const refreshed = await window.krtCsrf.refresh();
+                        if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+                    }
+                } catch (e) {
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
+                    return;
+                }
+                if (res.status === 422) {
+                    let map = {};
+                    try { map = await res.json(); } catch (e) { /* non-JSON body */ }
+                    renderFieldErrors(map);
+                    return;
+                }
+                if (res.status === 409) {
+                    let problem = {};
+                    try { problem = await res.json(); } catch (e) { /* non-JSON body */ }
+                    handleConflict(problem);
+                    return;
+                }
+                if (!res.ok) {
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
+                    return;
+                }
+                let versions = null;
+                try { versions = await res.json(); } catch (e) { /* non-JSON body */ }
+                writeVersions(versions);
+                clearFieldErrors();
+                if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(SAVED);
+            } finally {
+                inFlight = false;
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            submitInPlace();
+        });
     })();
 </script>
 <script th:attr="nonce=${cspNonce}">

@@ -1371,6 +1371,14 @@ label:has(+ [required])::after {
     align-items: flex-start;
 }
 
+/* #589: the mission core-edit form keeps its per-field .field-error divs always present (with a
+   data-error-for hook) so the in-place AJAX save can fill them client-side; an empty one must take
+   no space, matching the old th:if-removed-the-div behaviour. Harmless for the th:if-gated error
+   divs elsewhere (they only render when they already carry a message). */
+.field-error:empty {
+    display: none;
+}
+
 /* Input/select/textarea flagged invalid - red hairline at rest, swapping the
    orange focus bloom for a danger one, so the offending field is obvious next to
    its .field-error message. */
