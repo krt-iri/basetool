@@ -118,9 +118,11 @@
                     <span th:text="${order.handle}"></span>
                 </td>
                 <td class="p-0">
-                    <!-- MATERIAL orders: the material-requirement summary with per-material stock
-                         progress. ITEM orders show their ordered items with delivery progress
-                         instead, keeping the column visually parallel between the two kinds. -->
+                    <!-- Both order kinds render the same material-requirement summary: the material
+                         name, the total required amount and the collection progress (stock / required).
+                         MATERIAL orders use their per-line requirements; ITEM orders use the
+                         aggregated material list derived from the ordered items' blueprints (#595),
+                         so the column shows what materials must be gathered — not the item count. -->
                     <div th:if="${order.type != 'ITEM'}" class="table-responsive">
                     <table class="data-table" style="margin: 0; background: transparent; border: none; box-shadow: none; width: 100%;">
                         <colgroup>
@@ -156,19 +158,22 @@
                         </colgroup>
                         <thead>
                             <tr>
-                                <th th:text="#{orders.detail.item.name}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Item</th>
-                                <th th:text="#{orders.detail.item.amount}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Anzahl</th>
+                                <th th:text="#{orders.material.name}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Material</th>
+                                <th th:text="#{orders.material.amount}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Gefordert</th>
                                 <th th:text="#{orders.material.progress}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Fortschritt</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr th:each="item : ${order.items}">
-                                <td th:text="${item.gameItem != null ? item.gameItem.name() : '-'}" th:title="${item.gameItem != null ? item.gameItem.name() : '-'}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
-                                <td th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}" style="border-bottom: none; white-space: nowrap;"></td>
-                                <td th:text="${#numbers.formatDecimal((item.amount != null and item.amount > 0) ? ((item.deliveredAmount != null ? item.deliveredAmount : 0) * 100.0 / item.amount) : 0, 1, 0)} + ' %'" style="border-bottom: none; white-space: nowrap;"></td>
+                            <tr th:each="agg : ${order.aggregatedMaterials}">
+                                <td th:text="${agg.material != null ? agg.material.name() : '-'}" th:title="${agg.material != null ? agg.material.name() : '-'}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
+                                <td style="border-bottom: none; white-space: nowrap;" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                                    <span th:case="'PIECE'" th:text="|${agg.totalQuantity != null ? #numbers.formatInteger(agg.totalQuantity, 1) : '0'} #{material.quantity.piece}|"></span>
+                                    <span th:case="*" th:text="|${agg.totalQuantity != null ? #numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                                </td>
+                                <td th:text="${#numbers.formatDecimal((agg.totalQuantity != null and agg.totalQuantity > 0) ? ((agg.currentStock != null ? agg.currentStock : 0) >= agg.totalQuantity ? 100.0 : ((agg.currentStock != null ? agg.currentStock : 0) * 100.0 / agg.totalQuantity)) : 0, 1, 0)} + ' %'" style="border-bottom: none; white-space: nowrap;"></td>
                             </tr>
-                            <tr th:if="${order.items == null or order.items.isEmpty()}">
-                                <td colspan="3" class="text-muted" style="border-bottom: none;" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
+                            <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
+                                <td colspan="3" class="text-muted" style="border-bottom: none;" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</td>
                             </tr>
                         </tbody>
                     </table>

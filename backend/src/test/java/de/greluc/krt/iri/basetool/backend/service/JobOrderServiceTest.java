@@ -1279,5 +1279,60 @@ class JobOrderServiceTest {
       verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(order);
       assertEquals("edited", order.getHandle());
     }
+
+    @Test
+    void happyPath_enrichesAggregatedMaterialsWithCollectionStock() {
+      // #595: the order overview shows an item order's aggregated material list with collection
+      // progress, so every aggregated bucket must carry currentStock — the order-linked inventory
+      // summed at the bucket's quality floor (GOOD -> 700), exactly like the MATERIAL rows.
+      JobOrder order = itemOrder();
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+      when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+      // An ITEM base DTO with no MATERIAL lines, so only the aggregated path computes stock here.
+      JobOrderDto itemBase =
+          new JobOrderDto(
+              orderId,
+              1,
+              null,
+              null,
+              "Tester",
+              null,
+              1,
+              JobOrderStatus.OPEN,
+              JobOrderType.ITEM,
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of(),
+              Instant.now(),
+              1L);
+      when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(itemBase);
+      when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
+      when(jobOrderItemService.aggregateMaterials(any()))
+          .thenReturn(
+              List.of(
+                  new de.greluc.krt.iri.basetool.backend.model.dto.AggregatedMaterialDto(
+                      materialDto,
+                      de.greluc.krt.iri.basetool.backend.model.QualityRequirement.GOOD,
+                      10.0,
+                      null,
+                      List.of(),
+                      null)));
+      when(jobOrderItemService.buildItemLine(any()))
+          .thenAnswer(inv -> new de.greluc.krt.iri.basetool.backend.model.JobOrderItem());
+      when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
+              materialId, orderId, 700))
+          .thenReturn(4.0);
+
+      JobOrderDto result = jobOrderService.updateItemJobOrder(orderId, oneLine(1L));
+
+      assertEquals(1, result.aggregatedMaterials().size());
+      assertEquals(
+          4.0,
+          result.aggregatedMaterials().get(0).currentStock(),
+          "GOOD bucket sums order-linked inventory at the 700 floor as collection progress");
+    }
   }
 }
