@@ -450,6 +450,21 @@
         modalMessage: /*[[#{inventory.bulk.checkout.modal.message}]]*/ 'Sollen die {0} markierten Eintr\u00e4ge vollst\u00e4ndig ausgebucht werden?'
     };
 
+    // #577 part 2: the single book-out and the bulk-checkout now save in place through the shared
+    // krtFetch/krtCsrf foundation (REQ-FE-002/005). Both reuse the OPTIMISTIC_LOCK reload-confirm via
+    // these localized conflict strings (the shared frontend.ajax.conflict.* foundation set).
+    var inventoryConflictI18n = {
+        title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt: Jemand war schneller',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Die Daten wurden zwischenzeitlich ge\u00e4ndert.',
+        reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schlie\u00dfen',
+        reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
+    var bookOutI18n = {
+        success: /*[[#{success.inventory.bookout}]]*/ 'Eintrag erfolgreich ausgebucht',
+        error: /*[[#{error.inventory.bookout.failed}]]*/ 'Fehler beim Ausbuchen des Eintrags'
+    };
+
     function getCheckedItemIds() {
         var boxes = document.querySelectorAll('.inventory-item-checkbox:checked');
         var ids = [];
@@ -505,41 +520,41 @@
             return;
         }
         closeBulkCheckoutModal();
-
-        var csrfToken = (document.querySelector('meta[name="_csrf"]') || {}).content;
-        var csrfHeader = (document.querySelector('meta[name="_csrf_header"]') || {}).content;
-        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (csrfToken && csrfHeader && csrfHeader !== 'undefined' && csrfToken !== 'undefined') {
-            headers[csrfHeader] = csrfToken;
+        if (!window.krtFetch) {
+            return;
         }
-
-        try {
-            var response = await fetch('/api/v1/inventory/bulk-checkout', {
-                method: 'POST',
-                headers: headers,
-                credentials: 'same-origin',
-                body: JSON.stringify({ itemIds: ids })
-            });
-
-            if (response.status === 204) {
-                var successMsg = bulkI18n.success.replace('{0}', ids.length);
-                showInventoryToast('success', successMsg);
-                setTimeout(function() { window.location.reload(); }, 1200);
-            } else if (response.status === 403) {
-                showInventoryToast('error', bulkI18n.errorForbidden);
-            } else if (response.status === 404) {
-                showInventoryToast('error', bulkI18n.errorNotFound);
-                setTimeout(function() { window.location.reload(); }, 1500);
-            } else if (response.status === 409) {
-                showInventoryToast('error', bulkI18n.errorConflict);
-                setTimeout(function() { window.location.reload(); }, 1500);
-            } else {
-                showInventoryToast('error', bulkI18n.errorFailed);
+        // #577 part 2: route through the new POST /inventory/bulk-checkout frontend proxy (the
+        // former direct browser call to the backend /api/v1/... path had no frontend route, so the
+        // bulk action never reached the backend). krtFetch handles CSRF + retry-on-403 and drives
+        // the OPTIMISTIC_LOCK reload-confirm; on success the grouped table is re-swapped in place
+        // and the bulk bar reset, instead of a full reload.
+        await window.krtFetch.write({
+            method: 'POST',
+            url: '/inventory/bulk-checkout',
+            payload: { itemIds: ids },
+            toast: false,
+            errorMessage: bulkI18n.errorFailed,
+            conflict: inventoryConflictI18n,
+            onSuccess: function () {
+                // Use the working global toast (the page-local showInventoryToast targets a #toast
+                // element that does not exist) so the count-substituted confirmation actually shows —
+                // the single book-out + the krtFetch error path already use this same toast.
+                if (typeof window.showFrontendSuccessToast === 'function') {
+                    window.showFrontendSuccessToast(bulkI18n.success.replace('{0}', ids.length));
+                }
+                var bulkBtn = document.getElementById('bulkCheckoutBtn');
+                var bulkCount = document.getElementById('bulkCheckoutCount');
+                if (bulkBtn) {
+                    bulkBtn.disabled = true;
+                }
+                if (bulkCount) {
+                    bulkCount.textContent = '';
+                }
+                if (typeof filterMyInventory === 'function') {
+                    filterMyInventory();
+                }
             }
-        } catch (e) {
-            console.error('Bulk checkout error:', e);
-            showInventoryToast('error', bulkI18n.errorFailed);
-        }
+        });
     }
 
     // Close bulk modal on outside click
@@ -1106,7 +1121,72 @@
         }
     }
 
+    // The item id the open book-out modal targets; set when the modal opens, read by submitBookOut.
+    var bookOutItemId = null;
+    // Guards against a second submit (Enter / rapid click) landing while the first write is in
+    // flight — a duplicate book-out on the same version would otherwise 409.
+    var bookOutInFlight = false;
+
+    // #577 part 2: submit the book-out in place via the shared krtFetch/krtCsrf foundation, reusing
+    // the existing POST /inventory/{id}/transfer proxy (the backend book-out endpoint, equivalent
+    // for DISCARD / TRANSFER / SELL). On success the grouped table is re-swapped (the server
+    // regroups) instead of the page reloading; the classic POST stays the no-JS fallback.
+    function submitBookOut(event) {
+        // scu-decimal-input.js canonicalises + validates the amount fields in the capture phase
+        // first; if it found an invalid amount it already blocked the submit (preventDefault +
+        // reportValidity). Respect that and do not fire the AJAX write.
+        if (event.defaultPrevented) {
+            return;
+        }
+        event.preventDefault();
+        if (bookOutInFlight || !window.krtFetch || !bookOutItemId) {
+            return;
+        }
+        var typeInput = document.querySelector('input[name="type"]:checked');
+        var type = typeInput ? typeInput.value : 'DISCARD';
+        var amountEl = document.getElementById('amount');
+        var amount = window.krtScuInput
+            ? window.krtScuInput.parse(amountEl.value)
+            : parseFloat(amountEl.value);
+        var sellAmountEl = document.getElementById('sellAmount');
+        var payload = {
+            amount: amount,
+            targetUserId: type === 'TRANSFER' ? (document.getElementById('targetUserId').value || null) : null,
+            targetLocationId: type === 'TRANSFER' ? (document.getElementById('targetLocationId').value || null) : null,
+            type: type,
+            terminal: type === 'SELL' ? (document.getElementById('terminal').value || null) : null,
+            sellAmount: type === 'SELL' && sellAmountEl.value !== '' ? Number(sellAmountEl.value) : null,
+            version: parseInt(document.getElementById('version').value, 10),
+            targetOwningOrgUnitId: type === 'TRANSFER' ? (document.getElementById('targetOwningOrgUnitId').value || null) : null
+        };
+        var submitBtn = document.getElementById('bookOutSubmitBtn');
+        bookOutInFlight = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        window.krtFetch.write({
+            method: 'POST',
+            url: '/inventory/' + bookOutItemId + '/transfer',
+            payload: payload,
+            successMessage: bookOutI18n.success,
+            errorMessage: bookOutI18n.error,
+            conflict: inventoryConflictI18n,
+            onSuccess: function () {
+                closeBookOutModal();
+                if (typeof filterMyInventory === 'function') {
+                    filterMyInventory();
+                }
+            }
+        }).then(function () {
+            bookOutInFlight = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
+        });
+    }
+
     function openBookOutModal(id, amount, version, materialId, userId, locationId, quantityType) {
+        bookOutItemId = id;
         var bookOutForm = document.getElementById('bookOutForm');
         bookOutForm.action = window.safeSameOriginUrl('/inventory/' + id + '/book-out', bookOutForm.action);
         
@@ -1345,6 +1425,13 @@
         window.krtEvents.on('click', 'inv-my-remove-note', removeNote);
         window.krtEvents.on('click', 'inv-my-close-bulk', closeBulkCheckoutModal);
         window.krtEvents.on('click', 'inv-my-execute-bulk', executeBulkCheckout);
+    }
+
+    // The book-out form is a stable top-level element (outside the swapped table container), so a
+    // direct submit listener bound once survives the grouped-table re-swaps.
+    var bookOutFormEl = document.getElementById('bookOutForm');
+    if (bookOutFormEl) {
+        bookOutFormEl.addEventListener('submit', submitBookOut);
     }
 </script>
 </body>

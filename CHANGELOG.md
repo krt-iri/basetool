@@ -6,6 +6,8 @@
 
 - **Lager ohne Seitenneuladen (Epic #571 / #577, Teil 1):** Das Einbuchen, das Bearbeiten von Notizen und das Zuordnen von Aufträgen/Einsätzen, die Übergaben auf der Materialsammlungsseite (Besitzer-/Standortwechsel, Lieferstatus) sowie das vollständige Leeren des globalen Lagers (Admin) aktualisieren jetzt nur den betroffenen Bereich in-place statt die ganze Seite neu zu laden. Ein direkt nachfolgender Schritt auf derselben Zeile führt nicht mehr zu einem Konflikt. Das Ausbuchen und die Sammel-Ausbuchung folgen in Teil 2. Ohne JavaScript funktionieren die klassischen Formulare unverändert weiter.
 
+- **Lager ohne Seitenneuladen (Epic #571 / #577, Teil 2):** Das Ausbuchen eines Eintrags (einfache Ausbuchung, Umbuchung, Verkauf) und die Sammel-Ausbuchung im persönlichen Lager aktualisieren jetzt die gruppierte Lagertabelle in-place statt die ganze Seite neu zu laden; bei einem zwischenzeitlichen Konflikt erscheint ein Hinweis mit der Option, die aktuellen Werte zu laden. Damit ist der Lager-Bereich frei von Seitenneuladen. Ohne JavaScript funktioniert das klassische Ausbuchen-Formular unverändert weiter.
+
 - **Operationen ohne Seitenneuladen (Epic #571 / #576):** Das Anlegen und Löschen einer Operation aktualisiert die Operationsliste jetzt in-place statt die Seite neu zu laden; das Bearbeiten einer Operation auf der Detailseite speichert ebenfalls ohne Neuladen (zwei Speichervorgänge unmittelbar hintereinander führen nicht mehr zu einem Konflikt), und das Löschen auf der Detailseite wechselt nach Erfolg zur Liste. Der Bezahlt-Schalter der Auszahlungen lief schon vorher in-place. Ohne JavaScript funktionieren die klassischen Formulare unverändert weiter.
 
 - **Auftragsübersicht: Item-Aufträge zeigen in der Materialien-Spalte jetzt die aggregierte Materialliste mit Sammelfortschritt statt der Anzahl bestellter Items (#595).** Wie bei Material-Aufträgen erscheint pro Material die geforderte Menge und der Fortschritt beim Sammeln (vorhandener, dem Auftrag zugeordneter Bestand geteilt durch die benötigte Menge). So beantwortet die Spalte für beide Auftragsarten dieselbe Frage — was muss noch beschafft werden.
@@ -25,6 +27,8 @@
 ### Fixed
 
 - **Lager: Erfolgs- und Fehlerhinweise beim Bearbeiten von Notizen und bei der Sammelauswahl werden wieder angezeigt.** Der seiteneigene Hinweis-Helfer zeigte auf ein nicht vorhandenes Element und blieb dadurch wirkungslos; er nutzt jetzt die gemeinsamen Toast-Funktionen. Betrifft das persönliche Lager und die Admin-Ansicht.
+
+- **Persönliches Lager: Die Sammel-Ausbuchung funktioniert jetzt (#577).** Die Aktion rief bisher direkt eine Backend-Adresse auf, für die es im Frontend keine Route gab, sodass die markierten Einträge nie ausgebucht wurden; sie wird jetzt über das Frontend an das Backend weitergereicht und aktualisiert die gruppierte Tabelle in-place.
 
 - **Operationsdetailseite: Zwei Speichervorgänge unmittelbar hintereinander führen nicht mehr zu einem Konflikt (#576).** Nach dem In-Place-Speichern wurde die neue Versionsnummer nicht zurück ins Formular geschrieben, sodass der zweite Speichervorgang mit einem Konflikt (409) abgewiesen wurde; jetzt wird die aktuelle Version sofort übernommen.
 

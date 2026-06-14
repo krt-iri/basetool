@@ -144,9 +144,20 @@ guards surface their success/error outcome through the shared `showFrontendSucce
 them rather than to a non-existent page element; the material-collection owner/location transfer
 and delivered toggle move onto `krtFetch.write` (per-row patch; a full-amount transfer consumes the
 source row, 204, and removes it); and the admin delete-all clears the grouped table via the existing
-filter swap instead of a reload. The quantity-changing list writes (single book-out, bulk-checkout)
-are **part B** — they re-render the grouped table through the filter swap because a book-out/transfer
-regroups server-side.
+filter swap instead of a reload. **Part B** does the quantity-changing list writes. The single
+**book-out** modal (`inventory-my` / `inventory-admin`, all three of DISCARD / TRANSFER / SELL)
+submits in place through `krtFetch.write`, reusing the existing `POST /inventory/{id}/transfer`
+proxy (the same backend book-out endpoint — equivalent for every type, since
+`InventoryItemBookOutDto` only requires `amount` + `version`); on success it re-renders the grouped
+table through the filter swap (`filterMyInventory` / `filterInventory`) because a book-out regroups
+server-side, and `scu-decimal-input.js`'s capture-phase submit listener canonicalises + validates the
+amount before the page handler runs (which respects `event.defaultPrevented`). **Bulk-checkout**
+(personal inventory only) now posts to a new `POST /inventory/bulk-checkout` frontend proxy — the
+page previously called the backend `/api/v1/inventory/bulk-checkout` path directly, which had no
+matching frontend route, so the bulk action never reached the backend; the proxy relays the call and
+`propagateBackendError`s a failure, and the client re-swaps the grouped table + resets the bulk bar
+instead of reloading. Both reuse the shared `frontend.ajax.conflict.*` strings for the
+OPTIMISTIC_LOCK reload-confirm.
 
 The refinery **screenshot-extract import** (#591) applies the same fragment-swap idea to a
 **multipart POST** rather than a GET: an `X-Requested-With` import twin
