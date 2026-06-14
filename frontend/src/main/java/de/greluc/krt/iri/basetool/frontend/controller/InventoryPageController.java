@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.controller;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.AggregatedInventoryDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.InventoryItemCreateDto;
@@ -921,6 +922,43 @@ public class InventoryPageController {
     } catch (Exception e) {
       log.error("Failed to transfer inventory item", e);
       return org.springframework.http.ResponseEntity.status(500).build();
+    }
+  }
+
+  /**
+   * AJAX proxy for the bulk book-out of several fully-consumed inventory items in one call (#577,
+   * part 2). The personal-inventory page collects the checked item ids and posts them here; this
+   * forwards to the backend {@code POST /api/v1/inventory/bulk-checkout} (which discards each item
+   * in full and enforces per-item ownership). It replaces the page's former direct browser call to
+   * the backend {@code /api/v1/...} path, which had no matching frontend route — so the bulk action
+   * never reached the backend. On a backend failure the {@code problem+json} is propagated (so the
+   * client's {@code krtFetch.handleProblem} can drive the optimistic-lock reload-confirm or an
+   * error toast); on success {@code 204} lets the page re-swap the grouped table in place rather
+   * than reload.
+   *
+   * @param request the ids of the owned items to book out
+   * @return {@code 204} on success, otherwise the propagated backend error
+   */
+  @PostMapping("/bulk-checkout")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> bulkCheckout(
+      @RequestBody BulkCheckoutRequest request) {
+    // Guard the empty/missing id list here (rather than via @Valid, which the frontend
+    // GlobalExceptionHandler would surface as a 500) so the page gets a clean 422 problem+json —
+    // mirroring addInventoryItemAjax's manual validation. The page already blocks an empty
+    // selection client-side; the backend re-validates per item.
+    if (request == null || request.itemIds() == null || request.itemIds().isEmpty()) {
+      return inventoryValidationError("VALIDATION");
+    }
+    try {
+      backendApiClient.post("/api/v1/inventory/bulk-checkout", request, Void.class);
+      return org.springframework.http.ResponseEntity.noContent().build();
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.error("Failed to bulk-checkout inventory items (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to bulk-checkout inventory items (ajax)", e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
 
