@@ -219,17 +219,35 @@ write succeeds but only its follow-up refresh GET bounces, the swap surfaces a d
 reload" message rather than the generic "action failed" text, so a committed money booking is never
 mistaken for a failure.
 
+The **promotion** admin + management pages (#580) drop their last `AJAX-then-location.reload()`
+writes for in-place fragment swaps. The two admin pages re-render their list region after every
+mutation: **topics/categories** create / edit / delete and the up/down **reorder** swap
+`promotion-admin-topics :: topicsResults` into `#pa-topics-results`, and the **rank-requirements**
+create / edit / delete + group-delete swap `promotion-admin-rank-requirements :: ranksResults` into
+`#ar-results`. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
+and first/last arrow state, so a second reorder can no longer 409 — and the reorder no longer relies
+on a non-existent GET-by-id proxy route (it now reads the full DTO each PUT needs straight from the
+card's edit-button data attributes). The **manage** matrix already saved grades in place through its
+serialised save queue; #580 finishes it by recomputing each touched member's **eligibility chips**
+once the queue drains, via a lightweight per-member `promotion-manage :: eligibilityCell` swap, and
+by replacing the optimistic-lock **409 reload** with an in-place `promotion-manage :: matrixBody`
+re-render that rebuilds every row with a fresh `@Version` (the client-side collapse / sort / filter
+state is restored on `krt:swapped`). All three pages' bespoke `getCsrfToken` / `getCsrfHeader` +
+`apiCall` helpers were retired onto `krtCsrf` (shared reader + retry-once-on-403); the client-side
+rank filter and the manage CSV export are untouched.
+
 **Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
-refinery-import (#591), asset-management (#578) and bank (#579) twin / fragment / endpoint MVC + e2e
-tests. **Issues:** the epic children #572 through #591 (these areas #578 and #579). **Code:**
-`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
-`mission-detail.html`, `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`,
-`datetime-splitter.js`, `hangar.html`, `ship-data.html`, `personal-inventory.html`,
-`personal-inventory-blueprints.html`, `personal-inventory*.js`, `bank.js`, `bank-account-detail.html`,
-`bank-manage.html`, `bank-grants.html`, `JobOrderPageController`, `RefineryOrderPageController`,
-`HangarPageController`, `ShipDataPageController`, `PersonalInventoryPageController`,
-`PersonalInventoryBlueprintsPageController`, `BankPageController`, `BankManagePageController`,
-`BankGrantsPageController`.
+refinery-import (#591), asset-management (#578), bank (#579) and promotion (#580) twin / fragment /
+endpoint MVC + e2e tests. **Issues:** the epic children #572 through #591 (most recently #578, #579
+and #580). **Code:** `krt-fetch.js` (`swap`), `missions.js`, `operations.js`,
+`fragments/pagination.html`, `mission-detail.html`, `orders-index.html`, `orders-detail.html`,
+`refinery-orders-create.html`, `datetime-splitter.js`, `hangar.html`, `ship-data.html`,
+`personal-inventory.html`, `personal-inventory-blueprints.html`, `personal-inventory*.js`, `bank.js`,
+`bank-account-detail.html`, `bank-manage.html`, `bank-grants.html`, `promotion-admin-topics.html`,
+`promotion-admin-rank-requirements.html`, `promotion-manage.html`, `JobOrderPageController`,
+`RefineryOrderPageController`, `HangarPageController`, `ShipDataPageController`,
+`PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`, `BankPageController`,
+`BankManagePageController`, `BankGrantsPageController`, `PromotionPageController`.
 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 

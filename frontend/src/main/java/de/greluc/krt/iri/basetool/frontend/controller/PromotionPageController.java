@@ -41,6 +41,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /** Frontend controller for the promotion system pages. */
 @Controller
@@ -217,8 +218,22 @@ public class PromotionPageController {
   @GetMapping("/manage")
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public String manage(
-      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
+      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
+      @RequestParam(required = false) String fragment,
+      @RequestParam(required = false) String userId,
+      Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
+
+    // Cheap single-member eligibility re-render for the in-place evaluation save flow
+    // (REQ-FE-005): after a grade is stored the member's promotability may have flipped,
+    // so the client re-fetches just this one eligibility cell instead of reloading the
+    // whole matrix. Only this member's eligibility is queried, keeping the call lightweight
+    // even when the squadron has hundreds of evaluations.
+    if ("eligibilityCell".equals(fragment) && userId != null && !userId.isBlank()) {
+      model.addAttribute("eligList", fetchEligibilityForUser(userId));
+      return "promotion-manage :: eligibilityCell";
+    }
+
     List<PromotionTopicDto> topics = fetchTopics();
     // Flat list of all categories in topic-then-sortOrder order. Built in lock-step with the
     // per-topic map so the template can iterate row cells against the flat list and header
@@ -277,6 +292,12 @@ public class PromotionPageController {
     model.addAttribute("eligibilityByUser", eligibilityByUser);
     model.addAttribute("lastEvaluatedByUser", lastEvaluatedByUser);
     model.addAttribute("hasEvaluationsByUser", hasEvaluationsByUser);
+    // matrixBody is the authoritative full re-render used to recover from an optimistic-lock
+    // conflict in place: it rebuilds every row with fresh @Version, level, eligibility and
+    // last-evaluated state — exactly what the old full-page reload produced, minus the navigation.
+    if ("matrixBody".equals(fragment)) {
+      return "promotion-manage :: matrixBody";
+    }
     return "promotion-manage";
   }
 
@@ -284,7 +305,9 @@ public class PromotionPageController {
   @GetMapping("/admin/topics")
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public String adminTopics(
-      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
+      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
+      @RequestParam(required = false) String fragment,
+      Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
     List<PromotionTopicDto> topics = fetchTopics();
     Map<String, List<PromotionCategoryDto>> topicCategoryMap = new LinkedHashMap<>();
@@ -300,6 +323,9 @@ public class PromotionPageController {
     model.addAttribute("topics", topics);
     model.addAttribute("topicCategoryMap", topicCategoryMap);
     model.addAttribute("categoryContentMap", categoryContentMap);
+    if ("topicsResults".equals(fragment)) {
+      return "promotion-admin-topics :: topicsResults";
+    }
     return "promotion-admin-topics";
   }
 
@@ -309,13 +335,19 @@ public class PromotionPageController {
    * one section with its own table, mirroring the read-only layout used on {@code
    * /promotion/overview}.
    *
+   * @param promotionFeatureEnabled per-squadron feature flag; {@code false} short-circuits with 403
+   * @param fragment when {@code "ranksResults"}, only the requirements-list fragment is rendered
+   *     (for an in-place AJAX swap after a create/edit/delete) instead of the whole page
    * @param model Spring MVC model populated with the grouped requirements, topics and categories
-   * @return the Thymeleaf view name for the rank-requirements admin page
+   * @return the Thymeleaf view (or {@code view :: fragment}) name for the rank-requirements admin
+   *     page
    */
   @GetMapping("/admin/rank-requirements")
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public String adminRankRequirements(
-      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
+      @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
+      @RequestParam(required = false) String fragment,
+      Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
     List<RankRequirementDto> requirements = fetchAllRankRequirements();
 
@@ -345,6 +377,9 @@ public class PromotionPageController {
     model.addAttribute("topics", topics);
     model.addAttribute("categories", fetchAllCategories());
     model.addAttribute("categoriesByTopic", categoriesByTopic);
+    if ("ranksResults".equals(fragment)) {
+      return "promotion-admin-rank-requirements :: ranksResults";
+    }
     return "promotion-admin-rank-requirements";
   }
 

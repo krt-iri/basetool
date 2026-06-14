@@ -112,6 +112,8 @@
                     th:text="#{promotion.admin.ranks.new}">Neue Anforderung</button>
         </div>
 
+        <div id="ar-results">
+        <th:block th:fragment="ranksResults">
         <div th:if="${#lists.isEmpty(requirements)}">
             <p th:text="#{promotion.admin.ranks.no.requirements}">Keine Rangvoraussetzungen vorhanden.</p>
         </div>
@@ -193,6 +195,8 @@
             </div>
             <div id="ar-empty" class="pa-empty" hidden
                  th:text="#{promotion.admin.ranks.filter.empty}">Keine Treffer.</div>
+        </div>
+        </th:block>
         </div>
     </div>
     </th:block>
@@ -351,8 +355,28 @@
     function closeModal(id) { document.getElementById(id).classList.remove('active'); }
     function openModal(id)  { document.getElementById(id).classList.add('active'); }
 
-    function getCsrfToken()  { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
-    function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+    var MSG_REFRESH_FAILED = /*[[#{promotion.refresh.failed}]]*/ 'Saved, but the view could not be refreshed. Please reload the page.';
+
+    // CSRF readers delegate to the shared krtCsrf module (epic #571); the meta-tag
+    // fallback keeps the page working if krt-fetch.js failed to load.
+    function getCsrfToken()  { return (window.krtCsrf && window.krtCsrf.token && window.krtCsrf.token()) || document.querySelector('meta[name="_csrf"]')?.content || ''; }
+    function getCsrfHeader() { return (window.krtCsrf && window.krtCsrf.headerName && window.krtCsrf.headerName()) || document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+
+    // Re-renders the requirements list in place after a create / edit / delete so
+    // grouping, ordering and every row's data-ar-version come back fresh. The
+    // active client-side filter is re-applied via the krt:swapped listener below.
+    function arRefresh() {
+        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+            window.location.reload();
+            return Promise.resolve(false);
+        }
+        return window.krtFetch.swap({
+            url: '/promotion/admin/rank-requirements',
+            container: '#ar-results',
+            fragmentValue: 'ranksResults',
+            errorMessage: MSG_REFRESH_FAILED
+        });
+    }
 
     function syncToRank(fromInput) {
         if (!fromInput) return;
@@ -397,17 +421,35 @@
         return Number.isFinite(fromVal) && Number.isFinite(toVal) && (fromVal - toVal === 1);
     }
 
+    function arCsrfHeaders() {
+        if (window.krtCsrf && typeof window.krtCsrf.headers === 'function') {
+            return window.krtCsrf.headers();
+        }
+        var h = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        h[getCsrfHeader()] = getCsrfToken();
+        return h;
+    }
+
+    // JSON write through the shared CSRF reader with a single retry on a bare 403
+    // (stale token). On 409 it toasts and refreshes the list in place instead of
+    // reloading the whole page.
     function apiCall(url, method, body) {
-        var headers = { 'Content-Type': 'application/json' };
-        headers[getCsrfHeader()] = getCsrfToken();
-        return fetch(url, {
-            method: method,
-            headers: headers,
-            body: body ? JSON.stringify(body) : undefined
+        function run() {
+            return fetch(url, {
+                method: method,
+                headers: arCsrfHeaders(),
+                body: body ? JSON.stringify(body) : undefined
+            });
+        }
+        return run().then(function (r) {
+            if (r.status === 403 && window.krtCsrf && typeof window.krtCsrf.refresh === 'function') {
+                return window.krtCsrf.refresh().then(function (ok) { return ok ? run() : r; });
+            }
+            return r;
         }).then(function (r) {
             if (r.status === 409) {
                 toastError(MSG_CONFLICT);
-                setTimeout(function () { window.location.reload(); }, 1500);
+                arRefresh();
                 return null;
             }
             if (!r.ok) {
@@ -464,7 +506,7 @@
             if (!data) return;
             toastSuccess(MSG_SAVED);
             closeModal('modal-create');
-            setTimeout(function () { window.location.reload(); }, 600);
+            arRefresh();
         });
     }
 
@@ -486,7 +528,7 @@
             if (!data) return;
             toastSuccess(MSG_SAVED);
             closeModal('modal-edit');
-            setTimeout(function () { window.location.reload(); }, 600);
+            arRefresh();
         });
     }
 
@@ -509,7 +551,7 @@
             deleteRequirement(id).then(function (data) {
                 if (!data) return;
                 toastSuccess(MSG_DELETED);
-                setTimeout(function () { window.location.reload(); }, 600);
+                arRefresh();
             });
         });
     }
@@ -537,7 +579,7 @@
             });
             chain.then(function () {
                 toastSuccess(MSG_GROUP_DELETED);
-                setTimeout(function () { window.location.reload(); }, 600);
+                arRefresh();
             });
         });
     }
@@ -606,6 +648,15 @@
 
         var filter = document.getElementById('ar-filter');
         if (filter) filter.addEventListener('input', applyFilter);
+
+        // After an in-place refresh the rows are re-rendered, so re-apply the
+        // active search filter (the input lives outside the swapped region and
+        // keeps its value) to restore the visible subset.
+        document.addEventListener('krt:swapped', function (e) {
+            if (e.detail && e.detail.container && e.detail.container.id === 'ar-results') {
+                applyFilter();
+            }
+        });
     });
     /*]]>*/
 </script>
