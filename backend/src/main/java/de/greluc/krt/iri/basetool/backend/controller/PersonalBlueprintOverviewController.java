@@ -107,10 +107,13 @@ public class PersonalBlueprintOverviewController {
   }
 
   /**
-   * Lists the in-scope members that own the given blueprint, by display name only. The scope is
-   * re-resolved server-side, so the {@code productKey} parameter cannot widen visibility.
+   * Lists the in-scope members that own the given blueprint variant family, by display name only.
+   * The scope is re-resolved server-side, so the {@code productKey} parameter cannot widen
+   * visibility. The {@code productKey} carries the row's variant family key (a base item and its
+   * cosmetic variants share one), which the service expands to the family's product keys before
+   * resolving owners.
    *
-   * @param productKey the normalized product key whose owners to list
+   * @param productKey the variant family key (the availability row's key) whose owners to list
    * @return the owning in-scope members' display names
    */
   @GetMapping("/owners")

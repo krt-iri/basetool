@@ -38,7 +38,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -50,17 +49,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Assembles the item job-order <em>blueprint-coverage</em> view: for an {@code ITEM} order, who
- * among the members of the order's responsible (processing) squadron/SK owns the blueprints for the
- * items the order requests, and which of those required blueprints each member holds.
+ * among the members of the order's responsible (processing) squadron/SK owns the blueprint for the
+ * items the order requests (or for any cosmetic variant of them), and which concrete blueprint each
+ * member holds.
  *
  * <p>{@link PersonalBlueprint} carries no org-unit column — it is a per-user aggregate keyed by the
  * Keycloak {@code sub}. This service bridges a job order's required items to org-unit members
- * entirely in Java, mirroring {@link PersonalBlueprintOverviewService}: it normalizes each item
- * line's chosen-blueprint output name into a {@code product_key} (the same identity {@link
- * BlueprintNameNormalizer} computes for personal-blueprint ownership), resolves the responsible org
- * unit's member ids to their {@code sub} form (the {@code owner_sub} stored on {@link
- * PersonalBlueprint} equals {@code User.id}), and groups the matching owned-blueprint rows by owner
- * and by product.
+ * entirely in Java, mirroring {@link PersonalBlueprintOverviewService}: it reduces each item line's
+ * chosen-blueprint output name to its <em>variant family key</em> via {@link
+ * BlueprintVariantFamilyResolver} (so a base item and its cosmetic variants — {@code Fresnel Energy
+ * LMG} ↔ {@code Fresnel "Molten" Energy LMG} — collapse onto one required family, while magazines
+ * stay atomic), resolves the responsible org unit's member ids to their {@code sub} form (the
+ * {@code owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}), loads the members'
+ * owned blueprints, and matches them by the same family key. The coverage count is the distinct
+ * members owning any family member; each owner row lists the concrete variants they hold.
  *
  * <p>Member identity never leaves the service except as a display name — owners are exposed only
  * via {@link User#getEffectiveName()} (never the {@code sub} or e-mail), preserving the
@@ -77,17 +79,18 @@ public class JobOrderItemBlueprintOwnersService {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final UserRepository userRepository;
-  private final BlueprintNameNormalizer normalizer;
+  private final BlueprintVariantFamilyResolver familyResolver;
 
   /**
    * Builds the blueprint-coverage view for the given order. {@code MATERIAL} orders (and item
    * orders whose lines resolve to no blueprint product) yield an empty view. The owner grouping is
-   * restricted to the order's responsible org unit's members and to the order's required products,
-   * so neither foreign members nor a member's unrelated blueprints are exposed.
+   * restricted to the order's responsible org unit's members and to the order's required variant
+   * families, so neither foreign members nor a member's unrelated blueprints are exposed; a member
+   * who owns a cosmetic variant of a required item is counted, and their owned variant is surfaced.
    *
    * @param jobOrderId the job order to inspect; never {@code null}
-   * @return the coverage view (required products with owner counts + owning members with their
-   *     owned required products); never {@code null}
+   * @return the coverage view (required families with variant-inclusive owner counts + owning
+   *     members with the concrete variant blueprints they hold); never {@code null}
    * @throws EntityNotFoundException when the order id is unknown
    */
   @NotNull
@@ -97,19 +100,23 @@ public class JobOrderItemBlueprintOwnersService {
             .findByIdWithItemBlueprints(jobOrderId)
             .orElseThrow(() -> new EntityNotFoundException("Job order not found: " + jobOrderId));
 
-    // Required products: normalized product key -> first-seen display name. Item lines whose
-    // blueprint output name normalizes to nothing are skipped; a MATERIAL order has no item lines.
-    Map<String, String> requiredByKey = new LinkedHashMap<>();
+    // Required variant families: family key -> (ordered display name, variant-inclusive flag).
+    // Each item line's chosen-blueprint output name is reduced to its variant family key, so a base
+    // item and its cosmetic variants collapse onto one required row. Lines whose output name
+    // resolves to nothing are skipped; a MATERIAL order has no item lines. A magazine line stays
+    // atomic (variantInclusive = false): it is matched exactly and never folds in variants.
+    Map<String, RequiredFamily> requiredByFamily = new LinkedHashMap<>();
     for (JobOrderItem item : order.getItems()) {
       String outputName = item.getBlueprint() == null ? null : item.getBlueprint().getOutputName();
-      String key = normalizer.normalize(outputName);
-      if (key.isEmpty()) {
+      String familyKey = familyResolver.familyKey(outputName);
+      if (familyKey.isEmpty()) {
         continue;
       }
       String displayName = item.getGameItem() != null ? item.getGameItem().getName() : outputName;
-      requiredByKey.putIfAbsent(key, displayName);
+      boolean variantInclusive = !familyResolver.isMagazine(outputName);
+      requiredByFamily.putIfAbsent(familyKey, new RequiredFamily(displayName, variantInclusive));
     }
-    if (requiredByKey.isEmpty()) {
+    if (requiredByFamily.isEmpty()) {
       return new JobOrderItemBlueprintOwnersDto(List.of(), List.of());
     }
 
@@ -125,83 +132,90 @@ public class JobOrderItemBlueprintOwnersService {
                 .map(UUID::toString)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-    // Group the matching owned rows by owner id; the (owner_sub, product_key) unique constraint
-    // guarantees at most one row per owner per product, so the per-owner set is the owner's owned
-    // subset of the required products.
-    Map<UUID, Set<String>> ownedKeysByOwnerId = new LinkedHashMap<>();
+    // Load the members' owned blueprints and keep the ones whose variant family is required. The
+    // family key is a Java-computed reduction of the product name (no SQL form), so the match runs
+    // in memory over the members' rows. The per-owner set carries the ACTUAL owned variant names
+    // (so a lead sees which variant each member holds), and the per-family owner set drives the
+    // coverage count (distinct members owning any family member).
+    Map<UUID, Set<String>> ownedNamesByOwnerId = new LinkedHashMap<>();
+    Map<String, Set<UUID>> ownersByFamily = new HashMap<>();
     if (!ownerSubs.isEmpty()) {
-      for (PersonalBlueprint bp :
-          personalBlueprintRepository.findAllByOwnerSubInAndProductKeyIn(
-              ownerSubs, requiredByKey.keySet())) {
+      for (PersonalBlueprint bp : personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs)) {
+        String familyKey = familyResolver.familyKey(bp.getProductName());
+        if (!requiredByFamily.containsKey(familyKey)) {
+          continue;
+        }
         UUID ownerId = parseUuid(bp.getOwnerSub());
         if (ownerId == null) {
           continue;
         }
-        ownedKeysByOwnerId
+        ownedNamesByOwnerId
             .computeIfAbsent(ownerId, id -> new LinkedHashSet<>())
-            .add(bp.getProductKey());
-      }
-    }
-
-    // Per-product distinct owner counts, derived from the per-owner owned sets.
-    Map<String, Integer> ownerCountByKey = new HashMap<>();
-    for (Set<String> ownedKeys : ownedKeysByOwnerId.values()) {
-      for (String key : ownedKeys) {
-        ownerCountByKey.merge(key, 1, Integer::sum);
+            .add(bp.getProductName());
+        ownersByFamily.computeIfAbsent(familyKey, k -> new LinkedHashSet<>()).add(ownerId);
       }
     }
 
     List<JobOrderRequiredBlueprintDto> requiredBlueprints =
-        requiredByKey.entrySet().stream()
+        requiredByFamily.entrySet().stream()
             .map(
                 e ->
                     new JobOrderRequiredBlueprintDto(
-                        e.getKey(), e.getValue(), ownerCountByKey.getOrDefault(e.getKey(), 0)))
+                        e.getKey(),
+                        e.getValue().displayName(),
+                        ownersByFamily.getOrDefault(e.getKey(), Set.of()).size(),
+                        e.getValue().variantInclusive()))
             .sorted(
                 Comparator.comparing(
                         JobOrderRequiredBlueprintDto::productName, String.CASE_INSENSITIVE_ORDER)
                     .thenComparing(JobOrderRequiredBlueprintDto::productKey))
             .toList();
 
-    List<JobOrderBlueprintOwnerDto> owners = buildOwners(ownedKeysByOwnerId, requiredByKey);
+    List<JobOrderBlueprintOwnerDto> owners = buildOwners(ownedNamesByOwnerId);
     return new JobOrderItemBlueprintOwnersDto(requiredBlueprints, owners);
   }
 
   /**
-   * Resolves the grouped owner ids to display-name rows, mapping each owner's owned product keys
-   * back to the order's display names. Owners whose id no longer resolves to a {@link User} are
-   * dropped; the remaining rows are sorted by member name.
+   * Resolves the grouped owner ids to display-name rows. Each owner row carries the display names
+   * of the actual blueprints that member owns and which matched a required family — the concrete
+   * variant they hold, not the ordered base. Owners whose id no longer resolves to a {@link User}
+   * are dropped; the remaining rows are sorted by member name.
    *
-   * @param ownedKeysByOwnerId owner id → the required product keys that owner holds
-   * @param requiredByKey required product key → display name
+   * @param ownedNamesByOwnerId owner id → the owned blueprint display names that matched a required
+   *     family
    * @return the owning-member rows, sorted case-insensitively by name; never {@code null}
    */
   @NotNull
   private List<JobOrderBlueprintOwnerDto> buildOwners(
-      @NotNull Map<UUID, Set<String>> ownedKeysByOwnerId,
-      @NotNull Map<String, String> requiredByKey) {
-    if (ownedKeysByOwnerId.isEmpty()) {
+      @NotNull Map<UUID, Set<String>> ownedNamesByOwnerId) {
+    if (ownedNamesByOwnerId.isEmpty()) {
       return List.of();
     }
     Map<UUID, String> nameById =
-        userRepository.findAllById(ownedKeysByOwnerId.keySet()).stream()
+        userRepository.findAllById(ownedNamesByOwnerId.keySet()).stream()
             .collect(Collectors.toMap(User::getId, User::getEffectiveName));
-    return ownedKeysByOwnerId.entrySet().stream()
+    return ownedNamesByOwnerId.entrySet().stream()
         .filter(e -> nameById.containsKey(e.getKey()))
         .map(
             e ->
                 new JobOrderBlueprintOwnerDto(
                     nameById.get(e.getKey()),
-                    e.getValue().stream()
-                        .map(requiredByKey::get)
-                        .filter(Objects::nonNull)
-                        .sorted(String.CASE_INSENSITIVE_ORDER)
-                        .toList()))
+                    e.getValue().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList()))
         .sorted(
             Comparator.comparing(
                 JobOrderBlueprintOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))
         .toList();
   }
+
+  /**
+   * One required variant family while assembling the coverage view: the ordered item's display name
+   * (a variant name when a variant was ordered) and whether the row folds in cosmetic variants
+   * (true for a weapon family, false for an atomic magazine).
+   *
+   * @param displayName the ordered item's display name shown on the coverage row
+   * @param variantInclusive whether the coverage count includes owners of cosmetic variants
+   */
+  private record RequiredFamily(@NotNull String displayName, boolean variantInclusive) {}
 
   /**
    * Parses a stored {@code owner_sub} back into a {@link UUID}, returning {@code null} for the

@@ -38,6 +38,15 @@ import java.util.UUID;
  *
  * <p>The optional {@code note} is propagated directly to the resulting {@code InventoryItem} and
  * lets the user attach remarks already at the time of storage.
+ *
+ * <p>The optional {@code owningOrgUnitId} is the picker output that stamps the resulting {@code
+ * InventoryItem}'s owning OrgUnit, validated against the receiving user's ({@code userId}, else the
+ * order owner's) memberships by {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable}. It
+ * is required only when that receiving user belongs to more than one OrgUnit (the §5.5.1 matrix's
+ * "&gt;1 + no output → 400" branch); for a single-membership or membershipless receiver it may stay
+ * {@code null} and the resolver auto-stamps (or leaves the row ownerless). The store dialog
+ * pre-fills it with the order's own owning OrgUnit, so a same-OrgUnit self-store needs no manual
+ * choice.
  */
 @ValidQuantityAmount
 public record RefineryOrderStoreItemDto(
@@ -47,5 +56,6 @@ public record RefineryOrderStoreItemDto(
     @NotNull Double amount,
     UUID userId,
     UUID jobOrderId,
-    @Size(max = 1000) String note)
+    @Size(max = 1000) String note,
+    UUID owningOrgUnitId)
     implements QuantityAware {}

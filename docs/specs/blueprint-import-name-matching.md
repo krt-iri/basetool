@@ -119,6 +119,44 @@ the import does not consume it.
 `BlueprintExportFileDto`, `BlueprintImportService#parse` · **Issues:**
 [#327](https://github.com/greluc/basetool/issues/327)
 
+### REQ-INV-015 — Variant family key (cosmetic-variant grouping)
+
+Two features that count blueprint ownership across members — the item-order coverage view
+(`REQ-ORDERS-015`) and the org-unit availability overview (`REQ-INV-012`) — group a base item and
+its **cosmetic variants** into one craftable *family*, so owning any family member counts. The
+grouping is **name-based** (the catalog's `game_item.is_base_variant` / `class_name` are nullable,
+ship dark by default, and unreachable from a `PersonalBlueprint`, which is keyed by `product_key`
+string only), via a single `BlueprintVariantFamilyResolver.familyKey(name)` both sides call:
+
+- A cosmetic variant is the base name with a **quoted nickname** spliced in (`Fresnel Energy LMG` →
+  `Fresnel "Molten" Energy LMG`; `Novian Crossbow` → `Novian "Wildshot" Crossbow`). The family key is
+  the `BlueprintNameNormalizer`-normalized name with every ASCII double-quoted span removed and
+  whitespace re-collapsed — so all family members reduce to the same key. The rule is **conservative**:
+  it keeps the full unquoted residue (incl. the weapon-type word like `Rifle`/`SMG`/`Crossbow`), which
+  prevents cross-family collisions (`Sawtooth "Sirocco" Combat Knife` ≠ a `Karna` rifle) and leaves
+  genuinely distinct unquoted products distinct (ship sub-models `Aurora MR` vs `Aurora LN`).
+- **Magazines are never variants.** A name detected as an ammo container — a `(NNN cap)` capacity
+  parenthetical (a digit run + the whole word `cap`), or the standalone noun `magazine` / `battery` /
+  `ammo box` — gets an **atomic** family key that can only equal an identical magazine. It folds into
+  no weapon family, and two capacities of the "same" magazine stay distinct.
+- A small, curated, guarded/self-healing **alias map** (`BlueprintVariantAliasOverrides`, mirroring
+  `BlueprintOutputNameOverrides`, `REQ-INV-007`) canonicalizes the residual same-line cases the
+  structural rule cannot merge — base-name spelling drift (`Pulse "Blacklist" Pistol` → `pulse pistol`
+  folded onto `pulse laser pistol`) and confirmed unquoted sub-models (`Salvo Esteban Frag Pistol`,
+  `Model II Arclight`). Each entry is a deliberate game-domain judgement; a non-matching key is a no-op.
+
+**Acceptance**
+
+- [ ] `familyKey(base) == familyKey(variant)` for every quoted-nickname cosmetic variant, in both
+  directions, surviving the normalizer (case, spacing, curly quotes, apostrophes inside the nickname).
+- [ ] A magazine's family key is atomic and never equals its weapon's; the `cap` test never matches a
+  substring (`capacitor`/`capstone`) nor a non-capacity parenthetical (`(Modified)`).
+- [ ] Genuinely distinct unquoted products (ship sub-models, cross-family names) do not merge.
+- [ ] A registered alias canonicalizes; an unregistered key passes through unchanged.
+
+**Enforced by:** `BlueprintVariantFamilyResolverTest`, `BlueprintVariantAliasOverridesTest` ·
+**Code:** `BlueprintVariantFamilyResolver`, `BlueprintVariantAliasOverrides` · **Issues:** —
+
 ## Out of scope
 
 - The resolved `output_item` / `game_item` name (the recipe-detail view may still show a wrong

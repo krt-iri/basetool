@@ -632,8 +632,8 @@ class JobOrderItemDetailRenderTest {
     JobOrderItemBlueprintOwnersDto coverage =
         new JobOrderItemBlueprintOwnersDto(
             List.of(
-                new JobOrderRequiredBlueprintDto("a03 sniper rifle", "A03 Sniper Rifle", 1),
-                new JobOrderRequiredBlueprintDto("a03 optic scope", "A03 Optic Scope", 0)),
+                new JobOrderRequiredBlueprintDto("a03 sniper rifle", "A03 Sniper Rifle", 1, true),
+                new JobOrderRequiredBlueprintDto("a03 optic scope", "A03 Optic Scope", 0, true)),
             List.of(new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"))));
     when(backendApiClient.get(
             eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
@@ -663,6 +663,9 @@ class JobOrderItemDetailRenderTest {
         .as("per-item coverage row present")
         .contains("data-testid=\"blueprint-coverage-row\"");
     assertThat(html).as("coverage gap marker for the unowned item").contains("Keine Abdeckung");
+    assertThat(html)
+        .as("variant-inclusive hint shown for the weapon coverage row")
+        .contains("inkl. Varianten");
   }
 
   @Test

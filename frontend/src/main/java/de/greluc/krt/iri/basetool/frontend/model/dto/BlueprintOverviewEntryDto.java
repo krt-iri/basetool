@@ -21,10 +21,11 @@ package de.greluc.krt.iri.basetool.frontend.model.dto;
 
 /**
  * Frontend mirror of the backend {@code BlueprintOverviewEntryDto} (#364): one row of the org-unit
- * blueprint availability overview — a distinct product plus how many in-scope members own it.
+ * blueprint availability overview — a distinct variant family (base item with its cosmetic variants
+ * collapsed) plus how many in-scope members own any member of it.
  *
- * @param productKey normalized product identity (the drill-down key)
- * @param productName display spelling of the product
- * @param ownerCount number of distinct in-scope members that own this blueprint
+ * @param productKey variant family key (the drill-down key)
+ * @param productName the family's display label (case-preserving base name)
+ * @param ownerCount number of distinct in-scope members that own the base or any variant
  */
 public record BlueprintOverviewEntryDto(String productKey, String productName, long ownerCount) {}

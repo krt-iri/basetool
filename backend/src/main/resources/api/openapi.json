@@ -40969,6 +40969,10 @@
             "type" : "string",
             "maxLength" : 1000,
             "minLength" : 0
+          },
+          "owningOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]
@@ -44288,6 +44292,9 @@
           "ownerCount" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "variantInclusive" : {
+            "type" : "boolean"
           }
         }
       },
