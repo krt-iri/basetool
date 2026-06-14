@@ -55,7 +55,7 @@
 
 
         <div class="form-container">
-            <form th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}">
+            <form id="inventory-input-form" th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}">
                 <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
                     <ul class="text-danger">
                         <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
@@ -212,6 +212,76 @@
             jobSelect.value = "";
         }
     }
+</script>
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    // #577: book an item into the inventory in place. The classic POST->redirect stays the no-JS
+    // fallback; here we submit via the X-Requested-With twin and navigate to the source listing on
+    // success (navigate-after-AJAX), keeping the form + a toast on a validation/backend error
+    // instead of a flash-redirect. FormData submit lets the browser serialize the SCU-decimal amount
+    // + owner-picker exactly like the classic POST.
+    (function () {
+        if (!window.krtFetch) return; // no-JS / no-foundation: the classic POST->redirect runs.
+        const form = document.getElementById('inventory-input-form');
+        if (!form) return;
+        /*<![CDATA[*/
+        const INV_ADD_MSG = {
+            failed: /*[[#{error.inventory.add.failed}]]*/ 'Fehler.',
+            personalAssignment: /*[[#{error.inventory.personal.assignment}]]*/ 'Ungueltig.',
+            validation: /*[[#{error.validation.failed}]]*/ 'Eingaben pruefen.'
+        };
+        /*]]>*/
+        function headers() {
+            const h = { 'X-Requested-With': 'XMLHttpRequest' };
+            if (window.krtCsrf) {
+                const t = window.krtCsrf.token();
+                const n = window.krtCsrf.headerName();
+                if (t && n) h[n] = t;
+            }
+            return h;
+        }
+        let inFlight = false;
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            if (inFlight) return;
+            inFlight = true;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+            try {
+                const action = form.getAttribute('action');
+                let res;
+                try {
+                    res = await fetch(action, { method: 'POST', body: new FormData(form), headers: headers() });
+                    if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
+                        const refreshed = await window.krtCsrf.refresh();
+                        if (refreshed) res = await fetch(action, { method: 'POST', body: new FormData(form), headers: headers() });
+                    }
+                } catch (e) {
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(INV_ADD_MSG.failed);
+                    return;
+                }
+                if (res.ok) {
+                    let body = {};
+                    try { body = await res.json(); } catch (e) { /* tolerate empty body */ }
+                    // Navigate to the source listing carrying a success signal the destination's toast
+                    // fragment renders — a pre-navigation toast would be torn down by the page load.
+                    const target = body && body.targetUrl ? body.targetUrl : '/inventory';
+                    window.location.assign(
+                        target + (target.indexOf('?') >= 0 ? '&' : '?') + 'success=success.inventory.add');
+                    return;
+                }
+                let problem = {};
+                try { problem = await res.json(); } catch (e) { /* non-JSON body */ }
+                let msg = INV_ADD_MSG.failed;
+                if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT') msg = INV_ADD_MSG.personalAssignment;
+                else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
+                else if (problem && problem.detail) msg = problem.detail;
+                if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
+            } finally {
+                inFlight = false;
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        });
+    })();
 </script>
 </body>
 </html>

@@ -132,6 +132,19 @@ persisted operation in-transaction, so no second round-trip can observe a concur
 from the detail page navigates back to the list (the entity is gone — REQ-FE-006). The payout
 paid-out toggle was already in-place — its bespoke CSRF read now goes through `krtCsrf` (REQ-FE-002).
 
+The inventory area (#577) is converted in two parts; **part A** does the create + metadata writes.
+Book-in (`addInventoryItemAjax`, a multipart `X-Requested-With` twin beside the classic
+POST→redirect) navigates to the source listing on success and keeps the form with a toast on a 422
+(REQ-FE-006); the note and association edits (`inventory-my` / `inventory-admin`) drop their
+hand-rolled CSRF reads and per-`[data-id]`/`[data-note-for]` version loops for `krtCsrf`
+(retry-on-403) + `krtFetch.syncVersion` against the acting control's `.tree-row--leaf` container (so
+the next edit on that row does not 409 — REQ-FE-003); the material-collection owner/location transfer
+and delivered toggle move onto `krtFetch.write` (per-row patch; a full-amount transfer consumes the
+source row, 204, and removes it); and the admin delete-all clears the grouped table via the existing
+filter swap instead of a reload. The quantity-changing list writes (single book-out, bulk-checkout)
+are **part B** — they re-render the grouped table through the filter swap because a book-out/transfer
+regroups server-side.
+
 The refinery **screenshot-extract import** (#591) applies the same fragment-swap idea to a
 **multipart POST** rather than a GET: an `X-Requested-With` import twin
 (`RefineryOrderPageController.importExtractAjax`) returns the pre-filled create-form fragment
