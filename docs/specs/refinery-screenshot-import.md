@@ -232,14 +232,28 @@ Triggering an import must **never** raise the unsaved-changes leave-page warning
 import form is exempt from the dirty tracking (`no-track`) and is submitted via
 `requestSubmit()` so the guard's submit listener clears any dirty state armed by values
 typed into the create form beforehand. Those values are discarded **by design** — the
-redirected pre-fill (REQ-REFINERY-014) flashes a freshly built form that replaces the
-page's form state wholesale; nothing typed before the import survives, and no merge of
-old and imported values is attempted.
+pre-fill (REQ-REFINERY-014), whether flashed on the classic redirect or swapped in by the
+AJAX import twin (REQ-REFINERY-013), replaces the page's form state wholesale; nothing typed
+before the import survives, and no merge of old and imported values is attempted.
 
 *Amended 2026-06-11:* picking the extract JSON armed the guard (the file input's
 `change` event marked the page dirty) and the programmatic `submit()` skipped the
 submit event that resets it, so the native leave-page warning appeared on every
 import — even on a pristine form.
+
+*Amended 2026-06-14 (#591):* the upload now goes through an **in-place AJAX twin** by
+default. `POST /refinery-orders/import` carrying an `X-Requested-With=XMLHttpRequest`
+header routes to `RefineryOrderPageController.importExtractAjax`, which returns the
+pre-filled create-form fragment (`refinery-orders-create :: refineryImportFormBody`)
+instead of a redirect; the client swaps it into the stable `#refineryImportFormContainer`
+with no full page reload, and every error branch (invalid/oversized file, unparseable
+JSON, backend reject) renders inline in the swapped region. The classic `POST→redirect`
+proxy handler stays the no-JS fallback, and both paths share one parse contract
+(`RefineryImportProxyController.parseExtractObject`). Making the swap safe required an
+idempotent, `krt:swapped`-aware `datetime-splitter.js` (REQ-FE-005). The `no-track` /
+`requestSubmit()` dirty-guard contract above is unchanged; the client additionally calls
+`resetUnsavedChanges()` after the swap so the freshly imported form is not flagged
+dirty-vs-empty.
 
 ### REQ-REFINERY-014 — Server-side pre-fill via flash attributes
 
@@ -347,10 +361,12 @@ ignored).
   REQ-REFINERY-010 (see its embedded acceptance list).
 - V148 migration + `MaterialExternalAliasSource.REFINERY_SCREEN` + the
   `/admin/material-aliases` option cover REQ-REFINERY-012.
-- `RefineryImportProxyControllerTest` (relay, form mapping, error branches),
-  `RefineryOrderCreateImportRenderTest` (full Thymeleaf render with flags, chips and
-  banner) and the `RefineryImportE2eTest` file-upload flow
-  ([UC-24](../e2e-test/UC-24-refinery-import-extract.md)) cover REQ-REFINERY-013–016.
+- `RefineryImportProxyControllerTest` (classic relay, form mapping, error branches),
+  `RefineryImportAjaxControllerTest` (the #591 in-place twin: fragment render for every
+  branch, picker excluded from the swapped fragment), `RefineryOrderCreateImportRenderTest`
+  (full Thymeleaf render with flags, chips and banner) and the `RefineryImportE2eTest`
+  file-upload flow ([UC-24](../e2e-test/UC-24-refinery-import-extract.md), now asserting the
+  in-place swap) cover REQ-REFINERY-013–016.
 - REQ-REFINERY-017 carries its own enforcement list (see its **Enforced by** line —
   the producer half lives in the extractor repo's tests).
 
