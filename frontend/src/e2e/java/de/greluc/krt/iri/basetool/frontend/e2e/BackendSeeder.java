@@ -243,6 +243,24 @@ public final class BackendSeeder {
   }
 
   /**
+   * Seeds a {@code PLANNED} operation via {@code POST /api/v1/operations} so the operation-detail
+   * in-place write flows (#576) have a target. The backend stamps the owning org unit from the
+   * actor's active scope, so only a name and status are sent.
+   *
+   * @param username Keycloak username of the (mission-manager-or-above) test user
+   * @param password Keycloak password
+   * @param name the operation name
+   * @return the created operation's id
+   */
+  public String createOperation(String username, String password, String name) {
+    return seedEntity(
+        username,
+        password,
+        "/api/v1/operations",
+        "{\"name\":\"" + name + "\",\"status\":\"PLANNED\"}");
+  }
+
+  /**
    * Creates a refinery {@code Location} the create form's location dropdown can select.
    *
    * @param username admin username

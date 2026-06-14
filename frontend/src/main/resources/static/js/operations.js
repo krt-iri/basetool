@@ -31,6 +31,10 @@
         });
     }
 
+    // Exposed so the page-local create/delete handlers (operations-index.html) can refresh the list
+    // in place after an in-place write, reusing the active filter query — no full-page reload (#576).
+    window.krtOperationsReload = loadResults;
+
     function onFilterChange() {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(loadResults, 300);

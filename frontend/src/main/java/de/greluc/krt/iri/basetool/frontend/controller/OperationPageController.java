@@ -452,4 +452,122 @@ public class OperationPageController {
     }
     return "redirect:/operations";
   }
+
+  /**
+   * AJAX twin of {@link #createOperation} (#576): creates an operation in place. Routed by the
+   * {@code X-Requested-With} header (more specific than the classic {@code POST
+   * /operations/create}, which stays the no-JavaScript fallback). On success returns {@code 200}
+   * with no body — the client closes the create modal and swaps the list fragment; a backend
+   * failure is propagated as {@code problem+json} so the client surfaces an inline toast instead of
+   * reloading.
+   *
+   * @param form the bound operation form (JSON body)
+   * @return {@code 200} on success, or the propagated backend error
+   */
+  @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @ResponseBody
+  public ResponseEntity<Object> createOperationAjax(@RequestBody OperationForm form) {
+    try {
+      backendApiClient.post("/api/v1/operations", form, Void.class);
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
+      log.error("Create operation (ajax) failed: {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Create operation (ajax) failed", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX twin of {@link #updateOperation} (#576): saves the operation core-edit form in place.
+   * Routed by the {@code X-Requested-With} header (the classic {@code POST /operations/{id}/update}
+   * stays the no-JavaScript fallback). The backend {@code PUT} returns the persisted operation
+   * <em>in-transaction</em>, so the twin hands its fresh {@code {version, name, status}} straight
+   * back — the client writes the bumped optimistic-lock version into the form (a second consecutive
+   * save does not 409) and patches the page title in place. Returning the PUT body (rather than a
+   * follow-up {@code GET}) is deliberate: a second round-trip could observe a concurrent writer's
+   * {@code version+2} (a silent lost update on the next save) or turn an already-committed write
+   * into a reported failure if the re-read transiently fails. A backend {@code 409} is propagated
+   * as {@code problem+json} preserving the {@code OPTIMISTIC_LOCK} code so the client offers the
+   * sanctioned conflict reload.
+   *
+   * @param id the operation id
+   * @param form the bound operation form (JSON body; carries the optimistic-lock version)
+   * @return {@code 200} with the fresh version/name/status, or the propagated backend error
+   */
+  @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @ResponseBody
+  public ResponseEntity<Object> updateOperationAjax(
+      @PathVariable @NotNull UUID id, @RequestBody OperationForm form) {
+    try {
+      OperationDto updated =
+          backendApiClient.put("/api/v1/operations/" + id, form, OperationDto.class);
+      java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+      result.put("version", updated.version());
+      result.put("name", updated.name());
+      result.put("status", updated.status());
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
+      log.error("Update operation (ajax) failed for {}: {}", id, e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Update operation (ajax) failed for {}", id, e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX twin of {@link #deleteOperation} (#576): deletes an operation in place. Routed by the
+   * {@code X-Requested-With} header (the classic {@code POST /operations/{id}/delete} stays the
+   * no-JavaScript fallback). Admin-only, mirroring the classic handler. On success returns {@code
+   * 200}; the list page swaps the results fragment and the detail page navigates back to the list.
+   * A backend failure (e.g. the operation still has missions) is propagated as {@code problem+json}
+   * so the client keeps the page and surfaces a toast.
+   *
+   * @param id the operation id
+   * @return {@code 200} on success, or the propagated backend error
+   */
+  @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseBody
+  public ResponseEntity<Object> deleteOperationAjax(@PathVariable @NotNull UUID id) {
+    try {
+      backendApiClient.delete("/api/v1/operations/" + id, Void.class);
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
+      log.error("Delete operation (ajax) failed for {}: {}", id, e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Delete operation (ajax) failed for {}", id, e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Translates a {@link BackendServiceException} into an RFC 7807 {@code problem+json} {@link
+   * ResponseEntity}, preserving the backend status, {@code code} (e.g. {@code OPTIMISTIC_LOCK}),
+   * {@code detail} and correlation id so the client's {@code krtFetch.handleProblem} can drive the
+   * conflict reload-confirm or an error toast. Mirrors the helper in the mission / job-order
+   * controllers so the in-place write surfaces behave identically across areas.
+   *
+   * @param e the backend failure to relay
+   * @return a {@code problem+json} response carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
+  }
 }
