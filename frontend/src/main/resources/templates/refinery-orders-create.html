@@ -195,6 +195,13 @@
             </form>
         </div>
 
+        <!-- #591: the import error alerts + review banner + the form are the swappable region the
+             AJAX import twin re-renders in place. The stable #refineryImportFormContainer is the swap
+             target; its inner th:block (refineryImportFormBody) is exactly what the twin returns and
+             the client injects via innerHTML. The .import-extract-bar file picker above stays OUTSIDE
+             the fragment so its document-delegated rfc-import-* triggers survive every swap. -->
+        <div id="refineryImportFormContainer">
+        <th:block th:fragment="refineryImportFormBody">
         <!-- Import error states (#435): local key-based errors and verbatim localized backend
              problem details (e.g. unsupported schemaVersion) use separate attributes. -->
         <div th:if="${importErrorKey != null}" class="alert alert-danger mt-1" data-testid="refinery-import-error">
@@ -431,6 +438,8 @@
                 </div>
             </form>
         </div>
+        </th:block>
+        </div>
     </div>
 </main>
 
@@ -483,16 +492,6 @@
         // populated and the badge appears for the rows whose input material has UEX data.
         window.krtRefineryYield.refreshFor(selectElement);
     }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const inputSelects = document.querySelectorAll('select[id^="inputMaterialId_"]');
-        inputSelects.forEach(select => {
-            if(select.value) {
-                updateOutputMaterial(select);
-            }
-        });
-        window.krtRefineryYield.refreshAll();
-    });
 
     function setStartedAtNow() {
         const now = new Date();
@@ -703,28 +702,6 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const hiddenStartedAt = document.getElementById('startedAt');
-        const dHours = document.getElementById('durationHours');
-        const dMinutes = document.getElementById('durationMinutes');
-        
-        if (hiddenStartedAt) hiddenStartedAt.addEventListener('change', updateEndsAt);
-        if (dHours) dHours.addEventListener('input', updateEndsAt);
-        if (dMinutes) dMinutes.addEventListener('input', updateEndsAt);
-        
-        updateEndsAt();
-    });
-
-    document.addEventListener('DOMContentLoaded', function() {
-        updateMethodRatings();
-        const entries = document.querySelectorAll('.material-entry');
-        entries.forEach((_, index) => {
-            calcScu(index);
-        });
-        // Pre-filled selects (validation-error re-render or screenshot import, #435) are
-        // re-derived by the pre-existing DOMContentLoaded handler further up — no repeat here.
-    });
-
     /**
      * Aktualisiert das read-only "Gewinn/Verlust"-Feld live aus oreSales - expenses - otherExpenses.
      * Server bleibt Source of Truth; dies ist lediglich eine UI-Vorschau.
@@ -742,7 +719,6 @@
         preview.value = profit.toLocaleString();
         preview.classList.toggle('text-danger', profit < 0); preview.classList.toggle('text-muted', profit >= 0);
     }
-    document.addEventListener('DOMContentLoaded', updateProfitPreview);
 
     // CSP-safe delegated bindings (replaces the nine inline on*= handlers above — preserves
     // the input/change semantics so the profit-preview / material-output / scu calculations
@@ -839,11 +815,92 @@
         if (body && body.targetUrl) window.location.assign(body.targetUrl);
         else window.location.reload();
     }
-    const _refineryCreateForm = document.querySelector('form[data-testid="refinery-form"]');
-    if (_refineryCreateForm) {
-        _refineryCreateForm.addEventListener('submit', function (e) {
+    // #591: single idempotent re-init for everything that is NOT document-delegated, run on first
+    // load AND after the screenshot-import swaps #refineryImportFormContainer in place. The delegated
+    // krtEvents (rfc-*) handlers survive the swap and are deliberately NOT re-bound here (re-binding
+    // would double-fire them); the datetime widget re-inits itself via datetime-splitter.js's own
+    // krt:swapped listener. Subsumes the former four one-shot DOMContentLoaded init blocks.
+    function _reinitRefineryForm(fromSwap) {
+        const startedAt = document.getElementById('startedAt');
+        const dHours = document.getElementById('durationHours');
+        const dMinutes = document.getElementById('durationMinutes');
+        if (startedAt) { startedAt.removeEventListener('change', updateEndsAt); startedAt.addEventListener('change', updateEndsAt); }
+        if (dHours) { dHours.removeEventListener('input', updateEndsAt); dHours.addEventListener('input', updateEndsAt); }
+        if (dMinutes) { dMinutes.removeEventListener('input', updateEndsAt); dMinutes.addEventListener('input', updateEndsAt); }
+        updateMethodRatings();
+        document.querySelectorAll('.material-entry').forEach((_, index) => calcScu(index));
+        document.querySelectorAll('select[id^="inputMaterialId_"]').forEach(select => { if (select.value) updateOutputMaterial(select); });
+        if (window.krtRefineryYield) {
+            // On first load the page-level krtRefineryYield.init(...) already holds the server's yield
+            // map, so refreshAll repaints correctly. After an import SWAP that in-memory map is stale
+            // (init ran once at load, location-less), so re-fetch it for the imported location via
+            // onLocationChange (which repaints the badges when it resolves); a location-less import
+            // falls through to refreshAll.
+            const locationSelect = document.getElementById('locationId');
+            if (fromSwap && locationSelect && locationSelect.value
+                && typeof window.krtRefineryYield.onLocationChange === 'function') {
+                window.krtRefineryYield.onLocationChange(locationSelect);
+            } else {
+                window.krtRefineryYield.refreshAll();
+            }
+        }
+        updateProfitPreview();
+        updateEndsAt();
+        const createForm = document.querySelector('form[data-testid="refinery-form"]');
+        if (createForm && !createForm._rfcSubmitBound) {
+            createForm._rfcSubmitBound = true;
+            createForm.addEventListener('submit', function (e) { e.preventDefault(); _submitRefineryCreate(createForm); });
+        }
+    }
+    document.addEventListener('DOMContentLoaded', function () { _reinitRefineryForm(false); });
+    document.addEventListener('krt:swapped', function (e) {
+        const c = e.detail && e.detail.container;
+        if (c && c.id === 'refineryImportFormContainer') _reinitRefineryForm(true);
+    });
+
+    // #591: in-place screenshot-import. The picker posts the RefineryExtract as multipart; instead of
+    // the classic POST->redirect reload, fetch the pre-filled create-form fragment and swap it into
+    // #refineryImportFormContainer, then dispatch krt:swapped (the datetime splitter + the create-form
+    // re-init pick up the fresh DOM). A transport/redirect failure shows an inline toast and leaves
+    // the page intact; the classic multipart form-POST is the no-JS fallback (krtCsrf absent).
+    const MSG_RFC_IMPORT_FAILED = /*[[#{refineryImport.error.failed}]]*/ 'Import failed.';
+    async function _submitRefineryImport(form) {
+        if (!window.krtCsrf) { form.submit(); return; }
+        const fd = new FormData(form);
+        function buildHeaders() {
+            const h = { 'X-Requested-With': 'XMLHttpRequest' };
+            const t = window.krtCsrf.token();
+            const n = window.krtCsrf.headerName();
+            if (t && n) h[n] = t;
+            return h;
+        }
+        let res;
+        try {
+            res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+            if (res.status === 403 && window.krtCsrf.refresh) {
+                const refreshed = await window.krtCsrf.refresh();
+                if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+            }
+        } catch (e) {
+            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+            return;
+        }
+        if (res.redirected || !res.ok) {
+            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+            return;
+        }
+        const html = await res.text();
+        const container = document.getElementById('refineryImportFormContainer');
+        if (!container) { window.location.reload(); return; }
+        container.innerHTML = html;
+        document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container: container } }));
+        if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    }
+    const _refineryImportForm = document.getElementById('refineryImportForm');
+    if (_refineryImportForm) {
+        _refineryImportForm.addEventListener('submit', function (e) {
             e.preventDefault();
-            _submitRefineryCreate(_refineryCreateForm);
+            _submitRefineryImport(_refineryImportForm);
         });
     }
 </script>

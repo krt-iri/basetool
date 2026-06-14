@@ -86,11 +86,13 @@ public class RefineryImportProxyController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Dedicated mapper used only to verify the upload parses as a JSON object before the relay. An
-   * internal instance — not auto-wired — because the server-rendered frontend context runs without
-   * a shared {@code ObjectMapper} bean (same rationale as {@code BackendApiClient}).
+   * Dedicated mapper used only to verify the upload parses as a JSON object before the relay. A
+   * {@code static} instance (Jackson {@link ObjectMapper} reads are thread-safe) — not auto-wired,
+   * because the server-rendered frontend context runs without a shared {@code ObjectMapper} bean
+   * (same rationale as {@code BackendApiClient}); {@code static} so the AJAX import twin in {@code
+   * RefineryOrderPageController} can share the parse via {@link #parseExtractObject}.
    */
-  private final ObjectMapper objectMapper = JsonMapper.builder().build();
+  private static final ObjectMapper EXTRACT_MAPPER = JsonMapper.builder().build();
 
   /**
    * Handles the create-page upload form: validates the file is parseable JSON (cheap local check
@@ -107,19 +109,8 @@ public class RefineryImportProxyController {
   @PreAuthorize("isAuthenticated()")
   public String importExtract(
       @RequestParam("file") MultipartFile file, RedirectAttributes redirectAttributes) {
-    if (file == null || file.isEmpty() || file.getSize() > MAX_EXTRACT_BYTES) {
-      redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.invalidFile");
-      return "redirect:/refinery-orders/create";
-    }
-    JsonNode extract;
-    try {
-      extract = objectMapper.readTree(file.getBytes());
-    } catch (IOException | JacksonException e) {
-      log.warn("Refinery import upload was not parseable JSON: {}", e.getMessage());
-      redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.invalidFile");
-      return "redirect:/refinery-orders/create";
-    }
-    if (extract == null || !extract.isObject()) {
+    JsonNode extract = parseExtractObject(file);
+    if (extract == null) {
       redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.invalidFile");
       return "redirect:/refinery-orders/create";
     }
@@ -169,6 +160,30 @@ public class RefineryImportProxyController {
   public String handleOversizedUpload(RedirectAttributes redirectAttributes) {
     redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.invalidFile");
     return "redirect:/refinery-orders/create";
+  }
+
+  /**
+   * Parses and validates an uploaded {@code RefineryExtract}: a missing / empty / oversized upload
+   * (above {@link #MAX_EXTRACT_BYTES}), unparseable JSON, or a non-object payload all yield {@code
+   * null} (the callers map every such case to the same {@code refineryImport.error.invalidFile}
+   * message). Shared by the classic {@link #importExtract} and the AJAX import twin in {@code
+   * RefineryOrderPageController} so both apply one parse contract.
+   *
+   * @param file the uploaded multipart file
+   * @return the parsed JSON object node, or {@code null} when the upload is missing, too large, not
+   *     JSON, or not a JSON object
+   */
+  static JsonNode parseExtractObject(MultipartFile file) {
+    if (file == null || file.isEmpty() || file.getSize() > MAX_EXTRACT_BYTES) {
+      return null;
+    }
+    try {
+      JsonNode extract = EXTRACT_MAPPER.readTree(file.getBytes());
+      return extract != null && extract.isObject() ? extract : null;
+    } catch (IOException | JacksonException e) {
+      log.warn("Refinery import upload was not parseable JSON: {}", e.getMessage());
+      return null;
+    }
   }
 
   /**

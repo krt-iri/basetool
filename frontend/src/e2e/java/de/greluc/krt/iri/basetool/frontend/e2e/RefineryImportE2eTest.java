@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -40,10 +41,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <p>This is the repo's first file-upload e2e: {@code setInputFiles} targets the hidden file input
  * behind the styled import button; the change handler submits the multipart form to {@code
- * /refinery-orders/import}, which relays to the Phase 1 backend endpoint and flashes the pre-filled
- * form back onto the create page. The fixture's second row ("E2E IMPRT MATERAIL") is misspelled on
- * purpose (3 edits over 19 characters ≈ 0.84 similarity) so it stays below the fuzzy accept
- * threshold and surfaces only as a ranked suggestion.
+ * /refinery-orders/import}, which relays to the Phase 1 backend endpoint and — via the #591 AJAX
+ * twin — swaps the pre-filled create-form fragment back in place with no full reload. The fixture's
+ * second row ("E2E IMPRT MATERAIL") is misspelled on purpose (3 edits over 19 characters ≈ 0.84
+ * similarity) so it stays below the fuzzy accept threshold and surfaces only as a ranked
+ * suggestion.
  */
 @Tag("e2e")
 class RefineryImportE2eTest {
@@ -106,14 +108,30 @@ class RefineryImportE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create");
 
-        // Hidden input + styled trigger: setInputFiles needs no visibility; the change handler
-        // submits the multipart form, so the upload behaves like a regular form post.
-        E2eSupport.awaitFormPost(
-            page, () -> page.getByTestId("refinery-import-file").setInputFiles(fixture));
+        // In-place import (#591): the change handler now submits the multipart form via AJAX and
+        // swaps the pre-filled create-form fragment into #refineryImportFormContainer — there is no
+        // Post/Redirect/Get navigation to await. Mark the window to prove no full reload happened,
+        // pick the file, then web-first-wait for the review banner to appear in the swapped
+        // fragment.
+        page.evaluate("() => { window.__krtNoReload = true; }");
+        page.getByTestId("refinery-import-file").setInputFiles(fixture);
 
-        // The redirected create page carries the pre-fill and the review flags.
+        // The swapped-in create form carries the pre-fill and the review flags.
         assertThat(page.getByTestId("refinery-import-banner"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("() => window.__krtNoReload === true"),
+            "the screenshot-import must swap in place — no full-page reload cleared the window"
+                + " marker");
+        // #591 datetime swap-safety: the splitter's krt:swapped re-init must have populated the
+        // freshly-swapped date widget's visible parts from the imported hidden startedAt — proving
+        // the idempotent per-group init fired on the new .datetime-split-group (no double-bind).
+        assertThat(
+                page.locator("#refineryImportFormContainer .datetime-split-group .date-part")
+                    .first())
+            .not()
+            .hasValue("");
         assertThat(page.locator("#inputMaterialId_0")).hasValue(materialId);
         assertThat(page.locator("#inputQuantity_0")).hasValue("250");
         assertThat(page.locator("#outputQuantity_0")).hasValue("120");

@@ -121,10 +121,24 @@ every sibling's priority). The fresh `data-version` carried by the re-rendered f
 REQ-FE-003 for free, and on a backend read failure the fragment branch returns a section-sized error
 fragment, never a redirect the swap would follow into the container.
 
-**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574) and order-detail (#575)
-fragment/endpoint MVC tests · **Issues:** #572 to #575 · **Code:** `krt-fetch.js` (`swap`),
-`missions.js`, `operations.js`, `fragments/pagination.html`, `mission-detail.html`,
-`orders-index.html`, `orders-detail.html`, `JobOrderPageController`.
+The refinery **screenshot-extract import** (#591) applies the same fragment-swap idea to a
+**multipart POST** rather than a GET: an `X-Requested-With` import twin
+(`RefineryOrderPageController.importExtractAjax`) returns the pre-filled create-form fragment
+(`refinery-orders-create :: refineryImportFormBody`), and a bespoke `fetch` swaps it into the stable
+`#refineryImportFormContainer` then dispatches `krt:swapped` (`krtFetch.swap` is GET-only and cannot
+carry the upload). Every branch — success and each error (invalid/oversized file, unparseable JSON,
+backend reject) — renders inline in the swapped region, never a redirect; the classic
+`POST→redirect` proxy stays the no-JS fallback. This required making `datetime-splitter.js`
+**swap-safe**: an idempotent per-group `init` guarded by `data-krt-dt-initialized` plus a
+`krt:swapped` auto-reinit, so the create form's date widget — and any future fragment-swapped
+datetime group app-wide — re-initialises exactly once after a swap (no double-bound listeners, no
+duplicate error div).
+
+**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574), order-detail (#575) and
+refinery-import (#591) fragment/endpoint MVC + e2e tests · **Issues:** #572 to #575, #591 · **Code:**
+`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
+`mission-detail.html`, `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`,
+`datetime-splitter.js`, `JobOrderPageController`, `RefineryOrderPageController`.
 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 
@@ -178,14 +192,8 @@ twins, `propagateBackendError`).
   PATCHes (core/schedule/flags) with server-side `@Valid` field-error rendering; converting it in
   place needs a JSON field-error contract and is tracked as the follow-up issue **#589** so the
   well-tested validation UX is not regressed. Every other mission-detail write is in-place.
-- **Known carve-out (#575 → #591):** the refinery **screenshot-extract import**
-  (`refinery-orders-create.html` → `RefineryImportProxyController`, `POST /refinery-orders/import`)
-  still submits classic `POST→redirect`. It is **not a write** (it persists nothing — it relays the
-  uploaded extract and flashes a non-persisted pre-filled form + review flags back), and the reload
-  is benign because the import deliberately replaces the whole form (`no-track`), so no entered work
-  is lost. Converting it in place re-renders the entire create form and so needs an idempotent
-  per-group `init` seam extracted from the shared `datetime-splitter.js` (currently one-shot:
-  re-running double-binds listeners and appends duplicate error divs) plus re-init of the other
-  one-shot create-page enhancers — a larger, shared-file change tracked as **#591**. Every refinery
-  **write** (create/update/store/cancel) is in-place (REQ-FE-006).
+- **Resolved (#575 → #591):** the refinery **screenshot-extract import** carve-out is closed — it now
+  swaps the pre-filled create-form fragment in place via the `importExtractAjax` twin (see REQ-FE-005
+  above), and `datetime-splitter.js` was made swap-safe in the process. The whole refinery surface is
+  now reload-free.
 

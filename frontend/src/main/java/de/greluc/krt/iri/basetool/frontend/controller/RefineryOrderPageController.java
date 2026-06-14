@@ -25,6 +25,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.RefineryOrderStoreDto;
@@ -37,6 +38,7 @@ import de.greluc.krt.iri.basetool.frontend.model.form.RefineryOrderForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.RefineryOrderStoreForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.RefineryOrderStoreItemForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,6 +49,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.GrantedAuthority;
@@ -62,7 +65,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import tools.jackson.databind.JsonNode;
 
 /** REST controller for RefineryOrderPageController endpoints. */
 @Controller
@@ -182,39 +187,135 @@ public class RefineryOrderPageController {
       @RequestParam(required = false) String source,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
-    boolean isLogistician = isLogistician(principal);
-    model.addAttribute("isLogistician", isLogistician);
-
+    RefineryOrderForm form;
     if (!model.containsAttribute("refineryOrderForm")) {
-      RefineryOrderForm form = new RefineryOrderForm();
+      form = new RefineryOrderForm();
       form.setSource(source);
       UUID currentUserId = getCurrentUserId(principal);
       if (currentUserId != null) {
         form.setOwnerId(currentUserId);
       }
-      model.addAttribute("refineryOrderForm", form);
     } else {
-      RefineryOrderForm form = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
+      form = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
       if (form != null && form.getSource() == null) {
         form.setSource(source);
       }
     }
+    populateCreateFormModel(model, form, principal);
+    return "refinery-orders-create";
+  }
+
+  /**
+   * Populates {@code model} with everything the refinery create form needs to render: the bound
+   * {@code refineryOrderForm}, the logistician flag, the catalog dropdowns (materials, methods,
+   * locations, missions, users), the rounding mode, the UEX yield map for the form's
+   * currently-selected location and the owner-picker options. Shared by {@link #viewCreateForm}
+   * (full page) and {@link #importExtractAjax} (in-place import fragment) so both render an
+   * identical form.
+   *
+   * <p>The yield map is preloaded for any location already on the form (validation re-render or
+   * screenshot import) so the bonus badges paint without an extra round-trip; a fresh form has no
+   * location, falls through to an empty map, and the client-side {@code onLocationChange} handler
+   * fetches it when the user picks a refinery.
+   *
+   * @param model the Thymeleaf model to populate
+   * @param form the create form to bind (fresh, validation-failed or import-prefilled); a {@code
+   *     null} form (defensive flash path) is replaced by a fresh owner-prefilled one so the
+   *     template never iterates a null {@code *{goods}}
+   * @param principal the authenticated user (drives the logistician flag and the owner options)
+   */
+  private void populateCreateFormModel(Model model, RefineryOrderForm form, OidcUser principal) {
+    if (form == null) {
+      form = new RefineryOrderForm();
+      UUID currentUserId = getCurrentUserId(principal);
+      if (currentUserId != null) {
+        form.setOwnerId(currentUserId);
+      }
+    }
+    model.addAttribute("isLogistician", isLogistician(principal));
+    model.addAttribute("refineryOrderForm", form);
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("methods", fetchMethods());
     model.addAttribute("locations", fetchLocations());
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("users", fetchUsers());
     model.addAttribute("roundingMode", fetchRoundingMode());
-
-    // Preload the UEX yield map for any location already picked on the form (POST-validation
-    // re-render), so the bonus badges render on first paint without an extra round-trip. A
-    // fresh GET has no location yet, falls through to an empty map, and the client-side
-    // onLocationChange handler will fetch the map when the user picks a refinery.
-    RefineryOrderForm formForYields = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
-    UUID preselectedLocationId = formForYields != null ? formForYields.getLocationId() : null;
+    UUID preselectedLocationId = form != null ? form.getLocationId() : null;
     model.addAttribute("materialYieldBonuses", fetchYieldsForLocation(preselectedLocationId));
-    model.addAttribute("ownerOptions", fetchOwnerPickerOptions(formForYields, principal));
-    return "refinery-orders-create";
+    model.addAttribute("ownerOptions", fetchOwnerPickerOptions(form, principal));
+  }
+
+  /**
+   * AJAX twin of {@link RefineryImportProxyController#importExtract} (#591): relays the uploaded
+   * {@code RefineryExtract} JSON to the backend matcher and returns the pre-filled create-form
+   * fragment ({@code refinery-orders-create :: refineryImportFormBody}) so the create page swaps it
+   * in place instead of doing a full {@code POST → redirect} reload. Routed by the {@code
+   * X-Requested-With} header (more specific than the classic multipart handler in {@link
+   * RefineryImportProxyController}); the classic handler stays the no-JS fallback. Persists
+   * nothing.
+   *
+   * <p>Every branch — success and each failure (invalid/oversized file, unparseable JSON, backend
+   * reject) — returns the same fragment with the appropriate {@code importErrorKey} / {@code
+   * importErrorText} so the error surfaces inline in the swapped region, never as a redirect the
+   * client would have to follow. On any failure the form falls back to a fresh owner-prefilled
+   * form, matching the classic flow's fresh-{@code GET} render.
+   *
+   * @param file the uploaded {@code RefineryExtract} JSON
+   * @param model the model populated with the pre-filled form + review flags (or an error key)
+   * @param principal the authenticated user (drives the create-form catalogs + owner options)
+   * @return the create-form fragment view name
+   */
+  @PostMapping(
+      value = "/import",
+      headers = "X-Requested-With=XMLHttpRequest",
+      consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  public String importExtractAjax(
+      @RequestParam("file") MultipartFile file,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    RefineryOrderForm form = new RefineryOrderForm();
+    UUID currentUserId = getCurrentUserId(principal);
+    if (currentUserId != null) {
+      form.setOwnerId(currentUserId);
+    }
+    JsonNode extract = RefineryImportProxyController.parseExtractObject(file);
+    if (extract == null) {
+      model.addAttribute("importErrorKey", "refineryImport.error.invalidFile");
+      populateCreateFormModel(model, form, principal);
+      return "refinery-orders-create :: refineryImportFormBody";
+    }
+    try {
+      RefineryImportDraftDto draft =
+          backendApiClient.post(
+              "/api/v1/refinery-orders/import-extract", extract, RefineryImportDraftDto.class);
+      if (draft == null || draft.order() == null) {
+        model.addAttribute("importErrorKey", "refineryImport.error.failed");
+      } else {
+        form = RefineryImportProxyController.toForm(draft.order());
+        model.addAttribute(
+            "importIssues", RefineryImportProxyController.generalIssues(draft.issues()));
+        model.addAttribute(
+            "importRowIssues", RefineryImportProxyController.rowIssues(draft.issues()));
+        model.addAttribute("importGoodsMatched", draft.goodsMatched());
+        model.addAttribute("importGoodsTotal", draft.goodsTotal());
+        model.addAttribute("importRowsSkipped", draft.rowsSkipped());
+      }
+    } catch (BackendServiceException e) {
+      // Envelope-level reject (e.g. unsupported schemaVersion): the backend's problem detail is
+      // already localized — show it verbatim; otherwise a generic failure message.
+      String detail = e.getProblemDetail();
+      if (detail != null && !detail.isBlank()) {
+        model.addAttribute("importErrorText", detail);
+      } else {
+        model.addAttribute("importErrorKey", "refineryImport.error.failed");
+      }
+    } catch (Exception e) {
+      log.error("Refinery import relay failed (ajax)", e);
+      model.addAttribute("importErrorKey", "refineryImport.error.failed");
+    }
+    populateCreateFormModel(model, form, principal);
+    return "refinery-orders-create :: refineryImportFormBody";
   }
 
   /**
