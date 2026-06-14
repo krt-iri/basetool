@@ -47,6 +47,7 @@ import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -54,6 +55,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
+import org.springframework.context.MessageSource;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -61,6 +63,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -96,6 +99,15 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class MissionPageController {
 
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Resolves Jakarta {@code @Valid} field-error messages for the {@link #updateMissionAjax} twin's
+   * {@code {field: message}} JSON contract, using the same {@code
+   * messageSource.getMessage(fieldError, locale)} resolution Thymeleaf's {@code th:errors} performs
+   * — so an inline validation message is byte-identical to the classic full-page re-render and the
+   * well-tested validation UX is preserved.
+   */
+  private final MessageSource messageSource;
 
   /**
    * Frontend mirror of the backend's "registered member or above" role set. A caller holding none
@@ -1442,17 +1454,10 @@ public class MissionPageController {
   }
 
   /**
-   * Form-post endpoint that persists edits to a mission. Splits the submitted form into three
-   * section-scoped patches (core, schedule, flags) and dispatches them sequentially against the
-   * backend so that concurrent editors on other sections of the same mission do not invalidate each
-   * other's saves. Each section carries its own optimistic-lock counter ({@code coreVersion},
-   * {@code scheduleVersion}, {@code flagsVersion}); a 409 from any of them surfaces as the
-   * dedicated concurrency-conflict toast.
-   *
-   * <p>Schedule is patched first because the status-driven auto-transition (PLANNED → ACTIVE) in
-   * the core patch will additionally bump the schedule version — running schedule first lets the
-   * caller's plain time edits land before the auto-stamp logic kicks in, which keeps the round-trip
-   * free of an avoidable internal 409.
+   * Classic form-post endpoint that persists edits to a mission ({@code !isNew}). On a Jakarta
+   * {@code @Valid} failure it re-renders the whole detail page with inline {@code th:errors}; on
+   * success it fans the form out into the three section PATCHes via {@link #applyMissionUpdate} and
+   * flash-redirects. Stays the no-JavaScript fallback for {@link #updateMissionAjax} (#589).
    *
    * @return redirect to the mission detail page
    */
@@ -1469,54 +1474,7 @@ public class MissionPageController {
       return missionDetail(id, model, principal, null);
     }
     try {
-      Instant meetingTime =
-          (form.meetingTime() != null && !form.meetingTime().isBlank())
-              ? parseToInstant(form.meetingTime())
-              : null;
-      Instant plannedStartTime =
-          (form.plannedStartTime() != null && !form.plannedStartTime().isBlank())
-              ? parseToInstant(form.plannedStartTime())
-              : null;
-      Instant plannedEndTime =
-          (form.plannedEndTime() != null && !form.plannedEndTime().isBlank())
-              ? parseToInstant(form.plannedEndTime())
-              : null;
-      Instant actualStartTime =
-          (form.actualStartTime() != null && !form.actualStartTime().isBlank())
-              ? parseToInstant(form.actualStartTime())
-              : null;
-      Instant actualEndTime =
-          (form.actualEndTime() != null && !form.actualEndTime().isBlank())
-              ? parseToInstant(form.actualEndTime())
-              : null;
-
-      Map<String, Object> schedulePatch = new java.util.LinkedHashMap<>();
-      schedulePatch.put("meetingTime", meetingTime);
-      schedulePatch.put("plannedStartTime", plannedStartTime);
-      schedulePatch.put("plannedEndTime", plannedEndTime);
-      schedulePatch.put("actualStartTime", actualStartTime);
-      schedulePatch.put("actualEndTime", actualEndTime);
-      schedulePatch.put("version", form.scheduleVersion());
-      backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
-
-      UUID operationId =
-          (form.operationId() != null && !form.operationId().isBlank())
-              ? UUID.fromString(form.operationId())
-              : null;
-      Map<String, Object> corePatch = new java.util.LinkedHashMap<>();
-      corePatch.put("name", form.name());
-      corePatch.put("description", form.description());
-      corePatch.put("calendarLink", form.calendarLink());
-      corePatch.put("status", form.status());
-      corePatch.put("operationId", operationId);
-      corePatch.put("version", form.coreVersion());
-      backendApiClient.patch("/api/v1/missions/" + id + "/core", corePatch, Void.class);
-
-      Map<String, Object> flagsPatch = new java.util.LinkedHashMap<>();
-      flagsPatch.put("isInternal", form.isInternal() != null && form.isInternal());
-      flagsPatch.put("version", form.flagsVersion());
-      backendApiClient.patch("/api/v1/missions/" + id + "/flags", flagsPatch, Void.class);
-
+      applyMissionUpdate(id, form);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update mission failed", e);
@@ -1525,6 +1483,134 @@ public class MissionPageController {
       return "redirect:/missions/" + id;
     }
     return "redirect:/missions/" + id;
+  }
+
+  /**
+   * Fans a validated {@link MissionForm} out into the three section-scoped PATCHes (schedule → core
+   * → flags), each carrying its own optimistic-lock counter ({@code scheduleVersion} / {@code
+   * coreVersion} / {@code flagsVersion}) so concurrent editors of other sections don't invalidate
+   * each other's saves. Shared by the classic {@link #updateMission} and its AJAX twin {@link
+   * #updateMissionAjax} so the two can never drift.
+   *
+   * <p>Schedule is patched first because the status-driven PLANNED → ACTIVE auto-transition in the
+   * core patch additionally bumps the schedule version — running schedule first lets the caller's
+   * plain time edits land before the auto-stamp kicks in, avoiding an internal 409. Because that
+   * auto-bump leaves {@code scheduleVersion} stale on the caller's side, the AJAX twin re-reads the
+   * mission afterwards to return the four fresh versions.
+   *
+   * @param id the mission id
+   * @param form the validated submitted form
+   */
+  private void applyMissionUpdate(@NotNull UUID id, MissionForm form) {
+    Instant meetingTime =
+        (form.meetingTime() != null && !form.meetingTime().isBlank())
+            ? parseToInstant(form.meetingTime())
+            : null;
+    Instant plannedStartTime =
+        (form.plannedStartTime() != null && !form.plannedStartTime().isBlank())
+            ? parseToInstant(form.plannedStartTime())
+            : null;
+    Instant plannedEndTime =
+        (form.plannedEndTime() != null && !form.plannedEndTime().isBlank())
+            ? parseToInstant(form.plannedEndTime())
+            : null;
+    Instant actualStartTime =
+        (form.actualStartTime() != null && !form.actualStartTime().isBlank())
+            ? parseToInstant(form.actualStartTime())
+            : null;
+    Instant actualEndTime =
+        (form.actualEndTime() != null && !form.actualEndTime().isBlank())
+            ? parseToInstant(form.actualEndTime())
+            : null;
+
+    Map<String, Object> schedulePatch = new java.util.LinkedHashMap<>();
+    schedulePatch.put("meetingTime", meetingTime);
+    schedulePatch.put("plannedStartTime", plannedStartTime);
+    schedulePatch.put("plannedEndTime", plannedEndTime);
+    schedulePatch.put("actualStartTime", actualStartTime);
+    schedulePatch.put("actualEndTime", actualEndTime);
+    schedulePatch.put("version", form.scheduleVersion());
+    backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
+
+    UUID operationId =
+        (form.operationId() != null && !form.operationId().isBlank())
+            ? UUID.fromString(form.operationId())
+            : null;
+    Map<String, Object> corePatch = new java.util.LinkedHashMap<>();
+    corePatch.put("name", form.name());
+    corePatch.put("description", form.description());
+    corePatch.put("calendarLink", form.calendarLink());
+    corePatch.put("status", form.status());
+    corePatch.put("operationId", operationId);
+    corePatch.put("version", form.coreVersion());
+    backendApiClient.patch("/api/v1/missions/" + id + "/core", corePatch, Void.class);
+
+    Map<String, Object> flagsPatch = new java.util.LinkedHashMap<>();
+    flagsPatch.put("isInternal", form.isInternal() != null && form.isInternal());
+    flagsPatch.put("version", form.flagsVersion());
+    backendApiClient.patch("/api/v1/missions/" + id + "/flags", flagsPatch, Void.class);
+  }
+
+  /**
+   * AJAX twin of {@link #updateMission} (#589): saves the mission core-edit form in place. Routed
+   * by the {@code X-Requested-With} header (the classic {@code POST /missions/{id}} stays the no-JS
+   * fallback). On a Jakarta {@code @Valid} failure it returns {@code 422} with a {@code {field:
+   * message}} JSON map (messages resolved exactly as {@code th:errors} via {@link #messageSource})
+   * so the client renders the errors inline without a navigation. On success it runs the three
+   * section PATCHes, re-reads the mission to capture the PLANNED → ACTIVE auto-bump, and returns
+   * the four fresh versions {@code {version, coreVersion, scheduleVersion, flagsVersion}} so the
+   * client writes them back and a second consecutive save does not 409. A backend {@code 409} /
+   * domain conflict is propagated as {@code problem+json} via {@link #propagateBackendError}.
+   *
+   * @param id the mission id
+   * @param form the bound + validated edit form
+   * @param bindingResult the binding/validation result
+   * @param locale the request locale for field-error message resolution
+   * @return {@code 200} with the four versions, {@code 422} with the field-error map, or the
+   *     propagated backend error
+   */
+  @PostMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> updateMissionAjax(
+      @PathVariable @NotNull UUID id,
+      @Valid @ModelAttribute("missionForm") MissionForm form,
+      BindingResult bindingResult,
+      Locale locale) {
+    if (bindingResult.hasErrors()) {
+      Map<String, String> fieldErrors = new java.util.LinkedHashMap<>();
+      for (FieldError fe : bindingResult.getFieldErrors()) {
+        // First error per field wins (the form's fields carry one constraint each); the message is
+        // resolved exactly as th:errors does so the inline text matches the classic re-render. A
+        // constraint without a resolvable message key falls back to its default message rather than
+        // crashing the 422 contract to a 500.
+        String message;
+        try {
+          message = messageSource.getMessage(fe, locale);
+        } catch (org.springframework.context.NoSuchMessageException ex) {
+          message = fe.getDefaultMessage();
+        }
+        fieldErrors.putIfAbsent(fe.getField(), message);
+      }
+      return org.springframework.http.ResponseEntity.unprocessableEntity().body(fieldErrors);
+    }
+    try {
+      applyMissionUpdate(id, form);
+      MissionDto refreshed =
+          backendApiClient.get("/api/v1/missions/" + id, MissionDto.class, false);
+      Map<String, Object> versions = new java.util.LinkedHashMap<>();
+      versions.put("version", refreshed.version());
+      versions.put("coreVersion", refreshed.coreVersion());
+      versions.put("scheduleVersion", refreshed.scheduleVersion());
+      versions.put("flagsVersion", refreshed.flagsVersion());
+      return org.springframework.http.ResponseEntity.ok(versions);
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.error("Update mission (ajax) failed for {}: {}", id, e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Update mission (ajax) failed for {}", id, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
   }
 
   /**
@@ -2296,25 +2382,53 @@ public class MissionPageController {
     return "UP";
   }
 
+  /**
+   * Display time zone for the mission schedule fields. The datetime-splitter renders/edits times in
+   * the browser's local zone; the server-side {@link #formatInstant} / {@link #parseToInstant}
+   * round trip uses this fixed zone for the zoneless local-datetime form the hidden input carries
+   * when a field is rendered but never re-edited.
+   */
+  private static final java.time.ZoneId MISSION_TIME_ZONE = java.time.ZoneId.of("Europe/Berlin");
+
+  /**
+   * Parses a hidden datetime-input value back into an {@link java.time.Instant}, accepting every
+   * shape the datetime-splitter or {@link #formatInstant} can produce: a zone-bearing value (the
+   * splitter writes a UTC {@code toISOString()} with {@code Z} on edit, an explicit offset is
+   * equally absolute), a zoneless local datetime of <em>any</em> fractional-second precision (what
+   * {@link #formatInstant} renders for a field that was displayed but never re-edited, e.g. {@code
+   * 2026-06-21T11:59:58.222717}), or a bare date. A zoneless value is interpreted in {@link
+   * #MISSION_TIME_ZONE}.
+   *
+   * <p>The earlier fixed-length (16/19) checks rejected the microsecond local form and fell through
+   * to {@link java.time.Instant#parse}, which threw — silently nulling {@code
+   * plannedStartTime}/{@code meetingTime}/{@code plannedEndTime} on every save that did not
+   * re-touch the field (the #589 e2e regression).
+   *
+   * @param dateTimeStr the hidden input value; {@code null}/blank yields {@code null}
+   * @return the parsed instant, or {@code null} if the value is blank or unparseable
+   */
   private java.time.Instant parseToInstant(String dateTimeStr) {
     if (dateTimeStr == null || dateTimeStr.isBlank()) {
       return null;
     }
+    final String value = dateTimeStr.trim();
     try {
-      if (dateTimeStr.endsWith("Z")) {
-        return java.time.Instant.parse(dateTimeStr);
+      // A date-only value (the splitter submits a bare date when no time was entered) maps to the
+      // start of that day in the display zone.
+      if (value.length() == 10) {
+        return java.time.LocalDate.parse(value).atStartOfDay(MISSION_TIME_ZONE).toInstant();
       }
-      if (dateTimeStr.length() == 19) { // YYYY-MM-DDThh:mm:ss
-        java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateTimeStr);
-        return ldt.atZone(java.time.ZoneId.of("Europe/Berlin")).toInstant();
-      }
-      if (dateTimeStr.length() == 16) { // YYYY-MM-DDThh:mm
-        java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateTimeStr);
-        return ldt.atZone(java.time.ZoneId.of("Europe/Berlin")).toInstant();
-      }
-      return java.time.Instant.parse(dateTimeStr);
+      // ISO_DATE_TIME parses both a zone-bearing value (absolute instant) and a zoneless local
+      // datetime of any fractional precision; parseBest picks OffsetDateTime when a zone is present
+      // and LocalDateTime otherwise.
+      java.time.temporal.TemporalAccessor parsed =
+          java.time.format.DateTimeFormatter.ISO_DATE_TIME.parseBest(
+              value, java.time.OffsetDateTime::from, java.time.LocalDateTime::from);
+      return parsed instanceof java.time.OffsetDateTime odt
+          ? odt.toInstant()
+          : ((java.time.LocalDateTime) parsed).atZone(MISSION_TIME_ZONE).toInstant();
     } catch (Exception e) {
-      log.warn("Failed to parse datetime string: {}", dateTimeStr, e);
+      log.warn("Failed to parse datetime string: {}", value, e);
       return null;
     }
   }
@@ -2335,8 +2449,13 @@ public class MissionPageController {
       } else {
         return String.valueOf(instantObj);
       }
-      java.time.ZonedDateTime zdt = instant.atZone(java.time.ZoneId.of("Europe/Berlin"));
-      return zdt.toLocalDateTime().toString();
+      java.time.ZonedDateTime zdt = instant.atZone(MISSION_TIME_ZONE);
+      // Truncate to seconds: the splitter's date/time inputs are minute-granular and write back a
+      // seconds-precision value on edit, so sub-second digits would only be DOM noise. The
+      // microsecond local form (YYYY-MM-DDThh:mm:ss.SSSSSS) is also exactly what the splitter's
+      // local-datetime regex cannot match and what parseToInstant used to choke on; truncating
+      // keeps the value in the documented zoneless YYYY-MM-DDThh:mm[:ss] shape.
+      return zdt.toLocalDateTime().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
     } catch (Exception e) {
       log.warn("Failed to format instant: {}", instantObj);
       return String.valueOf(instantObj);

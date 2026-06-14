@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -105,7 +106,8 @@ class ParticipationCalculationTest {
             anyBoolean()))
         .thenReturn(mission);
 
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     Model model = new ConcurrentModel();
 
     // Act
@@ -203,7 +205,8 @@ class ParticipationCalculationTest {
             anyBoolean()))
         .thenReturn(mission);
 
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     Model model = new ConcurrentModel();
 
     // Act

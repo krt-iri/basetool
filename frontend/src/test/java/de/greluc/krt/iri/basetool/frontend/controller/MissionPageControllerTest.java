@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.MessageSource;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.ui.ConcurrentModel;
@@ -44,7 +45,8 @@ class MissionPageControllerTest {
   void createMissionForm_ShouldInitializeModelCorrectly() {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     Model model = new ConcurrentModel();
 
     // Act
@@ -72,7 +74,8 @@ class MissionPageControllerTest {
     // Arrange
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -103,7 +106,8 @@ class MissionPageControllerTest {
     // users are guided to pick an entry from the autocomplete.
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true)))
@@ -134,7 +138,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -160,7 +165,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -179,7 +185,8 @@ class MissionPageControllerTest {
     // frontend must surface the dedicated conflict toast key rather than the generic update error.
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false)))
@@ -201,7 +208,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.delete(anyString(), eq(Void.class), eq(false))).thenReturn(null);
@@ -225,7 +233,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
 
     when(backendApiClient.delete(anyString(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -248,7 +257,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -281,7 +291,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -311,7 +322,8 @@ class MissionPageControllerTest {
   void listMissions_ShowPastTrue_User_ShouldIncludeAllStatuses() {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     Model model = new ConcurrentModel();
     OidcUser user = mock(OidcUser.class); // Mock authenticated user
 
@@ -340,7 +352,8 @@ class MissionPageControllerTest {
   void listMissions_ShowPastTrue_Guest_ShouldIgnoreShowPast() {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     Model model = new ConcurrentModel();
     // No user (null)
 
@@ -372,7 +385,8 @@ class MissionPageControllerTest {
     // Arrange
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     Model model = new ConcurrentModel();
 
     de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto mission =
@@ -443,7 +457,8 @@ class MissionPageControllerTest {
     // Arrange
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionPageController controller = new MissionPageController(backendApiClient);
+    MissionPageController controller =
+        new MissionPageController(backendApiClient, mock(MessageSource.class));
     Model model = new ConcurrentModel();
 
     de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto mission =

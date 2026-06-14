@@ -183,6 +183,51 @@ submit helper can surface them inline.
 `refinery-orders-details.html`, `JobOrderPageController`, `RefineryOrderPageController` (`*Ajax`
 twins, `propagateBackendError`).
 
+### REQ-FE-007 — In-place form save with a `{field: message}` validation contract
+
+A form whose server-side validation must stay inline (the mission core-edit `#mission-form`, #589)
+saves through a header-gated AJAX twin (`X-Requested-With`) that returns one of three shapes, so the
+page never reloads on a save:
+
+- **success** → `200` JSON of the fresh optimistic-lock versions the form must echo back into its
+  hidden inputs. The mission twin re-reads the mission after its three section PATCHes to capture the
+  server-side `PLANNED→ACTIVE` auto-bump of the schedule version, then returns `{version, coreVersion,
+  scheduleVersion, flagsVersion}`; the client writes all four back so a second consecutive save does
+  not 409 (`syncVersion` is single-version, so this needs a bespoke handler).
+- **validation failure** → `422` with a flat `{field: message}` JSON map whose keys are the bound
+  field names and whose values are the messages resolved **exactly as `th:errors`**
+  (`messageSource.getMessage(fieldError, locale)`); the client renders them into the matching
+  always-present `.field-error[data-error-for="<field>"]` slots (an empty slot is hidden via
+  `.field-error:empty`, and the GET render keeps them empty with a `th:text` ternary that never
+  evaluates `th:errors` unbound). An unmapped key falls back to a toast so no message is dropped.
+- **conflict / backend error** → `problem+json` via `propagateBackendError`, so an `OPTIMISTIC_LOCK`
+  code drives the sanctioned reload-confirm and any other code a toast.
+
+The classic `POST→redirect` handler (sharing the patch logic with the twin via a private
+`applyMissionUpdate` helper) stays the no-JavaScript fallback, and its inline `th:errors` rendering is
+the single source of truth the AJAX message text matches.
+
+`applyMissionUpdate` must **round-trip the schedule datetimes losslessly**: a time field that is
+rendered into its hidden input but never re-edited submits the value `formatInstant` produced (a
+zoneless local datetime that may carry sub-second precision), and `parseToInstant` must parse it back
+to the same instant rather than failing and nulling it. A broken round-trip silently clears
+`meetingTime`/`plannedStartTime`/`plannedEndTime` on every save — and because `plannedStartTime` is a
+`required` form field, the next page load can no longer submit at all.
+
+**Acceptance**
+
+- [ ] Editing core data saves in place (no navigation) and a second consecutive save does not 409.
+- [ ] A `@Valid` failure renders the field message inline with no navigation; fixing + re-saving
+  clears it.
+- [ ] Saving core data preserves the schedule times the user did not re-edit (no silent nulling).
+- [ ] With JavaScript disabled the classic form still `POST→redirect`s (the twin is header-gated).
+
+**Enforced by:** `MissionCoreEditAjaxControllerTest` (four-version re-read, microsecond zoneless
+schedule-time round-trip, 422 field map, 409 problem+json, fallback routing) +
+`MissionCoreEditInPlaceE2eTest` (in-place save, double-save no-409, inline validation). **Code:**
+`mission-detail.html`, `MissionPageController` (`updateMissionAjax`, `applyMissionUpdate`,
+`parseToInstant`/`formatInstant`). **Issues:** #589.
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
@@ -198,11 +243,9 @@ twins, `propagateBackendError`).
 - None open. The transitional `MissionSubresource` alias was **removed** in #574; mission-detail now
   calls `krtFetch.write` through a small page-local `krtMissionWrite` wrapper, so `krt-fetch.js`
   carries no page-specific code.
-- **Known carve-out (#574 → #589):** the mission core-edit form (`#mission-form`: name/description/
-  status/operation/schedule) still submits classic `POST→redirect`. It fans out into three section
-  PATCHes (core/schedule/flags) with server-side `@Valid` field-error rendering; converting it in
-  place needs a JSON field-error contract and is tracked as the follow-up issue **#589** so the
-  well-tested validation UX is not regressed. Every other mission-detail write is in-place.
+- **Resolved (#574 → #589):** the mission core-edit form (`#mission-form`) is now in-place — it saves
+  through the `updateMissionAjax` twin with inline field-error rendering (see REQ-FE-007 below), so
+  the whole mission-detail page is reload-free. The classic `POST→redirect` stays the no-JS fallback.
 - **Resolved (#575 → #591):** the refinery **screenshot-extract import** carve-out is closed — it now
   swaps the pre-filled create-form fragment in place via the `importExtractAjax` twin (see REQ-FE-005
   above), and `datetime-splitter.js` was made swap-safe in the process. The whole refinery surface is

@@ -178,8 +178,8 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(topItem, subItem),
             List.of(
-                new AggregatedMaterialDto(acryliPlex, "GOOD", 7.5, List.of(), null),
-                new AggregatedMaterialDto(agricium, "NONE", 12.0, List.of(), null)),
+                new AggregatedMaterialDto(acryliPlex, "GOOD", 7.5, 3.0, List.of(), null),
+                new AggregatedMaterialDto(agricium, "NONE", 12.0, 12.0, List.of(), null)),
             List.of(),
             List.of(),
             List.of(),
@@ -286,7 +286,7 @@ class JobOrderItemDetailRenderTest {
             "ITEM",
             List.of(),
             List.of(line),
-            List.of(new AggregatedMaterialDto(agricium, "NONE", 12.0, List.of(claim), 6.0)),
+            List.of(new AggregatedMaterialDto(agricium, "NONE", 12.0, 4.0, List.of(claim), 6.0)),
             List.of(),
             List.of(),
             List.of(),
@@ -360,7 +360,7 @@ class JobOrderItemDetailRenderTest {
             List.of(line),
             List.of(
                 new AggregatedMaterialDto(
-                    material("Agricium", "SCU"), "NONE", 12.0, List.of(), null)),
+                    material("Agricium", "SCU"), "NONE", 12.0, 12.0, List.of(), null)),
             List.of(),
             List.of(),
             List.of(),
@@ -441,7 +441,7 @@ class JobOrderItemDetailRenderTest {
             List.of(line),
             List.of(
                 new AggregatedMaterialDto(
-                    material("Agricium", "SCU"), "NONE", 12.0, List.of(), null)),
+                    material("Agricium", "SCU"), "NONE", 12.0, 12.0, List.of(), null)),
             List.of(),
             List.of(),
             List.of(handover),
