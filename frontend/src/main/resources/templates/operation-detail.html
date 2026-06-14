@@ -404,7 +404,7 @@
     <div class="main-sticky-wrapper">
         <main style="padding-bottom: 0;">
             <div class="greeting hud-box flex-between">
-                <h1 class="m-0" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
+                <h1 id="operation-title" class="m-0" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
                 <a th:href="@{/operations}" class="btn btn-ghost" th:text="#{general.back}">Zurück</a>
             </div>
         </main>
@@ -791,6 +791,92 @@
 </script>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    // #576: save the operation core-edit form (#operation-form) and delete the operation in place
+    // (no full-page reload). The classic POST->redirect handlers stay the no-JS fallback. On save we
+    // write the bumped version back into the form (a second save does not 409) and patch the page
+    // title; on delete the operation is gone, so we navigate back to the list (navigate-after-AJAX).
+    /*<![CDATA[*/
+    const OPS_DETAIL_MSG = {
+        prefix: /*[[#{operation.prefix}]]*/ 'Operation:',
+        updateSuccess: /*[[#{operation.update.success}]]*/ 'Operation aktualisiert.',
+        updateError: /*[[#{operation.update.error}]]*/ 'Fehler beim Aktualisieren.',
+        deleteSuccess: /*[[#{operation.delete.success}]]*/ 'Operation geloescht.',
+        deleteError: /*[[#{operation.delete.error}]]*/ 'Fehler beim Loeschen.',
+        conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Geaendert.',
+        conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
+        conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
+    /*]]>*/
+
+    function opsDetailConflict() {
+        return {
+            title: OPS_DETAIL_MSG.conflictTitle,
+            reloadDetailFallback: OPS_DETAIL_MSG.conflictDetail,
+            reloadLabel: OPS_DETAIL_MSG.conflictReload,
+            dismissLabel: OPS_DETAIL_MSG.conflictDismiss,
+            reloadQuestion: OPS_DETAIL_MSG.conflictQuestion
+        };
+    }
+
+    (function () {
+        if (!window.krtFetch) return; // no-JS / no-foundation: the classic POST->redirect forms run.
+
+        const form = document.getElementById('operation-form');
+        if (form) {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const versionInput = form.querySelector('[name="version"]');
+                window.krtFetch.write({
+                    method: 'POST',
+                    url: form.getAttribute('action'),
+                    payload: {
+                        name: form.querySelector('[name="name"]').value,
+                        description: form.querySelector('[name="description"]').value,
+                        status: form.querySelector('[name="status"]').value,
+                        version: versionInput ? Number(versionInput.value) : null,
+                        owningOrgUnitId: null
+                    },
+                    successMessage: OPS_DETAIL_MSG.updateSuccess,
+                    errorMessage: OPS_DETAIL_MSG.updateError,
+                    conflict: opsDetailConflict(),
+                    onSuccess: function (body) {
+                        // Write the bumped version back so an immediate second save does not 409.
+                        if (body && body.version != null && versionInput) {
+                            versionInput.value = body.version;
+                        }
+                        // Keep the page title in sync with the (possibly renamed) operation.
+                        const title = document.getElementById('operation-title');
+                        if (title && body && body.name != null) {
+                            title.textContent = OPS_DETAIL_MSG.prefix + ' ' + body.name;
+                        }
+                    }
+                });
+            });
+        }
+
+        const deleteForm = document.getElementById('delete-operation-form');
+        if (deleteForm) {
+            deleteForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                window.krtFetch.write({
+                    method: 'POST',
+                    url: deleteForm.action,
+                    successMessage: OPS_DETAIL_MSG.deleteSuccess,
+                    errorMessage: OPS_DETAIL_MSG.deleteError,
+                    conflict: opsDetailConflict(),
+                    onSuccess: function () {
+                        // The operation no longer exists; navigate back to the list (REQ-FE-006).
+                        window.location.assign('/operations');
+                    }
+                });
+            });
+        }
+    })();
+</script>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // ---- Payout paid-out toggle (AJAX) ---------------------------------
     // The Auszahlungen panel has a "Bezahlt" checkbox per participant that
     // mission managers can flip. We POST to the page controller, which
@@ -860,12 +946,11 @@
         const desired = checkbox.checked;
         const previous = !desired;
 
-        const headers = { 'Content-Type': 'application/json' };
-        const csrfToken = document.querySelector('meta[name="_csrf"]');
-        const csrfHeader = document.querySelector('meta[name="_csrf_header"]');
-        if (csrfToken && csrfHeader) {
-            headers[csrfHeader.getAttribute('content')] = csrfToken.getAttribute('content');
-        }
+        // #576: read the CSRF header through the shared krtCsrf single source of truth (REQ-FE-002)
+        // instead of a bespoke meta read; krtCsrf.headers() already sets Content-Type + X-Requested-With.
+        const headers = window.krtCsrf
+            ? window.krtCsrf.headers()
+            : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
 
         // Disable while in-flight so a double-click does not race two writes.
         checkbox.disabled = true;

@@ -121,6 +121,17 @@ every sibling's priority). The fresh `data-version` carried by the re-rendered f
 REQ-FE-003 for free, and on a backend read failure the fragment branch returns a section-sized error
 fragment, never a redirect the swap would follow into the container.
 
+The operations area (#576) combines the patterns through a set of `X-Requested-With` write twins
+(`createOperationAjax` / `updateOperationAjax` / `deleteOperationAjax`) beside the classic
+POST→redirect fallbacks. Creating or deleting from the list re-renders `#operations-results` via the
+existing `GET /operations?fragment=results` swap (the page exposes `window.krtOperationsReload` so the
+write handlers reuse the active filter query); editing on the detail page patches the version input
+and the title in place from the twin's `{version, name, status}` (the backend PUT echoes the
+persisted operation in-transaction, so no second round-trip can observe a concurrent writer's
+`version+2` or mask an already-committed write — no navigation); deleting
+from the detail page navigates back to the list (the entity is gone — REQ-FE-006). The payout
+paid-out toggle was already in-place — its bespoke CSRF read now goes through `krtCsrf` (REQ-FE-002).
+
 The refinery **screenshot-extract import** (#591) applies the same fragment-swap idea to a
 **multipart POST** rather than a GET: an `X-Requested-With` import twin
 (`RefineryOrderPageController.importExtractAjax`) returns the pre-filled create-form fragment
