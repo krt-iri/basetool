@@ -112,12 +112,51 @@ when an in-place DOM patch would be too fragile (structural add/delete, server-d
 or a value duplicated across panes). The mission-detail page (#574) does this: a crew/finance/owner-
 manager write re-renders just its section via `GET /missions/{id}?fragment={crew-board,finance,mgmt}`
 into a stable `#…-results` container, and every per-element handler inside (drag-drop, action
-buttons, role selects) is delegated on the persistent container so it survives the swap. The fresh
-`data-version` carried by the re-rendered fragment satisfies REQ-FE-003 for free.
+buttons, role selects) is delegated on the persistent container so it survives the swap. The
+order-detail page (#575) does the same: claim create/edit/withdraw, the inventory unlink and the edit
+modal re-render the `header` / `materials` / `aggregated` sections via `GET /orders/{id}?fragment=…`
+(a server-derived aggregate like the claims "Offen" amount would desync a partial patch), and the
+order-list drag-drop priority reorder re-renders the whole queue the same way (the backend reshuffles
+every sibling's priority). The fresh `data-version` carried by the re-rendered fragment satisfies
+REQ-FE-003 for free, and on a backend read failure the fragment branch returns a section-sized error
+fragment, never a redirect the swap would follow into the container.
 
-**Enforced by:** lists/pagination e2e (#573) + mission-detail fragment MVC tests (#574) · **Code:**
-`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
-`mission-detail.html` (`krtRefreshMissionSection`) · **Issues:** #572, #573, #574
+**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574) and order-detail (#575)
+fragment/endpoint MVC tests · **Issues:** #572 to #575 · **Code:** `krt-fetch.js` (`swap`),
+`missions.js`, `operations.js`, `fragments/pagination.html`, `mission-detail.html`,
+`orders-index.html`, `orders-detail.html`, `JobOrderPageController`.
+
+### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
+
+Some write flows finish by landing the user on a **different** page — creating an entity navigates
+to its detail page or the list, and the refinery detail-page actions (save / store / cancel) redirect
+to the refinery-order list. For these flows the no-reload guarantee of REQ-FE-001 applies to the
+**failure path**: a client-side validation error or a backend save error keeps the user on the page
+with their entered data and shows an inline KRT toast, instead of the classic full reload that
+discards a half-filled form. On success the handler deliberately navigates to the server-returned
+`{"targetUrl": …}` JSON — the navigation **is** the user's intended outcome, so this is a refinement
+of REQ-FE-001, not a violation (there is no in-place reload that would lose work).
+
+The AJAX twin is routed by an `X-Requested-With=XMLHttpRequest` header (more specific than the classic
+`@PostMapping`, so Spring dispatches header-bearing requests to it) and submits a `FormData` of the
+real `<form>`, which lets the browser serialize the page's dynamic editors (order item lines, refinery
+goods / store items) and omit the disabled inactive-mode controls without hand-rolled JSON. The
+classic `POST→redirect` handler stays untouched as the no-JS fallback, and the twin reuses the same
+DTO-building / backend call as the classic path. Optimistic-lock and other backend errors are
+re-emitted as `application/problem+json` (the `propagateBackendError` helper) so the page-local
+submit helper can surface them inline.
+
+**Acceptance**
+
+- [ ] A client-side or backend validation/save error on a create / refinery-finalize submit keeps the
+  document on the same URL with the entered data intact and shows an inline toast — no full reload.
+- [ ] On success the page navigates exactly once to the server-supplied `targetUrl`.
+- [ ] With JavaScript disabled the classic form still `POST→redirect`s (the twin is header-gated).
+
+**Enforced by:** create/refinery navigate-after-AJAX MVC tests (`X-Requested-With` twins return
+`{targetUrl}` / `400`) · **Issues:** #575 · **Code:** `orders-create.html`, `refinery-orders-create.html`,
+`refinery-orders-details.html`, `JobOrderPageController`, `RefineryOrderPageController` (`*Ajax`
+twins, `propagateBackendError`).
 
 ## Out of scope
 
@@ -139,4 +178,14 @@ buttons, role selects) is delegated on the persistent container so it survives t
   PATCHes (core/schedule/flags) with server-side `@Valid` field-error rendering; converting it in
   place needs a JSON field-error contract and is tracked as the follow-up issue **#589** so the
   well-tested validation UX is not regressed. Every other mission-detail write is in-place.
+- **Known carve-out (#575 → #591):** the refinery **screenshot-extract import**
+  (`refinery-orders-create.html` → `RefineryImportProxyController`, `POST /refinery-orders/import`)
+  still submits classic `POST→redirect`. It is **not a write** (it persists nothing — it relays the
+  uploaded extract and flashes a non-persisted pre-filled form + review flags back), and the reload
+  is benign because the import deliberately replaces the whole form (`no-track`), so no entered work
+  is lost. Converting it in place re-renders the entire create form and so needs an idempotent
+  per-group `init` seam extracted from the shared `datetime-splitter.js` (currently one-shot:
+  re-running double-binds listeners and appends duplicate error divs) plus re-init of the other
+  one-shot create-page enhancers — a larger, shared-file change tracked as **#591**. Every refinery
+  **write** (create/update/store/cancel) is in-place (REQ-FE-006).
 

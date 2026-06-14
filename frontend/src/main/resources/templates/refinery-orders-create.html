@@ -181,7 +181,12 @@
         <!-- Screenshot-extract import (#435): file picker posts the RefineryExtract JSON to the
              proxy, which flashes the pre-filled form + review flags back onto this page.
              no-track: picking the file must not arm the unsaved-changes guard - the import
-             replaces the form wholesale, so there is nothing on this page worth protecting. -->
+             replaces the form wholesale, so there is nothing on this page worth protecting.
+             No-reload carve-out (#575 -> #591): this is the one refinery interaction still doing a
+             classic POST->redirect. It is not a write (persists nothing) and the reload is benign
+             (the form is replaced wholesale); converting it in place needs an idempotent per-group
+             re-init seam in the shared datetime-splitter.js plus the other one-shot enhancers, so it
+             is tracked separately. Every refinery WRITE is already navigate-after-AJAX (REQ-FE-006). -->
         <div class="import-extract-bar" data-testid="refinery-import-box">
             <form id="refineryImportForm" class="no-track" th:action="@{/refinery-orders/import}" method="post" enctype="multipart/form-data">
                 <input type="file" id="refineryImportFile" name="file" accept=".json,application/json" hidden data-trigger="rfc-import-file" data-testid="refinery-import-file">
@@ -788,6 +793,57 @@
             if (!select || !materialId) return;
             select.value = materialId;
             select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+
+    // In-place create submit (#575): creating a refinery order navigates away on success (to the
+    // list), so intercept the form, POST FormData (the browser serializes the dynamic materials
+    // editor AND omits the disabled non-logistician owner select, falling back to its hidden twin)
+    // with X-Requested-With + krtCsrf, and navigate to the JSON targetUrl. On a validation/backend
+    // failure the page STAYS with an inline toast instead of the POST->redirect reflash that loses
+    // the entered data. The classic form-POST is the no-JS fallback (krtCsrf absent).
+    const MSG_RFC_MATERIAL_INVALID = /*[[#{error.refineryorder.material.invalid}]]*/ 'Add a material.';
+    const MSG_RFC_CREATE_FAILED = /*[[#{error.refineryorder.create.failed}]]*/ 'Create failed.';
+    async function _submitRefineryCreate(form) {
+        if (!window.krtCsrf) { form.submit(); return; }
+        const fd = new FormData(form);
+        function buildHeaders() {
+            const h = { 'X-Requested-With': 'XMLHttpRequest' };
+            const t = window.krtCsrf.token();
+            const n = window.krtCsrf.headerName();
+            if (t && n) h[n] = t;
+            return h;
+        }
+        let res;
+        try {
+            res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+            if (res.status === 403 && window.krtCsrf.refresh) {
+                const refreshed = await window.krtCsrf.refresh();
+                if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+            }
+        } catch (e) {
+            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_CREATE_FAILED);
+            return;
+        }
+        if (res.status === 400) {
+            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_MATERIAL_INVALID);
+            return;
+        }
+        if (!res.ok) {
+            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_CREATE_FAILED);
+            return;
+        }
+        let body = null;
+        try { body = await res.json(); } catch (e) { /* non-JSON body */ }
+        if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+        if (body && body.targetUrl) window.location.assign(body.targetUrl);
+        else window.location.reload();
+    }
+    const _refineryCreateForm = document.querySelector('form[data-testid="refinery-form"]');
+    if (_refineryCreateForm) {
+        _refineryCreateForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            _submitRefineryCreate(_refineryCreateForm);
         });
     }
 </script>

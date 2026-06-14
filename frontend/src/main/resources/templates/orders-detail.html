@@ -31,13 +31,18 @@
             <a sec:authorize="hasRole('LOGISTICIAN')"
                th:if="${order.type == 'ITEM' and (order.itemHandovers == null or order.itemHandovers.isEmpty())}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-outline"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
-            <form sec:authorize="hasRole('ADMIN')" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
+            <form sec:authorize="hasRole('ADMIN')" id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                 <button type="submit" class="btn btn-quiet-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{orders.detail.delete}">Löschen</span></button>
             </form>
         </div>
     </div>
 
     <div class="hud-box mt-2">
+        <!-- In-place AJAX swap container (#571/#575): the edit modal re-renders this kv-list header
+             (requesting unit / handle / comment + the status select with its fresh @Version) via
+             GET /orders/{id}?fragment=header. The status select's handler is document-delegated and
+             the date spans re-localize on krt:swapped, so both survive the swap. -->
+        <div id="order-header-results"><th:block th:fragment="orderHeader">
         <dl class="kv-list kv-ruled" style="margin-bottom: 2rem;">
             <dt th:text="#{orders.index.id}">ID</dt>
             <dd><span id="order-display-id" th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}"></span></dd>
@@ -100,11 +105,18 @@
                 <dd class="kv-row-wide kv-row-self-start" style="white-space: pre-wrap;" th:text="${order.comment}">Kommentar</dd>
             </th:block>
         </dl>
+        </th:block></div>
 
         <!-- MATERIAL orders: the direct material-requirement table (click a row to expand the
              linked-inventory drill-down). ITEM orders render the ordered-items table plus the
              internal aggregated-materials view further below instead. -->
         <th:block th:if="${order.type != 'ITEM'}">
+        <!-- In-place AJAX swap container (#571/#575): a claim create/edit/withdraw re-renders this
+             section via GET /orders/{id}?fragment=materials. The #order-materials-results wrapper
+             persists (only its innerHTML is replaced); the claim/inventory triggers inside are
+             document-delegated (window.krtEvents), so they survive the swap. The swap is mandatory
+             because the per-bucket "Offen" open-amount is a backend aggregate not returned per claim. -->
+        <div id="order-materials-results"><th:block th:fragment="materialsSection">
         <h3 class="section-title" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders, detected by the backend
@@ -190,6 +202,7 @@
             </tbody>
         </table>
         </div>
+        </th:block></div>
         </th:block>
 
         <!-- ITEM orders: (1) the ordered finished items with delivery progress and sub-assembly
@@ -197,6 +210,9 @@
              material, and (3) the internal aggregated-materials view (one row per material+quality,
              unit-formatted by quantityType). Mirrors the material layout as closely as possible. -->
         <th:block th:if="${order.type == 'ITEM'}">
+        <!-- In-place AJAX swap container (#575): an item handover re-renders the ordered-items
+             table (delivered/outstanding per row) via GET /orders/{id}?fragment=items. -->
+        <div id="order-items-results"><th:block th:fragment="itemsSection">
         <h3 class="section-title" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
         <div class="table-responsive">
         <table class="data-table">
@@ -235,6 +251,7 @@
             </tbody>
         </table>
         </div>
+        </th:block></div>
 
         <!-- Items whose blueprint resolved to no procurable material (empty materials list). The
              persisted order keeps only resolved requirements, so an empty list is the detail-time
@@ -247,6 +264,9 @@
             </ul>
         </div>
 
+        <!-- In-place AJAX swap container (#571/#575): for ITEM orders the claims live on the
+             aggregated table; a claim create/edit/withdraw re-renders it via ?fragment=aggregated. -->
+        <div id="order-aggregated-results"><th:block th:fragment="aggregatedSection">
         <h3 class="section-title" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders (backend populates
@@ -330,7 +350,17 @@
             </tbody>
         </table>
         </div>
+        </th:block></div>
         </th:block>
+
+        <!-- Section-refresh error fragment (#575, mirrors the #574 fix): returned (HTTP 200) by
+             GET /orders/{id}?fragment=… when the backend read fails, so an in-place swap shows a
+             section-sized inline notice instead of a full-page redirect being followed into the
+             small #…-results container. Held in an inert <template> so it never renders in the
+             normal full page; the fragment selector extracts only the inner <p>. -->
+        <template>
+            <p th:fragment="fragmentError" class="text-muted" role="alert" th:text="#{error.joborder.load.details}">The section could not be refreshed. Please reload the page.</p>
+        </template>
 
         <!-- Bearbeiter (assignees) section. Re-rendered as a self-contained AJAX fragment by the
              enroll / unenroll / note endpoints so the whole list refreshes in place (no reload, no
@@ -464,6 +494,11 @@
         <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
              phase; for now the material-specific handover protocol is hidden for item orders. -->
         <th:block th:if="${order.type != 'ITEM'}">
+        <!-- In-place AJAX swap container (#575): a material handover re-renders this section (the
+             handover history gains a row) via GET /orders/{id}?fragment=handovers. The "Übergabe
+             protokollieren" button + the per-row report-download are document-delegated, so they
+             survive the swap; the requirement table and header are swapped separately. -->
+        <div id="order-handovers-results"><th:block th:fragment="materialHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -514,12 +549,17 @@
                 </table>
             </div>
         </div>
+        </th:block></div>
         </th:block>
 
         <!-- ITEM orders: handover workflow. Logisticians log per-line whole-unit deliveries; the
              backend decrements outstanding amounts and auto-completes the order once every line is
              fully delivered. Each persisted handover offers a PDF delivery note. -->
         <th:block th:if="${order.type == 'ITEM'}">
+        <!-- In-place AJAX swap container (#575): an item handover re-renders this section (history
+             gains a row; the open button hides once every line is delivered) via
+             GET /orders/{id}?fragment=item-handovers. -->
+        <div id="order-item-handovers-results"><th:block th:fragment="itemHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
 
         <!-- Handover toolbar — mirrors the MATERIAL handover toolbar by sitting the
@@ -571,6 +611,7 @@
                 </table>
             </div>
         </div>
+        </th:block></div>
         </th:block>
     </div>
 </main>
@@ -580,7 +621,7 @@
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="edit-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
         
-        <form th:action="@{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
+        <form id="edit-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
             <input type="hidden" th:field="*{version}">
             
             <div class="form-group mb-1">
@@ -756,7 +797,7 @@
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="handover-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
 
-        <form data-testid="order-handover-form" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
+        <form data-testid="order-handover-form" id="handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                 <label for="handoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
@@ -806,7 +847,7 @@
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="item-handover-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
 
-        <form data-testid="item-handover-form" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
+        <form data-testid="item-handover-form" id="item-handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                 <label for="itemHandoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="itemHandoverTime" th:field="*{handoverTime}">
@@ -824,6 +865,12 @@
             <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.lines}">Übergebene Items</h3>
             <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.hint}">Trage je Item die übergebene Stückzahl ein (maximal die ausstehende Menge).</p>
 
+            <!-- The outstanding-line rows are an in-place swap target (#575): an item handover
+                 re-renders them (fresh max=) via GET /orders/{id}?fragment=item-handover-lines so a
+                 consecutive handover uses the updated caps. ONLY the rows swap — the datetime widget
+                 + recipient above stay put, so the form's submit listener and the one-shot datetime
+                 enhancer both survive. -->
+            <div id="item-handover-lines"><th:block th:fragment="itemHandoverLines">
             <!-- One row per outstanding ordered-item line. Inputs are named by request-param index so
                  Spring binds them onto itemHandoverForm.entries; the controller drops empty rows. The
                  outstanding value is computed once on the iterating th:block (th:with runs after
@@ -845,6 +892,7 @@
                     </div>
                 </div>
             </th:block>
+            </th:block></div>
 
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
                 <button type="button" class="btn btn-ghost" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="item-handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
@@ -857,6 +905,49 @@
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     let cachedInventoryItems = [];
     let isInventoryCached = false;
+
+    const MSG_HANDOVER_SUCCESS = '[(#{success.joborder.handover})]';
+    const MSG_HANDOVER_FAILED = '[(#{error.joborder.handover.failed})]';
+    const MSG_HANDOVER_NOITEMS = '[(#{error.joborder.handover.noitems})]';
+
+    // Serialize the material-handover modal form to the JSON its AJAX twin binds (#575).
+    function _serializeHandoverForm() {
+        const items = [];
+        document.querySelectorAll('#handover-items-container .handover-item-row').forEach(function (row) {
+            const sel = row.querySelector('select[name$=".inventoryItemId"]');
+            const amtInput = row.querySelector('input[name$=".amount"]');
+            const inventoryItemId = sel ? sel.value : '';
+            const amount = (amtInput && window.krtScuInput)
+                ? window.krtScuInput.parse(amtInput.value)
+                : (amtInput ? parseFloat(amtInput.value) : NaN);
+            if (!inventoryItemId || !(amount > 0)) return;
+            items.push({ inventoryItemId: inventoryItemId, amount: amount });
+        });
+        return {
+            handoverTime: (document.getElementById('handoverTime') || {}).value || '',
+            recipientHandle: (document.getElementById('recipientHandle') || {}).value || '',
+            recipientSquadron: (document.getElementById('recipientSquadron') || {}).value || '',
+            items: items
+        };
+    }
+
+    // Serialize the item-handover modal's per-line whole-unit amounts to the JSON its twin binds.
+    function _serializeItemHandoverForm() {
+        const entries = [];
+        document.querySelectorAll('#item-handover-modal .item-handover-line').forEach(function (line) {
+            const idInput = line.querySelector('input[name$=".jobOrderItemId"]');
+            const amtInput = line.querySelector('input[name$=".amount"]');
+            const jobOrderItemId = idInput ? idInput.value : '';
+            const amount = amtInput ? parseInt(amtInput.value, 10) : NaN;
+            if (!jobOrderItemId || !(amount > 0)) return;
+            entries.push({ jobOrderItemId: jobOrderItemId, amount: amount });
+        });
+        return {
+            handoverTime: (document.getElementById('itemHandoverTime') || {}).value || '',
+            recipientHandle: (document.getElementById('itemRecipientHandle') || {}).value || '',
+            entries: entries
+        };
+    }
 
     async function openHandoverModal() {
         document.getElementById('handover-modal').style.display = 'flex';
@@ -997,33 +1088,98 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const handoverForm = document.querySelector('#handover-modal form');
+        const handoverForm = document.getElementById('handover-form');
         if (handoverForm) {
-            handoverForm.addEventListener('submit', (e) => {
-                if (!validateHandoverAmounts()) {
-                    e.preventDefault();
+            handoverForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!validateHandoverAmounts()) return;
+                const orderId = handoverForm.getAttribute('data-order-id');
+                if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
+                    handoverForm.submit();
+                    return;
                 }
+                const payload = _serializeHandoverForm();
+                if (!payload.items.length) { showFrontendErrorToast(MSG_HANDOVER_NOITEMS); return; }
+                await krtOrderWrite({
+                    method: 'POST',
+                    url: '/orders/' + orderId + '/handovers',
+                    payload: payload,
+                    toast: false,
+                    errorMessage: MSG_HANDOVER_FAILED,
+                    onSuccess: function (order) {
+                        // Patch the edit-modal @Version (the handover may auto-complete + bump it);
+                        // the status select gets its fresh version from the header swap below.
+                        const editVer = document.querySelector('#edit-modal input[name="version"]');
+                        if (editVer && order && order.version != null) editVer.value = order.version;
+                        const modal = document.getElementById('handover-modal');
+                        if (modal) modal.style.display = 'none';
+                        // The handover spent stock → the cached inventory + the modal's rows are
+                        // stale; drop them so a reopen re-fetches and starts clean.
+                        isInventoryCached = false;
+                        cachedInventoryItems = [];
+                        const itemsContainer = document.getElementById('handover-items-container');
+                        if (itemsContainer) itemsContainer.innerHTML = '';
+                        showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
+                        // Re-render the requirement table (stock/status), the handover history (new
+                        // row) and the header (status select + version, if the order auto-completed).
+                        _refreshMaterialsSection(orderId);
+                        _swapOrderSection(orderId, 'order-handovers-results', 'handovers');
+                        _swapOrderSection(orderId, 'order-header-results', 'header');
+                    }
+                });
             });
         }
-        const itemHandoverForm = document.querySelector('#item-handover-modal form');
+        const itemHandoverForm = document.getElementById('item-handover-form');
         if (itemHandoverForm) {
-            itemHandoverForm.addEventListener('submit', (e) => {
-                if (typeof validateItemHandoverForm === 'function' && !validateItemHandoverForm()) {
-                    e.preventDefault();
+            itemHandoverForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (typeof validateItemHandoverForm === 'function' && !validateItemHandoverForm()) return;
+                const orderId = itemHandoverForm.getAttribute('data-order-id');
+                if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
+                    itemHandoverForm.submit();
+                    return;
                 }
+                const payload = _serializeItemHandoverForm();
+                if (!payload.entries.length) { showFrontendErrorToast(MSG_HANDOVER_NOITEMS); return; }
+                await krtOrderWrite({
+                    method: 'POST',
+                    url: '/orders/' + orderId + '/item-handovers',
+                    payload: payload,
+                    toast: false,
+                    errorMessage: MSG_HANDOVER_FAILED,
+                    onSuccess: function (order) {
+                        const editVer = document.querySelector('#edit-modal input[name="version"]');
+                        if (editVer && order && order.version != null) editVer.value = order.version;
+                        const modal = document.getElementById('item-handover-modal');
+                        if (modal) modal.style.display = 'none';
+                        showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
+                        // Re-render the ordered-items table (delivered/outstanding), the history (new
+                        // row + button-gating), the modal's outstanding-line rows (fresh max=) and the
+                        // header (status, if auto-completed). The datetime widget + recipient stay put,
+                        // so the form binding and the one-shot datetime enhancer survive.
+                        _swapOrderSection(orderId, 'order-items-results', 'items');
+                        _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
+                        _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
+                        _swapOrderSection(orderId, 'order-header-results', 'header');
+                    }
+                });
             });
         }
     });
 </script>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', () => {
-        const dateSpan = document.getElementById('created-date-span');
-        const daysSpan = document.getElementById('elapsed-days-span');
-        const daysContainer = document.getElementById('elapsed-days-container');
-        const yellowDays = /*[[${ageYellowDays}]]*/ 30;
-        const redDays = /*[[${ageRedDays}]]*/ 90;
-        
+    const ORDER_AGE_YELLOW = /*[[${ageYellowDays}]]*/ 30;
+    const ORDER_AGE_RED = /*[[${ageRedDays}]]*/ 90;
+
+    // Localize the created-date + elapsed-days (kv-list header) and every handover timestamp.
+    // Extracted so it re-runs after a header / handover fragment swap (#575) — it was a one-shot
+    // DOMContentLoaded enhancer, so swapped-in dates would otherwise stay raw ISO strings.
+    function localizeOrderDates(root) {
+        const scope = root || document;
+        const dateSpan = scope.querySelector('#created-date-span');
+        const daysSpan = scope.querySelector('#elapsed-days-span');
+        const daysContainer = scope.querySelector('#elapsed-days-container');
         if (dateSpan && daysSpan) {
             const utcDateStr = dateSpan.getAttribute('data-utc');
             if (utcDateStr) {
@@ -1031,21 +1187,18 @@
                 if (!isNaN(date)) {
                     dateSpan.textContent = date.toLocaleDateString();
                     const now = new Date();
-                    const diffTime = now.getTime() - date.getTime();
-                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
                     daysSpan.textContent = diffDays > 0 ? diffDays : 0;
-                    
                     const targetEl = daysContainer || daysSpan;
-                    if (diffDays >= redDays) {
+                    if (diffDays >= ORDER_AGE_RED) {
                         targetEl.classList.add('text-danger');
-                    } else if (diffDays >= yellowDays) {
+                    } else if (diffDays >= ORDER_AGE_YELLOW) {
                         targetEl.classList.add('text-warning');
                     }
                 }
             }
         }
-        
-        document.querySelectorAll('.handover-time-span').forEach(el => {
+        scope.querySelectorAll('.handover-time-span').forEach(el => {
             const utcDateStr = el.getAttribute('data-utc');
             if (utcDateStr) {
                 const dateObj = new Date(utcDateStr);
@@ -1057,6 +1210,13 @@
                 }
             }
         });
+    }
+    document.addEventListener('krt:swapped', (e) => {
+        localizeOrderDates(e && e.detail ? e.detail.container : document);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        localizeOrderDates(document);
 
         // Material Row Management
         const materialsContainer = document.getElementById('materials-container');
@@ -1189,6 +1349,131 @@
     const MSG_STATUS_ERROR   = '[(#{orders.status.update.error})]';
     const MSG_STATUS_CONFLICT = '[(#{orders.status.update.conflict})]';
 
+    // Page-local krtFetch.write wrapper (#571 / #575): injects the already-localized order conflict
+    // strings so every order write shares ONE optimistic-lock UX (krtFetch hardcodes no user text),
+    // and retires the four bespoke CSRF readers on this page (krtFetch.write reads window.krtCsrf
+    // internally + retries once on a stale-token 403).
+    const ORDER_CONFLICT = {
+        title: '[(#{orders.conflict.toast.title})]',
+        detail: '[(#{orders.conflict.toast.detail})]',
+        reload: '[(#{orders.conflict.action.reload})]',
+        reloadQuestion: '[(#{orders.conflict.action.reload.question})]',
+        dismiss: '[(#{orders.conflict.action.dismiss})]'
+    };
+    function krtOrderWrite(opts) {
+        return window.krtFetch.write(Object.assign({}, opts, {
+            conflict: {
+                title: ORDER_CONFLICT.title,
+                reloadLabel: ORDER_CONFLICT.reload,
+                reloadQuestion: ORDER_CONFLICT.reloadQuestion,
+                dismissLabel: ORDER_CONFLICT.dismiss,
+                reloadDetailFallback: ORDER_CONFLICT.detail
+            }
+        }));
+    }
+
+    // Delete order in place (#575): add a KRT confirm (none existed — destructive + the
+    // no-native-dialogs rule), then krtFetch.write DELETE and navigate to the list. A backend
+    // rejection (e.g. the order still has linked inventory) keeps the user on the page with the
+    // error toast instead of a redirect-reflash. The classic POST form is the no-JS fallback.
+    const MSG_DELETE_TITLE = '[(#{info.delete.confirm.title})]';
+    const MSG_DELETE_MESSAGE = '[(#{info.delete.confirm.message})]';
+    const MSG_DELETE_CONFIRM = '[(#{orders.detail.delete})]';
+    const MSG_DELETE_CANCEL = '[(#{general.cancel})]';
+    const MSG_DELETE_ERROR = '[(#{error.joborder.delete.failed})]';
+    (function () {
+        const form = document.getElementById('delete-order-form');
+        if (!form) return;
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const orderId = form.getAttribute('data-order-id');
+            if (!orderId || typeof window.showKrtConfirm !== 'function' || !window.krtFetch) {
+                form.submit();
+                return;
+            }
+            const ok = await window.showKrtConfirm(
+                MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL);
+            if (!ok) return;
+            const res = await krtOrderWrite({
+                method: 'DELETE',
+                url: '/orders/' + orderId,
+                toast: false,
+                errorMessage: MSG_DELETE_ERROR
+            });
+            if (res.ok) {
+                window.location.assign('/orders');
+            }
+        });
+    })();
+
+    // Edit order in place (#575): serialize the modal form (header fields + the dynamic material
+    // editor) and krtFetch.write the JSON twin, then re-render the kv-list header and the material
+    // requirement section in place — no reload. The edit modal lives outside both swap containers,
+    // so its material editor survives; its hidden @Version input is patched from the returned order
+    // (the status select gets its fresh version from the header swap). Classic POST is the fallback.
+    const MSG_UPDATE_SUCCESS = '[(#{success.joborder.update})]';
+    const MSG_UPDATE_ERROR = '[(#{error.joborder.update.failed})]';
+    const MSG_MATERIAL_INVALID = '[(#{error.joborder.material.invalid})]';
+    function _serializeEditForm() {
+        const materials = [];
+        document.querySelectorAll('#materials-container .material-row').forEach(function (row) {
+            const matSel = row.querySelector('[name$=".materialId"]');
+            const qualSel = row.querySelector('[name$=".minQuality"]');
+            const amtInput = row.querySelector('[name$=".amount"]');
+            const materialId = matSel ? matSel.value : '';
+            const amount = (amtInput && window.krtScuInput)
+                ? window.krtScuInput.parse(amtInput.value)
+                : (amtInput ? parseFloat(amtInput.value) : NaN);
+            if (!materialId || !(amount > 0)) return;
+            materials.push({
+                materialId: materialId,
+                minQuality: (qualSel && qualSel.value) ? parseInt(qualSel.value, 10) : null,
+                amount: amount
+            });
+        });
+        const versionInput = document.querySelector('#edit-modal input[name="version"]');
+        return {
+            requestingOrgUnitId: (document.getElementById('requestingOrgUnitId') || {}).value || null,
+            handle: (document.getElementById('handle') || {}).value || '',
+            comment: (document.getElementById('edit-comment') || {}).value || '',
+            version: versionInput ? parseInt(versionInput.value, 10) : null,
+            materials: materials
+        };
+    }
+    (function () {
+        const form = document.getElementById('edit-order-form');
+        if (!form) return;
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const orderId = form.getAttribute('data-order-id');
+            if (!orderId || !window.krtFetch) { form.submit(); return; }
+            const payload = _serializeEditForm();
+            if (!payload.materials.length) { showFrontendErrorToast(MSG_MATERIAL_INVALID); return; }
+            await krtOrderWrite({
+                method: 'POST',
+                url: '/orders/' + orderId + '/update',
+                payload: payload,
+                toast: false,
+                errorMessage: MSG_UPDATE_ERROR,
+                onSuccess: function (dto) {
+                    const editVer = document.querySelector('#edit-modal input[name="version"]');
+                    if (editVer && dto && dto.version != null) editVer.value = dto.version;
+                    const modal = document.getElementById('edit-modal');
+                    if (modal) modal.style.display = 'none';
+                    showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
+                    const header = document.getElementById('order-header-results');
+                    if (header && window.krtFetch.swap) {
+                        window.krtFetch.swap({
+                            url: '/orders/' + orderId, container: header,
+                            fragmentValue: 'header', history: false, preserveScroll: true
+                        });
+                    }
+                    _refreshMaterialsSection(orderId);
+                }
+            });
+        });
+    })();
+
     // Material claim ("Eintragung") interaction (Phase 6, #346).
     const MSG_CLAIM_TITLE_ADD = '[(#{orders.claim.modal.title.add})]';
     const MSG_CLAIM_TITLE_EDIT = '[(#{orders.claim.modal.title.edit})]';
@@ -1204,11 +1489,62 @@
     const MSG_CLAIM_VALIDATION_AMOUNT = '[(#{orders.claim.validation.amount})]';
     const MSG_CLAIM_VALIDATION_OVERCLAIM = '[(#{orders.claim.validation.overclaim})]';
 
-    function _claimCsrf() {
-        return {
-            token: document.querySelector('meta[name="_csrf"]')?.content || '',
-            header: document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'
-        };
+    // Re-render the material section in place (#575) after a claim create/edit/withdraw OR an
+    // inventory unlink. The "Offen" open-amount + the per-row stock/status cells are backend-derived
+    // and not returned per write, so a partial DOM patch would desync them — re-pull the whole table
+    // fragment instead. MATERIAL orders render the requirement table on #order-materials-results,
+    // ITEM orders the aggregated table on #order-aggregated-results; swap whichever exists.
+    function _refreshMaterialsSection(orderId) {
+        orderId = orderId || (document.getElementById('claim-order-id') || {}).value;
+        const mat = document.getElementById('order-materials-results');
+        const agg = document.getElementById('order-aggregated-results');
+        const container = mat || agg;
+        if (!orderId || !container || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
+        return window.krtFetch.swap({
+            url: '/orders/' + orderId,
+            container: container,
+            fragmentValue: mat ? 'materials' : 'aggregated',
+            history: false,
+            preserveScroll: true
+        });
+    }
+
+    // Swap one order-detail section by container id + fragment value (#575). Used by the handover
+    // flow to re-render the handover history + the header (status select carrying the fresh
+    // @Version) in place.
+    function _swapOrderSection(orderId, containerId, fragmentValue) {
+        const c = document.getElementById(containerId);
+        if (!c || !orderId || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
+        return window.krtFetch.swap({
+            url: '/orders/' + orderId, container: c, fragmentValue: fragmentValue,
+            history: false, preserveScroll: true
+        });
+    }
+
+    // Detach a linked inventory item in place (#575): the AJAX twin re-fetches the order so we can
+    // patch the bumped ORDER @Version (the detach mutates the aggregate, so the next status/handover
+    // write would otherwise 409) and then re-render the material section (stock/status recompute; the
+    // open drill-down collapses with the swap). Delegated on the button, so it survives the swap.
+    async function unlinkInventoryItem(btn) {
+        const orderId = btn.getAttribute('data-order-id');
+        const invId = btn.getAttribute('data-inventory-item-id');
+        if (!orderId || !invId) return;
+        await krtOrderWrite({
+            method: 'DELETE',
+            url: '/orders/' + orderId + '/inventory/' + invId + '/unlink/ajax',
+            toast: false,
+            errorMessage: MSG_INVENTORY_UNLINK_ERROR,
+            onSuccess: function (data) {
+                if (data && data.version != null) {
+                    const sel = document.getElementById('status-select');
+                    if (sel) sel.dataset.version = data.version;
+                    const editVer = document.querySelector('#edit-modal input[name="version"]');
+                    if (editVer) editVer.value = data.version;
+                }
+                showFrontendSuccessToast(MSG_INVENTORY_UNLINK_SUCCESS);
+                _refreshMaterialsSection(orderId);
+            }
+        });
     }
 
     function _openClaimModal(opts) {
@@ -1271,51 +1607,56 @@
         if (!squadronId) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_SQUADRON); return; }
         if (!(amount > 0)) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_AMOUNT); return; }
         if (amount > max + 1e-9) { showFrontendErrorToast(MSG_CLAIM_VALIDATION_OVERCLAIM); return; }
-        const csrf = _claimCsrf();
-        fetch('/orders/' + orderId + '/claims', {
+        krtOrderWrite({
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', [csrf.header]: csrf.token },
-            body: JSON.stringify({ materialId: materialId, qualityRequirement: quality, claimingOrgUnitId: squadronId, amount: amount })
-        }).then(res => {
-            if (res.status === 409) { showFrontendErrorToast(MSG_CLAIM_CONFLICT); setTimeout(() => window.location.reload(), 1500); return; }
-            if (res.status === 403) { showFrontendErrorToast(MSG_CLAIM_FORBIDDEN); return; }
-            if (!res.ok) { showFrontendErrorToast(MSG_CLAIM_ERROR); return; }
-            showFrontendSuccessToast(MSG_CLAIM_SUCCESS); setTimeout(() => window.location.reload(), 800);
-        }).catch(() => showFrontendErrorToast(MSG_CLAIM_ERROR));
+            url: '/orders/' + orderId + '/claims',
+            payload: { materialId: materialId, qualityRequirement: quality, claimingOrgUnitId: squadronId, amount: amount },
+            toast: false,
+            errorMessage: MSG_CLAIM_ERROR,
+            onSuccess: function () {
+                document.getElementById('claim-modal').style.display = 'none';
+                showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
+                _refreshMaterialsSection();
+            }
+        });
     }
 
     function withdrawClaimAction() {
         const orderId = document.getElementById('claim-order-id').value;
         const claimId = document.getElementById('claim-id').value;
         if (!claimId) { return; }
-        const csrf = _claimCsrf();
-        fetch('/orders/' + orderId + '/claims/' + claimId + '/withdraw', {
+        krtOrderWrite({
             method: 'POST',
-            headers: { [csrf.header]: csrf.token }
-        }).then(res => {
-            if (res.status === 409) { showFrontendErrorToast(MSG_CLAIM_CONFLICT); setTimeout(() => window.location.reload(), 1500); return; }
-            if (res.status === 403) { showFrontendErrorToast(MSG_CLAIM_FORBIDDEN); return; }
-            if (!res.ok) { showFrontendErrorToast(MSG_CLAIM_ERROR); return; }
-            showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS); setTimeout(() => window.location.reload(), 800);
-        }).catch(() => showFrontendErrorToast(MSG_CLAIM_ERROR));
+            url: '/orders/' + orderId + '/claims/' + claimId + '/withdraw',
+            toast: false,
+            errorMessage: MSG_CLAIM_ERROR,
+            onSuccess: function () {
+                document.getElementById('claim-modal').style.display = 'none';
+                showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
+                _refreshMaterialsSection();
+            }
+        });
     }
 
     let _pendingStatus = null;
     let _previousStatus = null;
 
+    // The last successfully-saved status of the select, read from data-saved-status (set on every
+    // successful in-place change) and falling back to the server-rendered selected option. Replaces
+    // the reload the old flow relied on to reset the control after a change.
+    function _knownStatus(selectElement) {
+        return selectElement.dataset.savedStatus
+            || (selectElement.querySelector('option[selected]') || {}).value
+            || selectElement.options[0].value;
+    }
+
     function updateStatus(selectElement) {
         const newStatus = selectElement.value;
         if (newStatus === 'COMPLETED' || newStatus === 'REJECTED') {
             _pendingStatus = newStatus;
-            _previousStatus = Array.from(selectElement.options)
-                .find(o => o.defaultSelected || o.selected && o.value !== newStatus)?.value
-                || selectElement.dataset.previousValue
-                || selectElement.options[0].value;
-            // Store previous for cancel
-            selectElement.dataset.previousValue = _previousStatus;
+            _previousStatus = _knownStatus(selectElement);
             document.getElementById('status-warning-modal').style.display = 'flex';
         } else {
-            selectElement.dataset.previousValue = newStatus;
             _doStatusUpdate(selectElement.dataset.orderId, newStatus, parseInt(selectElement.dataset.version, 10), selectElement);
         }
     }
@@ -1340,31 +1681,37 @@
     }
 
     function _doStatusUpdate(orderId, status, version, selectElement) {
-        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || '';
-        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
-        fetch('/orders/' + orderId + '/status', {
+        // In-place (#575): no reload. Capture the last-good status up front so a failed change can
+        // revert the optimistic <select>; krtOrderWrite reads CSRF via krtCsrf (+ retry-on-403) and
+        // surfaces the 409 conflict reload-prompt itself.
+        const savedStatus = selectElement ? _knownStatus(selectElement) : null;
+        krtOrderWrite({
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
-            body: JSON.stringify({ status: status, version: version })
-        }).then(res => {
-            if (res.status === 409) {
-                showFrontendErrorToast(MSG_STATUS_CONFLICT);
-                setTimeout(() => window.location.reload(), 1500);
-                return;
-            }
-            if (!res.ok) {
-                showFrontendErrorToast(MSG_STATUS_ERROR);
-                return;
-            }
-            return res.json().then(data => {
-                if (selectElement && data && data.version !== undefined) {
+            url: '/orders/' + orderId + '/status',
+            payload: { status: status, version: version },
+            toast: false,
+            errorMessage: MSG_STATUS_ERROR,
+            onSuccess: function (data) {
+                // Patch ONLY the two elements carrying the ORDER @Version — the status select (next
+                // status change) and the edit-modal hidden input (next edit save). The assignee
+                // edges carry their own per-edge version and must NOT be overwritten here.
+                if (data && data.version != null && selectElement) {
                     selectElement.dataset.version = data.version;
+                    const editVer = document.querySelector('#edit-modal input[name="version"]');
+                    if (editVer) editVer.value = data.version;
+                }
+                if (selectElement) selectElement.dataset.savedStatus = status;
+                // COMPLETED/REJECTED detach linked inventory server-side; drop any open drill-down so
+                // a stale list is not shown (it is lazily re-fetched on the next row click).
+                if (status === 'COMPLETED' || status === 'REJECTED') {
+                    document.querySelectorAll('.inventory-details-row').forEach(function (r) { r.remove(); });
                 }
                 showFrontendSuccessToast(MSG_STATUS_SUCCESS);
-                setTimeout(() => window.location.reload(), 1000);
-            });
-        }).catch(() => {
-            showFrontendErrorToast(MSG_STATUS_ERROR);
+            }
+        }).then(function (res) {
+            if (selectElement && (!res || !res.ok)) {
+                selectElement.value = savedStatus;
+            }
         });
     }
 
@@ -1604,6 +1951,8 @@
     const MSG_LOADING_INVENTORY = '[(#{orders.detail.inventory.loading})]';
     const MSG_EMPTY_INVENTORY = '[(#{orders.detail.inventory.empty})]';
     const MSG_INVENTORY_UNLINK_TOOLTIP = '[(#{orders.detail.inventory.unlink.tooltip})]';
+    const MSG_INVENTORY_UNLINK_SUCCESS = '[(#{orders.detail.inventory.unlink.success})]';
+    const MSG_INVENTORY_UNLINK_ERROR = '[(#{orders.detail.inventory.unlink.error})]';
     const IS_LOGISTICIAN = /*[[${isLogistician}]]*/ false;
     // Order's requesting-squadron id is used to flag cross-squadron inventory rows in the
     // AJAX-rendered per-material item table. When the inventory item's owningSquadron differs
@@ -1671,7 +2020,6 @@
                 const locationName = item.location ? item.location.name : '-';
                 const quality = item.quality !== null ? item.quality : '-';
                 const quantity = (item.amount !== null ? item.amount.toFixed(3) : '0.000') + ' ' + (amountType ? amountType : '');
-                const csrfTokenValue = document.querySelector('meta[name="_csrf"]')?.content || '';
                 const itemSquadron = item.owningSquadron || null;
                 const itemSquadronId = itemSquadron ? itemSquadron.id : null;
                 const itemSquadronShorthand = itemSquadron ? itemSquadron.shorthand : null;
@@ -1688,13 +2036,12 @@
                     : `<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
                 const unlinkCell = IS_LOGISTICIAN ? `
                                         <td data-trigger="stop-propagation">
-                                            <form method="post" action="/orders/${escapeAttr(orderId)}/inventory/${escapeAttr(item.id)}/unlink" class="m-0"
-                                                  data-trigger="od-disable-submit">
-                                                <input type="hidden" name="_csrf" value="${escapeAttr(csrfTokenValue)}">
-                                                <button type="submit" class="btn btn-quiet-danger"
-                                                        style="padding: 0.1rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
-                                                        title="${escapeAttr(MSG_INVENTORY_UNLINK_TOOLTIP)}">&times;</button>
-                                            </form>
+                                            <button type="button" class="btn btn-quiet-danger"
+                                                    data-trigger="od-unlink-inventory"
+                                                    data-order-id="${escapeAttr(orderId)}"
+                                                    data-inventory-item-id="${escapeAttr(item.id)}"
+                                                    style="padding: 0.1rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
+                                                    title="${escapeAttr(MSG_INVENTORY_UNLINK_TOOLTIP)}">&times;</button>
                                         </td>` : '';
 
                 html += `
@@ -1735,13 +2082,15 @@
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('change', 'od-update-status', function (el) { updateStatus(el); });
         window.krtEvents.on('click', 'od-toggle-inventory', function (el, ev) {
-            // Skip the row inventory-toggle when the click originated on a claim control (the claim
-            // buttons live inside the clickable material row), so the modal opens without also
-            // expanding the inventory drill-down.
+            // Skip the row inventory-toggle when the click originated on a claim control or the
+            // in-drill-down unlink button (both live inside the clickable material row); krtEvents
+            // fires each data-trigger independently, so without this guard the unlink click would
+            // also collapse the drill-down.
             if (ev && ev.target && typeof ev.target.closest === 'function'
-                && ev.target.closest('[data-claim-control]')) { return; }
+                && ev.target.closest('[data-claim-control], [data-trigger="od-unlink-inventory"]')) { return; }
             toggleInventory(el);
         });
+        window.krtEvents.on('click', 'od-unlink-inventory', function (el) { unlinkInventoryItem(el); });
         window.krtEvents.on('click', 'claim-add', function (el) { openClaimCreate(el); });
         window.krtEvents.on('click', 'claim-edit', function (el) { openClaimEdit(el); });
         window.krtEvents.on('click', 'claim-submit', function () { submitClaim(); });
@@ -1788,10 +2137,14 @@
         const I18N_NOTE_FORBIDDEN = '[(#{orders.detail.assignees.note.forbidden})]';
         const I18N_NOTE_FOR = '[(#{orders.detail.assignees.note.for})]';
 
+        // CSRF header via the shared krtCsrf reader (#575) — retires the bespoke meta read. Not
+        // krtCsrf.headers(), because that forces Content-Type application/json; the assignee calls
+        // vary the content type (json / form / none) and accept an HTML fragment, so build just the
+        // CSRF header here and keep oaSend's per-path content-type logic.
         function oaCsrf() {
             const headers = {};
-            const token = document.querySelector('meta[name="_csrf"]')?.content;
-            const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+            const token = window.krtCsrf ? window.krtCsrf.token() : (document.querySelector('meta[name="_csrf"]')?.content);
+            const header = window.krtCsrf ? window.krtCsrf.headerName() : (document.querySelector('meta[name="_csrf_header"]')?.content);
             if (token && header) headers[header] = token;
             return headers;
         }
@@ -1803,19 +2156,29 @@
 
         async function oaSend(method, url, opts) {
             opts = opts || {};
-            const headers = oaCsrf();
-            headers['Accept'] = 'text/html';
-            const init = { method: method, headers: headers };
-            if (opts.json !== undefined) {
-                headers['Content-Type'] = 'application/json';
-                init.body = JSON.stringify(opts.json);
-            } else if (opts.form !== undefined) {
-                headers['Content-Type'] = 'application/x-www-form-urlencoded';
-                init.body = opts.form;
+            function buildInit() {
+                const headers = oaCsrf();
+                headers['Accept'] = 'text/html';
+                const init = { method: method, headers: headers };
+                if (opts.json !== undefined) {
+                    headers['Content-Type'] = 'application/json';
+                    init.body = JSON.stringify(opts.json);
+                } else if (opts.form !== undefined) {
+                    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                    init.body = opts.form;
+                }
+                return init;
             }
             let res;
             try {
-                res = await fetch(url, init);
+                res = await fetch(url, buildInit());
+                // A bare 403 is the CSRF filter rejecting a stale token (post-re-login / evicted
+                // session). Refresh the token once and retry before treating it as a domain
+                // "forbidden" (#575) — matches krtFetch.write's retry-on-403.
+                if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
+                    const refreshed = await window.krtCsrf.refresh();
+                    if (refreshed) res = await fetch(url, buildInit());
+                }
             } catch (e) {
                 showFrontendErrorToast(opts.errorMsg || I18N_NOTE_ERROR);
                 return false;
@@ -1837,6 +2200,11 @@
             const sec = document.getElementById('assignees-section');
             if (sec) {
                 sec.outerHTML = html;
+                // Let global enhancers re-process the swapped-in subtree (mirrors krtFetch.swap,
+                // which the bespoke outerHTML swap predates).
+                document.dispatchEvent(new CustomEvent('krt:swapped', {
+                    detail: { container: document.getElementById('assignees-section') }
+                }));
             }
             if (opts.successMsg) showFrontendSuccessToast(opts.successMsg);
             return true;

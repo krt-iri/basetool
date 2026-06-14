@@ -172,13 +172,16 @@ class RefineryOrderLifecycleE2eTest {
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
+        // Cancel now shows a KRT confirm dialog before posting (#575). Click the cancel button to
+        // open the overlay, then accept it inside waitForResponse so the wait is registered before
+        // the confirm fires the delete POST. Selector matches the green
+        // OrgChartPositionCrudE2eTest.
+        page.locator("form[action$='/" + orderId + "/delete'] button[type='submit']").click();
         page.waitForResponse(
             response ->
                 response.url().contains("/refinery-orders/" + orderId + "/delete")
                     && "POST".equals(response.request().method()),
-            () ->
-                page.locator("form[action$='/" + orderId + "/delete'] button[type='submit']")
-                    .click());
+            () -> page.locator(".krt-confirm-overlay .krt-confirm-ok").click());
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "refinery-lifecycle-cancel");
         throw failure;

@@ -197,6 +197,13 @@ class JobOrderItemHandoverE2eTest {
     page.locator("#item-handover-modal .time-part").fill("12:00");
     page.locator("#itemRecipientHandle").fill(recipient);
     page.locator("input[name='entries[0].amount']").fill(amount);
-    E2eSupport.awaitFormPost(page, () -> page.getByTestId("item-handover-submit").click());
+    // Submit in place (#575): the item handover swaps the items/handover sections via AJAX instead
+    // of a Post/Redirect/Get. Await the item-handover XHR POST (the delivery commit) rather than a
+    // document navigation that never comes; the caller re-navigates to assert the result.
+    page.waitForResponse(
+        response ->
+            response.url().contains("/item-handovers")
+                && "POST".equals(response.request().method()),
+        () -> page.getByTestId("item-handover-submit").click());
   }
 }

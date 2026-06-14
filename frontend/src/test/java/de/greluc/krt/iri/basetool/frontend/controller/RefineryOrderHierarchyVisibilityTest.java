@@ -196,7 +196,8 @@ class RefineryOrderHierarchyVisibilityTest {
         html.contains("onclick=\"openStoreModal()\""),
         "Store button should be hidden in COMPLETED state");
     org.junit.jupiter.api.Assertions.assertFalse(
-        html.contains("Auftrag Abbrechen"), "Cancel button should be hidden in COMPLETED state");
+        html.contains("id=\"refineryCancelForm\""),
+        "Cancel button should be hidden in COMPLETED state");
   }
 
   @Test
@@ -269,6 +270,7 @@ class RefineryOrderHierarchyVisibilityTest {
         html.contains("onclick=\"openStoreModal()\""),
         "Store button should be hidden in CANCELED state");
     org.junit.jupiter.api.Assertions.assertFalse(
-        html.contains("Auftrag Abbrechen"), "Cancel button should be hidden in CANCELED state");
+        html.contains("id=\"refineryCancelForm\""),
+        "Cancel button should be hidden in CANCELED state");
   }
 }

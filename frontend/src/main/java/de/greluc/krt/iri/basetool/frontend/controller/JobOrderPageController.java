@@ -289,11 +289,14 @@ public class JobOrderPageController {
       @PathVariable UUID id,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       Model model,
-      @AuthenticationPrincipal OidcUser principal) {
+      @AuthenticationPrincipal OidcUser principal,
+      @RequestParam(required = false) String fragment) {
     if (!canViewJobOrders) {
       // Non-profit members may not open order details — the backend returns 403 for them anyway.
-      // Route to the create form (their only order surface) so a stray bookmark/link is graceful.
-      return "redirect:/orders/create";
+      // Route to the create form (their only order surface) so a stray bookmark/link is graceful;
+      // a section-swap caller gets a section-sized error fragment instead of a redirect it would
+      // otherwise follow into a small results container (#571/#575, mirrors the #574 fix).
+      return fragment != null ? "orders-detail :: fragmentError" : "redirect:/orders/create";
     }
     try {
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
@@ -394,8 +397,25 @@ public class JobOrderPageController {
     } catch (Exception e) {
       log.error("Failed to fetch order", e);
       log.error("Failed to load job order", e);
+      if (fragment != null) {
+        return "orders-detail :: fragmentError";
+      }
       model.addAttribute("error", "error.joborder.load.details");
       return "redirect:/orders";
+    }
+    // In-place section swap (#571/#575): re-render only the section the caller mutated. The full
+    // model is already built above, so each fragment renders with every attribute it needs.
+    if (fragment != null) {
+      return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
+        case "materials" -> "orders-detail :: materialsSection";
+        case "aggregated" -> "orders-detail :: aggregatedSection";
+        case "header" -> "orders-detail :: orderHeader";
+        case "handovers" -> "orders-detail :: materialHandoverSection";
+        case "items" -> "orders-detail :: itemsSection";
+        case "item-handovers" -> "orders-detail :: itemHandoverSection";
+        case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
+        default -> "orders-detail";
+      };
     }
     return "orders-detail";
   }
@@ -518,6 +538,84 @@ public class JobOrderPageController {
       redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
       return "redirect:/orders/create"
           + (form.getSource() != null ? "?source=" + form.getSource() : "");
+    }
+  }
+
+  /**
+   * Builds the validated {@link CreateJobOrderItemLineDto} list from an item-order form, dropping
+   * lines without a game item, blueprint or positive amount, and per-line materials without a
+   * material id or quality. Shared by the item create + edit AJAX twins.
+   *
+   * @param form the bound item-order form
+   * @return the filtered item-line DTOs (preserving the client line + parent ids)
+   */
+  private static List<CreateJobOrderItemLineDto> buildItemLineDtos(JobOrderItemForm form) {
+    return form.getItems().stream()
+        .filter(
+            l ->
+                l.getGameItemId() != null
+                    && l.getBlueprintId() != null
+                    && l.getAmount() != null
+                    && l.getAmount() > 0)
+        .map(
+            l ->
+                new CreateJobOrderItemLineDto(
+                    l.getGameItemId(),
+                    l.getBlueprintId(),
+                    l.getAmount(),
+                    l.getMaterials().stream()
+                        .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
+                        .map(
+                            m ->
+                                new CreateJobOrderItemMaterialDto(
+                                    m.getMaterialId(), m.getQuality()))
+                        .collect(Collectors.toList()),
+                    l.getClientLineId(),
+                    l.getParentClientLineId()))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * AJAX twin of {@link #createItemOrder} (#575): creates an item order from the form-encoded body
+   * and returns the post-create navigation target as JSON. Routed by the {@code X-Requested-With}
+   * header; the classic handler stays the no-JS fallback. Empty lines → 400.
+   *
+   * @param form the bound item-order form
+   * @param canViewJobOrders whether the caller may browse the order queue
+   * @param principal the authenticated caller, or null for a guest
+   * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(value = "/items", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createItemOrderAjax(
+      @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
+      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      @AuthenticationPrincipal OidcUser principal) {
+    List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
+    if (lines.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderItemRequestDto dto =
+          new CreateJobOrderItemRequestDto(
+              form.getResponsibleOrgUnitId(),
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              lines,
+              form.getVersion());
+      backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
+      return org.springframework.http.ResponseEntity.ok(
+          java.util.Map.of(
+              "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+    } catch (BackendServiceException bse) {
+      log.error("Failed to create item order (ajax): {}", bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create item order (ajax)", e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
     }
   }
 
@@ -685,6 +783,47 @@ public class JobOrderPageController {
   }
 
   /**
+   * AJAX twin of {@link #updateItemOrder} (#575): saves an item-order edit and returns the detail-
+   * page URL as JSON so the editor navigates itself. Routed by the {@code X-Requested-With} header;
+   * the classic handler stays the no-JS fallback. Empty lines → 400.
+   *
+   * @param id the item-order id
+   * @param form the bound item-order form
+   * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(value = "/{id}/items/update", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> updateItemOrderAjax(
+      @PathVariable UUID id, @ModelAttribute("jobOrderItemForm") JobOrderItemForm form) {
+    List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
+    if (lines.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderItemRequestDto dto =
+          new CreateJobOrderItemRequestDto(
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              lines,
+              form.getVersion());
+      backendApiClient.put("/api/v1/orders/" + id + "/items", dto, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(
+          java.util.Map.of("targetUrl", "/orders/" + id));
+    } catch (BackendServiceException bse) {
+      log.error("Failed to update item order {} (ajax): {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to update item order {} (ajax)", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * JSON proxy for the create form's blueprint picker: returns the blueprints that produce the
    * given orderable item. Relays to the backend item-catalog endpoint.
    *
@@ -840,6 +979,85 @@ public class JobOrderPageController {
   }
 
   /**
+   * Shared post-create navigation target (#575): viewers go to the order list, anonymous guests and
+   * non-profit members stay on the create form (mirrors the classic {@link #createOrder} / {@link
+   * #createItemOrder} redirects, since they cannot browse the queue).
+   *
+   * @param principal the caller (null for an anonymous guest)
+   * @param canViewJobOrders whether the caller may browse the order queue
+   * @param source the create-page source param to carry on the stay-on-create target
+   * @return the URL the AJAX caller should navigate to on success
+   */
+  private static String postCreateTarget(
+      OidcUser principal, boolean canViewJobOrders, String source) {
+    if (principal == null || !canViewJobOrders) {
+      return "/orders/create" + (source != null ? "?source=" + source : "");
+    }
+    return "/orders";
+  }
+
+  /**
+   * Builds the validated {@link CreateJobOrderMaterialDto} list from a material-order form,
+   * dropping rows without a material id or a positive amount.
+   *
+   * @param form the bound material-order form
+   * @return the filtered material requirement DTOs
+   */
+  private static List<CreateJobOrderMaterialDto> buildMaterialDtos(JobOrderForm form) {
+    return form.getMaterials().stream()
+        .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
+        .map(
+            m -> new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * AJAX twin of {@link #createOrder} (#575): creates a material order from the form-encoded body
+   * and returns the post-create navigation target as JSON, so the create page navigates itself
+   * instead of a server redirect (and stays put with an inline toast on a validation/backend
+   * failure). Routed by the {@code X-Requested-With} header so the classic form-POST handler stays
+   * the no-JS fallback. Empty materials → 400 (the page also pre-validates).
+   *
+   * @param form the bound material-order form
+   * @param canViewJobOrders whether the caller may browse the order queue (decides the target)
+   * @param principal the authenticated caller, or null for a guest
+   * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createOrderAjax(
+      @ModelAttribute("jobOrderForm") JobOrderForm form,
+      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      @AuthenticationPrincipal OidcUser principal) {
+    List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
+    if (materials.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderDto dto =
+          new CreateJobOrderDto(
+              form.getResponsibleOrgUnitId(),
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              materials,
+              form.getVersion());
+      backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
+      return org.springframework.http.ResponseEntity.ok(
+          java.util.Map.of(
+              "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+    } catch (BackendServiceException bse) {
+      log.error("Failed to create order (ajax): {}", bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create order (ajax)", e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * Reorders an order's priority (drag-and-drop between job orders). Backend uses pessimistic
    * locking on the entire job-order priority sequence to serialize concurrent reorders, per the
    * concurrency pattern in CLAUDE.md.
@@ -865,6 +1083,68 @@ public class JobOrderPageController {
   }
 
   /**
+   * AJAX twin of {@link #updatePriority}: persists a drag-drop reorder without a full-page reload
+   * (epic #571 / #575). Returns the dragged order so the caller can confirm success; the
+   * order-index JS then re-renders the whole queue via a {@code ?fragment=results} swap, because
+   * the backend reshuffles <em>every</em> active order's priority slot (not just this one), so
+   * sibling rows' {@code data-priority} attributes must refresh or the next drag computes a stale
+   * target slot. The gate is tightened to {@code LOGISTICIAN} to match the backend so a
+   * non-logistician gets a clean propagated 403 toast instead of a redirect.
+   *
+   * @param id the order whose priority slot changed
+   * @param priority the new 1-based target slot
+   * @return the updated order on success, or the propagated RFC 7807 backend error
+   */
+  @PutMapping("/{id}/priority/ajax")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> updatePriorityAjax(
+      @PathVariable UUID id, @RequestParam Integer priority) {
+    try {
+      JobOrderDto result =
+          backendApiClient.put(
+              "/api/v1/orders/" + id + "/priority?priority=" + priority, null, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (BackendServiceException bse) {
+      log.error("Failed to update priority (ajax) for order {}: {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to update priority (ajax) for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * Re-emits a backend {@link BackendServiceException} as an {@code application/problem+json}
+   * response preserving the stable {@code code} and human-readable {@code detail} from the upstream
+   * RFC 7807 body. The order-detail / order-index AJAX layer ({@code krt-fetch.js}) reads {@code
+   * code} to decide between a "stale data, reload?" prompt (only {@code OPTIMISTIC_LOCK} / {@code
+   * PESSIMISTIC_LOCK}) and a plain error toast for domain conflicts; returning {@code .build()}
+   * with only the status would strip that signal and make every 409 look like an optimistic-lock
+   * conflict.
+   *
+   * @param e parsed backend exception with status + RFC 7807 fields
+   * @return problem+json response mirroring the upstream status and body
+   */
+  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
+      BackendServiceException e) {
+    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
+        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
+  }
+
+  /**
    * AJAX status transition endpoint. Updates the job order's status (OPEN → IN_PROGRESS →
    * COMPLETED, REJECTED). Backend enforces the state machine and rejects illegal transitions with a
    * 400.
@@ -874,7 +1154,7 @@ public class JobOrderPageController {
   @PostMapping("/{id}/status")
   @PreAuthorize("isAuthenticated()")
   @org.springframework.web.bind.annotation.ResponseBody
-  public org.springframework.http.ResponseEntity<JobOrderDto> updateStatus(
+  public org.springframework.http.ResponseEntity<Object> updateStatus(
       @PathVariable UUID id, @RequestBody UpdateJobOrderStatusDto dto) {
     try {
       JobOrderDto result =
@@ -882,7 +1162,7 @@ public class JobOrderPageController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (BackendServiceException bse) {
       log.error("Failed to update status for order {}: {}", id, bse.getMessage());
-      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+      return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to update status for order {}", id, e);
       return org.springframework.http.ResponseEntity.status(
@@ -906,7 +1186,7 @@ public class JobOrderPageController {
   @PostMapping("/{id}/claims")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<ClaimDto> upsertClaim(
+  public org.springframework.http.ResponseEntity<Object> upsertClaim(
       @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
     try {
       ClaimDto result =
@@ -916,7 +1196,7 @@ public class JobOrderPageController {
           .body(result);
     } catch (BackendServiceException bse) {
       log.error("Failed to upsert claim on order {}: {}", id, bse.getMessage());
-      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+      return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to upsert claim on order {}", id, e);
       return org.springframework.http.ResponseEntity.status(
@@ -937,14 +1217,14 @@ public class JobOrderPageController {
   @PostMapping("/{id}/claims/{claimId}/withdraw")
   @PreAuthorize("hasRole('LOGISTICIAN')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Void> withdrawClaim(
+  public org.springframework.http.ResponseEntity<Object> withdrawClaim(
       @PathVariable UUID id, @PathVariable UUID claimId) {
     try {
       backendApiClient.delete("/api/v1/orders/" + id + "/claims/" + claimId, Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (BackendServiceException bse) {
       log.error("Failed to withdraw claim {} on order {}: {}", claimId, id, bse.getMessage());
-      return org.springframework.http.ResponseEntity.status(bse.getStatusCode()).build();
+      return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to withdraw claim {} on order {}", claimId, id, e);
       return org.springframework.http.ResponseEntity.status(
@@ -1002,6 +1282,57 @@ public class JobOrderPageController {
   }
 
   /**
+   * AJAX twin of {@link #updateOrder} (#575): edits a MATERIAL order's requesting unit / handle /
+   * comment / materials and returns the updated order so the detail page can re-render the header +
+   * material sections in place (and pick up the bumped {@code @Version}) instead of a full reload.
+   * Distinguished from the classic form-POST handler by {@code consumes=application/json}; that one
+   * stays the no-JS fallback. An empty material list is a 400 (the client also pre-validates).
+   *
+   * @param id the order to update
+   * @param form the edit payload (requestingOrgUnitId, handle, comment, version, materials[])
+   * @return the updated order on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(
+      value = "/{id}/update",
+      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> updateOrderAjax(
+      @PathVariable UUID id, @RequestBody JobOrderForm form) {
+    List<CreateJobOrderMaterialDto> materials =
+        form.getMaterials().stream()
+            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
+            .map(
+                m ->
+                    new CreateJobOrderMaterialDto(
+                        m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+            .collect(Collectors.toList());
+    if (materials.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderDto dto =
+          new CreateJobOrderDto(
+              null,
+              form.getRequestingOrgUnitId(),
+              form.getHandle(),
+              form.getComment(),
+              materials,
+              form.getVersion());
+      JobOrderDto updated = backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(updated);
+    } catch (BackendServiceException bse) {
+      log.error("Failed to update order {} (ajax): {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to update order {} (ajax)", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * Cancels (soft-deletes) a job order. Backend rejects the delete when the order has linked
    * inventory items, per the {@code EntityInUseException} pattern.
    *
@@ -1019,6 +1350,34 @@ public class JobOrderPageController {
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.delete.failed");
     }
     return "redirect:/orders";
+  }
+
+  /**
+   * AJAX twin of {@link #deleteOrder} (#575): cancels (soft-deletes) the order without a server
+   * redirect, so the order-detail JS can confirm via the KRT dialog and then navigate to the list
+   * itself. On a backend rejection (e.g. the order still has linked inventory) the RFC 7807 error
+   * is propagated so the page shows a toast and stays put instead of redirect-reflashing. The
+   * classic {@code POST}→redirect above stays the no-JS fallback.
+   *
+   * @param id the order to cancel
+   * @return 204 on success, or the propagated RFC 7807 backend error
+   */
+  @DeleteMapping("/{id}")
+  @PreAuthorize("isAuthenticated()")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
+    try {
+      backendApiClient.delete("/api/v1/orders/" + id, Void.class);
+      return org.springframework.http.ResponseEntity.noContent().build();
+    } catch (BackendServiceException bse) {
+      log.error("Failed to delete order {} (ajax): {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to delete order {} (ajax)", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
   }
 
   /**
@@ -1205,6 +1564,134 @@ public class JobOrderPageController {
   }
 
   /**
+   * Parses the client-supplied handover time (a UTC ISO-Instant produced by datetime-splitter.js),
+   * falling back to local-datetime parsing and finally {@code now()} so a malformed value never
+   * blocks the handover. Extracted so the AJAX handover twins share the classic handlers' exact
+   * timezone handling.
+   *
+   * @param raw the raw {@code handoverTime} form value (may be null/blank)
+   * @return the parsed instant, or {@code Instant.now()} when absent/unparseable
+   */
+  private Instant parseHandoverTime(String raw) {
+    if (raw != null && !raw.isBlank()) {
+      try {
+        return Instant.parse(raw);
+      } catch (Exception eiso) {
+        try {
+          return LocalDateTime.parse(raw, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+              .atZone(ZoneId.systemDefault())
+              .toInstant();
+        } catch (Exception elocal) {
+          log.warn("Could not parse handoverTime {}, using now()", raw);
+        }
+      }
+    }
+    return Instant.now();
+  }
+
+  /**
+   * AJAX twin of {@link #createHandover} (#575): records a material handover and returns the
+   * refreshed order so the detail page can re-render the material requirement table, the handover
+   * history and the header (status + bumped {@code @Version}) in place instead of a full reload.
+   * The backend's {@code …WithinTransaction} bulk-update pattern is unchanged (one proxied call).
+   * Empty items → 400 (the client pre-validates); other failures propagate RFC 7807. Classic POST
+   * kept.
+   *
+   * @param id the order id
+   * @param form the handover payload (handoverTime, recipientHandle, recipientSquadron, items[])
+   * @return the refreshed order on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(
+      value = "/{id}/handovers",
+      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createHandoverAjax(
+      @PathVariable UUID id, @RequestBody JobOrderHandoverForm form) {
+    List<JobOrderHandoverItemCreateDto> items =
+        form.getItems().stream()
+            .filter(
+                item ->
+                    item.getInventoryItemId() != null
+                        && item.getAmount() != null
+                        && item.getAmount() > 0)
+            .map(
+                item ->
+                    new JobOrderHandoverItemCreateDto(item.getInventoryItemId(), item.getAmount()))
+            .collect(Collectors.toList());
+    if (items.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      JobOrderHandoverCreateDto dto =
+          new JobOrderHandoverCreateDto(
+              parseHandoverTime(form.getHandoverTime()),
+              form.getRecipientHandle(),
+              form.getRecipientSquadron(),
+              items);
+      backendApiClient.post("/api/v1/orders/" + id + "/handovers", dto, JobOrderHandoverDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(order);
+    } catch (BackendServiceException bse) {
+      de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+          log, "POST /api/v1/orders/{id}/handovers (ajax)", id, bse);
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create handover (ajax) for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * AJAX twin of {@link #createItemHandover} (#575): records an item handover and returns the
+   * refreshed order so the detail page can re-render the ordered-items table
+   * (delivered/outstanding), the item-handover history, the modal (rows for the still-outstanding
+   * lines) and the header in place. Empty entries → 400; other failures propagate RFC 7807. Classic
+   * POST kept as the no-JS fallback.
+   *
+   * @param id the item order id
+   * @param form the item-handover payload (handoverTime, recipientHandle, entries[])
+   * @return the refreshed order on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(
+      value = "/{id}/item-handovers",
+      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> createItemHandoverAjax(
+      @PathVariable UUID id, @RequestBody JobOrderItemHandoverForm form) {
+    List<JobOrderItemHandoverEntryCreateDto> entries =
+        form.getEntries().stream()
+            .filter(
+                e -> e.getJobOrderItemId() != null && e.getAmount() != null && e.getAmount() > 0)
+            .map(e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
+            .collect(Collectors.toList());
+    if (entries.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      JobOrderItemHandoverCreateDto dto =
+          new JobOrderItemHandoverCreateDto(
+              parseHandoverTime(form.getHandoverTime()), form.getRecipientHandle(), entries);
+      backendApiClient.post(
+          "/api/v1/orders/" + id + "/item-handovers", dto, JobOrderItemHandoverDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(order);
+    } catch (BackendServiceException bse) {
+      de.greluc.krt.iri.basetool.frontend.logging.BackendErrorLogging.warn(
+          log, "POST /api/v1/orders/{id}/item-handovers (ajax)", id, bse);
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to create item handover (ajax) for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * Removes a material requirement from the order without deleting any associated inventory items
    * (the items keep their job-order link cleared by the backend).
    *
@@ -1254,6 +1741,42 @@ public class JobOrderPageController {
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
     }
     return "redirect:/orders/" + id;
+  }
+
+  /**
+   * AJAX twin of {@link #unlinkInventoryItem} (#575): detaches the inventory item and returns the
+   * refreshed order so the detail page can re-render the material section in place AND pick up the
+   * bumped order {@code @Version} (the detach mutates the aggregate, so a subsequent status/
+   * handover write would otherwise 409). The classic {@code POST}→redirect above stays the no-JS
+   * fallback.
+   *
+   * @param id the order id
+   * @param inventoryItemId the inventory item to detach
+   * @return the refreshed order on success, or the propagated RFC 7807 backend error
+   */
+  @DeleteMapping("/{id}/inventory/{inventoryItemId}/unlink/ajax")
+  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> unlinkInventoryItemAjax(
+      @PathVariable UUID id, @PathVariable UUID inventoryItemId) {
+    try {
+      backendApiClient.delete(
+          "/api/v1/orders/" + id + "/inventory/" + inventoryItemId + "/unlink", Void.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(order);
+    } catch (BackendServiceException bse) {
+      log.error(
+          "Failed to unlink inventory item {} from order {} (ajax): {}",
+          inventoryItemId,
+          id,
+          bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to unlink inventory item {} from order {} (ajax)", inventoryItemId, id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
   }
 
   /**

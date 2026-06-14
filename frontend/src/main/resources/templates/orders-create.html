@@ -685,6 +685,63 @@
         window.krtEvents.on('click', 'orders-add-material', addMaterialRow);
         window.krtEvents.on('click', 'orders-add-item', () => addItemLine());
     }
+
+    // In-place create submit (#575): a create/edit navigates away on success, so intercept the form,
+    // POST it via FormData (the browser serializes the dynamic material/item editor AND omits the
+    // disabled inactive-form controls, exactly like the native POST) and navigate to the JSON
+    // targetUrl. On a validation/backend failure the page STAYS with an inline toast instead of the
+    // POST->redirect reflash. The classic form-POST is the no-JS fallback (krtCsrf absent).
+    const MSG_MATERIAL_INVALID = '[(#{error.joborder.material.invalid})]';
+    const MSG_ITEM_INVALID = '[(#{error.joborder.item.invalid})]';
+    const MSG_CREATE_FAILED = '[(#{error.joborder.create.failed})]';
+    const MSG_UPDATE_FAILED = '[(#{error.joborder.update.failed})]';
+    async function _submitOrderCreate(form, invalidMessage, failedMessage) {
+        if (!window.krtCsrf) { form.submit(); return; }
+        const fd = new FormData(form);
+        function buildHeaders() {
+            const h = { 'X-Requested-With': 'XMLHttpRequest' };
+            const t = window.krtCsrf.token();
+            const n = window.krtCsrf.headerName();
+            if (t && n) h[n] = t;
+            return h;
+        }
+        let res;
+        try {
+            res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+            if (res.status === 403 && window.krtCsrf.refresh) {
+                const refreshed = await window.krtCsrf.refresh();
+                if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+            }
+        } catch (e) {
+            showFrontendErrorToast(failedMessage);
+            return;
+        }
+        if (res.status === 400) { showFrontendErrorToast(invalidMessage); return; }
+        if (!res.ok) { showFrontendErrorToast(failedMessage); return; }
+        let body = null;
+        try { body = await res.json(); } catch (e) { /* non-JSON body */ }
+        if (body && body.targetUrl) {
+            window.location.assign(body.targetUrl);
+        } else {
+            window.location.reload();
+        }
+    }
+    const _materialCreateForm = document.querySelector('#mode-material form');
+    if (_materialCreateForm) {
+        _materialCreateForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            _submitOrderCreate(_materialCreateForm, MSG_MATERIAL_INVALID, MSG_CREATE_FAILED);
+        });
+    }
+    const _itemCreateForm = document.querySelector('#mode-item form');
+    if (_itemCreateForm) {
+        _itemCreateForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const failed = _itemCreateForm.getAttribute('action').indexOf('/items/update') >= 0
+                ? MSG_UPDATE_FAILED : MSG_CREATE_FAILED;
+            _submitOrderCreate(_itemCreateForm, MSG_ITEM_INVALID, failed);
+        });
+    }
     /*]]>*/
 </script>
 </body>

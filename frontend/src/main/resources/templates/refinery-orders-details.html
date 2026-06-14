@@ -359,7 +359,7 @@
                 </th:block>
                 <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
                     <button type="button" class="btn btn-outline" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
-                    <form th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" class="m-0">
+                    <form id="refineryCancelForm" th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" class="m-0">
                         <th:block th:replace="~{fragments/components :: button(label=#{refineryorder.action.cancel}, variant='danger', type='submit', extraClass=null)}"></th:block>
                     </form>
                 </th:block>
@@ -453,6 +453,52 @@
         /*[[#{refineryorder.form.material.yieldBonus.help}]]*/ '');
     const MATERIAL_ENTRY_TITLE_LABEL = /*[[#{refineryorder.form.material.entryTitle}]]*/ 'Material';
     const MATERIAL_REMOVE_LABEL = /*[[#{refineryorder.form.material.remove}]]*/ 'Entfernen';
+
+    // In-place writes (#575): the refinery update/store/cancel navigate away on success (to the
+    // list), so intercept the forms, POST FormData (the browser serializes the dynamic goods/store
+    // editor) with X-Requested-With + krtCsrf, and navigate to the JSON targetUrl. On a
+    // validation/backend failure the page STAYS with an inline toast instead of the POST->redirect
+    // reflash. The classic form-POST handlers are the no-JS fallback (krtCsrf absent).
+    const MSG_SAVING = /*[[#{refineryorder.action.saving}]]*/ 'Saving...';
+    const MSG_REFINERY_UPDATE_FAILED = /*[[#{error.refineryorder.update.failed}]]*/ 'Update failed.';
+    const MSG_REFINERY_STORE_FAILED = /*[[#{error.refineryorder.store.failed}]]*/ 'Store failed.';
+    const MSG_REFINERY_CANCEL_FAILED = /*[[#{error.refineryorder.cancel.failed}]]*/ 'Cancel failed.';
+    const MSG_CANCEL_CONFIRM = /*[[#{refineryorder.action.cancel.confirm}]]*/ 'Cancel this order?';
+    const MSG_CANCEL_TITLE = /*[[#{refineryorder.action.cancel}]]*/ 'Cancel Order';
+    const MSG_CANCEL_DISMISS = /*[[#{general.cancel}]]*/ 'Cancel';
+    async function _submitRefinery(form, errorMessage, onFailure) {
+        if (!window.krtCsrf) { form.submit(); return; }
+        const fd = new FormData(form);
+        function buildHeaders() {
+            const h = { 'X-Requested-With': 'XMLHttpRequest' };
+            const t = window.krtCsrf.token();
+            const n = window.krtCsrf.headerName();
+            if (t && n) h[n] = t;
+            return h;
+        }
+        let res;
+        try {
+            res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+            if (res.status === 403 && window.krtCsrf.refresh) {
+                const refreshed = await window.krtCsrf.refresh();
+                if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+            }
+        } catch (e) {
+            if (onFailure) onFailure();
+            showFrontendErrorToast(errorMessage);
+            return;
+        }
+        if (!res.ok) {
+            if (onFailure) onFailure();
+            showFrontendErrorToast(errorMessage);
+            return;
+        }
+        let body = null;
+        try { body = await res.json(); } catch (e) { /* non-JSON body */ }
+        if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+        if (body && body.targetUrl) window.location.assign(body.targetUrl);
+        else window.location.reload();
+    }
 
     function calcScu(index) {
         const unitInput = document.getElementById('outputQuantity_' + index);
@@ -865,13 +911,53 @@
                 // overwriting btn.innerText would wipe the icon out of the icon+text button.
                 var btnLabel = btn.querySelector('span');
                 if (btnLabel) {
-                    btnLabel.textContent = 'WIRD GESPEICHERT...';
+                    btnLabel.textContent = MSG_SAVING;
                 } else {
-                    btn.innerText = 'WIRD GESPEICHERT...';
+                    btn.innerText = MSG_SAVING;
                 }
             }
         });
     }
+
+    // #575 in-place form interceptors. Bound at parse time (the forms are rendered above this
+    // script). rod-* controls stay document-delegated (they survive); these just replace the native
+    // POST->redirect with FormData + navigate/toast.
+    (function () {
+        const mainForm = document.getElementById('refineryOrderMainForm');
+        if (mainForm) {
+            mainForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                _submitRefinery(mainForm, MSG_REFINERY_UPDATE_FAILED);
+            });
+        }
+        const storeForm = document.getElementById('storeForm');
+        if (storeForm) {
+            storeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                // rod-disable-submit (document-delegated) disables + relabels the button after this
+                // handler; capture the original label now so a failed store can restore it (no reload).
+                const btn = storeForm.querySelector('button[type=submit]');
+                const btnLabel = btn ? btn.querySelector('span') : null;
+                const originalLabel = btnLabel ? btnLabel.textContent : null;
+                _submitRefinery(storeForm, MSG_REFINERY_STORE_FAILED, function () {
+                    if (btn) btn.disabled = false;
+                    if (btnLabel && originalLabel != null) btnLabel.textContent = originalLabel;
+                });
+            });
+        }
+        const cancelForm = document.getElementById('refineryCancelForm');
+        if (cancelForm) {
+            cancelForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (typeof window.showKrtConfirm === 'function') {
+                    const ok = await window.showKrtConfirm(
+                        MSG_CANCEL_TITLE, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS);
+                    if (!ok) return;
+                }
+                _submitRefinery(cancelForm, MSG_REFINERY_CANCEL_FAILED);
+            });
+        }
+    })();
 </script>
 </body>
 </html>

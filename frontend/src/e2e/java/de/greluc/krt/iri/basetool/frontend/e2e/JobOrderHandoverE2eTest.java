@@ -185,18 +185,21 @@ class JobOrderHandoverE2eTest {
         page.locator("#handover-modal .time-part").fill("12:00");
         page.locator("#recipientHandle").fill("E2E Recipient");
 
-        // Wait for the full post-submit redirect to settle before navigating, else WebKit aborts
-        // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
-        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-handover-submit").click());
-
-        // The recorded handover must appear in the order's handover table. The post-submit GET goes
-        // through the retry helper — WebKit can abort it (HTTP/2 INTERNAL_ERROR) even after the
-        // redirect settled. See E2eSupport#navigate.
-        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
+        // Submit in place (#575): the material handover swaps the materials/handover/header
+        // sections via AJAX and closes the modal — there is no Post/Redirect/Get navigation to
+        // await. Mark the window to prove no full reload happened, submit, then web-first-wait for
+        // the recorded handover row to appear in the re-rendered history (which also proves the
+        // entry persisted), and assert the marker survived.
+        page.evaluate("window.__krtNoReload = true;");
+        page.getByTestId("order-handover-submit").click();
         assertThat(
                 page.getByTestId("order-handover-row")
                     .filter(new Locator.FilterOptions().setHasText("E2E Recipient")))
             .isVisible();
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "handover submit must update in place — no full-page reload cleared the window marker");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-handover");
         throw failure;
@@ -228,7 +231,14 @@ class JobOrderHandoverE2eTest {
         page.locator("input[name='items[0].amount']").fill("40");
         fillRecipientAndTime(page, "E2E Single Book-out");
 
-        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-handover-submit").click());
+        // Submit in place (#575): the handover books out inventory in one transaction and swaps
+        // sections via AJAX — await the handover XHR POST (the commit) rather than a document
+        // navigation that never comes; the backend read-back below then sees the booked-out amount.
+        page.waitForResponse(
+            response ->
+                response.url().contains("/orders/" + singleEntryOrderId + "/handovers")
+                    && "POST".equals(response.request().method()),
+            () -> page.getByTestId("order-handover-submit").click());
 
         // The linked entry must now hold the original 100 minus the 40 handed over.
         assertEquals(
@@ -272,7 +282,13 @@ class JobOrderHandoverE2eTest {
         page.locator("input[name='items[1].amount']").fill("30");
         fillRecipientAndTime(page, "E2E Multi Book-out");
 
-        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-handover-submit").click());
+        // Submit in place (#575): await the handover XHR POST (the book-out commit) rather than a
+        // document navigation that never comes; the per-entry read-backs below then see the result.
+        page.waitForResponse(
+            response ->
+                response.url().contains("/orders/" + multiEntryOrderId + "/handovers")
+                    && "POST".equals(response.request().method()),
+            () -> page.getByTestId("order-handover-submit").click());
 
         // Each entry is reduced by its own handed-over amount, not the pooled total.
         assertEquals(
