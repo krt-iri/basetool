@@ -97,7 +97,12 @@ class OperationWritesInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/operations");
         page.waitForLoadState();
 
-        page.locator("button[data-modal-id='create-operation-modal']").click();
+        // Scope to the open-trigger: the modal's "Abbrechen" button also carries
+        // data-modal-id='create-operation-modal' (close-trigger), so the bare attribute selector
+        // matches two elements and trips Playwright strict mode.
+        page.locator(
+                "button[data-trigger='open-modal-display'][data-modal-id='create-operation-modal']")
+            .click();
         page.locator("#create-name").fill(name);
         page.evaluate("window.__krtNoReload = true;");
         page.waitForResponse(

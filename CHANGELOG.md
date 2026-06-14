@@ -22,6 +22,8 @@
 
 ### Fixed
 
+- **Operationsdetailseite: Zwei Speichervorgänge unmittelbar hintereinander führen nicht mehr zu einem Konflikt (#576).** Nach dem In-Place-Speichern wurde die neue Versionsnummer nicht zurück ins Formular geschrieben, sodass der zweite Speichervorgang mit einem Konflikt (409) abgewiesen wurde; jetzt wird die aktuelle Version sofort übernommen.
+
 - **Missionsdetailseite: Das Speichern der Kerndaten (Verwaltung) löscht keine Zeiten mehr.** Treffen-, Geplant-Start- und Geplant-Ende-Zeit, die beim Bearbeiten nicht erneut angefasst wurden, wurden beim Speichern still auf leer gesetzt (eine Zeitangabe mit Sekundenbruchteilen ließ sich nicht zurücklesen); sie bleiben jetzt erhalten.
 
 - **In-Place-Listen und -Bereiche: Bricht eine Aktualisierung ab (abgelaufene Sitzung, kurzzeitig nicht erreichbares Backend), wird nicht mehr eine ganze Seite — etwa die Login- oder die Missionsliste — in den kleinen Ergebnisbereich gerendert.** Der bisherige Inhalt bleibt erhalten und es erscheint ein KRT-Hinweis; die Missionsdetailseite zeigt stattdessen einen passenden Inline-Fehler im betroffenen Bereich.
