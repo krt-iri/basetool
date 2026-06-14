@@ -354,6 +354,70 @@ public class ProfileController {
   }
 
   /**
+   * AJAX variant of {@link #updatePayoutPreference}: performs the same update but answers with JSON
+   * instead of a redirect, so the profile page saves the payout preference in place (epic #571,
+   * REQ-FE-001). Selected over the form handler only for the {@code krtFetch.write} call (which
+   * sends {@code X-Requested-With: XMLHttpRequest} with a JSON body); a script-disabled browser
+   * still posts the HTML form and lands on {@link #updatePayoutPreference}, so the redirect path
+   * stays the no-JS fallback.
+   *
+   * <p>On success the user row's bumped {@code version} is read back from {@code /me} and returned
+   * so the client can write it into every {@code version} field on the page — the description form
+   * and the payout-preference form share one row version, so without this the next save would 409.
+   * A backend 409 with problem type {@code concurrency-conflict} maps to an {@code OPTIMISTIC_LOCK}
+   * 409 so {@code krtFetch} shows the reload-confirm; validation errors map to 400.
+   *
+   * @param form validated JSON payload (defaultPayoutPreference, version)
+   * @param bindingResult validation-errors carrier for the bound JSON body
+   * @param principal authenticated OIDC user
+   * @return 200 with {@code {version, defaultPayoutPreference}} on success; otherwise a 4xx/5xx
+   *     body carrying a localized {@code detail} (plus a {@code code} for the optimistic-lock case)
+   */
+  @PostMapping(
+      value = "/profile/payout-preference",
+      headers = "X-Requested-With=XMLHttpRequest",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity<Map<String, Object>> updatePayoutPreferenceAjax(
+      @Valid @RequestBody ProfilePayoutPreferenceForm form,
+      BindingResult bindingResult,
+      @AuthenticationPrincipal OidcUser principal) {
+    if (principal == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    }
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
+    }
+    String preference =
+        form.defaultPayoutPreference() == null
+            ? PayoutPreference.PAYOUT.name()
+            : form.defaultPayoutPreference().name();
+    try {
+      backendApiClient.put(
+          "/api/v1/users/me/payout-preference",
+          Map.of("preference", preference, "version", form.version() == null ? 0L : form.version()),
+          Void.class);
+    } catch (de.greluc.krt.iri.basetool.frontend.service.BackendServiceException e) {
+      log.error("AJAX payout-preference update failed", e);
+      if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of("code", "OPTIMISTIC_LOCK", "detail", msg("error.concurrency.conflict")));
+      }
+      return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    } catch (Exception e) {
+      log.error("AJAX payout-preference update failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    }
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("version", refreshedUserVersion(form.version()));
+    body.put("defaultPayoutPreference", preference);
+    return ResponseEntity.ok(body);
+  }
+
+  /**
    * Reads the user row's current {@code version} back from {@code /api/v1/users/me} after a write
    * so the client can sync the freshly bumped value into the page's {@code version} fields. Falls
    * back to {@code priorVersion + 1} when the re-fetch is unavailable — the description update

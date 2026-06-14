@@ -74,7 +74,7 @@ class OrgChartPageControllerTest {
     when(backend.get("/api/v1/org-chart", OrgChartDto.class)).thenReturn(chart);
     Model model = new ConcurrentModel();
 
-    String view = controller.orgChart(model, auth("ROLE_SQUADRON_MEMBER"));
+    String view = controller.orgChart(null, model, auth("ROLE_SQUADRON_MEMBER"));
 
     assertEquals("org-chart", view);
     assertSame(chart, model.getAttribute("orgChart"));
@@ -96,7 +96,7 @@ class OrgChartPageControllerTest {
                     "effectiveName", "Pilot")));
     Model model = new ConcurrentModel();
 
-    controller.orgChart(model, auth("ROLE_ADMIN"));
+    controller.orgChart(null, model, auth("ROLE_ADMIN"));
 
     assertEquals(1, ((List<?>) model.getAttribute("allUsers")).size());
   }
@@ -109,10 +109,28 @@ class OrgChartPageControllerTest {
         .thenThrow(new BackendServiceException("boom", null, 503));
     Model model = new ConcurrentModel();
 
-    String view = controller.orgChart(model, auth("ROLE_SQUADRON_MEMBER"));
+    String view = controller.orgChart(null, model, auth("ROLE_SQUADRON_MEMBER"));
 
     assertEquals("org-chart", view);
     assertEquals("error.orgChart.load", model.getAttribute("error"));
+  }
+
+  @Test
+  void orgChart_fragmentChartBody_returnsChartBodySelectorAndSkipsUserLookup() {
+    // The in-place chart refresh (epic #571 / REQ-FE-005) re-renders only the chartBody fragment;
+    // the assign picker's allUsers list lives in the modal (outside the swap), so the fragment path
+    // must skip the user-lookup round-trip even for an admin.
+    BackendApiClient backend = mock(BackendApiClient.class);
+    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartDto chart = emptyChart();
+    when(backend.get("/api/v1/org-chart", OrgChartDto.class)).thenReturn(chart);
+    Model model = new ConcurrentModel();
+
+    String view = controller.orgChart("chartBody", model, auth("ROLE_ADMIN"));
+
+    assertEquals("org-chart :: chartBody", view);
+    assertSame(chart, model.getAttribute("orgChart"));
+    verify(backend, never()).get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
   }
 
   @Test

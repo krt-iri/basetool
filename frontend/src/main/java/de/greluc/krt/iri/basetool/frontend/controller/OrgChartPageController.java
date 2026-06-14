@@ -73,17 +73,32 @@ public class OrgChartPageController {
    * user-lookup list for admins so the inline editor's assign picker has its options without a
    * second round-trip. Non-admins get an empty {@code allUsers} list (they never see the editor).
    *
+   * <p>When {@code fragment=chartBody} the controller returns only the {@code chartBody} fragment
+   * so the page re-renders the whole tree in place after an edit instead of a full reload (epic
+   * #571 / REQ-FE-005). The chart is a flat, CSS-connected pre-order tree whose add affordances and
+   * vacant/filled transitions are derived aggregate state, so a per-node DOM patch would desync the
+   * "+" buttons and the ARIA roving-tabindex order — a full fragment swap re-stamps every {@code
+   * data-version} and rebuilds the tree atomically. The assign picker's {@code allUsers} list lives
+   * in the modal (outside the swapped region), so the fragment path skips that lookup.
+   *
+   * @param fragment when {@code "chartBody"}, only the chart-body fragment is rendered for an
+   *     in-place AJAX swap; otherwise the full page.
    * @param model Thymeleaf model populated with {@code orgChart} and {@code allUsers}.
    * @param authentication the current authentication, used to decide whether to preload the picker.
-   * @return the {@code org-chart} view name.
+   * @return the {@code org-chart} view name, or its {@code chartBody} selector for the fragment
+   *     path.
    */
   @GetMapping
-  public String orgChart(Model model, Authentication authentication) {
+  public String orgChart(
+      @RequestParam(required = false) String fragment, Model model, Authentication authentication) {
     try {
       model.addAttribute("orgChart", backendApiClient.get("/api/v1/org-chart", OrgChartDto.class));
     } catch (Exception e) {
       log.error("Failed to load org chart", e);
       model.addAttribute("error", "error.orgChart.load");
+    }
+    if ("chartBody".equals(fragment)) {
+      return "org-chart :: chartBody";
     }
     model.addAttribute("allUsers", isAdmin(authentication) ? fetchUserLookup() : List.of());
     return "org-chart";

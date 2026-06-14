@@ -57,7 +57,11 @@
 
     <div class="hud-box mt-2">
         
-        <form th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
+        <!-- data-member-edit gates the in-place save script (epic #571, REQ-FE-007). The form keeps
+             its th:action/method=post so a script-disabled browser still posts and hits the redirect
+             handler (MemberManagementController#updateMember) — progressive enhancement. -->
+        <form id="member-edit-form" data-member-edit="true"
+              th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
             <input type="hidden" name="version" th:field="*{version}">
             <input type="hidden" name="source" th:field="*{source}">
             <div class="form-group">
@@ -75,13 +79,18 @@
             <div class="form-group">
                 <label th:text="#{profile.display_name}">Anzeigename</label>
                 <input type="text" name="displayName" th:value="*{displayName}" />
-                <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" class="field-error"></div>
+                <!-- Always present + GET-safe so the in-place save (REQ-FE-007) can paint the field
+                     error client-side; a bare th:errors would throw on a GET with no BindingResult,
+                     and .field-error:empty{display:none} hides it until populated. -->
+                <div class="field-error" data-error-for="displayName"
+                     th:text="${#fields.hasErrors('displayName') ? #fields.errors('displayName')[0] : ''}"></div>
             </div>
-            
+
             <div class="form-group">
                 <label th:text="#{profile.description}">Beschreibung</label>
                 <textarea name="description" rows="5" th:text="*{description}"></textarea>
-                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
+                <div class="field-error" data-error-for="description"
+                     th:text="${#fields.hasErrors('description') ? #fields.errors('description')[0] : ''}"></div>
             </div>
             
             <div class="form-group">
@@ -164,9 +173,139 @@
         </ul>
     </div>
 </main>
-<script th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function() {
-    });
+<!--
+  In-place member-edit save (epic #571, REQ-FE-007). Intercepts the form submit and posts the same
+  multipart body through a JSON twin (MemberManagementController#updateMemberAjax) — no navigation on
+  success. FormData is used so the browser serialises the checkboxes + the Spring _field reset hidden
+  inputs exactly like the native POST, and X-Requested-With routes to the twin. The form keeps its
+  th:action/method=post so a script-disabled browser falls back to the redirect handler.
+-->
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    (function () {
+        'use strict';
+        var form = document.getElementById('member-edit-form');
+        if (!form || form.getAttribute('data-member-edit') === null || !window.krtFetch || !window.krtCsrf) {
+            return;
+        }
+        var i18n = {
+            saved: /*[[#{notification.success.save}]]*/ 'Saved.',
+            error: /*[[#{error.member.update.failed}]]*/ 'Update failed.',
+            conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
+            conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
+            conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
+            conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
+            conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
+        };
+
+        // FormData needs the browser to set the multipart boundary, so build the CSRF headers
+        // WITHOUT krtCsrf.headers() (which forces Content-Type: application/json).
+        function writeHeaders() {
+            var headers = {'X-Requested-With': 'XMLHttpRequest'};
+            var token = window.krtCsrf.token();
+            var headerName = window.krtCsrf.headerName();
+            if (token && headerName) {
+                headers[headerName] = token;
+            }
+            return headers;
+        }
+
+        function clearErrors() {
+            form.querySelectorAll('.field-error[data-error-for]').forEach(function (slot) {
+                slot.textContent = '';
+            });
+        }
+
+        function renderErrors(errors) {
+            clearErrors();
+            if (!errors) {
+                return;
+            }
+            Object.keys(errors).forEach(function (field) {
+                var slot = form.querySelector('.field-error[data-error-for="' + field + '"]');
+                if (slot) {
+                    slot.textContent = errors[field];
+                }
+            });
+        }
+
+        function syncVersion(version) {
+            if (version == null) {
+                return;
+            }
+            form.querySelectorAll('input[name="version"]').forEach(function (input) {
+                input.value = String(version);
+            });
+        }
+
+        var inFlight = false;
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            if (inFlight) {
+                return;
+            }
+            inFlight = true;
+            var submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+            function done() {
+                inFlight = false;
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                }
+            }
+            function doPost() {
+                return fetch(form.getAttribute('action'), {
+                    method: 'POST',
+                    headers: writeHeaders(),
+                    body: new FormData(form)
+                });
+            }
+            doPost().then(function (resp) {
+                // A bare 403 is the CSRF filter rejecting a stale token; refresh once and retry.
+                if (resp.status === 403) {
+                    return window.krtCsrf.refresh().then(function (refreshed) {
+                        return refreshed ? doPost() : resp;
+                    });
+                }
+                return resp;
+            }).then(function (resp) {
+                if (resp.status === 422) {
+                    return resp.json().catch(function () { return {}; }).then(function (errors) {
+                        renderErrors(errors);
+                        done();
+                    });
+                }
+                if (!resp.ok) {
+                    return resp.json().catch(function () { return {}; }).then(function (data) {
+                        if (data && data.code === 'OPTIMISTIC_LOCK') {
+                            window.showFrontendErrorToast(data.detail || i18n.conflictDetail);
+                            if (window.showKrtConfirm) {
+                                window.showKrtConfirm(i18n.conflictTitle, i18n.conflictQuestion,
+                                    i18n.conflictReload, i18n.conflictDismiss).then(function (ok) {
+                                    if (ok) {
+                                        window.location.reload();
+                                    }
+                                });
+                            }
+                        } else {
+                            window.showFrontendErrorToast((data && data.detail) || i18n.error);
+                        }
+                        done();
+                    });
+                }
+                return resp.json().catch(function () { return {}; }).then(function (body) {
+                    clearErrors();
+                    syncVersion(body ? body.version : null);
+                    window.showFrontendSuccessToast(i18n.saved);
+                    done();
+                });
+            }).catch(function () {
+                window.showFrontendErrorToast(i18n.error);
+                done();
+            });
+        });
+    })();
 </script>
 </body>
 </html>

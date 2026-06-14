@@ -3,8 +3,8 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{orgChart.title} + ' - ' + ${appTitle}">Organigramm - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <meta name="_csrf" th:content="${_csrf.token}"/>
-        <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+        <!-- The _csrf / _csrf_header meta tags come from fragments/head.html; the inline editor reads
+             them through window.krtCsrf (epic #571 / REQ-SEC-010), so no page-local copy is needed. -->
         <link rel="stylesheet" th:href="@{/css/org-chart.css}">
     </th:block>
 </head>
@@ -46,7 +46,13 @@
          sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}"
          th:text="#{orgChart.editHint}">Bearbeiten aktiv: Positionen zuweisen, umbenennen oder entfernen.</div>
 
-    <div id="oc-chart" class="oc-chart" th:if="${orgChart != null}" th:with="area=${orgChart.areaLeadership()}">
+    <!-- #oc-chart is the STABLE swap container (its `editing` class + the toolbar toggle survive an
+         innerHTML swap); the inner th:block th:fragment renders only its children, so re-fetching
+         `?fragment=chartBody` and assigning container.innerHTML never double-nests the id and
+         re-stamps every data-version atomically (epic #571 / REQ-FE-005). `area` is rebound on the
+         fragment block because a standalone fragment render ignores the ancestor th:with. -->
+    <div id="oc-chart" class="oc-chart" th:if="${orgChart != null}">
+        <th:block th:fragment="chartBody" th:with="area=${orgChart.areaLeadership()}">
 
         <div class="oc-caption">
             <span class="oc-caption-title" th:text="#{orgChart.area.title}">Bereichsleitung</span>
@@ -279,6 +285,7 @@
              th:text="#{orgChart.empty}">
             Es sind noch keine profit-berechtigten Staffeln oder Spezialkommandos vorhanden.
         </div>
+        </th:block>
     </div>
 </main>
 
@@ -335,77 +342,40 @@
         const modalContent = modal ? modal.querySelector('.modal-content') : null;
         let lastTrigger = null;
 
-        // Preserve the wide chart's horizontal scroll (and the page's vertical scroll)
-        // across the full-page reload that send() runs after every successful edit, so
-        // the view does not snap back to the top-left. Saved right before the reload,
-        // restored exactly once on the next load.
-        const SCROLL_KEY = 'oc-chart.scroll';
-        function saveScrollState() {
-            try {
-                window.sessionStorage.setItem(SCROLL_KEY, JSON.stringify({
-                    x: chart ? chart.scrollLeft : 0,
-                    y: window.pageYOffset || 0
-                }));
-            } catch (e) {
-                /* storage unavailable (private mode) — fall back to a plain reload */
+        // In-place chart refresh after a successful edit (epic #571 / REQ-FE-005). The whole tree
+        // is re-rendered via ?fragment=chartBody and swapped into the stable #oc-chart container,
+        // re-stamping every data-version and rebuilding the add affordances + ARIA tree atomically
+        // — no full-page reload. The innerHTML assignment resets the container's horizontal scroll,
+        // so it is captured before the swap and restored after; krtFetch.swap (preserveScroll)
+        // keeps the page's vertical scroll.
+        const MSG_REFRESH_FAILED =
+            /*[[#{orgChart.refresh.failed}]]*/ 'Saved, but the chart could not be refreshed.';
+        function refreshChart() {
+            if (!chart || !window.krtFetch) {
+                window.location.reload();
+                return;
             }
+            const savedX = chart.scrollLeft;
+            window.krtFetch.swap({
+                url: '/org-chart',
+                container: chart,
+                fragmentValue: 'chartBody',
+                errorMessage: MSG_REFRESH_FAILED
+            }).then(function (ok) {
+                if (ok) {
+                    chart.scrollLeft = savedX;
+                }
+            });
         }
-        function restoreScrollState() {
-            let raw = null;
-            try {
-                raw = window.sessionStorage.getItem(SCROLL_KEY);
-            } catch (e) {
-                return;
-            }
-            if (!raw) {
-                return;
-            }
-            let pos;
-            try {
-                pos = JSON.parse(raw);
-            } catch (e) {
-                try { window.sessionStorage.removeItem(SCROLL_KEY); } catch (e2) { /* ignore */ }
-                return;
-            }
-            // Re-apply the saved offsets across animation frames until they stick. On a large org
-            // the chart has not finished laying out when this end-of-body script first runs, so a
-            // single assignment would clamp scrollLeft toward 0 and snap the view back to the left
-            // edge. Once the horizontal offset settles (or the frame budget is spent) clear the key
-            // and flag completion, so callers/tests can tell the restore is done.
-            // Give the chart up to a few seconds to finish laying out: under load a large org's
-            // chart can take well over a second, and the offset only sticks once scrollWidth is
-            // final. Time-based (not a fixed frame count) so it is robust to a throttled frame rate.
-            const deadline = performance.now() + 5000;
-            function apply() {
-                if (typeof pos.y === 'number') {
-                    window.scrollTo(0, pos.y);
-                }
-                if (chart && typeof pos.x === 'number') {
-                    chart.scrollLeft = pos.x;
-                }
-                const settled =
-                    !chart || typeof pos.x !== 'number' || pos.x <= 0 || chart.scrollLeft === pos.x;
-                if (settled || performance.now() >= deadline) {
-                    try { window.sessionStorage.removeItem(SCROLL_KEY); } catch (e) { /* ignore */ }
-                    if (chart) {
-                        chart.setAttribute('data-oc-scroll-restored', '1');
-                    }
-                    return;
-                }
-                window.requestAnimationFrame(apply);
-            }
-            apply();
-        }
-        restoreScrollState();
 
-        function csrfHeaders() {
-            const headers = {'Content-Type': 'application/json', 'Accept': 'application/json'};
-            const token = document.querySelector('meta[name="_csrf"]');
-            const header = document.querySelector('meta[name="_csrf_header"]');
-            if (token && header && header.content) {
-                headers[header.content] = token.content;
+        // One JSON write, headers read fresh from window.krtCsrf (epic #571 / REQ-SEC-010) so the
+        // single meta-tag CSRF token is always current; retry-on-403 lives in send().
+        function doFetch(method, url, body) {
+            const opts = {method: method, headers: window.krtCsrf.headers()};
+            if (body !== null) {
+                opts.body = JSON.stringify(body);
             }
-            return headers;
+            return fetch(url, opts);
         }
 
         function field(id) {
@@ -547,37 +517,40 @@
         }
 
         function send(method, url, body) {
-            const opts = {method: method, headers: csrfHeaders()};
-            if (body !== null) {
-                opts.body = JSON.stringify(body);
-            }
-            fetch(url, opts).then(function (resp) {
+            doFetch(method, url, body).then(function (resp) {
+                // A bare 403 is the CSRF filter rejecting a stale token (stale tab / re-login
+                // session rotation); refresh once and retry, mirroring krtFetch.write.
+                if (resp.status === 403) {
+                    return window.krtCsrf.refresh().then(function (refreshed) {
+                        return refreshed ? doFetch(method, url, body) : resp;
+                    });
+                }
+                return resp;
+            }).then(function (resp) {
                 if (resp.ok) {
                     window.showFrontendSuccessToast(/*[[#{orgChart.toast.saved}]]*/ 'Saved');
-                    // Capture the chart's horizontal scroll BEFORE closeModal(): closeModal()
-                    // returns focus to the triggering control, and focus() scrolls that control
-                    // into view — under the reflow from hiding the dialog and clearing inert on
-                    // <main> the browser can briefly judge it off-screen and reset chart.scrollLeft
-                    // to 0, which would then be the saved (and wrongly restored) value. Saving
-                    // first records the user's real offset, immune to that focus-driven reset.
-                    saveScrollState();
                     closeModal();
-                    setTimeout(function () {
-                        window.location.reload();
-                    }, 400);
+                    // Re-render the tree in place — re-stamps every data-version, so the next edit
+                    // does not 409 (no reload). #574/#578/#579 chose the same fragment-swap over a
+                    // node patch because the add affordances + ARIA order are derived state.
+                    refreshChart();
                     return null;
                 }
                 return resp.json().catch(function () {
                     return {};
                 }).then(function (data) {
-                    let message;
                     if (data && data.code === 'OPTIMISTIC_LOCK') {
-                        message = /*[[#{error.concurrency.conflict}]]*/ 'Conflict, please reload.';
-                    } else if (data && data.detail) {
-                        message = data.detail;
-                    } else {
-                        message = /*[[#{orgChart.error.generic}]]*/ 'Action failed.';
+                        // The version the modal carried is stale; close it and re-render so the
+                        // user retries against the freshly-stamped chart instead of re-409ing.
+                        window.showFrontendErrorToast(
+                            /*[[#{error.concurrency.conflict}]]*/ 'Conflict, please reload.');
+                        closeModal();
+                        refreshChart();
+                        return;
                     }
+                    const message = (data && data.detail)
+                        ? data.detail
+                        : /*[[#{orgChart.error.generic}]]*/ 'Action failed.';
                     window.showFrontendErrorToast(message);
                 });
             }).catch(function () {
@@ -758,8 +731,14 @@
         // purely from aria-level over the flattened treeitem order. Exactly one
         // treeitem is tabbable at a time; the arrow keys move focus and preserve that
         // invariant (↑/↓ between siblings, ←/→ between levels, Home/End to the ends).
-        const tree = chart ? chart.querySelector('.oc-tree') : null;
-        if (tree) {
+        // Wrapped in initTree() and re-run on krt:swapped: a chart refresh replaces .oc-tree, so the
+        // roving-tabindex init + the keydown listener must re-bind on the fresh element (the listener
+        // lived on the now-discarded tree). chart is the stable swap container that survives the swap.
+        function initTree() {
+            const tree = chart ? chart.querySelector('.oc-tree') : null;
+            if (!tree) {
+                return;
+            }
             const treeItems = function () {
                 return Array.prototype.slice.call(
                     tree.querySelectorAll('[role="treeitem"]'));
@@ -875,6 +854,15 @@
                 }
             });
         }
+        initTree();
+        // A successful edit re-renders #oc-chart's contents (replacing .oc-tree); re-init the tree
+        // keyboard navigation on the fresh subtree. Scoped to the chart container so unrelated swaps
+        // elsewhere on the page do not trigger a wasted re-init.
+        document.addEventListener('krt:swapped', function (e) {
+            if (e && e.detail && e.detail.container === chart) {
+                initTree();
+            }
+        });
     })();
 </script>
 </body>

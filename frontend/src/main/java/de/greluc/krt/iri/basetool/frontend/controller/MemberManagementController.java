@@ -24,17 +24,27 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.UserAttributesUpdateDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.MemberEditForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.context.MessageSource;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,6 +71,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class MemberManagementController {
 
   private final BackendApiClient backendApiClient;
+  private final MessageSource messageSource;
 
   /**
    * Renders the member list, optionally filtered by free-text search and paginated.
@@ -69,8 +80,10 @@ public class MemberManagementController {
    *     {@code /users/search}
    * @param page zero-based page index
    * @param size page size
-   * @param fragment when {@code true}, only the results+pagination fragment is rendered for an
-   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
+   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
+   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page. A {@code String} (not
+   *     {@code boolean}) so it binds the {@code krtFetch.swap} helper's {@code fragment=results}
+   *     value — a {@code boolean} param cannot parse that and silently 400s the swap.
    * @param model Thymeleaf model populated with users, page metadata and the echoed search query
    * @return the {@code members} view name, or its {@code membersTableFragment} selector
    */
@@ -79,7 +92,7 @@ public class MemberManagementController {
       @RequestParam(required = false) String search,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false, defaultValue = "false") boolean fragment,
+      @RequestParam(required = false) String fragment,
       Model model) {
     try {
       // L-1: build the URI via UriComponentsBuilder so query-param encoding is correct and a
@@ -138,7 +151,7 @@ public class MemberManagementController {
       log.error("Could not fetch members", e);
       model.addAttribute("error", "error.members.load");
     }
-    if (fragment) {
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "members :: membersTableFragment";
     }
     return "members";
@@ -288,55 +301,7 @@ public class MemberManagementController {
       return editMember(id, form.source(), model, redirectAttributes);
     }
     try {
-      // Persist attributes first; the backend bumps @Version on success and the response is
-      // empty, so we re-fetch the user to learn the new version before issuing the optional
-      // squadron-assignment PATCH (otherwise the second call collides with 409).
-      UserAttributesUpdateDto body =
-          new UserAttributesUpdateDto(
-              form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
-      backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
-      // The squadron assignment is a separate admin operation behind its own @PreAuthorize at
-      // the backend; route it through the dedicated PATCH endpoint with the freshly-loaded
-      // version so the optimistic-lock chain stays coherent across the two calls.
-      UserDto refreshed =
-          backendApiClient.get(
-              "/api/v1/users/" + id, de.greluc.krt.iri.basetool.frontend.model.dto.UserDto.class);
-      UUID existingSquadronId =
-          refreshed != null && refreshed.squadron() != null ? refreshed.squadron().id() : null;
-      boolean squadronChanged = !java.util.Objects.equals(existingSquadronId, form.squadronId());
-      Boolean existingLogistician = refreshed != null ? refreshed.isLogistician() : null;
-      Boolean existingMissionManager = refreshed != null ? refreshed.isMissionManager() : null;
-      boolean logisticianChanged =
-          form.isLogistician() != null
-              && !java.util.Objects.equals(existingLogistician, form.isLogistician());
-      boolean missionManagerChanged =
-          form.isMissionManager() != null
-              && !java.util.Objects.equals(existingMissionManager, form.isMissionManager());
-
-      // SPEZIALKOMMANDO_PLAN.md §7.4 — bundle the Staffel reassignment and the Staffel-flag flips
-      // into one single-POST delta. The per-row optimistic-lock survives because the backend's
-      // delta endpoint forwards through {@code updateUserSquadron} (uses {@code userVersion}) and
-      // through {@code applyStaffelMembershipFlagDelta} (which is idempotent and now race-hardened
-      // by the R7 follow-up). When nothing on the Staffel side changed, no call fires.
-      if (squadronChanged || logisticianChanged || missionManagerChanged) {
-        de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest.StaffelChange
-            staffelChange =
-                new de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest
-                    .StaffelChange(
-                    form.squadronId(),
-                    logisticianChanged ? form.isLogistician() : null,
-                    missionManagerChanged ? form.isMissionManager() : null,
-                    squadronChanged
-                        ? (refreshed != null ? refreshed.version() : form.version())
-                        : null);
-        de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest deltaBody =
-            new de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest(
-                staffelChange, null);
-        backendApiClient.patch(
-            "/api/v1/users/" + id + "/memberships",
-            deltaBody,
-            de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaResponse.class);
-      }
+      applyMemberUpdate(id, form);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
       if ("profile".equals(form.source())) {
         return "redirect:/profile";
@@ -350,6 +315,174 @@ public class MemberManagementController {
           + (form.source() != null ? "?source=" + form.source() : "");
     }
     return "redirect:/members";
+  }
+
+  /**
+   * AJAX variant of {@link #updateMember}: applies the same save but answers with JSON instead of a
+   * redirect, so the member-edit page saves in place (epic #571, REQ-FE-007). Selected over the
+   * form handler only when {@code krtFetch}'s submit sends {@code X-Requested-With:
+   * XMLHttpRequest}; a script-disabled browser still posts the HTML form and lands on {@link
+   * #updateMember}, so the redirect path stays the no-JS fallback.
+   *
+   * <p>Validation failures map to a {@code 422} carrying a {@code {field: message}} object (each
+   * message resolved against the request locale exactly as Thymeleaf {@code th:errors} would) so
+   * the client paints per-field errors without a reload. On success the freshly bumped user-row
+   * {@code version} is returned so the hidden form input stays current and a second consecutive
+   * save does not 409. A backend failure is relayed with its original status plus a slim {@code
+   * {code, detail}} body so the client can recognise {@code OPTIMISTIC_LOCK} and show the localized
+   * reason.
+   *
+   * @param id user id
+   * @param form member edit form bound from the multipart/form-encoded body
+   * @param bindingResult validation-errors carrier
+   * @param locale request locale used to resolve field-error messages
+   * @return {@code 200 {version}} on success; {@code 422 {field: message}} on validation failure;
+   *     otherwise the relayed backend error status with {@code {code, detail}}
+   */
+  @PostMapping(value = "/{id}/edit", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Map<String, Object>> updateMemberAjax(
+      @PathVariable @NotNull UUID id,
+      @Valid @ModelAttribute("memberEditForm") MemberEditForm form,
+      BindingResult bindingResult,
+      Locale locale) {
+    if (bindingResult.hasErrors()) {
+      Map<String, Object> errors = new LinkedHashMap<>();
+      for (FieldError fieldError : bindingResult.getFieldErrors()) {
+        errors.putIfAbsent(fieldError.getField(), resolveFieldMessage(fieldError, locale));
+      }
+      return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+          .contentType(MediaType.APPLICATION_JSON)
+          .body(errors);
+    }
+    try {
+      applyMemberUpdate(id, form);
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("version", currentUserVersion(id, form.version()));
+      return ResponseEntity.ok(body);
+    } catch (BackendServiceException e) {
+      return relayBackendError("AJAX member update failed", e);
+    } catch (Exception e) {
+      log.error("AJAX member update failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(Map.of("code", "INTERNAL_ERROR"));
+    }
+  }
+
+  /**
+   * Applies a member edit to the backend: persists the attributes first (the backend bumps
+   * {@code @Version} and returns an empty body), re-fetches the user to learn the new version, then
+   * issues the optional Staffel reassignment + flag delta as one PATCH so the optimistic-lock chain
+   * stays coherent across the calls. Shared by the redirect handler and the AJAX twin; throws on a
+   * backend failure so each caller can map it to its own error shape.
+   *
+   * @param id user id
+   * @param form the validated member edit form
+   */
+  private void applyMemberUpdate(@NotNull UUID id, MemberEditForm form) {
+    UserAttributesUpdateDto body =
+        new UserAttributesUpdateDto(
+            form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
+    backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
+    // The squadron assignment is a separate admin operation behind its own @PreAuthorize at
+    // the backend; route it through the dedicated PATCH endpoint with the freshly-loaded
+    // version so the optimistic-lock chain stays coherent across the two calls.
+    UserDto refreshed =
+        backendApiClient.get(
+            "/api/v1/users/" + id, de.greluc.krt.iri.basetool.frontend.model.dto.UserDto.class);
+    UUID existingSquadronId =
+        refreshed != null && refreshed.squadron() != null ? refreshed.squadron().id() : null;
+    boolean squadronChanged = !java.util.Objects.equals(existingSquadronId, form.squadronId());
+    Boolean existingLogistician = refreshed != null ? refreshed.isLogistician() : null;
+    Boolean existingMissionManager = refreshed != null ? refreshed.isMissionManager() : null;
+    boolean logisticianChanged =
+        form.isLogistician() != null
+            && !java.util.Objects.equals(existingLogistician, form.isLogistician());
+    boolean missionManagerChanged =
+        form.isMissionManager() != null
+            && !java.util.Objects.equals(existingMissionManager, form.isMissionManager());
+
+    // SPEZIALKOMMANDO_PLAN.md §7.4 — bundle the Staffel reassignment and the Staffel-flag flips
+    // into one single-POST delta. The per-row optimistic-lock survives because the backend's
+    // delta endpoint forwards through {@code updateUserSquadron} (uses {@code userVersion}) and
+    // through {@code applyStaffelMembershipFlagDelta} (which is idempotent and now race-hardened
+    // by the R7 follow-up). When nothing on the Staffel side changed, no call fires.
+    if (squadronChanged || logisticianChanged || missionManagerChanged) {
+      de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest.StaffelChange
+          staffelChange =
+              new de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest
+                  .StaffelChange(
+                  form.squadronId(),
+                  logisticianChanged ? form.isLogistician() : null,
+                  missionManagerChanged ? form.isMissionManager() : null,
+                  squadronChanged
+                      ? (refreshed != null ? refreshed.version() : form.version())
+                      : null);
+      de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest deltaBody =
+          new de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaRequest(
+              staffelChange, null);
+      backendApiClient.patch(
+          "/api/v1/users/" + id + "/memberships",
+          deltaBody,
+          de.greluc.krt.iri.basetool.frontend.model.dto.MembershipDeltaResponse.class);
+    }
+  }
+
+  /**
+   * Reads the user row's current {@code version} back from the backend after a write so the
+   * in-place member-edit save can sync the freshly bumped value into the hidden form input. Falls
+   * back to {@code priorVersion + 1} when the re-fetch is unavailable.
+   *
+   * @param id user id
+   * @param priorVersion the version the client submitted (may be {@code null})
+   * @return the current user-row version, or a best-effort {@code priorVersion + 1}
+   */
+  private Long currentUserVersion(@NotNull UUID id, Long priorVersion) {
+    try {
+      UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
+      if (user != null && user.version() != null) {
+        return user.version();
+      }
+    } catch (Exception ignored) {
+      // Re-fetch failed — fall through to the best-effort increment below.
+    }
+    return (priorVersion == null ? 0L : priorVersion) + 1;
+  }
+
+  /**
+   * Resolves a bound field error's message against the request locale, mirroring how Thymeleaf
+   * {@code th:errors} renders it. Degrades to the error's own default message on a missing bundle
+   * key so a translation gap never crashes the in-place save to a 500.
+   *
+   * @param fieldError the validation error to render
+   * @param locale the request locale
+   * @return the localized message, or the field error's default message as a fallback
+   */
+  private String resolveFieldMessage(FieldError fieldError, Locale locale) {
+    try {
+      return messageSource.getMessage(fieldError, locale);
+    } catch (org.springframework.context.NoSuchMessageException e) {
+      return fieldError.getDefaultMessage();
+    }
+  }
+
+  /**
+   * Relays a backend failure to the AJAX caller with its original HTTP status and a slim {@code
+   * {code, detail}} body so {@code krtFetch} can recognise {@code OPTIMISTIC_LOCK} and show the
+   * backend's localized message.
+   *
+   * @param logMessage context for the warn log line
+   * @param e the backend service exception carrying the relayed status, problem code and detail
+   * @return the relayed error response
+   */
+  private ResponseEntity<Map<String, Object>> relayBackendError(
+      String logMessage, BackendServiceException e) {
+    log.warn("{}: status={}, code={}", logMessage, e.getStatusCode(), e.getProblemCode());
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("code", e.getProblemCode());
+    payload.put("detail", e.getProblemDetail());
+    int status = e.getStatusCode() > 0 ? e.getStatusCode() : 500;
+    return ResponseEntity.status(status).body(payload);
   }
 
   /**
@@ -406,5 +539,32 @@ public class MemberManagementController {
       redirectAttributes.addFlashAttribute("errorToast", "error.user.delete");
     }
     return "redirect:/members";
+  }
+
+  /**
+   * AJAX variant of {@link #deleteMember}: deletes the user and answers with JSON so the member
+   * list removes the row in place (epic #571, REQ-FE-005) instead of redirecting. On success the
+   * page re-swaps the results fragment to keep pagination and the SK column coherent; a backend
+   * refusal (e.g. the user still exists in Keycloak) is relayed with its status + {@code {code,
+   * detail}} so the client shows the reason without navigating away. ADMIN-only, like the redirect
+   * handler.
+   *
+   * @param id user id
+   * @return {@code 200} on success, or the relayed backend error status with {@code {code, detail}}
+   */
+  @DeleteMapping("/{id}")
+  @ResponseBody
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Map<String, Object>> deleteMemberAjax(@PathVariable @NotNull UUID id) {
+    try {
+      backendApiClient.delete("/api/v1/users/" + id, Void.class);
+      return ResponseEntity.ok(Map.of());
+    } catch (BackendServiceException e) {
+      return relayBackendError("AJAX member delete failed", e);
+    } catch (Exception e) {
+      log.error("AJAX member delete failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(Map.of("code", "INTERNAL_ERROR"));
+    }
   }
 }

@@ -55,13 +55,15 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 class MemberManagementControllerTest {
 
   private BackendApiClient backendApiClient;
+  private org.springframework.context.MessageSource messageSource;
   private MemberManagementController controller;
   private RedirectAttributes redirectAttributes;
 
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new MemberManagementController(backendApiClient);
+    messageSource = mock(org.springframework.context.MessageSource.class);
+    controller = new MemberManagementController(backendApiClient, messageSource);
     redirectAttributes = new RedirectAttributesModelMap();
   }
 
@@ -107,7 +109,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(page);
 
-      String view = controller.listMembers(null, null, null, false, model);
+      String view = controller.listMembers(null, null, null, null, model);
 
       assertEquals("members", view);
       // SPEZIALKOMMANDO_PLAN.md §7.5: listMembers now also fetches per-user memberships for the
@@ -131,7 +133,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(newPage(List.of()));
 
-      controller.listMembers("alice", null, null, false, model);
+      controller.listMembers("alice", null, null, null, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
@@ -150,7 +152,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(newPage(List.of()));
 
-      controller.listMembers("   ", null, null, false, model);
+      controller.listMembers("   ", null, null, null, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
@@ -163,7 +165,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(newPage(List.of()));
 
-      controller.listMembers(null, 2, 25, false, model);
+      controller.listMembers(null, 2, 25, null, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
@@ -180,7 +182,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
           .thenReturn(null);
 
-      String view = controller.listMembers(null, null, null, false, model);
+      String view = controller.listMembers(null, null, null, null, model);
 
       assertEquals("members", view);
       assertNull(model.getAttribute("users"));
@@ -194,7 +196,7 @@ class MemberManagementControllerTest {
           .when(backendApiClient)
           .get(anyString(), any(ParameterizedTypeReference.class));
 
-      String view = controller.listMembers(null, null, null, false, model);
+      String view = controller.listMembers(null, null, null, null, model);
 
       assertEquals("members", view, "error path must NOT redirect — direct view render");
       assertEquals("error.members.load", model.getAttribute("error"));
@@ -208,7 +210,7 @@ class MemberManagementControllerTest {
           .thenReturn(newPage(List.of(newUser("alice"))));
 
       // When
-      String view = controller.listMembers(null, null, null, true, model);
+      String view = controller.listMembers(null, null, null, "results", model);
 
       // Then — only the table fragment is rendered, not the full page.
       assertEquals("members :: membersTableFragment", view);
@@ -427,6 +429,107 @@ class MemberManagementControllerTest {
           view,
           "the source param must be preserved on the failure redirect so the user "
               + "lands back on the same view");
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // updateMemberAjax / deleteMemberAjax — in-place JSON twins (epic #571)
+  // ---------------------------------------------------------------
+
+  @Nested
+  class AjaxTwinTests {
+
+    @Test
+    void updateMemberAjax_validationError_returns422WithFieldMessages() {
+      UUID id = UUID.randomUUID();
+      MemberEditForm form = new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(true);
+      org.springframework.validation.FieldError fe =
+          new org.springframework.validation.FieldError(
+              "memberEditForm", "description", "too long");
+      when(br.getFieldErrors()).thenReturn(List.of(fe));
+      when(messageSource.getMessage(eq(fe), any())).thenReturn("Description too long");
+
+      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+          controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
+
+      assertEquals(422, response.getStatusCode().value());
+      assertNotNull(response.getBody());
+      assertEquals("Description too long", response.getBody().get("description"));
+      verify(backendApiClient, never()).put(anyString(), any(), any());
+    }
+
+    @Test
+    void updateMemberAjax_happyPath_returns200WithRefreshedVersion() {
+      UUID id = UUID.randomUUID();
+      MemberEditForm form =
+          new MemberEditForm(5, "desc", "Alice", 4L, null, null, null, null, null);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(false);
+      // The refreshed re-fetch (no squadron/flag change) AND the post-save version read both hit
+      // /api/v1/users/{id}; the stub's version (1L) is what the twin echoes back to the form.
+      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
+          .thenReturn(newUser("alice"));
+
+      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+          controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
+
+      assertEquals(200, response.getStatusCode().value());
+      assertNotNull(response.getBody());
+      assertEquals(1L, response.getBody().get("version"));
+      verify(backendApiClient)
+          .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
+    }
+
+    @Test
+    void updateMemberAjax_backendConflict_relaysStatusAndCodeAndDetail() {
+      UUID id = UUID.randomUUID();
+      MemberEditForm form =
+          new MemberEditForm(5, "desc", "Alice", 4L, null, null, null, null, null);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(false);
+      doThrow(
+              new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException(
+                  "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "Stale data"))
+          .when(backendApiClient)
+          .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
+
+      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+          controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
+
+      assertEquals(409, response.getStatusCode().value());
+      assertNotNull(response.getBody());
+      assertEquals("OPTIMISTIC_LOCK", response.getBody().get("code"));
+      assertEquals("Stale data", response.getBody().get("detail"));
+    }
+
+    @Test
+    void deleteMemberAjax_success_returns200() {
+      UUID id = UUID.randomUUID();
+
+      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+          controller.deleteMemberAjax(id);
+
+      assertEquals(200, response.getStatusCode().value());
+      verify(backendApiClient).delete("/api/v1/users/" + id, Void.class);
+    }
+
+    @Test
+    void deleteMemberAjax_backendFailure_relaysStatusAndCode() {
+      UUID id = UUID.randomUUID();
+      doThrow(
+              new de.greluc.krt.iri.basetool.frontend.service.BackendServiceException(
+                  "nope", null, 409, "ENTITY_IN_USE", null, List.of(), "Still in Keycloak"))
+          .when(backendApiClient)
+          .delete("/api/v1/users/" + id, Void.class);
+
+      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+          controller.deleteMemberAjax(id);
+
+      assertEquals(409, response.getStatusCode().value());
+      assertNotNull(response.getBody());
+      assertEquals("ENTITY_IN_USE", response.getBody().get("code"));
     }
   }
 

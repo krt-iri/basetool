@@ -120,10 +120,6 @@
         </div>
     </div>
 
-    <!-- Hidden form for deletion to support redirects with Flash-Messages -->
-    <form id="delete-user-form" method="post" style="display:none;">
-        <input type="hidden" name="_csrf" th:value="${_csrf.token}" />
-    </form>
 </main>
 <script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:attr="nonce=${cspNonce}">
@@ -196,54 +192,78 @@
     const MSG_DELETE_CONFIRM = "[[#{members.delete_confirm}]]";
     const MSG_DELETE_LABEL = "[[#{members.delete}]]";
     const MSG_CANCEL_LABEL = "[[#{general.cancel}]]";
+    const MSG_DELETE_SUCCESS = "[[#{success.user.delete}]]";
+    const MSG_DELETE_ERROR = "[[#{error.user.delete}]]";
 
-    async function updateLogisticianStatus(userId, isLogistician) {
+    // Flag-toggle writes stay in place (epic #571): on failure the toggle the user flipped did
+    // not persist, so the checkbox is reverted to its prior state instead of reloading the page.
+    async function updateLogisticianStatus(checkbox, userId, isLogistician) {
         try {
             const resp = await fetch(`/members/${userId}/logistician?isLogistician=${isLogistician}`, {
                 method: 'POST',
                 headers: window.krtCsrf.headers()
             });
             if (!resp.ok) {
-                const data = await resp.json();
+                const data = await resp.json().catch(() => ({}));
                 showFrontendErrorToast(data.message || MSG_STATUS_UPDATE_ERROR);
-                location.reload();
+                checkbox.checked = !isLogistician;
             } else {
                 showFrontendSuccessToast(MSG_STATUS_UPDATED);
             }
         } catch (err) {
             console.error('Failed to update status', err);
             showFrontendErrorToast(MSG_STATUS_UPDATE_FAILED);
-            location.reload();
+            checkbox.checked = !isLogistician;
         }
     }
 
-    async function updateMissionManagerStatus(userId, isMissionManager) {
+    async function updateMissionManagerStatus(checkbox, userId, isMissionManager) {
         try {
             const resp = await fetch(`/members/${userId}/mission-manager?isMissionManager=${isMissionManager}`, {
                 method: 'POST',
                 headers: window.krtCsrf.headers()
             });
             if (!resp.ok) {
-                const data = await resp.json();
+                const data = await resp.json().catch(() => ({}));
                 showFrontendErrorToast(data.message || MSG_STATUS_UPDATE_ERROR);
-                location.reload();
+                checkbox.checked = !isMissionManager;
             } else {
                 showFrontendSuccessToast(MSG_STATUS_UPDATED);
             }
         } catch (err) {
             console.error('Failed to update status', err);
             showFrontendErrorToast(MSG_STATUS_UPDATE_FAILED);
-            location.reload();
+            checkbox.checked = !isMissionManager;
         }
+    }
+
+    // Re-render the current (filtered/paginated) member list so a deleted row drops out and the
+    // pagination + SK column stay coherent. The URL already carries the active filter (kept in
+    // sync by applyMembersFilter's history:true), so re-fetch it as a fragment swap (#571/#573).
+    function refreshMembersResults() {
+        const container = document.getElementById('members-results');
+        if (!container || !window.krtFetch) {
+            location.reload();
+            return;
+        }
+        window.krtFetch.swap({
+            url: window.location.pathname + window.location.search,
+            container: container
+        });
     }
 
     async function deleteUser(userId) {
         const confirmed = await window.showKrtConfirm(MSG_DELETE_TITLE, MSG_DELETE_CONFIRM, MSG_DELETE_LABEL, MSG_CANCEL_LABEL);
         if (!confirmed) return;
-
-        const form = document.getElementById('delete-user-form');
-        form.action = window.safeSameOriginUrl(`/members/${userId}/delete`, form.action);
-        form.submit();
+        window.krtFetch.write({
+            method: 'DELETE',
+            url: '/members/' + encodeURIComponent(userId),
+            successMessage: MSG_DELETE_SUCCESS,
+            errorMessage: MSG_DELETE_ERROR,
+            onSuccess: function () {
+                refreshMembersResults();
+            }
+        });
     }
 
     // Delegated event bindings (CSP-safe replacement for inline onclick/onchange).
@@ -252,10 +272,10 @@
     // Thymeleaf re-renders the member table on filter/pagination changes.
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('change', 'members-toggle-logistician', function (el) {
-            updateLogisticianStatus(el.getAttribute('data-user-id'), el.checked);
+            updateLogisticianStatus(el, el.getAttribute('data-user-id'), el.checked);
         });
         window.krtEvents.on('change', 'members-toggle-mission-manager', function (el) {
-            updateMissionManagerStatus(el.getAttribute('data-user-id'), el.checked);
+            updateMissionManagerStatus(el, el.getAttribute('data-user-id'), el.checked);
         });
         window.krtEvents.on('click', 'members-delete-user', function (el) {
             deleteUser(el.getAttribute('data-user-id'));
