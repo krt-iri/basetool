@@ -137,6 +137,37 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   List<PersonalBlueprint> findAllByProductKey(String productKey);
 
   /**
+   * Unrestricted bulk product lookup — backs the admin "all org units" branch of the
+   * <em>variant-family</em> owner drill-down (#364). A family expands to several product keys (a
+   * base plus its cosmetic variants), so the drill-down resolves the family's product-key set once
+   * (via the cached blueprint family index) and fetches every owner of any of them in one bounded
+   * {@code IN} query — the family-aware generalization of {@link #findAllByProductKey(String)}.
+   * ADMIN-ONLY: scoped callers must keep using {@link
+   * #findAllByProductKeyInAndOwnerSubIn(Collection, Collection)} so the owner-isolation rule holds.
+   *
+   * @param productKeys the normalized product keys making up the family
+   * @return every owned-blueprint row for any of the products, across all owners; never {@code
+   *     null}
+   */
+  List<PersonalBlueprint> findAllByProductKeyIn(Collection<String> productKeys);
+
+  /**
+   * Owner-restricted bulk product lookup — backs the scoped branch of the variant-family owner
+   * drill-down (#364): given a family's product-key set and the Keycloak {@code sub}s of every
+   * in-scope member, returns the rows that pin which of those members own any product in the
+   * family. The family-aware generalization of {@link #findAllByProductKeyAndOwnerSubIn(String,
+   * Collection)}; keeping the owner restriction server-side preserves the multi-user data-isolation
+   * rule.
+   *
+   * @param productKeys the normalized product keys making up the family
+   * @param ownerSubs the Keycloak {@code sub}s of the in-scope owners
+   * @return the matching rows (one per owning in-scope member × owned family product); never {@code
+   *     null}
+   */
+  List<PersonalBlueprint> findAllByProductKeyInAndOwnerSubIn(
+      Collection<String> productKeys, Collection<String> ownerSubs);
+
+  /**
    * Bulk owner + product lookup — backs the item job-order blueprint-coverage view: given the
    * Keycloak {@code sub}s of every member of the order's responsible org unit and the set of
    * normalized product keys the order's item lines resolve to, returns exactly the owned-blueprint

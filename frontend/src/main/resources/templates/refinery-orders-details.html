@@ -419,6 +419,13 @@
                             </div>
                         </div>
                         <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
+                            <label th:for="'storeOrgUnit_' + ${stat.index}" th:text="#{refineryorder.store.orgUnit}">Org-Einheit</label>
+                            <select th:id="'storeOrgUnit_' + ${stat.index}" class="store-org-unit-select" th:field="*{items[__${stat.index}__].owningOrgUnitId}">
+                                <option value="" th:text="#{refineryorder.store.orgUnit.placeholder}">-- Org-Einheit w&#228;hlen --</option>
+                                <option th:each="ou : ${storeOrgUnitOptions}" th:value="${ou.orgUnitId()}" th:text="${ou.orgUnitName()}"></option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
                             <label th:for="'storeJobOrder_' + ${stat.index}" th:text="#{refineryorder.store.joborder}">Auftrag (Optional)</label>
                             <select th:id="'storeJobOrder_' + ${stat.index}" th:field="*{items[__${stat.index}__].jobOrderId}">
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -466,6 +473,10 @@
     const MSG_CANCEL_CONFIRM = /*[[#{refineryorder.action.cancel.confirm}]]*/ 'Cancel this order?';
     const MSG_CANCEL_TITLE = /*[[#{refineryorder.action.cancel}]]*/ 'Cancel Order';
     const MSG_CANCEL_DISMISS = /*[[#{general.cancel}]]*/ 'Cancel';
+    // #596 store-dialog owning-org-unit picker: the order's inherited default selection (null when
+    // the order itself is ownerless) and the placeholder label for the rebuilt option list.
+    const STORE_INHERITED_ORG_UNIT_ID = /*[[${orderOwningOrgUnitId}]]*/ null;
+    const STORE_ORG_UNIT_PLACEHOLDER = /*[[#{refineryorder.store.orgUnit.placeholder}]]*/ 'Select org unit';
     async function _submitRefinery(form, errorMessage, onFailure) {
         if (!window.krtCsrf) { form.submit(); return; }
         const fd = new FormData(form);
@@ -591,6 +602,53 @@
             });
         });
     }
+
+    // #596: rebuild a store row's owning-org-unit <select> from the picked receiver's OrgUnit
+    // memberships. Re-selects the order's inherited default when the receiver belongs to it, else
+    // keeps a prior still-valid pick, else leaves the placeholder selected to force a choice.
+    function rebuildOrgUnitOptions(selectEl, options) {
+        const previous = selectEl.value;
+        while (selectEl.firstChild) {
+            selectEl.removeChild(selectEl.firstChild);
+        }
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = STORE_ORG_UNIT_PLACEHOLDER;
+        selectEl.appendChild(placeholder);
+        let hasInherited = false;
+        let hasPrevious = false;
+        options.forEach((o) => {
+            const opt = document.createElement('option');
+            opt.value = o.orgUnitId;
+            opt.textContent = o.orgUnitName;
+            selectEl.appendChild(opt);
+            if (o.orgUnitId === STORE_INHERITED_ORG_UNIT_ID) hasInherited = true;
+            if (previous && o.orgUnitId === previous) hasPrevious = true;
+        });
+        if (hasInherited) selectEl.value = STORE_INHERITED_ORG_UNIT_ID;
+        else if (hasPrevious) selectEl.value = previous;
+        else selectEl.value = '';
+    }
+
+    // When the receiving member of a store row changes, refresh that row's owning-org-unit picker
+    // from the new member's memberships (proxied via the frontend AJAX endpoint). Delegated on the
+    // items container so split (duplicated) rows are covered too.
+    (function () {
+        const storeItemsContainer = document.getElementById('storeItemsContainer');
+        if (!storeItemsContainer) return;
+        storeItemsContainer.addEventListener('change', (e) => {
+            const sel = e.target;
+            if (!sel || !sel.id || !sel.id.startsWith('storeUser_')) return;
+            const index = sel.id.substring('storeUser_'.length);
+            const orgSelect = document.getElementById('storeOrgUnit_' + index);
+            if (!orgSelect || !sel.value) return;
+            fetch('/refinery-orders/users/' + encodeURIComponent(sel.value) + '/org-units',
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then((r) => (r.ok ? r.json() : []))
+                .then((opts) => rebuildOrgUnitOptions(orgSelect, Array.isArray(opts) ? opts : []))
+                .catch(() => rebuildOrgUnitOptions(orgSelect, []));
+        });
+    })();
 
     function updateOutputMaterial(selectElement) {
         const entryBlock = selectElement.closest('.material-entry');

@@ -404,6 +404,14 @@ public class RefineryOrderPageController {
         model.addAttribute("isLogistician", isLogistician);
         model.addAttribute("order", orderDto);
 
+        // Store-dialog owning-org-unit picker (#596): options for the default receiver (the caller)
+        // are server-rendered; the JS rebuilds them per row when the receiver dropdown changes. The
+        // inherited default pre-selects the order's own owning OrgUnit so a same-OrgUnit self-store
+        // needs no manual choice. A receiver who is not a member of that OrgUnit simply gets no
+        // pre-selection and must pick — the §5.5.1 "force choice" fallback.
+        model.addAttribute("storeOrgUnitOptions", fetchUserOrgUnitOptions(currentUserId));
+        model.addAttribute("orderOwningOrgUnitId", orderDto.owningOrgUnitId());
+
         if (!model.containsAttribute("refineryOrderForm")) {
           RefineryOrderForm form = new RefineryOrderForm();
 
@@ -507,6 +515,11 @@ public class RefineryOrderPageController {
                 if (currentUserId != null) {
                   storeItem.setUserId(currentUserId);
                 }
+                // Inherit the order's own owning OrgUnit as the picker's default selection (#596).
+                // Valid only when the default receiver (the caller) is a member of it; if not, the
+                // option is absent from storeOrgUnitOptions and the picker renders unselected,
+                // forcing an explicit choice per the §5.5.1 matrix.
+                storeItem.setOwningOrgUnitId(orderDto.owningOrgUnitId());
                 storeForm.getItems().add(storeItem);
               }
             }
@@ -561,6 +574,23 @@ public class RefineryOrderPageController {
   @ResponseBody
   public Map<String, Integer> getYieldsForLocation(@PathVariable UUID locationId) {
     return fetchYieldsForLocation(locationId);
+  }
+
+  /**
+   * AJAX endpoint (#596) that proxies the backend's {@code GET /api/v1/users/{userId}/memberships}
+   * so the store dialog's per-item owning-org-unit picker can refresh its options client-side when
+   * the receiving-member dropdown changes — without a full page reload. Returns the receiver's
+   * OrgUnit memberships as the picker-friendly option rows; an empty list on a backend hiccup keeps
+   * the picker from breaking the dialog.
+   *
+   * @param userId the receiving member whose OrgUnit memberships back the picker
+   * @return the member's OrgUnit options as JSON; never {@code null}
+   */
+  @GetMapping("/users/{userId}/org-units")
+  @PreAuthorize("isAuthenticated()")
+  @ResponseBody
+  public List<OrgUnitMembershipOptionDto> getUserOrgUnits(@PathVariable UUID userId) {
+    return fetchUserOrgUnitOptions(userId);
   }
 
   /**
@@ -807,7 +837,8 @@ public class RefineryOrderPageController {
               f.getAmount(),
               f.getUserId(),
               f.getJobOrderId(),
-              f.getNote()));
+              f.getNote(),
+              f.getOwningOrgUnitId()));
     }
     return new RefineryOrderStoreDto(dtoList);
   }
@@ -1125,17 +1156,30 @@ public class RefineryOrderPageController {
     if (targetUserId == null) {
       targetUserId = getCurrentUserId(principal);
     }
-    if (targetUserId == null) {
+    return fetchUserOrgUnitOptions(targetUserId);
+  }
+
+  /**
+   * Fetches a user's OrgUnit memberships as picker-friendly option rows, backing both the
+   * create-form owner picker (via {@link #fetchOwnerPickerOptions}) and the store dialog's per-item
+   * owning-org-unit picker (#596). Wraps every failure in an empty list — a {@code null} id or a
+   * transient backend hiccup leaves the picker empty rather than breaking the page.
+   *
+   * @param userId the user whose memberships to list; {@code null} yields an empty list.
+   * @return the picker options, sorted Staffel-first then SK alphabetical by the backend; never
+   *     {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchUserOrgUnitOptions(UUID userId) {
+    if (userId == null) {
       return List.of();
     }
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/" + targetUserId + "/memberships",
-              new ParameterizedTypeReference<>() {});
+              "/api/v1/users/" + userId + "/memberships", new ParameterizedTypeReference<>() {});
       return options != null ? options : List.of();
     } catch (Exception e) {
-      log.warn("Failed to fetch memberships for refinery-order owner-picker", e);
+      log.warn("Failed to fetch memberships for refinery org-unit picker", e);
       return List.of();
     }
   }

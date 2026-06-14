@@ -36,10 +36,12 @@ import org.springframework.context.annotation.Configuration;
  * <ul>
  *   <li><b>Master data (30 min)</b> — cities, materials, ship types, locations, frequency types,
  *       job types, manufacturers, refining methods, star systems, mission lead types, material
- *       categories. Quasi-static: editor flows already trigger {@code @CacheEvict
- *       (allEntries=true)} on writes, so a stale entry only survives until the next admin write or
- *       the 30 min lapse — whichever comes first. The previous 2 min global TTL kept paying the
- *       underlying DB-hit cost 15× per hour for data that almost never changes.
+ *       categories, and the blueprint variant-family index (rebuilt from the active blueprint
+ *       master; no write-evict hook — it lags the periodic SC Wiki sync by at most the TTL).
+ *       Quasi-static: editor flows already trigger {@code @CacheEvict (allEntries=true)} on writes,
+ *       so a stale entry only survives until the next admin write or the 30 min lapse — whichever
+ *       comes first. The previous 2 min global TTL kept paying the underlying DB-hit cost 15× per
+ *       hour for data that almost never changes.
  *   <li><b>Squadrons (10 min)</b> — slower than master data because admins toggle the active
  *       squadron mid-session via the {@code X-Active-Squadron-Id} header, but the squadron entity
  *       itself rarely changes. {@code SquadronService} already evicts on writes.
@@ -112,6 +114,15 @@ public class CacheConfig {
   public static final String STAR_SYSTEMS_CACHE = "starSystems";
 
   /**
+   * Cache name for the blueprint variant-family index ({@code familyKey -> product keys}). Built
+   * once from the ~1600-row active blueprint master, it backs the family-aware owner drill-down on
+   * the availability overview (#364), keeping the per-expand query bounded to a family's product
+   * keys instead of a table scan. Master-data TTL; the catalog only changes on the SC Wiki
+   * blueprint sync.
+   */
+  public static final String BLUEPRINT_FAMILY_INDEX_CACHE = "blueprintFamilyIndex";
+
+  /**
    * Builds the shared {@link CacheManager} with per-cache Caffeine specs. Every cache name is
    * pre-registered via {@link CaffeineCacheManager#registerCustomCache(String,
    * com.github.benmanes.caffeine.cache.Cache)} so an unknown name on a {@code @Cacheable}
@@ -135,6 +146,7 @@ public class CacheConfig {
     register(manager, REFINING_METHODS_CACHE, MASTER_DATA_TTL);
     register(manager, SHIP_TYPES_CACHE, MASTER_DATA_TTL);
     register(manager, STAR_SYSTEMS_CACHE, MASTER_DATA_TTL);
+    register(manager, BLUEPRINT_FAMILY_INDEX_CACHE, MASTER_DATA_TTL);
 
     register(manager, SQUADRONS_CACHE, SQUADRONS_TTL);
     register(manager, ROLES_CACHE, ROLES_TTL);

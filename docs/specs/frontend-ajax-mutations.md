@@ -138,7 +138,10 @@ POST→redirect) navigates to the source listing on success and keeps the form w
 (REQ-FE-006); the note and association edits (`inventory-my` / `inventory-admin`) drop their
 hand-rolled CSRF reads and per-`[data-id]`/`[data-note-for]` version loops for `krtCsrf`
 (retry-on-403) + `krtFetch.syncVersion` against the acting control's `.tree-row--leaf` container (so
-the next edit on that row does not 409 — REQ-FE-003); the material-collection owner/location transfer
+the next edit on that row does not 409 — REQ-FE-003), and the note edits plus the bulk-selection
+guards surface their success/error outcome through the shared `showFrontendSuccessToast` /
+`showFrontendErrorToast` globals — the page-local `showInventoryToast(type, msg)` helper delegates to
+them rather than to a non-existent page element; the material-collection owner/location transfer
 and delivered toggle move onto `krtFetch.write` (per-row patch; a full-amount transfer consumes the
 source row, 204, and removes it); and the admin delete-all clears the grouped table via the existing
 filter swap instead of a reload. **Part B** does the quantity-changing list writes. The single

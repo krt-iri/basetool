@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-14.
 > **Owner area:** INV/UI · **Related ADRs:** none
 
 # Blueprint availability overview — list & drill-down contract
@@ -24,9 +24,11 @@ identity is exposed as display name only) is documented on
 
 ### REQ-INV-012 — Owner drill-down stays responsive
 
-Expanding or collapsing a blueprint row must not perform work that scales with the size of
-the table, and the owners fetch must not perform work that scales with the number of users
-outside the requested product.
+The list aggregates one row per **variant family** (`REQ-INV-015`): a base item and its cosmetic
+variants collapse onto one row whose owner count spans the whole family (magazines stay atomic), and
+the row's key is the family key. Expanding or collapsing a row must not perform work that scales with
+the size of the table, and the owners fetch must not perform work that scales with the number of
+users outside the requested family.
 
 **Acceptance**
 
@@ -34,16 +36,19 @@ outside the requested product.
   class toggled on the element itself by `blueprint-overview.js`; no CSS rule may
   derive the companion row's visibility from a `:has()`/sibling selector that the
   browser has to re-evaluate across the table on every toggle.
-- [ ] For the admin "all org units" scope, the owners lookup queries by product key alone
-  (`findAllByProductKey`); it must not enumerate all distinct owner subs first nor
-  pass them back as an `IN` restriction.
-- [ ] Non-admin scopes keep the owner-restricted lookup (product key + in-scope member
-  subs), resolved server-side — the client cannot widen the scope, and the
-  multi-user data-isolation rule is unaffected.
+- [ ] The drill-down expands the row's family key to its concrete product keys **once** via the
+  cached `BlueprintVariantFamilyCatalog` (a base plus its cosmetic variants — usually a handful),
+  rebuilt only on the periodic blueprint sync, so an expand click never rescans the blueprint master.
+- [ ] For the admin "all org units" scope, the owners lookup queries by that **family product-key
+  set alone** (`findAllByProductKeyIn`); it must not enumerate all distinct owner subs first nor pass
+  them back as an `IN` restriction.
+- [ ] Non-admin scopes keep the owner-restricted lookup (family product keys + in-scope member subs,
+  `findAllByProductKeyInAndOwnerSubIn`), resolved server-side — the client cannot widen the scope, and
+  the multi-user data-isolation rule is unaffected.
 
-**Enforced by:** `PersonalBlueprintOverviewServiceTest` · **Code:**
-`PersonalBlueprintOverviewService`, `frontend/src/main/resources/static/js/blueprint-overview.js`
-· **Issues:** #364
+**Enforced by:** `PersonalBlueprintOverviewServiceTest`, `BlueprintVariantFamilyCatalogTest` ·
+**Code:** `PersonalBlueprintOverviewService`, `BlueprintVariantFamilyCatalog`,
+`frontend/src/main/resources/static/js/blueprint-overview.js` · **Issues:** #364
 
 ### REQ-INV-013 — True server-side pagination with selectable page size
 

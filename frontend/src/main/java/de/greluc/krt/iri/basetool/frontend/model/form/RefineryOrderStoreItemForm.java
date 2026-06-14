@@ -64,4 +64,12 @@ public class RefineryOrderStoreItemForm {
 
   @Size(max = 1000)
   private String note;
+
+  /**
+   * Picker output stamping the resulting inventory item's owning OrgUnit. Pre-filled with the
+   * order's own owning OrgUnit and only meaningful when the receiving member ({@link #userId})
+   * belongs to more than one OrgUnit; {@code null} lets the backend auto-stamp a single-membership
+   * receiver. Mirrors {@code RefineryOrderStoreItemDto#owningOrgUnitId}.
+   */
+  private UUID owningOrgUnitId;
 }

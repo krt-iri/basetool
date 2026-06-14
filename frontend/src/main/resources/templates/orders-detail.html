@@ -479,7 +479,10 @@
                 </thead>
                 <tbody>
                   <tr th:each="rb : ${itemBlueprintOwners.requiredBlueprints}" data-testid="blueprint-coverage-row">
-                    <td th:text="${rb.productName}">Item</td>
+                    <td>
+                      <span th:text="${rb.productName}">Item</span>
+                      <span th:if="${rb.variantInclusive}" class="bp-coverage__hint" th:text="#{orders.detail.blueprintOwners.coverage.variantHint}">(inkl. Varianten gez&auml;hlt)</span>
+                    </td>
                     <td>
                       <span th:if="${rb.ownerCount > 0}" th:text="${rb.ownerCount}">2</span>
                       <span th:if="${rb.ownerCount == 0}" class="bp-gap" th:text="#{orders.detail.blueprintOwners.gap}">Keine Abdeckung</span>
