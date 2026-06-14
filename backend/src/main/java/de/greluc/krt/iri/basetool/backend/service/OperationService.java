@@ -327,7 +327,13 @@ public class OperationService {
     operation.setDescription(updateDto.description());
     operation.setStatus(updateDto.status());
 
-    return operationRepository.save(operation);
+    // saveAndFlush (not save): OperationController is class-level @Transactional and maps the
+    // returned entity to OperationDto INSIDE that still-open transaction. A plain save() defers the
+    // UPDATE — and the Hibernate @Version increment — to commit, so the DTO would carry the
+    // pre-increment version. The in-place AJAX twin (updateOperationAjax, #576) hands that version
+    // straight back to the form; a stale value makes the user's next consecutive save 409. Forcing
+    // the flush here bumps @Version before the mapping reads it. Same precedent as JobOrderService.
+    return operationRepository.saveAndFlush(operation);
   }
 
   /**
