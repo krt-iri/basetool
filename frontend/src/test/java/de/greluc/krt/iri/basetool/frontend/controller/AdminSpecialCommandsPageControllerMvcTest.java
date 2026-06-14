@@ -23,9 +23,12 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -121,5 +124,92 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"sc-results\""))))
         .andExpect(content().string(not(containsString("id=\"specialcommand-modal\""))))
         .andExpect(content().string(not(containsString("id=\"add-sc-btn\""))));
+  }
+
+  // covers #582 — the SK-create twin (X-Requested-With + form params) relays to the backend and
+  // returns 200; the list page re-swaps the SK-list fragment.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createSpecialCommandAjax_withHeader_returns200() throws Exception {
+    when(backendApiClient.post(contains("/special-commands"), any(), eq(Void.class)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("name", "New SK")
+                .param("shorthand", "NSK")
+                .param("description", "d")
+                .param("version", "0"))
+        .andExpect(status().isOk());
+  }
+
+  // covers #582 — the member lead-toggle twin (X-Requested-With + isLead/version) PATCHes the lead
+  // flag and returns 200.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleMemberLeadAjax_withHeader_returns200() throws Exception {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.patch(contains("/lead"), any(), eq(Void.class))).thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + skId + "/members/" + userId + "/lead")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("isLead", "true")
+                .param("version", "0"))
+        .andExpect(status().isOk());
+  }
+
+  // covers #582 / REQ-FE-005 — the NEW member-roster fragment GET renders only the membersResults
+  // fragment; the add-member modal (which lives outside the fragment) is not present.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void detail_fragmentMembers_rendersOnlyMembersFragment() throws Exception {
+    UUID skId = UUID.randomUUID();
+    Map<String, Object> sc = new HashMap<>();
+    sc.put("id", skId.toString());
+    sc.put("name", "Detail SK");
+    sc.put("shorthand", "DSK");
+    sc.put("description", "desc");
+    sc.put("active", true);
+    sc.put("isProfitEligible", false);
+    sc.put("version", 0);
+    when(backendApiClient.get(
+            eq("/api/v1/special-commands/" + skId), any(ParameterizedTypeReference.class)))
+        .thenReturn(sc);
+    when(backendApiClient.get(
+            eq("/api/v1/special-commands/" + skId + "/members"),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/admin/special-commands/" + skId).param("fragment", "members"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/special-command-detail :: membersResults"))
+        .andExpect(content().string(not(containsString("add-member-modal"))));
+  }
+
+  // covers #582 — header routing: the same SK-create URL WITHOUT the header still hits the classic
+  // form handler and redirects (no-JS fallback preserved).
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createSpecialCommand_withoutHeader_redirects() throws Exception {
+    when(backendApiClient.post(contains("/special-commands"), any(), eq(Void.class)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands")
+                .with(csrf())
+                .param("name", "New SK")
+                .param("shorthand", "NSK")
+                .param("description", "d")
+                .param("version", "0"))
+        .andExpect(status().is3xxRedirection());
   }
 }

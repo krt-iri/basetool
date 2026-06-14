@@ -78,12 +78,17 @@
     </div>
 
     <!-- Member roster -->
-    <div class="hud-box mt-2" id="members-box">
+    <div class="hud-box mt-2" id="members-box" th:data-sc-id="${specialCommand != null ? specialCommand.id() : ''}">
         <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h2 th:text="#{admin.specialcommands.members.title}" class="m-0">Mitglieder</h2>
             <button id="add-member-btn" class="btn btn--cta" type="button" th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</button>
         </div>
 
+        <!-- AJAX swap target (#582): the flags / lead / remove / add-member writes re-render only
+             this fragment, refreshing role badges, lead state and the fresh @Version on every form
+             so the next member action does not 409. -->
+        <div id="members-results">
+        <th:block th:fragment="membersResults">
         <div th:if="${members == null or #lists.isEmpty(members)}" style="color: var(--color-gray-2); padding: 1rem 0;" th:text="#{admin.specialcommands.members.empty}">
             Noch keine Mitglieder zugeordnet.
         </div>
@@ -147,6 +152,8 @@
                 </tbody>
             </table>
         </div>
+        </th:block>
+        </div>
     </div>
 </main>
 
@@ -168,17 +175,109 @@
     </div>
 </div>
 
-<!-- Add-Member modal wiring (CSP-safe) -->
-<script th:attr="nonce=${cspNonce}">
+<!-- Add-Member modal wiring + in-place member CRUD (#582) -->
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
 (function () {
-    const modal = document.getElementById('add-member-modal');
-    const openBtn = document.getElementById('add-member-btn');
-    const closeBtn = document.querySelector('#add-member-modal .close-add-member-modal');
-    if (!modal || !openBtn) return;
+    var MEMBER_MSG = {
+        saved:   '[[#{notification.success.save}]]',
+        deleted: '[[#{notification.success.delete}]]',
+        error:   '[[#{notification.error.save}]]'
+    };
+    var MEMBER_CONFLICT = {
+        title:                '[[#{frontend.ajax.conflict.title}]]',
+        reloadDetailFallback: '[[#{frontend.ajax.conflict.detail}]]',
+        reloadLabel:          '[[#{frontend.ajax.conflict.reload}]]',
+        dismissLabel:         '[[#{frontend.ajax.conflict.dismiss}]]',
+        reloadQuestion:       '[[#{frontend.ajax.conflict.question}]]'
+    };
 
-    openBtn.addEventListener('click', () => { modal.style.display = 'flex'; });
-    closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    var membersBox = document.getElementById('members-box');
+    var scId = membersBox ? membersBox.getAttribute('data-sc-id') : '';
+
+    // Re-renders the member roster fragment, refreshing role/lead badges and the fresh @Version on
+    // every form so the next member action does not 409.
+    function reswapMembers() {
+        if (!window.krtFetch || !scId) { return; }
+        window.krtFetch.swap({
+            url: '/admin/special-commands/' + encodeURIComponent(scId) + '?fragment=members',
+            container: '#members-results',
+            fragmentValue: 'members',
+            history: false
+        });
+    }
+
+    // FormData POST to a member AJAX twin (keeps the @ModelAttribute / @RequestParam binding) with
+    // X-Requested-With + CSRF + retry-once-on-403. On success re-swaps the roster; on failure
+    // delegates to krtFetch.handleProblem (already-member toast / OPTIMISTIC_LOCK reload-confirm).
+    function memberWrite(theForm, successMessage, onSuccess) {
+        var action = theForm.getAttribute('action');
+        function headers() {
+            var h = { 'X-Requested-With': 'XMLHttpRequest' };
+            var t = window.krtCsrf ? window.krtCsrf.token() : null;
+            var hn = window.krtCsrf ? window.krtCsrf.headerName() : null;
+            if (t && hn) { h[hn] = t; }
+            return h;
+        }
+        function post() {
+            return fetch(action, { method: 'POST', headers: headers(), body: new FormData(theForm) });
+        }
+        post().then(function (res) {
+            if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
+                return window.krtCsrf.refresh().then(function (r) { return r ? post() : res; });
+            }
+            return res;
+        }).then(function (res) {
+            if (res.ok) {
+                if (window.showFrontendSuccessToast) { window.showFrontendSuccessToast(successMessage); }
+                if (typeof onSuccess === 'function') { onSuccess(); }
+                reswapMembers();
+                return;
+            }
+            res.text().then(function (text) {
+                var problem = null;
+                try { problem = JSON.parse(text); } catch (e) { /* not problem+json */ }
+                if (window.krtFetch && typeof window.krtFetch.handleProblem === 'function') {
+                    window.krtFetch.handleProblem(res, problem, { errorMessage: MEMBER_MSG.error, conflict: MEMBER_CONFLICT });
+                } else if (window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(MEMBER_MSG.error);
+                }
+            });
+        }).catch(function () {
+            if (window.showFrontendErrorToast) { window.showFrontendErrorToast(MEMBER_MSG.error); }
+        });
+    }
+
+    // The flags / lead / remove forms live inside the swappable roster fragment, so they are
+    // document-delegated (survive a re-swap). Remove uses the delete message, the rest "saved".
+    document.addEventListener('submit', function (e) {
+        var memberForm = e.target.closest('#members-results form');
+        if (!memberForm) { return; }
+        e.preventDefault();
+        if (!window.krtFetch) { memberForm.submit(); return; }
+        var isRemove = memberForm.getAttribute('action').indexOf('/delete') !== -1;
+        memberWrite(memberForm, isRemove ? MEMBER_MSG.deleted : MEMBER_MSG.saved, null);
+    });
+
+    // Add-member modal (outside the fragment): open/close + in-place add.
+    var modal = document.getElementById('add-member-modal');
+    var openBtn = document.getElementById('add-member-btn');
+    var closeBtn = document.querySelector('#add-member-modal .close-add-member-modal');
+    if (modal && openBtn) {
+        openBtn.addEventListener('click', function () { modal.style.display = 'flex'; });
+        if (closeBtn) { closeBtn.addEventListener('click', function () { modal.style.display = 'none'; }); }
+        modal.addEventListener('click', function (e) { if (e.target === modal) { modal.style.display = 'none'; } });
+        var addForm = modal.querySelector('form');
+        if (addForm) {
+            addForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!window.krtFetch) { addForm.submit(); return; }
+                memberWrite(addForm, MEMBER_MSG.saved, function () {
+                    modal.style.display = 'none';
+                    addForm.reset();
+                });
+            });
+        }
+    }
 })();
 </script>
 </body>

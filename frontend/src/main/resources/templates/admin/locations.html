@@ -84,13 +84,19 @@
                         <td th:text="${loc.description}">Desc</td>
                         <td>
                             <div class="flex-gap-xs">
-                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" class="m-0">
+                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" class="m-0" data-location-toggle="visibility">
                                     <input type="hidden" name="hidden" th:value="${!loc.hidden}">
-                                    <button type="submit" class="btn" th:classappend="${loc.hidden} ? '' : 'btn-secondary'" th:text="${loc.hidden} ? 'Einblenden' : 'Ausblenden'">Toggle</button>
+                                    <button type="submit" class="btn" th:classappend="${loc.hidden} ? '' : 'btn-secondary'"
+                                            th:data-label-on="#{admin.location.visibility.show}"
+                                            th:data-label-off="#{admin.location.visibility.hide}"
+                                            th:text="${loc.hidden} ? #{admin.location.visibility.show} : #{admin.location.visibility.hide}">Toggle</button>
                                 </form>
-                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-home-location(id=${loc.id})}" class="m-0">
+                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/locations/{id}/toggle-home-location(id=${loc.id})}" class="m-0" data-location-toggle="home">
                                     <input type="hidden" name="homeLocation" th:value="${!loc.homeLocation}">
-                                    <button type="submit" class="btn" th:classappend="${loc.homeLocation} ? 'btn-secondary' : ''" th:text="${loc.homeLocation} ? #{admin.location.home.unmark} : #{admin.location.home.mark}">Home</button>
+                                    <button type="submit" class="btn" th:classappend="${loc.homeLocation} ? 'btn-secondary' : ''"
+                                            th:data-label-on="#{admin.location.home.unmark}"
+                                            th:data-label-off="#{admin.location.home.mark}"
+                                            th:text="${loc.homeLocation} ? #{admin.location.home.unmark} : #{admin.location.home.mark}">Home</button>
                                 </form>
                             </div>
                         </td>
@@ -132,6 +138,74 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         // Scripts removed as modals are no longer used
+    });
+</script>
+<!-- In-place visibility / home-location toggles (#582). Kept in a separate inline block from the
+     filterTable script above, whose comment warns that a List/Collection JS-inline serialisation
+     truncates the surrounding <script>; only scalar messages are inlined here. -->
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    document.addEventListener('DOMContentLoaded', function () {
+        const MSG = {
+            success:    /*[[#{notification.success.save}]]*/ 'Gespeichert.',
+            error:      /*[[#{notification.error.save}]]*/ 'Speichern fehlgeschlagen.'
+        };
+        const CONFLICT = {
+            title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+            reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+            reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+            dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+            reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+        };
+
+        // The response is the full LocationDto, so both toggle buttons in the row are re-rendered
+        // from the authoritative state regardless of which one was clicked. data-label-on is the
+        // label shown when the flag is TRUE, data-label-off when FALSE; btn-secondary tracks the
+        // flag with the per-button polarity passed as secondaryWhen.
+        function patchButton(btn, flagValue, secondaryWhen) {
+            if (!btn) { return; }
+            btn.textContent = flagValue
+                ? btn.getAttribute('data-label-on')
+                : btn.getAttribute('data-label-off');
+            btn.classList.toggle('btn-secondary', flagValue === secondaryWhen);
+        }
+
+        function patchRow(row, updated) {
+            if (!row || !updated) { return; }
+            const visForm = row.querySelector('form[data-location-toggle="visibility"]');
+            const homeForm = row.querySelector('form[data-location-toggle="home"]');
+            if (visForm) {
+                patchButton(visForm.querySelector('button'), updated.hidden, false);
+                const visInput = visForm.querySelector('input[name="hidden"]');
+                if (visInput) { visInput.value = String(!updated.hidden); }
+            }
+            if (homeForm) {
+                patchButton(homeForm.querySelector('button'), updated.homeLocation, true);
+                const homeInput = homeForm.querySelector('input[name="homeLocation"]');
+                if (homeInput) { homeInput.value = String(!updated.homeLocation); }
+            }
+        }
+
+        document.addEventListener('submit', function (event) {
+            const form = event.target.closest('form[data-location-toggle]');
+            if (!form) { return; }
+            event.preventDefault();
+            if (!window.krtFetch) { form.submit(); return; }
+            const row = form.closest('tr');
+            const button = form.querySelector('button[type="submit"]');
+            if (button) { button.disabled = true; }
+            window.krtFetch
+                .write({
+                    method: 'POST',
+                    url: form.getAttribute('action'),
+                    successMessage: MSG.success,
+                    errorMessage: MSG.error,
+                    conflict: CONFLICT,
+                    onSuccess: function (updated) { patchRow(row, updated); }
+                })
+                .finally(function () {
+                    if (button) { button.disabled = false; }
+                });
+        });
     });
 </script>
 </body>

@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,6 +42,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -51,6 +55,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -302,12 +307,19 @@ public class AdminSpecialCommandsPageController {
    * starting set without an AJAX fetch.
    *
    * @param id Spezialkommando id.
+   * @param fragment when {@code "members"} only the member-roster fragment is rendered (AJAX
+   *     re-swap after an in-place member mutation, REQ-FE-005); otherwise the full page.
    * @param model Thymeleaf model populated with the SK, the member roster + every known user for
    *     the add-member picker.
-   * @return the {@code admin/special-command-detail} view name.
+   * @return the {@code admin/special-command-detail} view name, or its {@code membersResults}
+   *     fragment for an AJAX swap.
    */
   @GetMapping("/{id}")
-  public String detail(@PathVariable @NotNull UUID id, Model model) {
+  public String detail(
+      @PathVariable @NotNull UUID id,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    boolean membersFragment = "members".equals(fragment);
     try {
       SpecialCommandDto sc = fetchSpecialCommand(id);
       if (sc == null) {
@@ -315,12 +327,18 @@ public class AdminSpecialCommandsPageController {
       }
       model.addAttribute("specialCommand", sc);
       model.addAttribute("members", fetchMembers(id));
-      model.addAttribute("allUsers", fetchUserLookup());
+      // The add-member picker (allUsers) lives outside the swappable roster fragment, so the
+      // re-swap path skips that lookup.
+      if (!membersFragment) {
+        model.addAttribute("allUsers", fetchUserLookup());
+      }
     } catch (Exception e) {
       log.error("Load SpecialCommand detail failed", e);
       return "redirect:/admin/special-commands?error=LoadSpecialCommandDetailFailed";
     }
-    return "admin/special-command-detail";
+    return membersFragment
+        ? "admin/special-command-detail :: membersResults"
+        : "admin/special-command-detail";
   }
 
   /**
@@ -463,6 +481,230 @@ public class AdminSpecialCommandsPageController {
       return "redirect:/admin/special-commands/" + id + "?error=ToggleLeadFailed";
     }
     return "redirect:/admin/special-commands/" + id;
+  }
+
+  // In-place (AJAX) twins (#582). Routed ahead of their classic POST->redirect siblings by the
+  // X-Requested-With header (no-JS forms keep their redirect fallback). They return 200 on success
+  // — the list page re-swaps the SK-list fragment and the detail page re-swaps the member-roster
+  // fragment, which re-render the correct derived state (active badges, role badges, lead state)
+  // and fresh @Version data so the next action does not 409. Conflicts are relayed as
+  // application/problem+json (duplicate/in-use toast, or OPTIMISTIC_LOCK reload-confirm).
+
+  /**
+   * In-place twin of {@link #createSpecialCommand}.
+   *
+   * @param form SK form
+   * @param bindingResult validation errors carrier
+   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
+   *     on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> createSpecialCommandAjax(
+      @Valid @ModelAttribute("specialCommandForm") SpecialCommandForm form,
+      BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.status(422).build();
+    }
+    return okOrRelay(
+        () ->
+            backendApiClient.post(
+                "/api/v1/special-commands",
+                new SpecialCommandDto(
+                    null, form.name(), form.shorthand(), form.description(), true, false, 0L),
+                Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #updateSpecialCommand}.
+   *
+   * @param id SK id
+   * @param form SK form (carries the version)
+   * @param bindingResult validation errors carrier
+   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
+   *     on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateSpecialCommandAjax(
+      @PathVariable @NotNull UUID id,
+      @Valid @ModelAttribute("specialCommandForm") SpecialCommandForm form,
+      BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.status(422).build();
+    }
+    return okOrRelay(
+        () ->
+            backendApiClient.put(
+                "/api/v1/special-commands/" + id,
+                new SpecialCommandDto(
+                    id,
+                    form.name(),
+                    form.shorthand(),
+                    form.description(),
+                    true,
+                    false,
+                    form.version()),
+                Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #deleteSpecialCommand}.
+   *
+   * @param id SK id
+   * @return {@code 200} on success, the relayed backend status on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> deleteSpecialCommandAjax(@PathVariable @NotNull UUID id) {
+    return okOrRelay(() -> backendApiClient.delete("/api/v1/special-commands/" + id, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #activateSpecialCommand}.
+   *
+   * @param id SK id
+   * @return {@code 200} on success, the relayed backend status on failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> activateSpecialCommandAjax(@PathVariable @NotNull UUID id) {
+    return okOrRelay(
+        () ->
+            backendApiClient.post(
+                "/api/v1/special-commands/" + id + "/activate", null, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #addMember}.
+   *
+   * @param id SK id
+   * @param userId user to add
+   * @return {@code 200} on success, the relayed backend status (incl. 409 already-member) on
+   *     failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/members", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> addMemberAjax(
+      @PathVariable @NotNull UUID id, @RequestParam @NotNull UUID userId) {
+    return okOrRelay(
+        () ->
+            backendApiClient.post(
+                "/api/v1/special-commands/" + id + "/members/" + userId, null, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #removeMember}.
+   *
+   * @param id SK id
+   * @param userId user to remove
+   * @return {@code 200} on success, the relayed backend status on failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/members/{userId}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> removeMemberAjax(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+    return okOrRelay(
+        () ->
+            backendApiClient.delete(
+                "/api/v1/special-commands/" + id + "/members/" + userId, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #patchMemberFlags}. Carries the optimistic-lock version; a conflict is
+   * relayed as {@code OPTIMISTIC_LOCK} so the client offers the reload-confirm.
+   *
+   * @param id SK id
+   * @param userId user whose flags to patch
+   * @param form bound form carrying both flag values and the version
+   * @return {@code 200} on success, the relayed backend status on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/members/{userId}/flags", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> patchMemberFlagsAjax(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID userId,
+      @ModelAttribute MembershipFlagsForm form) {
+    return okOrRelay(
+        () -> {
+          Map<String, Object> body = new HashMap<>();
+          body.put("isLogistician", form.isLogistician());
+          body.put("isMissionManager", form.isMissionManager());
+          body.put("version", form.version());
+          backendApiClient.patch(
+              "/api/v1/special-commands/" + id + "/members/" + userId, body, Void.class);
+        });
+  }
+
+  /**
+   * In-place twin of {@link #toggleMemberLead}.
+   *
+   * @param id SK id
+   * @param userId user whose membership to update
+   * @param isLead new Lead state
+   * @param version current optimistic-lock version
+   * @return {@code 200} on success, the relayed backend status on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/members/{userId}/lead", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> toggleMemberLeadAjax(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID userId,
+      @RequestParam @NotNull Boolean isLead,
+      @RequestParam @NotNull Long version) {
+    return okOrRelay(
+        () -> {
+          Map<String, Object> body = new HashMap<>();
+          body.put("isLead", isLead);
+          body.put("version", version);
+          backendApiClient.patch(
+              "/api/v1/special-commands/" + id + "/members/" + userId + "/lead", body, Void.class);
+        });
+  }
+
+  /**
+   * Runs a Spezialkommando backend write and maps the outcome to an HTTP status: {@code 200} on
+   * success, the relayed backend problem on a {@link BackendServiceException}, {@code 500}
+   * otherwise. Shared by every SK / member AJAX twin.
+   *
+   * @param backendCall the backend mutation to perform
+   * @return the mapped {@link ResponseEntity}
+   */
+  private ResponseEntity<Object> okOrRelay(Runnable backendCall) {
+    try {
+      backendCall.run();
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
+      log.error("SpecialCommand write (ajax) failed", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("SpecialCommand write (ajax) failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
+   * preserving the stable {@code code} (e.g. {@code OPTIMISTIC_LOCK}) and {@code detail}, so the
+   * shared {@code krtFetch} client branches on the conflict semantics exactly as the other in-place
+   * writes do.
+   *
+   * @param e the backend failure to relay
+   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   // ---------- helper fetchers for the detail page ---------------------------------

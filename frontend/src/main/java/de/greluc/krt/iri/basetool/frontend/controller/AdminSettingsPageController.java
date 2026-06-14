@@ -25,20 +25,30 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SystemSettingUpdateDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.MessageSource;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -81,6 +91,7 @@ public class AdminSettingsPageController {
   private static final BigDecimal DEFAULT_TRANSFER_FEE_PERCENT = new BigDecimal("0.5");
 
   private final BackendApiClient backendApiClient;
+  private final MessageSource messageSource;
 
   /**
    * Loads all admin-tunable system settings and exposes value+version pairs to the form template.
@@ -324,4 +335,164 @@ public class AdminSettingsPageController {
     }
     return "redirect:/admin/settings";
   }
+
+  /**
+   * In-place (AJAX) twin of {@link #updateSettings} — routed here ahead of the classic handler by
+   * the {@code X-Requested-With} header so the no-JS form keeps its redirect fallback. Applies the
+   * same cross-field invariants and per-setting PUTs, but returns the bumped optimistic-lock
+   * versions as JSON so the page can write them back into the hidden version inputs (the next save
+   * would otherwise 409). Validation failures are returned as {@code application/problem+json} with
+   * a localized {@code detail} so the shared {@code krtFetch} client toasts the exact reason; a
+   * backend conflict on any setting is relayed with its {@code OPTIMISTIC_LOCK} code so the client
+   * offers the reload-confirm rather than reloading.
+   *
+   * @param request the JSON-bound settings payload (values + per-setting versions)
+   * @param locale the request locale used to resolve validation messages
+   * @return {@code 200} with the fresh versions on success, {@code 422 problem+json} on a
+   *     validation failure, the relayed backend status on conflict/failure, {@code 500} on an
+   *     unexpected error
+   */
+  @ResponseBody
+  @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateSettingsAjax(
+      @RequestBody SettingsAjaxRequest request, Locale locale) {
+    try {
+      int yellowDays = Integer.parseInt(request.ageYellowDays());
+      int redDays = Integer.parseInt(request.ageRedDays());
+      if (yellowDays < 0 || redDays < 0 || yellowDays >= redDays) {
+        return validationProblem("error.settings.invalid.values", locale);
+      }
+
+      BigDecimal transferFeePercent = new BigDecimal(request.transferFeePercent().trim());
+      if (transferFeePercent.signum() < 0 || transferFeePercent.compareTo(ONE_HUNDRED) >= 0) {
+        return validationProblem("error.settings.invalid.values", locale);
+      }
+      BigDecimal transferFeeRate = transferFeePercent.divide(ONE_HUNDRED, 6, RoundingMode.HALF_UP);
+
+      final SystemSettingDto yellow =
+          backendApiClient.put(
+              "/api/v1/settings/job_order.age_yellow_days",
+              new SystemSettingUpdateDto(String.valueOf(yellowDays), request.ageYellowVersion()),
+              SystemSettingDto.class);
+      final SystemSettingDto red =
+          backendApiClient.put(
+              "/api/v1/settings/job_order.age_red_days",
+              new SystemSettingUpdateDto(String.valueOf(redDays), request.ageRedVersion()),
+              SystemSettingDto.class);
+      final SystemSettingDto rounding =
+          backendApiClient.put(
+              "/api/v1/settings/refinery.rounding.mode",
+              new SystemSettingUpdateDto(
+                  request.refineryRoundingMode(), request.refineryRoundingVersion()),
+              SystemSettingDto.class);
+      final SystemSettingDto fee =
+          backendApiClient.put(
+              "/api/v1/settings/operation.transfer_fee_rate",
+              new SystemSettingUpdateDto(
+                  transferFeeRate.stripTrailingZeros().toPlainString(),
+                  request.transferFeeVersion()),
+              SystemSettingDto.class);
+
+      Long intakeVersion =
+          request.intakeSpecialCommandVersion() != null
+              ? request.intakeSpecialCommandVersion()
+              : 0L;
+      String intakeId = request.intakeSpecialCommandId();
+      if (intakeId != null && !intakeId.isBlank()) {
+        SystemSettingDto intake =
+            backendApiClient.put(
+                "/api/v1/settings/" + INTAKE_SK_SETTING_KEY,
+                new SystemSettingUpdateDto(intakeId.trim(), intakeVersion),
+                SystemSettingDto.class);
+        intakeVersion = intake.version();
+      }
+
+      Map<String, Object> result = new LinkedHashMap<>();
+      result.put("ageYellowVersion", yellow.version());
+      result.put("ageRedVersion", red.version());
+      result.put("refineryRoundingVersion", rounding.version());
+      result.put("transferFeeVersion", fee.version());
+      result.put("intakeSpecialCommandVersion", intakeVersion);
+      result.put("transferFeePercent", transferFeePercent.stripTrailingZeros().toPlainString());
+      return ResponseEntity.ok(result);
+    } catch (NumberFormatException e) {
+      return validationProblem("error.settings.invalid.format", locale);
+    } catch (BackendServiceException e) {
+      log.error("Failed to update settings (ajax)", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to update settings (ajax)", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Builds a {@code 422 application/problem+json} response whose {@code detail} is the localized
+   * message for {@code messageKey}, so the client toasts the exact validation reason without
+   * client-side key mapping.
+   *
+   * @param messageKey the message bundle key to resolve
+   * @param locale the request locale
+   * @return a 422 problem+json {@link ResponseEntity}
+   */
+  private ResponseEntity<Object> validationProblem(String messageKey, Locale locale) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", 422);
+    body.put("code", "VALIDATION_FAILED");
+    body.put("detail", messageSource.getMessage(messageKey, null, messageKey, locale));
+    return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
+  }
+
+  /**
+   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
+   * preserving the stable {@code code} (e.g. {@code OPTIMISTIC_LOCK}) and {@code detail}, so the
+   * shared {@code krtFetch} client branches on the conflict semantics exactly as the other in-place
+   * writes do.
+   *
+   * @param e the backend failure to relay
+   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
+  }
+
+  /**
+   * JSON payload for the in-place settings save ({@link #updateSettingsAjax}). Mirrors the classic
+   * form's request parameters; the day/percent fields stay strings so they are parsed and
+   * range-validated server-side exactly as the redirect handler does.
+   *
+   * @param ageYellowDays yellow-aging threshold (parsed as int)
+   * @param ageYellowVersion optimistic-lock version for the yellow setting
+   * @param ageRedDays red-aging threshold (parsed as int)
+   * @param ageRedVersion optimistic-lock version for the red setting
+   * @param refineryRoundingMode rounding mode value ({@code UP} / {@code DOWN})
+   * @param refineryRoundingVersion optimistic-lock version for the rounding setting
+   * @param transferFeePercent in-game transfer fee as a percent string (e.g. {@code 0.5})
+   * @param transferFeeVersion optimistic-lock version for the transfer-fee setting
+   * @param intakeSpecialCommandId UUID string of the intake Spezialkommando, or blank to leave it
+   *     unchanged
+   * @param intakeSpecialCommandVersion optimistic-lock version for the intake-SK setting
+   */
+  public record SettingsAjaxRequest(
+      String ageYellowDays,
+      Long ageYellowVersion,
+      String ageRedDays,
+      Long ageRedVersion,
+      String refineryRoundingMode,
+      Long refineryRoundingVersion,
+      String transferFeePercent,
+      Long transferFeeVersion,
+      String intakeSpecialCommandId,
+      Long intakeSpecialCommandVersion) {}
 }

@@ -25,12 +25,17 @@ import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -39,6 +44,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -181,5 +187,100 @@ public class AdminLocationsPageController {
       return "redirect:/admin/locations?error=ToggleHomeLocationFailed";
     }
     return "redirect:/admin/locations";
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #toggleLocationVisibility} — routed here ahead of the classic
+   * handler by the {@code X-Requested-With} header so the no-JS form keeps its redirect fallback.
+   * Flips the hidden flag server-side off a freshly-read record (so no stale client version can
+   * reach the PUT) and returns the persisted {@link LocationDto} so the page can re-render the
+   * row's toggle buttons in place. A concurrent-tab conflict is relayed as {@code
+   * application/problem+json} so the client surfaces the reload-confirm rather than reloading.
+   *
+   * @param id location id
+   * @return the updated {@link LocationDto} on success, the relayed backend status on conflict/
+   *     failure, {@code 500} on an unexpected error
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/toggle-visibility", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Object> toggleLocationVisibilityAjax(@PathVariable @NotNull UUID id) {
+    try {
+      LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+      LocationDto body =
+          new LocationDto(
+              id,
+              current.name(),
+              current.description(),
+              !current.hidden(),
+              current.homeLocation(),
+              current.version());
+      backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      return ResponseEntity.ok(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
+    } catch (BackendServiceException e) {
+      log.error("Toggle location visibility (ajax) failed", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Toggle location visibility (ajax) failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #toggleHomeLocation}. Flips the home-location flag server-side
+   * off a freshly-read record and returns the persisted {@link LocationDto} for an in-place row
+   * re-render; conflicts are relayed as {@code application/problem+json}.
+   *
+   * @param id location id
+   * @return the updated {@link LocationDto} on success, the relayed backend status on conflict/
+   *     failure, {@code 500} on an unexpected error
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/toggle-home-location", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Object> toggleHomeLocationAjax(@PathVariable @NotNull UUID id) {
+    try {
+      LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+      LocationDto body =
+          new LocationDto(
+              id,
+              current.name(),
+              current.description(),
+              current.hidden(),
+              !current.homeLocation(),
+              current.version());
+      backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      return ResponseEntity.ok(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
+    } catch (BackendServiceException e) {
+      log.error("Toggle home-location (ajax) failed", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Toggle home-location (ajax) failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
+   * preserving the stable {@code code} (e.g. {@code OPTIMISTIC_LOCK}) and {@code detail}, so the
+   * shared {@code krtFetch} client branches on the conflict semantics exactly as the other in-place
+   * writes do.
+   *
+   * @param e the backend failure to relay
+   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 }

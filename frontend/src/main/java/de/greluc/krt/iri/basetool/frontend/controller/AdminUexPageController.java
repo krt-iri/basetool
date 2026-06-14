@@ -43,6 +43,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -51,6 +54,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -219,6 +223,153 @@ public class AdminUexPageController {
       return "redirect:/admin/uex-data?error=ToggleVisibilityFailed";
     }
     return "redirect:/admin/uex-data";
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #updateLoadingDockOverride} — routed here ahead of the classic
+   * handler by the {@code X-Requested-With} header so the no-JS form keeps its redirect fallback.
+   * The button active-state is patched deterministically client-side from the action, so this just
+   * relays success/failure.
+   *
+   * @param kind one of {@code cities}, {@code space-stations}, {@code outposts}, {@code pois},
+   *     {@code terminals}
+   * @param id entity id
+   * @param action one of {@code uex} (clear pin), {@code yes} or {@code no} (set pin)
+   * @return {@code 200} on success, {@code 400} for an unknown kind/action, the relayed backend
+   *     status on a backend failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{kind}/{id}/loading-dock", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Object> updateLoadingDockOverrideAjax(
+      @PathVariable @NotNull String kind,
+      @PathVariable @NotNull UUID id,
+      @RequestParam String action) {
+    if (!ALLOWED_LOADING_DOCK_KINDS.contains(kind)) {
+      return ResponseEntity.badRequest().build();
+    }
+    return dispatchOverrideAjax(
+        "/api/v1/" + kind + "/" + id, action, "loading-dock", "loading-dock-override");
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #updateTerminalAutoLoadOverride}.
+   *
+   * @param id terminal id
+   * @param action one of {@code uex}, {@code yes}, {@code no}
+   * @return {@code 200} on success, {@code 400} for an unknown action, the relayed backend status
+   *     on failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/terminals/{id}/auto-load", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Object> updateTerminalAutoLoadOverrideAjax(
+      @PathVariable @NotNull UUID id, @RequestParam String action) {
+    return dispatchOverrideAjax(
+        "/api/v1/terminals/" + id, action, "auto-load", "auto-load-override");
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #toggleTerminalVisibility}. Flips the hidden flag server-side
+   * off a freshly-read record (so the body still carries the UEX-imported display fields verbatim)
+   * and relays success/failure; the button is re-rendered client-side.
+   *
+   * @param id terminal id
+   * @return {@code 200} on success, the relayed backend status on failure, {@code 500} on an
+   *     unexpected error
+   */
+  @ResponseBody
+  @PostMapping(
+      value = "/terminals/{id}/toggle-visibility",
+      headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Object> toggleTerminalVisibilityAjax(@PathVariable @NotNull UUID id) {
+    try {
+      TerminalDto current = backendApiClient.get("/api/v1/terminals/" + id, TerminalDto.class);
+      TerminalDto body =
+          new TerminalDto(
+              id,
+              current.name(),
+              current.nickname(),
+              current.starSystemName(),
+              current.planetName(),
+              current.cityName(),
+              current.spaceStationName(),
+              current.hasLoadingDock(),
+              current.isAutoLoad(),
+              current.hasLoadingDockOverridden(),
+              current.isAutoLoadOverridden(),
+              current.uexHasLoadingDock(),
+              current.uexIsAutoLoad(),
+              current.uexSyncedAt(),
+              !current.hidden());
+      backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
+      log.error("Toggle terminal visibility (ajax) failed", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Toggle terminal visibility (ajax) failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * AJAX counterpart of {@link #dispatchOverride}: applies the same {@code uex}/{@code yes}/{@code
+   * no} mapping but returns an HTTP status instead of a redirect, relaying any backend problem so
+   * {@code krtFetch} can branch on it.
+   *
+   * @param baseUri backend URI up to and including the entity id, with no trailing slash
+   * @param action button action ({@code uex}, {@code yes}, or {@code no})
+   * @param setPath URL segment that pins the flag on a PATCH
+   * @param clearPath URL segment that drops the pin on a DELETE
+   * @return {@code 200} on success, {@code 400} for an unknown action, the relayed backend status
+   *     on failure
+   */
+  private ResponseEntity<Object> dispatchOverrideAjax(
+      String baseUri, String action, String setPath, String clearPath) {
+    try {
+      switch (action) {
+        case "uex" -> backendApiClient.delete(baseUri + "/" + clearPath, Void.class);
+        case "yes" ->
+            backendApiClient.patch(baseUri + "/" + setPath + "?value=true", null, Void.class);
+        case "no" ->
+            backendApiClient.patch(baseUri + "/" + setPath + "?value=false", null, Void.class);
+        default -> {
+          return ResponseEntity.badRequest().build();
+        }
+      }
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
+      log.error("Override update (ajax) failed", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Override update (ajax) failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
+   * preserving the stable {@code code} and {@code detail}, so the shared {@code krtFetch} client
+   * can branch on the conflict semantics exactly as the other in-place writes do.
+   *
+   * @param e the backend failure to relay
+   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   /**

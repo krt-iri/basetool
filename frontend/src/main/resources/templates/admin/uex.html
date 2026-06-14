@@ -498,93 +498,103 @@
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    // sessionStorage key for the page's vertical scroll position. The override
-    // forms POST to the controller, which 302-redirects back here — without
-    // restoration the browser would land at scrollY=0 and the admin would
-    // have to re-scroll to whatever row they were operating on.
-    var UEX_SCROLL_KEY = "admin-uex-scroll-y";
-    var UEX_OPEN_SYSTEMS_KEY = "admin-uex-open-systems";
-    var UEX_OPEN_PARENTS_KEY = "admin-uex-open-parents";
+    // In-place toggle messages (#582). The override / visibility forms now save via the AJAX
+    // twins, so the scroll + disclosure snapshot the old POST->redirect needed is gone with it.
+    var MSG_SAVED = /*[[#{notification.success.save}]]*/ 'Gespeichert.';
+    var MSG_ERROR = /*[[#{error.admin.uex.flag.update}]]*/ 'Speichern fehlgeschlagen.';
 
     document.addEventListener("DOMContentLoaded", function () {
-        // ---- Disclosure state restoration -------------------------------
-        // <details> resets to its default open/closed state on every redirect.
-        // To keep the admin's expanded systems/cities/stations open across
-        // the POST→redirect cycle we serialise the open ones to sessionStorage
-        // just before submit and re-apply them on load.
-        function snapshotDisclosures() {
-            try {
-                var openSystems = [];
-                document.querySelectorAll('details.uex-system[open]').forEach(function (el) {
-                    var name = el.getAttribute('data-system-name');
-                    if (name) openSystems.push(name);
+        // ---- In-place override + visibility toggles (#582) ---------------
+        // The three-state override buttons (loading-dock / auto-load) and the terminal hidden
+        // toggle save via the AJAX twins and patch their own state client-side, so the page never
+        // reloads. The new state is deterministic from the clicked action, so no backend body is
+        // needed.
+
+        // Patches a three-state override group: the button matching the clicked action becomes
+        // active, the other two secondary. For terminals the adjacent UEX source chip's "mismatch"
+        // marker is recomputed from the action and the rendered UEX value (data-uex-value): yes ->
+        // effective true, no -> false, uex -> the UEX value (so no mismatch).
+        function patchOverrideGroup(form, action) {
+            var group = form.parentElement;
+            if (group) {
+                group.querySelectorAll('form').forEach(function (f) {
+                    var actionInput = f.querySelector('input[name="action"]');
+                    var btn = f.querySelector('button');
+                    if (!actionInput || !btn) { return; }
+                    var isActive = actionInput.value === action;
+                    btn.classList.toggle('btn-active', isActive);
+                    btn.classList.toggle('btn-secondary', !isActive);
                 });
-                sessionStorage.setItem(UEX_OPEN_SYSTEMS_KEY, JSON.stringify(openSystems));
-
-                var openParents = [];
-                document.querySelectorAll('details.uex-parent[open]').forEach(function (el) {
-                    var name = el.getAttribute('data-name');
-                    if (name) openParents.push(name);
-                });
-                sessionStorage.setItem(UEX_OPEN_PARENTS_KEY, JSON.stringify(openParents));
-            } catch (e) { /* sessionStorage may be unavailable; ignore */ }
-        }
-
-        function restoreDisclosures() {
-            try {
-                var openSystems = JSON.parse(sessionStorage.getItem(UEX_OPEN_SYSTEMS_KEY) || 'null');
-                if (Array.isArray(openSystems)) {
-                    // Default: every system is open. To keep that default we only
-                    // close systems the user collapsed before submitting.
-                    document.querySelectorAll('details.uex-system').forEach(function (el) {
-                        var name = el.getAttribute('data-system-name');
-                        if (name && openSystems.indexOf(name) === -1) el.open = false;
-                    });
-                }
-                var openParents = JSON.parse(sessionStorage.getItem(UEX_OPEN_PARENTS_KEY) || 'null');
-                if (Array.isArray(openParents)) {
-                    // Default: every parent (city/station) is closed. So only
-                    // reopen what was open before the submit.
-                    document.querySelectorAll('details.uex-parent').forEach(function (el) {
-                        var name = el.getAttribute('data-name');
-                        if (name && openParents.indexOf(name) !== -1) el.open = true;
-                    });
-                }
-                // Consume so a manual reload doesn't replay a stale snapshot.
-                sessionStorage.removeItem(UEX_OPEN_SYSTEMS_KEY);
-                sessionStorage.removeItem(UEX_OPEN_PARENTS_KEY);
-            } catch (e) { /* ignore */ }
-        }
-
-        restoreDisclosures();
-
-        // ---- Scroll + form submit ---------------------------------------
-        var forms = document.querySelectorAll("form[method='post']");
-        forms.forEach(function (f) {
-            f.addEventListener("submit", function (ev) {
-                try {
-                    sessionStorage.setItem(UEX_SCROLL_KEY, String(window.scrollY));
-                } catch (e) { /* ignore */ }
-                snapshotDisclosures();
-                // The parent-row controls live inside <summary>. Without this
-                // stopPropagation the click bubbles to the disclosure and
-                // toggles the panel open/closed on every button press, which
-                // makes the segmented override controls feel busted.
-                ev.stopPropagation();
-            });
-            // Same reason: keep button clicks from toggling the surrounding
-            // <details> when the form sits inside a <summary>.
-            f.addEventListener("click", function (ev) { ev.stopPropagation(); });
-        });
-
-        try {
-            var savedY = sessionStorage.getItem(UEX_SCROLL_KEY);
-            if (savedY !== null) {
-                sessionStorage.removeItem(UEX_SCROLL_KEY);
-                var y = parseInt(savedY, 10);
-                if (!isNaN(y) && y >= 0) window.scrollTo(0, y);
             }
-        } catch (e) { /* ignore */ }
+            var td = form.closest('td');
+            var chip = td ? td.querySelector('.uex-source-chip') : null;
+            if (chip) {
+                var raw = chip.getAttribute('data-uex-value');
+                if (raw !== 'true' && raw !== 'false') {
+                    chip.classList.remove('mismatch');
+                } else {
+                    var uexVal = raw === 'true';
+                    var effective = action === 'yes' ? true : (action === 'no' ? false : uexVal);
+                    chip.classList.toggle('mismatch', uexVal !== effective);
+                }
+            }
+        }
+
+        function submitOverride(form) {
+            var actionInput = form.querySelector('input[name="action"]');
+            var action = actionInput ? actionInput.value : '';
+            window.krtFetch.write({
+                method: 'POST',
+                url: form.getAttribute('action') + '?action=' + encodeURIComponent(action),
+                successMessage: MSG_SAVED,
+                errorMessage: MSG_ERROR,
+                onSuccess: function () { patchOverrideGroup(form, action); }
+            });
+        }
+
+        function submitVisibility(form) {
+            var btn = form.querySelector('button');
+            var hiddenInput = form.querySelector('input[name="hidden"]');
+            window.krtFetch.write({
+                method: 'POST',
+                url: form.getAttribute('action'),
+                successMessage: MSG_SAVED,
+                errorMessage: MSG_ERROR,
+                onSuccess: function () {
+                    if (!btn) { return; }
+                    // btn-secondary is present only when the terminal is visible (hidden=false).
+                    var currentlyHidden = !btn.classList.contains('btn-secondary');
+                    var newHidden = !currentlyHidden;
+                    btn.classList.toggle('btn-secondary', !newHidden);
+                    btn.textContent = newHidden
+                        ? btn.getAttribute('data-label-show')
+                        : btn.getAttribute('data-label-hide');
+                    if (hiddenInput) { hiddenInput.value = String(!newHidden); }
+                }
+            });
+        }
+
+        // Selecting by action keeps the markup edit-free. stopPropagation on the click keeps a
+        // button press inside a <summary> (city/station controls) from toggling the <details>.
+        document.querySelectorAll('form[action*="/loading-dock"], form[action*="/auto-load"]')
+            .forEach(function (form) {
+                form.addEventListener('click', function (ev) { ev.stopPropagation(); });
+                form.addEventListener('submit', function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    if (!window.krtFetch) { form.submit(); return; }
+                    submitOverride(form);
+                });
+            });
+        document.querySelectorAll('form[action*="/toggle-visibility"]').forEach(function (form) {
+            form.addEventListener('click', function (ev) { ev.stopPropagation(); });
+            form.addEventListener('submit', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                if (!window.krtFetch) { form.submit(); return; }
+                submitVisibility(form);
+            });
+        });
 
         // ---- Last-sync timestamp localisation ---------------------------
         document.querySelectorAll('.local-datetime-display').forEach(function (el) {
