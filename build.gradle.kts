@@ -98,8 +98,14 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   flexmark {
     // LICENSE.md is excluded because flexmark cannot converge on it (its output is
     // not idempotent), which it otherwise skips with a warning on every run.
+    // CLAUDE.md is excluded because it is a hand-maintained agent-instruction file
+    // whose deliberate structure must not be reflowed; it is also the file editors
+    // most often re-save as CRLF on Windows, and with `core.autocrlf=true` +
+    // `*.md text eol=lf` (.gitattributes) that CRLF working-tree copy reads as clean
+    // to git until flexmark rewrites it to LF — flipping it to "modified" with an
+    // empty `git diff` on every `spotlessApply`. Excluding it stops that churn.
     target("**/*.md")
-    targetExclude(*vendored, "CHANGELOG.md", "LICENSE.md")
+    targetExclude(*vendored, "CHANGELOG.md", "LICENSE.md", "CLAUDE.md")
     flexmark()
   }
 
