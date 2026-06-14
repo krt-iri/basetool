@@ -266,6 +266,57 @@ class BankPageControllerTest {
         .get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class));
   }
 
+  // covers REQ-FE-005 (#579) — an in-place money-write re-render (fragment=accountBody) returns the
+  // whole account body fragment with the SAME full model the page builds (detail, holders,
+  // transferTargets, distributionPercents, bookings) so balance, distribution AND the modals'
+  // distribution-derived holder selects all refresh from one swap.
+  @Test
+  void accountDetail_fragmentAccountBody_rendersBodyFragment_withFullModel() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankPageController controller = new BankPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    UUID accountId = UUID.randomUUID();
+    UUID holderA = UUID.randomUUID();
+    BankAccountDto self = account(accountId, "KB-0001", "ACTIVE", "1000");
+    BankAccountDetailDto detail =
+        new BankAccountDetailDto(
+            self,
+            new BigDecimal("10"),
+            1,
+            1,
+            List.of(new BankHolderBalanceDto(holderA, "alpha", true, new BigDecimal("1000"))),
+            new BankCapabilitiesDto(true, true, true, false));
+    when(backendApiClient.get(
+            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+        .thenReturn(detail);
+    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+        .thenReturn(
+            new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+        .thenReturn(
+            List.of(
+                new BankHolderDto(
+                    holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, 1, 0L)));
+    when(backendApiClient.get(
+            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<>(List.of(self), 0, 500, 1, 1, Collections.emptyList()));
+
+    // When
+    String view = controller.accountDetail(accountId, null, "accountBody", model);
+
+    // Then
+    assertEquals("bank-account-detail :: accountBody", view);
+    // The accountBody fragment needs the FULL model (unlike the bookings-only fragment): detail,
+    // the
+    // distribution-derived holder selects, transfer targets and percents must all be present.
+    assertNotNull(model.getAttribute("detail"));
+    assertNotNull(model.getAttribute("activeHolders"));
+    assertNotNull(model.getAttribute("transferTargets"));
+    assertNotNull(model.getAttribute("distributionPercents"));
+    assertNotNull(model.getAttribute("bookings"));
+  }
+
   private static BankAccountDto account(UUID id, String no, String status, String balance) {
     return new BankAccountDto(
         id,

@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.manage.title}">Bank-Verwaltung</h1>
@@ -42,6 +42,12 @@
         </div>
     </div>
 
+    <!-- In-place lifecycle writes (REQ-FE-005, #579): account/holder create/rename/close/reopen/
+         (de)activate re-render this region via krtFetch (fragment=manageBody), refreshing the row,
+         its trigger buttons' data-field-version AND the tab-count aggregates without a reload. The
+         creation modals live outside this fragment, so their one-time JS init survives the swap. -->
+    <div id="bank-manage-results">
+    <th:block th:fragment="manageBody">
     <!-- W1 tab switcher (server-side via query param, same pattern as mission detail). -->
     <div class="tab-nav mt-2" role="tablist">
         <a th:href="@{/bank/manage(tab='konten')}" class="tab" role="tab"
@@ -164,6 +170,8 @@
                data-testid="bank-holders-empty" th:text="#{bank.manage.holders.empty}">Noch keine Halter registriert.</p>
         </div>
     </div>
+    </th:block>
+    </div>
 
     <!-- ============ Modals ============ -->
 
@@ -175,7 +183,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-create-account-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/accounts" data-method="POST">
+            <form class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/accounts" data-method="POST">
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
                         <label for="bank-create-name" th:text="#{bank.field.accountName}">Kontoname</label>
@@ -230,7 +239,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-rename-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/accounts/{id}" data-method="PATCH">
+            <form class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/accounts/{id}" data-method="PATCH">
                 <input type="hidden" name="_id">
                 <input type="hidden" name="version">
                 <div class="krt-modal-body">
@@ -260,7 +270,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-close-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/accounts/{id}/close" data-method="POST">
+            <form class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/accounts/{id}/close" data-method="POST">
                 <input type="hidden" name="_id">
                 <input type="hidden" name="version">
                 <div class="krt-modal-body">
@@ -285,7 +296,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-reopen-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/accounts/{id}/reopen" data-method="POST">
+            <form class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/accounts/{id}/reopen" data-method="POST">
                 <input type="hidden" name="_id">
                 <input type="hidden" name="version">
                 <div class="krt-modal-body">
@@ -310,7 +322,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-register-holder-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/holders" data-method="POST">
+            <form class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/holders" data-method="POST">
                 <div class="krt-modal-body">
                     <p class="bank-field-hint" th:text="#{bank.modal.registerHolder.hint}">Nur registrierte Tool-Nutzer k&ouml;nnen Halter werden. Das Handle wird beim Registrieren eingefroren.</p>
                     <div class="bank-form-row">
@@ -343,7 +356,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-holder-deactivate-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/holders/{id}" data-method="PATCH">
+            <form class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/holders/{id}" data-method="PATCH">
                 <input type="hidden" name="_id">
                 <input type="hidden" name="version">
                 <input type="hidden" name="active" value="false">
@@ -369,7 +383,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-holder-reactivate-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/holders/{id}" data-method="PATCH">
+            <form class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/holders/{id}" data-method="PATCH">
                 <input type="hidden" name="_id">
                 <input type="hidden" name="version">
                 <input type="hidden" name="active" value="true">

@@ -58,8 +58,12 @@ public class BankGrantsPageController {
    * @param view grouping mode ({@code account} default, {@code employee})
    * @param accountId selected account in per-account mode; absent = all accounts
    * @param userId selected grantee in per-employee mode; absent = first employee with grants
+   * @param fragment when {@code "grantsMatrix"} only the capability matrix is re-rendered after a
+   *     grant create/revoke (REQ-FE-005), honouring the current {@code view}/{@code
+   *     accountId}/{@code userId} filter so the in-place swap keeps the active grouping; the filter
+   *     selectors and the create modal's lookups (all grants, accounts, users) are then skipped
    * @param model Spring MVC model
-   * @return the grants template
+   * @return the grants template, or its {@code grantsMatrix} fragment for an AJAX swap
    */
   @GetMapping("/bank/grants")
   @PreAuthorize("hasRole('BANK_MANAGEMENT')")
@@ -67,6 +71,7 @@ public class BankGrantsPageController {
       @RequestParam(required = false) String view,
       @RequestParam(required = false) UUID accountId,
       @RequestParam(required = false) UUID userId,
+      @RequestParam(required = false) String fragment,
       Model model) {
     boolean byEmployee = "employee".equalsIgnoreCase(view);
 
@@ -79,6 +84,11 @@ public class BankGrantsPageController {
     List<BankGrantDto> grants =
         backendApiClient.get(
             grantsUri.toUriString(), new ParameterizedTypeReference<List<BankGrantDto>>() {});
+    model.addAttribute("grants", grants == null ? List.<BankGrantDto>of() : grants);
+    if ("grantsMatrix".equals(fragment)) {
+      return "bank-grants :: grantsMatrix";
+    }
+
     List<BankGrantDto> allGrants =
         backendApiClient.get(
             "/api/v1/bank/grants", new ParameterizedTypeReference<List<BankGrantDto>>() {});
@@ -95,7 +105,6 @@ public class BankGrantsPageController {
       grantees.putIfAbsent(grant.userId(), grant.userHandle());
     }
 
-    model.addAttribute("grants", grants == null ? List.<BankGrantDto>of() : grants);
     model.addAttribute(
         "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
     model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);

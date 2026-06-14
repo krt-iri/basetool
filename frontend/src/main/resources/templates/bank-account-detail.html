@@ -24,7 +24,15 @@
 </header>
 
 <main th:if="${detail != null}" th:with="acct=${detail.account()}, caps=${detail.capabilities()}"
-      th:attr="data-bank-generic-error=#{bank.error.network}">
+      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
+    <!-- In-place money writes (REQ-FE-005, #579): deposit/withdraw/transfer/rebook/reverse re-render
+         this whole body via krtFetch (fragment=accountBody) so the balance, the holder distribution
+         and the modals' distribution-derived holder selects all refresh without a page reload. The
+         money forms carry no @Version (append-only ledger), so there is no cross-form version to
+         sync — the server re-render is the single source of truth. -->
+    <div id="bank-account-results">
+    <th:block th:fragment="accountBody" th:if="${detail != null}"
+              th:with="acct=${detail.account()}, caps=${detail.capabilities()}">
     <!-- K1 greeting: name + type chip + status pill + KB number; capability-gated booking actions. -->
     <div class="greeting hud-box flex-between">
         <div>
@@ -254,7 +262,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-deposit-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/deposits" data-method="POST"
+            <form class="bank-ajax-form no-track" data-refresh="accountBody"
+                  data-endpoint="/api/proxy/bank/deposits" data-method="POST"
                   th:attr="data-account-id=${acct.id()}">
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
@@ -297,7 +306,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-withdraw-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/withdrawals" data-method="POST"
+            <form class="bank-ajax-form no-track" data-refresh="accountBody"
+                  data-endpoint="/api/proxy/bank/withdrawals" data-method="POST"
                   th:attr="data-account-id=${acct.id()}">
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
@@ -343,7 +353,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-transfer-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/transfers" data-method="POST"
+            <form class="bank-ajax-form no-track" data-refresh="accountBody"
+                  data-endpoint="/api/proxy/bank/transfers" data-method="POST"
                   th:attr="data-account-id=${acct.id()}" data-account-id-field="sourceAccountId">
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
@@ -409,7 +420,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-rebook-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/transfers" data-method="POST"
+            <form class="bank-ajax-form no-track" data-refresh="accountBody"
+                  data-endpoint="/api/proxy/bank/transfers" data-method="POST"
                   th:attr="data-account-id=${acct.id()},data-fixed-destination=${acct.id()}"
                   data-account-id-field="sourceAccountId">
                 <input type="hidden" name="destinationAccountId" th:value="${acct.id()}">
@@ -465,8 +477,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-reverse-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/transactions/{id}/reversal"
-                  data-method="POST">
+            <form class="bank-ajax-form no-track" data-refresh="accountBody"
+                  data-endpoint="/api/proxy/bank/transactions/{id}/reversal" data-method="POST">
                 <input type="hidden" name="_id">
                 <div class="krt-modal-body">
                     <p th:text="#{bank.modal.reverse.text}">Erzeugt eine negierte Gegenbuchung. Die Originalbuchung bleibt unver&auml;ndert im Ledger.</p>
@@ -532,6 +544,8 @@
             </form>
         </div>
     </div>
+    </th:block>
+    </div>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
@@ -540,15 +554,22 @@
     // Booking-history pager -> in-place swap (REQ-FE-002). The page-btn links inside
     // #bank-bookings-results point at /bank/accounts/{id}?page=N; krtFetch intercepts them and
     // re-renders only that block via fragment=bookings. The reverse button is document-delegated
-    // (bank.js) and .utc-time cells re-localise on krt:swapped, so swapped-in rows stay live and
-    // nothing needs re-init here. No-JS fallback reloads the page.
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({
-            container: '#bank-bookings-results',
-            fragmentValue: 'bookings',
-            history: true
-        });
+    // (bank.js) and .utc-time cells re-localise on krt:swapped, so swapped-in rows stay live.
+    // A money write (#579) re-renders the whole accountBody, REPLACING the #bank-bookings-results
+    // element, so its pagination interception must be re-attached on krt:swapped. bindSwap guards on
+    // _krtSwapBound, so re-running it (incl. after a pager-only swap, where the element persists) is
+    // an idempotent no-op. No-JS fallback reloads the page.
+    function bindBankBookingsPager() {
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({
+                container: '#bank-bookings-results',
+                fragmentValue: 'bookings',
+                history: true
+            });
+        }
     }
+    bindBankBookingsPager();
+    document.addEventListener('krt:swapped', bindBankBookingsPager);
 </script>
 </body>
 </html>
