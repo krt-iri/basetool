@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-14.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Item-order blueprint coverage
@@ -24,31 +24,41 @@ required products and its responsible org unit.
 ### REQ-ORDERS-015 — Blueprint-coverage view for item orders
 
 The item-order detail page MUST show, for an `ITEM` order, who among the members of the
-order's **responsible (processing) org unit** owns the blueprint for each required item, and
-which of those required blueprints each member holds. The view is **person-centric** — one
-row per owning member with the required products they own — and additionally surfaces a
-**per-item coverage** summary (each distinct required product with the count of members who
-own its blueprint, flagging products **no member** owns as a coverage gap).
+order's **responsible (processing) org unit** owns the blueprint for each required item **or for
+any cosmetic variant of it**, and which concrete blueprint each member holds. The view is
+**person-centric** — one row per owning member with the actual variant blueprints they own — and
+additionally surfaces a **per-item coverage** summary (each distinct required item with the count of
+members who own a matching blueprint, flagging items **no member** owns as a coverage gap).
 
-Matching is by the normalized blueprint `product_key`: a required line's
-`blueprint.outputName` is normalized through `BlueprintNameNormalizer` (the same identity used
-for `PersonalBlueprint.productKey`), so a member "has the blueprint for an item" exactly when
-they own a `PersonalBlueprint` whose `product_key` equals the line's. Distinct required
-products are de-duplicated by `product_key`. A `MATERIAL` order yields an empty view. A
-member's blueprints that are **not** among the order's required products are never exposed,
-and owners are identified by display name only (never the Keycloak `sub` or e-mail).
+Matching is by the **variant family key** (`REQ-INV-015`), not the raw `product_key`: a required
+line's `blueprint.outputName` and each member's `PersonalBlueprint.productName` are reduced to a
+family key by `BlueprintVariantFamilyResolver`, so a base item and its cosmetic variants
+(`Fresnel Energy LMG` ↔ `Fresnel "Molten" Energy LMG`) match in **both directions** — ordering the
+base counts owners of any variant, and ordering a variant counts owners of the base and the sibling
+variants. **Magazines are never counted** toward a weapon (they are atomic; a required magazine
+matches only an identical magazine). Distinct required items are de-duplicated by family key. A
+`MATERIAL` order yields an empty view. A member's blueprints that are **not** in a required family
+are never exposed, and owners are identified by display name only (never the Keycloak `sub` or
+e-mail).
+
+Display: each coverage row shows the **ordered** item name (the variant the line requested, if any)
+and, for every non-magazine row, a "counts variants" hint; each owner row shows the **actual** owned
+variant blueprint names (so a lead sees which variant each member holds).
 
 **Acceptance**
 
-- [ ] For an item order, a member of the responsible org unit who owns a `PersonalBlueprint`
-  matching a required item appears in the owners list with that product's display name.
-- [ ] A required product no member owns shows owner count `0` (a gap) in the coverage summary.
-- [ ] A member owning none of the required blueprints does not appear in the owners list.
-- [ ] Owner blueprints outside the order's required products are not listed for that member.
+- [ ] A member who owns a **cosmetic variant** of a required item appears in the owners list and is
+  counted in that item's coverage, with the actual variant name shown.
+- [ ] Ordering a **variant** counts owners of the base and the sibling variants (symmetric).
+- [ ] A **magazine** (e.g. `… Magazine (NNN cap)`, `… Battery`, `… Ammo Box`) is never counted toward
+  its weapon, and a member's magazine is not surfaced; a required magazine matches only itself.
+- [ ] A required item no member can build shows owner count `0` (a gap) in the coverage summary.
+- [ ] A member owning none of the required families does not appear in the owners list.
 - [ ] A material order returns an empty coverage view.
 
-**Enforced by:** `JobOrderItemBlueprintOwnersServiceTest` · **Code:**
-`JobOrderItemBlueprintOwnersService`, `JobOrderController.getItemBlueprintOwners` · **Issues:** —
+**Enforced by:** `JobOrderItemBlueprintOwnersServiceTest`, `BlueprintVariantFamilyResolverTest` ·
+**Code:** `JobOrderItemBlueprintOwnersService`, `BlueprintVariantFamilyResolver`,
+`JobOrderController.getItemBlueprintOwners` · **Issues:** —
 
 ### REQ-ORDERS-016 — Coverage view is restricted to the responsible org unit's members
 
