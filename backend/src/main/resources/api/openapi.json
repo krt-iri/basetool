@@ -44288,6 +44288,9 @@
           "ownerCount" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "variantInclusive" : {
+            "type" : "boolean"
           }
         }
       },

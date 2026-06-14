@@ -3076,6 +3076,16 @@ input[type='radio']:focus {
     font-weight: var(--fw-bold);
 }
 
+/* Coverage row hint — notes that the owner count folds in cosmetic variants of
+   the ordered item (every non-magazine row). Muted, small, on its own line under
+   the item name. */
+.bp-coverage__hint {
+    display: block;
+    margin-top: var(--space-1);
+    color: var(--color-gray-2);
+    font-size: var(--fs-xs);
+}
+
 /* Department tag — small square chip tinted by the owning Bereichsfarbe.
    The border inherits `currentColor`, so setting the text colour to a
    department token (e.g. `color: var(--color-dept-forschung)`) tints both
