@@ -609,6 +609,8 @@
             </div>
 
             <div class="pm-matrix-wrapper">
+                <div id="pm-matrix-results">
+                <th:block th:fragment="matrixBody">
                 <table class="pm-matrix">
                     <thead>
                         <tr class="pm-row-topic">
@@ -695,6 +697,7 @@
                                       th:text="#{promotion.manage.last.evaluated.placeholder}">Zuletzt bewertet …</span>
                             </td>
                             <td class="pm-eligibility-cell pm-eligibility-col">
+                                <th:block th:fragment="eligibilityCell">
                                 <span th:if="${eligList == null or #lists.isEmpty(eligList)}"
                                       class="pm-eligibility-none"
                                       th:text="#{promotion.manage.eligibility.none}">-</span>
@@ -706,6 +709,7 @@
                                       th:title="${elig.eligible} ? #{promotion.manage.eligibility.eligible} + ' (' + ${elig.fromRank} + ' &rarr; ' + ${elig.toRank} + ')' : #{promotion.manage.eligibility.not.eligible} + ' (' + ${elig.fromRank} + ' &rarr; ' + ${elig.toRank} + ')'">
                                     <span th:text="${elig.fromRank}">20</span>&rarr;<span th:text="${elig.toRank}">19</span>
                                 </span>
+                                </th:block>
                             </td>
                             <td th:each="cat : ${categories}"
                                 class="pm-cat-col"
@@ -730,6 +734,8 @@
                 </table>
                 <div id="pm-empty-state" class="pm-empty" hidden
                      th:text="#{promotion.manage.filter.empty}">Keine Treffer.</div>
+                </th:block>
+                </div>
             </div>
         </th:block>
     </div>
@@ -771,8 +777,87 @@
     var STORAGE_KEY_SORT      = 'promotion-manage-sort-mode';
     var STORAGE_KEY_FILTERS   = 'promotion-manage-filters';
 
-    function getCsrfToken()  { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
-    function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+    var MSG_REFRESH_FAILED = /*[[#{promotion.refresh.failed}]]*/ 'Saved, but the view could not be refreshed. Please reload the page.';
+
+    // CSRF readers delegate to the shared krtCsrf module (epic #571); the meta-tag
+    // fallback keeps the page working if krt-fetch.js failed to load.
+    function getCsrfToken()  { return (window.krtCsrf && window.krtCsrf.token && window.krtCsrf.token()) || document.querySelector('meta[name="_csrf"]')?.content || ''; }
+    function getCsrfHeader() { return (window.krtCsrf && window.krtCsrf.headerName && window.krtCsrf.headerName()) || document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+
+    function pmCsrfHeaders() {
+        if (window.krtCsrf && typeof window.krtCsrf.headers === 'function') {
+            return window.krtCsrf.headers();
+        }
+        var h = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        h[getCsrfHeader()] = getCsrfToken();
+        return h;
+    }
+
+    // PUT an evaluation through the shared CSRF reader, retrying once on a bare 403
+    // (stale token) before surfacing the response to the caller.
+    function pmPutEvaluation(url, payload) {
+        function run() {
+            return fetch(url, { method: 'PUT', headers: pmCsrfHeaders(), body: JSON.stringify(payload) });
+        }
+        return run().then(function (r) {
+            if (r.status === 403 && window.krtCsrf && typeof window.krtCsrf.refresh === 'function') {
+                return window.krtCsrf.refresh().then(function (ok) { return ok ? run() : r; });
+            }
+            return r;
+        });
+    }
+
+    // Members whose stored grades changed during the current save run. Their
+    // eligibility chips are recomputed once the queue drains (one lightweight
+    // per-member fetch each) instead of reloading the whole matrix (#580).
+    var pmEligibilityDirty = new Set();
+
+    // Full in-place re-render of the matrix used to recover from an optimistic-lock
+    // conflict: the server rebuilds every row with fresh @Version / level /
+    // eligibility, replacing the old full-page reload. View state (collapse, sort,
+    // filter, formatting) is restored by the krt:swapped listener.
+    function pmRefreshMatrix() {
+        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+            window.location.reload();
+            return Promise.resolve(false);
+        }
+        return window.krtFetch.swap({
+            url: '/promotion/manage',
+            container: '#pm-matrix-results',
+            fragmentValue: 'matrixBody',
+            errorMessage: MSG_REFRESH_FAILED
+        });
+    }
+
+    // Recompute one member's eligibility chips in place after a successful save by
+    // swapping just that row's eligibility cell, then derive the row-level
+    // data-pm-eligible flag the "Nur Beförderbare" filter reads.
+    function pmRefreshEligibility(userId) {
+        var row = document.querySelector('tr[data-pm-user-id="' + userId + '"]');
+        if (!row) return Promise.resolve(false);
+        var cell = row.querySelector('.pm-eligibility-cell');
+        if (!cell || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+            return Promise.resolve(false);
+        }
+        return window.krtFetch.swap({
+            url: '/promotion/manage?userId=' + encodeURIComponent(userId),
+            container: cell,
+            fragmentValue: 'eligibilityCell'
+        }).then(function (ok) {
+            if (!ok) return false;
+            var eligible = !!cell.querySelector('.eligibility-chip[data-pm-eligible="true"]');
+            row.setAttribute('data-pm-eligible', eligible ? 'true' : 'false');
+            pmApplyFilters();
+            return true;
+        });
+    }
+
+    function pmFlushEligibility() {
+        if (pmEligibilityDirty.size === 0) return;
+        var ids = Array.from(pmEligibilityDirty);
+        pmEligibilityDirty.clear();
+        ids.forEach(function (uid) { pmRefreshEligibility(uid); });
+    }
 
     // ----------------------------------------------------------------------
     // Save queue
@@ -818,6 +903,9 @@
         if (pmSaveQueue.length === 0) {
             pmInFlightKey = null;
             pmUpdateQueueIndicator();
+            // Queue drained: recompute eligibility chips for every member touched
+            // during this run, in place, instead of reloading the page.
+            pmFlushEligibility();
             return;
         }
         var job = pmSaveQueue.shift();
@@ -832,24 +920,21 @@
         var assignedLevel = select.value || null;
         var cell         = select.closest('td');
 
-        var headers = { 'Content-Type': 'application/json' };
-        headers[getCsrfHeader()] = getCsrfToken();
-
-        return fetch('/api/proxy/promotion/evaluations/user/' + encodeURIComponent(userId) +
-                     '/category/' + encodeURIComponent(categoryId), {
-            method: 'PUT',
-            headers: headers,
-            body: JSON.stringify({ version: version, assignedLevel: assignedLevel })
-        })
+        return pmPutEvaluation(
+            '/api/proxy/promotion/evaluations/user/' + encodeURIComponent(userId) +
+                '/category/' + encodeURIComponent(categoryId),
+            { version: version, assignedLevel: assignedLevel })
         .then(function (response) {
             if (response.status === 409) {
                 if (typeof window.showFrontendErrorToast === 'function') {
                     window.showFrontendErrorToast(MSG_CONFLICT);
                 }
-                // Drop pending jobs — the page reload will rebuild the queue
-                // from the server's authoritative state.
+                // Drop pending jobs and re-render the matrix in place from the
+                // server's authoritative state (fresh @Version on every cell) —
+                // the in-place equivalent of the old full-page reload.
                 pmSaveQueue = [];
-                setTimeout(function () { window.location.reload(); }, 1500);
+                pmEligibilityDirty.clear();
+                pmRefreshMatrix();
                 return null;
             }
             if (!response.ok) {
@@ -864,6 +949,8 @@
             if (data) {
                 select.setAttribute('data-version', data.version);
                 select.setAttribute('data-level', assignedLevel || '');
+                // Mark this member for an eligibility recompute once the queue drains.
+                pmEligibilityDirty.add(userId);
                 if (cell) {
                     // Restart the animation by removing+re-adding the class on
                     // the next animation frame. Without the rAF the browser
@@ -1326,6 +1413,25 @@
             window.krtEvents.on('click', 'pm-bulk-apply', pmBulkApply);
             window.krtEvents.on('click', 'pm-bulk-clear', pmClearSelection);
         }
+
+        // After a full matrix re-render (409 recovery) the rows are rebuilt from
+        // server state, so re-apply every client-side view layer: topic collapse,
+        // last-evaluated formatting, the persisted sort mode, the active filter
+        // and the bulk-selection panel. The delegated change/click handlers above
+        // survive the swap (they are bound on document), so only view state needs
+        // restoring. The lighter eligibility-cell swaps target a <td> (no id), so
+        // they are intentionally ignored here.
+        document.addEventListener('krt:swapped', function (e) {
+            var c = e.detail && e.detail.container;
+            if (!c || c.id !== 'pm-matrix-results') return;
+            pmApplyCollapsedState(pmLoadCollapsedTopics());
+            pmFormatLastEvaluated();
+            var mode = pmRestoreSortMode();
+            pmSetSortMode(mode);
+            pmApplySort(mode);
+            pmApplyFilters();
+            pmRefreshBulkPanel();
+        });
     });
     /*]]>*/
 </script>
