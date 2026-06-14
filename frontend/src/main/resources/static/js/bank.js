@@ -355,12 +355,38 @@
         const url = spec.preserveQuery
             ? window.location.pathname + window.location.search
             : window.location.pathname;
-        window.krtFetch.swap({
-            url: url,
-            container: spec.container,
-            fragmentValue: form.getAttribute('data-refresh'),
-            errorMessage: refreshError || genericError(),
+        // Freeze the about-to-be-replaced open-modal trigger buttons for the duration of the
+        // in-flight swap. The swap is async, so until its fresh DOM lands the old triggers still
+        // carry a now-stale data-field-version; a rapid re-open + submit would prime a modal with it
+        // and 409 (the manage/holder lifecycle race the old full reload dodged by navigating away).
+        // It also blocks an accidental rapid double money booking. On a successful swap they are
+        // replaced by fresh enabled buttons; if the swap bails (rare expired-session bounce, DOM left
+        // untouched) we re-enable exactly the ones we froze.
+        const container = document.querySelector(spec.container);
+        const frozen = container
+            ? Array.from(
+                  container.querySelectorAll(
+                      'button[data-trigger="open-modal-display"]:not([disabled])',
+                  ),
+              )
+            : [];
+        frozen.forEach(function (button) {
+            button.disabled = true;
         });
+        window.krtFetch
+            .swap({
+                url: url,
+                container: spec.container,
+                fragmentValue: form.getAttribute('data-refresh'),
+                errorMessage: refreshError || genericError(),
+            })
+            .then(function (swapped) {
+                if (!swapped) {
+                    frozen.forEach(function (button) {
+                        button.disabled = false;
+                    });
+                }
+            });
     }
 
     document.addEventListener('submit', function (event) {
