@@ -196,17 +196,26 @@ The classic `POST→redirect` handler (sharing the patch logic with the twin via
 `applyMissionUpdate` helper) stays the no-JavaScript fallback, and its inline `th:errors` rendering is
 the single source of truth the AJAX message text matches.
 
+`applyMissionUpdate` must **round-trip the schedule datetimes losslessly**: a time field that is
+rendered into its hidden input but never re-edited submits the value `formatInstant` produced (a
+zoneless local datetime that may carry sub-second precision), and `parseToInstant` must parse it back
+to the same instant rather than failing and nulling it. A broken round-trip silently clears
+`meetingTime`/`plannedStartTime`/`plannedEndTime` on every save — and because `plannedStartTime` is a
+`required` form field, the next page load can no longer submit at all.
+
 **Acceptance**
 
 - [ ] Editing core data saves in place (no navigation) and a second consecutive save does not 409.
 - [ ] A `@Valid` failure renders the field message inline with no navigation; fixing + re-saving
   clears it.
+- [ ] Saving core data preserves the schedule times the user did not re-edit (no silent nulling).
 - [ ] With JavaScript disabled the classic form still `POST→redirect`s (the twin is header-gated).
 
-**Enforced by:** `MissionCoreEditAjaxControllerTest` (success four-version re-read, 422 field map, 409
-problem+json, header-gated fallback routing) + `MissionCoreEditInPlaceE2eTest` (in-place save,
-double-save no-409, inline validation) · **Issues:** #589 · **Code:** `mission-detail.html`,
-`MissionPageController` (`updateMissionAjax`, `applyMissionUpdate`).
+**Enforced by:** `MissionCoreEditAjaxControllerTest` (four-version re-read, microsecond zoneless
+schedule-time round-trip, 422 field map, 409 problem+json, fallback routing) +
+`MissionCoreEditInPlaceE2eTest` (in-place save, double-save no-409, inline validation). **Code:**
+`mission-detail.html`, `MissionPageController` (`updateMissionAjax`, `applyMissionUpdate`,
+`parseToInstant`/`formatInstant`). **Issues:** #589.
 
 ## Out of scope
 

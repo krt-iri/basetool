@@ -21,6 +21,7 @@ package de.greluc.krt.iri.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -40,10 +41,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import java.time.Instant;
 import java.util.Collections;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -54,10 +58,12 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * MVC tests for the #589 in-place mission core-edit twin {@link
  * MissionPageController#updateMissionAjax}: the success path returns the four fresh versions (incl.
- * the schedule version re-read after the PLANNED→ACTIVE auto-bump), a {@code @Valid} failure
- * returns a {@code 422} {@code {field: message}} map (messages resolved exactly as {@code
- * th:errors}) with no backend call, a backend {@code 409} is propagated as {@code problem+json}
- * preserving the {@code code}, and a header-less POST falls back to the classic redirect handler.
+ * the schedule version re-read after the PLANNED→ACTIVE auto-bump), an unedited microsecond
+ * zoneless schedule time round-trips through the schedule PATCH instead of being nulled, a
+ * {@code @Valid} failure returns a {@code 422} {@code {field: message}} map (messages resolved
+ * exactly as {@code th:errors}) with no backend call, a backend {@code 409} is propagated as {@code
+ * problem+json} preserving the {@code code}, and a header-less POST falls back to the classic
+ * redirect handler.
  */
 @SpringBootTest
 class MissionCoreEditAjaxControllerTest {
@@ -117,6 +123,51 @@ class MissionCoreEditAjaxControllerTest {
         .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
     verify(backendApiClient)
         .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+  }
+
+  @Test
+  void updateMissionAjax_microsecondZonelessPlannedStart_isPreservedNotNulled() throws Exception {
+    // Regression for the datetime round-trip data loss: formatInstant renders a schedule time that
+    // was displayed but never re-edited as a zoneless Europe/Berlin local datetime that can carry
+    // microseconds (e.g. 2026-06-21T11:59:58.222717). parseToInstant must round-trip it to the
+    // correct instant instead of throwing and nulling the field — otherwise every core-edit save
+    // silently clears plannedStartTime/meetingTime/plannedEndTime the user did not re-touch, which
+    // is exactly what broke MissionCoreEditInPlaceE2eTest (the next page load lost the required
+    // plannedStart, so the form could no longer submit).
+    MissionDto refreshed = mock(MissionDto.class);
+    when(refreshed.version()).thenReturn(1L);
+    when(refreshed.coreVersion()).thenReturn(1L);
+    when(refreshed.scheduleVersion()).thenReturn(1L);
+    when(refreshed.flagsVersion()).thenReturn(1L);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class), eq(false)))
+        .thenReturn(refreshed);
+
+    mockMvc
+        .perform(
+            post("/missions/" + MISSION_ID)
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(oidcLogin())
+                .with(csrf())
+                .param("name", "Edited Mission")
+                .param("status", "PLANNED")
+                .param("plannedStartTime", "2026-06-21T11:59:58.222717")
+                .param("scheduleVersion", "5"))
+        .andExpect(status().isOk());
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> scheduleBody = ArgumentCaptor.forClass(Map.class);
+    verify(backendApiClient)
+        .patch(
+            eq("/api/v1/missions/" + MISSION_ID + "/schedule"),
+            scheduleBody.capture(),
+            eq(Void.class));
+    // 2026-06-21T11:59:58.222717 in Europe/Berlin (CEST, +02:00 in June) is 09:59:58.222717Z — and
+    // critically NOT null, which is what the broken parse produced.
+    assertEquals(
+        Instant.parse("2026-06-21T09:59:58.222717Z"),
+        scheduleBody.getValue().get("plannedStartTime"),
+        "an unedited microsecond zoneless schedule time must round-trip, not be nulled on save");
   }
 
   @Test

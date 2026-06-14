@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- **Missionsdetailseite: Das Speichern der Kerndaten (Verwaltung) löscht keine Zeiten mehr.** Treffen-, Geplant-Start- und Geplant-Ende-Zeit, die beim Bearbeiten nicht erneut angefasst wurden, wurden beim Speichern still auf leer gesetzt (eine Zeitangabe mit Sekundenbruchteilen ließ sich nicht zurücklesen); sie bleiben jetzt erhalten.
+
 - **In-Place-Listen und -Bereiche: Bricht eine Aktualisierung ab (abgelaufene Sitzung, kurzzeitig nicht erreichbares Backend), wird nicht mehr eine ganze Seite — etwa die Login- oder die Missionsliste — in den kleinen Ergebnisbereich gerendert.** Der bisherige Inhalt bleibt erhalten und es erscheint ein KRT-Hinweis; die Missionsdetailseite zeigt stattdessen einen passenden Inline-Fehler im betroffenen Bereich.
 
 - **Admin › Spezialkommandos: Der Löschen-Button (Papierkorb) in der Listenansicht funktioniert wieder.** Er war bisher folgenlos (kein Formular, keine Verdrahtung); jetzt öffnet er einen KRT-Bestätigungsdialog und deaktiviert das Spezialkommando anschließend (reversibel über „Inaktive anzeigen" → „Aktivieren").

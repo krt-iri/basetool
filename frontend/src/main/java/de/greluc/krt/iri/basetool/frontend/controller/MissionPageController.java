@@ -2382,25 +2382,53 @@ public class MissionPageController {
     return "UP";
   }
 
+  /**
+   * Display time zone for the mission schedule fields. The datetime-splitter renders/edits times in
+   * the browser's local zone; the server-side {@link #formatInstant} / {@link #parseToInstant}
+   * round trip uses this fixed zone for the zoneless local-datetime form the hidden input carries
+   * when a field is rendered but never re-edited.
+   */
+  private static final java.time.ZoneId MISSION_TIME_ZONE = java.time.ZoneId.of("Europe/Berlin");
+
+  /**
+   * Parses a hidden datetime-input value back into an {@link java.time.Instant}, accepting every
+   * shape the datetime-splitter or {@link #formatInstant} can produce: a zone-bearing value (the
+   * splitter writes a UTC {@code toISOString()} with {@code Z} on edit, an explicit offset is
+   * equally absolute), a zoneless local datetime of <em>any</em> fractional-second precision (what
+   * {@link #formatInstant} renders for a field that was displayed but never re-edited, e.g. {@code
+   * 2026-06-21T11:59:58.222717}), or a bare date. A zoneless value is interpreted in {@link
+   * #MISSION_TIME_ZONE}.
+   *
+   * <p>The earlier fixed-length (16/19) checks rejected the microsecond local form and fell through
+   * to {@link java.time.Instant#parse}, which threw — silently nulling {@code
+   * plannedStartTime}/{@code meetingTime}/{@code plannedEndTime} on every save that did not
+   * re-touch the field (the #589 e2e regression).
+   *
+   * @param dateTimeStr the hidden input value; {@code null}/blank yields {@code null}
+   * @return the parsed instant, or {@code null} if the value is blank or unparseable
+   */
   private java.time.Instant parseToInstant(String dateTimeStr) {
     if (dateTimeStr == null || dateTimeStr.isBlank()) {
       return null;
     }
+    final String value = dateTimeStr.trim();
     try {
-      if (dateTimeStr.endsWith("Z")) {
-        return java.time.Instant.parse(dateTimeStr);
+      // A date-only value (the splitter submits a bare date when no time was entered) maps to the
+      // start of that day in the display zone.
+      if (value.length() == 10) {
+        return java.time.LocalDate.parse(value).atStartOfDay(MISSION_TIME_ZONE).toInstant();
       }
-      if (dateTimeStr.length() == 19) { // YYYY-MM-DDThh:mm:ss
-        java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateTimeStr);
-        return ldt.atZone(java.time.ZoneId.of("Europe/Berlin")).toInstant();
-      }
-      if (dateTimeStr.length() == 16) { // YYYY-MM-DDThh:mm
-        java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateTimeStr);
-        return ldt.atZone(java.time.ZoneId.of("Europe/Berlin")).toInstant();
-      }
-      return java.time.Instant.parse(dateTimeStr);
+      // ISO_DATE_TIME parses both a zone-bearing value (absolute instant) and a zoneless local
+      // datetime of any fractional precision; parseBest picks OffsetDateTime when a zone is present
+      // and LocalDateTime otherwise.
+      java.time.temporal.TemporalAccessor parsed =
+          java.time.format.DateTimeFormatter.ISO_DATE_TIME.parseBest(
+              value, java.time.OffsetDateTime::from, java.time.LocalDateTime::from);
+      return parsed instanceof java.time.OffsetDateTime odt
+          ? odt.toInstant()
+          : ((java.time.LocalDateTime) parsed).atZone(MISSION_TIME_ZONE).toInstant();
     } catch (Exception e) {
-      log.warn("Failed to parse datetime string: {}", dateTimeStr, e);
+      log.warn("Failed to parse datetime string: {}", value, e);
       return null;
     }
   }
@@ -2421,8 +2449,13 @@ public class MissionPageController {
       } else {
         return String.valueOf(instantObj);
       }
-      java.time.ZonedDateTime zdt = instant.atZone(java.time.ZoneId.of("Europe/Berlin"));
-      return zdt.toLocalDateTime().toString();
+      java.time.ZonedDateTime zdt = instant.atZone(MISSION_TIME_ZONE);
+      // Truncate to seconds: the splitter's date/time inputs are minute-granular and write back a
+      // seconds-precision value on edit, so sub-second digits would only be DOM noise. The
+      // microsecond local form (YYYY-MM-DDThh:mm:ss.SSSSSS) is also exactly what the splitter's
+      // local-datetime regex cannot match and what parseToInstant used to choke on; truncating
+      // keeps the value in the documented zoneless YYYY-MM-DDThh:mm[:ss] shape.
+      return zdt.toLocalDateTime().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
     } catch (Exception e) {
       log.warn("Failed to format instant: {}", instantObj);
       return String.valueOf(instantObj);
