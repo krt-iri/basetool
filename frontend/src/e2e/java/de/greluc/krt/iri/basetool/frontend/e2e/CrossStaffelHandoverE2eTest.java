@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -146,17 +147,20 @@ class CrossStaffelHandoverE2eTest {
           page.locator("#recipientSquadron").selectOption(STAFFEL_B_NAME);
         }
 
-        // Await the handover POST before re-navigating; otherwise the in-flight submit is aborted
-        // and the mutation lost (the flaky WebKit failure — see E2eSupport#awaitFormPost).
-        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-handover-submit").click());
-
-        // Post-submit GET via the retry helper — WebKit can abort it (HTTP/2 INTERNAL_ERROR) even
-        // after the redirect settled. See E2eSupport#navigate.
-        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
+        // Submit in place (#575): the material handover swaps sections via AJAX and closes the
+        // modal — no Post/Redirect/Get navigation to await. Mark the window to prove no full reload
+        // happened, submit, then web-first-wait for the handover row carrying the recipient to
+        // appear in the re-rendered history (which also proves persistence), and assert the marker.
+        page.evaluate("window.__krtNoReload = true;");
+        page.getByTestId("order-handover-submit").click();
         assertThat(
                 page.getByTestId("order-handover-row")
                     .filter(new Locator.FilterOptions().setHasText("E2E CrossStaffel Recipient")))
             .isVisible();
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "material handover must swap in place — no full-page reload cleared the window marker");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "crossstaffel-handover");
         throw failure;
