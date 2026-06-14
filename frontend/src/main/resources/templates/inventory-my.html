@@ -602,12 +602,14 @@
     }
 
     function showInventoryToast(type, msg) {
-        var toast = document.getElementById('toast');
-        if (!toast) { return; }
-        toast.textContent = msg;
-        toast.className = 'toast ' + (type === 'error' ? 'toast-error' : 'toast-success');
-        toast.style.display = 'block';
-        setTimeout(function () { toast.style.display = 'none'; }, 4000);
+        // Delegate to the shared toast fragment globals (templates/fragments/toast.html).
+        // There is no page-local #toast element; routing through the globals is the only
+        // path that actually surfaces a notification.
+        if (type === 'error') {
+            if (typeof window.showFrontendErrorToast === 'function') { window.showFrontendErrorToast(msg); }
+        } else if (typeof window.showFrontendSuccessToast === 'function') {
+            window.showFrontendSuccessToast(msg);
+        }
     }
 
     function saveNote() {

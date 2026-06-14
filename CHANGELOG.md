@@ -28,6 +28,8 @@
 
 ### Fixed
 
+- **Lager: Erfolgs- und Fehlerhinweise beim Bearbeiten von Notizen und bei der Sammelauswahl werden wieder angezeigt.** Der seiteneigene Hinweis-Helfer zeigte auf ein nicht vorhandenes Element und blieb dadurch wirkungslos; er nutzt jetzt die gemeinsamen Toast-Funktionen. Betrifft das persönliche Lager und die Admin-Ansicht.
+
 - **Raffinerieauftrag einlagern: Mitglieder mit mehreren Org-Einheiten können wieder einlagern (#596).** Gehörte der Empfänger eines eingelagerten Outputs mehr als einer Org-Einheit an (Staffel plus Spezialkommando), brach das Einlagern bisher mit „User belongs to multiple org units" (400) ab, weil der Einlager-Dialog keine Org-Einheit zur Auswahl bot. Der Dialog zeigt jetzt pro Position eine Org-Einheit-Auswahl — die Optionen richten sich nach dem gewählten Empfänger und sind mit der Org-Einheit des Auftrags vorbelegt, sodass das Einlagern auf die eigene Org-Einheit weiterhin ein Klick bleibt.
 
 - **Persönliches Lager: Die Sammel-Ausbuchung funktioniert jetzt (#577).** Die Aktion rief bisher direkt eine Backend-Adresse auf, für die es im Frontend keine Route gab, sodass die markierten Einträge nie ausgebucht wurden; sie wird jetzt über das Frontend an das Backend weitergereicht und aktualisiert die gruppierte Tabelle in-place.
