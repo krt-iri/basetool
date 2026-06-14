@@ -441,7 +441,7 @@ class OperationServiceTest {
           new OperationUpdateDto("new", "new-desc", OperationStatus.ACTIVE, 2L);
 
       when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
-      when(operationRepository.save(existing)).thenReturn(existing);
+      when(operationRepository.saveAndFlush(existing)).thenReturn(existing);
 
       Operation result = operationService.updateOperation(id, incoming, false);
 
@@ -503,7 +503,7 @@ class OperationServiceTest {
           new OperationUpdateDto("new", "post-mortem description", OperationStatus.COMPLETED, 1L);
 
       when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
-      when(operationRepository.save(existing)).thenReturn(existing);
+      when(operationRepository.saveAndFlush(existing)).thenReturn(existing);
 
       Operation result = operationService.updateOperation(id, incoming, false);
 
@@ -524,7 +524,7 @@ class OperationServiceTest {
       OperationUpdateDto incoming = new OperationUpdateDto("n", "d", OperationStatus.PLANNED, 1L);
 
       when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
-      when(operationRepository.save(existing)).thenReturn(existing);
+      when(operationRepository.saveAndFlush(existing)).thenReturn(existing);
 
       Operation result = operationService.updateOperation(id, incoming, true);
 
@@ -580,7 +580,7 @@ class OperationServiceTest {
           new OperationUpdateDto("new", null, OperationStatus.PLANNED, null);
 
       when(operationRepository.findById(id)).thenReturn(Optional.of(existing));
-      when(operationRepository.save(existing)).thenReturn(existing);
+      when(operationRepository.saveAndFlush(existing)).thenReturn(existing);
 
       Operation result = operationService.updateOperation(id, incoming, false);
       assertEquals("new", result.getName());
