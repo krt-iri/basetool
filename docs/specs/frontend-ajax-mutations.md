@@ -219,6 +219,23 @@ write succeeds but only its follow-up refresh GET bounces, the swap surfaces a d
 reload" message rather than the generic "action failed" text, so a committed money booking is never
 mistaken for a failure.
 
+The **promotion** admin + management pages (#580) drop their last `AJAX-then-location.reload()`
+writes for in-place fragment swaps. The two admin pages re-render their list region after every
+mutation: **topics/categories** create / edit / delete and the up/down **reorder** swap
+`promotion-admin-topics :: topicsResults` into `#pa-topics-results`, and the **rank-requirements**
+create / edit / delete + group-delete swap `promotion-admin-rank-requirements :: ranksResults` into
+`#ar-results`. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
+and first/last arrow state, so a second reorder can no longer 409 — and the reorder no longer relies
+on a non-existent GET-by-id proxy route (it now reads the full DTO each PUT needs straight from the
+card's edit-button data attributes). The **manage** matrix already saved grades in place through its
+serialised save queue; #580 finishes it by recomputing each touched member's **eligibility chips**
+once the queue drains, via a lightweight per-member `promotion-manage :: eligibilityCell` swap, and
+by replacing the optimistic-lock **409 reload** with an in-place `promotion-manage :: matrixBody`
+re-render that rebuilds every row with a fresh `@Version` (the client-side collapse / sort / filter
+state is restored on `krt:swapped`). All three pages' bespoke `getCsrfToken` / `getCsrfHeader` +
+`apiCall` helpers were retired onto `krtCsrf` (shared reader + retry-once-on-403); the client-side
+rank filter and the manage CSV export are untouched.
+
 The organisation / members / profile area (#581) converts the org-chart inline editor, the member
 list and the profile + home-page writes. The org-chart position operations (add / reassign / rename /
 vacate / remove) drop the `setTimeout(location.reload)` that followed each `send()` for a `chartBody`
@@ -240,20 +257,21 @@ entity on the page through `OwnerScopeService`, so the existing controlled full 
 re-rendering the whole page anyway (REQ-ORG-\*).
 
 **Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
-refinery-import (#591), asset-management (#578), bank (#579) and org/members/profile (#581) twin /
-fragment / endpoint MVC + e2e tests. **Issues:** the epic children `#572`–`#591` (this area `#581`).
-**Code:**
+refinery-import (#591), asset-management (#578), bank (#579), promotion (#580) and org/members/profile
+(#581) twin / fragment / endpoint MVC + e2e tests. **Issues:** the epic children `#572`–`#591` (these
+areas `#580`/`#581`). **Code:**
 
 `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
 `mission-detail.html`, `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`,
 `datetime-splitter.js`, `hangar.html`, `ship-data.html`, `personal-inventory.html`,
 `personal-inventory-blueprints.html`, `personal-inventory*.js`, `bank.js`, `bank-account-detail.html`,
-`bank-manage.html`, `bank-grants.html`, `org-chart.html`, `members.html`, `member-edit.html`,
-`profile.html`, `index.html`, `JobOrderPageController`, `RefineryOrderPageController`,
-`HangarPageController`, `ShipDataPageController`, `PersonalInventoryPageController`,
-`PersonalInventoryBlueprintsPageController`, `BankPageController`, `BankManagePageController`,
-`BankGrantsPageController`, `OrgChartPageController`, `MemberManagementController`, `ProfileController`,
-`HomeController`.
+`bank-manage.html`, `bank-grants.html`, `promotion-admin-topics.html`,
+`promotion-admin-rank-requirements.html`, `promotion-manage.html`, `org-chart.html`, `members.html`,
+`member-edit.html`, `profile.html`, `index.html`, `JobOrderPageController`,
+`RefineryOrderPageController`, `HangarPageController`, `ShipDataPageController`,
+`PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`, `BankPageController`,
+`BankManagePageController`, `BankGrantsPageController`, `PromotionPageController`,
+`OrgChartPageController`, `MemberManagementController`, `ProfileController`, `HomeController`.
 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 

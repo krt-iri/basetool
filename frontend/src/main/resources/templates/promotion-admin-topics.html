@@ -138,6 +138,8 @@
                     th:text="#{promotion.manage.collapse.all}">Alle einklappen</button>
         </div>
 
+        <div id="pa-topics-results">
+        <th:block th:fragment="topicsResults">
         <div th:if="${#lists.isEmpty(topics)}">
             <p th:text="#{promotion.admin.topics.no.topics}">Keine Themenbereiche vorhanden.</p>
         </div>
@@ -295,6 +297,8 @@
                 </div>
             </div>
         </details>
+        </th:block>
+        </div>
     </div>
     </th:block>
 </main>
@@ -414,6 +418,7 @@
     var MSG_OK            = /*[[#{general.confirm}]]*/ 'OK';
     var MSG_CANCEL        = /*[[#{general.cancel}]]*/ 'Cancel';
     var MSG_DIRTY_LEAVE   = /*[[#{promotion.admin.topics.dirty.leave}]]*/ 'You have unsaved changes. Leave anyway?';
+    var MSG_REFRESH_FAILED = /*[[#{promotion.refresh.failed}]]*/ 'Saved, but the view could not be refreshed. Please reload the page.';
 
     function toastSuccess(msg) { if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg); }
     function toastError(msg)   { if (window.showFrontendErrorToast)   window.showFrontendErrorToast(msg); }
@@ -421,20 +426,57 @@
     function closeModal(id) { document.getElementById(id).classList.remove('active'); }
     function openModal(id)  { document.getElementById(id).classList.add('active'); }
 
-    function getCsrfToken()  { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
-    function getCsrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+    // CSRF readers delegate to the shared krtCsrf module (epic #571); the meta-tag
+    // fallback keeps the page working if krt-fetch.js failed to load.
+    function getCsrfToken()  { return (window.krtCsrf && window.krtCsrf.token && window.krtCsrf.token()) || document.querySelector('meta[name="_csrf"]')?.content || ''; }
+    function getCsrfHeader() { return (window.krtCsrf && window.krtCsrf.headerName && window.krtCsrf.headerName()) || document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
 
+    // Re-renders the topics list in place after any structural change (create /
+    // edit / delete / reorder). The server re-renders the fragment, so every
+    // card's data-pa-*-version, sortOrder and first/last arrow state come back
+    // fresh — this is what guarantees a second reorder does not 409 (#580).
+    function paRefreshTopics() {
+        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+            window.location.reload();
+            return Promise.resolve(false);
+        }
+        return window.krtFetch.swap({
+            url: '/promotion/admin/topics',
+            container: '#pa-topics-results',
+            fragmentValue: 'topicsResults',
+            errorMessage: MSG_REFRESH_FAILED
+        });
+    }
+
+    function paCsrfHeaders() {
+        if (window.krtCsrf && typeof window.krtCsrf.headers === 'function') {
+            return window.krtCsrf.headers();
+        }
+        var h = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        h[getCsrfHeader()] = getCsrfToken();
+        return h;
+    }
+
+    // JSON write through the shared CSRF reader with a single retry on a bare 403
+    // (stale token). Keeps the page's inline conflict UX — on 409 it toasts and
+    // refreshes the list in place rather than reloading the whole page.
     function apiCall(url, method, body) {
-        var headers = { 'Content-Type': 'application/json' };
-        headers[getCsrfHeader()] = getCsrfToken();
-        return fetch(url, {
-            method: method,
-            headers: headers,
-            body: body ? JSON.stringify(body) : undefined
+        function run() {
+            return fetch(url, {
+                method: method,
+                headers: paCsrfHeaders(),
+                body: body ? JSON.stringify(body) : undefined
+            });
+        }
+        return run().then(function (r) {
+            if (r.status === 403 && window.krtCsrf && typeof window.krtCsrf.refresh === 'function') {
+                return window.krtCsrf.refresh().then(function (ok) { return ok ? run() : r; });
+            }
+            return r;
         }).then(function (r) {
             if (r.status === 409) {
                 toastError(MSG_CONFLICT);
-                setTimeout(function () { window.location.reload(); }, 1500);
+                paRefreshTopics();
                 return null;
             }
             if (!r.ok) {
@@ -475,7 +517,7 @@
             if (!data) return;
             toastSuccess(MSG_SAVED);
             closeModal('modal-create-topic');
-            setTimeout(function () { window.location.reload(); }, 600);
+            paRefreshTopics();
         });
     }
     function updateTopic() {
@@ -490,7 +532,7 @@
             if (!data) return;
             toastSuccess(MSG_SAVED);
             closeModal('modal-edit-topic');
-            setTimeout(function () { window.location.reload(); }, 600);
+            paRefreshTopics();
         });
     }
     function deleteTopic(btn) {
@@ -503,7 +545,7 @@
             apiCall('/api/proxy/promotion/topics/' + id, 'DELETE', null).then(function (data) {
                 if (!data) return;
                 toastSuccess(MSG_DELETED);
-                setTimeout(function () { window.location.reload(); }, 600);
+                paRefreshTopics();
             });
         });
     }
@@ -538,7 +580,7 @@
             if (!data) return;
             toastSuccess(MSG_SAVED);
             closeModal('modal-create-category');
-            setTimeout(function () { window.location.reload(); }, 600);
+            paRefreshTopics();
         });
     }
     function updateCategory() {
@@ -554,7 +596,7 @@
             if (!data) return;
             toastSuccess(MSG_SAVED);
             closeModal('modal-edit-category');
-            setTimeout(function () { window.location.reload(); }, 600);
+            paRefreshTopics();
         });
     }
     function deleteCategory(btn) {
@@ -567,7 +609,7 @@
             apiCall('/api/proxy/promotion/categories/' + id, 'DELETE', null).then(function (data) {
                 if (!data) return;
                 toastSuccess(MSG_DELETED);
-                setTimeout(function () { window.location.reload(); }, 600);
+                paRefreshTopics();
             });
         });
     }
@@ -575,46 +617,50 @@
     // ----------------------------------------------------------------------
     // Sort: up/down arrows (T4)
     // ----------------------------------------------------------------------
-    // We do not have a swap endpoint; instead we PUT both the moved item and
-    // its neighbour with their sortOrder values swapped. After both PUTs the
-    // page reloads to pick up the new server state. Sequential, not parallel,
-    // so a 409 on either call surfaces cleanly via apiCall.
-    function fetchTopic(id) {
-        return fetch('/api/proxy/promotion/topics/' + id, {
-            headers: { 'Accept': 'application/json' }
-        }).then(function (r) { return r.ok ? r.json() : null; });
+    // There is no swap endpoint; instead we PUT both the moved item and its
+    // neighbour with their sortOrder values swapped, then re-render the list in
+    // place (no reload) so every card's fresh @Version comes back for the next
+    // move. The full DTO each PUT needs (name/description/sortOrder/version, plus
+    // topicId for categories) is read straight from the card's edit-button data
+    // attributes — the page already carries it, so no read-back GET is required
+    // (the proxy exposes no GET-by-id route anyway).
+    function paReadCardBody(card, trigger) {
+        var btn = card.querySelector('[data-trigger="' + trigger + '"]');
+        if (!btn) return null;
+        var version = parseInt(btn.getAttribute('data-pa-version'), 10);
+        if (!Number.isFinite(version)) return null;
+        var body = {
+            version: version,
+            name: btn.getAttribute('data-pa-name'),
+            description: btn.getAttribute('data-pa-description') || null,
+            sortOrder: parseInt(btn.getAttribute('data-pa-sort'), 10) || 0
+        };
+        var topicId = btn.getAttribute('data-pa-topic-id');
+        if (topicId) body.topicId = topicId;
+        return body;
     }
-    function fetchCategory(id) {
-        return fetch('/api/proxy/promotion/categories/' + id, {
-            headers: { 'Accept': 'application/json' }
-        }).then(function (r) { return r.ok ? r.json() : null; });
-    }
-    function swapSort(currentCard, otherCard, putUrl, dataAttrPrefix) {
-        var currentSort   = parseInt(currentCard.getAttribute(dataAttrPrefix + '-sort'), 10);
-        var otherSort     = parseInt(otherCard.getAttribute(dataAttrPrefix + '-sort'), 10);
-        if (!Number.isFinite(currentSort) || !Number.isFinite(otherSort)) return Promise.resolve(null);
-        var currentId      = currentCard.getAttribute(dataAttrPrefix + '-id');
-        var otherId        = otherCard.getAttribute(dataAttrPrefix + '-id');
-        var currentVersion = parseInt(currentCard.getAttribute(dataAttrPrefix + '-version'), 10);
-        var otherVersion   = parseInt(otherCard.getAttribute(dataAttrPrefix + '-version'), 10);
-        if (currentSort === otherSort) {
-            // Tie-break: shift the other one out of the way so the values
-            // become distinct, then swap. Avoids a deadlock state.
-            otherSort = currentSort + (otherCard.compareDocumentPosition(currentCard) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+    function swapSort(currentCard, otherCard, putUrl, kind) {
+        var trigger = kind === 'topic' ? 'pa-edit-topic' : 'pa-edit-category';
+        var idAttr  = kind === 'topic' ? 'data-pa-topic-id' : 'data-pa-category-id';
+        var a = paReadCardBody(currentCard, trigger);
+        var b = paReadCardBody(otherCard, trigger);
+        if (!a || !b) { toastError(MSG_ERROR); return Promise.resolve(null); }
+        var aSort = a.sortOrder;
+        var bSort = b.sortOrder;
+        if (aSort === bSort) {
+            // Tie-break: nudge the other value so the two become distinct,
+            // otherwise swapping equal sortOrders is a no-op and the move sticks.
+            bSort = aSort + (otherCard.compareDocumentPosition(currentCard) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
         }
-        var fetcher = dataAttrPrefix === 'data-pa-topic' ? fetchTopic : fetchCategory;
-        // PUT requires the full DTO; we re-fetch the bodies so we don't have
-        // to mirror every field of the original payload into the page.
-        return Promise.all([fetcher(currentId), fetcher(otherId)]).then(function (bodies) {
-            if (!bodies[0] || !bodies[1]) { toastError(MSG_ERROR); return null; }
-            bodies[0].sortOrder = otherSort;
-            bodies[0].version   = currentVersion;
-            bodies[1].sortOrder = currentSort;
-            bodies[1].version   = otherVersion;
-            return apiCall(putUrl + '/' + currentId, 'PUT', bodies[0]).then(function (r1) {
-                if (!r1) return null;
-                return apiCall(putUrl + '/' + otherId, 'PUT', bodies[1]);
-            });
+        a.sortOrder = bSort;
+        b.sortOrder = aSort;
+        var aId = currentCard.getAttribute(idAttr);
+        var bId = otherCard.getAttribute(idAttr);
+        // Sequential, not parallel: a 409 on the first PUT surfaces (and refreshes
+        // the list) via apiCall before the second one fires.
+        return apiCall(putUrl + '/' + aId, 'PUT', a).then(function (r1) {
+            if (!r1) return null;
+            return apiCall(putUrl + '/' + bId, 'PUT', b);
         });
     }
     function findAdjacentSibling(card, direction) {
@@ -629,20 +675,20 @@
         var card = btn.closest('.admin-topic-card');
         var other = findAdjacentSibling(card, direction);
         if (!other) return;
-        swapSort(card, other, '/api/proxy/promotion/topics', 'data-pa-topic').then(function (r) {
+        swapSort(card, other, '/api/proxy/promotion/topics', 'topic').then(function (r) {
             if (r === null) return;
             toastSuccess(MSG_SAVED);
-            setTimeout(function () { window.location.reload(); }, 400);
+            paRefreshTopics();
         });
     }
     function moveCategory(btn, direction) {
         var card = btn.closest('.pa-category-card');
         var other = findAdjacentSibling(card, direction);
         if (!other) return;
-        swapSort(card, other, '/api/proxy/promotion/categories', 'data-pa-category').then(function (r) {
+        swapSort(card, other, '/api/proxy/promotion/categories', 'category').then(function (r) {
             if (r === null) return;
             toastSuccess(MSG_SAVED);
-            setTimeout(function () { window.location.reload(); }, 400);
+            paRefreshTopics();
         });
     }
 
@@ -789,6 +835,16 @@
             window.krtEvents.on('click',  'pa-expand-all-topics',   function () { paToggleAllTopics(true); });
             window.krtEvents.on('click',  'pa-collapse-all-topics', function () { paToggleAllTopics(false); });
         }
+
+        // After an in-place refresh the level-content textareas are re-rendered
+        // from authoritative server state, so any tracked "dirty" references now
+        // point at detached nodes — drop them and hide the save-all banner.
+        document.addEventListener('krt:swapped', function (e) {
+            if (e.detail && e.detail.container && e.detail.container.id === 'pa-topics-results') {
+                paDirtyTextareas.clear();
+                paUpdateSaveAllBanner();
+            }
+        });
     });
     /*]]>*/
 </script>
