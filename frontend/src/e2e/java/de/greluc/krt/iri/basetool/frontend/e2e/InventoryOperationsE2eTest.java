@@ -225,8 +225,15 @@ class InventoryOperationsE2eTest {
           page.locator("#amount").fill("42");
 
           double before = totalAmount(stacksForMaterial(pickedMaterialId));
-          E2eSupport.clickSubmitClearingFooter(
-              page.locator("form[action$='/inventory/input'] button[type='submit']"));
+          // #577: book-in is now an X-Requested-With AJAX twin (navigate-after-AJAX on success), so
+          // wait on the XHR POST rather than a document navigation; keep the footer-clear so the
+          // trusted click is not intercepted by the fixed footer.
+          page.evaluate(
+              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                  + " 'none'; } }");
+          page.waitForResponse(
+              r -> r.url().contains("/inventory/input") && "POST".equals(r.request().method()),
+              () -> page.locator("form[action$='/inventory/input'] button[type='submit']").click());
           double after = totalAmount(stacksForMaterial(pickedMaterialId));
 
           assertEquals(
@@ -448,12 +455,25 @@ class InventoryOperationsE2eTest {
           page.locator("#personal").check();
           // Index 0 is the "-- Kein Einsatz --" placeholder; index 1 is the seeded mission.
           page.locator("#missionId").selectOption(new SelectOption().setIndex(1));
-          E2eSupport.clickSubmitClearingFooter(
-              page.locator("form[action$='/inventory/input'] button[type='submit']"));
+          // #577: the cross-field rule now comes back as a 422 from the AJAX twin — no navigation,
+          // the form stays put and the error surfaces as a toast.
+          page.evaluate("window.__krtNoReload = true;");
+          page.evaluate(
+              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                  + " 'none'; } }");
+          page.waitForResponse(
+              r -> r.url().contains("/inventory/input") && "POST".equals(r.request().method()),
+              () -> page.locator("form[action$='/inventory/input'] button[type='submit']").click());
 
-          // Inline re-render (no redirect): still on the input form, with a field error shown.
+          assertEquals(
+              Boolean.TRUE,
+              page.evaluate("window.__krtNoReload === true"),
+              "a rejected personal+assignment create must not navigate (in-place 422)");
           assertThat(page).hasURL(Pattern.compile(".*/inventory/input.*"));
-          assertThat(page.locator("ul.text-danger li").first()).isVisible();
+          // The 422 surfaces as the JS-built dynamic toast (.notification-toast.error-toast, no
+          // id),
+          // not the server-rendered flash toast — the AJAX path never re-renders the page.
+          assertThat(page.locator(".notification-toast.error-toast").first()).isVisible();
         });
   }
 

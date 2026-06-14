@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Lager ohne Seitenneuladen (Epic #571 / #577, Teil 1):** Das Einbuchen, das Bearbeiten von Notizen und das Zuordnen von Aufträgen/Einsätzen, die Übergaben auf der Materialsammlungsseite (Besitzer-/Standortwechsel, Lieferstatus) sowie das vollständige Leeren des globalen Lagers (Admin) aktualisieren jetzt nur den betroffenen Bereich in-place statt die ganze Seite neu zu laden. Ein direkt nachfolgender Schritt auf derselben Zeile führt nicht mehr zu einem Konflikt. Das Ausbuchen und die Sammel-Ausbuchung folgen in Teil 2. Ohne JavaScript funktionieren die klassischen Formulare unverändert weiter.
+
 - **Operationen ohne Seitenneuladen (Epic #571 / #576):** Das Anlegen und Löschen einer Operation aktualisiert die Operationsliste jetzt in-place statt die Seite neu zu laden; das Bearbeiten einer Operation auf der Detailseite speichert ebenfalls ohne Neuladen (zwei Speichervorgänge unmittelbar hintereinander führen nicht mehr zu einem Konflikt), und das Löschen auf der Detailseite wechselt nach Erfolg zur Liste. Der Bezahlt-Schalter der Auszahlungen lief schon vorher in-place. Ohne JavaScript funktionieren die klassischen Formulare unverändert weiter.
 
 - **Auftragsübersicht: Item-Aufträge zeigen in der Materialien-Spalte jetzt die aggregierte Materialliste mit Sammelfortschritt statt der Anzahl bestellter Items (#595).** Wie bei Material-Aufträgen erscheint pro Material die geforderte Menge und der Fortschritt beim Sammeln (vorhandener, dem Auftrag zugeordneter Bestand geteilt durch die benötigte Menge). So beantwortet die Spalte für beide Auftragsarten dieselbe Frage — was muss noch beschafft werden.
