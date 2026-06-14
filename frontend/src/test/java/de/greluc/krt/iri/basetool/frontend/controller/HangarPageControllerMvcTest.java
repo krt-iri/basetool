@@ -156,6 +156,37 @@ class HangarPageControllerMvcTest {
 
   @Test
   @WithMockUser
+  void viewHangar_FragmentResults_RendersOnlyTheShipTableFragment() throws Exception {
+    // The in-place swap target: GET /hangar?fragment=results returns just the hangarResults
+    // fragment (the add button + table) and NOT the surrounding page chrome (the modals, the
+    // import section), so a write handler can re-render the table without reloading (REQ-FE-005).
+    ManufacturerDto manufacturer =
+        new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
+    ShipTypeDto shipType =
+        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
+    ShipDto ship =
+        new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
+    PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 1000, 1, 1, List.of());
+
+    when(backendApiClient.get(
+            eq("/api/v1/hangar/my-ships?size=1000"), any(ParameterizedTypeReference.class)))
+        .thenReturn(ships);
+
+    mockMvc
+        .perform(get("/hangar").param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("hangar :: hangarResults"))
+        .andExpect(content().string(containsString("data-testid=\"hangar-add-ship\"")))
+        .andExpect(content().string(containsString("data-ship-filter=")))
+        // the modals + import section live outside the fragment and must not be in the swap body
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("id=\"ship-modal\""))))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("id=\"fleetview-import-btn\""))));
+  }
+
+  @Test
+  @WithMockUser
   void viewSquadron_ShouldRenderSearchFormAndPageSizePicker() throws Exception {
     // Given a first page at the default size 50 with enough total entries (>10) for the
     // page-size picker to render at all.

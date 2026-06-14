@@ -25,14 +25,19 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.ManufacturerForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.ShipTypeForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -41,6 +46,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -185,6 +191,112 @@ public class ShipDataPageController {
       redirectAttributes.addFlashAttribute("errorToast", "error.shipdata.unfit.failed");
     }
     return "redirect:/ship-data";
+  }
+
+  // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-001)
+
+  /**
+   * Header-gated AJAX twin of {@link #resetAllFitted}: clears the {@code fitted} flag on every ship
+   * and returns {@code 204} so {@code ship-data.html} surfaces a toast and closes the confirm modal
+   * without the classic POST→redirect reload (the reset has no per-row effect on this page). The
+   * classic handler stays the no-JS fallback.
+   *
+   * @return {@code 204} on success, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/reset-fitted", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseBody
+  public ResponseEntity<Object> resetAllFittedAjax() {
+    try {
+      backendApiClient.post("/api/v1/hangar/ships/reset-fitted", null, Void.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Reset all fitted failed (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Reset all fitted failed (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #toggleShipTypeVisibility}: flips a ship type's hidden flag
+   * and returns {@code 204} so the page toggles just that row (button label, secondary style,
+   * dimmed opacity) in place instead of reloading. The classic handler stays the no-JS fallback.
+   *
+   * @param id ship type id
+   * @param hidden the desired new flag value
+   * @return {@code 204} on success, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/ship-types/{id}/visibility", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseBody
+  public ResponseEntity<Object> toggleShipTypeVisibilityAjax(
+      @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
+    try {
+      backendApiClient.put(
+          "/api/v1/ship-types/" + id + "/visibility?hidden=" + hidden, null, Void.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Update ShipType visibility failed (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Update ShipType visibility failed (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #toggleManufacturerVisibility}: flips a manufacturer's hidden
+   * flag and returns {@code 204} so the page toggles just that row in place instead of reloading.
+   * The classic handler stays the no-JS fallback.
+   *
+   * @param id manufacturer id
+   * @param hidden the desired new flag value
+   * @return {@code 204} on success, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(
+      value = "/manufacturers/{id}/visibility",
+      headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseBody
+  public ResponseEntity<Object> toggleManufacturerVisibilityAjax(
+      @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
+    try {
+      backendApiClient.put(
+          "/api/v1/manufacturers/" + id + "/visibility?hidden=" + hidden, null, Void.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Update Manufacturer visibility failed (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Update Manufacturer visibility failed (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Translates a {@link BackendServiceException} into an RFC 7807 {@code problem+json} response,
+   * preserving the backend status, {@code code}, {@code detail} and correlation id so the client's
+   * {@code krtFetch.handleProblem} can drive the conflict reload-confirm or an error toast. Mirrors
+   * the helper in the hangar / inventory / mission controllers.
+   *
+   * @param e the backend failure to relay
+   * @return a {@code problem+json} response carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   private String parseString(Object o) {

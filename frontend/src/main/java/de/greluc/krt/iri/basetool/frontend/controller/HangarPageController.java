@@ -31,17 +31,22 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.ShipForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.iri.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -50,8 +55,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -125,11 +132,13 @@ public class HangarPageController {
    * catalog never blanks the whole page. The ship list is sorted client-side with the multi-key
    * comparator described in the class Javadoc.
    *
+   * @param fragment when {@code "results"}, only the ship-table results fragment is rendered for an
+   *     in-place AJAX swap after a ship write (epic #571 / REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with the ship form, ship list and reference catalogs
-   * @return the {@code hangar} view name
+   * @return the {@code hangar} view name, or its {@code hangarResults} fragment selector
    */
   @GetMapping
-  public String viewHangar(Model model) {
+  public String viewHangar(@RequestParam(required = false) String fragment, Model model) {
     if (!model.containsAttribute("shipForm")) {
       model.addAttribute("shipForm", new ShipForm());
     }
@@ -254,6 +263,9 @@ public class HangarPageController {
     model.addAttribute("homeLocations", homeLocations);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions());
 
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "hangar :: hangarResults";
+    }
     return "hangar";
   }
 
@@ -384,7 +396,7 @@ public class HangarPageController {
       // through a Redis-serialised FlashMap (see RedisSessionConfig).
       model.addAttribute("showShipModal", true);
       model.addAttribute("modalAction", "/hangar/add");
-      return viewHangar(model);
+      return viewHangar(null, model);
     }
 
     try {
@@ -431,7 +443,7 @@ public class HangarPageController {
       model.addAttribute("errorToast", "error.validation.failed");
       model.addAttribute("showShipModal", true);
       model.addAttribute("modalAction", "/hangar/" + id + "/update");
-      return viewHangar(model);
+      return viewHangar(null, model);
     }
 
     try {
@@ -500,6 +512,194 @@ public class HangarPageController {
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.home_location.set");
     }
     return "redirect:/hangar";
+  }
+
+  // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-005)
+
+  /**
+   * Header-gated AJAX twin of {@link #addShip}: adds a ship and returns {@code 204} so {@code
+   * hangar.html} re-swaps the ship table in place via {@code GET /hangar?fragment=results} instead
+   * of the classic POST→redirect reload. The twin is selected only for an {@code
+   * X-Requested-With=XMLHttpRequest} request, so the classic handler stays the no-JS fallback. The
+   * modal's HTML5 {@code required} dropdowns guard ship-type + insurance client-side; a missing one
+   * still yields a {@code 422} so a crafted request cannot slip past, and a backend rejection is
+   * relayed verbatim as {@code problem+json}.
+   *
+   * @param request the ship payload submitted as JSON ({@code version} is ignored — always a
+   *     create)
+   * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
+   *     {@code problem+json}
+   */
+  @PostMapping(value = "/add", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> addShipAjax(@RequestBody ShipRequestDto request) {
+    if (request == null || request.shipTypeId() == null || isBlank(request.insurance())) {
+      return validationProblem();
+    }
+    try {
+      backendApiClient.post(
+          "/api/v1/hangar/ships",
+          new ShipRequestDto(
+              request.name(),
+              request.shipTypeId(),
+              request.insurance(),
+              request.locationId(),
+              request.fitted(),
+              null,
+              request.owningOrgUnitId()),
+          ShipDto.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Failed to add ship (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to add ship (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #updateShip}: updates a ship and returns {@code 204} so the
+   * page re-swaps the ship table in place. The optimistic-lock {@code version} travels in the JSON
+   * payload; a concurrent edit surfaces as a {@code 409} {@code problem+json} carrying {@code
+   * OPTIMISTIC_LOCK}, which the client turns into the sanctioned reload-confirm. {@code
+   * owningOrgUnitId} is not editable on update (the existing stamp survives), mirroring the classic
+   * handler.
+   *
+   * @param id ship id
+   * @param request the ship payload submitted as JSON (carries the last-seen {@code version})
+   * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
+   *     {@code problem+json}
+   */
+  @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> updateShipAjax(
+      @PathVariable @NotNull UUID id, @RequestBody ShipRequestDto request) {
+    if (request == null || request.shipTypeId() == null || isBlank(request.insurance())) {
+      return validationProblem();
+    }
+    try {
+      backendApiClient.put(
+          "/api/v1/hangar/ships/" + id,
+          new ShipRequestDto(
+              request.name(),
+              request.shipTypeId(),
+              request.insurance(),
+              request.locationId(),
+              request.fitted(),
+              request.version(),
+              null),
+          ShipDto.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Failed to update ship (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to update ship (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #deleteShip}: deletes a ship and returns {@code 204} so the
+   * page removes the row and re-swaps the table in place. A backend failure is relayed as {@code
+   * problem+json}.
+   *
+   * @param id ship id
+   * @return {@code 204} on success, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> deleteShipAjax(@PathVariable @NotNull UUID id) {
+    try {
+      backendApiClient.delete("/api/v1/hangar/ships/" + id, Void.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Failed to delete ship (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to delete ship (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #setHomeLocation}: bulk-sets the chosen home location on every
+   * ship the caller owns and returns {@code 204} so the page re-swaps the table (every row's
+   * location cell resyncs from the fresh fragment). A backend failure is relayed as {@code
+   * problem+json}.
+   *
+   * @param request the chosen curated home location id, submitted as JSON
+   * @return {@code 204} on success, {@code 422} on a missing location, or the relayed backend
+   *     {@code problem+json}
+   */
+  @PostMapping(value = "/home-location", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> setHomeLocationAjax(
+      @RequestBody SetHomeLocationRequestDto request) {
+    if (request == null || request.locationId() == null) {
+      return validationProblem();
+    }
+    try {
+      backendApiClient.post("/api/v1/hangar/ships/home-location", request, Void.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Failed to set home location (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to set home location (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Null/blank guard kept local so the AJAX twins can validate a required string field without
+   * dragging in a utility dependency.
+   *
+   * @param value the value to test
+   * @return {@code true} when {@code value} is {@code null} or blank
+   */
+  private static boolean isBlank(String value) {
+    return value == null || value.isBlank();
+  }
+
+  /**
+   * Builds the {@code 422} {@code problem+json} carrying the stable {@code VALIDATION} code that
+   * {@code hangar.html} maps to an inline toast when a required ship field is missing on an AJAX
+   * write, so the create/edit modal surfaces the error without a navigation.
+   *
+   * @return a {@code 422} {@code problem+json} response
+   */
+  private static ResponseEntity<Object> validationProblem() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", 422);
+    body.put("code", "VALIDATION");
+    return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
+  }
+
+  /**
+   * Translates a {@link BackendServiceException} into an RFC 7807 {@code problem+json} response,
+   * preserving the backend status, {@code code} (e.g. {@code OPTIMISTIC_LOCK}), {@code detail} and
+   * correlation id so the client's {@code krtFetch.handleProblem} can drive the conflict
+   * reload-confirm or an error toast. Mirrors the helper in the inventory / mission / operation
+   * controllers.
+   *
+   * @param e the backend failure to relay
+   * @return a {@code problem+json} response carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   private Long parseLong(Object o) {

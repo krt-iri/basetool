@@ -99,4 +99,38 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         // bare token (not the full path) because JS inlining escapes the slashes to `\/`.
         .andExpect(content().string(containsString("ID_PLACEHOLDER")));
   }
+
+  @Test
+  @WithMockUser
+  void view_fragmentList_rendersOnlyTheCollectionCardFragment() throws Exception {
+    // The in-place swap target: GET /personal-inventory/blueprints?fragment=list returns just the
+    // blueprintList fragment (the master/detail card) and NOT the surrounding page chrome (the add
+    // bar, the import/edit modals), so a batch add / import / remove can re-render the list without
+    // reloading (REQ-FE-005).
+    PersonalBlueprintDto bp =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "arclight pistol",
+            "Arclight Pistol",
+            null,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            "note",
+            0L,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-01T00:00:00Z"));
+    PageResponse<PersonalBlueprintDto> page =
+        new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+
+    mockMvc
+        .perform(get("/personal-inventory/blueprints").param("fragment", "list"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("personal-inventory-blueprints :: blueprintList"))
+        .andExpect(content().string(containsString("id=\"krt-bp-master-rows\"")))
+        .andExpect(content().string(containsString("id=\"krt-bp-total-meta\"")))
+        // the import modal lives outside the fragment and must not be in the swap body
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("id=\"krt-bp-import-modal\""))));
+  }
 }
