@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.grants.title}">Berechtigungen</h1>
@@ -71,9 +71,15 @@
         </div>
     </div>
 
-    <!-- G1 capability matrix. -->
+    <!-- G1 capability matrix. In-place writes (REQ-FE-005, #579): grant create/revoke re-render this
+         matrix via krtFetch (fragment=grantsMatrix) so the new/removed row and the empty-state toggle
+         in place without a reload; the swap URL carries the active view/accountId/userId filter
+         (#573) so the grouping is preserved. The single-flag toggle dom-patches its own row instead
+         (no structural change). The filter selectors + create modal live outside the fragment. -->
     <div class="bank-panel mt-2" data-testid="bank-grants-panel">
         <div class="bank-panel-body">
+            <div id="bank-grants-results">
+            <th:block th:fragment="grantsMatrix">
             <div class="table-responsive" th:if="${!#lists.isEmpty(grants)}">
                 <table class="data-table">
                     <thead>
@@ -132,6 +138,8 @@
             </div>
             <p class="text-center text-muted" th:if="${#lists.isEmpty(grants)}"
                data-testid="bank-grants-empty" th:text="#{bank.grants.empty}">Keine Berechtigungen vergeben.</p>
+            </th:block>
+            </div>
         </div>
     </div>
 
@@ -143,7 +151,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-grant-create-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/grants" data-method="POST">
+            <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
+                  data-endpoint="/api/proxy/bank/grants" data-method="POST">
                 <div class="krt-modal-body">
                     <p class="bank-field-hint" th:text="#{bank.modal.grant.hint}">Der Nutzer braucht die Keycloak-Rolle &quot;Bank Employee&quot;, damit die Berechtigung wirkt.</p>
                     <div class="bank-form-row">
@@ -200,8 +209,8 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-grant-revoke-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-endpoint="/api/proxy/bank/grants/{userId}/{accountId}"
-                  data-method="DELETE">
+            <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
+                  data-endpoint="/api/proxy/bank/grants/{userId}/{accountId}" data-method="DELETE">
                 <input type="hidden" name="_userId">
                 <input type="hidden" name="_accountId">
                 <div class="krt-modal-body">

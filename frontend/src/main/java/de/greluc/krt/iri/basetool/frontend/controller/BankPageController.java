@@ -107,10 +107,13 @@ public class BankPageController {
    * @param id the account id
    * @param page zero-based booking page
    * @param fragment when {@code "bookings"} only the paged booking-history fragment is rendered
-   *     (AJAX pager swap, REQ-FE-002), skipping the holder/account round-trips the modals need;
-   *     otherwise the full page is returned
+   *     (AJAX pager swap, REQ-FE-002); when {@code "accountBody"} the whole account body (facts,
+   *     distribution, bookings and the booking modals) is re-rendered in place after a money write
+   *     (REQ-FE-005) so the balance, holder distribution and the modals' distribution-derived
+   *     holder selects refresh without a reload; otherwise the full page is returned
    * @param model Spring MVC model
-   * @return the detail template, or its {@code bookings} fragment for an AJAX swap
+   * @return the detail template, or its {@code bookings} / {@code accountBody} fragment for an AJAX
+   *     swap
    */
   @GetMapping("/bank/accounts/{id}")
   @PreAuthorize("hasRole('BANK_EMPLOYEE')")
@@ -152,6 +155,9 @@ public class BankPageController {
                 .toList());
     model.addAttribute("distributionPercents", distributionPercents(detail, balance));
     model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
+    if ("accountBody".equals(fragment)) {
+      return "bank-account-detail :: accountBody";
+    }
     return "bank-account-detail";
   }
 

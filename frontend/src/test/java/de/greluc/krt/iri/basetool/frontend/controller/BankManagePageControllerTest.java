@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.BankAccountDto;
@@ -76,7 +78,7 @@ class BankManagePageControllerTest {
         .thenReturn(List.of());
 
     // When
-    String view = controller.manage(null, model);
+    String view = controller.manage(null, null, model);
 
     // Then
     assertEquals("bank-manage", view);
@@ -99,7 +101,7 @@ class BankManagePageControllerTest {
         .thenReturn(null);
 
     // When
-    String view = controller.manage("HALTER", model);
+    String view = controller.manage("HALTER", null, model);
 
     // Then
     assertEquals("bank-manage", view);
@@ -108,5 +110,35 @@ class BankManagePageControllerTest {
     assertEquals(List.of(), model.getAttribute("holders"));
     assertEquals(List.of(), model.getAttribute("orgUnits"));
     assertEquals(List.of(), model.getAttribute("users"));
+  }
+
+  // covers REQ-FE-005 (#579) — an in-place re-render (fragment=manageBody) returns only the tab-nav
+  // + active panel fragment and skips the creation-modal lookups (org-units, users) that live
+  // outside the swapped region.
+  @Test
+  void manage_fragmentManageBody_rendersOnlyBodyFragment_andSkipsModalLookups() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(
+            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of());
+
+    // When
+    String view = controller.manage("halter", "manageBody", model);
+
+    // Then
+    assertEquals("bank-manage :: manageBody", view);
+    assertEquals("halter", model.getAttribute("activeTab"));
+    assertNotNull(model.getAttribute("accounts"));
+    assertNotNull(model.getAttribute("holders"));
+    // The fragment path must not load the creation-modal lookups.
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/org-units/active"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
   }
 }

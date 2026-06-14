@@ -53,18 +53,33 @@ public class BankManagePageController {
    * with custody totals. The org-unit list and the user lookup feed the two creation modals.
    *
    * @param tab the active tab ({@code konten} default, {@code halter})
+   * @param fragment when {@code "manageBody"} only the tab-nav + active panel are re-rendered after
+   *     an account/holder lifecycle write (REQ-FE-005), refreshing the row plus the tab-count
+   *     aggregates in place; the creation-modal lookups (org-units, users) are then skipped because
+   *     the modals live outside the swapped region
    * @param model Spring MVC model
-   * @return the manage template
+   * @return the manage template, or its {@code manageBody} fragment for an AJAX swap
    */
   @GetMapping("/bank/manage")
   @PreAuthorize("hasRole('BANK_MANAGEMENT')")
-  public String manage(@RequestParam(required = false) String tab, Model model) {
+  public String manage(
+      @RequestParam(required = false) String tab,
+      @RequestParam(required = false) String fragment,
+      Model model) {
     PageResponse<BankAccountDto> accounts =
         backendApiClient.get(
             "/api/v1/bank/accounts?size=500", new ParameterizedTypeReference<>() {});
     List<BankHolderDto> holders =
         backendApiClient.get(
             "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
+    model.addAttribute(
+        "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
+    model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
+    model.addAttribute("activeTab", "halter".equalsIgnoreCase(tab) ? "halter" : "konten");
+    if ("manageBody".equals(fragment)) {
+      return "bank-manage :: manageBody";
+    }
+
     List<OrgUnitMembershipOptionDto> orgUnits =
         backendApiClient.get(
             "/api/v1/org-units/active",
@@ -72,14 +87,9 @@ public class BankManagePageController {
     List<UserReferenceDto> users =
         backendApiClient.get(
             "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
-
-    model.addAttribute(
-        "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
-    model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute(
         "orgUnits", orgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : orgUnits);
     model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
-    model.addAttribute("activeTab", "halter".equalsIgnoreCase(tab) ? "halter" : "konten");
     return "bank-manage";
   }
 }

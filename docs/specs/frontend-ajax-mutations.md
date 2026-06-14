@@ -172,11 +172,31 @@ backend reject) — renders inline in the swapped region, never a redirect; the 
 datetime group app-wide — re-initialises exactly once after a swap (no double-bound listeners, no
 duplicate error div).
 
-**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574), order-detail (#575) and
-refinery-import (#591) fragment/endpoint MVC + e2e tests · **Issues:** #572 to #575, #591 · **Code:**
-`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
-`mission-detail.html`, `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`,
-`datetime-splitter.js`, `JobOrderPageController`, `RefineryOrderPageController`.
+The bank area (#579) converts the last AJAX-then-`location.reload()` writes — money operations and
+the account / holder / grant lifecycle — to in-place fragment swaps without touching the already
+complete `BankProxyController`. The generic `bank.js` form dispatcher keeps its bespoke inline
+field-error rendering (`.bank-field-error` slots + the `CODE_FIELD` overdraft / self-transfer /
+holder-inactive mapping — bank 409s render at the field, never as a reload-confirm toast) but moves
+its CSRF onto the shared `krtCsrf` with retry-on-403, and replaces the success reload with a server
+re-render of the region named by the form's `data-refresh` attribute. The account-detail money writes
+(deposit / withdraw / transfer / rebook / reverse) swap the whole `accountBody`
+(`GET /bank/accounts/{id}?fragment=accountBody`) because the balance, the holder distribution and the
+booking modals' distribution-derived holder selects are all backend aggregates a JS patch would
+desync — and the money forms carry no `@Version` (the ledger is append-only), so an immediate second
+booking cannot 409. The manage lifecycle writes swap `manageBody` (tab-nav + active panel together, so
+the `.tab-count` aggregates and every trigger button's fresh `data-field-version` re-render atomically,
+fixing the shared deactivate/reactivate-modal stale-version trap), and grant create / revoke swap
+`grantsMatrix` honouring the active `view` / `accountId` / `userId` filter (#573). The one genuinely
+isolated single-row write — a grant capability flag toggle — stays a precise dom-patch (`button.on` +
+the row's `data-can-*` + `krtFetch.syncVersion` from the `BankGrantDto` response).
+
+**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574), order-detail (#575),
+refinery-import (#591) and bank (#579) fragment/endpoint MVC + e2e tests · **Issues:** #572 to #575,
+#579, #591 · **Code:** `krt-fetch.js` (`swap`), `missions.js`, `operations.js`,
+`fragments/pagination.html`, `mission-detail.html`, `orders-index.html`, `orders-detail.html`,
+`refinery-orders-create.html`, `datetime-splitter.js`, `bank.js`, `bank-account-detail.html`,
+`bank-manage.html`, `bank-grants.html`, `JobOrderPageController`, `RefineryOrderPageController`,
+`BankPageController`, `BankManagePageController`, `BankGrantsPageController`.
 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 
