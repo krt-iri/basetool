@@ -611,4 +611,15 @@
     } else {
         init();
     }
+
+    // Re-init after the collection card is re-rendered in place (#578 batch add / import / remove):
+    // the master rows + filter input are fresh DOM, so the direct bindings above must be re-applied.
+    // recipeCache persists across the swap; activeRow is reset because the previous node is detached.
+    document.addEventListener('krt:swapped', function (e) {
+        const c = e.detail && e.detail.container;
+        if (c && (c.id === 'krt-bp-list' || c.querySelector('#krt-bp-md'))) {
+            activeRow = null;
+            init();
+        }
+    });
 })();

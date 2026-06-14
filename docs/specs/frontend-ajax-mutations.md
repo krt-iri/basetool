@@ -172,6 +172,32 @@ backend reject) — renders inline in the swapped region, never a redirect; the 
 datetime group app-wide — re-initialises exactly once after a swap (no double-bound listeners, no
 duplicate error div).
 
+The asset-management area (#578) — **hangar**, **ship-data** and the **personal-inventory** /
+**blueprints** pages — combines the twin + fragment-swap patterns through a set of `X-Requested-With`
+write twins beside the classic `POST→redirect` fallbacks. **Hangar** create/edit (the modal form),
+delete and the bulk home-location set submit through `krtFetch.write` to header-gated twins
+(`addShipAjax` / `updateShipAjax` / `deleteShipAjax` / `setHomeLocationAjax`) and re-render the ship
+table via the existing `GET /hangar?fragment=results` swap (the server multi-key sort makes a
+client-side row insert too fragile); the import + delete-all flows drop their post-action
+`location.reload()` for the same swap and their two hand-rolled CSRF reads move onto `krtCsrf` (the
+multipart import keeps a bespoke `fetch` minus the JSON `Content-Type`). Because the action + per-row
+edit buttons live inside the swapped `#hangar-results` fragment they are bound through `krtEvents`
+`data-trigger` delegation (and the live ship-type filter is a delegated document listener) so they
+survive every re-swap. **Ship-data** flips each visibility toggle in place (button label + secondary
+style + dimmed opacity, the hidden input updated so the next toggle sends the opposite value) and the
+admin reset-all-fitted toasts + closes its modal, all without navigating. **Personal-inventory**
+add/edit/delete go through JSON twins that re-render the existing `#pi-results` list fragment.
+**Blueprints** note-edit returns the fresh blueprint from its twin so the master row (note + version
++ note-marker badge) and the detail pane are patched in place (the selection and the loaded recipe
+survive); remove, batch-add and import-apply re-render the new `#krt-bp-list` fragment (`recipe.js`
+re-inits its master/detail wiring and `personal-inventory-blueprints.js` resyncs the header counts on
+`krt:swapped`), and the variant CSRF helpers in `personal-inventory-blueprints.js` /
+`-import.js` were replaced by `krtCsrf` / `krtFetch`. Every twin relays a backend failure as
+`problem+json` (the shared `propagateBackendError` helper) so an `OPTIMISTIC_LOCK` drives the
+sanctioned reload-confirm; a missing required field on a create twin is a `422` `VALIDATION`
+`problem+json` rather than the 500 the frontend `@ControllerAdvice` would make of a `@Valid`
+`@RequestBody` bind failure.
+
 The bank area (#579) converts the last AJAX-then-`location.reload()` writes — money operations and
 the account / holder / grant lifecycle — to in-place fragment swaps without touching the already
 complete `BankProxyController`. The generic `bank.js` form dispatcher keeps its bespoke inline
@@ -184,19 +210,26 @@ re-render of the region named by the form's `data-refresh` attribute. The accoun
 booking modals' distribution-derived holder selects are all backend aggregates a JS patch would
 desync — and the money forms carry no `@Version` (the ledger is append-only), so an immediate second
 booking cannot 409. The manage lifecycle writes swap `manageBody` (tab-nav + active panel together, so
-the `.tab-count` aggregates and every trigger button's fresh `data-field-version` re-render atomically,
-fixing the shared deactivate/reactivate-modal stale-version trap), and grant create / revoke swap
-`grantsMatrix` honouring the active `view` / `accountId` / `userId` filter (#573). The one genuinely
-isolated single-row write — a grant capability flag toggle — stays a precise dom-patch (`button.on` +
-the row's `data-can-*` + `krtFetch.syncVersion` from the `BankGrantDto` response).
+the `.tab-count` aggregates and every trigger button's fresh `data-field-version` re-render
+atomically, fixing the shared deactivate/reactivate-modal stale-version trap), and grant create /
+revoke swap `grantsMatrix` honouring the active `view` / `accountId` / `userId` filter (#573). The one
+genuinely isolated single-row write — a grant capability flag toggle — stays a precise dom-patch
+(`button.on` + the row's `data-can-*` + `krtFetch.syncVersion` from the `BankGrantDto` response). If a
+write succeeds but only its follow-up refresh GET bounces, the swap surfaces a dedicated "saved, but
+reload" message rather than the generic "action failed" text, so a committed money booking is never
+mistaken for a failure.
 
-**Enforced by:** lists/pagination e2e (#573) plus mission-detail (#574), order-detail (#575),
-refinery-import (#591) and bank (#579) fragment/endpoint MVC + e2e tests · **Issues:** #572 to #575,
-#579, #591 · **Code:** `krt-fetch.js` (`swap`), `missions.js`, `operations.js`,
-`fragments/pagination.html`, `mission-detail.html`, `orders-index.html`, `orders-detail.html`,
-`refinery-orders-create.html`, `datetime-splitter.js`, `bank.js`, `bank-account-detail.html`,
+**Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
+refinery-import (#591), asset-management (#578) and bank (#579) twin / fragment / endpoint MVC + e2e
+tests. **Issues:** the epic children #572 through #591 (these areas #578 and #579). **Code:**
+`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
+`mission-detail.html`, `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`,
+`datetime-splitter.js`, `hangar.html`, `ship-data.html`, `personal-inventory.html`,
+`personal-inventory-blueprints.html`, `personal-inventory*.js`, `bank.js`, `bank-account-detail.html`,
 `bank-manage.html`, `bank-grants.html`, `JobOrderPageController`, `RefineryOrderPageController`,
-`BankPageController`, `BankManagePageController`, `BankGrantsPageController`.
+`HangarPageController`, `ShipDataPageController`, `PersonalInventoryPageController`,
+`PersonalInventoryBlueprintsPageController`, `BankPageController`, `BankManagePageController`,
+`BankGrantsPageController`.
 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 

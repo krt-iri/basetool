@@ -26,17 +26,22 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalInventoryItemUpdate
 import de.greluc.krt.iri.basetool.frontend.model.dto.UexLocationDto;
 import de.greluc.krt.iri.basetool.frontend.model.form.PersonalInventoryForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -45,6 +50,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -211,6 +217,157 @@ public class PersonalInventoryPageController {
           "errorToast", classifyError(e, "personalInventory.error.delete"));
     }
     return "redirect:/personal-inventory";
+  }
+
+  // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-005)
+
+  /**
+   * Header-gated AJAX twin of {@link #add}: creates an item and returns {@code 204} so {@code
+   * personal-inventory.html} re-renders the {@code #pi-results} list fragment via {@code GET
+   * /personal-inventory?fragment=results} instead of the classic POST→redirect reload. The twin is
+   * selected only for an {@code X-Requested-With=XMLHttpRequest} JSON request, so the classic
+   * {@code @ModelAttribute} handler stays the no-JS fallback. The modal's HTML5 {@code required}
+   * and the location typeahead guard the inputs client-side; an empty required field still yields a
+   * {@code 422} so a crafted request cannot slip past, and a backend rejection is relayed as {@code
+   * problem+json}.
+   *
+   * @param request the item payload submitted as JSON
+   * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
+   *     {@code problem+json}
+   */
+  @PostMapping(value = "/add", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> addAjax(@RequestBody PersonalInventoryItemCreateRequest request) {
+    if (isInvalidCreate(request)) {
+      return validationProblem();
+    }
+    try {
+      backendApiClient.post("/api/v1/personal-inventory", request, PersonalInventoryItemDto.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Failed to create personal inventory item (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to create personal inventory item (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #update}: updates an item and returns {@code 204} so the page
+   * re-renders the {@code #pi-results} list fragment in place. The optimistic-lock {@code version}
+   * travels in the JSON payload; a concurrent edit surfaces as a {@code 409} {@code problem+json}
+   * carrying {@code OPTIMISTIC_LOCK}, which the client turns into the sanctioned reload-confirm.
+   *
+   * @param id inventory item id
+   * @param request the item payload submitted as JSON (carries the last-seen {@code version})
+   * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
+   *     {@code problem+json}
+   */
+  @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> updateAjax(
+      @PathVariable @NotNull UUID id, @RequestBody PersonalInventoryItemUpdateRequest request) {
+    if (request == null
+        || request.name() == null
+        || request.name().isBlank()
+        || request.locationUexId() == null
+        || request.locationType() == null
+        || request.quantity() == null
+        || request.quantity() < 1) {
+      return validationProblem();
+    }
+    try {
+      backendApiClient.put(
+          "/api/v1/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Failed to update personal inventory item {} (ajax): {}", id, e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to update personal inventory item {} (ajax)", id, e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #delete}: deletes an item and returns {@code 204} so the page
+   * re-renders the {@code #pi-results} list fragment in place. A backend failure is relayed as
+   * {@code problem+json}.
+   *
+   * @param id inventory item id
+   * @return {@code 204} on success, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> deleteAjax(@PathVariable @NotNull UUID id) {
+    try {
+      backendApiClient.delete("/api/v1/personal-inventory/" + id, Void.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Failed to delete personal inventory item {} (ajax): {}", id, e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to delete personal inventory item {} (ajax)", id, e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Mirrors the {@code PersonalInventoryForm} bean constraints for the JSON create twin: name must
+   * be present, a location (UEX id + type) must be chosen via the typeahead and the quantity must
+   * be at least one.
+   *
+   * @param request the create payload to validate
+   * @return {@code true} when any required field is missing or out of range
+   */
+  private static boolean isInvalidCreate(PersonalInventoryItemCreateRequest request) {
+    return request == null
+        || request.name() == null
+        || request.name().isBlank()
+        || request.locationUexId() == null
+        || request.locationType() == null
+        || request.quantity() == null
+        || request.quantity() < 1;
+  }
+
+  /**
+   * Builds the {@code 422} {@code problem+json} carrying the stable {@code VALIDATION} code that
+   * {@code personal-inventory.html} maps to an inline toast when a required field is missing on an
+   * AJAX write, so the create/edit modal surfaces the error without a navigation.
+   *
+   * @return a {@code 422} {@code problem+json} response
+   */
+  private static ResponseEntity<Object> validationProblem() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", 422);
+    body.put("code", "VALIDATION");
+    return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
+  }
+
+  /**
+   * Translates a {@link BackendServiceException} into an RFC 7807 {@code problem+json} response,
+   * preserving the backend status, {@code code} (e.g. {@code OPTIMISTIC_LOCK}), {@code detail} and
+   * correlation id so the client's {@code krtFetch.handleProblem} can drive the conflict
+   * reload-confirm or an error toast. Mirrors the helper in the hangar / inventory / mission
+   * controllers.
+   *
+   * @param e the backend failure to relay
+   * @return a {@code problem+json} response carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   /**

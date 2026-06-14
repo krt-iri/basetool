@@ -27,17 +27,22 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintRecipeDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -76,15 +81,25 @@ public class PersonalInventoryBlueprintsPageController {
    * Renders the owned-blueprint list with the multi-select add bar and the edit / remove modals.
    *
    * @param q optional case-insensitive product-name filter, echoed into the search input
+   * @param fragment when {@code "list"}, only the collection card fragment is rendered for an
+   *     in-place AJAX swap after a batch add / import / remove (epic #571 / REQ-FE-005); otherwise
+   *     the full page
    * @param model Thymeleaf model populated with the blueprint list and the filter query
-   * @return the {@code personal-inventory-blueprints} view name
+   * @return the {@code personal-inventory-blueprints} view name, or its {@code blueprintList}
+   *     fragment selector
    */
   @GetMapping
-  public String view(@RequestParam(required = false) String q, Model model) {
+  public String view(
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) String fragment,
+      Model model) {
     model.addAttribute("filterQuery", q == null ? "" : q);
     PageResponse<PersonalBlueprintDto> blueprints = fetchOwned(q);
     model.addAttribute(
         "blueprints", blueprints != null ? blueprints.content() : Collections.emptyList());
+    if (fragment != null && "list".equalsIgnoreCase(fragment)) {
+      return "personal-inventory-blueprints :: blueprintList";
+    }
     return "personal-inventory-blueprints";
   }
 
@@ -235,6 +250,93 @@ public class PersonalInventoryBlueprintsPageController {
           "errorToast", classifyError(e, "personalInventory.blueprints.error.remove"));
     }
     return "redirect:/personal-inventory/blueprints";
+  }
+
+  // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-005)
+
+  /**
+   * Header-gated AJAX twin of {@link #updateNote}: updates an owned blueprint's note and returns
+   * the fresh {@link PersonalBlueprintDto} so {@code personal-inventory-blueprints.html} patches
+   * the master-row's note + version and the detail pane in place (keeping the current selection and
+   * the already-loaded recipe) instead of the classic POST→redirect reload. The optimistic-lock
+   * {@code version} travels in the JSON payload; a concurrent edit surfaces as a {@code 409} {@code
+   * problem+json} carrying {@code OPTIMISTIC_LOCK}. The classic handler stays the no-JS fallback.
+   *
+   * @param id blueprint entry id
+   * @param request the note payload submitted as JSON ({@code acquiredAt}, {@code note}, {@code
+   *     version})
+   * @return {@code 200} with the persisted blueprint on success, or the relayed backend {@code
+   *     problem+json}
+   */
+  @PostMapping(value = "/{id}/update-note", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> updateNoteAjax(
+      @PathVariable @NotNull UUID id, @RequestBody PersonalBlueprintUpdateRequest request) {
+    try {
+      PersonalBlueprintDto dto =
+          backendApiClient.put(
+              "/api/v1/personal-blueprints/" + id,
+              new PersonalBlueprintUpdateRequest(
+                  request.acquiredAt(), emptyToNull(request.note()), request.version()),
+              PersonalBlueprintDto.class);
+      return ResponseEntity.ok(dto);
+    } catch (BackendServiceException e) {
+      log.error("Failed to update blueprint note {} (ajax): {}", id, e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to update blueprint note {} (ajax)", id, e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #delete}: removes an owned blueprint and returns {@code 204}
+   * so the page re-renders the collection card via {@code GET
+   * /personal-inventory/blueprints?fragment= list} in place (resyncing the counts and the empty
+   * state) instead of the classic POST→redirect reload. A backend failure is relayed as {@code
+   * problem+json}.
+   *
+   * @param id blueprint entry id
+   * @return {@code 204} on success, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> deleteAjax(@PathVariable @NotNull UUID id) {
+    try {
+      backendApiClient.delete("/api/v1/personal-blueprints/" + id, Void.class);
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
+      log.error("Failed to remove blueprint {} (ajax): {}", id, e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to remove blueprint {} (ajax)", id, e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Translates a {@link BackendServiceException} into an RFC 7807 {@code problem+json} response,
+   * preserving the backend status, {@code code} (e.g. {@code OPTIMISTIC_LOCK}), {@code detail} and
+   * correlation id so the client's {@code krtFetch.handleProblem} can drive the conflict
+   * reload-confirm or an error toast. Mirrors the helper in the hangar / inventory / mission
+   * controllers.
+   *
+   * @param e the backend failure to relay
+   * @return a {@code problem+json} response carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   /**

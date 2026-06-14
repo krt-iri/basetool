@@ -64,6 +64,145 @@
             }
         });
         wireFilterSwap();
+        wireWriteSubmits();
+    }
+
+    // --------------------------------------------------------- in-place writes
+
+    // The create/edit modal form and the delete form submit through krtFetch (REQ-FE-001/002)
+    // instead of a classic POST→redirect: on success the modal closes and the #pi-results list is
+    // re-rendered in place via the existing fragment swap, preserving the active filter. The header
+    // count resyncs from the swapped #pi-total-meta marker (see syncCounts). The classic POST
+    // handlers stay the no-JS fallback (the AJAX twins are gated on X-Requested-With, which krtFetch
+    // always sends). Listeners are delegated on document; the forms live outside #pi-results, so a
+    // filter swap never detaches them.
+    function wireWriteSubmits() {
+        if (!window.krtFetch) {
+            return;
+        }
+        document.addEventListener('submit', function (e) {
+            if (e.target === form) {
+                e.preventDefault();
+                submitItemForm();
+            } else if (e.target === deleteForm) {
+                e.preventDefault();
+                submitDeleteForm();
+            }
+        });
+    }
+
+    function conflictObj() {
+        const i18n = window.krtPersonalInventoryI18n || {};
+        return {
+            title: i18n.conflictTitle,
+            reloadDetailFallback: i18n.conflictDetail,
+            reloadLabel: i18n.conflictReload,
+            dismissLabel: i18n.conflictDismiss,
+            reloadQuestion: i18n.conflictQuestion,
+        };
+    }
+
+    // Re-render only the #pi-results list for the active filter (mirrors the address-bar query the
+    // filter swap keeps in sync), without touching the URL again.
+    function reswapResults() {
+        window.krtFetch.swap({
+            url: window.location.pathname + window.location.search,
+            container: '#pi-results',
+            history: false,
+        });
+    }
+
+    function fieldValue(name) {
+        if (!form) {
+            return '';
+        }
+        const el = form.querySelector('[name="' + name + '"]');
+        return el ? el.value : '';
+    }
+
+    function toIntOrNull(raw) {
+        if (raw == null || String(raw).trim() === '') {
+            return null;
+        }
+        const n = parseInt(raw, 10);
+        return isNaN(n) ? null : n;
+    }
+
+    function submitItemForm() {
+        if (!form) {
+            return;
+        }
+        const i18n = window.krtPersonalInventoryI18n || {};
+        const action = form.getAttribute('action') || form.action;
+        const isUpdate = /\/update$/.test(action);
+        const uexId = hiddenUexId ? hiddenUexId.value : '';
+        if (!uexId) {
+            if (window.showFrontendErrorToast) {
+                window.showFrontendErrorToast(i18n.locationRequired || i18n.errorCreate || 'Error');
+            }
+            return;
+        }
+        const payload = {
+            name: fieldValue('name'),
+            note: fieldValue('note'),
+            quantity: toIntOrNull(fieldValue('quantity')),
+            locationUexId: toIntOrNull(uexId),
+            locationType: hiddenLocationType ? hiddenLocationType.value : null,
+        };
+        if (isUpdate) {
+            payload.version = toIntOrNull(fieldValue('version'));
+        }
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: window.safeSameOriginUrl(action, action),
+                payload: payload,
+                successMessage: isUpdate ? i18n.updated : i18n.created,
+                errorMessage: isUpdate ? i18n.errorUpdate : i18n.errorCreate,
+                conflict: conflictObj(),
+                onSuccess: function () {
+                    closeModal();
+                    reswapResults();
+                },
+            })
+            .then(function () {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                }
+            });
+    }
+
+    function submitDeleteForm() {
+        if (!deleteForm) {
+            return;
+        }
+        const i18n = window.krtPersonalInventoryI18n || {};
+        const action = deleteForm.getAttribute('action') || deleteForm.action;
+        const btn = deleteForm.querySelector('button[type="submit"]');
+        if (btn) {
+            btn.disabled = true;
+        }
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: window.safeSameOriginUrl(action, action),
+                successMessage: i18n.deleted,
+                errorMessage: i18n.errorDelete,
+                conflict: conflictObj(),
+                onSuccess: function () {
+                    closeDelete();
+                    reswapResults();
+                },
+            })
+            .then(function () {
+                if (btn) {
+                    btn.disabled = false;
+                }
+            });
     }
 
     // ----------------------------------------------------------- filter swap

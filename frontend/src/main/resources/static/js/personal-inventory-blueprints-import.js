@@ -48,12 +48,15 @@
             .replace(/'/g, '&#39;');
     }
 
-    function csrfHeaders(base) {
-        const headers = base || {};
-        const token = document.querySelector('meta[name="_csrf"]');
-        const header = document.querySelector('meta[name="_csrf_header"]');
-        if (token && header && token.content && header.content) {
-            headers[header.content] = token.content;
+    // CSRF headers via the shared krtCsrf seam (REQ-FE-002), replacing the hand-rolled meta-tag
+    // read. For the multipart preview upload the browser must set its own multipart boundary, so
+    // the JSON Content-Type krtCsrf adds by default is removed when `multipart` is set.
+    function csrfHeaders(base, multipart) {
+        const headers = window.krtCsrf
+            ? window.krtCsrf.headers(base || {})
+            : Object.assign({}, base || {});
+        if (multipart) {
+            delete headers['Content-Type'];
         }
         return headers;
     }
@@ -89,7 +92,7 @@
         fetch(endpoints().importPreview || '/personal-inventory/blueprints/import/preview', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: csrfHeaders({ Accept: 'application/json' }),
+            headers: csrfHeaders({ Accept: 'application/json' }, true),
             body: fd,
         })
             .then(function (resp) {
@@ -387,48 +390,55 @@
             return;
         }
         if (applyBtn) applyBtn.disabled = true;
-        fetch(endpoints().importApply || '/personal-inventory/blueprints/import/apply', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: csrfHeaders({
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-            }),
-            body: JSON.stringify(resolutions),
-        })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
+        if (!window.krtFetch) {
+            applyError();
+            return;
+        }
+        // Apply -> krtFetch (REQ-FE-002): CSRF + retry-on-403 + problem handling; on success the
+        // blueprint list re-renders in place instead of the former AJAX-then-reload (REQ-FE-001).
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: endpoints().importApply || '/personal-inventory/blueprints/import/apply',
+                payload: resolutions,
+                toast: false,
+                errorMessage: i18n().error,
+                onSuccess: function (result) {
+                    const res = result || {};
+                    const msg =
+                        (i18n().applied || 'Import complete.') +
+                        ' ' +
+                        (i18n().addedLabel || 'added') +
+                        ': ' +
+                        (res.added || 0) +
+                        ', ' +
+                        (i18n().updatedLabel || 'updated') +
+                        ': ' +
+                        (res.acquiredAtUpdated || 0) +
+                        ', ' +
+                        (i18n().aliasesLabel || 'aliases') +
+                        ': ' +
+                        (res.aliasesLearned || 0) +
+                        ', ' +
+                        (i18n().skippedLabel || 'skipped') +
+                        ': ' +
+                        (res.skipped || 0);
+                    if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(msg);
+                    }
+                    closeModal();
+                    window.krtFetch.swap({
+                        url: window.location.pathname + window.location.search,
+                        container: '#krt-bp-list',
+                        fragmentValue: 'list',
+                        history: false,
+                    });
+                },
             })
-            .then(function (result) {
-                if (!result) {
-                    applyError();
-                    return;
+            .then(function () {
+                if (applyBtn) {
+                    applyBtn.disabled = false;
                 }
-                const msg =
-                    (i18n().applied || 'Import complete.') +
-                    ' ' +
-                    (i18n().addedLabel || 'added') +
-                    ': ' +
-                    (result.added || 0) +
-                    ', ' +
-                    (i18n().updatedLabel || 'updated') +
-                    ': ' +
-                    (result.acquiredAtUpdated || 0) +
-                    ', ' +
-                    (i18n().aliasesLabel || 'aliases') +
-                    ': ' +
-                    (result.aliasesLearned || 0) +
-                    ', ' +
-                    (i18n().skippedLabel || 'skipped') +
-                    ': ' +
-                    (result.skipped || 0);
-                if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg);
-                setTimeout(function () {
-                    window.location.reload();
-                }, 700);
-            })
-            .catch(function () {
-                applyError();
             });
     }
 

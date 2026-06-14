@@ -90,7 +90,9 @@
                         <td th:text="${st.manufacturer != null ? st.manufacturer.abbreviation : ''}">Hersteller</td>
                         <td th:text="${st.description}">Desc</td>
                         <td sec:authorize="hasRole('ADMIN')">
-                            <form th:action="@{/ship-data/ship-types/{id}/visibility(id=${st.id})}" method="post">
+                            <form th:action="@{/ship-data/ship-types/{id}/visibility(id=${st.id})}" method="post"
+                                  class="js-visibility-toggle"
+                                  th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
                                 <input type="hidden" name="hidden" th:value="${!st.hidden}">
                                 <button type="submit" class="btn" th:classappend="${st.hidden} ? '' : 'btn-secondary'" th:text="${st.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
                             </form>
@@ -134,7 +136,9 @@
                         <td th:text="${m.abbreviation}">Kürzel</td>
                         <td th:text="${m.description}">Desc</td>
                         <td sec:authorize="hasRole('ADMIN')">
-                            <form th:action="@{/ship-data/manufacturers/{id}/visibility(id=${m.id})}" method="post">
+                            <form th:action="@{/ship-data/manufacturers/{id}/visibility(id=${m.id})}" method="post"
+                                  class="js-visibility-toggle"
+                                  th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
                                 <input type="hidden" name="hidden" th:value="${!m.hidden}">
                                 <button type="submit" class="btn" th:classappend="${m.hidden} ? '' : 'btn-secondary'" th:text="${m.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
                             </form>
@@ -156,7 +160,7 @@
             <p style="margin:1.5rem 0; font-family:var(--font-body); color:var(--color-gray-1);" th:text="#{hangar.ship.reset_fitted.confirm.message}">Möchten Sie wirklich alle Schiffe aller Spieler auf "nicht einsatzbereit" (unfitted) setzen?</p>
             <div style="display:flex; gap:1rem; justify-content:center;">
                 <button type="button" class="btn btn-ghost" data-trigger="ship-close-modal" data-modal-id="reset-fitted-confirm-modal" th:text="#{info.cancel}">Abbrechen</button>
-                <button type="button" class="btn btn-danger" data-trigger="submit-form-by-id" data-form-id="reset-fitted-form" th:text="#{hangar.ship.reset_fitted.button}">Zurücksetzen</button>
+                <button type="button" class="btn btn-danger" data-trigger="shipdata-reset" th:text="#{hangar.ship.reset_fitted.button}">Zurücksetzen</button>
             </div>
         </div>
     </div>
@@ -227,6 +231,102 @@
             closeModal(el.getAttribute('data-modal-id'));
         });
     }
+</script>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    /*<![CDATA[*/
+    // In-place AJAX (epic #571 / REQ-FE-001): the visibility toggles flip the row and the reset
+    // clears the fitted flag without a full-page reload. The classic POST→redirect forms stay the
+    // no-JS fallback (the AJAX twins are gated on the X-Requested-With header).
+    (function () {
+        if (!window.krtFetch) {
+            return;
+        }
+        var i18n = {
+            saved:        /*[[#{notification.success.save}]]*/ 'Gespeichert.',
+            toggleError:  /*[[#{shipdata.toggle.error}]]*/ 'Sichtbarkeit konnte nicht geaendert werden.',
+            resetSuccess: /*[[#{notification.success.ship_unfitted}]]*/ 'Alle Schiffe zurueckgesetzt.',
+            resetError:   /*[[#{error.shipdata.unfit.failed}]]*/ 'Zuruecksetzen fehlgeschlagen.'
+        };
+        var conflict = {
+            title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+            reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+            reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+            dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+            reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+        };
+
+        // Visibility toggle: intercept the per-row form submit and flip the affected row in place
+        // (button label + secondary style + dimmed opacity), updating the hidden input so the next
+        // toggle sends the opposite value. Delegated on document so it needs no per-row binding.
+        document.addEventListener('submit', function (e) {
+            var form = e.target;
+            if (!form.classList || !form.classList.contains('js-visibility-toggle')) {
+                return;
+            }
+            e.preventDefault();
+            var hiddenInput = form.querySelector('input[name="hidden"]');
+            var desired = hiddenInput ? hiddenInput.value === 'true' : true;
+            var btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+                btn.disabled = true;
+            }
+            window.krtFetch
+                .write({
+                    method: 'POST',
+                    url: form.getAttribute('action') + '?hidden=' + desired,
+                    toast: false,
+                    errorMessage: i18n.toggleError,
+                    conflict: conflict,
+                    onSuccess: function () {
+                        var row = form.closest('tr');
+                        if (row) {
+                            row.style.opacity = desired ? '0.5' : '';
+                        }
+                        if (hiddenInput) {
+                            hiddenInput.value = (!desired).toString();
+                        }
+                        if (btn) {
+                            btn.textContent = desired
+                                ? form.getAttribute('data-label-show')
+                                : form.getAttribute('data-label-hide');
+                            btn.classList.toggle('btn-secondary', !desired);
+                        }
+                        if (window.showFrontendSuccessToast) {
+                            window.showFrontendSuccessToast(i18n.saved);
+                        }
+                    },
+                })
+                .then(function () {
+                    if (btn) {
+                        btn.disabled = false;
+                    }
+                });
+        });
+
+        // Reset-all-fitted: drive the confirm button through krtFetch, then close the modal + toast.
+        window.krtEvents.on('click', 'shipdata-reset', function (el) {
+            el.disabled = true;
+            window.krtFetch
+                .write({
+                    method: 'POST',
+                    url: /*[[@{/ship-data/reset-fitted}]]*/ '/ship-data/reset-fitted',
+                    toast: false,
+                    errorMessage: i18n.resetError,
+                    conflict: conflict,
+                    onSuccess: function () {
+                        closeModal('reset-fitted-confirm-modal');
+                        if (window.showFrontendSuccessToast) {
+                            window.showFrontendSuccessToast(i18n.resetSuccess);
+                        }
+                    },
+                })
+                .then(function () {
+                    el.disabled = false;
+                });
+        });
+    })();
+    /*]]>*/
 </script>
 </body>
 </html>
