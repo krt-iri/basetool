@@ -223,13 +223,15 @@ public class JobOrderItemService {
         .map(
             e -> {
               Material material = materials.get(e.getKey().materialId());
-              // Claim fields stay neutral here (no claims / null open) — JobOrderService enriches
-              // them for SK orders in mapToDtoWithStock (Phase 5, #345); non-SK orders keep the
-              // null open-amount so the UI renders no claim columns.
+              // currentStock and the claim fields stay neutral here — JobOrderService enriches them
+              // in mapToDtoWithStock: it sums the order-linked inventory per bucket (collection
+              // progress for the overview, #595) and overlays the SK claims (Phase 5, #345).
+              // Non-SK orders keep the null open-amount so the UI renders no claim columns.
               return new AggregatedMaterialDto(
                   materialMapper.toDto(material),
                   e.getKey().quality(),
                   roundForQuantityType(e.getValue(), material),
+                  null,
                   java.util.List.of(),
                   null);
             })

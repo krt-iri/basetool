@@ -39286,6 +39286,10 @@
             "type" : "number",
             "format" : "double"
           },
+          "currentStock" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "claims" : {
             "type" : "array",
             "items" : {

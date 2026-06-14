@@ -32,6 +32,9 @@ import java.util.List;
  * @param material the aggregated material (carries {@code quantityType} for unit-aware display)
  * @param qualityRequirement the quality bucket name ({@code GOOD} or {@code NONE})
  * @param totalQuantity the summed required quantity for this material+quality
+ * @param currentStock the total stock linked to the order for this material at or above the
+ *     bucket's quality floor; the order-overview list renders {@code currentStock / totalQuantity}
+ *     as the material-collection progress for item orders, mirroring the MATERIAL rows
  * @param claims the per-squadron claims on this bucket (empty for non-SK orders)
  * @param openAmount {@code totalQuantity − Σ claims}; {@code null} for non-SK orders
  */
@@ -39,5 +42,6 @@ public record AggregatedMaterialDto(
     MaterialDto material,
     String qualityRequirement,
     Double totalQuantity,
+    Double currentStock,
     List<ClaimDto> claims,
     Double openAmount) {}

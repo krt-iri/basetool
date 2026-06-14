@@ -87,6 +87,13 @@ public class JobOrderService {
   /** System-setting key holding the UUID of the intake SK that guest order creations route to. */
   private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
 
+  /**
+   * Inventory quality floor a {@code GOOD} aggregated bucket sums stock at or above (700+ =
+   * refining-grade); a {@code NONE} bucket imposes no floor. Mirrors the MATERIAL requirement's
+   * stored {@code minQuality} so item-order collection progress is computed the same way.
+   */
+  private static final int GOOD_QUALITY_FLOOR = 700;
+
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
@@ -998,15 +1005,18 @@ public class JobOrderService {
   }
 
   /**
-   * Rebuilds the item order's aggregated-material rows with their per-bucket claims +
-   * open-remaining (Phase 5, #345). The base rows come from {@link
-   * JobOrderItemService#aggregateMaterials} with neutral claim fields; this overlays the SK claim
-   * view. For a non-SK order {@code claimByBucket} is empty, so every row keeps its empty claims /
-   * {@code null} open-amount.
+   * Rebuilds the item order's aggregated-material rows with their collection stock and (for SK
+   * orders) their per-bucket claims + open-remaining. The base rows come from {@link
+   * JobOrderItemService#aggregateMaterials} with neutral stock/claim fields; this enriches each
+   * with {@code currentStock} — the order-linked inventory summed at the bucket's quality floor
+   * ({@code GOOD} → {@link #GOOD_QUALITY_FLOOR}, {@code NONE} → no floor), the same per-bucket sum
+   * the MATERIAL rows use — so the overview can show material-collection progress (#595). For a
+   * non-SK order {@code claimByBucket} is empty, so every row keeps its empty claims / {@code null}
+   * open-amount but still gains its stock.
    *
    * @param jobOrder the item order.
    * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders.
-   * @return the aggregated rows, claim-enriched.
+   * @return the aggregated rows, stock- and claim-enriched.
    */
   private List<AggregatedMaterialDto> enrichAggregatedWithClaims(
       JobOrder jobOrder,
@@ -1014,18 +1024,24 @@ public class JobOrderService {
     return jobOrderItemService.aggregateMaterials(jobOrder).stream()
         .map(
             agg -> {
+              Integer minQuality =
+                  agg.qualityRequirement()
+                          == de.greluc.krt.iri.basetool.backend.model.QualityRequirement.GOOD
+                      ? GOOD_QUALITY_FLOOR
+                      : null;
+              Double stock =
+                  inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
+                      agg.material().id(), jobOrder.getId(), minQuality);
               de.greluc.krt.iri.basetool.backend.model.dto.ClaimBucketDto bucket =
                   claimByBucket.get(
                       bucketKey(agg.material().id(), agg.qualityRequirement().name()));
-              if (bucket == null) {
-                return agg;
-              }
               return new AggregatedMaterialDto(
                   agg.material(),
                   agg.qualityRequirement(),
                   agg.totalQuantity(),
-                  bucket.claims(),
-                  bucket.openRemaining());
+                  stock != null ? stock : 0.0,
+                  bucket != null ? bucket.claims() : agg.claims(),
+                  bucket != null ? bucket.openRemaining() : agg.openAmount());
             })
         .toList();
   }
