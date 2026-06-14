@@ -82,6 +82,15 @@ valid → honoured) and differ only on the **0-membership** row:
   may legitimately exist without an OrgUnit: `Ship`, `RefineryOrder`, `InventoryItem` (V132),
   `Mission` (V144) and `Operation` (V145 — see REQ-ORG-009).
 
+**Refinery-store output stamping (#596).** Storing a refinery order creates one `InventoryItem`
+per output, owned by the receiving member (`RefineryOrderStoreItemDto.userId`, else the order
+owner). The store dialog carries a per-item owning-OrgUnit picker whose options are the *receiver's*
+memberships and whose default selection is the order's own `owningOrgUnit`; the chosen id rides
+`RefineryOrderStoreItemDto.owningOrgUnitId` into `resolveOrgUnitForPickerOutputNullable`. This closes
+the gap where a multi-membership receiver was hard-rejected with the `>1 + no output → 400` branch
+because the form offered no choice — the picker is always shown so the receiver's OrgUnit pool is
+explicit, while the inherited default keeps a same-OrgUnit self-store one-click.
+
 Job Order uses its own resolvers: `responsible_org_unit_id` must be profit-eligible (or the configured intake SK
 from system setting `job_order.intake_special_command_id` for guest creations);
 `requesting_org_unit_id` accepts any OrgUnit and is freely editable.

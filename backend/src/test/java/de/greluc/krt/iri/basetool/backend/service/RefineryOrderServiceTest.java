@@ -114,6 +114,7 @@ class RefineryOrderServiceTest {
   private static final UUID MATERIAL_ID = UUID.randomUUID();
   private static final UUID LOCATION_ID = UUID.randomUUID();
   private static final UUID JOB_ORDER_ID = UUID.randomUUID();
+  private static final UUID OWNING_OU_ID = UUID.randomUUID();
 
   private RefineryOrder order;
   private User owner;
@@ -334,6 +335,52 @@ class RefineryOrderServiceTest {
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository, times(1)).save(captor.capture());
       assertSame(other, captor.getValue().getUser());
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Owning-OrgUnit stamping (#596 — per-item picker output)
+  // ------------------------------------------------------------------
+
+  @Nested
+  class OwningOrgUnitStampingTests {
+
+    @Test
+    void threadsItemOwningOrgUnitIdIntoResolver_andStampsResolvedOrgUnit() {
+      // A multi-membership receiver supplies an explicit picker output; the service must hand that
+      // exact id (not null) to the resolver and stamp the returned OrgUnit on the new Lager row.
+      stubLookupsForSingleItem();
+      de.greluc.krt.iri.basetool.backend.model.Squadron resolved =
+          new de.greluc.krt.iri.basetool.backend.model.Squadron();
+      resolved.setId(OWNING_OU_ID);
+      when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, OWNING_OU_ID))
+          .thenReturn(resolved);
+
+      RefineryOrderStoreItemDto dto =
+          new RefineryOrderStoreItemDto(
+              MATERIAL_ID, LOCATION_ID, 500, 10.0, null, null, null, OWNING_OU_ID);
+      refineryOrderService.storeRefineryOrder(
+          OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(dto)), false);
+
+      verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, OWNING_OU_ID);
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, times(1)).save(captor.capture());
+      assertSame(resolved, captor.getValue().getOwningOrgUnit());
+    }
+
+    @Test
+    void passesNullPickerOutput_whenItemOmitsOwningOrgUnitId() {
+      // No pick: a single-membership / membershipless receiver still flows through with a null
+      // picker output so the resolver keeps its auto-stamp / ownerless behaviour.
+      stubLookupsForSingleItem();
+
+      refineryOrderService.storeRefineryOrder(
+          OWNER_ID,
+          ORDER_ID,
+          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, null))),
+          false);
+
+      verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, null);
     }
   }
 
@@ -580,7 +627,8 @@ class RefineryOrderServiceTest {
     lenient().when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
 
     RefineryOrderStoreItemDto dto =
-        new RefineryOrderStoreItemDto(material.getId(), LOCATION_ID, 500, amount, null, null, null);
+        new RefineryOrderStoreItemDto(
+            material.getId(), LOCATION_ID, 500, amount, null, null, null, null);
     refineryOrderService.storeRefineryOrder(
         OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(dto)), false);
   }
@@ -596,7 +644,7 @@ class RefineryOrderServiceTest {
   private static RefineryOrderStoreItemDto itemWithAmount(
       double amount, String note, UUID userId, UUID jobOrderId) {
     return new RefineryOrderStoreItemDto(
-        MATERIAL_ID, LOCATION_ID, 500, amount, userId, jobOrderId, note);
+        MATERIAL_ID, LOCATION_ID, 500, amount, userId, jobOrderId, note, null);
   }
 
   private static Material newMaterial(QuantityType type) {

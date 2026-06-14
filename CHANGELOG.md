@@ -22,6 +22,8 @@
 
 ### Fixed
 
+- **Raffinerieauftrag einlagern: Mitglieder mit mehreren Org-Einheiten können wieder einlagern (#596).** Gehörte der Empfänger eines eingelagerten Outputs mehr als einer Org-Einheit an (Staffel plus Spezialkommando), brach das Einlagern bisher mit „User belongs to multiple org units" (400) ab, weil der Einlager-Dialog keine Org-Einheit zur Auswahl bot. Der Dialog zeigt jetzt pro Position eine Org-Einheit-Auswahl — die Optionen richten sich nach dem gewählten Empfänger und sind mit der Org-Einheit des Auftrags vorbelegt, sodass das Einlagern auf die eigene Org-Einheit weiterhin ein Klick bleibt.
+
 - **Operationsdetailseite: Zwei Speichervorgänge unmittelbar hintereinander führen nicht mehr zu einem Konflikt (#576).** Nach dem In-Place-Speichern wurde die neue Versionsnummer nicht zurück ins Formular geschrieben, sodass der zweite Speichervorgang mit einem Konflikt (409) abgewiesen wurde; jetzt wird die aktuelle Version sofort übernommen.
 
 - **Missionsdetailseite: Das Speichern der Kerndaten (Verwaltung) löscht keine Zeiten mehr.** Treffen-, Geplant-Start- und Geplant-Ende-Zeit, die beim Bearbeiten nicht erneut angefasst wurden, wurden beim Speichern still auf leer gesetzt (eine Zeitangabe mit Sekundenbruchteilen ließ sich nicht zurücklesen); sie bleiben jetzt erhalten.
