@@ -423,6 +423,21 @@
         error: /*[[#{inventory.stack.entries.error}]]*/ 'Eintr\u00e4ge konnten nicht geladen werden.'
     };
 
+    // #577 part 2: the single book-out now saves in place through the shared krtFetch/krtCsrf
+    // foundation (REQ-FE-002/005), reusing the OPTIMISTIC_LOCK reload-confirm via these localized
+    // conflict strings (the shared frontend.ajax.conflict.* foundation set).
+    var inventoryConflictI18n = {
+        title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt: Jemand war schneller',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Die Daten wurden zwischenzeitlich ge\u00e4ndert.',
+        reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schlie\u00dfen',
+        reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
+    var bookOutI18n = {
+        success: /*[[#{success.inventory.bookout}]]*/ 'Eintrag erfolgreich ausgebucht',
+        error: /*[[#{error.inventory.bookout.failed}]]*/ 'Fehler beim Ausbuchen des Eintrags'
+    };
+
     var noteI18n = {
         saved: /*[[#{inventory.note.success.saved}]]*/ 'Notiz gespeichert',
         removed: /*[[#{inventory.note.success.removed}]]*/ 'Notiz entfernt',
@@ -1045,7 +1060,72 @@
         }
     }
 
+    // The item id the open book-out modal targets; set when the modal opens, read by submitBookOut.
+    var bookOutItemId = null;
+    // Guards against a second submit (Enter / rapid click) landing while the first write is in
+    // flight — a duplicate book-out on the same version would otherwise 409.
+    var bookOutInFlight = false;
+
+    // #577 part 2: submit the book-out in place via the shared krtFetch/krtCsrf foundation, reusing
+    // the existing POST /inventory/{id}/transfer proxy (the backend book-out endpoint, equivalent
+    // for DISCARD / TRANSFER / SELL). On success the grouped table is re-swapped (the server
+    // regroups) instead of the page reloading; the classic POST stays the no-JS fallback.
+    function submitBookOut(event) {
+        // scu-decimal-input.js canonicalises + validates the amount fields in the capture phase
+        // first; if it found an invalid amount it already blocked the submit (preventDefault +
+        // reportValidity). Respect that and do not fire the AJAX write.
+        if (event.defaultPrevented) {
+            return;
+        }
+        event.preventDefault();
+        if (bookOutInFlight || !window.krtFetch || !bookOutItemId) {
+            return;
+        }
+        var typeInput = document.querySelector('input[name="type"]:checked');
+        var type = typeInput ? typeInput.value : 'DISCARD';
+        var amountEl = document.getElementById('amount');
+        var amount = window.krtScuInput
+            ? window.krtScuInput.parse(amountEl.value)
+            : parseFloat(amountEl.value);
+        var sellAmountEl = document.getElementById('sellAmount');
+        var payload = {
+            amount: amount,
+            targetUserId: type === 'TRANSFER' ? (document.getElementById('targetUserId').value || null) : null,
+            targetLocationId: type === 'TRANSFER' ? (document.getElementById('targetLocationId').value || null) : null,
+            type: type,
+            terminal: type === 'SELL' ? (document.getElementById('terminal').value || null) : null,
+            sellAmount: type === 'SELL' && sellAmountEl.value !== '' ? Number(sellAmountEl.value) : null,
+            version: parseInt(document.getElementById('version').value, 10),
+            targetOwningOrgUnitId: type === 'TRANSFER' ? (document.getElementById('targetOwningOrgUnitId').value || null) : null
+        };
+        var submitBtn = document.getElementById('bookOutSubmitBtn');
+        bookOutInFlight = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        window.krtFetch.write({
+            method: 'POST',
+            url: '/inventory/' + bookOutItemId + '/transfer',
+            payload: payload,
+            successMessage: bookOutI18n.success,
+            errorMessage: bookOutI18n.error,
+            conflict: inventoryConflictI18n,
+            onSuccess: function () {
+                closeBookOutModal();
+                if (typeof filterInventory === 'function') {
+                    filterInventory();
+                }
+            }
+        }).then(function () {
+            bookOutInFlight = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
+        });
+    }
+
     function openBookOutModal(id, amount, version, materialId, userId, locationId, quantityType) {
+        bookOutItemId = id;
         var bookOutForm = document.getElementById('bookOutForm');
         bookOutForm.action = window.safeSameOriginUrl('/inventory/' + id + '/book-out', bookOutForm.action);
         
@@ -1331,6 +1411,13 @@
         window.krtEvents.on('input', 'inv-admin-update-note-counter', updateNoteCounter);
         window.krtEvents.on('click', 'inv-admin-save-note', saveNote);
         window.krtEvents.on('click', 'inv-admin-remove-note', removeNote);
+    }
+
+    // The book-out form is a stable top-level element (outside the swapped table container), so a
+    // direct submit listener bound once survives the grouped-table re-swaps.
+    var bookOutFormEl = document.getElementById('bookOutForm');
+    if (bookOutFormEl) {
+        bookOutFormEl.addEventListener('submit', submitBookOut);
     }
 </script>
 </body>

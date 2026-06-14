@@ -253,7 +253,7 @@ class InventoryOperationsE2eTest {
           openBookOutModal(page, discardMatId, discardItemId);
           page.locator("input[name='type'][value='DISCARD']").check();
           page.locator("#amount").fill("40");
-          E2eSupport.clickSubmitClearingFooter(page.locator("#bookOutSubmitBtn"));
+          submitBookOutInPlace(page);
 
           assertEquals(
               60.0, totalAmount(stacksForMaterial(discardMatId)), AMOUNT_DELTA, "100 - 40 = 60");
@@ -273,7 +273,7 @@ class InventoryOperationsE2eTest {
           openBookOutModal(page, discardAllMatId, discardAllItemId);
           page.locator("input[name='type'][value='DISCARD']").check();
           page.locator("#amount").fill("50");
-          E2eSupport.clickSubmitClearingFooter(page.locator("#bookOutSubmitBtn"));
+          submitBookOutInPlace(page);
 
           assertEquals(
               0,
@@ -296,7 +296,7 @@ class InventoryOperationsE2eTest {
           page.locator("input[name='type'][value='TRANSFER']").check();
           String destinationLocationId = selectDifferentLocation(page, opsHubLocId);
           page.locator("#amount").fill("30");
-          E2eSupport.clickSubmitClearingFooter(page.locator("#bookOutSubmitBtn"));
+          submitBookOutInPlace(page);
 
           JsonArray stacks = stacksForMaterial(transferMatId);
           assertEquals(2, stackCount(stacks), "transfer splits the row into source + destination");
@@ -330,7 +330,7 @@ class InventoryOperationsE2eTest {
           page.locator("#terminal").selectOption(new SelectOption().setIndex(1));
           page.locator("#sellAmount").fill("1500");
           page.locator("#amount").fill("30");
-          E2eSupport.clickSubmitClearingFooter(page.locator("#bookOutSubmitBtn"));
+          submitBookOutInPlace(page);
 
           assertEquals(
               50.0, totalAmount(stacksForMaterial(sellMatId)), AMOUNT_DELTA, "80 - 30 = 50");
@@ -388,8 +388,8 @@ class InventoryOperationsE2eTest {
 
   /**
    * Edge case: booking out more than is held is rejected by the backend (the SCU input only guards
-   * "&gt; 0", not the held maximum), the controller flashes an error and redirects, and the 50-SCU
-   * row is left untouched.
+   * "&gt; 0", not the held maximum); the in-place book-out surfaces the error as a toast without
+   * navigating, and the 50-SCU row is left untouched.
    */
   @Test
   void edgeCaseBookingOutMoreThanAvailableLeavesStockUnchanged() {
@@ -399,7 +399,7 @@ class InventoryOperationsE2eTest {
           openBookOutModal(page, overbookMatId, overbookItemId);
           page.locator("input[name='type'][value='DISCARD']").check();
           page.locator("#amount").fill("999");
-          E2eSupport.clickSubmitClearingFooter(page.locator("#bookOutSubmitBtn"));
+          submitBookOutInPlace(page);
 
           assertEquals(
               50.0,
@@ -423,7 +423,7 @@ class InventoryOperationsE2eTest {
           // TRANSFER.
           page.locator("input[name='type'][value='TRANSFER']").check();
           page.locator("#amount").fill("10");
-          E2eSupport.clickSubmitClearingFooter(page.locator("#bookOutSubmitBtn"));
+          submitBookOutInPlace(page);
 
           JsonArray stacks = stacksForMaterial(sameLocMatId);
           assertEquals(1, stackCount(stacks), "a no-op transfer must not split the row");
@@ -549,6 +549,31 @@ class InventoryOperationsE2eTest {
     openMyInventoryToEntry(page, materialId, itemId);
     page.locator("button[data-trigger='inv-my-bookout'][data-id='" + itemId + "']").click();
     assertThat(page.locator("#bookOutModal")).isVisible();
+  }
+
+  /**
+   * Submits the open book-out modal and waits for its in-place AJAX write to settle (#577 part 2:
+   * the book-out posts to {@code /inventory/{id}/transfer} and re-swaps the grouped table on
+   * success, or surfaces a toast on a backend rejection — neither path navigates). Sets the {@code
+   * window.__krtNoReload} marker and drops the {@code position: fixed} footer out of the way (it
+   * can otherwise intercept the trusted click), then waits on the XHR POST so the backend has
+   * provably answered before the caller reads the stock back. Finally asserts the marker survived,
+   * proving the page was never reloaded.
+   *
+   * @param page the authenticated page with the book-out modal open and filled
+   */
+  private static void submitBookOutInPlace(Page page) {
+    page.evaluate("window.__krtNoReload = true;");
+    page.evaluate(
+        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+            + " 'none'; } }");
+    page.waitForResponse(
+        r -> r.url().contains("/transfer") && "POST".equals(r.request().method()),
+        () -> page.locator("#bookOutSubmitBtn").click());
+    assertEquals(
+        Boolean.TRUE,
+        page.evaluate("window.__krtNoReload === true"),
+        "the in-place book-out must not reload the page");
   }
 
   /**
