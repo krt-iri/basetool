@@ -219,11 +219,19 @@ public class RefineryOrderPageController {
    * fetches it when the user picks a refinery.
    *
    * @param model the Thymeleaf model to populate
-   * @param form the create form to bind (fresh, validation-failed or import-prefilled); may be
-   *     {@code null} on a defensive flash path
+   * @param form the create form to bind (fresh, validation-failed or import-prefilled); a {@code
+   *     null} form (defensive flash path) is replaced by a fresh owner-prefilled one so the
+   *     template never iterates a null {@code *{goods}}
    * @param principal the authenticated user (drives the logistician flag and the owner options)
    */
   private void populateCreateFormModel(Model model, RefineryOrderForm form, OidcUser principal) {
+    if (form == null) {
+      form = new RefineryOrderForm();
+      UUID currentUserId = getCurrentUserId(principal);
+      if (currentUserId != null) {
+        form.setOwnerId(currentUserId);
+      }
+    }
     model.addAttribute("isLogistician", isLogistician(principal));
     model.addAttribute("refineryOrderForm", form);
     model.addAttribute("materials", fetchMaterials());

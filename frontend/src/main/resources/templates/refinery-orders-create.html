@@ -820,7 +820,7 @@
     // krtEvents (rfc-*) handlers survive the swap and are deliberately NOT re-bound here (re-binding
     // would double-fire them); the datetime widget re-inits itself via datetime-splitter.js's own
     // krt:swapped listener. Subsumes the former four one-shot DOMContentLoaded init blocks.
-    function _reinitRefineryForm() {
+    function _reinitRefineryForm(fromSwap) {
         const startedAt = document.getElementById('startedAt');
         const dHours = document.getElementById('durationHours');
         const dMinutes = document.getElementById('durationMinutes');
@@ -830,7 +830,20 @@
         updateMethodRatings();
         document.querySelectorAll('.material-entry').forEach((_, index) => calcScu(index));
         document.querySelectorAll('select[id^="inputMaterialId_"]').forEach(select => { if (select.value) updateOutputMaterial(select); });
-        if (window.krtRefineryYield) window.krtRefineryYield.refreshAll();
+        if (window.krtRefineryYield) {
+            // On first load the page-level krtRefineryYield.init(...) already holds the server's yield
+            // map, so refreshAll repaints correctly. After an import SWAP that in-memory map is stale
+            // (init ran once at load, location-less), so re-fetch it for the imported location via
+            // onLocationChange (which repaints the badges when it resolves); a location-less import
+            // falls through to refreshAll.
+            const locationSelect = document.getElementById('locationId');
+            if (fromSwap && locationSelect && locationSelect.value
+                && typeof window.krtRefineryYield.onLocationChange === 'function') {
+                window.krtRefineryYield.onLocationChange(locationSelect);
+            } else {
+                window.krtRefineryYield.refreshAll();
+            }
+        }
         updateProfitPreview();
         updateEndsAt();
         const createForm = document.querySelector('form[data-testid="refinery-form"]');
@@ -839,10 +852,10 @@
             createForm.addEventListener('submit', function (e) { e.preventDefault(); _submitRefineryCreate(createForm); });
         }
     }
-    document.addEventListener('DOMContentLoaded', _reinitRefineryForm);
+    document.addEventListener('DOMContentLoaded', function () { _reinitRefineryForm(false); });
     document.addEventListener('krt:swapped', function (e) {
         const c = e.detail && e.detail.container;
-        if (c && c.id === 'refineryImportFormContainer') _reinitRefineryForm();
+        if (c && c.id === 'refineryImportFormContainer') _reinitRefineryForm(true);
     });
 
     // #591: in-place screenshot-import. The picker posts the RefineryExtract as multipart; instead of
