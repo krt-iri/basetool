@@ -2965,7 +2965,7 @@
             // :not(:empty) because #589 made the core-edit .field-error divs always-present (empty
             // when there is no error) so the client can fill them — a bare `.field-error` would now
             // always match and wrongly pin every load to the Verwaltung tab.
-            if (document.querySelector('#pane-verw .field-error:not(:empty)') && validKeys.includes('verw'))
+            if (document.querySelector('#pane-verw #mission-form .field-error:not(:empty)') && validKeys.includes('verw'))
                 return 'verw';
             if (useStore) {
                 try {
@@ -3078,41 +3078,51 @@
                 window.showFrontendErrorToast((problem && problem.detail) || msg('mission.conflict.toast.detail', FAILED));
             }
         }
+        let inFlight = false;
         async function submitInPlace() {
             if (!window.krtCsrf) { form.submit(); return; }
-            const fd = new FormData(form);
-            let res;
+            if (inFlight) return; // ignore a rapid second submit while one is still in flight
+            inFlight = true;
+            const submitBtn = document.querySelector('button[type="submit"][form="mission-form"]');
+            if (submitBtn) submitBtn.disabled = true;
             try {
-                res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-                if (res.status === 403 && window.krtCsrf.refresh) {
-                    const refreshed = await window.krtCsrf.refresh();
-                    if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+                const fd = new FormData(form);
+                let res;
+                try {
+                    res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+                    if (res.status === 403 && window.krtCsrf.refresh) {
+                        const refreshed = await window.krtCsrf.refresh();
+                        if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+                    }
+                } catch (e) {
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
+                    return;
                 }
-            } catch (e) {
-                if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
-                return;
+                if (res.status === 422) {
+                    let map = {};
+                    try { map = await res.json(); } catch (e) { /* non-JSON body */ }
+                    renderFieldErrors(map);
+                    return;
+                }
+                if (res.status === 409) {
+                    let problem = {};
+                    try { problem = await res.json(); } catch (e) { /* non-JSON body */ }
+                    handleConflict(problem);
+                    return;
+                }
+                if (!res.ok) {
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
+                    return;
+                }
+                let versions = null;
+                try { versions = await res.json(); } catch (e) { /* non-JSON body */ }
+                writeVersions(versions);
+                clearFieldErrors();
+                if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(SAVED);
+            } finally {
+                inFlight = false;
+                if (submitBtn) submitBtn.disabled = false;
             }
-            if (res.status === 422) {
-                let map = {};
-                try { map = await res.json(); } catch (e) { /* non-JSON body */ }
-                renderFieldErrors(map);
-                return;
-            }
-            if (res.status === 409) {
-                let problem = {};
-                try { problem = await res.json(); } catch (e) { /* non-JSON body */ }
-                handleConflict(problem);
-                return;
-            }
-            if (!res.ok) {
-                if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
-                return;
-            }
-            let versions = null;
-            try { versions = await res.json(); } catch (e) { /* non-JSON body */ }
-            writeVersions(versions);
-            clearFieldErrors();
-            if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(SAVED);
         }
         form.addEventListener('submit', function (e) {
             e.preventDefault();

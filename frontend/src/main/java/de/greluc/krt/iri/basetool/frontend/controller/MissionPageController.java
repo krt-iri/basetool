@@ -1581,8 +1581,16 @@ public class MissionPageController {
       Map<String, String> fieldErrors = new java.util.LinkedHashMap<>();
       for (FieldError fe : bindingResult.getFieldErrors()) {
         // First error per field wins (the form's fields carry one constraint each); the message is
-        // resolved exactly as th:errors does so the inline text matches the classic re-render.
-        fieldErrors.putIfAbsent(fe.getField(), messageSource.getMessage(fe, locale));
+        // resolved exactly as th:errors does so the inline text matches the classic re-render. A
+        // constraint without a resolvable message key falls back to its default message rather than
+        // crashing the 422 contract to a 500.
+        String message;
+        try {
+          message = messageSource.getMessage(fe, locale);
+        } catch (org.springframework.context.NoSuchMessageException ex) {
+          message = fe.getDefaultMessage();
+        }
+        fieldErrors.putIfAbsent(fe.getField(), message);
       }
       return org.springframework.http.ResponseEntity.unprocessableEntity().body(fieldErrors);
     }
