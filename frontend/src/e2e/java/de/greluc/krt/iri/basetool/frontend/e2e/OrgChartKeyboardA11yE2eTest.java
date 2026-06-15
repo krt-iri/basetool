@@ -28,7 +28,6 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -220,17 +219,17 @@ class OrgChartKeyboardA11yE2eTest {
 
   /**
    * Verifies that a successful edit keeps the chart's horizontal scroll position across the
-   * post-save reload. On a narrow viewport the chart is first widened with a few leaderless
-   * Kommando columns until it scrolls horizontally; the rightmost Kommando is then renamed with the
-   * chart scrolled fully to the right. After the reload the restored {@code scrollLeft} must match
-   * that pre-save value, not snap back to zero.
+   * post-save in-place refresh. On a narrow viewport the chart is first widened with a few
+   * leaderless Kommando columns until it scrolls horizontally; the rightmost Kommando is then
+   * renamed with the chart scrolled fully to the right. After the refresh the restored {@code
+   * scrollLeft} must match that pre-save value, not snap back to zero.
    *
    * <p>The rename is deliberate on two counts. First, the editor re-focuses the triggering control
    * on close — and a {@code focus()} scrolls that control into view, which would itself reset the
    * scroll if the trigger were off-screen; driving the <em>rightmost</em> control with the chart
    * scrolled fully right keeps that control visible, so the focus moves nothing and the saved
    * scroll is the value under test. Second, a rename leaves the chart width unchanged, so the
-   * scroll range is identical before and after the reload and the restored offset must match
+   * scroll range is identical before and after the refresh and the restored offset must match
    * exactly.
    */
   @Test
@@ -247,8 +246,10 @@ class OrgChartKeyboardA11yE2eTest {
         // overflows horizontally. The shared ephemeral stack may already make the all-Staffeln
         // chart
         // scrollable (sibling suites seed extra Staffeln/SKs into it), in which case a width-only
-        // condition would create none and leave no oc-rename control to drive. Each create reloads
-        // the page, so edit mode is re-entered inside the helper.
+        // condition would create none and leave no oc-rename control to drive. Each create
+        // refreshes
+        // the chart in place; edit mode survives it and is re-entered idempotently inside the
+        // helper.
         for (int i = 0; i < 4 && (i == 0 || maxScrollLeft(page) <= 0); i++) {
           createLeaderlessKommando(page, "E2E Breite " + i);
         }
@@ -256,8 +257,10 @@ class OrgChartKeyboardA11yE2eTest {
             maxScrollLeft(page) > 0,
             "chart should be horizontally scrollable after adding Kommando columns");
 
-        // Rename the rightmost Kommando — a genuine, reloading edit that does not change the chart
-        // width. Clicking the control scrolls it into view; then scroll fully right so that the
+        // Rename the rightmost Kommando — a genuine, in-place-refreshing edit that does not change
+        // the chart width. Clicking the control scrolls it into view; then scroll fully right so
+        // that
+        // the
         // control the editor re-focuses on close is already visible (no focus-driven scroll reset).
         enterEditMode(page);
         page.locator("[data-trigger='oc-rename']").last().click();
@@ -267,13 +270,17 @@ class OrgChartKeyboardA11yE2eTest {
         assertTrue(target > 0, "precondition: chart must be scrolled away from the left edge");
 
         page.locator("#oc-name").fill("E2E Renamed");
-        clickAndAwaitReload(page, page.locator("#oc-modal [data-trigger='oc-modal-submit']"));
+        clickAndAwaitRefresh(page, page.locator("#oc-modal [data-trigger='oc-modal-submit']"));
 
-        // The scroll restore re-applies for up to a few seconds until the wide chart has laid out;
-        // wait for it to flag completion (see org-chart.html restoreScrollState) so the read below
-        // does not race the async restore. The timeout clears the restore's own ~5 s budget.
-        assertThat(page.locator("#oc-chart[data-oc-scroll-restored]"))
-            .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(10_000));
+        // After the in-place refresh swaps a fresh tree into #oc-chart (which resets the
+        // container's
+        // scroll), refreshChart() restores the captured horizontal offset in its swap .then(); wait
+        // for that restore to land before reading, so the assertions below do not race it.
+        page.waitForFunction(
+            "(t) => { const el = document.getElementById('oc-chart');"
+                + " return el && Math.abs(Math.round(el.scrollLeft) - t) <= 3; }",
+            target,
+            new Page.WaitForFunctionOptions().setTimeout(10_000));
         int restored = scrollLeft(page);
         assertTrue(
             restored > 0,
@@ -308,7 +315,9 @@ class OrgChartKeyboardA11yE2eTest {
 
   /**
    * Turns the inline editor on (idempotently), so the dashed add affordances and the per-node
-   * action controls become visible. After a reload the toggle is off again, hence the guard.
+   * action controls become visible. Edit mode survives an in-place chart refresh (the {@code
+   * editing} class lives on the stable {@code #oc-chart} container), so the guard is really for the
+   * initial page load, where the toggle starts off; calling it after a refresh is a harmless no-op.
    *
    * @param page the page showing the org chart
    */
@@ -323,9 +332,9 @@ class OrgChartKeyboardA11yE2eTest {
 
   /**
    * Creates a single leaderless Kommando(gruppe) on the first Staffel through the inline editor and
-   * blocks until the post-save reload has settled. Used only to widen the chart for the
-   * scroll-preservation assertion; the holder is intentionally left empty (a {@code COMMAND_LEAD}
-   * is the one rank that may be created vacant).
+   * blocks until the post-save in-place chart refresh has settled. Used only to widen the chart for
+   * the scroll-preservation assertion; the holder is intentionally left empty (a {@code
+   * COMMAND_LEAD} is the one rank that may be created vacant).
    *
    * @param page the page showing the org chart
    * @param name the Kommando name to enter
@@ -335,31 +344,42 @@ class OrgChartKeyboardA11yE2eTest {
     page.locator(ADD_COMMAND_BUTTON).first().click();
     assertThat(page.locator("#oc-modal")).isVisible();
     page.locator("#oc-name").fill(name);
-    clickAndAwaitReload(page, page.locator("#oc-modal [data-trigger='oc-modal-submit']"));
+    clickAndAwaitRefresh(page, page.locator("#oc-modal [data-trigger='oc-modal-submit']"));
   }
 
   /**
-   * Clicks a control that triggers the editor's "save then full-page reload" path and blocks until
-   * the reload has fully loaded. A window-scoped sentinel set on the current document disappears
-   * with it, so waiting for the sentinel to vanish proves the new document is committed; the
-   * subsequent load-state wait guarantees its end-of-body script (which restores the scroll) has
-   * run before the caller inspects anything.
+   * Clicks a control that triggers the editor's "save then in-place refresh" path and blocks until
+   * the refresh has committed. A successful edit no longer reloads the page: it re-renders the
+   * whole tree via {@code krtFetch.swap(?fragment=chartBody)} into the stable {@code #oc-chart}
+   * container (epic #571 / REQ-FE-005), which dispatches a {@code krt:swapped} event on {@code
+   * document} once the new subtree is in the DOM. A one-shot listener scoped to {@code #oc-chart}
+   * flips a sentinel on exactly that commit, so waiting for the sentinel proves the fresh tree is
+   * in place before the caller inspects anything.
    *
-   * @param page the page that will reload
+   * @param page the page that hosts the chart
    * @param submit the submit control to click
    */
-  private static void clickAndAwaitReload(Page page, Locator submit) {
-    page.evaluate("() => { window.__ocReloadPending = true; }");
+  private static void clickAndAwaitRefresh(Page page, Locator submit) {
+    page.evaluate(
+        "() => {"
+            + "  window.__ocSwapped = false;"
+            + "  const chart = document.getElementById('oc-chart');"
+            + "  document.addEventListener('krt:swapped', function onSwap(e) {"
+            + "    if (e && e.detail && e.detail.container === chart) {"
+            + "      window.__ocSwapped = true;"
+            + "      document.removeEventListener('krt:swapped', onSwap);"
+            + "    }"
+            + "  });"
+            + "}");
     submit.click();
-    // 30 s, not 15 s: the post-save reload re-renders the entire org chart, which on the shared
+    // 30 s, not 15 s: the in-place refresh re-renders the entire org chart, which on the shared
     // ephemeral stack keeps growing as sibling suites seed Staffeln/SKs into it. Under CI load that
     // full re-render has overrun a 15 s budget (the create step times out before the chart
     // returns).
     page.waitForFunction(
-        "() => window.__ocReloadPending === undefined",
+        "() => window.__ocSwapped === true",
         null,
         new Page.WaitForFunctionOptions().setTimeout(30_000));
-    page.waitForLoadState();
   }
 
   /**

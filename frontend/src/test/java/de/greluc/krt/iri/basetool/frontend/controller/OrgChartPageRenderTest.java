@@ -203,4 +203,51 @@ class OrgChartPageRenderTest {
     assertThat(html).as("vacant Kommandoleiter sits at level 5").contains("aria-level=\"5\"");
     assertThat(html).as("child Stv./Ensign nodes sit at level 6").contains("aria-level=\"6\"");
   }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void chartBodyFragment_rendersTreeWithoutPageChrome() throws Exception {
+    // The in-place chart refresh (epic #571 / REQ-FE-005) swaps ?fragment=chartBody into the stable
+    // #oc-chart container. The fragment must render the tree + its add affordances but NOT the page
+    // chrome that lives outside the swap region (the edit toolbar and the assign modal) — otherwise
+    // an innerHTML swap would inject a duplicate toolbar/modal into the chart.
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(
+                    new SquadronChartDto(
+                        UUID.randomUUID(),
+                        "IRIDIUM",
+                        "IRI",
+                        null,
+                        List.of(),
+                        List.of(),
+                        true,
+                        true)),
+                List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart").param("fragment", "chartBody"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("fragment renders the tree").contains("role=\"tree\"");
+    assertThat(html).as("fragment renders the Staffel column").contains("IRIDIUM");
+    assertThat(html)
+        .as("fragment renders the in-tree add affordance")
+        .contains("data-position-type=\"SQUADRON_LEAD\"");
+    assertThat(html)
+        .as("edit toolbar lives OUTSIDE the fragment")
+        .doesNotContain("data-trigger=\"oc-toggle-edit\"");
+    assertThat(html)
+        .as("assign modal lives OUTSIDE the fragment")
+        .doesNotContain("id=\"oc-modal\"");
+    assertThat(html)
+        .as("fragment is chrome-free — no page header brand")
+        .doesNotContain("class=\"brand\"");
+  }
 }

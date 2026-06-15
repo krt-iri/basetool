@@ -603,4 +603,69 @@ class ProfileControllerTest {
     verify(backendApiClient, never()).put(any(), any(), any());
     verifyNoInteractions(redirectAttributes);
   }
+
+  // ── POST /profile/payout-preference (AJAX / krtFetch — epic #571) ─────────
+
+  @Test
+  void updatePayoutPreferenceAjax_happyPath_returns200WithRefreshedVersion() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    when(backendApiClient.<Map<String, Object>>get(
+            eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenReturn(Map.of("version", 7L));
+
+    ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.DONATE, 6L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updatePayoutPreferenceAjax(form, bindingResult, principal);
+
+    assertEquals(200, response.getStatusCode().value());
+    Map<String, Object> body = response.getBody();
+    assertNotNull(body);
+    assertEquals(7L, body.get("version"));
+    assertEquals("DONATE", body.get("defaultPayoutPreference"));
+
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    verify(backendApiClient)
+        .put(eq("/api/v1/users/me/payout-preference"), bodyCap.capture(), eq(Void.class));
+    assertEquals("DONATE", bodyCap.getValue().get("preference"));
+    assertEquals(6L, bodyCap.getValue().get("version"));
+  }
+
+  @Test
+  void updatePayoutPreferenceAjax_optimisticLockConflict_returns409WithOptimisticLockCode() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    BackendServiceException conflict =
+        org.mockito.Mockito.spy(
+            new BackendServiceException(
+                "concurrency-conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), null));
+    org.mockito.Mockito.doReturn("concurrency-conflict").when(conflict).getProblemType();
+    doThrow(conflict)
+        .when(backendApiClient)
+        .put(eq("/api/v1/users/me/payout-preference"), any(), eq(Void.class));
+    when(messageSource.getMessage(any(), any(), any(), any())).thenReturn("conflict-message");
+
+    ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updatePayoutPreferenceAjax(form, bindingResult, principal);
+
+    assertEquals(409, response.getStatusCode().value());
+    assertNotNull(response.getBody());
+    assertEquals("OPTIMISTIC_LOCK", response.getBody().get("code"));
+    assertEquals("conflict-message", response.getBody().get("detail"));
+  }
+
+  @Test
+  void updatePayoutPreferenceAjax_validationError_returns400WithoutBackendCall() {
+    when(bindingResult.hasErrors()).thenReturn(true);
+    when(bindingResult.getFieldErrors()).thenReturn(List.of());
+    when(messageSource.getMessage(any(), any(), any(), any())).thenReturn("validation-failed");
+
+    ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updatePayoutPreferenceAjax(form, bindingResult, principal);
+
+    assertEquals(400, response.getStatusCode().value());
+    assertNotNull(response.getBody());
+    assertEquals("validation-failed", response.getBody().get("detail"));
+    verify(backendApiClient, never()).put(any(), any(), any());
+  }
 }

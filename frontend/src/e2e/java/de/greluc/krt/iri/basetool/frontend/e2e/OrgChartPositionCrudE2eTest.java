@@ -132,13 +132,13 @@ class OrgChartPositionCrudE2eTest {
         page.locator(".oc-command-head [data-trigger='oc-rename']").first().click();
         assertThat(page.locator("#oc-modal")).isVisible();
         page.locator("#oc-name").fill("E2E CRUD Bravo");
-        submitModalAndAwaitReload(page);
+        submitModalAndAwaitRefresh(page);
         enterEditMode(page);
         assertThat(commandHeadNamed(page, "E2E CRUD Bravo")).isVisible();
         assertThat(commandHeadNamed(page, "E2E CRUD Alpha")).hasCount(0);
 
         // DELETE
-        confirmAndAwaitReload(page, page.locator(COMMAND_REMOVE_BUTTON).first());
+        confirmAndAwaitRefresh(page, page.locator(COMMAND_REMOVE_BUTTON).first());
         assertThat(commandHeadNamed(page, "E2E CRUD Bravo")).hasCount(0);
         assertThat(page.locator(".oc-command-head")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
@@ -176,7 +176,7 @@ class OrgChartPositionCrudE2eTest {
         page.locator(ASSIGN_LEAD_BUTTON).first().click();
         assertThat(page.locator("#oc-modal")).isVisible();
         page.locator("#oc-user").selectOption(userIds.get(0));
-        submitModalAndAwaitReload(page);
+        submitModalAndAwaitRefresh(page);
         enterEditMode(page);
         // The seat is now filled: a vacate affordance appears and the reassign control carries the
         // assigned user's id.
@@ -189,21 +189,21 @@ class OrgChartPositionCrudE2eTest {
           page.locator(REASSIGN_LEAD_ICON).first().click();
           assertThat(page.locator("#oc-modal")).isVisible();
           page.locator("#oc-user").selectOption(userIds.get(1));
-          submitModalAndAwaitReload(page);
+          submitModalAndAwaitRefresh(page);
           enterEditMode(page);
           assertThat(page.locator(REASSIGN_LEAD_ICON).first())
               .hasAttribute("data-user-id", userIds.get(1));
         }
 
         // EDIT — vacate the Kommandoleiter: the holder is cleared but the Kommando(gruppe) stays.
-        confirmAndAwaitReload(page, page.locator(VACATE_LEAD_BUTTON).first());
+        confirmAndAwaitRefresh(page, page.locator(VACATE_LEAD_BUTTON).first());
         enterEditMode(page);
         assertThat(commandHeadNamed(page, "E2E CRUD Lead")).isVisible();
         assertThat(page.locator(VACATE_LEAD_BUTTON)).hasCount(0);
         assertThat(page.locator(ASSIGN_LEAD_BUTTON)).isVisible();
 
         // DELETE — remove the whole Kommando(gruppe).
-        confirmAndAwaitReload(page, page.locator(COMMAND_REMOVE_BUTTON).first());
+        confirmAndAwaitRefresh(page, page.locator(COMMAND_REMOVE_BUTTON).first());
         assertThat(commandHeadNamed(page, "E2E CRUD Lead")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-chart-crud-leader");
@@ -229,7 +229,9 @@ class OrgChartPositionCrudE2eTest {
 
   /**
    * Turns the inline editor on (idempotently), so the dashed add affordances and the per-node
-   * action controls become visible. After a reload the toggle is off again, hence the guard.
+   * action controls become visible. Edit mode survives an in-place chart refresh (the {@code
+   * editing} class lives on the stable {@code #oc-chart} container), so the guard is really for the
+   * initial page load, where the toggle starts off; calling it after a refresh is a harmless no-op.
    *
    * @param page the page showing the org chart
    */
@@ -256,14 +258,14 @@ class OrgChartPositionCrudE2eTest {
       if (removes.count() == 0) {
         return;
       }
-      confirmAndAwaitReload(page, removes.first());
+      confirmAndAwaitRefresh(page, removes.first());
     }
   }
 
   /**
    * Creates a single leaderless Kommando(gruppe) with the given name on the first Staffel through
-   * the inline editor and blocks until the post-save reload has settled. The holder is left empty
-   * (a {@code COMMAND_LEAD} is the one rank that may be created vacant).
+   * the inline editor and blocks until the post-save in-place chart refresh has settled. The holder
+   * is left empty (a {@code COMMAND_LEAD} is the one rank that may be created vacant).
    *
    * @param page the page showing the org chart
    * @param name the Kommando name to enter
@@ -273,30 +275,30 @@ class OrgChartPositionCrudE2eTest {
     page.locator(ADD_COMMAND_BUTTON).first().click();
     assertThat(page.locator("#oc-modal")).isVisible();
     page.locator("#oc-name").fill(name);
-    submitModalAndAwaitReload(page);
+    submitModalAndAwaitRefresh(page);
   }
 
   /**
-   * Clicks the editor dialog's submit button and blocks until the resulting full-page reload has
-   * settled (see {@link #awaitReload(Page, Runnable)}).
+   * Clicks the editor dialog's submit button and blocks until the resulting in-place chart refresh
+   * has settled (see {@link #awaitChartRefresh(Page, Runnable)}).
    *
    * @param page the page whose dialog to submit
    */
-  private static void submitModalAndAwaitReload(Page page) {
+  private static void submitModalAndAwaitRefresh(Page page) {
     Locator submit = page.locator("#oc-modal [data-trigger='oc-modal-submit']");
-    awaitReload(page, submit::click);
+    awaitChartRefresh(page, submit::click);
   }
 
   /**
    * Clicks a control that raises the KRT confirmation dialog (remove / vacate), accepts it, and
-   * blocks until the resulting full-page reload has settled. The confirm overlay is created
+   * blocks until the resulting in-place chart refresh has settled. The confirm overlay is created
    * synchronously by the trigger's click handler, so its OK button is available immediately after.
    *
    * @param page the page showing the org chart
    * @param trigger the control that opens the confirm dialog
    */
-  private static void confirmAndAwaitReload(Page page, Locator trigger) {
-    awaitReload(
+  private static void confirmAndAwaitRefresh(Page page, Locator trigger) {
+    awaitChartRefresh(
         page,
         () -> {
           trigger.click();
@@ -305,26 +307,37 @@ class OrgChartPositionCrudE2eTest {
   }
 
   /**
-   * Runs an action that triggers the editor's "save then full-page reload" path and blocks until
-   * the reload has fully loaded. A window-scoped sentinel set on the current document disappears
-   * with it, so waiting for the sentinel to vanish proves the new document is committed; the
-   * subsequent load-state wait guarantees its end-of-body script has run before the caller inspects
-   * anything.
+   * Runs an action that triggers the editor's "save then in-place refresh" path and blocks until
+   * the refresh has committed. A successful edit no longer reloads the page: it re-renders the
+   * whole tree via {@code krtFetch.swap(?fragment=chartBody)} into the stable {@code #oc-chart}
+   * container (epic #571 / REQ-FE-005), which dispatches a {@code krt:swapped} event on {@code
+   * document} once the new subtree is in the DOM. A one-shot listener scoped to {@code #oc-chart}
+   * flips a sentinel on exactly that commit, so waiting for the sentinel proves the fresh tree
+   * (with its re-stamped {@code data-version}s) is in place before the caller inspects anything.
    *
-   * @param page the page that will reload
-   * @param action the action that starts the save (and the reload it triggers)
+   * @param page the page that hosts the chart
+   * @param action the action that starts the save (and the in-place refresh it triggers)
    */
-  private static void awaitReload(Page page, Runnable action) {
-    page.evaluate("() => { window.__ocReloadPending = true; }");
+  private static void awaitChartRefresh(Page page, Runnable action) {
+    page.evaluate(
+        "() => {"
+            + "  window.__ocSwapped = false;"
+            + "  const chart = document.getElementById('oc-chart');"
+            + "  document.addEventListener('krt:swapped', function onSwap(e) {"
+            + "    if (e && e.detail && e.detail.container === chart) {"
+            + "      window.__ocSwapped = true;"
+            + "      document.removeEventListener('krt:swapped', onSwap);"
+            + "    }"
+            + "  });"
+            + "}");
     action.run();
-    // 30 s, not 15 s: the post-save reload re-renders the entire org chart, which on the shared
+    // 30 s, not 15 s: the in-place refresh re-renders the entire org chart, which on the shared
     // ephemeral stack keeps growing as sibling suites seed Staffeln/SKs into it. Under CI load that
     // full re-render has overrun a 15 s budget.
     page.waitForFunction(
-        "() => window.__ocReloadPending === undefined",
+        "() => window.__ocSwapped === true",
         null,
         new Page.WaitForFunctionOptions().setTimeout(30_000));
-    page.waitForLoadState();
   }
 
   /**

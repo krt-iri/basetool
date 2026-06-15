@@ -57,4 +57,36 @@ class HomeControllerTest {
     // I will assert "max_muster" to verify my fix later.
     assertEquals("max_muster", model.getAttribute("username"));
   }
+
+  @Test
+  void markAnnouncementAsReadAjax_success_returns200() {
+    // Arrange — the in-place twin (epic #571) marks the announcement read and answers 200 so the
+    // home page removes the control without reloading.
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    HomeController controller = new HomeController(backendApiClient);
+
+    // Act
+    var response = controller.markAnnouncementAsReadAjax("ann-1");
+
+    // Assert
+    assertEquals(200, response.getStatusCode().value());
+    verify(backendApiClient).put("/api/v1/users/me/read-announcement/ann-1", null, Void.class);
+  }
+
+  @Test
+  void markAnnouncementAsReadAjax_backendFailure_returns502AndDoesNotThrow() {
+    // Arrange — a failed mark-as-read must never break the page; the twin swallows the error and
+    // answers 502 so the client simply leaves the control in place.
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    HomeController controller = new HomeController(backendApiClient);
+    doThrow(new RuntimeException("backend down"))
+        .when(backendApiClient)
+        .put(anyString(), any(), any());
+
+    // Act
+    var response = controller.markAnnouncementAsReadAjax("ann-1");
+
+    // Assert
+    assertEquals(502, response.getStatusCode().value());
+  }
 }

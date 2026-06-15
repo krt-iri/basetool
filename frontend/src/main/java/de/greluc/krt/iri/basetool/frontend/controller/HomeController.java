@@ -140,4 +140,30 @@ public class HomeController {
     }
     return "redirect:/";
   }
+
+  /**
+   * AJAX variant of {@link #markAnnouncementAsRead}: marks the announcement read and answers with a
+   * bare 200 so the home page removes the "mark read" control in place (epic #571, REQ-FE-005)
+   * instead of reloading. Selected over the redirect handler only when the request carries {@code
+   * X-Requested-With: XMLHttpRequest}; a script-disabled browser still posts the HTML form and
+   * lands on the redirect handler, which stays the no-JS fallback. A backend failure answers 502
+   * (the client leaves the control in place) — a failed mark-as-read must never break the page.
+   *
+   * @param id announcement id to mark as read
+   * @return {@code 200} on success, {@code 502} on a backend failure
+   */
+  @org.springframework.web.bind.annotation.PostMapping(
+      value = "/announcement/read",
+      headers = "X-Requested-With=XMLHttpRequest")
+  @org.springframework.web.bind.annotation.ResponseBody
+  public org.springframework.http.ResponseEntity<Void> markAnnouncementAsReadAjax(
+      @org.springframework.web.bind.annotation.RequestParam String id) {
+    try {
+      backendApiClient.put("/api/v1/users/me/read-announcement/" + id, null, Void.class);
+      return org.springframework.http.ResponseEntity.ok().build();
+    } catch (Exception e) {
+      log.error("Failed to mark announcement as read", e);
+      return org.springframework.http.ResponseEntity.status(502).build();
+    }
+  }
 }
