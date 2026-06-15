@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.5.0](https://github.com/krt-iri/basetool/releases/tag/v0.5.0) - 2026-06-15
+
 ### Changed
 
 - **Organigramm, Mitgliederverwaltung und Profil ohne Seitenneuladen (Epic #571 / #581):** Im Organigramm aktualisieren das Zuweisen, Neubesetzen, Umbenennen und Entfernen von Positionen jetzt nur das Diagramm in-place statt die ganze Seite neu zu laden. In der Mitgliederverwaltung entfernt das Löschen eines Mitglieds die Zeile in-place, und ein fehlgeschlagener Logistiker-/Missions-Manager-Schalter wird direkt zurückgesetzt statt die Seite neu zu laden; das Bearbeiten eines Mitglieds speichert ohne Neuladen, wobei Eingabefehler direkt am jeweiligen Feld erscheinen. Auf der Profilseite speichert die Standard-Auszahlungspräferenz jetzt ohne Neuladen, und auf der Startseite wird „Als gelesen markieren" in-place übernommen. Das Umschalten der aktiven Org-Einheit lädt bewusst weiterhin die Seite neu, weil es den Geltungsbereich der gesamten Seite ändert. Ohne JavaScript funktionieren die klassischen Formulare unverändert weiter.

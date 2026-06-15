@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:ecd215ed-abd1-41d8-844b-6d5cd5bd9a7a" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:bf6f7c0a-7e81-42c6-b683-b1063fd5e390" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-06-13T11:38:55Z</timestamp>
+    <timestamp>2026-06-15T15:30:58Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-iri/basetool/actions/runs/27465683774</url>
+          <url>https://github.com/krt-iri/basetool/actions/runs/27557280393</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-iri/basetool</url>
@@ -3980,20 +3980,20 @@ There are currently about 600 StringTemplate source downloads a month.</descript
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.commonmark/commonmark@0.25.1?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.commonmark/commonmark@0.28.0?type=jar">
       <group>org.commonmark</group>
       <name>commonmark</name>
-      <version>0.25.1</version>
+      <version>0.28.0</version>
       <description>Core of commonmark-java (a library for parsing Markdown to an AST, modifying the AST and rendering it to HTML or Markdown)</description>
       <hashes>
-        <hash alg="MD5">bfc5c7136958635cce65e9a4d27c3ea9</hash>
-        <hash alg="SHA-1">c691886308d41f45556c335a063a0a4ac15e3f6f</hash>
-        <hash alg="SHA-256">b862e3a8be7defd9611502c7f63c9417018ca395608c216a13e2de23d37d52ee</hash>
-        <hash alg="SHA-512">c9a32c752efbb762896c74464bb806d3ef4d0a59202f9fa31d9a10a223211664fe50ffe9d2430831c23e74e70ed73a6fc3da9ade34d83dd5675bd46e3a11b3ce</hash>
-        <hash alg="SHA-384">28fd1cc813614838e91b25eab5a3fb771501544ba937eb11d4e4d3ee76dd2af156322c643372bec32afefbd1d6d477ac</hash>
-        <hash alg="SHA3-384">19f7f5b185df1e16cd8dd919a1580b6e92e90aba3bb35f348bb4c55be807cd875d19ddb875f745c583e004e3c2db32b9</hash>
-        <hash alg="SHA3-256">47fb7ef3dbaec643175a5952251eafaa49fd0dbfe0151b2ae710d047b0f402ed</hash>
-        <hash alg="SHA3-512">b1ae8c2e9ffcb3469cc77517deee58c6fece1ccd132067efa99fbffb07da95fb9e011e4f1ca5b1a18208cf4c71a4cefb4371db644e785cdd7be5f1d7ac1feea8</hash>
+        <hash alg="MD5">1242f7899d4f37a41126f45113e27c95</hash>
+        <hash alg="SHA-1">9fa5c6ea2a17aedfec543c693be35573307750dd</hash>
+        <hash alg="SHA-256">f8b28e00f97c568329ee1b2496cfec5c3ef8664b565ea09cf8988894183b956d</hash>
+        <hash alg="SHA-512">cd4ee2b918de001ab4ff09c3ee9d3b0d38c3566116a6755080a0cb5f0a16a9557ccc9530a1f20e8c71b43b4b37cce8667dcc8d12cb389fcde11193456e65ef77</hash>
+        <hash alg="SHA-384">21d34ff51409a97f41f45172e2c399671241df8d2eaca05064e0639d3e3b796a31c5ab98ba854539383e149a4c6dad31</hash>
+        <hash alg="SHA3-384">1f02b2c588749a06368219eb749499a9088d16caa3865d8d64573ff36346899352750ceac648e24c44a43fa85dcbe183</hash>
+        <hash alg="SHA3-256">8cfeec2b2b5ce49fc21e3cb7bf0f2e1db3766f90ed1eb6044e3c25d35e2135c9</hash>
+        <hash alg="SHA3-512">5be241384747221d92c907a0f10768a08eb2c10028ac659c9ae8346dcc7687c7b25ad0db16631e1d65f214e9b46db738ad105cc4b4ddd7737770a71083537433</hash>
       </hashes>
       <licenses>
         <license>
@@ -4001,7 +4001,7 @@ There are currently about 600 StringTemplate source downloads a month.</descript
           <url>https://opensource.org/licenses/BSD-2-Clause</url>
         </license>
       </licenses>
-      <purl>pkg:maven/org.commonmark/commonmark@0.25.1?type=jar</purl>
+      <purl>pkg:maven/org.commonmark/commonmark@0.28.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -9361,7 +9361,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar"/>
       <dependency ref="pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
-      <dependency ref="pkg:maven/org.commonmark/commonmark@0.25.1?type=jar"/>
+      <dependency ref="pkg:maven/org.commonmark/commonmark@0.28.0?type=jar"/>
       <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
@@ -9752,7 +9752,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.codehaus.plexus/plexus-utils@3.3.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.codehaus.plexus/plexus-utils@3.3.0?type=jar"/>
-    <dependency ref="pkg:maven/org.commonmark/commonmark@0.25.1?type=jar"/>
+    <dependency ref="pkg:maven/org.commonmark/commonmark@0.28.0?type=jar"/>
     <dependency ref="pkg:maven/org.dom4j/dom4j@2.2.0?type=jar"/>
     <dependency ref="pkg:maven/org.hamcrest/hamcrest-core@3.0?type=jar">
       <dependency ref="pkg:maven/org.hamcrest/hamcrest@3.0?type=jar"/>
