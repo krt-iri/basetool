@@ -346,25 +346,47 @@
         // is re-rendered via ?fragment=chartBody and swapped into the stable #oc-chart container,
         // re-stamping every data-version and rebuilding the add affordances + ARIA tree atomically
         // — no full-page reload. The innerHTML assignment resets the container's horizontal scroll,
-        // so it is captured before the swap and restored after; krtFetch.swap (preserveScroll)
-        // keeps the page's vertical scroll.
+        // so the caller captures it BEFORE closeModal() (whose focus()/inert-clear reflow can zero
+        // it on Chromium/Firefox) and refreshChart re-applies it across animation frames until the
+        // freshly-swapped tree's layout settles; krtFetch.swap (preserveScroll) keeps the page's
+        // vertical scroll.
         const MSG_REFRESH_FAILED =
             /*[[#{orgChart.refresh.failed}]]*/ 'Saved, but the chart could not be refreshed.';
-        function refreshChart() {
+        function refreshChart(keepScroll) {
             if (!chart || !window.krtFetch) {
                 window.location.reload();
                 return;
             }
-            const savedX = chart.scrollLeft;
+            const savedX = (typeof keepScroll === 'number') ? keepScroll : chart.scrollLeft;
             window.krtFetch.swap({
                 url: '/org-chart',
                 container: chart,
                 fragmentValue: 'chartBody',
                 errorMessage: MSG_REFRESH_FAILED
             }).then(function (ok) {
-                if (ok) {
-                    chart.scrollLeft = savedX;
+                if (!ok) {
+                    return;
                 }
+                // Re-apply the captured offset until it sticks. The innerHTML swap resets the
+                // container scroll and the fresh tree lays out asynchronously, so a single
+                // assignment clamps toward 0 while scrollWidth is below its final value (the browser
+                // does not re-expand scrollLeft once layout grows). Re-assert savedX each frame
+                // until the chart's max scroll has stabilised AND the offset has landed; bounded by
+                // a deadline so a refresh that narrows the chart (savedX then unreachable) cannot
+                // spin. Mirrors the former reload-path restoreScrollState settle loop.
+                const deadline = performance.now() + 5000;
+                let prevMax = -1;
+                (function reapply() {
+                    const maxScroll = chart.scrollWidth - chart.clientWidth;
+                    chart.scrollLeft = savedX;
+                    const landed = chart.scrollLeft >= Math.min(savedX, maxScroll) - 1;
+                    const settled = maxScroll === prevMax;
+                    prevMax = maxScroll;
+                    if (savedX <= 0 || (landed && settled) || performance.now() >= deadline) {
+                        return;
+                    }
+                    window.requestAnimationFrame(reapply);
+                })();
             });
         }
 
@@ -529,11 +551,16 @@
             }).then(function (resp) {
                 if (resp.ok) {
                     window.showFrontendSuccessToast(/*[[#{orgChart.toast.saved}]]*/ 'Saved');
+                    // Capture the horizontal scroll BEFORE closeModal(): closeModal() returns focus
+                    // to the trigger and clears `inert` on <main>, whose reflow can reset
+                    // chart.scrollLeft to 0 on Chromium/Firefox — read it here so refreshChart
+                    // restores the user's real offset.
+                    const keepScroll = chart ? chart.scrollLeft : 0;
                     closeModal();
                     // Re-render the tree in place — re-stamps every data-version, so the next edit
                     // does not 409 (no reload). #574/#578/#579 chose the same fragment-swap over a
                     // node patch because the add affordances + ARIA order are derived state.
-                    refreshChart();
+                    refreshChart(keepScroll);
                     return null;
                 }
                 return resp.json().catch(function () {
@@ -544,8 +571,9 @@
                         // user retries against the freshly-stamped chart instead of re-409ing.
                         window.showFrontendErrorToast(
                             /*[[#{error.concurrency.conflict}]]*/ 'Conflict, please reload.');
+                        const keepScroll = chart ? chart.scrollLeft : 0;
                         closeModal();
-                        refreshChart();
+                        refreshChart(keepScroll);
                         return;
                     }
                     const message = (data && data.detail)
