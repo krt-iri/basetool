@@ -339,7 +339,8 @@
             deleteSuccess: /*[[#{notification.success.delete}]]*/ 'Gelöscht.',
             deleteError:   /*[[#{notification.error.delete}]]*/ 'Löschen fehlgeschlagen.',
             deleteConfirm: /*[[#{admin.materials.categories.delete.confirm}]]*/ 'Wirklich löschen?',
-            deleteTitle:   /*[[#{general.delete}]]*/ 'Löschen'
+            deleteTitle:   /*[[#{general.delete}]]*/ 'Löschen',
+            noEntries:     /*[[#{general.no_entries}]]*/ 'Keine Einträge'
         };
         const CAT_CONFLICT = {
             title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
@@ -393,6 +394,18 @@
             actionTd.appendChild(form);
             tr.appendChild(nameTd);
             tr.appendChild(actionTd);
+            return tr;
+        }
+
+        // Rebuilds the "no entries" placeholder row removed by the first create, so deleting the
+        // last category restores it instead of leaving a header over an empty body.
+        function buildEmptyCategoryRow() {
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-category-empty', '');
+            const td = document.createElement('td');
+            td.colSpan = 2;
+            td.textContent = CAT_MSG.noEntries;
+            tr.appendChild(td);
             return tr;
         }
 
@@ -450,7 +463,13 @@
                         onSuccess: function () {
                             removeCategoryOption(categoryId);
                             const row = form.closest('tr');
+                            const tbody = row ? row.parentElement : null;
                             if (row) { row.remove(); }
+                            // Restore the placeholder when the last category is gone (the old full
+                            // reload re-rendered this server-side empty-state row).
+                            if (tbody && !tbody.querySelector('tr:not([data-category-empty])')) {
+                                tbody.appendChild(buildEmptyCategoryRow());
+                            }
                         }
                     });
                     return;

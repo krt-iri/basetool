@@ -107,10 +107,28 @@
     const MSG_LOCATION_UPDATED = /*[[#{material.collection.toast.locationUpdated}]]*/ 'Standort aktualisiert.';
     const MSG_DELIVERED_UPDATED = /*[[#{material.collection.toast.deliveredUpdated}]]*/ 'Lieferstatus aktualisiert.';
     const MSG_ERROR_GENERIC   = /*[[#{material.collection.toast.error}]]*/ 'Fehler beim Speichern.';
+    const MSG_COLLECTION_EMPTY = /*[[#{material.collection.empty}]]*/ 'Keine Lagereinträge für diesen Auftrag vorhanden.';
     /*]]>*/
 
     function collectionRow(inventoryId) {
         return document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
+    }
+
+    // Swaps the now-empty table for the same empty-state block the server renders when there are no
+    // entries, so a full-amount transfer of the last row matches a fresh page load instead of
+    // leaving a header over an empty table until the next reload.
+    function showCollectionEmptyIfDrained() {
+        const table = document.getElementById('material-collection-table');
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        if (tbody && tbody.querySelector('tr[data-inventory-id]')) return; // rows remain
+        const wrap = table.closest('.table-responsive');
+        const host = wrap ? wrap.parentElement : null;
+        if (!wrap || !host) return;
+        const empty = document.createElement('div');
+        empty.style.cssText = "color: var(--color-gray-2); font-family: 'Lato', sans-serif; padding: 2rem 0; text-align: center;";
+        empty.textContent = MSG_COLLECTION_EMPTY;
+        host.replaceChild(empty, wrap);
     }
 
     async function collectionTransfer(inventoryId, target, successMessage) {
@@ -136,8 +154,12 @@
             errorMessage: MSG_ERROR_GENERIC,
             onSuccess: function (body) {
                 window.showFrontendSuccessToast(successMessage);
-                // A full-amount transfer consumes the source row (204, no body) — remove it.
-                if (!body) row.remove();
+                // A full-amount transfer consumes the source row (204, no body) — remove it, and
+                // when it was the last row restore the server-style empty-state.
+                if (!body) {
+                    row.remove();
+                    showCollectionEmptyIfDrained();
+                }
             }
         });
         if (!result.ok) {

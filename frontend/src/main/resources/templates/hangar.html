@@ -184,6 +184,7 @@
                     <button id="set-home-location-btn" type="button" class="btn btn-outline"
                             data-trigger="hangar-open-home"
                             th:if="${!#lists.isEmpty(myShips)}"
+                            th:data-ship-count="${#lists.size(myShips)}"
                             th:text="#{hangar.home_location.btn}">Home-Location setzen</button>
                     <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" data-trigger="hangar-add-ship" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
                 </div>
@@ -411,7 +412,7 @@
                         <option th:each="loc : ${homeLocations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>
                 </div>
-                <p class="mb-2" th:text="#{hangar.home_location.modal.body(${#lists.size(myShips)})}">Setzt den Ort aller Schiffe auf die gewählte Home-Location.</p>
+                <p id="home-location-body" class="mb-2" th:text="#{hangar.home_location.modal.body(${#lists.size(myShips)})}">Setzt den Ort aller Schiffe auf die gewählte Home-Location.</p>
                 <div style="display: flex; justify-content: space-between;">
                     <button type="button" class="btn btn-ghost close-home-cancel" th:text="#{general.cancel}">Abbrechen</button>
                     <button type="submit" class="btn btn--cta" th:text="#{hangar.home_location.confirm}">Bestätigen</button>
@@ -458,7 +459,11 @@
             addError:      /*[[#{error.hangar.ship.add}]]*/ 'Hinzufuegen fehlgeschlagen.',
             updateError:   /*[[#{error.hangar.ship.update}]]*/ 'Aktualisieren fehlgeschlagen.',
             deleteError:   /*[[#{error.hangar.ship.delete}]]*/ 'Loeschen fehlgeschlagen.',
-            homeError:     /*[[#{error.hangar.home_location.set}]]*/ 'Setzen fehlgeschlagen.'
+            homeError:     /*[[#{error.hangar.home_location.set}]]*/ 'Setzen fehlgeschlagen.',
+            // Raw message template (inlined with no argument so the {0} placeholder is preserved);
+            // re-rendered client-side with the live ship count when the home-location modal opens,
+            // because the modal lives outside the swapped #hangar-results fragment.
+            homeBodyTemplate: /*[[#{hangar.home_location.modal.body}]]*/ 'Setzt den Ort von {0} Schiff(en) auf die gewaehlte Home-Location.'
         };
         var hangarConflict = {
             title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
@@ -744,9 +749,22 @@
 
             function closeHome() { homeModal.style.display = 'none'; }
 
+            // Re-render the modal body with the LIVE ship count. The count baked in at page load
+            // goes stale once an in-place ship add/delete re-swaps #hangar-results; the trigger
+            // button lives inside that fragment, so its data-ship-count is always current.
+            function refreshHomeBody() {
+                const body = document.getElementById('home-location-body');
+                const trigger = document.querySelector('[data-trigger="hangar-open-home"]');
+                if (body && trigger && hangarI18n.homeBodyTemplate) {
+                    const count = trigger.getAttribute('data-ship-count') || '';
+                    body.textContent = hangarI18n.homeBodyTemplate.replace('{0}', count);
+                }
+            }
+
             // The open button lives in the swapped #hangar-results fragment -> delegate via krtEvents.
             if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 window.krtEvents.on('click', 'hangar-open-home', function() {
+                    refreshHomeBody();
                     homeModal.style.display = 'flex';
                 });
             }

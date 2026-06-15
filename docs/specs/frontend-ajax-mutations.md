@@ -34,8 +34,16 @@ reload via `showKrtConfirm`.
   state (badges, totals and status cells re-derived in the success handler, not by a reload).
 - [ ] No `location.reload()` runs on the success path; the only reload is a user-accepted
   optimistic-lock confirm.
+- [ ] Derived UI that lives **outside** the swapped fragment is refreshed too — an emptied list
+  restores its "no entries" placeholder, and a count shown in a separate modal/header reflects the
+  new state (when a fragment swap cannot cover it, the handler patches it explicitly, e.g. the
+  hangar home-location ship count re-rendered on modal open, the category/alias placeholder rebuilt
+  on the last delete).
+- [ ] The submit control is disabled for the duration of the in-flight write and re-enabled in a
+  `.then`/`finally`, so a double-click cannot fire a duplicate create or a stale-version delete.
 
-**Enforced by:** per-area Playwright e2e (no-navigation assertion) · **Code:** `krt-fetch.js`,
+**Enforced by:** per-area Playwright e2e (no-navigation assertion) +
+`MaterialsCategoryEmptyStateInPlaceE2eTest` (empty-state restore) · **Code:** `krt-fetch.js`,
 the converted page handlers · **Issues:** #571, #572
 
 ### REQ-FE-002 — All writes go through `krtFetch` + `krtCsrf`
