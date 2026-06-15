@@ -196,7 +196,8 @@
             saveError:     /*[[#{notification.error.save}]]*/ 'Speichern fehlgeschlagen.',
             deleteSuccess: /*[[#{notification.success.delete}]]*/ 'Gelöscht.',
             deleteError:   /*[[#{notification.error.delete}]]*/ 'Löschen fehlgeschlagen.',
-            deleteTitle:   /*[[#{admin.materialAlias.action.delete}]]*/ 'Löschen'
+            deleteTitle:   /*[[#{admin.materialAlias.action.delete}]]*/ 'Löschen',
+            empty:         /*[[#{admin.materialAlias.empty}]]*/ 'Noch keine Aliase vorhanden.'
         };
         const CONFLICT = {
             title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
@@ -237,6 +238,18 @@
         // Builds a list row from the created alias. The trash SVG is constant markup (no user data);
         // all alias values are written via textContent. The new delete form is handled by the
         // delegated submit listener below, so no per-row binding is needed.
+        // Rebuilds the "no aliases yet" placeholder row removed by the first create, so deleting the
+        // last alias restores it instead of leaving a header over an empty body.
+        function buildEmptyAliasRow() {
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-alias-empty', '');
+            const td = document.createElement('td');
+            td.colSpan = 7;
+            td.textContent = MSG.empty;
+            tr.appendChild(td);
+            return tr;
+        }
+
         function buildAliasRow(alias) {
             const tr = document.createElement('tr');
             tr.setAttribute('data-alias-id', alias.id);
@@ -300,7 +313,13 @@
                 opts.errorMessage = MSG.deleteError;
                 opts.onSuccess = function () {
                     const row = form.closest('tr');
+                    const tb = row ? row.parentElement : null;
                     if (row) { row.remove(); }
+                    // Restore the placeholder when the last alias is gone (the old full reload
+                    // re-rendered this server-side empty-state row).
+                    if (tb && !tb.querySelector('tr:not([data-alias-empty])')) {
+                        tb.appendChild(buildEmptyAliasRow());
+                    }
                 };
             } else {
                 opts.payload = aliasPayload(form);

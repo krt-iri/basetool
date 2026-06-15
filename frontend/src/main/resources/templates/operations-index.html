@@ -247,6 +247,10 @@
             createForm.addEventListener('submit', function (event) {
                 event.preventDefault();
                 const owner = createForm.querySelector('[name="owningOrgUnitId"]');
+                // Disable the submit while the write is in flight so a double-click cannot create
+                // the operation twice (the old POST->redirect flow blocked this via full navigation).
+                const submitBtn = createForm.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
                 window.krtFetch.write({
                     method: 'POST',
                     url: createForm.getAttribute('action'),
@@ -264,7 +268,7 @@
                         createForm.reset();
                         reloadOperationsList();
                     }
-                });
+                }).then(function () { if (submitBtn) submitBtn.disabled = false; });
             });
         }
 
@@ -272,6 +276,10 @@
         if (deleteForm) {
             deleteForm.addEventListener('submit', function (event) {
                 event.preventDefault();
+                // Disable the submit while the write is in flight so a double-click cannot fire a
+                // second delete (whose stale version would 409 after the first one succeeded).
+                const submitBtn = deleteForm.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
                 window.krtFetch.write({
                     method: 'POST',
                     url: deleteForm.action,
@@ -282,7 +290,7 @@
                         closeOperationModal('delete-operation-modal');
                         reloadOperationsList();
                     }
-                });
+                }).then(function () { if (submitBtn) submitBtn.disabled = false; });
             });
         }
     })();
