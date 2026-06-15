@@ -56,6 +56,14 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.REFRESH_VERSIONS_TOKEN }}
+          # Author the commit as the GitHub Actions bot so the DCO check
+          # (dco.yml) takes its documented bot exemption. Without this,
+          # create-pull-request defaults the author to github.actor — on a
+          # workflow_dispatch run that is the maintainer, who then trips
+          # "DCO sign-off missing" because this automated commit carries no
+          # Signed-off-by trailer (the bot does not own contributor IP).
+          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          committer: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           branch: chore/refresh-versions
           base: main
           title: "chore(deps): refreshVersions proposals"
