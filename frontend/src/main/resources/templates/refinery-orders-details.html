@@ -477,8 +477,12 @@
     // the order itself is ownerless) and the placeholder label for the rebuilt option list.
     const STORE_INHERITED_ORG_UNIT_ID = /*[[${orderOwningOrgUnitId}]]*/ null;
     const STORE_ORG_UNIT_PLACEHOLDER = /*[[#{refineryorder.store.orgUnit.placeholder}]]*/ 'Select org unit';
-    async function _submitRefinery(form, errorMessage, onFailure) {
+    async function _submitRefinery(form, errorMessage, onFailure, submitter) {
         if (!window.krtCsrf) { form.submit(); return; }
+        // Double-submit guard: disable the triggering button for the whole round-trip (re-enabled in
+        // the finally so a failed write can be retried; the success path navigates away).
+        if (submitter) { submitter.disabled = true; }
+        try {
         const fd = new FormData(form);
         function buildHeaders() {
             const h = { 'X-Requested-With': 'XMLHttpRequest' };
@@ -509,6 +513,9 @@
         if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
         if (body && body.targetUrl) window.location.assign(body.targetUrl);
         else window.location.reload();
+        } finally {
+            if (submitter) { submitter.disabled = false; }
+        }
     }
 
     function calcScu(index) {
@@ -985,7 +992,7 @@
         if (mainForm) {
             mainForm.addEventListener('submit', (e) => {
                 e.preventDefault();
-                _submitRefinery(mainForm, MSG_REFINERY_UPDATE_FAILED);
+                _submitRefinery(mainForm, MSG_REFINERY_UPDATE_FAILED, null, e.submitter);
             });
         }
         const storeForm = document.getElementById('storeForm');
@@ -1012,7 +1019,7 @@
                         MSG_CANCEL_TITLE, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS);
                     if (!ok) return;
                 }
-                _submitRefinery(cancelForm, MSG_REFINERY_CANCEL_FAILED);
+                _submitRefinery(cancelForm, MSG_REFINERY_CANCEL_FAILED, null, e.submitter);
             });
         }
     })();

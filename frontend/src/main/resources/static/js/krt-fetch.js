@@ -171,6 +171,35 @@
         }
     }
 
+    // Double-submit guard (app-wide): record the button that triggered the most recent form submit
+    // — capture phase, so it runs before the form's own preventDefault handler — so write() can
+    // disable it for the in-flight request without every call site threading it through. A microtask
+    // clears it right after the synchronous submit handler runs, and write() consumes it on first
+    // use, so an unrelated later write never inherits a stale submitter. Raw-fetch writes that do not
+    // go through write() guard their submit button explicitly instead.
+    let pendingSubmitter = null;
+    document.addEventListener(
+        'submit',
+        function (e) {
+            const form = e.target;
+            pendingSubmitter =
+                e.submitter ||
+                (form && form.querySelector
+                    ? form.querySelector('button[type="submit"], input[type="submit"]')
+                    : null);
+            Promise.resolve().then(function () {
+                pendingSubmitter = null;
+            });
+        },
+        true,
+    );
+
+    function consumePendingSubmitter() {
+        const s = pendingSubmitter;
+        pendingSubmitter = null;
+        return s;
+    }
+
     /**
      * Renders the KRT-styled feedback for a non-ok response.
      *
@@ -253,12 +282,19 @@
      *  - errorMessage         already-localized generic error text
      *  - conflict             localized conflict strings (see handleProblem)
      *  - onSuccess            callback(body) run after a 2xx
+     *  - submitter            optional submit button disabled for the in-flight request and
+     *                         re-enabled when it settles (double-submit guard)
      *
      * Returns { ok, status, body }. On a bare 403 the CSRF token is refreshed
      * from GET /csrf and the request retried exactly once before failing.
      */
     async function write(opts) {
         const method = opts.method || 'PATCH';
+        // In-flight double-submit guard: the explicit opts.submitter, else the button auto-captured
+        // from the triggering form submit. Disabled for the whole round-trip and re-enabled in the
+        // finally below on every success/error/network path, so a double-click cannot fire a second
+        // (duplicate-create / stale-version) write.
+        const submitter = opts.submitter || consumePendingSubmitter();
 
         function buildInit() {
             const init = { method: method, headers: csrfHeaders() };
@@ -268,51 +304,60 @@
             return init;
         }
 
-        let response;
+        if (submitter) {
+            submitter.disabled = true;
+        }
         try {
-            response = await fetch(opts.url, buildInit());
-            // A bare 403 is the CSRF filter rejecting a stale token (it answers
-            // before GlobalExceptionHandler, so the body is not problem+json).
-            // Refresh the token once and retry; a genuine authorization failure
-            // either redirects (302) or 403s again after the refetch and surfaces.
-            if (response.status === 403) {
-                const refreshed = await refreshCsrf();
-                if (refreshed) {
-                    response = await fetch(opts.url, buildInit());
+            let response;
+            try {
+                response = await fetch(opts.url, buildInit());
+                // A bare 403 is the CSRF filter rejecting a stale token (it answers
+                // before GlobalExceptionHandler, so the body is not problem+json).
+                // Refresh the token once and retry; a genuine authorization failure
+                // either redirects (302) or 403s again after the refetch and surfaces.
+                if (response.status === 403) {
+                    const refreshed = await refreshCsrf();
+                    if (refreshed) {
+                        response = await fetch(opts.url, buildInit());
+                    }
+                }
+            } catch (networkError) {
+                errorToast(
+                    text(opts.errorMessage, 'Speichern fehlgeschlagen.') +
+                        ' (' +
+                        (networkError && networkError.message ? networkError.message : 'network') +
+                        ')',
+                );
+                return { ok: false, status: 0, body: null };
+            }
+
+            const body = await parseBody(response);
+
+            if (!response.ok) {
+                await handleProblem(response, body, opts);
+                return { ok: false, status: response.status, body: body };
+            }
+
+            if (opts.containerSelector && body && body.version != null) {
+                syncVersion(opts.containerSelector, body.version);
+            }
+            if (opts.toast !== false) {
+                const label = opts.sectionLabel ? opts.sectionLabel + ': ' : '';
+                successToast(label + text(opts.successMessage, 'Gespeichert.'));
+            }
+            if (typeof opts.onSuccess === 'function') {
+                try {
+                    opts.onSuccess(body);
+                } catch (_callbackError) {
+                    /* a success callback must never break the UX */
                 }
             }
-        } catch (networkError) {
-            errorToast(
-                text(opts.errorMessage, 'Speichern fehlgeschlagen.') +
-                    ' (' +
-                    (networkError && networkError.message ? networkError.message : 'network') +
-                    ')',
-            );
-            return { ok: false, status: 0, body: null };
-        }
-
-        const body = await parseBody(response);
-
-        if (!response.ok) {
-            await handleProblem(response, body, opts);
-            return { ok: false, status: response.status, body: body };
-        }
-
-        if (opts.containerSelector && body && body.version != null) {
-            syncVersion(opts.containerSelector, body.version);
-        }
-        if (opts.toast !== false) {
-            const label = opts.sectionLabel ? opts.sectionLabel + ': ' : '';
-            successToast(label + text(opts.successMessage, 'Gespeichert.'));
-        }
-        if (typeof opts.onSuccess === 'function') {
-            try {
-                opts.onSuccess(body);
-            } catch (_callbackError) {
-                /* a success callback must never break the UX */
+            return { ok: true, status: response.status, body: body };
+        } finally {
+            if (submitter) {
+                submitter.disabled = false;
             }
         }
-        return { ok: true, status: response.status, body: body };
     }
 
     // ------------------------------------------------------------ fragment swap

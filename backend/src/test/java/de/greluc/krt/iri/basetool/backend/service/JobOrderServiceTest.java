@@ -720,7 +720,7 @@ class JobOrderServiceTest {
         () -> {
           jobOrderService.updateJobOrder(orderId, updateDto);
         });
-    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+    verify(jobOrderRepository, never()).saveAndFlush(any(JobOrder.class));
   }
 
   @Test
@@ -751,7 +751,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(bravoId)).thenReturn(Optional.of(bravo));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
     jobOrderService.updateJobOrder(orderId, updateDto);
@@ -829,7 +829,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
     when(materialRepository.findById(newMaterialId)).thenReturn(Optional.of(newMaterial));
-    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
 
     // When
@@ -843,8 +843,35 @@ class JobOrderServiceTest {
     // Check if the old material was unlinked
     verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
 
-    // Verify save
-    verify(jobOrderRepository).save(jobOrder);
+    // Verify the persist flushes (saveAndFlush) so the in-place response carries the fresh
+    // @Version.
+    verify(jobOrderRepository).saveAndFlush(jobOrder);
+  }
+
+  @Test
+  void updateJobOrder_flushesSoReturnedVersionIsFresh() {
+    // Regression (#571): updateJobOrder maps the response DTO inside the open transaction, so the
+    // @Version bump must be flushed (saveAndFlush) before toDto — otherwise the in-place edit modal
+    // receives a stale pre-flush version and the user's next consecutive edit 409s. Assert the
+    // flush, and that a plain save() (which defers the bump to commit) is never used on this path.
+    UUID betaId = UUID.randomUUID();
+    Squadron beta = new Squadron();
+    beta.setId(betaId);
+    beta.setShorthand("Beta");
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 700, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(null, betaId, "Tester", null, List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+
+    jobOrderService.updateJobOrder(orderId, updateDto);
+
+    verify(jobOrderRepository).saveAndFlush(jobOrder);
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
   @Test

@@ -575,7 +575,13 @@ public class JobOrderService {
       jobOrder.addMaterial(jobOrderMaterial);
     }
 
-    jobOrder = jobOrderRepository.save(jobOrder);
+    // saveAndFlush so the flushed @Version reaches the response DTO: this is an in-place AJAX edit
+    // whose returned version is written back onto the edit-modal's hidden version input (which
+    // lives
+    // outside the swapped fragments), so a stale pre-flush version would 409 the next consecutive
+    // edit. The sibling updateItemJobOrder / updateJobOrderStatus already flush; this path was the
+    // one order write missed by the #610 sweep.
+    jobOrder = jobOrderRepository.saveAndFlush(jobOrder);
 
     // Reconciliation (Phase 4 / #344, decision #6): an edit that drops a material bucket withdraws
     // any now-orphaned claims on that bucket. No-op for non-SK orders (which carry no claims).

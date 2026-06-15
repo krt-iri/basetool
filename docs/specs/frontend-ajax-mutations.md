@@ -39,8 +39,10 @@ reload via `showKrtConfirm`.
   new state (when a fragment swap cannot cover it, the handler patches it explicitly, e.g. the
   hangar home-location ship count re-rendered on modal open, the category/alias placeholder rebuilt
   on the last delete).
-- [ ] The submit control is disabled for the duration of the in-flight write and re-enabled in a
-  `.then`/`finally`, so a double-click cannot fire a duplicate create or a stale-version delete.
+- [ ] The submit control is disabled for the duration of the in-flight write and re-enabled when it
+  settles, so a double-click cannot fire a duplicate create or a stale-version delete. Enforced
+  centrally: `krtFetch.write` auto-captures the triggering form's submit button and toggles it
+  (raw-`fetch` write paths — order/refinery create, the mission-data helper — guard it explicitly).
 
 **Enforced by:** per-area Playwright e2e (no-navigation assertion) +
 `MaterialsCategoryEmptyStateInPlaceE2eTest` (empty-state restore) · **Code:** `krt-fetch.js`,
@@ -77,7 +79,9 @@ increment is otherwise deferred to commit — _after_ the DTO is mapped — so t
 (e.g. `Mission.coreVersion` / `scheduleVersion` / `flagsVersion` / `partyLeadVersion`), which is
 already current in the DTO regardless of flush timing, nor to writes whose handler re-renders the
 fragment from a fresh server `GET` (the re-swap re-reads the committed version). See the
-optimistic-locking rules in `CLAUDE.md`.
+optimistic-locking rules in `CLAUDE.md`. (A 2026-06 area audit added
+`JobOrderService.updateJobOrder` to the `saveAndFlush` set — its edit-modal version writeback
+otherwise 409s the next consecutive order edit.)
 
 **Acceptance**
 

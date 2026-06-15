@@ -387,7 +387,7 @@ class JobOrderServicePriorityAndStatusTest {
       assertThrows(
           ObjectOptimisticLockingFailureException.class,
           () -> service.updateJobOrder(ORDER_ID, newUpdateDto(3L)));
-      verify(jobOrderRepository, never()).save(any());
+      verify(jobOrderRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -407,7 +407,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(materialRepository.findById(yId)).thenReturn(Optional.of(materialWithId(yId)));
-      when(jobOrderRepository.save(o)).thenReturn(o);
+      when(jobOrderRepository.saveAndFlush(o)).thenReturn(o);
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
@@ -441,13 +441,13 @@ class JobOrderServicePriorityAndStatusTest {
     void nullVersion_bypassesOptimisticCheck() {
       JobOrder o = newOrder(JobOrderStatus.OPEN, 1, 5L);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
-      when(jobOrderRepository.save(o)).thenReturn(o);
+      when(jobOrderRepository.saveAndFlush(o)).thenReturn(o);
 
       CreateJobOrderDto dto = new CreateJobOrderDto(null, null, "b", null, List.of(), null);
 
       service.updateJobOrder(ORDER_ID, dto);
 
-      verify(jobOrderRepository).save(o);
+      verify(jobOrderRepository).saveAndFlush(o);
     }
   }
 
