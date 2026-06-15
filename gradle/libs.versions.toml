@@ -28,7 +28,7 @@ axeCorePlaywright = "4.11.3"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
 openpdf = "3.0.5"
-commonmark = "0.25.1"
+commonmark = "0.28.0"
 
 [libraries]
 
