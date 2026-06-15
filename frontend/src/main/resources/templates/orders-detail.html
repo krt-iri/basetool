@@ -1704,10 +1704,22 @@
                     if (editVer) editVer.value = data.version;
                 }
                 if (selectElement) selectElement.dataset.savedStatus = status;
-                // COMPLETED/REJECTED detach linked inventory server-side; drop any open drill-down so
-                // a stale list is not shown (it is lazily re-fetched on the next row click).
+                // COMPLETED/REJECTED detach linked inventory server-side (lowering the per-material
+                // stock + fulfilment status cells) and null the priority — all backend-derived and
+                // rendered OUTSIDE the fragments this DOM-patch touches. Re-pull the materials
+                // section and the header so they match the server instead of staying stale until a
+                // manual reload (mirrors the edit/handover flows). Also drop any open drill-down
+                // (lazily re-fetched on the next row click).
                 if (status === 'COMPLETED' || status === 'REJECTED') {
                     document.querySelectorAll('.inventory-details-row').forEach(function (r) { r.remove(); });
+                    const header = document.getElementById('order-header-results');
+                    if (header && window.krtFetch.swap) {
+                        window.krtFetch.swap({
+                            url: '/orders/' + orderId, container: header,
+                            fragmentValue: 'header', history: false, preserveScroll: true
+                        });
+                    }
+                    _refreshMaterialsSection(orderId);
                 }
                 showFrontendSuccessToast(MSG_STATUS_SUCCESS);
             }

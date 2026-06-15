@@ -395,6 +395,10 @@
     // (duplicate-name / in-use toast, or OPTIMISTIC_LOCK reload-confirm).
     function missionWrite(form, successMessage, onSuccess) {
         var action = form.getAttribute('action');
+        // In-flight double-submit guard: disable the form's submit button for the whole round-trip
+        // and re-enable it in the finally below, so a double-click cannot fire a duplicate write.
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; }
         function headers() {
             var h = { 'X-Requested-With': 'XMLHttpRequest' };
             var t = window.krtCsrf ? window.krtCsrf.token() : null;
@@ -431,6 +435,8 @@
             });
         }).catch(function () {
             if (window.showFrontendErrorToast) { window.showFrontendErrorToast(MISSION_MSG.error); }
+        }).finally(function () {
+            if (submitBtn) { submitBtn.disabled = false; }
         });
     }
 

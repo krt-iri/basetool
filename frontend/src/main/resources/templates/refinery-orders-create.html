@@ -780,8 +780,12 @@
     // the entered data. The classic form-POST is the no-JS fallback (krtCsrf absent).
     const MSG_RFC_MATERIAL_INVALID = /*[[#{error.refineryorder.material.invalid}]]*/ 'Add a material.';
     const MSG_RFC_CREATE_FAILED = /*[[#{error.refineryorder.create.failed}]]*/ 'Create failed.';
-    async function _submitRefineryCreate(form) {
+    async function _submitRefineryCreate(form, submitter) {
         if (!window.krtCsrf) { form.submit(); return; }
+        // Double-submit guard: disable the triggering button for the whole round-trip (re-enabled in
+        // the finally so a failed create can be retried; the success path navigates away).
+        if (submitter) { submitter.disabled = true; }
+        try {
         const fd = new FormData(form);
         function buildHeaders() {
             const h = { 'X-Requested-With': 'XMLHttpRequest' };
@@ -814,6 +818,9 @@
         if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
         if (body && body.targetUrl) window.location.assign(body.targetUrl);
         else window.location.reload();
+        } finally {
+            if (submitter) { submitter.disabled = false; }
+        }
     }
     // #591: single idempotent re-init for everything that is NOT document-delegated, run on first
     // load AND after the screenshot-import swaps #refineryImportFormContainer in place. The delegated
@@ -849,7 +856,7 @@
         const createForm = document.querySelector('form[data-testid="refinery-form"]');
         if (createForm && !createForm._rfcSubmitBound) {
             createForm._rfcSubmitBound = true;
-            createForm.addEventListener('submit', function (e) { e.preventDefault(); _submitRefineryCreate(createForm); });
+            createForm.addEventListener('submit', function (e) { e.preventDefault(); _submitRefineryCreate(createForm, e.submitter); });
         }
     }
     document.addEventListener('DOMContentLoaded', function () { _reinitRefineryForm(false); });

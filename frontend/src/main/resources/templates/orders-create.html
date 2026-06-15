@@ -695,8 +695,12 @@
     const MSG_ITEM_INVALID = '[(#{error.joborder.item.invalid})]';
     const MSG_CREATE_FAILED = '[(#{error.joborder.create.failed})]';
     const MSG_UPDATE_FAILED = '[(#{error.joborder.update.failed})]';
-    async function _submitOrderCreate(form, invalidMessage, failedMessage) {
+    async function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
         if (!window.krtCsrf) { form.submit(); return; }
+        // Double-submit guard: disable the triggering button for the whole round-trip (re-enabled in
+        // the finally so a failed create can be retried; the success path navigates away).
+        if (submitter) { submitter.disabled = true; }
+        try {
         const fd = new FormData(form);
         function buildHeaders() {
             const h = { 'X-Requested-With': 'XMLHttpRequest' };
@@ -725,12 +729,15 @@
         } else {
             window.location.reload();
         }
+        } finally {
+            if (submitter) { submitter.disabled = false; }
+        }
     }
     const _materialCreateForm = document.querySelector('#mode-material form');
     if (_materialCreateForm) {
         _materialCreateForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            _submitOrderCreate(_materialCreateForm, MSG_MATERIAL_INVALID, MSG_CREATE_FAILED);
+            _submitOrderCreate(_materialCreateForm, MSG_MATERIAL_INVALID, MSG_CREATE_FAILED, e.submitter);
         });
     }
     const _itemCreateForm = document.querySelector('#mode-item form');
@@ -739,7 +746,7 @@
             e.preventDefault();
             const failed = _itemCreateForm.getAttribute('action').indexOf('/items/update') >= 0
                 ? MSG_UPDATE_FAILED : MSG_CREATE_FAILED;
-            _submitOrderCreate(_itemCreateForm, MSG_ITEM_INVALID, failed);
+            _submitOrderCreate(_itemCreateForm, MSG_ITEM_INVALID, failed, e.submitter);
         });
     }
     /*]]>*/
