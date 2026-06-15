@@ -193,11 +193,19 @@ class AdminSettingsInPlaceE2eTest {
    * client's in-place writeback.
    *
    * @return the persisted {@code ageYellowDays} value as an int
+   * @throws IllegalStateException if the backend returns a non-numeric {@code value} for the
+   *     setting — surfaced explicitly (with the offending raw value and key) instead of leaking a
+   *     bare {@link NumberFormatException}, while still failing the test
    */
   private static int persistedYellowDays() {
     String body =
         new BackendSeeder().getBody(USERNAME, PASSWORD, "/api/v1/settings/" + YELLOW_DAYS_KEY);
-    return Integer.parseInt(
-        JsonParser.parseString(body).getAsJsonObject().get("value").getAsString());
+    String raw = JsonParser.parseString(body).getAsJsonObject().get("value").getAsString();
+    try {
+      return Integer.parseInt(raw);
+    } catch (NumberFormatException e) {
+      throw new IllegalStateException(
+          "Setting '" + YELLOW_DAYS_KEY + "' returned a non-numeric value: '" + raw + "'", e);
+    }
   }
 }
