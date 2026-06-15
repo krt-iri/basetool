@@ -145,7 +145,7 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrder.getId())).thenReturn(Optional.of(jobOrder));
-    when(inventoryItemRepository.save(item)).thenReturn(item);
+    when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item)).thenReturn(mapped);
 
     // When
@@ -156,7 +156,7 @@ class InventoryItemServiceTest {
     assertSame(mapped, result, "the returned DTO is the mapper projection of the edited row");
     assertEquals(
         2.0, item.getAmount(), "amount equals the DTO amount, never summed with a sibling");
-    verify(inventoryItemRepository).save(item);
+    verify(inventoryItemRepository).saveAndFlush(item);
     verify(inventoryItemRepository, never()).delete(any());
   }
 
@@ -511,7 +511,7 @@ class InventoryItemServiceTest {
     inventoryItemService.bookOutInventoryItem(itemId, dto, currentUserId, false);
 
     assertEquals(5.0, existingItem.getAmount());
-    verify(inventoryItemRepository).save(existingItem);
+    verify(inventoryItemRepository).saveAndFlush(existingItem);
   }
 
   @Test
@@ -557,7 +557,10 @@ class InventoryItemServiceTest {
 
     inventoryItemService.bookOutInventoryItem(itemId, dto, adminId, true);
 
-    verify(inventoryItemRepository, times(2)).save(any(InventoryItem.class));
+    // Partial TRANSFER -> new target row save()d once, reduced source row saveAndFlush()ed once
+    // (change #7: the source is flushed so its @Version stays current within the transaction).
+    verify(inventoryItemRepository).save(any(InventoryItem.class));
+    verify(inventoryItemRepository).saveAndFlush(existingItem);
     assertEquals(5.0, existingItem.getAmount());
   }
 
@@ -673,7 +676,7 @@ class InventoryItemServiceTest {
 
     inventoryItemService.bookOutInventoryItem(itemId, dto, currentUserId, false);
 
-    verify(inventoryItemRepository).save(existingItem);
+    verify(inventoryItemRepository).saveAndFlush(existingItem);
     assertEquals(5.0, existingItem.getAmount());
 
     verify(missionFinanceEntryRepository).save(any(MissionFinanceEntry.class));
@@ -722,12 +725,12 @@ class InventoryItemServiceTest {
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(newJobOrderId)).thenReturn(Optional.of(jobOrder));
     when(missionRepository.findById(newMissionId)).thenReturn(Optional.of(mission));
-    when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(existingItem);
+    when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class))).thenReturn(existingItem);
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false);
 
-    verify(inventoryItemRepository).save(existingItem);
+    verify(inventoryItemRepository).saveAndFlush(existingItem);
     assertEquals(newJobOrderId, existingItem.getJobOrder().getId());
     assertEquals(newMissionId, existingItem.getMission().getId());
   }
@@ -782,13 +785,13 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
     when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
-    when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(existingItem);
+    when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class))).thenReturn(existingItem);
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     // isLogistician = true
     inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, true);
 
-    verify(inventoryItemRepository).save(existingItem);
+    verify(inventoryItemRepository).saveAndFlush(existingItem);
     assertNull(existingItem.getJobOrder());
     assertNull(existingItem.getMission());
   }
@@ -839,14 +842,14 @@ class InventoryItemServiceTest {
         new InventoryItemNoteUpdateRequest("Ready for mission", 3L);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
-    when(inventoryItemRepository.save(any(InventoryItem.class)))
+    when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     inventoryItemService.updateNote(itemId, req, ownerId, false);
 
     assertEquals("Ready for mission", item.getNote());
-    verify(inventoryItemRepository).save(item);
+    verify(inventoryItemRepository).saveAndFlush(item);
   }
 
   @Test
@@ -886,14 +889,14 @@ class InventoryItemServiceTest {
     InventoryItemNoteUpdateRequest req = new InventoryItemNoteUpdateRequest("admin hint", 1L);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
-    when(inventoryItemRepository.save(any(InventoryItem.class)))
+    when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     inventoryItemService.updateNote(itemId, req, strangerId, true);
 
     assertEquals("admin hint", item.getNote());
-    verify(inventoryItemRepository).save(item);
+    verify(inventoryItemRepository).saveAndFlush(item);
   }
 
   @Test
@@ -932,14 +935,14 @@ class InventoryItemServiceTest {
     InventoryItemNoteUpdateRequest req = new InventoryItemNoteUpdateRequest("   ", 1L);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
-    when(inventoryItemRepository.save(any(InventoryItem.class)))
+    when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     inventoryItemService.updateNote(itemId, req, ownerId, false);
 
     assertNull(item.getNote());
-    verify(inventoryItemRepository).save(item);
+    verify(inventoryItemRepository).saveAndFlush(item);
   }
 
   // ---- getMaterialCollection ----
@@ -1029,7 +1032,7 @@ class InventoryItemServiceTest {
         new de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
-    when(inventoryItemRepository.save(any(InventoryItem.class)))
+    when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
@@ -1038,7 +1041,39 @@ class InventoryItemServiceTest {
 
     // Then
     assertTrue(item.getDelivered());
-    verify(inventoryItemRepository).save(item);
+    verify(inventoryItemRepository).saveAndFlush(item);
+  }
+
+  /**
+   * Pins that {@code updateDelivered} maps its response from a {@code saveAndFlush}, not a plain
+   * {@code save}: the material-collection delivered checkbox syncs the returned {@code @Version}
+   * onto the row in place (no reload), so a plain {@code save} would return the stale pre-flush
+   * version and a second consecutive toggle of the same row would 409.
+   */
+  @Test
+  void updateDelivered_flushesSoVersionIsFresh() {
+    UUID itemId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+
+    User owner = new User();
+    owner.setId(ownerId);
+
+    InventoryItem item = new InventoryItem();
+    item.setId(itemId);
+    item.setVersion(1L);
+    item.setUser(owner);
+    item.setDelivered(false);
+
+    de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest request =
+        new de.greluc.krt.iri.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+
+    inventoryItemService.updateDelivered(itemId, request, ownerId, false);
+
+    verify(inventoryItemRepository).saveAndFlush(item);
+    verify(inventoryItemRepository, never()).save(item);
   }
 
   @Test

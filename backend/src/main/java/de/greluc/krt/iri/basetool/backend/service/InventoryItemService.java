@@ -844,7 +844,10 @@ public class InventoryItemService {
         inventoryItemRepository.delete(item);
       } else {
         item.setAmount(remainingAmount);
-        inventoryItemRepository.save(item);
+        // saveAndFlush the reduced source row for parity with the discard/sell fall-through below:
+        // the returned DTO is the new target row, but flushing keeps the source row's @Version
+        // current within the transaction so any future in-place consumer of a transfer cannot 409.
+        inventoryItemRepository.saveAndFlush(item);
       }
       return inventoryItemMapper.toDto(savedNew);
     } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
@@ -1024,7 +1027,10 @@ public class InventoryItemService {
     }
 
     item.setDelivered(request.delivered());
-    return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    // saveAndFlush so the response carries the flushed @Version — the material-collection delivered
+    // checkbox syncs the returned version onto the row in place (no reload), so a plain save would
+    // return the stale pre-flush version and a second consecutive toggle of the same row would 409.
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
   }
 
   private Double roundAmount(Double amount) {

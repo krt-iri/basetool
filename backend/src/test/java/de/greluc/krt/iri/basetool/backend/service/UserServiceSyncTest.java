@@ -473,7 +473,7 @@ class UserServiceSyncTest {
       User user = newUser(USER_ID, "alice");
       user.setVersion(1L);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
+      when(userRepository.saveAndFlush(user)).thenReturn(user);
 
       userService.updateUserDescription(USER_ID, "new description", "Display Name", 1L);
 
@@ -487,7 +487,7 @@ class UserServiceSyncTest {
       user.setVersion(1L);
       user.setDisplayName("previous");
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
+      when(userRepository.saveAndFlush(user)).thenReturn(user);
 
       userService.updateUserDescription(USER_ID, null, "   ", 1L);
 
@@ -503,7 +503,7 @@ class UserServiceSyncTest {
       User user = newUser(USER_ID, "alice");
       user.setVersion(5L);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
+      when(userRepository.saveAndFlush(user)).thenReturn(user);
 
       userService.updateUserDescription(USER_ID, "x", null, null);
 
@@ -545,7 +545,7 @@ class UserServiceSyncTest {
       User user = newUser(USER_ID, "alice");
       user.setVersion(1L);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
+      when(userRepository.saveAndFlush(user)).thenReturn(user);
 
       userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.DONATE, 1L);
 
@@ -557,7 +557,7 @@ class UserServiceSyncTest {
       User user = newUser(USER_ID, "alice");
       user.setVersion(5L);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
+      when(userRepository.saveAndFlush(user)).thenReturn(user);
 
       userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.PAYOUT, null);
 

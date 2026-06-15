@@ -174,7 +174,7 @@ class InventoryItemServiceBookOutTest {
           false);
 
       // No exception -> the version check was bypassed.
-      verify(inventoryItemRepository).save(item);
+      verify(inventoryItemRepository).saveAndFlush(item);
     }
 
     @Test
@@ -208,7 +208,7 @@ class InventoryItemServiceBookOutTest {
           otherUserId,
           /* isAdmin= */ true);
 
-      verify(inventoryItemRepository).save(item);
+      verify(inventoryItemRepository).saveAndFlush(item);
     }
 
     @Test
@@ -255,11 +255,13 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      // TRANSFER -> save called twice (new item + updated source).
+      // Partial TRANSFER -> the new target row is save()d, the reduced source row is
+      // saveAndFlush()ed (so its @Version stays current within the transaction; see change #7).
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
-      verify(inventoryItemRepository, org.mockito.Mockito.times(2)).save(captor.capture());
-      // First save = the new item with targetUser; second = updated source.
-      assertSame(targetUser, captor.getAllValues().get(0).getUser());
+      verify(inventoryItemRepository).save(captor.capture());
+      verify(inventoryItemRepository).saveAndFlush(item);
+      // The captured save = the new item with targetUser.
+      assertSame(targetUser, captor.getValue().getUser());
     }
 
     @Test
@@ -280,9 +282,11 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
+      // Partial TRANSFER -> new target row save()d, reduced source row saveAndFlush()ed.
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
-      verify(inventoryItemRepository, org.mockito.Mockito.times(2)).save(captor.capture());
-      assertSame(targetLocation, captor.getAllValues().get(0).getLocation());
+      verify(inventoryItemRepository).save(captor.capture());
+      verify(inventoryItemRepository).saveAndFlush(item);
+      assertSame(targetLocation, captor.getValue().getLocation());
     }
 
     @Test
@@ -294,7 +298,8 @@ class InventoryItemServiceBookOutTest {
           ITEM_ID, newDto(1.0, null, null, /* type= */ null, null, null, 1L), OWNER_ID, false);
 
       // DISCARD -> source updated, no transfer-side new item created.
-      verify(inventoryItemRepository, org.mockito.Mockito.times(1)).save(any(InventoryItem.class));
+      verify(inventoryItemRepository, org.mockito.Mockito.times(1))
+          .saveAndFlush(any(InventoryItem.class));
     }
   }
 
@@ -446,12 +451,17 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
-      verify(inventoryItemRepository, org.mockito.Mockito.times(2)).save(captor.capture());
-      InventoryItem newItem = captor.getAllValues().get(0);
-      InventoryItem source = captor.getAllValues().get(1);
+      // Partial TRANSFER -> new target row save()d, reduced source row saveAndFlush()ed (change
+      // #7).
+      ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
+      ArgumentCaptor<InventoryItem> flushCaptor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository).save(saveCaptor.capture());
+      verify(inventoryItemRepository).saveAndFlush(flushCaptor.capture());
+      InventoryItem newItem = saveCaptor.getValue();
+      InventoryItem source = flushCaptor.getValue();
       assertEquals(3.0, newItem.getAmount(), "new item gets the booked-out amount");
       assertEquals(7.0, source.getAmount(), "source keeps the remainder");
+      assertSame(item, source, "the flushed row is the original source");
       assertSame(targetUser, newItem.getUser());
       verify(inventoryItemRepository, never()).delete(any());
     }
@@ -520,12 +530,13 @@ class InventoryItemServiceBookOutTest {
       // new target row (amount 4, owned by targetUser) and the decremented source (10 - 4 = 6).
       assertEquals(6.0, existingTarget.getAmount(), "existing target stack must be left untouched");
       assertEquals(6.0, source.getAmount(), "source keeps the remainder");
-      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
-      verify(inventoryItemRepository, org.mockito.Mockito.times(2)).save(captor.capture());
-      InventoryItem newRow = captor.getAllValues().get(0);
+      // Partial TRANSFER -> new target row save()d, decremented source row saveAndFlush()ed.
+      ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository).save(saveCaptor.capture());
+      InventoryItem newRow = saveCaptor.getValue();
       assertSame(targetUser, newRow.getUser(), "the inserted row is owned by the target user");
       assertEquals(4.0, newRow.getAmount(), "the inserted row carries the moved amount");
-      assertSame(source, captor.getAllValues().get(1), "the second save is the decremented source");
+      verify(inventoryItemRepository).saveAndFlush(source);
       verify(inventoryItemRepository, never()).delete(any());
     }
 
@@ -571,12 +582,48 @@ class InventoryItemServiceBookOutTest {
 
       // foreign-org target untouched; a brand-new row stamped org B is created instead.
       assertEquals(6.0, foreignOrgTarget.getAmount(), "foreign-org stack must be left untouched");
-      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
-      verify(inventoryItemRepository, org.mockito.Mockito.times(2)).save(captor.capture());
-      InventoryItem newRow = captor.getAllValues().get(0);
+      // Partial TRANSFER -> new target row save()d, decremented source row saveAndFlush()ed.
+      ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository).save(saveCaptor.capture());
+      verify(inventoryItemRepository).saveAndFlush(source);
+      InventoryItem newRow = saveCaptor.getValue();
       assertSame(orgB, newRow.getOwningOrgUnit());
       assertSame(targetUser, newRow.getUser());
       assertEquals(4.0, newRow.getAmount(), "the inserted row carries the moved amount");
+    }
+
+    /**
+     * Pins change #7: a PARTIAL cross-user transfer persists the reduced source row via {@code
+     * saveAndFlush} (not a plain {@code save}) so the row's @Version stays current within the
+     * transaction and no future in-place consumer of a transfer can 409, while the brand-new target
+     * row is still inserted via a plain {@code save}.
+     */
+    @Test
+    void partialTransfer_flushesReducedSourceRow() {
+      UUID targetUserId = UUID.randomUUID();
+      User targetUser = new User();
+      targetUser.setId(targetUserId);
+
+      InventoryItem source = newItem(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
+      when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(3.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      // The reduced source row is flushed; the new target row is the only plain save().
+      verify(inventoryItemRepository).saveAndFlush(source);
+      verify(inventoryItemRepository, never()).save(source);
+      ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository).save(saveCaptor.capture());
+      assertSame(
+          targetUser, saveCaptor.getValue().getUser(), "the saved row is the new target row");
+      verify(inventoryItemRepository, never()).delete(any());
     }
   }
 
@@ -672,7 +719,7 @@ class InventoryItemServiceBookOutTest {
     void discardPartial_updatesSourceAmount() {
       InventoryItem item = newItem(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-      when(inventoryItemRepository.save(item)).thenReturn(item);
+      when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
 
       InventoryItemDto result =
           service.bookOutInventoryItem(
