@@ -218,8 +218,8 @@
         <div class="facts-bar">
             <span><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span class="fact-v krt-local-dt" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
             <span><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span class="fact-v krt-local-dt" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span th:title="#{mission.participants.count.tooltip}"><span class="fact-k" th:text="#{mission.participants}">Teilnehmer</span><span class="fact-v" th:text="${mission.registeredParticipants}">0</span></span>
-            <span><span class="fact-k" th:text="#{mission.facts.checked_in}">Eingecheckt</span><span class="fact-v" th:text="${mission.checkedInParticipants}">0</span></span>
+            <span th:title="#{mission.participants.count.tooltip}"><span class="fact-k" th:text="#{mission.participants}">Teilnehmer</span><span id="facts-registered" class="fact-v" th:text="${mission.registeredParticipants}">0</span></span>
+            <span><span class="fact-k" th:text="#{mission.facts.checked_in}">Eingecheckt</span><span id="facts-checked-in" class="fact-v" th:text="${mission.checkedInParticipants}">0</span></span>
             <span th:if="${financeSum != null}"><span class="fact-k" th:text="#{mission.finance.total}">Gesamtsumme</span><span class="fact-v" th:classappend="${financeSum >= 0 ? 'pos' : 'neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span></span>
         </div>
         <div class="tab-nav" role="tablist" th:aria-label="#{mission.details}">
@@ -315,6 +315,10 @@
                  persists (only its innerHTML is replaced), so the board drag-drop / button handlers
                  are delegated on it and survive every swap. -->
             <div id="crew-board-results"><th:block th:fragment="crewBoard">
+            <!-- Carries the fresh participant counts so an in-place crew swap can patch the facts bar
+                 + crew tab badge, which live in the page header OUTSIDE this fragment. Generalises the
+                 finance #finance-count-meta / refreshFinanceAndBadge precedent (#571/#574). -->
+            <span id="crew-count-meta" hidden th:attr="data-registered=${mission.registeredParticipants},data-checked-in=${mission.checkedInParticipants}"></span>
             <div class="sec-h">
                 <h2><span th:text="#{mission.crew.planning}">Crew-Planung</span> &middot; <span class="warn" th:text="|${unassignedParticipants.size()} ${#messages.msg('mission.overview.without_unit')}|">0 ohne Einheit</span></h2>
                 <span class="legend" th:if="${mission.canEdit}" th:text="#{mission.crew.legend}">Ziehen oder ausw&auml;hlen und Ziel anklicken</span>
@@ -1528,6 +1532,32 @@
             });
         }));
     };
+
+    // Patch the participant counts that live in the page header — the facts bar (#facts-registered,
+    // #facts-checked-in) and the crew tab badge (#tab-crew .tab-count) — after every in-place crew
+    // swap. They sit OUTSIDE the #crew-board-results fragment, so a participant add / edit / delete
+    // or check-in / out would otherwise leave them stale until a full reload (#571/#574). The
+    // crewBoard fragment exposes the fresh counts via #crew-count-meta; this generalises the finance
+    // #finance-count-meta / refreshFinanceAndBadge precedent as a krt:swapped listener so it covers
+    // every crew-board swap without touching each write call site.
+    document.addEventListener('krt:swapped', function (ev) {
+        const container = ev && ev.detail && ev.detail.container;
+        if (!container || container.id !== 'crew-board-results') {
+            return;
+        }
+        const meta = document.getElementById('crew-count-meta');
+        if (!meta) {
+            return;
+        }
+        const registered = (meta.getAttribute('data-registered') || '0').trim();
+        const checkedIn = (meta.getAttribute('data-checked-in') || '0').trim();
+        const registeredEl = document.getElementById('facts-registered');
+        const checkedInEl = document.getElementById('facts-checked-in');
+        const badge = document.querySelector('#tab-crew .tab-count');
+        if (registeredEl) { registeredEl.textContent = registered; }
+        if (checkedInEl) { checkedInEl.textContent = checkedIn; }
+        if (badge) { badge.textContent = checkedIn + '/' + registered; }
+    });
 </script>
 <script th:attr="nonce=${cspNonce}">
     // ---- KRT modal helpers: open with focus, dismiss buttons, Esc, focus trap. ----

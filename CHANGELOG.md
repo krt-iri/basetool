@@ -38,6 +38,8 @@
 
 ### Fixed
 
+- **Missionsdetailseite: Die Teilnehmer-Zähler im Kopfbereich aktualisieren sich jetzt ohne Seitenneuladen (Epic #571 / #574).** Beim Anmelden, Bearbeiten, Entfernen oder Ein-/Auschecken eines Teilnehmers blieben die Teilnehmer- und Eingecheckt-Zähler in der Faktenleiste sowie die Zahl im Tab „Teilnehmer & Einheiten" bisher auf dem Stand vom Seitenaufruf, bis die Seite vollständig neu geladen wurde (die gespeicherten Daten waren korrekt, nur die Anzeige veraltet). Diese Zähler werden jetzt direkt zusammen mit der Crew-Ansicht aktualisiert.
+
 - **Mitgliederverwaltung: Die In-Place-Suche und -Seitennavigation aktualisiert die Liste jetzt wirklich (#581).** Der Filter-Parameter war als `boolean` deklariert und konnte den vom AJAX-Helfer gesendeten Wert (`fragment=results`) nicht binden, sodass die gefilterte Anfrage scheiterte und die Liste sich beim Suchen/Blättern nicht aktualisierte; der Parameter ist jetzt ein `String` und bindet korrekt.
 
 - **Lager: Erfolgs- und Fehlerhinweise beim Bearbeiten von Notizen und bei der Sammelauswahl werden wieder angezeigt.** Der seiteneigene Hinweis-Helfer zeigte auf ein nicht vorhandenes Element und blieb dadurch wirkungslos; er nutzt jetzt die gemeinsamen Toast-Funktionen. Betrifft das persönliche Lager und die Admin-Ansicht.
