@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Übersichtsseiten zeigen nach dem Zurück-Navigieren wieder aktuelle Werte (Browser-Back/Forward-Cache).** Wer z. B. in der Bank eine Einzahlung vornimmt und dann per Zurück-Taste zur Kontenübersicht zurückgeht, sah dort bisher noch den alten Saldo in der Kachel — erst ein manuelles Neuladen zeigte den neuen Wert. Der Browser stellte die Seite aus seinem Verlaufs-Cache wieder her, ohne sie neu vom Server zu laden. Übersichtsseiten laden sich beim Zurück-/Vorwärts-Wiederherstellen jetzt einmalig neu, sodass Salden, Zähler und Status app-weit aktuell sind.
+
 - **Die Sofortsuche in der persönlichen Blueprint-Liste (`/personal-inventory/blueprints`) filtert wieder.** Das Tippen in das Suchfeld der vorhandenen Blueprints berechnete die Treffer korrekt, blendete die nicht passenden Zeilen aber nie aus, weil eine CSS-Regel das `hidden`-Attribut der Zeilen überstimmte. Die Suche der allgemein verfügbaren Blueprints (Hinzufügen-Leiste) war davon nicht betroffen.
 
 ## [v0.5.0](https://github.com/krt-iri/basetool/releases/tag/v0.5.0) - 2026-06-15
