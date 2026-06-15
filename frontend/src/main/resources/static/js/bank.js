@@ -633,6 +633,74 @@
     });
 
     /**
+     * In-place admin wipe-reset (#582): posts via the AJAX twin and reports the outcome as a toast
+     * instead of the former PRG reload. The no-reload win is the failure path (inline toast, modal
+     * stays open to retry); on success the danger modal closes and the type-to-confirm hurdle
+     * resets. Falls back to the native POST when krtFetch is unavailable (no-JS). The success /
+     * no-op / error strings come from data-* attributes on the form so bank.js stays i18n-free.
+     */
+    document.addEventListener('submit', function (event) {
+        const form = event.target.closest('form[data-bank-wipe]');
+        if (!form) {
+            return;
+        }
+        event.preventDefault();
+        if (!window.krtFetch) {
+            form.submit();
+            return;
+        }
+        const confirmInput = form.querySelector('input[name="confirm"]');
+        const confirmValue = confirmInput ? confirmInput.value : '';
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        const url = form.getAttribute('action') + '?confirm=' + encodeURIComponent(confirmValue);
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: url,
+                toast: false,
+                errorMessage: form.getAttribute('data-wipe-error') || genericError(),
+                onSuccess: function (body) {
+                    const accountsReset =
+                        body && body.accountsReset != null ? body.accountsReset : 0;
+                    const zeroed =
+                        body && body.holderStashesZeroed != null ? body.holderStashesZeroed : 0;
+                    if (typeof window.showFrontendSuccessToast === 'function') {
+                        const message =
+                            accountsReset === 0
+                                ? form.getAttribute('data-wipe-noop') || ''
+                                : (form.getAttribute('data-wipe-success') || '')
+                                      .replace('{0}', accountsReset)
+                                      .replace('{1}', zeroed);
+                        window.showFrontendSuccessToast(message);
+                    }
+                    // Close the danger modal and clear the confirm input so a re-open requires
+                    // re-typing the WIPE token (the hurdle is re-armed in finally below).
+                    const overlay = form.closest('.krt-modal-overlay');
+                    const closeBtn = overlay
+                        ? overlay.querySelector('[data-trigger="close-modal-display"]')
+                        : null;
+                    if (closeBtn) {
+                        closeBtn.click();
+                    }
+                    if (confirmInput) {
+                        confirmInput.value = '';
+                    }
+                },
+            })
+            .finally(function () {
+                if (submitBtn && confirmInput) {
+                    submitBtn.disabled =
+                        confirmInput.value !== confirmInput.getAttribute('data-confirm-token');
+                } else if (submitBtn) {
+                    submitBtn.disabled = false;
+                }
+            });
+    });
+
+    /**
      * Statement export form: the datetime-splitter keeps the hidden from/to fields as UTC
      * ISO instants; both are required, then the PDF is fetched as a blob download.
      */

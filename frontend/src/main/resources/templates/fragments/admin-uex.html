@@ -33,6 +33,7 @@
             </div>
             <div class="uex-source-chip"
                  th:classappend="${term.uexHasLoadingDock != null and term.hasLoadingDock != null and term.uexHasLoadingDock != term.hasLoadingDock} ? 'mismatch' : ''"
+                 th:data-uex-value="${term.uexHasLoadingDock}"
                  th:title="#{admin.terminal.uexValue.tooltip}">
                 <span class="uex-source-chip__label" th:text="#{admin.terminal.uexValue.label}">UEX:</span>
                 <span th:if="${term.uexHasLoadingDock != null}"
@@ -60,6 +61,7 @@
             </div>
             <div class="uex-source-chip"
                  th:classappend="${term.uexIsAutoLoad != null and term.isAutoLoad != null and term.uexIsAutoLoad != term.isAutoLoad} ? 'mismatch' : ''"
+                 th:data-uex-value="${term.uexIsAutoLoad}"
                  th:title="#{admin.terminal.uexValue.tooltip}">
                 <span class="uex-source-chip__label" th:text="#{admin.terminal.uexValue.label}">UEX:</span>
                 <span th:if="${term.uexIsAutoLoad != null}"
@@ -73,7 +75,9 @@
         <td>
             <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/uex-data/terminals/{id}/toggle-visibility(id=${term.id})}" class="m-0">
                 <input type="hidden" name="hidden" th:value="${!term.hidden}">
-                <button type="submit" class="btn" th:classappend="${term.hidden} ? '' : 'btn-secondary'" th:text="${term.hidden} ? #{btn.show} : #{btn.hide}">Toggle</button>
+                <button type="submit" class="btn" th:classappend="${term.hidden} ? '' : 'btn-secondary'"
+                        th:data-label-show="#{btn.show}" th:data-label-hide="#{btn.hide}"
+                        th:text="${term.hidden} ? #{btn.show} : #{btn.hide}">Toggle</button>
             </form>
         </td>
     </tr>

@@ -65,7 +65,10 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="bank-wipe-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form method="post" th:action="@{/admin/bank/wipe-reset}" class="no-track">
+            <form method="post" th:action="@{/admin/bank/wipe-reset}" class="no-track" data-bank-wipe
+                  th:data-wipe-success="#{admin.bank.wipe.success}"
+                  th:data-wipe-noop="#{admin.bank.wipe.noop}"
+                  th:data-wipe-error="#{admin.bank.wipe.error.failed}">
                 <div class="krt-modal-body">
                     <p th:text="#{admin.bank.wipe.modal.text}">Diese Aktion setzt die gesamte Kartellbank auf 0. Tippe WIPE, um zu best&auml;tigen.</p>
                     <div class="bank-form-row">

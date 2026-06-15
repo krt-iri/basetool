@@ -83,7 +83,7 @@ class BankAdminResetE2eTest {
     }
   }
 
-  /** The type-to-confirm wipe modal zeroes the seeded balance and shows the success banner. */
+  /** The type-to-confirm wipe modal zeroes the seeded balance and shows the success toast. */
   @Test
   void adminWipeResetZeroesBalancesAndIsAudited() {
     // Precondition: the seeded account holds money.
@@ -101,15 +101,23 @@ class BankAdminResetE2eTest {
         E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/admin/bank");
         page.waitForLoadState();
+        // A full reload would wipe this marker; the #582 in-place wipe leaves it intact.
+        page.evaluate("window.__krtNoReload = true;");
         page.locator("[data-testid='bank-wipe-open']")
             .click(new com.microsoft.playwright.Locator.ClickOptions().setTimeout(20_000));
         // The submit button stays disabled until the exact token is typed.
         page.locator("[data-testid='bank-wipe-confirm']").fill("WIPE");
-        E2eSupport.awaitFormPost(
-            page, () -> page.locator("[data-testid='bank-wipe-submit']").click());
-        page.waitForLoadState();
-        assertThat(page.locator("[data-testid='bank-wipe-success']"))
+        // #582: the wipe posts via the AJAX twin and reports success as a toast — no PRG reload, so
+        // wait on the write's XHR response rather than a post-submit document navigation.
+        page.waitForResponse(
+            r -> r.url().contains("/admin/bank/wipe-reset") && "POST".equals(r.request().method()),
+            () -> page.locator("[data-testid='bank-wipe-submit']").click());
+        assertThat(page.locator(".notification-toast").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "the wipe must save in place without reloading the page");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "bank-admin-wipe");
         throw failure;

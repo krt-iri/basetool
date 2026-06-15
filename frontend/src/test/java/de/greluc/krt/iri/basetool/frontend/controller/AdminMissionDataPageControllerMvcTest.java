@@ -23,15 +23,19 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -219,5 +223,82 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"squadrons-results\""))))
         .andExpect(content().string(not(containsString("id=\"frequency-type-modal\""))))
         .andExpect(content().string(not(containsString("id=\"add-freqtype-btn\""))));
+  }
+
+  // covers #582 — the squadron-create twin (X-Requested-With + form params) relays to the backend
+  // and returns 200; the page re-swaps the squadron-results fragment.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createSquadronAjax_withHeader_returns200() throws Exception {
+    when(backendApiClient.post(contains("/squadrons"), any(), eq(Void.class))).thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/mission-data/squadrons")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("name", "Frag SQ")
+                .param("shorthand", "FSQ")
+                .param("description", "d")
+                .param("version", "0"))
+        .andExpect(status().isOk());
+  }
+
+  // covers #582 — the job-type-delete twin (X-Requested-With) returns 200 so the page re-swaps the
+  // job-type fragment in place rather than reloading.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void deleteJobTypeAjax_withHeader_returns200() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.delete(eq("/api/v1/job-types/" + id), eq(Void.class))).thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/mission-data/job-types/" + id + "/delete")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk());
+  }
+
+  // covers #582 — a backend duplicate-name conflict on the squadron create is relayed as the
+  // backend
+  // status (409) so krtFetch toasts the domain message.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createSquadronAjax_backendConflict_relays409() throws Exception {
+    when(backendApiClient.post(contains("/squadrons"), any(), eq(Void.class)))
+        .thenThrow(
+            new BackendServiceException(
+                "duplicate", null, 409, "DUPLICATE", null, java.util.List.of(), "duplicate"));
+
+    mockMvc
+        .perform(
+            post("/admin/mission-data/squadrons")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("name", "Frag SQ")
+                .param("shorthand", "FSQ")
+                .param("description", "d")
+                .param("version", "0"))
+        .andExpect(status().isConflict());
+  }
+
+  // covers #582 — header routing: the same create URL WITHOUT the header still hits the classic
+  // form
+  // handler and redirects (no-JS fallback preserved).
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createSquadron_withoutHeader_redirects() throws Exception {
+    when(backendApiClient.post(contains("/squadrons"), any(), eq(Void.class))).thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/mission-data/squadrons")
+                .with(csrf())
+                .param("name", "Frag SQ")
+                .param("shorthand", "FSQ")
+                .param("description", "d")
+                .param("version", "0"))
+        .andExpect(status().is3xxRedirection());
   }
 }

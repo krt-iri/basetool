@@ -24,22 +24,30 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialExternalAliasDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialExternalAliasUpdateRequest;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -226,6 +234,124 @@ public class AdminMaterialAliasesPageController {
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
     }
     return "redirect:/admin/material-aliases";
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #create} — routed here ahead of the classic handler by the
+   * {@code X-Requested-With} header so the no-JS form keeps its redirect fallback. Binds the form
+   * as JSON and returns the created {@link MaterialExternalAliasDto} so the page can append a row
+   * without reloading. Optional string fields are normalised exactly like the classic flow.
+   *
+   * @param request the JSON-bound create payload
+   * @return the created alias on success, the relayed backend status on failure, {@code 500} on an
+   *     unexpected error
+   */
+  @ResponseBody
+  @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> createAjax(
+      @RequestBody MaterialExternalAliasCreateRequest request) {
+    try {
+      MaterialExternalAliasCreateRequest body =
+          new MaterialExternalAliasCreateRequest(
+              request.materialId(),
+              request.sourceSystem(),
+              request.externalName(),
+              blankToNull(request.externalKey()),
+              request.externalUuid(),
+              blankToNull(request.externalCode()),
+              blankToNull(request.note()));
+      return ResponseEntity.ok(
+          backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class));
+    } catch (BackendServiceException e) {
+      log.error("Create alias (ajax) failed", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Create alias (ajax) failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #update}. Carries the optimistic-lock {@code version}; a backend
+   * conflict is relayed as {@code application/problem+json} so the client surfaces the
+   * reload-confirm instead of reloading, and the fresh version is returned so the edit form can
+   * keep saving.
+   *
+   * @param id alias UUID to update
+   * @param request the JSON-bound update payload (incl. {@code version})
+   * @return the updated alias on success, the relayed backend status on conflict/failure, {@code
+   *     500} on an unexpected error
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateAjax(
+      @PathVariable @NotNull UUID id, @RequestBody MaterialExternalAliasUpdateRequest request) {
+    try {
+      MaterialExternalAliasUpdateRequest body =
+          new MaterialExternalAliasUpdateRequest(
+              request.materialId(),
+              request.sourceSystem(),
+              request.externalName(),
+              blankToNull(request.externalKey()),
+              request.externalUuid(),
+              blankToNull(request.externalCode()),
+              blankToNull(request.note()),
+              request.version());
+      return ResponseEntity.ok(
+          backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class));
+    } catch (BackendServiceException e) {
+      log.error("Update alias {} (ajax) failed", id, e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Update alias {} (ajax) failed", id, e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #delete}. On success the page removes the alias row in place.
+   *
+   * @param id alias UUID
+   * @return {@code 200} on success, the relayed backend status on failure, {@code 500} on an
+   *     unexpected error
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> deleteAjax(@PathVariable @NotNull UUID id) {
+    try {
+      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
+      log.error("Delete alias {} (ajax) failed", id, e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Delete alias {} (ajax) failed", id, e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
+   * preserving the stable {@code code} (e.g. {@code OPTIMISTIC_LOCK}) and {@code detail}, so the
+   * shared {@code krtFetch} client branches on the conflict semantics exactly as the other in-place
+   * writes do.
+   *
+   * @param e the backend failure to relay
+   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   /**

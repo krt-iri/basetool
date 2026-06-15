@@ -23,15 +23,19 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SyncReportDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.SyncReportPurgeResultDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
@@ -131,5 +135,51 @@ class AdminSyncReportsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"sync-results\""))))
         .andExpect(content().string(not(containsString("tab-bar"))))
         .andExpect(content().string(not(containsString("id=\"purge-form\""))));
+  }
+
+  // covers #582 — the delete-old twin (X-Requested-With) purges and returns the deleted-row count
+  // as
+  // JSON so the page shows a count toast in place rather than reloading.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void deleteOldAjax_withHeader_returns200WithDeletedCount() throws Exception {
+    when(backendApiClient.delete(contains("/sync-reports"), eq(SyncReportPurgeResultDto.class)))
+        .thenReturn(new SyncReportPurgeResultDto(5));
+
+    mockMvc
+        .perform(
+            post("/admin/sync-reports/delete-old")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("days", "30")
+                .param("source", ""))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("deleted")));
+  }
+
+  // covers #582 — days < 1 is rejected with 400 before any backend call.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void deleteOldAjax_withHeaderDaysZero_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/sync-reports/delete-old")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("days", "0"))
+        .andExpect(status().isBadRequest());
+  }
+
+  // covers #582 — header routing: the same URL WITHOUT the header still hits the classic form
+  // handler and redirects (no-JS fallback preserved).
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void deleteOld_withoutHeader_redirects() throws Exception {
+    when(backendApiClient.delete(contains("/sync-reports"), eq(SyncReportPurgeResultDto.class)))
+        .thenReturn(new SyncReportPurgeResultDto(5));
+
+    mockMvc
+        .perform(post("/admin/sync-reports/delete-old").with(csrf()).param("days", "30"))
+        .andExpect(status().is3xxRedirection());
   }
 }

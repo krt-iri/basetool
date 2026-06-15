@@ -32,6 +32,7 @@ import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +43,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -710,6 +713,320 @@ public class AdminMissionDataPageController {
       log.error("Reorder FrequencyTypes failed", e);
       return ResponseEntity.status(500).build();
     }
+  }
+
+  // In-place (AJAX) twins (#582). Each is routed ahead of its classic POST->redirect sibling by
+  // the X-Requested-With header, so the no-JS forms keep their redirect fallback. They return 200
+  // on success — the page re-swaps the affected section fragment (the same fragment the
+  // include-inactive filter swaps), which re-renders the correct derived state (active badges,
+  // ordering) and fresh @Version data attributes. A backend conflict is relayed as
+  // application/problem+json so krtFetch toasts the domain message (duplicate / in-use) or offers
+  // the reload-confirm (OPTIMISTIC_LOCK).
+
+  /**
+   * In-place twin of {@link #createJobType}.
+   *
+   * @param form job-type form
+   * @param bindingResult validation errors carrier
+   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
+   *     on a domain conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/job-types", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> createJobTypeAjax(
+      @Valid @ModelAttribute("jobTypeForm") JobTypeForm form, BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.status(422).build();
+    }
+    return okOrRelay(
+        () ->
+            backendApiClient.post(
+                "/api/v1/job-types",
+                new JobTypeDto(
+                    null,
+                    form.name(),
+                    form.description(),
+                    form.archetype(),
+                    null,
+                    true,
+                    form.isLeadershipRole(),
+                    0L),
+                Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #updateJobType}.
+   *
+   * @param id job-type id
+   * @param form job-type form (carries the version)
+   * @param bindingResult validation errors carrier
+   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
+   *     on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/job-types/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateJobTypeAjax(
+      @PathVariable @NotNull UUID id,
+      @Valid @ModelAttribute("jobTypeForm") JobTypeForm form,
+      BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.status(422).build();
+    }
+    return okOrRelay(
+        () ->
+            backendApiClient.put(
+                "/api/v1/job-types/" + id,
+                new JobTypeDto(
+                    id,
+                    form.name(),
+                    form.description(),
+                    form.archetype(),
+                    null,
+                    true,
+                    form.isLeadershipRole(),
+                    form.version()),
+                Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #deleteJobType}.
+   *
+   * @param id job-type id
+   * @return {@code 200} on success, the relayed backend status on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/job-types/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> deleteJobTypeAjax(@PathVariable @NotNull UUID id) {
+    return okOrRelay(() -> backendApiClient.delete("/api/v1/job-types/" + id, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #activateJobType}.
+   *
+   * @param id job-type id
+   * @return {@code 200} on success, the relayed backend status on failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/job-types/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Object> activateJobTypeAjax(@PathVariable @NotNull UUID id) {
+    return okOrRelay(
+        () -> backendApiClient.post("/api/v1/job-types/" + id + "/activate", null, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #createSquadron}.
+   *
+   * @param form squadron form
+   * @param bindingResult validation errors carrier
+   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
+   *     on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/squadrons", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> createSquadronAjax(
+      @Valid @ModelAttribute("squadronForm") SquadronForm form, BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.status(422).build();
+    }
+    return okOrRelay(
+        () ->
+            backendApiClient.post(
+                "/api/v1/squadrons",
+                new SquadronDto(
+                    null, form.name(), form.shorthand(), form.description(), true, true, false, 0L),
+                Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #updateSquadron}.
+   *
+   * @param id squadron id
+   * @param form squadron form
+   * @param bindingResult validation errors carrier
+   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
+   *     on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/squadrons/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateSquadronAjax(
+      @PathVariable @NotNull UUID id,
+      @Valid @ModelAttribute("squadronForm") SquadronForm form,
+      BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.status(422).build();
+    }
+    return okOrRelay(
+        () ->
+            backendApiClient.put(
+                "/api/v1/squadrons/" + id,
+                new SquadronDto(
+                    id,
+                    form.name(),
+                    form.shorthand(),
+                    form.description(),
+                    true,
+                    true,
+                    false,
+                    form.version()),
+                Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #deleteSquadron}.
+   *
+   * @param id squadron id
+   * @return {@code 200} on success, the relayed backend status on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/squadrons/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> deleteSquadronAjax(@PathVariable @NotNull UUID id) {
+    return okOrRelay(() -> backendApiClient.delete("/api/v1/squadrons/" + id, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #activateSquadron}.
+   *
+   * @param id squadron id
+   * @return {@code 200} on success, the relayed backend status on failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/squadrons/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Object> activateSquadronAjax(@PathVariable @NotNull UUID id) {
+    return okOrRelay(
+        () -> backendApiClient.post("/api/v1/squadrons/" + id + "/activate", null, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #createFrequencyType}.
+   *
+   * @param form frequency-type form
+   * @param bindingResult validation errors carrier
+   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
+   *     on failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/frequency-types", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> createFrequencyTypeAjax(
+      @Valid @ModelAttribute("frequencyTypeForm") FrequencyTypeForm form,
+      BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.status(422).build();
+    }
+    return okOrRelay(
+        () -> {
+          Map<String, Object> body = new HashMap<>();
+          body.put("name", form.name());
+          body.put("description", form.description());
+          body.put("active", true);
+          backendApiClient.post("/api/v1/frequency-types", body, Void.class);
+        });
+  }
+
+  /**
+   * In-place twin of {@link #updateFrequencyType}.
+   *
+   * @param id frequency-type id
+   * @param form frequency-type form
+   * @param active optional active override; defaults to {@code true} when omitted
+   * @param bindingResult validation errors carrier
+   * @return {@code 200} on success, {@code 422} on a validation failure, the relayed backend status
+   *     on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/frequency-types/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateFrequencyTypeAjax(
+      @PathVariable @NotNull UUID id,
+      @Valid @ModelAttribute("frequencyTypeForm") FrequencyTypeForm form,
+      @RequestParam(required = false) Boolean active,
+      BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.status(422).build();
+    }
+    return okOrRelay(
+        () -> {
+          Map<String, Object> body = new HashMap<>();
+          body.put("name", form.name());
+          body.put("description", form.description());
+          body.put("active", active != null ? active : true);
+          body.put("version", form.version());
+          backendApiClient.put("/api/v1/frequency-types/" + id, body, Void.class);
+        });
+  }
+
+  /**
+   * In-place twin of {@link #deleteFrequencyType}.
+   *
+   * @param id frequency-type id
+   * @return {@code 200} on success, the relayed backend status on a conflict / failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/frequency-types/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> deleteFrequencyTypeAjax(@PathVariable @NotNull UUID id) {
+    return okOrRelay(() -> backendApiClient.delete("/api/v1/frequency-types/" + id, Void.class));
+  }
+
+  /**
+   * In-place twin of {@link #activateFrequencyType}.
+   *
+   * @param id frequency-type id
+   * @return {@code 200} on success, the relayed backend status on failure
+   */
+  @ResponseBody
+  @PostMapping(
+      value = "/frequency-types/{id}/activate",
+      headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> activateFrequencyTypeAjax(@PathVariable @NotNull UUID id) {
+    return okOrRelay(
+        () ->
+            backendApiClient.post("/api/v1/frequency-types/" + id + "/activate", null, Void.class));
+  }
+
+  /**
+   * Runs a reference-data backend write, clears the static-data cache on success, and maps the
+   * outcome to an HTTP status: {@code 200} on success, the relayed backend problem on a {@link
+   * BackendServiceException}, {@code 500} otherwise. Shared by every mission-data AJAX twin.
+   *
+   * @param backendCall the backend mutation to perform
+   * @return the mapped {@link ResponseEntity}
+   */
+  private ResponseEntity<Object> okOrRelay(Runnable backendCall) {
+    try {
+      backendCall.run();
+      backendApiClient.clearStaticDataCache();
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
+      log.error("Mission-data write (ajax) failed", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Mission-data write (ajax) failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
+   * preserving the stable {@code code} (e.g. {@code OPTIMISTIC_LOCK}) and {@code detail}, so the
+   * shared {@code krtFetch} client branches on the conflict semantics exactly as the other in-place
+   * writes do.
+   *
+   * @param e the backend failure to relay
+   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   private static String parseString(Object o) {

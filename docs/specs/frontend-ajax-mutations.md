@@ -243,35 +243,65 @@ fragment swap (`GET /org-chart?fragment=chartBody`): the chart is a flat, CSS-co
 tree whose add affordances and vacant/filled transitions are derived aggregate state, so a per-node
 patch would desync the "+" buttons and the roving-tabindex order — the swap re-stamps every
 `data-version` and the inline JS re-inits the tree keyboard navigation on `krt:swapped`; the bespoke
-`csrfHeaders()` reader moves onto `krtCsrf` with retry-on-403. The member list converts the delete (a
-`@DeleteMapping` JSON twin whose success re-swaps the results fragment so pagination and the SK column
-stay coherent) and reverts — rather than reloads — a failed logistician / mission-manager toggle in
-place; its filter `fragment` param changes from `boolean` to `String` so it binds the `krtFetch.swap`
-helper's `fragment=results` value (a `boolean` param silently 400'd that swap). The member-edit page
-saves through an in-place `{field: message}` twin (REQ-FE-007). The profile payout-preference form
-joins the description form on `krtFetch.write` (both echo the one shared user-row version), and the
-home-page mark-announcement-read posts in place and removes its control. The one reload deliberately
-kept is the sidebar active-OrgUnit switcher: switching the org-unit re-scopes every list, count and
-entity on the page through `OwnerScopeService`, so the existing controlled full navigation (`POST
-/me/active-org-unit` → `_referer` redirect) is the correct UX — an "in-place" swap would amount to
-re-rendering the whole page anyway (REQ-ORG-\*).
+`csrfHeaders()` reader moves onto `krtCsrf` with retry-on-403. The chart's horizontal scroll is
+captured before the focus-returning `closeModal()` and re-applied across animation frames until the
+freshly-swapped tree's layout settles, so the offset survives the in-place refresh on every engine.
+The member list converts the delete (a `@DeleteMapping` JSON twin whose success re-swaps the results
+fragment so pagination and the SK column stay coherent) and reverts — rather than reloads — a failed
+logistician / mission-manager toggle in place; its filter `fragment` param changes from `boolean` to
+`String` so it binds the `krtFetch.swap` helper's `fragment=results` value (a `boolean` param silently
+400'd that swap). The member-edit page saves through an in-place `{field: message}` twin (REQ-FE-007).
+The profile payout-preference form joins the description form on `krtFetch.write` (both echo the one
+shared user-row version), and the home-page mark-announcement-read posts in place and removes its
+control. The one reload deliberately kept is the sidebar active-OrgUnit switcher: switching the
+org-unit re-scopes every list, count and entity on the page through `OwnerScopeService`, so the
+existing controlled full navigation (`POST /me/active-org-unit` → `_referer` redirect) is the correct
+UX — an "in-place" swap would amount to re-rendering the whole page anyway (REQ-ORG-\*).
+
+The **admin CRUD** long tail (#582 — the last epic child) converts the remaining admin reference-data
+pages. The list-level CRUD on **mission-data** (squadrons / job-types / frequency-types create / edit
+/ delete / activate, plus the frequency-type drag-drop **reorder**) and **special-commands** (SK
+create / edit / delete / activate; member add / remove / role-flag / lead-toggle on the detail page)
+save through header-gated `X-Requested-With` twins and re-render the affected section fragment — the
+same `?fragment=…` fragment the include-inactive filters already swap, plus a new
+`special-command-detail :: membersResults` fragment for the member roster. A full server re-render is
+exactly what re-syncs every row's `@Version`, the active / role / lead badges and the frequency
+ordering, so a second action can no longer 409, and the reorder drops its `location.reload()`.
+**announcement** (update / delete), **material-aliases** (create / update / delete), **material
+categories** (create / delete) and **admin-settings** (the five-version save) patch their own
+row / version inputs in place; settings validation failures and material-category conflicts come back
+as `application/problem+json` so the client toasts the exact reason or offers the reload-confirm. The
+**uex** three-state loading-dock / auto-load overrides and the terminal hidden toggle patch their
+button group (and the terminal UEX-source chip) **deterministically from the clicked action** — these
+overrides carry no `@Version`, so no fragment re-render is needed — and the **locations** visibility /
+home-location toggles flip server-side off a fresh read and re-render the row's two buttons. **bank**
+wipe-reset and **sync-reports** purge keep their type-to-confirm / confirm hurdles and report the
+outcome as a toast; **p4k-import** (already AJAX) had its bespoke CSRF reader retired onto `krtCsrf`.
+Every classic `POST`→redirect handler stays as the no-JS fallback.
 
 **Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
-refinery-import (#591), asset-management (#578), bank (#579), promotion (#580) and org/members/profile
-(#581) twin / fragment / endpoint MVC + e2e tests. **Issues:** the epic children `#572`–`#591` (these
-areas `#580`/`#581`). **Code:**
-
+refinery-import (#591), asset-management (#578), bank (#579), promotion (#580), org/members/profile
+(#581) and admin-CRUD (#582) twin / fragment / endpoint MVC + e2e tests. **Issues:** the epic children
+(#572) through (#591), most recently (#580), (#581) and (#582), the last child. **Code:**
 `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
-`mission-detail.html`, `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`,
-`datetime-splitter.js`, `hangar.html`, `ship-data.html`, `personal-inventory.html`,
-`personal-inventory-blueprints.html`, `personal-inventory*.js`, `bank.js`, `bank-account-detail.html`,
-`bank-manage.html`, `bank-grants.html`, `promotion-admin-topics.html`,
-`promotion-admin-rank-requirements.html`, `promotion-manage.html`, `org-chart.html`, `members.html`,
-`member-edit.html`, `profile.html`, `index.html`, `JobOrderPageController`,
+`mission-detail.html`,
+`orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`, `datetime-splitter.js`,
+`hangar.html`, `ship-data.html`, `personal-inventory.html`, `personal-inventory-blueprints.html`,
+`personal-inventory*.js`, `bank.js`, `bank-account-detail.html`, `bank-manage.html`,
+`bank-grants.html`, `promotion-admin-topics.html`, `promotion-admin-rank-requirements.html`,
+`promotion-manage.html`, `org-chart.html`, `members.html`, `member-edit.html`, `profile.html`,
+`index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
+`materials.html`, `material-aliases.html`, `admin-settings.html`, `uex.html`,
+`fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
+`special-command-detail.html`, `p4k-import.js` — over `JobOrderPageController`,
 `RefineryOrderPageController`, `HangarPageController`, `ShipDataPageController`,
 `PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`, `BankPageController`,
 `BankManagePageController`, `BankGrantsPageController`, `PromotionPageController`,
-`OrgChartPageController`, `MemberManagementController`, `ProfileController`, `HomeController`.
+`OrgChartPageController`, `MemberManagementController`, `ProfileController`, `HomeController`,
+`AdminAnnouncementPageController`, `AdminSyncReportsPageController`, `AdminBankPageController`,
+`AdminLocationsPageController`, `AdminMaterialsPageController`, `AdminMaterialAliasesPageController`,
+`AdminSettingsPageController`, `AdminUexPageController`, `AdminMissionDataPageController` and
+`AdminSpecialCommandsPageController`.
 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 
