@@ -146,7 +146,7 @@
         </div>
     </div>
 </main>
-<script th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function () {
         // Intercept the prev/next pager anchors inside #sync-results so paging swaps in place
         // (REQ-FE-002). The table rows carry no per-element handlers, so nothing needs re-init on
@@ -157,6 +157,7 @@
 
         const form = document.getElementById('purge-form');
         const daysInput = document.getElementById('purge-days');
+        const sourceInput = form ? form.querySelector('input[name="source"]') : null;
         const modal = document.getElementById('purge-confirm-modal');
         const trigger = document.getElementById('purge-trigger');
         const cancelBtn = document.getElementById('purge-cancel');
@@ -166,6 +167,11 @@
         if (!form || !daysInput || !modal || !trigger || !confirmBtn) {
             return;
         }
+
+        const MSG = {
+            successTemplate: /*[[#{admin.syncReports.delete.success}]]*/ '{0} Berichte gelöscht.',
+            deleteError:     /*[[#{error.admin.syncReports.delete}]]*/ 'Löschen fehlgeschlagen.'
+        };
 
         const template = messageEl ? (messageEl.getAttribute('data-template') || '') : '';
 
@@ -189,7 +195,36 @@
         }
         confirmBtn.addEventListener('click', function () {
             closeModal();
-            form.requestSubmit();
+            if (!window.krtFetch) { form.requestSubmit(); return; }
+            // @RequestParam binds from the query string regardless of the JSON content-type that
+            // krtFetch sends, so pass source/days as query params and omit the body.
+            const sourceValue = sourceInput ? sourceInput.value : '';
+            const url = '/admin/sync-reports/delete-old?days='
+                + encodeURIComponent(daysInput.value)
+                + '&source=' + encodeURIComponent(sourceValue);
+            window.krtFetch.write({
+                method: 'POST',
+                url: url,
+                toast: false,
+                errorMessage: MSG.deleteError,
+                onSuccess: function (body) {
+                    const count = body && body.deleted != null ? body.deleted : 0;
+                    if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(
+                            MSG.successTemplate.replace('{0}', count));
+                    }
+                    // Refresh the results table in place for the active tab. The "Gesamt"
+                    // total sits outside the swap fragment and refreshes on the next
+                    // navigation — acceptable for a rare maintenance purge.
+                    if (window.krtFetch) {
+                        window.krtFetch.swap({
+                            url: window.location.pathname + window.location.search,
+                            container: '#sync-results',
+                            history: false
+                        });
+                    }
+                }
+            });
         });
         window.addEventListener('click', function (event) {
             if (event.target === modal) {

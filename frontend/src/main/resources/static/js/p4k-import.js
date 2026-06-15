@@ -55,12 +55,17 @@
             .replace(/'/g, '&#39;');
     }
 
+    // Sources the CSRF token from the shared window.krtCsrf reader (the single
+    // source of truth over the meta tags, epic #571) rather than re-reading the
+    // meta elements locally. The token/header-name are merged into the given base
+    // WITHOUT forcing a Content-Type, so the multipart upload keeps the
+    // browser-generated boundary and the body-less apply stays header-only.
     function csrfHeaders(base) {
         const headers = base || {};
-        const token = document.querySelector('meta[name="_csrf"]');
-        const header = document.querySelector('meta[name="_csrf_header"]');
-        if (token && header && token.content && header.content) {
-            headers[header.content] = token.content;
+        const token = window.krtCsrf ? window.krtCsrf.token() : null;
+        const header = window.krtCsrf ? window.krtCsrf.headerName() : null;
+        if (token && header) {
+            headers[header] = token;
         }
         return headers;
     }

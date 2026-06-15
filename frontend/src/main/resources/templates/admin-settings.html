@@ -52,7 +52,7 @@
             <h2 th:text="#{admin.settings.orders}">Auftragsverwaltung</h2>
             <p class="mb-1 text-muted" th:text="#{admin.settings.orders.description}">Konfiguration der Farbcodierung für ältere Aufträge (in Tagen).</p>
             
-            <form th:action="@{/admin/settings}" method="post">
+            <form id="admin-settings-form" th:action="@{/admin/settings}" method="post">
                 <input type="hidden" name="ageYellowVersion" th:value="${ageYellowVersion}">
                 <input type="hidden" name="ageRedVersion" th:value="${ageRedVersion}">
                 <input type="hidden" name="refineryRoundingVersion" th:value="${refineryRoundingVersion}">
@@ -255,8 +255,10 @@
     var MSG_ERROR    = /*[[#{admin.settings.squadron.promotion.error}]]*/ 'Speichern fehlgeschlagen';
     var MSG_SAVED    = /*[[#{admin.settings.squadron.promotion.saved}]]*/ 'Gespeichert';
 
-    function csrfToken()  { return document.querySelector('meta[name="_csrf"]')?.content || ''; }
-    function csrfHeader() { return document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN'; }
+    // Sourced from the shared window.krtCsrf reader (the single source of truth over the meta
+    // tags, epic #571) rather than re-reading the meta elements locally.
+    function csrfToken()  { return (window.krtCsrf && window.krtCsrf.token()) || ''; }
+    function csrfHeader() { return (window.krtCsrf && window.krtCsrf.headerName()) || 'X-CSRF-TOKEN'; }
 
     function patchPromotionEnabled(squadronId, enabled) {
         var headers = { 'Content-Type': 'application/json' };
@@ -388,6 +390,73 @@
                     }
                     if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PROFIT_ERROR);
                 });
+            });
+        });
+    });
+
+    /*
+     * In-place settings save (#582): the multi-setting form saves via the AJAX twin and writes the
+     * five bumped optimistic-lock versions back into the hidden inputs so a second save does not
+     * 409. A 422 validation problem+json carries a localized detail that krtFetch toasts directly;
+     * an OPTIMISTIC_LOCK conflict triggers the reload-confirm. Without krtFetch the native
+     * POST->redirect runs (no-JS fallback).
+     */
+    var SAVE_SUCCESS = /*[[#{success.settings.update}]]*/ 'Gespeichert.';
+    var SAVE_ERROR   = /*[[#{error.settings.update.failed}]]*/ 'Speichern fehlgeschlagen.';
+    var SAVE_CONFLICT = {
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var settingsForm = document.getElementById('admin-settings-form');
+        if (!settingsForm) { return; }
+        settingsForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            if (!window.krtFetch) { settingsForm.submit(); return; }
+            var el = settingsForm.elements;
+            var intakeIdEl = el['intakeSpecialCommandId'];
+            var intakeVerEl = el['intakeSpecialCommandVersion'];
+            var payload = {
+                ageYellowDays: el['ageYellowDays'].value,
+                ageYellowVersion: Number(el['ageYellowVersion'].value),
+                ageRedDays: el['ageRedDays'].value,
+                ageRedVersion: Number(el['ageRedVersion'].value),
+                refineryRoundingMode: el['refineryRoundingMode'].value,
+                refineryRoundingVersion: Number(el['refineryRoundingVersion'].value),
+                transferFeePercent: el['transferFeePercent'].value,
+                transferFeeVersion: Number(el['transferFeeVersion'].value),
+                intakeSpecialCommandId: intakeIdEl ? intakeIdEl.value : '',
+                intakeSpecialCommandVersion: intakeVerEl ? Number(intakeVerEl.value) : 0
+            };
+            var submitBtn = settingsForm.querySelector('button[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; }
+            window.krtFetch.write({
+                method: 'POST',
+                url: settingsForm.getAttribute('action'),
+                payload: payload,
+                successMessage: SAVE_SUCCESS,
+                errorMessage: SAVE_ERROR,
+                conflict: SAVE_CONFLICT,
+                onSuccess: function (body) {
+                    if (!body) { return; }
+                    function setVer(name, value) {
+                        if (el[name] && value != null) { el[name].value = value; }
+                    }
+                    setVer('ageYellowVersion', body.ageYellowVersion);
+                    setVer('ageRedVersion', body.ageRedVersion);
+                    setVer('refineryRoundingVersion', body.refineryRoundingVersion);
+                    setVer('transferFeeVersion', body.transferFeeVersion);
+                    setVer('intakeSpecialCommandVersion', body.intakeSpecialCommandVersion);
+                    if (body.transferFeePercent != null && el['transferFeePercent']) {
+                        el['transferFeePercent'].value = body.transferFeePercent;
+                    }
+                }
+            }).finally(function () {
+                if (submitBtn) { submitBtn.disabled = false; }
             });
         });
     });

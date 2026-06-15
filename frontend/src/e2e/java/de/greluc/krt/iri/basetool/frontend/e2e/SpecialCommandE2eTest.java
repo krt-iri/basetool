@@ -103,12 +103,17 @@ class SpecialCommandE2eTest {
         E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
         page.navigate(baseUrl + "/admin/special-commands");
         page.waitForLoadState();
+        // A full reload would wipe this marker; the #582 in-place create leaves it intact.
+        page.evaluate("window.__krtNoReload = true;");
         // The create form lives in a modal opened by the "Neues Spezialkommando" button.
         page.locator("#add-sc-btn").click();
         page.locator("#sc-name").fill(SK_UI_NAME);
         page.locator("#sc-shorthand").fill("ESKU");
-        E2eSupport.clickSubmitClearingFooter(page.locator("#sc-form button[type='submit']"));
-        page.waitForLoadState();
+        submitInPlace(page.locator("#sc-form button[type='submit']"));
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "creating an SK must save in place without reloading the page");
         // Re-load the list fresh (as the other create flows do); asserting on the post-submit page
         // directly proved flaky. Match the new SK by its table row, not a bare text locator. Via
         // the retry helper — WebKit can abort this post-submit GET (HTTP/2 INTERNAL_ERROR). See
@@ -150,11 +155,16 @@ class SpecialCommandE2eTest {
         Locator row =
             page.locator("tbody tr").filter(new Locator.FilterOptions().setHasText(SK_DELETE_NAME));
         assertThat(row).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        // A full reload would wipe this marker; the #582 in-place deactivate leaves it intact.
+        page.evaluate("window.__krtNoReload = true;");
         row.locator(".delete-btn").click();
         assertThat(page.locator("#sc-delete-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        E2eSupport.clickSubmitClearingFooter(page.locator("#sc-delete-form button[type='submit']"));
-        page.waitForLoadState();
+        submitInPlace(page.locator("#sc-delete-form button[type='submit']"));
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "deactivating an SK must save in place without reloading the page");
 
         // The active-only list no longer shows the SK.
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
@@ -203,5 +213,25 @@ class SpecialCommandE2eTest {
         status,
         "a non-profit-eligible SK named as a job order's responsible OrgUnit must be rejected with"
             + " 400");
+  }
+
+  /**
+   * Submits an in-place SK write (#582): drops the {@code position: fixed} footer (the WebKit
+   * click-interception guard {@link E2eSupport#clickSubmitClearingFooter} also applies) and clicks
+   * the submit, blocking on the AJAX twin's {@code POST /admin/special-commands*} response. The
+   * write now re-swaps the SK-list fragment instead of navigating, so — unlike the classic flow —
+   * there is no post-submit document load to await; the caller re-loads the list itself afterwards.
+   *
+   * @param submit the submit control (in the create/edit or delete modal) to click
+   */
+  private static void submitInPlace(Locator submit) {
+    Page page = submit.page();
+    page.evaluate(
+        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+            + " 'none'; } }");
+    page.waitForResponse(
+        r -> r.url().contains("/admin/special-commands") && "POST".equals(r.request().method()),
+        new Page.WaitForResponseOptions().setTimeout(15_000),
+        submit::click);
   }
 }

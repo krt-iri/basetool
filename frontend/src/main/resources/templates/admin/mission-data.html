@@ -340,7 +340,100 @@
     </div>
 </main>
 
-<script th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    // ---- In-place CRUD helpers (#582) ----------------------------------------------------
+    var MISSION_MSG = {
+        saved:   '[[#{notification.success.save}]]',
+        deleted: '[[#{notification.success.delete}]]',
+        error:   '[[#{notification.error.save}]]'
+    };
+    var MISSION_CONFLICT = {
+        title:                '[[#{frontend.ajax.conflict.title}]]',
+        reloadDetailFallback: '[[#{frontend.ajax.conflict.detail}]]',
+        reloadLabel:          '[[#{frontend.ajax.conflict.reload}]]',
+        dismissLabel:         '[[#{frontend.ajax.conflict.dismiss}]]',
+        reloadQuestion:       '[[#{frontend.ajax.conflict.question}]]'
+    };
+
+    // The include-inactive filter values, sent on every section re-swap so the swapped fragment
+    // keeps the same inactive-visibility as the rest of the page.
+    function missionFilterParams() {
+        function checked(id) {
+            var el = document.getElementById(id);
+            return el ? el.checked : false;
+        }
+        return 'includeInactiveSquadrons=' + checked('includeInactiveSquadrons')
+            + '&includeInactiveJobTypes=' + checked('includeInactiveJobTypes')
+            + '&includeInactiveFrequencyTypes=' + checked('includeInactiveFrequencyTypes');
+    }
+
+    function missionSectionForAction(action) {
+        if (action.indexOf('/squadrons') !== -1) return 'squadrons-results';
+        if (action.indexOf('/job-types') !== -1) return 'jobtypes-results';
+        if (action.indexOf('/frequency-types') !== -1) return 'freqtypes-results';
+        return null;
+    }
+
+    // Re-renders the section the just-saved entity belongs to, picking up the new/edited/removed
+    // row with correct derived state (active badges, frequency ordering) and fresh @Version
+    // attributes for the next edit.
+    function reswapMissionSection(action) {
+        var section = missionSectionForAction(action);
+        if (section && window.krtFetch) {
+            window.krtFetch.swap({
+                url: '/admin/mission-data?' + missionFilterParams(),
+                container: '#' + section,
+                fragmentValue: section,
+                history: false
+            });
+        }
+    }
+
+    // FormData POST to a mission-data AJAX twin (keeps the @ModelAttribute binding the classic
+    // forms use) with X-Requested-With + CSRF + retry-once-on-403. On success runs onSuccess and
+    // re-swaps the section; on failure delegates to krtFetch.handleProblem for the conflict UX
+    // (duplicate-name / in-use toast, or OPTIMISTIC_LOCK reload-confirm).
+    function missionWrite(form, successMessage, onSuccess) {
+        var action = form.getAttribute('action');
+        function headers() {
+            var h = { 'X-Requested-With': 'XMLHttpRequest' };
+            var t = window.krtCsrf ? window.krtCsrf.token() : null;
+            var hn = window.krtCsrf ? window.krtCsrf.headerName() : null;
+            if (t && hn) { h[hn] = t; }
+            return h;
+        }
+        function post() {
+            return fetch(action, { method: 'POST', headers: headers(), body: new FormData(form) });
+        }
+        post().then(function (res) {
+            if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
+                return window.krtCsrf.refresh().then(function (r) { return r ? post() : res; });
+            }
+            return res;
+        }).then(function (res) {
+            if (res.ok) {
+                if (window.showFrontendSuccessToast) { window.showFrontendSuccessToast(successMessage); }
+                if (typeof onSuccess === 'function') { onSuccess(); }
+                reswapMissionSection(action);
+                return;
+            }
+            res.text().then(function (text) {
+                var problem = null;
+                try { problem = JSON.parse(text); } catch (e) { /* not problem+json */ }
+                if (window.krtFetch && typeof window.krtFetch.handleProblem === 'function') {
+                    window.krtFetch.handleProblem(res, problem, {
+                        errorMessage: MISSION_MSG.error,
+                        conflict: MISSION_CONFLICT
+                    });
+                } else if (window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(MISSION_MSG.error);
+                }
+            });
+        }).catch(function () {
+            if (window.showFrontendErrorToast) { window.showFrontendErrorToast(MISSION_MSG.error); }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         // Squadron Modal
         const sqModal = document.getElementById('squadron-modal');
@@ -508,6 +601,42 @@
                 }
             }
         });
+
+        // ---- In-place CRUD interceptors (#582) --------------------------------------------
+        // Create/edit share one modal form per section; on success the modal closes and the
+        // section re-swaps. Delete uses the shared confirm modal. Activate forms live inside the
+        // swappable sections, so they are document-delegated to survive a re-swap.
+        function wireModalSave(form, modal) {
+            if (!form) { return; }
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!window.krtFetch) { form.submit(); return; }
+                missionWrite(form, MISSION_MSG.saved, function () {
+                    if (modal) { modal.style.display = 'none'; }
+                });
+            });
+        }
+        wireModalSave(sqForm, sqModal);
+        wireModalSave(jtForm, jtModal);
+        wireModalSave(ftForm, ftModal);
+
+        if (deleteForm) {
+            deleteForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!window.krtFetch) { deleteForm.submit(); return; }
+                missionWrite(deleteForm, MISSION_MSG.deleted, function () {
+                    if (deleteModal) { deleteModal.style.display = 'none'; }
+                });
+            });
+        }
+
+        document.addEventListener('submit', function (e) {
+            var actForm = e.target.closest('form[action*="/activate"]');
+            if (!actForm) { return; }
+            e.preventDefault();
+            if (!window.krtFetch) { actForm.submit(); return; }
+            missionWrite(actForm, MISSION_MSG.saved, null);
+        });
     });
 
     function toggleBox(event, boxId) {
@@ -554,21 +683,36 @@
             const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
             const newOrderIds = rows.map(row => row.dataset.id);
 
+            // #582: persist via the existing AJAX endpoint, then re-swap the frequency-type
+            // section in place instead of reloading. The swap refreshes every row's order/priority
+            // on success and reverts the optimistic drag move on failure. CSRF is sourced from the
+            // shared krtCsrf reader.
+            var reorderHeaders = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+            var token = window.krtCsrf ? window.krtCsrf.token() : null;
+            var headerName = window.krtCsrf ? window.krtCsrf.headerName() : null;
+            if (token && headerName) { reorderHeaders[headerName] = token; }
+            var reswapFreqTypes = function () {
+                if (window.krtFetch) {
+                    window.krtFetch.swap({
+                        url: '/admin/mission-data?' + missionFilterParams(),
+                        container: '#freqtypes-results',
+                        fragmentValue: 'freqtypes-results',
+                        history: false
+                    });
+                }
+            };
             fetch(reorderUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    [document.querySelector('meta[name="_csrf_header"]').content]: document.querySelector('meta[name="_csrf"]').content
-                },
+                headers: reorderHeaders,
                 body: JSON.stringify(newOrderIds)
             }).then(response => {
-                if (!response.ok) {
-                    console.error('Failed to reorder');
+                if (!response.ok && window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(MISSION_MSG.error);
                 }
-                window.location.reload();
-            }).catch(err => {
-                console.error('Error during reorder', err);
-                window.location.reload();
+                reswapFreqTypes();
+            }).catch(() => {
+                if (window.showFrontendErrorToast) { window.showFrontendErrorToast(MISSION_MSG.error); }
+                reswapFreqTypes();
             });
 
             draggedRow = null;
@@ -610,17 +754,12 @@
     // replacing the former data-trigger="submit-form-by-id" full reload. Each swap URL carries
     // all three include-inactive values so the address bar / no-JS refresh reproduce full state.
     if (window.krtFetch) {
-        const filterParams = function () {
-            return 'includeInactiveSquadrons=' + document.getElementById('includeInactiveSquadrons').checked
-                + '&includeInactiveJobTypes=' + document.getElementById('includeInactiveJobTypes').checked
-                + '&includeInactiveFrequencyTypes=' + document.getElementById('includeInactiveFrequencyTypes').checked;
-        };
         const wireFilter = function (checkboxId, sectionId) {
             const cb = document.getElementById(checkboxId);
             if (!cb) return;
             cb.addEventListener('change', function () {
                 window.krtFetch.swap({
-                    url: '/admin/mission-data?' + filterParams(),
+                    url: '/admin/mission-data?' + missionFilterParams(),
                     container: '#' + sectionId,
                     fragmentValue: sectionId,
                     history: true

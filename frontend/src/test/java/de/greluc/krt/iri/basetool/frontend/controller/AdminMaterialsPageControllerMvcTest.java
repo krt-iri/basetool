@@ -21,14 +21,18 @@ package de.greluc.krt.iri.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
@@ -123,5 +127,71 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"Aluminum\"")))
         .andExpect(content().string(containsString("'admin-materials-update'")))
         .andExpect(content().string(containsString("</html>")));
+  }
+
+  // covers #582 — the category-create twin (X-Requested-With + JSON body) relays to the backend and
+  // returns the created MaterialCategoryDto so the page appends it without reloading.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createCategoryAjax_withHeader_returns200WithCategory() throws Exception {
+    when(backendApiClient.post(
+            contains("/material-categories"), any(), eq(MaterialCategoryDto.class)))
+        .thenReturn(new MaterialCategoryDto(UUID.randomUUID(), "X", 0L));
+
+    mockMvc
+        .perform(
+            post("/admin/materials/categories")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"X\"}"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("X")));
+  }
+
+  // covers #582 — a blank category name is rejected with 400 before any backend call.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createCategoryAjax_withHeaderBlankName_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/materials/categories")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"  \"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  // covers #582 — the category-delete twin (X-Requested-With) returns 200 so the page removes the
+  // category row in place rather than reloading.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void deleteCategoryAjax_withHeader_returns200() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.delete(eq("/api/v1/material-categories/" + id), eq(Void.class)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/materials/categories/" + id + "/delete")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk());
+  }
+
+  // covers #582 — header routing: the same create URL WITHOUT the header still hits the classic
+  // form
+  // handler and redirects (no-JS fallback preserved).
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createCategory_withoutHeader_redirects() throws Exception {
+    when(backendApiClient.post(
+            contains("/material-categories"), any(), eq(MaterialCategoryDto.class)))
+        .thenReturn(new MaterialCategoryDto(UUID.randomUUID(), "X", 0L));
+
+    mockMvc
+        .perform(post("/admin/materials/categories").with(csrf()).param("name", "X"))
+        .andExpect(status().is3xxRedirection());
   }
 }

@@ -23,8 +23,10 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -32,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -99,5 +102,68 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"ARC-L1\"")))
         .andExpect(content().string(containsString("function filterTable(tableId, query)")))
         .andExpect(content().string(containsString("</html>")));
+  }
+
+  // covers #582 — the toggle-visibility twin (X-Requested-With) flips the hidden flag off a
+  // freshly-read record and returns the persisted LocationDto so the page re-renders the row in
+  // place. The second get() returns the toggled record.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleLocationVisibilityAjax_withHeader_returns200WithLocation() throws Exception {
+    UUID id = UUID.randomUUID();
+    LocationDto before = new LocationDto(id, "ARC-L1", "desc", false, false, 0L);
+    LocationDto after = new LocationDto(id, "ARC-L1", "desc", true, false, 1L);
+    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+        .thenReturn(before, after);
+    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/locations/" + id + "/toggle-visibility")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("ARC-L1")));
+  }
+
+  // covers #582 — a backend optimistic-lock conflict on the PUT is relayed as the backend status
+  // (409) so krtFetch offers the reload-confirm instead of reloading.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleLocationVisibilityAjax_backendConflict_relays409() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+        .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
+    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+        .thenThrow(
+            new BackendServiceException(
+                "conflict", null, 409, "OPTIMISTIC_LOCK", null, java.util.List.of(), "conflict"));
+
+    mockMvc
+        .perform(
+            post("/admin/locations/" + id + "/toggle-visibility")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isConflict());
+  }
+
+  // covers #582 — header routing: the same URL WITHOUT the header still hits the classic form
+  // handler and redirects (no-JS fallback preserved).
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleLocationVisibility_withoutHeader_redirects() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+        .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
+    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/locations/" + id + "/toggle-visibility")
+                .with(csrf())
+                .param("hidden", "true"))
+        .andExpect(status().is3xxRedirection());
   }
 }

@@ -23,17 +23,23 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.BankAuditEventDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -121,6 +127,67 @@ public class AdminBankPageController {
       redirectAttributes.addFlashAttribute("error", "admin.bank.wipe.error.failed");
     }
     return "redirect:/admin/bank";
+  }
+
+  /**
+   * In-place (AJAX) twin of {@link #wipeReset} — routed here ahead of the classic handler by the
+   * {@code X-Requested-With} header so the no-JS form keeps its redirect fallback. Returns the
+   * affected counts as {@code {"accountsReset": <n>, "holderStashesZeroed": <m>}} so the page can
+   * show a success/no-op toast in place instead of reloading. The {@code WIPE} confirm token is
+   * re-checked server-side as a backstop to the type-to-confirm modal.
+   *
+   * @param confirm the type-to-confirm token; must equal {@code WIPE}
+   * @return {@code 200} with the counts on success, {@code 400} when the confirm token is wrong, a
+   *     relayed {@code problem+json} carrying the backend status and {@code code} (e.g. {@code
+   *     PESSIMISTIC_LOCK} when the wipe races a concurrent booking) so {@code krtFetch} can offer
+   *     the reload-confirm, or {@code 500} on an otherwise-unclassified backend failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/admin/bank/wipe-reset", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> wipeResetAjax(@RequestParam(required = false) String confirm) {
+    if (!"WIPE".equals(confirm)) {
+      return ResponseEntity.badRequest().build();
+    }
+    try {
+      BankWipeResetResultDto result =
+          backendApiClient.post(
+              "/api/v1/bank/admin/wipe-reset", Map.of(), BankWipeResetResultDto.class);
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("accountsReset", result == null ? 0 : result.accountsReset());
+      body.put("holderStashesZeroed", result == null ? 0 : result.holderStashesZeroed());
+      return ResponseEntity.ok(body);
+    } catch (BackendServiceException e) {
+      log.error("Bank wipe reset (ajax) failed", e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Bank wipe reset (ajax) failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
+   * preserving the stable {@code code} (e.g. {@code PESSIMISTIC_LOCK} when the all-account wipe
+   * lock races a concurrent booking) and {@code detail}, so the shared {@code krtFetch} client
+   * branches on the conflict semantics — showing the reload-confirm — exactly as it does for the
+   * other in-place admin writes.
+   *
+   * @param e the backend failure to relay
+   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   /**
