@@ -171,6 +171,30 @@ whose label flips with state (e.g. the org-chart edit toggle) keep their text la
 **Enforced by:** code/design review · **Code:** `fragments/icons.html`, `static/css/styles.css`
 (`.btn-icon`, `.btn .krt-icon`), the per-feature templates.
 
+### REQ-UI-011 — Overlay popups are not clipped by their container
+
+Floating popups that overflow their host field — currently the searchable-select dropdown
+(`.krt-combobox__listbox`, the type-to-filter list that progressively enhances a `<select>`) —
+must overlay the surrounding chrome, **not** be cropped by an ancestor's `overflow`. Inside a
+modal this matters specifically: `.krt-modal-body` scrolls (`overflow-y: auto`), so an in-flow
+`position: absolute` popup would be chopped at the body's bottom edge — i.e. behind the pinned
+`.krt-modal-foot` action bar. The popup is therefore anchored to its field in viewport space
+(`position: fixed`, set by `krt-searchable-select.js`), kept glued to the field while the window
+or any scroll container scrolls/resizes, and flipped above the field when there is more room
+there than below (`.krt-combobox__listbox--above`); its height is capped to the available space
+on the chosen side so no option lands off-screen.
+
+**Acceptance**
+
+- [ ] The user picker in the bank "Halter registrieren" modal (and any searchable select in a
+  modal) shows its full option list over the modal foot — no option is hidden behind the
+  action bar.
+- [ ] A searchable select low in the viewport flips its list upward instead of overflowing
+  off-screen.
+
+**Enforced by:** code/design review · **Code:** `static/js/krt-searchable-select.js`,
+`static/css/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`).
+
 ## Out of scope
 
 Brand assets/logos themselves (managed in the design skill `assets/`), and the desktop SC

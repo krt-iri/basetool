@@ -202,9 +202,81 @@
         let activeIndex = -1;
         let remoteSeq = 0;
         let remoteTimer = null;
+        let repositionHandler = null;
 
         function isOpen() {
             return listbox.hidden === false;
+        }
+
+        // Anchor the open popup to the textbox in viewport space (position: fixed)
+        // instead of relying on the in-flow `top: 100%` (position: absolute) from
+        // the stylesheet. A fixed-positioned box is laid out against the viewport,
+        // so an ancestor's overflow clip — e.g. a scrolling `.krt-modal-body`,
+        // whose `overflow-y: auto` would otherwise crop the list at the modal
+        // foot — no longer applies to it. The list flips above the field when
+        // there is more room there, and its height is capped to the space on the
+        // chosen side so no row ends up off-screen (the viewport can't scroll
+        // behind a fixed modal). Must run while the list is visible so
+        // `scrollHeight` measures the rendered content.
+        function positionListbox() {
+            const rect = input.getBoundingClientRect();
+            const gap = 4;
+            const cap = 288; // mirrors the .krt-combobox__listbox max-height (18rem @16px)
+            const below = window.innerHeight - rect.bottom;
+            const above = rect.top;
+            const flipUp = below < Math.min(cap, listbox.scrollHeight) && above > below;
+            listbox.classList.toggle('krt-combobox__listbox--above', flipUp);
+            listbox.style.position = 'fixed';
+            listbox.style.left = rect.left + 'px';
+            listbox.style.right = 'auto';
+            listbox.style.width = rect.width + 'px';
+            const avail = Math.max(0, Math.min(cap, (flipUp ? above : below) - gap));
+            listbox.style.maxHeight = avail + 'px';
+            if (flipUp) {
+                listbox.style.top = 'auto';
+                listbox.style.bottom = window.innerHeight - rect.top + 'px';
+            } else {
+                listbox.style.bottom = 'auto';
+                listbox.style.top = rect.bottom + 'px';
+            }
+        }
+
+        // Clears the inline positioning so the stylesheet's defaults apply again
+        // on the next open (and the flip-up modifier never sticks).
+        function resetListboxPosition() {
+            listbox.classList.remove('krt-combobox__listbox--above');
+            listbox.style.position = '';
+            listbox.style.left = '';
+            listbox.style.right = '';
+            listbox.style.top = '';
+            listbox.style.bottom = '';
+            listbox.style.width = '';
+            listbox.style.maxHeight = '';
+        }
+
+        // While the popup is open, keep it glued to the textbox as either the
+        // window or any scroll container (the modal body) scrolls or resizes —
+        // capture phase catches scrolls on inner containers, which do not bubble.
+        function attachReposition() {
+            if (repositionHandler) {
+                return;
+            }
+            repositionHandler = function () {
+                if (isOpen()) {
+                    positionListbox();
+                }
+            };
+            window.addEventListener('scroll', repositionHandler, true);
+            window.addEventListener('resize', repositionHandler);
+        }
+
+        function detachReposition() {
+            if (!repositionHandler) {
+                return;
+            }
+            window.removeEventListener('scroll', repositionHandler, true);
+            window.removeEventListener('resize', repositionHandler);
+            repositionHandler = null;
         }
 
         function noticeRow(message) {
@@ -298,6 +370,8 @@
             renderOptions(query);
             listbox.hidden = false;
             input.setAttribute('aria-expanded', 'true');
+            positionListbox();
+            attachReposition();
             highlightCommitted();
         }
 
@@ -320,6 +394,7 @@
                     }
                     items = Array.isArray(list) ? list.slice() : [];
                     renderOptions(query);
+                    positionListbox();
                     highlightCommitted();
                 })
                 .catch(function () {
@@ -328,6 +403,7 @@
                     }
                     items = [];
                     renderOptions(query);
+                    positionListbox();
                 });
         }
 
@@ -336,6 +412,8 @@
             renderLoading();
             listbox.hidden = false;
             input.setAttribute('aria-expanded', 'true');
+            positionListbox();
+            attachReposition();
             window.clearTimeout(remoteTimer);
             remoteTimer = window.setTimeout(function () {
                 loadRemote(query);
@@ -350,6 +428,8 @@
             input.setAttribute('aria-expanded', 'false');
             input.removeAttribute('aria-activedescendant');
             activeIndex = -1;
+            detachReposition();
+            resetListboxPosition();
         }
 
         function commit(item) {

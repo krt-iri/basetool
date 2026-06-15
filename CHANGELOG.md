@@ -8,6 +8,8 @@
 
 - **Die Sofortsuche in der persönlichen Blueprint-Liste (`/personal-inventory/blueprints`) filtert wieder.** Das Tippen in das Suchfeld der vorhandenen Blueprints berechnete die Treffer korrekt, blendete die nicht passenden Zeilen aber nie aus, weil eine CSS-Regel das `hidden`-Attribut der Zeilen überstimmte. Die Suche der allgemein verfügbaren Blueprints (Hinzufügen-Leiste) war davon nicht betroffen.
 
+- **Suchbare Auswahllisten werden in Modals nicht mehr abgeschnitten.** Das Aufklapp-Menü einer suchbaren Auswahl (z. B. „Nutzer wählen" beim Halter-Registrieren in der Bank-Verwaltung) wurde am unteren Rand vom Fußbereich des Modals mit den Schaltflächen verdeckt. Die Liste legt sich jetzt als Overlay über den Modal-Rahmen und klappt bei wenig Platz nach oben auf, sodass alle Einträge sichtbar und auswählbar sind.
+
 ## [v0.5.0](https://github.com/krt-iri/basetool/releases/tag/v0.5.0) - 2026-06-15
 
 ### Changed
