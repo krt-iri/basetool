@@ -435,7 +435,10 @@ public class UserService {
     if (displayName != null) {
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
-    return userRepository.save(user);
+    // saveAndFlush so the bumped @Version is in the response — the profile page writes the returned
+    // version back onto every hidden version input in place via syncAllVersions (no reload), so a
+    // stale save() version 409s the next consecutive profile edit.
+    return userRepository.saveAndFlush(user);
   }
 
   /**
@@ -471,7 +474,10 @@ public class UserService {
       throw new ObjectOptimisticLockingFailureException(User.class, id);
     }
     user.setDefaultPayoutPreference(preference);
-    return userRepository.save(user);
+    // saveAndFlush so the bumped @Version reaches the response — the profile payout-preference
+    // dropdown writes the returned version back in place via syncAllVersions (no reload), so a
+    // stale save version 409s the next consecutive change.
+    return userRepository.saveAndFlush(user);
   }
 
   /**

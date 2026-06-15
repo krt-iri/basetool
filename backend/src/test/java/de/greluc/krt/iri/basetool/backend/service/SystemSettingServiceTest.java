@@ -81,7 +81,7 @@ class SystemSettingServiceTest {
   @Test
   void updateSetting_ShouldUpdateValue() {
     when(systemSettingRepository.findById("test_key")).thenReturn(Optional.of(setting));
-    when(systemSettingRepository.save(any())).thenReturn(setting);
+    when(systemSettingRepository.saveAndFlush(any())).thenReturn(setting);
     when(systemSettingMapper.toDto(any()))
         .thenReturn(new SystemSettingDto("test_key", "new_value", 2L));
 
@@ -89,7 +89,26 @@ class SystemSettingServiceTest {
     SystemSettingDto result = systemSettingService.updateSetting("test_key", updateDto);
 
     assertEquals("new_value", result.value());
-    verify(systemSettingRepository).save(setting);
+    verify(systemSettingRepository).saveAndFlush(setting);
+  }
+
+  /**
+   * Pins that {@code updateSetting} maps its response DTO from a {@code saveAndFlush}, not a plain
+   * {@code save}: the admin-settings form writes the returned {@code @Version} straight back into
+   * its hidden input in place (no reload), so a plain {@code save} would hand back the stale
+   * pre-flush version and the next consecutive save of the same setting would 409.
+   */
+  @Test
+  void updateSetting_flushesBeforeMappingSoVersionIsFresh() {
+    when(systemSettingRepository.findById("test_key")).thenReturn(Optional.of(setting));
+    when(systemSettingRepository.saveAndFlush(setting)).thenReturn(setting);
+    when(systemSettingMapper.toDto(setting))
+        .thenReturn(new SystemSettingDto("test_key", "new_value", 2L));
+
+    systemSettingService.updateSetting("test_key", new SystemSettingUpdateDto("new_value", 1L));
+
+    verify(systemSettingRepository).saveAndFlush(setting);
+    verify(systemSettingRepository, never()).save(setting);
   }
 
   @Test

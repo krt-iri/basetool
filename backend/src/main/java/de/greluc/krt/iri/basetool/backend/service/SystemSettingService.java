@@ -105,6 +105,9 @@ public class SystemSettingService {
     }
 
     setting.setValue(dto.value());
-    return systemSettingMapper.toDto(systemSettingRepository.save(setting));
+    // saveAndFlush so the bumped @Version is mapped into the response DTO — the admin-settings form
+    // writes each setting's returned version straight back into its hidden input in place (no
+    // reload), so a plain save would hand back the stale pre-flush version and the next save 409s.
+    return systemSettingMapper.toDto(systemSettingRepository.saveAndFlush(setting));
   }
 }

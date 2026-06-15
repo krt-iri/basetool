@@ -225,7 +225,8 @@ class MaterialExternalAliasServiceTest {
     when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
         .thenReturn(Optional.empty());
-    when(repository.save(any(MaterialExternalAlias.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.saveAndFlush(any(MaterialExternalAlias.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
 
     MaterialExternalAliasUpdateRequest request =
         new MaterialExternalAliasUpdateRequest(
@@ -296,7 +297,8 @@ class MaterialExternalAliasServiceTest {
     when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "Stileron (Ore)"))
         .thenReturn(Optional.of(existing));
-    when(repository.save(any(MaterialExternalAlias.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.saveAndFlush(any(MaterialExternalAlias.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
 
     MaterialExternalAliasUpdateRequest request =
         new MaterialExternalAliasUpdateRequest(
@@ -305,6 +307,34 @@ class MaterialExternalAliasServiceTest {
     MaterialExternalAlias saved = service.update(aliasId, request);
 
     assertEquals("Stileron (Ore)", saved.getExternalName());
+  }
+
+  /**
+   * Pins that {@code update} returns the entity from a {@code saveAndFlush}, not a plain {@code
+   * save}: the alias edit form writes the returned {@code @Version} back into its hidden version
+   * input in place (no reload), so a stale {@code save} version would 409 the next consecutive edit
+   * of the same alias. The create path (unchanged) still uses {@code save}.
+   */
+  @Test
+  void update_flushesSoReturnedVersionIsFresh() {
+    MaterialExternalAlias existing = newAlias("Raw Silicon");
+    existing.setId(aliasId);
+    existing.setVersion(7L);
+    when(repository.findById(aliasId)).thenReturn(Optional.of(existing));
+    when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
+    when(repository.findBySourceSystemAndExternalNameIgnoreCase(
+            MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
+        .thenReturn(Optional.empty());
+    when(repository.saveAndFlush(existing)).thenReturn(existing);
+
+    MaterialExternalAliasUpdateRequest request =
+        new MaterialExternalAliasUpdateRequest(
+            siliconId, "SCWIKI", "Raw Silicon", null, null, null, null, 7L);
+
+    service.update(aliasId, request);
+
+    verify(repository).saveAndFlush(existing);
+    verify(repository, never()).save(existing);
   }
 
   @Test

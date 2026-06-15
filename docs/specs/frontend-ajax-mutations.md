@@ -60,11 +60,24 @@ aggregate sends the fresh version and does not 409. When propagation cannot be m
 place, the handler reloads deliberately (the conflict-confirm path) rather than leaving a stale
 version. This is the client half of the `@Version` rules in `CLAUDE.md`.
 
+**Backend obligation.** The contract above only holds if the mutation response carries the
+_post-write_ version. A service (or class-`@Transactional` controller) that maps the response DTO
+**inside the still-open transaction** must persist with `saveAndFlush`, not `save`: the `@Version`
+increment is otherwise deferred to commit — _after_ the DTO is mapped — so the response carries the
+**stale pre-flush** version, the client writes it back in place, and the next action 409s. This does
+**not** apply to entities whose section version is a manual in-memory counter bumped before mapping
+(e.g. `Mission.coreVersion` / `scheduleVersion` / `flagsVersion` / `partyLeadVersion`), which is
+already current in the DTO regardless of flush timing, nor to writes whose handler re-renders the
+fragment from a fresh server `GET` (the re-swap re-reads the committed version). See the
+optimistic-locking rules in `CLAUDE.md`.
+
 **Acceptance**
 
 - [ ] A second consecutive action on the same row/aggregate after a successful write does not
   produce a 409.
 - [ ] All related `[data-version]` attributes in the DOM context hold the new version after success.
+- [ ] A write whose response feeds an in-place version writeback returns the flushed
+  (post-increment) version — `saveAndFlush` wherever the DTO is mapped inside the transaction.
 
 **Enforced by:** per-area e2e "double-action" assertion · **Code:** `krt-fetch.js` (`syncVersion`)
 · **Issues:** #571

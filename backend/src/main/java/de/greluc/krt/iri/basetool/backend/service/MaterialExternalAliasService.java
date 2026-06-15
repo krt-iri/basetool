@@ -226,7 +226,10 @@ public class MaterialExternalAliasService {
     alias.setExternalUuid(request.externalUuid());
     alias.setExternalCode(request.externalCode());
     alias.setNote(request.note());
-    MaterialExternalAlias saved = repository.save(alias);
+    // saveAndFlush so the returned entity carries the flushed @Version — the alias edit form writes
+    // it back into its hidden version input in place (no reload), so a stale save version would 409
+    // the next consecutive edit of the same alias.
+    MaterialExternalAlias saved = repository.saveAndFlush(alias);
     log.info("Admin alias updated: id={} by={}", saved.getId(), currentPrincipalNameOrSystem());
     return saved;
   }

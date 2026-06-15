@@ -674,7 +674,11 @@ public class InventoryItemService {
     // Append-only: an update edits the row in place and is never folded into another matching
     // stack.
     // Rows that now share a stack identity are grouped only for display (group-on-read).
-    return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    // saveAndFlush (not save): this method's @Transactional commits AFTER it returns, so a plain
+    // save() leaves the @Version increment unflushed and the mapped DTO carries the STALE version.
+    // The client writes that back, and the user's NEXT in-place edit of the same row then 409s.
+    // Flushing here makes the response @Version authoritative (REQ-FE-003).
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**
@@ -724,7 +728,9 @@ public class InventoryItemService {
     }
     item.setNote(normalizedNote);
 
-    return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    // saveAndFlush so the response carries the post-increment @Version (see updateInventoryItem) —
+    // otherwise editing a note right after an association change 409s.
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**
@@ -838,7 +844,10 @@ public class InventoryItemService {
         inventoryItemRepository.delete(item);
       } else {
         item.setAmount(remainingAmount);
-        inventoryItemRepository.save(item);
+        // saveAndFlush the reduced source row for parity with the discard/sell fall-through below:
+        // the returned DTO is the new target row, but flushing keeps the source row's @Version
+        // current within the transaction so any future in-place consumer of a transfer cannot 409.
+        inventoryItemRepository.saveAndFlush(item);
       }
       return inventoryItemMapper.toDto(savedNew);
     } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
@@ -870,7 +879,9 @@ public class InventoryItemService {
       return null;
     } else {
       item.setAmount(remainingAmount);
-      return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+      // saveAndFlush so a partial book-out's response carries the fresh @Version (see
+      // updateInventoryItem) — otherwise a follow-up edit of the reduced row 409s.
+      return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
     }
   }
 
@@ -1016,7 +1027,10 @@ public class InventoryItemService {
     }
 
     item.setDelivered(request.delivered());
-    return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    // saveAndFlush so the response carries the flushed @Version — the material-collection delivered
+    // checkbox syncs the returned version onto the row in place (no reload), so a plain save would
+    // return the stale pre-flush version and a second consecutive toggle of the same row would 409.
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
   }
 
   private Double roundAmount(Double amount) {

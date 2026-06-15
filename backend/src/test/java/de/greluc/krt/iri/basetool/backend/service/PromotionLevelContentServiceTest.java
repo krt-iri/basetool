@@ -30,6 +30,7 @@ import de.greluc.krt.iri.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.iri.basetool.backend.model.Squadron;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
 import de.greluc.krt.iri.basetool.backend.model.dto.PromotionLevelContentResponse;
+import de.greluc.krt.iri.basetool.backend.model.dto.PromotionLevelContentUpdateRequest;
 import de.greluc.krt.iri.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.iri.basetool.backend.repository.PromotionLevelContentRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -175,6 +176,53 @@ class PromotionLevelContentServiceTest {
     // Then
     assertEquals(PromotionLevel.LEVEL_A, result.level());
     verify(repository).save(entity);
+  }
+
+  /**
+   * Pins that {@code update} maps its response from a {@code saveAndFlush}, not a plain {@code
+   * save}: the level-content textarea writes the returned {@code @Version} back onto its {@code
+   * data-lc-version} attribute in place (no re-swap), so a stale {@code save} version would 409 the
+   * next consecutive edit. The create path (unchanged) still uses {@code save}.
+   */
+  @Test
+  void update_flushesSoResponseVersionIsFresh() {
+    // Given: an existing level content with a bare category (no owning squadron -> edit-guard
+    // returns early), version 4.
+    UUID id = UUID.randomUUID();
+    UUID categoryId = UUID.randomUUID();
+    PromotionCategory category =
+        PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
+    PromotionLevelContent entity =
+        PromotionLevelContent.builder()
+            .category(category)
+            .level(PromotionLevel.LEVEL_A)
+            .description("Kann fliegen")
+            .build();
+    entity.setVersion(4L);
+    PromotionLevelContentResponse response =
+        new PromotionLevelContentResponse(
+            id,
+            5L,
+            categoryId,
+            "Flug Kenntnisse",
+            PromotionLevel.LEVEL_A,
+            "Kann jetzt besser fliegen",
+            null,
+            null);
+    PromotionLevelContentUpdateRequest request =
+        new PromotionLevelContentUpdateRequest(
+            4L, categoryId, PromotionLevel.LEVEL_A, "Kann jetzt besser fliegen");
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+    when(repository.saveAndFlush(entity)).thenReturn(entity);
+    when(mapper.toResponse(entity)).thenReturn(response);
+
+    // When
+    service.update(id, request);
+
+    // Then: the flushed entity is what gets mapped, and a plain save never happens.
+    verify(repository).saveAndFlush(entity);
+    verify(repository, never()).save(entity);
   }
 
   @Test
