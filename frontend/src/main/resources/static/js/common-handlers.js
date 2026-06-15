@@ -14,9 +14,39 @@
  * dedicated `<template>.js` modules with their own short prefix
  * (e.g. `pi-` for personal-inventory) so a refactor of one page cannot trip a
  * collision across the codebase.
+ *
+ * It also hosts the one global page-lifecycle handler the app needs (bfcache
+ * restore — see below); that listener is registered independently of the
+ * `data-trigger` registry so it survives even a missing `krtEvents`.
  */
 (function () {
     'use strict';
+
+    /*
+     * Force a fresh server render when the browser restores this document from its
+     * back/forward cache (bfcache). A bfcache restore reinstates the in-memory DOM
+     * snapshot taken when the user navigated away — NOT a fresh GET — so any
+     * server-rendered aggregate baked into that snapshot (a bank account-card
+     * balance, a list count, a status pill) still shows whatever it was BEFORE the
+     * user's edit on the page they had navigated forward to. The in-place mutation
+     * foundation (`krtFetch`, REQ-FE-001..007) only keeps the *active* document
+     * fresh; it cannot touch a sibling document the browser later replays from
+     * bfcache. Reloading on `event.persisted` re-runs the GET so the restored
+     * overview reflects current state. This is the second — and only other —
+     * sanctioned reload beside the optimistic-lock conflict confirm (spec
+     * REQ-FE-008, ADR-0013).
+     *
+     * It cannot loop: the document the reload produces is a fresh load, whose own
+     * `pageshow` fires with `persisted === false`, so the reload only ever fires for
+     * a genuine bfcache restore, never on the page it itself produced. Registered
+     * before the `krtEvents` guard below so it is unaffected by the delegation
+     * registry's presence.
+     */
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    });
 
     if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
         // event-delegation.js has not loaded — abort silently. Production fragments/head.html

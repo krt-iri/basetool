@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-15.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -25,15 +25,17 @@ replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)
 
 A create / update / delete / toggle / reorder interaction must update only the changed DOM nodes and
 must not navigate the document (no `window.location.reload()`, no redirect-follow) on success. The
-**only** sanctioned reload is the optimistic-lock conflict path, where the user explicitly accepts a
-reload via `showKrtConfirm`.
+**only** sanctioned reloads are (1) the optimistic-lock conflict path, where the user explicitly
+accepts a reload via `showKrtConfirm`, and (2) the bfcache history-restore refresh of REQ-FE-008 —
+which is not a success-path reload but a freshness guarantee for a document the browser replays from
+its back/forward cache.
 
 **Acceptance**
 
 - [ ] After the action, the URL and document are unchanged and the affected node(s) reflect the new
   state (badges, totals and status cells re-derived in the success handler, not by a reload).
-- [ ] No `location.reload()` runs on the success path; the only reload is a user-accepted
-  optimistic-lock confirm.
+- [ ] No `location.reload()` runs on the success path; the only success-path-adjacent reloads are a
+  user-accepted optimistic-lock confirm and the bfcache history-restore refresh (REQ-FE-008).
 - [ ] Derived UI that lives **outside** the swapped fragment is refreshed too — an emptied list
   restores its "no entries" placeholder, and a count or server-derived value shown in a separate
   modal/header reflects the new state (when a fragment swap cannot cover it, the handler patches it
@@ -416,6 +418,38 @@ schedule-time round-trip, 422 field map, 409 problem+json, fallback routing) +
 `MissionCoreEditInPlaceE2eTest` (in-place save, double-save no-409, inline validation). **Code:**
 `mission-detail.html`, `MissionPageController` (`updateMissionAjax`, `applyMissionUpdate`,
 `parseToInstant`/`formatInstant`). **Issues:** #589.
+
+### REQ-FE-008 — A bfcache history-restore renders fresh server state
+
+A document restored from the browser's **back/forward cache (bfcache)** must reflect current server
+state, not the stale in-memory snapshot the browser replays. A bfcache restore reinstates the DOM and
+JS heap captured when the user navigated away — it does **not** re-run the GET — so any
+server-rendered aggregate on an overview page (a bank account-card balance, a list count, a status
+pill) shows its pre-edit value after the user edits the entity on a forward page and navigates back.
+The in-place mutation foundation (REQ-FE-001…007) only keeps the **active** document fresh; it cannot
+reach a sibling document the browser later replays. This is the gap behind the reported bank symptom:
+deposit on the account-detail page (in-place, correct) → browser back → dashboard card still shows the
+old balance until a manual reload.
+
+A single global `pageshow` listener (in
+[`common-handlers.js`](../../frontend/src/main/resources/static/js/common-handlers.js), loaded on
+every page via `fragments/head.html`) calls `window.location.reload()` exactly when
+`event.persisted` is true — the precise signal of a bfcache restore. It cannot loop: a fresh load
+fires `pageshow` with `persisted === false`. This is the second sanctioned reload of REQ-FE-001 and is
+deliberate (ADR-0013): a full reload, not a fragment swap, because the restored document is an
+arbitrary overview with no single swap target, and Spring Security's `no-store` headers do not
+reliably suppress bfcache across Chromium / Firefox / WebKit.
+
+**Acceptance**
+
+- [ ] A page restored from bfcache (browser back/forward into a cached document) re-runs its GET and
+  renders current server state — a value edited elsewhere in the meantime is reflected without a
+  manual reload.
+- [ ] The reload fires only on a genuine bfcache restore (`event.persisted`), never on a normal load,
+  so it does not loop and adds no navigation to ordinary page views.
+
+**Enforced by:** `BfcacheRefreshE2eTest` (a synthetic `pageshow{persisted:true}` drives a reload that
+discards a live-document marker) · **Code:** `common-handlers.js` · **ADR:** ADR-0013
 
 ## Out of scope
 
