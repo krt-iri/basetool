@@ -100,35 +100,18 @@
     // the shared krtFetch/krtCsrf foundation (REQ-FE-002). The page-local csrfHeaders/getVersion/
     // syncVersion/handleConflict/reload helpers are gone: krtFetch.write reads CSRF (with
     // retry-on-403), and for `delivered` it syncs the fresh version onto the row via containerSelector
-    // so a follow-up action on the same row does not 409. A transfer moves the row's FULL amount, so
-    // the backend consumes the source (204, no body) and we remove the <tr>.
+    // so a follow-up action on the same row does not 409. A transfer moves the row's FULL amount: the
+    // backend deletes the source item and appends a new target item (still linked to this job order),
+    // returning that target DTO, so we re-key the <tr> to the new id/version in place.
     /*<![CDATA[*/
     const MSG_OWNER_UPDATED   = /*[[#{material.collection.toast.ownerUpdated}]]*/ 'Besitzer aktualisiert.';
     const MSG_LOCATION_UPDATED = /*[[#{material.collection.toast.locationUpdated}]]*/ 'Standort aktualisiert.';
     const MSG_DELIVERED_UPDATED = /*[[#{material.collection.toast.deliveredUpdated}]]*/ 'Lieferstatus aktualisiert.';
     const MSG_ERROR_GENERIC   = /*[[#{material.collection.toast.error}]]*/ 'Fehler beim Speichern.';
-    const MSG_COLLECTION_EMPTY = /*[[#{material.collection.empty}]]*/ 'Keine Lagereinträge für diesen Auftrag vorhanden.';
     /*]]>*/
 
     function collectionRow(inventoryId) {
         return document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
-    }
-
-    // Swaps the now-empty table for the same empty-state block the server renders when there are no
-    // entries, so a full-amount transfer of the last row matches a fresh page load instead of
-    // leaving a header over an empty table until the next reload.
-    function showCollectionEmptyIfDrained() {
-        const table = document.getElementById('material-collection-table');
-        if (!table) return;
-        const tbody = table.querySelector('tbody');
-        if (tbody && tbody.querySelector('tr[data-inventory-id]')) return; // rows remain
-        const wrap = table.closest('.table-responsive');
-        const host = wrap ? wrap.parentElement : null;
-        if (!wrap || !host) return;
-        const empty = document.createElement('div');
-        empty.style.cssText = "color: var(--color-gray-2); font-family: 'Lato', sans-serif; padding: 2rem 0; text-align: center;";
-        empty.textContent = MSG_COLLECTION_EMPTY;
-        host.replaceChild(empty, wrap);
     }
 
     async function collectionTransfer(inventoryId, target, successMessage) {
@@ -154,17 +137,30 @@
             errorMessage: MSG_ERROR_GENERIC,
             onSuccess: function (body) {
                 window.showFrontendSuccessToast(successMessage);
-                // A full-amount transfer consumes the source row (204, no body) — remove it, and
-                // when it was the last row restore the server-style empty-state.
-                if (!body) {
-                    row.remove();
-                    showCollectionEmptyIfDrained();
+                // The backend always deletes the full-amount source item and appends a brand-new
+                // target item (its own id + version), returning that target DTO (never 204). The
+                // target keeps this job-order link, so the row stays in the collection: re-key the
+                // <tr> and its controls to the new id/version so a follow-up move or delivered-toggle
+                // on the same row hits the live item instead of the deleted source (which would 404).
+                // The fresh target row is not yet delivered.
+                if (body && body.id) {
+                    row.setAttribute('data-inventory-id', body.id);
+                    if (body.version != null) {
+                        row.setAttribute('data-version', body.version);
+                    }
+                    row.querySelectorAll('[data-inventory-id]').forEach(function (el) {
+                        el.setAttribute('data-inventory-id', body.id);
+                    });
+                    const deliveredCheckbox = row.querySelector('.delivered-checkbox');
+                    if (deliveredCheckbox) {
+                        deliveredCheckbox.checked = false;
+                    }
                 }
             }
         });
-        if (!result.ok) {
-            row.querySelectorAll('select').forEach(function (s) { s.disabled = false; });
-        }
+        // Re-enable the row's selects whether the move succeeded (the row was re-keyed and stays
+        // interactive) or failed (nothing changed) so the control is never left permanently disabled.
+        row.querySelectorAll('select').forEach(function (s) { s.disabled = false; });
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -181,19 +177,28 @@
         });
 
         document.querySelectorAll('.delivered-checkbox').forEach(function (checkbox) {
-            checkbox.addEventListener('change', function () {
-                const inventoryId = this.getAttribute('data-inventory-id');
+            checkbox.addEventListener('change', async function () {
+                const cb = this;
+                const inventoryId = cb.getAttribute('data-inventory-id');
                 const row = collectionRow(inventoryId);
                 if (!window.krtFetch || !row) return;
-                window.krtFetch.write({
+                const previous = !cb.checked; // state before this toggle, for revert-on-failure
+                const result = await window.krtFetch.write({
                     method: 'PATCH',
                     url: '/inventory/' + inventoryId + '/delivered',
-                    payload: { delivered: this.checked, version: parseInt(row.getAttribute('data-version'), 10) },
+                    payload: { delivered: cb.checked, version: parseInt(row.getAttribute('data-version'), 10) },
                     containerSelector: 'tr[data-inventory-id="' + inventoryId + '"]',
                     toast: false,
                     errorMessage: MSG_ERROR_GENERIC,
                     onSuccess: function () { window.showFrontendSuccessToast(MSG_DELIVERED_UPDATED); }
                 });
+                // A failed write (409 stale version / 5xx) already surfaced an error toast via
+                // krtFetch.handleProblem, but the native checkbox kept its new, unpersisted state —
+                // revert it so the control matches the persisted flag instead of lying until a reload
+                // (mirrors the status <select> revert on a failed order-status change).
+                if (!result || !result.ok) {
+                    cb.checked = previous;
+                }
             });
         });
     });

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-14.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-15.
 > **Owner area:** FE/UI · **Related ADRs:** ADR-0012
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
@@ -35,18 +35,27 @@ reload via `showKrtConfirm`.
 - [ ] No `location.reload()` runs on the success path; the only reload is a user-accepted
   optimistic-lock confirm.
 - [ ] Derived UI that lives **outside** the swapped fragment is refreshed too — an emptied list
-  restores its "no entries" placeholder, and a count shown in a separate modal/header reflects the
-  new state (when a fragment swap cannot cover it, the handler patches it explicitly, e.g. the
-  hangar home-location ship count re-rendered on modal open, the category/alias placeholder rebuilt
-  on the last delete).
+  restores its "no entries" placeholder, and a count or server-derived value shown in a separate
+  modal/header reflects the new state (when a fragment swap cannot cover it, the handler patches it
+  explicitly, e.g. the hangar home-location ship count re-rendered on modal open, the category/alias
+  placeholder rebuilt on the last delete, the order-detail header re-pulled on **every** status
+  change so a reactivated order's reassigned priority renders in place — not only on the terminal
+  transition).
+- [ ] A write that **replaces the entity identity** (delete-old + create-new — e.g. a full-amount
+  inventory transfer that appends a new target item and deletes the source) re-keys the affected DOM
+  row + its controls to the new id/version, so a follow-up action targets the live entity, not the
+  removed one. An optimistic native control (checkbox / select) reverts to its prior state on a
+  failed write, so the rendered state never diverges from the persisted value.
 - [ ] The submit control is disabled for the duration of the in-flight write and re-enabled when it
   settles, so a double-click cannot fire a duplicate create or a stale-version delete. Enforced
   centrally: `krtFetch.write` auto-captures the triggering form's submit button and toggles it
   (raw-`fetch` write paths — order/refinery create, the mission-data helper — guard it explicitly).
 
 **Enforced by:** per-area Playwright e2e (no-navigation assertion) +
-`MaterialsCategoryEmptyStateInPlaceE2eTest` (empty-state restore) · **Code:** `krt-fetch.js`,
-the converted page handlers · **Issues:** #571, #572
+`MaterialsCategoryEmptyStateInPlaceE2eTest` (empty-state restore) +
+`MaterialCollectionTransferInPlaceE2eTest` (row re-keyed after a transfer) +
+`JobOrderReactivatePriorityInPlaceE2eTest` (header refreshed on reactivate) · **Code:**
+`krt-fetch.js`, the converted page handlers · **Issues:** #571, #572
 
 ### REQ-FE-002 — All writes go through `krtFetch` + `krtCsrf`
 
@@ -167,8 +176,11 @@ the next edit on that row does not 409 — REQ-FE-003), and the note edits plus 
 guards surface their success/error outcome through the shared `showFrontendSuccessToast` /
 `showFrontendErrorToast` globals — the page-local `showInventoryToast(type, msg)` helper delegates to
 them rather than to a non-existent page element; the material-collection owner/location transfer
-and delivered toggle move onto `krtFetch.write` (per-row patch; a full-amount transfer consumes the
-source row, 204, and removes it); and the admin delete-all clears the grouped table via the existing
+and delivered toggle move onto `krtFetch.write` (per-row patch; a full-amount transfer deletes the
+source item server-side and appends a new target item still linked to the job order, returning that
+target DTO — the row is re-keyed in place to the new id/version rather than removed, and a failed
+delivered toggle reverts the checkbox); and the admin delete-all clears the grouped table via the
+existing
 filter swap instead of a reload. **Part B** does the quantity-changing list writes. The single
 **book-out** modal (`inventory-my` / `inventory-admin`, all three of DISCARD / TRANSFER / SELL)
 submits in place through `krtFetch.write`, reusing the existing `POST /inventory/{id}/transfer`
