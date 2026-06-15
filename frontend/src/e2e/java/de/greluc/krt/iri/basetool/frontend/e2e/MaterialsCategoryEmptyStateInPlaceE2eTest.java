@@ -123,8 +123,13 @@ class MaterialsCategoryEmptyStateInPlaceE2eTest {
                 response.url().endsWith("/admin/materials/categories")
                     && "POST".equals(response.request().method()),
             () -> page.locator("form[data-category-create] button[type='submit']").click());
+        // Scope to category-management rows: addCategoryOption() also injects the new name as an
+        // <option> into every material-row category dropdown, so a bare tr+hasText(name) matches
+        // many rows and trips Playwright strict mode. Only the JS-built category row carries
+        // data-category-row.
         Locator newRow =
-            page.locator("tr").filter(new Locator.FilterOptions().setHasText(categoryName));
+            page.locator("tr[data-category-row]")
+                .filter(new Locator.FilterOptions().setHasText(categoryName));
         assertThat(newRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
         // Delete it: the delete form is data-krt-confirm, so a KRT confirm overlay opens; confirm
@@ -142,7 +147,9 @@ class MaterialsCategoryEmptyStateInPlaceE2eTest {
         // full reload (the marker survives).
         assertThat(page.locator("[data-category-empty]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        assertThat(page.locator("tr").filter(new Locator.FilterOptions().setHasText(categoryName)))
+        assertThat(
+                page.locator("tr[data-category-row]")
+                    .filter(new Locator.FilterOptions().setHasText(categoryName)))
             .hasCount(0);
         assertEquals(
             Boolean.TRUE,
