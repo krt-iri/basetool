@@ -1,0 +1,148 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.iri.basetool.backend;
+
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.iri.basetool.backend.mapper.InventoryItemMapper;
+import de.greluc.krt.iri.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.iri.basetool.backend.model.CheckoutType;
+import de.greluc.krt.iri.basetool.backend.model.InventoryItem;
+import de.greluc.krt.iri.basetool.backend.model.Location;
+import de.greluc.krt.iri.basetool.backend.model.Material;
+import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemBookOutDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.InventoryItemUpdateDto;
+import de.greluc.krt.iri.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.iri.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionFinanceEntryRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionParticipantRepository;
+import de.greluc.krt.iri.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import de.greluc.krt.iri.basetool.backend.service.InventoryItemService;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+/**
+ * Regression tests for the optimistic-lock {@code @Version} write-back on the in-place inventory
+ * edits (epic #571 / #577). The in-place edits ({@code updateInventoryItem}, {@code updateNote} and
+ * the reducing {@code bookOutInventoryItem}) return the item DTO whose version the frontend writes
+ * back onto every control in the same row. Because the service is {@code @Transactional} (the
+ * commit — and thus the {@code @Version} increment — happens after the method returns), the DTO
+ * must be mapped from a {@code saveAndFlush}, not a plain {@code save}: a plain {@code save} leaves
+ * the version unflushed, so the response carries the STALE version and the user's next in-place
+ * edit of the same row fails with {@code ObjectOptimisticLockingFailureException} (HTTP 409). These
+ * tests pin {@code saveAndFlush}, mirroring the {@code verify(...).flush()} guard in {@code
+ * InventoryItemServiceBulkCheckoutTest}.
+ */
+@ExtendWith(MockitoExtension.class)
+class InventoryItemServiceVersionFlushTest {
+
+  @Mock private InventoryItemRepository inventoryItemRepository;
+  @Mock private UserRepository userRepository;
+  @Mock private MaterialRepository materialRepository;
+  @Mock private LocationRepository locationRepository;
+  @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private MissionRepository missionRepository;
+  @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
+  @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private InventoryItemMapper inventoryItemMapper;
+  @Mock private MaterialMapper materialMapper;
+
+  @InjectMocks private InventoryItemService inventoryItemService;
+
+  private User userWithId(UUID id) {
+    User u = new User();
+    u.setId(id);
+    return u;
+  }
+
+  private InventoryItem item(UUID itemId, UUID ownerId, double amount) {
+    InventoryItem item = new InventoryItem();
+    item.setId(itemId);
+    item.setUser(userWithId(ownerId));
+    item.setPersonal(false);
+    item.setVersion(0L);
+    item.setAmount(amount);
+    return item;
+  }
+
+  @Test
+  void updateInventoryItem_flushesSoTheReturnedVersionIsCurrent() {
+    UUID userId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItem item = item(itemId, userId, 15.0);
+
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(new Location()));
+
+    InventoryItemUpdateDto dto =
+        new InventoryItemUpdateDto(materialId, locationId, 800, 15.0, false, null, null, 0L);
+    inventoryItemService.updateInventoryItem(itemId, dto, userId, false);
+
+    verify(inventoryItemRepository).saveAndFlush(item);
+    verify(inventoryItemRepository, never()).save(item);
+  }
+
+  @Test
+  void updateNote_flushesSoTheReturnedVersionIsCurrent() {
+    UUID userId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    InventoryItem item = item(itemId, userId, 15.0);
+
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+
+    inventoryItemService.updateNote(
+        itemId, new InventoryItemNoteUpdateRequest("a note", 0L), userId, false);
+
+    verify(inventoryItemRepository).saveAndFlush(item);
+    verify(inventoryItemRepository, never()).save(item);
+  }
+
+  @Test
+  void partialBookOut_flushesSoTheReducedRowReturnsTheCurrentVersion() {
+    UUID userId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    InventoryItem item = item(itemId, userId, 10.0);
+
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+
+    // DISCARD a partial amount so the row is reduced (not deleted) and its DTO is returned.
+    InventoryItemBookOutDto dto =
+        new InventoryItemBookOutDto(3.0, null, null, CheckoutType.DISCARD, null, null, 0L, null);
+    inventoryItemService.bookOutInventoryItem(itemId, dto, userId, false);
+
+    verify(inventoryItemRepository).saveAndFlush(item);
+    verify(inventoryItemRepository, never()).save(item);
+  }
+}

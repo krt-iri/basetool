@@ -674,7 +674,11 @@ public class InventoryItemService {
     // Append-only: an update edits the row in place and is never folded into another matching
     // stack.
     // Rows that now share a stack identity are grouped only for display (group-on-read).
-    return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    // saveAndFlush (not save): this method's @Transactional commits AFTER it returns, so a plain
+    // save() leaves the @Version increment unflushed and the mapped DTO carries the STALE version.
+    // The client writes that back, and the user's NEXT in-place edit of the same row then 409s.
+    // Flushing here makes the response @Version authoritative (REQ-FE-003).
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**
@@ -724,7 +728,9 @@ public class InventoryItemService {
     }
     item.setNote(normalizedNote);
 
-    return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    // saveAndFlush so the response carries the post-increment @Version (see updateInventoryItem) —
+    // otherwise editing a note right after an association change 409s.
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**
@@ -870,7 +876,9 @@ public class InventoryItemService {
       return null;
     } else {
       item.setAmount(remainingAmount);
-      return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+      // saveAndFlush so a partial book-out's response carries the fresh @Version (see
+      // updateInventoryItem) — otherwise a follow-up edit of the reduced row 409s.
+      return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
     }
   }
 
