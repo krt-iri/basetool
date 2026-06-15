@@ -6,6 +6,10 @@
 
 - **Übersichtsseiten zeigen nach dem Zurück-Navigieren wieder aktuelle Werte (Browser-Back/Forward-Cache).** Wer z. B. in der Bank eine Einzahlung vornimmt und dann per Zurück-Taste zur Kontenübersicht zurückgeht, sah dort bisher noch den alten Saldo in der Kachel — erst ein manuelles Neuladen zeigte den neuen Wert. Der Browser stellte die Seite aus seinem Verlaufs-Cache wieder her, ohne sie neu vom Server zu laden. Übersichtsseiten laden sich beim Zurück-/Vorwärts-Wiederherstellen jetzt einmalig neu, sodass Salden, Zähler und Status app-weit aktuell sind.
 
+- **Die Sofortsuche in der persönlichen Blueprint-Liste (`/personal-inventory/blueprints`) filtert wieder.** Das Tippen in das Suchfeld der vorhandenen Blueprints berechnete die Treffer korrekt, blendete die nicht passenden Zeilen aber nie aus, weil eine CSS-Regel das `hidden`-Attribut der Zeilen überstimmte. Die Suche der allgemein verfügbaren Blueprints (Hinzufügen-Leiste) war davon nicht betroffen.
+
+## [v0.5.0](https://github.com/krt-iri/basetool/releases/tag/v0.5.0) - 2026-06-15
+
 ### Changed
 
 - **Organigramm, Mitgliederverwaltung und Profil ohne Seitenneuladen (Epic #571 / #581):** Im Organigramm aktualisieren das Zuweisen, Neubesetzen, Umbenennen und Entfernen von Positionen jetzt nur das Diagramm in-place statt die ganze Seite neu zu laden. In der Mitgliederverwaltung entfernt das Löschen eines Mitglieds die Zeile in-place, und ein fehlgeschlagener Logistiker-/Missions-Manager-Schalter wird direkt zurückgesetzt statt die Seite neu zu laden; das Bearbeiten eines Mitglieds speichert ohne Neuladen, wobei Eingabefehler direkt am jeweiligen Feld erscheinen. Auf der Profilseite speichert die Standard-Auszahlungspräferenz jetzt ohne Neuladen, und auf der Startseite wird „Als gelesen markieren" in-place übernommen. Das Umschalten der aktiven Org-Einheit lädt bewusst weiterhin die Seite neu, weil es den Geltungsbereich der gesamten Seite ändert. Ohne JavaScript funktionieren die klassischen Formulare unverändert weiter.
