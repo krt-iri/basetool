@@ -3314,6 +3314,15 @@ details.hud-details[open] > summary::after {
     display: none;
 }
 
+/* Flip-up variant: when the popup opens above the field (more room there than
+   below — set by krt-searchable-select.js, which also switches to fixed
+   positioning so a scrolling modal body cannot clip it), restore the top border
+   and drop the bottom one so the open edge meets the textbox. */
+.krt-combobox__listbox--above {
+    border-top: var(--border-accent);
+    border-bottom: none;
+}
+
 .krt-combobox__option {
     display: flex;
     align-items: center;
