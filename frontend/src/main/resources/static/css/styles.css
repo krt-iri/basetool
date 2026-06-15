@@ -4643,6 +4643,12 @@ textarea:focus-visible,
     outline: 2px solid var(--color-primary);
     outline-offset: -2px;
 }
+/* The instant client-side filter hides non-matching rows via the `hidden` attribute. The
+   author-level `display: flex` above outranks the UA stylesheet's `[hidden] { display: none }`,
+   so without this explicit override the attribute is ignored and the filter shows nothing. */
+.master-row[hidden] {
+    display: none;
+}
 .detail-pane {
     background: var(--color-bg-dark-gray);
     border: var(--border-hairline);

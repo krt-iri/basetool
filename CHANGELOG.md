@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Sofortsuche in der persönlichen Blueprint-Liste (`/personal-inventory/blueprints`) filtert wieder.** Das Tippen in das Suchfeld der vorhandenen Blueprints berechnete die Treffer korrekt, blendete die nicht passenden Zeilen aber nie aus, weil eine CSS-Regel das `hidden`-Attribut der Zeilen überstimmte. Die Suche der allgemein verfügbaren Blueprints (Hinzufügen-Leiste) war davon nicht betroffen.
+
 ## [v0.5.0](https://github.com/krt-iri/basetool/releases/tag/v0.5.0) - 2026-06-15
 
 ### Changed
