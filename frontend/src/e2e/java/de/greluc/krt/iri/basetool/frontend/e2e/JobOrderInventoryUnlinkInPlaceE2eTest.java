@@ -122,7 +122,7 @@ class JobOrderInventoryUnlinkInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/orders/" + jobOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
         page.waitForLoadState();
 
         // Marker on the live document: a full reload wipes it, so its survival proves the unlink

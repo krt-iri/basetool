@@ -95,7 +95,7 @@ class MissionDesignFixesCheckE2eTest {
       E2eSupport.login(page, baseUrl, "test-admin", "test-admin-pw");
 
       // 1) Übersicht: no jump cards left.
-      page.navigate(baseUrl + "/missions/" + missionId + "?tab=ueb");
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=ueb");
       page.waitForLoadState();
       page.waitForTimeout(400);
       Object uebProbe =
@@ -107,7 +107,7 @@ class MissionDesignFixesCheckE2eTest {
               .setPath(Paths.get("build", "e2e", "fix-ueb.png")));
 
       // 2) Crew board: legend + drop-hint must render light/regular, not thin gray-2.
-      page.navigate(baseUrl + "/missions/" + missionId + "?tab=crew");
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       page.waitForTimeout(400);
       Object crewProbe =
@@ -124,7 +124,7 @@ class MissionDesignFixesCheckE2eTest {
               .setPath(Paths.get("build", "e2e", "fix-crew.png")));
 
       // 3+4) Finance: payout table fits without horizontal scroll; details carry a panel surface.
-      page.navigate(baseUrl + "/missions/" + missionId + "?tab=fin");
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
       page.waitForLoadState();
       page.waitForTimeout(400);
       Object finProbe =
@@ -148,7 +148,7 @@ class MissionDesignFixesCheckE2eTest {
               .setPath(Paths.get("build", "e2e", "fix-fin.png")));
 
       // 5) Verwaltung: both "Jetzt" buttons fully visible inside their pane.
-      page.navigate(baseUrl + "/missions/" + missionId + "?tab=verw");
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=verw");
       page.waitForLoadState();
       page.waitForTimeout(400);
       Object verwProbe =

@@ -119,7 +119,7 @@ class PublicMissionCrossStaffelE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
-        page.navigate(baseUrl + "/missions");
+        E2eSupport.navigate(page, baseUrl + "/missions");
         page.waitForLoadState();
 
         assertThat(
@@ -132,7 +132,7 @@ class PublicMissionCrossStaffelE2eTest {
             .hasCount(0);
 
         // B can open A's public mission detail cross-Staffel.
-        page.navigate(baseUrl + "/missions/" + publicMissionId);
+        E2eSupport.navigate(page, baseUrl + "/missions/" + publicMissionId);
         page.waitForLoadState();
         assertThat(page.getByText(PUBLIC_MISSION).first()).isVisible();
       } catch (RuntimeException | AssertionError failure) {

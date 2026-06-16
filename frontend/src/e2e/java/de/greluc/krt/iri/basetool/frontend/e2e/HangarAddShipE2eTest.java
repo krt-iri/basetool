@@ -94,7 +94,7 @@ class HangarAddShipE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/hangar");
+        E2eSupport.navigate(page, baseUrl + "/hangar");
         page.getByTestId("hangar-add-ship").click();
 
         // The add-ship modal opens via JS; the ship-type / insurance selects are server-rendered.

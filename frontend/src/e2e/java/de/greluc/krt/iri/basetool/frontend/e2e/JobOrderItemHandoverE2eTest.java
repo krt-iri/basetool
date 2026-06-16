@@ -119,7 +119,7 @@ class JobOrderItemHandoverE2eTest {
         String id = order.get("id").getAsString();
         String detailUrl = baseUrl + "/orders/" + id;
 
-        page.navigate(detailUrl);
+        E2eSupport.navigate(page, detailUrl);
         assertThat(page.getByTestId("item-handover-open")).isVisible();
 
         // Partial handover: deliver one of two units. The log-handover button must remain.
@@ -159,7 +159,7 @@ class JobOrderItemHandoverE2eTest {
    * @param handle the unique contact handle the order is filed under (used for the admin read-back)
    */
   private static void createItemOrderForTwoUnits(Page page, String baseUrl, String handle) {
-    page.navigate(baseUrl + "/orders/create");
+    E2eSupport.navigate(page, baseUrl + "/orders/create");
     page.getByTestId("order-mode-item").check();
     page.locator("#item-responsibleOrgUnitId").selectOption(IRIDIUM_ID);
     page.locator("#item-requestingOrgUnitId").selectOption(IRIDIUM_ID);

@@ -103,7 +103,7 @@ class JobOrderCreateE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/orders/create");
+        E2eSupport.navigate(page, baseUrl + "/orders/create");
         // Responsible (processing) unit — restricted to profit-eligible org units; IRIDIUM is opted
         // in at stack bootstrap. Required, so it must be selected for the create to pass.
         page.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);

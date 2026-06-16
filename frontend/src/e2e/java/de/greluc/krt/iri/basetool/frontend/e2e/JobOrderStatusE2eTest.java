@@ -118,7 +118,7 @@ class JobOrderStatusE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(detailUrl);
+        E2eSupport.navigate(page, detailUrl);
 
         // OPEN -> IN_PROGRESS: a non-terminal target posts straight away on the change event.
         page.waitForResponse(

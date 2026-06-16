@@ -111,7 +111,7 @@ class LoginSmokeE2eTest {
       try {
         // Hitting the Spring authorization endpoint directly starts the OIDC code flow and
         // redirects the browser to the Keycloak login page for the `keycloak` client registration.
-        page.navigate(baseUrl + "/oauth2/authorization/keycloak");
+        E2eSupport.navigate(page, baseUrl + "/oauth2/authorization/keycloak");
 
         // Keycloak default login theme: stable element ids #username / #password / #kc-login.
         page.waitForSelector("#username");

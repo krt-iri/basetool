@@ -103,7 +103,7 @@ class RefineryOrderCreateE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/refinery-orders");
+        E2eSupport.navigate(page, baseUrl + "/refinery-orders");
         page.getByTestId("refinery-create-link").click();
         page.waitForURL(url -> url.contains("/refinery-orders/create"));
         page.waitForLoadState();

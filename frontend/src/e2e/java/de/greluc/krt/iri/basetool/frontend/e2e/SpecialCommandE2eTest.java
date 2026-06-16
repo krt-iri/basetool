@@ -101,7 +101,7 @@ class SpecialCommandE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
-        page.navigate(baseUrl + "/admin/special-commands");
+        E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
         // A full reload would wipe this marker; the #582 in-place create leaves it intact.
         page.evaluate("window.__krtNoReload = true;");

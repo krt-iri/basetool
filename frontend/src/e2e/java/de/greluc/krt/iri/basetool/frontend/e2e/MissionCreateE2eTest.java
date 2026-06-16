@@ -92,7 +92,7 @@ class MissionCreateE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/missions");
+        E2eSupport.navigate(page, baseUrl + "/missions");
         page.getByTestId("missions-create-link").click();
         // Wait for the create page to finish loading: datetime-splitter.js clears the date/time
         // pickers on DOMContentLoaded (from the empty hidden field), so filling before that init

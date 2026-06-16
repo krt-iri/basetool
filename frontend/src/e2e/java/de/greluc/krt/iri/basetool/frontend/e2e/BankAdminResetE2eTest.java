@@ -111,6 +111,10 @@ class BankAdminResetE2eTest {
         // wait on the write's XHR response rather than a post-submit document navigation.
         page.waitForResponse(
             r -> r.url().contains("/admin/bank/wipe-reset") && "POST".equals(r.request().method()),
+            // 60 s (above the 30 s default): the wipe's proxied XHR round-trip can outrun 30 s on a
+            // contended CI runner (the Firefox-only flake window), timing out an otherwise-correct
+            // POST. Headroom hardens the wait without masking a genuinely stuck request.
+            new Page.WaitForResponseOptions().setTimeout(60_000),
             () -> page.locator("[data-testid='bank-wipe-submit']").click());
         assertThat(page.locator(".notification-toast").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));

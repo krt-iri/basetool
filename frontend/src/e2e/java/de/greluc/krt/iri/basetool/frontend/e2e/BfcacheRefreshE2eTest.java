@@ -128,7 +128,14 @@ class BfcacheRefreshE2eTest {
         // The handler's reload wipes the marker; waitForFunction re-attaches across the navigation
         // and resolves once the fresh document (no marker) is live. A regressed build never clears
         // it, so this wait is the red/green gate.
-        page.waitForFunction("() => typeof window.__bfcacheMarker === 'undefined'");
+        page.waitForFunction(
+            "() => typeof window.__bfcacheMarker === 'undefined'",
+            null,
+            // 60 s (above the 30 s default): the bfcache-restore reload is a full document
+            // navigation that can outrun 30 s on a contended CI runner (the Firefox-only flake
+            // window). Headroom hardens the gate without masking a build that never clears the
+            // marker.
+            new Page.WaitForFunctionOptions().setTimeout(60_000));
 
         assertEquals(
             Boolean.TRUE,
