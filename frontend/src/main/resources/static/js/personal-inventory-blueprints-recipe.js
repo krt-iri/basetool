@@ -185,8 +185,13 @@
         }
         // Default blueprints (REQ-INV-016) are non-removable: hide the delete control so the user
         // is never offered an action that would be refused. data-removable is "false" for defaults.
+        // The `hidden` attribute alone does NOT hide a `.btn` — its class display outranks the UA
+        // `[hidden]` rule (see the documented trap on `.master-row[hidden]` in styles.css) — so the
+        // inline `display` (which beats any class) is what actually hides/shows it.
         if (deleteBtn) {
-            deleteBtn.hidden = attr(row, 'data-removable') === 'false';
+            const removable = attr(row, 'data-removable') !== 'false';
+            deleteBtn.hidden = !removable;
+            deleteBtn.style.display = removable ? '' : 'none';
         }
 
         if (note) {
