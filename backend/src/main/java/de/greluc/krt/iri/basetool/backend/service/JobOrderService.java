@@ -19,6 +19,8 @@
 
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.event.JobOrderCreatedEvent;
+import de.greluc.krt.iri.basetool.backend.event.OrgUnitRef;
 import de.greluc.krt.iri.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.mapper.JobOrderMapper;
@@ -54,6 +56,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -102,6 +105,7 @@ public class JobOrderService {
   private final SystemSettingService systemSettingService;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
+  private final ApplicationEventPublisher eventPublisher;
   private final MaterialClaimService materialClaimService;
   private final JobOrderMapper jobOrderMapper;
   private final JobOrderItemService jobOrderItemService;
@@ -156,6 +160,7 @@ public class JobOrderService {
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
     normalizePriorities();
+    publishJobOrderCreated(jobOrder);
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -216,7 +221,31 @@ public class JobOrderService {
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
     normalizePriorities();
+    publishJobOrderCreated(jobOrder);
     return mapToDtoWithStock(jobOrder);
+  }
+
+  /**
+   * Publishes a {@link JobOrderCreatedEvent} for a freshly persisted job order so the notification
+   * pipeline can fan out after commit. Reads only managed-entity scalars (ids, kinds, shorthand,
+   * display id) and never re-saves the order, so it adds no second {@code @Version} bump. The actor
+   * is the current authenticated user (empty for anonymous/guest creates).
+   *
+   * @param jobOrder the persisted, flushed job order
+   */
+  private void publishJobOrderCreated(JobOrder jobOrder) {
+    OrgUnit responsible = jobOrder.getResponsibleOrgUnit();
+    OrgUnit requesting = jobOrder.getRequestingOrgUnit();
+    eventPublisher.publishEvent(
+        new JobOrderCreatedEvent(
+            jobOrder.getId(),
+            jobOrder.getDisplayId(),
+            jobOrder.getHandle(),
+            new OrgUnitRef(responsible.getId(), responsible.getKind()),
+            responsible.getShorthand(),
+            requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
+            jobOrder.getType() == null ? null : jobOrder.getType().name(),
+            authHelperService.currentUserId().orElse(null)));
   }
 
   /**

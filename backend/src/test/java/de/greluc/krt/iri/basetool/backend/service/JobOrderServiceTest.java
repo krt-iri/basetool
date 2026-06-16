@@ -89,6 +89,8 @@ class JobOrderServiceTest {
   private de.greluc.krt.iri.basetool.backend.mapper.JobOrderItemHandoverMapper
       jobOrderItemHandoverMapper;
 
+  @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
   @InjectMocks private JobOrderService jobOrderService;
 
   private Material material;

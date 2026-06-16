@@ -2739,7 +2739,9 @@ input[type='radio']:focus {
 .squadron-context-chip {
     position: fixed;
     top: 1rem;
-    right: 1rem;
+    /* Shifted left of the notification bell (fixed at right:1rem). The chip is right-anchored and
+       grows leftward, so this offset clears the fixed-width bell regardless of the chip's width. */
+    right: 4rem;
     z-index: 1200; /* above header, below sidebar overlay */
     display: flex;
     align-items: center;
@@ -2755,6 +2757,158 @@ input[type='radio']:focus {
     pointer-events: none; /* tooltip-only, never intercepts clicks */
     backdrop-filter: blur(2px);
     box-shadow: 0 2px 6px rgb(0 0 0 / 40%);
+}
+
+/* ===== Notification bell + dropdown + list (epic #622, REQ-NOTIF-006) ===== */
+.notification-bell {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1300; /* above the context chip so the bell stays clickable */
+}
+
+.notification-bell-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    color: var(--color-gray-1);
+    background-color: rgb(20 20 20 / 85%);
+    border: var(--border-accent);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 40%);
+    cursor: pointer;
+}
+
+.notification-bell-btn:hover {
+    color: var(--color-primary);
+}
+
+.notification-bell-btn .krt-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -0.35rem;
+    right: -0.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.1rem;
+    height: 1.1rem;
+    padding: 0 0.25rem;
+    color: var(--color-bg-black);
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    font-weight: var(--fw-bold);
+    line-height: 1;
+    background-color: var(--color-primary);
+    border-radius: var(--radius-pill);
+}
+
+.notification-badge-hidden {
+    display: none;
+}
+
+.notification-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    width: 22rem;
+    max-width: 90vw;
+    max-height: 26rem;
+    overflow-y: auto;
+    background-color: var(--color-bg-dark-gray);
+    border: var(--border-accent);
+    box-shadow: var(--shadow-dropdown);
+}
+
+.notification-dropdown-hidden {
+    display: none;
+}
+
+.notification-dropdown-header,
+.notification-dropdown-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-gray-3);
+}
+
+.notification-dropdown-footer {
+    border-top: 1px solid var(--color-gray-3);
+    border-bottom: 0;
+}
+
+.notification-link-btn {
+    padding: 0;
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.notification-dropdown-list,
+.notification-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.notification-dropdown-empty,
+.notification-empty {
+    padding: var(--space-3);
+    color: var(--color-gray-2);
+    font-size: 0.85rem;
+}
+
+.notification-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--color-gray-3);
+}
+
+.notification-item.is-read {
+    opacity: 0.6;
+}
+
+.notification-item-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.notification-item-text {
+    margin: 0 0 0.25rem;
+    color: var(--color-gray-1);
+    font-size: 0.85rem;
+}
+
+.notification-item-time {
+    color: var(--color-gray-2);
+    font-size: 0.7rem;
+}
+
+.notification-item-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: var(--space-2);
+}
+
+.notification-page-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
 }
 
 .squadron-context-chip-label {

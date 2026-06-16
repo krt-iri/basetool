@@ -51,4 +51,7 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0011](0011-bank-authorization-model.md)                    | Bank authorization: coarse Keycloak roles + app-managed per-account grants              | Proposed                          |
 | [0012](0012-frontend-krtfetch-json-mutations-csrf-retry.md) | Standardize frontend mutations on krtFetch + JSON with session/meta CSRF + retry-on-403 | Accepted                          |
 | [0013](0013-frontend-bfcache-history-restore-reload.md)     | Refresh on bfcache history-restore with a global `pageshow` reload                      | Accepted                          |
+| [0014](0014-notification-system-architecture.md)            | Notification system: per-user inbox produced by after-commit domain events              | Accepted                          |
+| [0015](0015-notification-data-driven-rule-engine.md)        | Notification recipients via a data-driven rule engine                                   | Accepted                          |
+| [0016](0016-notification-transport-polling-sse.md)          | Notification delivery: in-app polling baseline, SSE push as enhancement                 | Accepted                          |
 

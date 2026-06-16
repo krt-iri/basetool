@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
 import de.greluc.krt.iri.basetool.frontend.controller.MeFrontendController;
+import de.greluc.krt.iri.basetool.frontend.model.dto.NotificationCountResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.SquadronDto;
@@ -495,6 +496,30 @@ public class SquadronContextAdvice {
   @ModelAttribute("canViewJobOrders")
   public boolean canViewJobOrders(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
     return caps != null && caps.canViewJobOrders();
+  }
+
+  /**
+   * The caller's unread-notification count, fed to the always-on bell badge rendered on every page
+   * (REQ-NOTIF-006). Resolved once per request; fails soft to zero so a backend hiccup hides the
+   * badge rather than breaking the chrome, and the bell's client-side polling keeps it fresh after
+   * the initial render.
+   *
+   * @return the unread count, or {@code 0} when unauthenticated or on a backend error.
+   */
+  @ModelAttribute("unreadNotificationCount")
+  public long unreadNotificationCount() {
+    if (!authHelper.isAuthenticated()) {
+      return 0L;
+    }
+    try {
+      NotificationCountResponse resp =
+          backendApiClient.get(
+              "/api/v1/notifications/unread-count", NotificationCountResponse.class);
+      return resp != null && resp.count() != null ? resp.count() : 0L;
+    } catch (Exception ex) {
+      log.debug("Failed to resolve unread notification count", ex);
+      return 0L;
+    }
   }
 
   /**

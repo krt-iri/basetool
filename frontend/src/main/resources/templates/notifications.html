@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{notifications.title} + ' - ' + ${appTitle}">Notifications - Profit Basetool</title>
+    <th:block th:fragment="extraLinks"></th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{notifications.title}">Benachrichtigungen</h1>
+        <p th:text="#{notifications.subtitle}">Deine pers&#246;nlichen Benachrichtigungen.</p>
+    </div>
+
+    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
+        <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div class="notification-page-actions">
+            <button type="button" class="btn btn-secondary" data-notif-mark-all
+                    th:text="#{notifications.markAllRead}">Alle als gelesen markieren</button>
+            <button type="button" class="btn btn-secondary" data-notif-clear-read
+                    th:text="#{notifications.clearRead}">Gelesene l&#246;schen</button>
+        </div>
+
+        <ul class="notification-list" id="notification-page-list">
+            <li th:each="n : ${notifications}" class="notification-item"
+                th:classappend="${n.read} ? 'is-read' : ''"
+                th:attr="data-notif-id=${n.id},data-notif-read=${n.read}">
+                <div class="notification-item-body">
+                    <p class="notification-item-text" th:text="${n.text}">Notification text</p>
+                    <span class="notification-item-time" th:text="${n.createdAtDisplay}">2026-01-01 00:00 UTC</span>
+                </div>
+                <div class="notification-item-actions">
+                    <button type="button" class="btn btn-icon" data-notif-mark-read
+                            th:if="${!n.read}" th:title="#{notifications.markRead}"
+                            th:aria-label="#{notifications.markRead}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-check"></use></svg>
+                    </button>
+                    <button type="button" class="btn btn-quiet-danger btn-icon" data-notif-delete
+                            th:title="#{notifications.delete}" th:aria-label="#{notifications.delete}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"></use></svg>
+                    </button>
+                </div>
+            </li>
+        </ul>
+        <p class="notification-empty" data-notif-empty
+           th:classappend="${#lists.isEmpty(notifications)} ? '' : 'notification-badge-hidden'"
+           th:text="#{notifications.empty}">Keine Benachrichtigungen</p>
+    </div>
+</main>
+</body>
+</html>

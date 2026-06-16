@@ -132,4 +132,40 @@ public interface OrgUnitMembershipRepository
    */
   @Query("SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId IN :orgUnitIds")
   Set<UUID> findDistinctUserIdsByOrgUnitIdIn(@Param("orgUnitIds") Collection<UUID> orgUnitIds);
+
+  /**
+   * Returns the ids of users who are Leads of the given org unit. Backs the notification rule
+   * engine's {@code ORG_RELATIVE_ROLE = LEAD} resolution (leads of a responsible Spezialkommando).
+   *
+   * @param orgUnitId the org unit whose leads to collect; never {@code null}
+   * @return the lead user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.isLead ="
+          + " true")
+  Set<UUID> findLeadUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
+
+  /**
+   * Returns the ids of users who are Logisticians of the given org unit. Backs the notification
+   * rule engine's {@code ORG_RELATIVE_ROLE = LOGISTICIAN} resolution.
+   *
+   * @param orgUnitId the org unit whose logisticians to collect; never {@code null}
+   * @return the logistician user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND"
+          + " m.isLogistician = true")
+  Set<UUID> findLogisticianUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
+
+  /**
+   * Returns the ids of users who are Mission Managers of the given org unit. Backs the notification
+   * rule engine's {@code ORG_RELATIVE_ROLE = MISSION_MANAGER} resolution.
+   *
+   * @param orgUnitId the org unit whose mission managers to collect; never {@code null}
+   * @return the mission-manager user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND"
+          + " m.isMissionManager = true")
+  Set<UUID> findMissionManagerUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 }

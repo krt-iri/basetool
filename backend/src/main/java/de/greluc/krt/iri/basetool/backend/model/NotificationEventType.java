@@ -1,0 +1,35 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.iri.basetool.backend.model;
+
+/**
+ * Identifies the domain trigger that a {@link NotificationRule} reacts to.
+ *
+ * <p>Distinct from {@link NotificationType}: an event type names <em>what happened</em> (the
+ * trigger a rule matches on) while a notification type names <em>what is shown</em> (the rendered
+ * message a rule produces). They coincide for the first use case but are kept separate so a single
+ * trigger can drive differently-rendered notifications in future. The constant is persisted via
+ * {@code @Enumerated(STRING)} and matched against {@code notification_rule.event_type}.
+ */
+public enum NotificationEventType {
+
+  /** A new job order ("Auftrag") was created. */
+  JOB_ORDER_CREATED
+}

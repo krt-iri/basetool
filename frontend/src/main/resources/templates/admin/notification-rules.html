@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.notificationRules.title} + ' - ' + ${appTitle}">Notification rules - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <style th:attr="nonce=${cspNonce}">
+            .form-group label {
+                display: block;
+                margin-bottom: 0.4rem;
+                font-family: var(--font-body);
+                font-size: 0.8rem;
+            }
+            .form-group input[type='text'], .form-group select, .form-group textarea {
+                width: 100%;
+                padding: 0.5rem;
+                background-color: var(--color-gray-4);
+                border: 1px solid var(--color-gray-3);
+                color: var(--color-gray-1);
+                box-sizing: border-box;
+            }
+            .form-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 1rem;
+            }
+            .selector-row {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: end;
+                gap: 0.75rem;
+                padding: 0.75rem;
+                margin-bottom: 0.75rem;
+                border: 1px solid var(--color-gray-3);
+            }
+            .selector-row .form-group {
+                flex: 1 1 160px;
+                margin: 0;
+            }
+        </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <span id="rule-i18n" hidden
+          th:attr="data-confirm-delete-title=#{admin.notificationRules.confirmDelete.title},data-confirm-delete-body=#{admin.notificationRules.confirmDelete.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-saved=#{admin.notificationRules.success.saved},data-deleted=#{admin.notificationRules.success.deleted},data-error=#{notification.error.title}"></span>
+
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.notificationRules.title}">Benachrichtigungsregeln</h1>
+        <p th:text="#{admin.notificationRules.subtitle}">Wer wird bei welchem Ereignis benachrichtigt.</p>
+    </div>
+
+    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
+        <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <div class="hud-box mt-2">
+        <h2 th:text="#{admin.notificationRules.existing}">Vorhandene Regeln</h2>
+        <table id="rules-table">
+            <thead>
+            <tr>
+                <th th:text="#{admin.notificationRules.eventType}">Ereignis</th>
+                <th th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</th>
+                <th th:text="#{admin.notificationRules.enabled}">Aktiv</th>
+                <th th:text="#{admin.notificationRules.selectors}">Empfänger-Selektoren</th>
+                <th th:text="#{admin.notificationRules.description}">Beschreibung</th>
+                <th th:text="#{admin.notificationRules.actions}">Aktion</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${rules}" th:attr="data-rule-id=${r.id}">
+                <td th:text="${r.eventType}">JOB_ORDER_CREATED</td>
+                <td th:text="${r.notificationType}">JOB_ORDER_CREATED</td>
+                <td th:text="${r.enabled} ? '✓' : '–'">✓</td>
+                <td th:text="${#lists.size(r.selectors)}">4</td>
+                <td th:text="${r.description}">…</td>
+                <td>
+                    <button type="button" class="btn btn-icon" data-rule-edit
+                            th:title="#{admin.notificationRules.edit}" th:aria-label="#{admin.notificationRules.edit}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
+                    </button>
+                    <button type="button" class="btn btn-quiet-danger btn-icon" data-rule-delete
+                            th:title="#{admin.notificationRules.delete}" th:aria-label="#{admin.notificationRules.delete}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"></use></svg>
+                    </button>
+                </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(rules)}">
+                <td colspan="6" th:text="#{admin.notificationRules.empty}">Noch keine Regeln.</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="hud-box mt-2">
+        <h2 id="rule-form-title" th:text="#{admin.notificationRules.create}">Regel anlegen</h2>
+        <form id="rule-form" data-rule-id="">
+            <input type="hidden" id="rule-version" value="">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="rule-eventType" th:text="#{admin.notificationRules.eventType}">Ereignis</label>
+                    <select id="rule-eventType">
+                        <option value="JOB_ORDER_CREATED">JOB_ORDER_CREATED</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="rule-notificationType" th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</label>
+                    <select id="rule-notificationType">
+                        <option value="JOB_ORDER_CREATED">JOB_ORDER_CREATED</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="rule-description" th:text="#{admin.notificationRules.description}">Beschreibung</label>
+                    <input type="text" id="rule-description" maxlength="255">
+                </div>
+            </div>
+            <div class="form-grid mt-2">
+                <div class="form-group">
+                    <label><input type="checkbox" id="rule-enabled" checked>
+                        <span th:text="#{admin.notificationRules.enabled}">Aktiv</span></label>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="rule-excludeActor" checked>
+                        <span th:text="#{admin.notificationRules.excludeActor}">Ersteller ausnehmen</span></label>
+                </div>
+            </div>
+
+            <h3 class="mt-2" th:text="#{admin.notificationRules.selectors}">Empfänger-Selektoren</h3>
+            <div id="selectors-container"></div>
+            <button type="button" class="btn btn-secondary" id="add-selector"
+                    th:text="#{admin.notificationRules.addSelector}">Selektor hinzufügen</button>
+
+            <div class="mt-2">
+                <button type="submit" class="btn btn--cta" th:text="#{admin.notificationRules.save}">Speichern</button>
+                <button type="button" class="btn btn-secondary" id="rule-cancel"
+                        th:text="#{general.cancel}">Abbrechen</button>
+            </div>
+        </form>
+    </div>
+
+    <template id="selector-row-template">
+        <div class="selector-row" data-selector-row>
+            <div class="form-group">
+                <label th:text="#{admin.notificationRules.selector.kind}">Art</label>
+                <select data-selector-kind>
+                    <option value="ORG_RELATIVE_ROLE">ORG_RELATIVE_ROLE</option>
+                    <option value="ROLE">ROLE</option>
+                    <option value="SPECIFIC_USER">SPECIFIC_USER</option>
+                </select>
+            </div>
+            <div class="form-group" data-field="orgRelativeRole">
+                <label th:text="#{admin.notificationRules.selector.orgRelativeRole}">Org-relative Rolle</label>
+                <select data-selector-orgRelativeRole>
+                    <option value="OFFICER">OFFICER</option>
+                    <option value="LEAD">LEAD</option>
+                    <option value="LOGISTICIAN">LOGISTICIAN</option>
+                    <option value="MISSION_MANAGER">MISSION_MANAGER</option>
+                </select>
+            </div>
+            <div class="form-group" data-field="contextRole">
+                <label th:text="#{admin.notificationRules.selector.contextRole}">Kontext-Einheit</label>
+                <select data-selector-contextRole>
+                    <option value="RESPONSIBLE">RESPONSIBLE</option>
+                    <option value="REQUESTING">REQUESTING</option>
+                </select>
+            </div>
+            <div class="form-group" data-field="roleCode">
+                <label th:text="#{admin.notificationRules.selector.roleCode}">Rollencode</label>
+                <select data-selector-roleCode>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="OFFICER">OFFICER</option>
+                    <option value="SQUADRON_MEMBER">SQUADRON_MEMBER</option>
+                    <option value="BANK_EMPLOYEE">BANK_EMPLOYEE</option>
+                    <option value="BANK_MANAGEMENT">BANK_MANAGEMENT</option>
+                    <option value="GUEST">GUEST</option>
+                </select>
+            </div>
+            <div class="form-group" data-field="userSub">
+                <label th:text="#{admin.notificationRules.selector.userSub}">Benutzer-ID (sub)</label>
+                <input type="text" data-selector-userSub placeholder="UUID">
+            </div>
+            <div class="form-group">
+                <button type="button" class="btn btn-quiet-danger" data-selector-remove
+                        th:text="#{admin.notificationRules.removeSelector}">Entfernen</button>
+            </div>
+        </div>
+    </template>
+</main>
+
+<script th:src="@{/js/notification-rules.js}" th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

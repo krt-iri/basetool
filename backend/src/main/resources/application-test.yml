@@ -78,6 +78,11 @@ app:
       # The scheduled sweep is disabled under test; BankLedgerIntegrityServiceTest drives verify()
       # directly so the schedule never races the synthetic-corruption assertions.
       enabled: false
+  notifications:
+    retention:
+      # The scheduled retention sweep is disabled under @SpringBootTest; the repository delete is
+      # exercised directly by NotificationRepositoryIntegrationTest.
+      enabled: false
 
 # Disable the KeycloakHealthIndicator under @SpringBootTest. The test issuer URI
 # (http://keycloak.example.com) is a non-resolvable placeholder; leaving the
