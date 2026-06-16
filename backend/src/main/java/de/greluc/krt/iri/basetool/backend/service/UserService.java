@@ -19,7 +19,6 @@
 
 package de.greluc.krt.iri.basetool.backend.service;
 
-import de.greluc.krt.iri.basetool.backend.event.UserProvisionedEvent;
 import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.Role;
 import de.greluc.krt.iri.basetool.backend.model.User;
@@ -45,7 +44,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -90,7 +88,7 @@ public class UserService {
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
-  private final ApplicationEventPublisher eventPublisher;
+  private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -241,9 +239,12 @@ public class UserService {
     if (changed || user.isNew()) {
       User saved = userRepository.save(user);
       if (created) {
-        // The id is the Keycloak sub, set before the first save, so it is safe to read here
-        // regardless of what the persistence layer returns.
-        eventPublisher.publishEvent(new UserProvisionedEvent(user.getId()));
+        // Grant the default blueprints in THIS transaction so a brand-new user has them committed
+        // before the request returns (REQ-INV-016). The grant is an idempotent bulk INSERT … ON
+        // CONFLICT touching only personal_blueprint (never the app_user row), so it neither bumps
+        // the user's @Version nor collides with the converter's retry. The id is the Keycloak sub,
+        // set before the first save.
+        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
       }
       return saved;
     }
@@ -303,8 +304,8 @@ public class UserService {
     if (changed || user.isNew()) {
       userRepository.save(user);
       if (created) {
-        // The id is the Keycloak sub, set before the first save, so it is safe to read here.
-        eventPublisher.publishEvent(new UserProvisionedEvent(user.getId()));
+        // Grant the default blueprints synchronously on first creation (REQ-INV-016); idempotent.
+        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
       }
     }
   }

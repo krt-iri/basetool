@@ -81,8 +81,9 @@ The system MUST maintain, for **every** user, an owned `personal_blueprint` row 
 the admin-managed default set (REQ-INV-017). Provisioning MUST be idempotent and MUST cover both
 existing and future users:
 
-- a brand-new user receives the defaults on first appearance (the `app_user` row creation publishes
-  an after-commit `UserProvisionedEvent`; the listener grants the defaults);
+- a brand-new user receives the defaults synchronously when their `app_user` row is first created
+  (the grant runs in the same `UserService.syncUser` transaction, so the rows are committed before
+  the first request returns);
 - a deploy / drift is reconciled by a startup backfill and a periodic sweep
   (`DefaultBlueprintProvisioningTask`), both bulk `INSERT … SELECT … ON CONFLICT (owner_sub,
   product_key) DO NOTHING` so a re-run never duplicates;
@@ -113,7 +114,7 @@ owned blueprints. Provisioning can be disabled per environment via
 
 **Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/DefaultBlueprintProvisioningService.java),
 [`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/repository/PersonalBlueprintRepository.java),
-[`UserProvisionedEventListener`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/event/UserProvisionedEventListener.java),
+[`UserService#syncUser`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/UserService.java),
 [`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/task/DefaultBlueprintProvisioningTask.java),
 [`PersonalBlueprintService#requireRemovable`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/PersonalBlueprintService.java).
 

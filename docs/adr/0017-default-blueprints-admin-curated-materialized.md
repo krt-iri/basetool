@@ -40,9 +40,10 @@ an **admin-curated** `default_blueprint` table (not the unreliable flag, not a h
   degraded fall-back so a default is granted even if the catalog lacks it.
 - Provisioning is an idempotent bulk `INSERT … SELECT … ON CONFLICT (owner_sub, product_key) DO
   NOTHING`. It is driven from three triggers so the "always present" guarantee holds for any user:
-  an after-commit `UserProvisionedEvent` on first `app_user` creation (immediate for new users; same
-  after-commit-event pattern as the notification system, [ADR-0014](0014-notification-system-architecture.md)),
-  a grant-to-everyone step when an admin adds a default, and a startup backfill + periodic sweep.
+  a synchronous grant inside `UserService.syncUser` when an `app_user` row is first created (so a new
+  user has the rows committed before their first request returns — chosen over an after-commit event
+  because the grant must be immediate and is small), a grant-to-everyone step when an admin adds a
+  default, and a startup backfill + periodic sweep.
 - Defaults are non-removable: the personal-blueprint response carries a non-visible `removable` flag
   that hides the delete control, and the delete endpoint refuses a default server-side (409). The
   user chose to hide the control rather than show a "Default" badge, so the list stays visually
