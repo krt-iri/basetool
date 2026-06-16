@@ -23,30 +23,24 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Boundary DTO for one of the caller's owned blueprints (#327). The internal {@code ownerSub} is
- * intentionally never exposed.
+ * Boundary DTO for one entry of the admin-managed default-blueprint set (REQ-INV-017), rendered on
+ * the admin default-blueprints page.
  *
- * @param id entry primary key
+ * @param id entry primary key (used by the remove action)
  * @param productKey normalized product identity
- * @param productName display name of the owned product
+ * @param productName display name of the default product
  * @param outputItemId resolved output {@code game_item} id, or {@code null} if unresolved
- * @param acquiredAt optional in-game acquisition time
- * @param note optional free-form note
- * @param removable whether the owner may delete this entry; {@code false} for an auto-granted
- *     default blueprint (REQ-INV-016), which the UI uses to hide the delete control and which the
- *     delete endpoint enforces server-side
- * @param version optimistic-lock version
+ * @param scwikiKey representative SC Wiki recipe key captured at add time, or {@code null}
+ * @param createdBy admin {@code sub} that added the entry, or {@code "system"} for the seed
  * @param createdAt row creation timestamp
- * @param updatedAt row last-update timestamp
+ * @param version optimistic-lock version
  */
-public record PersonalBlueprintResponse(
+public record DefaultBlueprintResponse(
     UUID id,
     String productKey,
     String productName,
     UUID outputItemId,
-    Instant acquiredAt,
-    String note,
-    boolean removable,
-    Long version,
+    String scwikiKey,
+    String createdBy,
     Instant createdAt,
-    Instant updatedAt) {}
+    Long version) {}

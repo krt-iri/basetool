@@ -63,7 +63,7 @@ class AdminPersonalBlueprintControllerTest {
   private static PersonalBlueprintResponse sample() {
     Instant now = Instant.parse("2026-01-01T00:00:00Z");
     return new PersonalBlueprintResponse(
-        UUID.randomUUID(), "k", "Name", null, null, null, 0L, now, now);
+        UUID.randomUUID(), "k", "Name", null, null, null, true, 0L, now, now);
   }
 
   @Test

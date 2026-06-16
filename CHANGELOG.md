@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Standard-Blueprints werden automatisch jedem Account gutgeschrieben.** Die auf jedem Star-Citizen-Account von Anfang an freigeschalteten Blueprints (Starter-Pistole und -Gewehr, deren Magazine, die Field-Recon-Suit-Teile) lassen sich nicht über einen Import erfassen und werden deshalb jedem Nutzer automatisch in die persönliche Blueprint-Liste eingetragen — auch rückwirkend für bestehende Konten und fortlaufend für neue. Sie sind nicht löschbar (es wird kein Lösch-Knopf angezeigt); Admins pflegen die Standard-Liste über eine neue Verwaltungsseite. Neue Konfiguration: `APP_DEFAULT_BLUEPRINTS_PROVISIONING_ENABLED`, `APP_DEFAULT_BLUEPRINTS_PROVISIONING_INTERVAL`.
+
 ### Changed
 
 - **Der aktive Bereichskontext (z. B. „IRIDIUM" oder „Alle Staffeln") wird nicht mehr doppelt angezeigt.** Bisher stand er gleichzeitig im Chip oben rechts und hinter dem App-Titel. Der überflüssige Chip entfällt; der aktive Bereich bleibt hinter dem App-Titel sichtbar — jetzt auch bei aktivem Spezialkommando, das der Titel zuvor nicht anzeigte.

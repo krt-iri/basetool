@@ -183,6 +183,11 @@
             editBtn.setAttribute('data-version', version);
             editBtn.setAttribute('data-acquired-at', acquired);
         }
+        // Default blueprints (REQ-INV-016) are non-removable: hide the delete control so the user
+        // is never offered an action that would be refused. data-removable is "false" for defaults.
+        if (deleteBtn) {
+            deleteBtn.hidden = attr(row, 'data-removable') === 'false';
+        }
 
         if (note) {
             noteEl.textContent = note;

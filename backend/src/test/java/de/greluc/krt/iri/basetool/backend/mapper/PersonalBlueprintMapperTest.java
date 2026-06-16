@@ -20,7 +20,9 @@
 package de.greluc.krt.iri.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.iri.basetool.backend.model.GameItem;
 import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
@@ -54,7 +56,7 @@ class PersonalBlueprintMapperTest {
             .build();
     entity.setVersion(4L);
 
-    PersonalBlueprintResponse response = mapper.toResponse(entity);
+    PersonalBlueprintResponse response = mapper.toResponse(entity, false);
 
     assertEquals(id, response.id());
     assertEquals("arclight pistol", response.productKey());
@@ -62,6 +64,7 @@ class PersonalBlueprintMapperTest {
     assertEquals(itemId, response.outputItemId());
     assertEquals(Instant.parse("2026-01-02T03:04:05Z"), response.acquiredAt());
     assertEquals("looted in Pyro", response.note());
+    assertFalse(response.removable());
     assertEquals(4L, response.version());
   }
 
@@ -75,8 +78,9 @@ class PersonalBlueprintMapperTest {
             .productName("Aril Core")
             .build();
 
-    PersonalBlueprintResponse response = mapper.toResponse(entity);
+    PersonalBlueprintResponse response = mapper.toResponse(entity, true);
 
     assertNull(response.outputItemId());
+    assertTrue(response.removable());
   }
 }

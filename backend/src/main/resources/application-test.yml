@@ -83,6 +83,12 @@ app:
       # The scheduled retention sweep is disabled under @SpringBootTest; the repository delete is
       # exercised directly by NotificationRepositoryIntegrationTest.
       enabled: false
+  default-blueprints:
+    provisioning:
+      # The startup seed/backfill and the periodic sweep are disabled under @SpringBootTest so they
+      # never seed degraded rows or race assertions. Tests that exercise the feature re-enable it
+      # explicitly via @TestPropertySource / @DynamicPropertySource.
+      enabled: false
 
 # Disable the KeycloakHealthIndicator under @SpringBootTest. The test issuer URI
 # (http://keycloak.example.com) is a non-resolvable placeholder; leaving the

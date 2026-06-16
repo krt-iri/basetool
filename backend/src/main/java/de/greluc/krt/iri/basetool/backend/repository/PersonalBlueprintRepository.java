@@ -28,7 +28,9 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -192,4 +194,51 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    */
   @Query("SELECT DISTINCT pb.ownerSub FROM PersonalBlueprint pb")
   Set<String> findAllDistinctOwnerSubs();
+
+  /**
+   * Materialises the admin-curated default blueprints (REQ-INV-016) for a single user: inserts one
+   * {@code personal_blueprint} row per {@code default_blueprint} the user does not yet own. The
+   * {@code ON CONFLICT (owner_sub, product_key) DO NOTHING} makes it idempotent (a re-run, or a
+   * race with the periodic sweep, inserts nothing); {@code version} / {@code created_at} / {@code
+   * updated_at} fall to their column defaults. {@code flushAutomatically} flushes any pending
+   * persistence-context writes first so a default just added in the same transaction is visible.
+   *
+   * @param ownerSub Keycloak {@code sub} (= {@code app_user.id} as text) of the user to provision
+   * @return the number of newly inserted rows
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          INSERT INTO personal_blueprint (id, owner_sub, product_key, product_name, output_item_id)
+          SELECT gen_random_uuid(), :ownerSub, d.product_key, d.product_name, d.output_item_id
+          FROM default_blueprint d
+          ON CONFLICT (owner_sub, product_key) DO NOTHING
+          """,
+      nativeQuery = true)
+  int grantDefaultBlueprintsToUser(@Param("ownerSub") String ownerSub);
+
+  /**
+   * Materialises the admin-curated default blueprints (REQ-INV-016) for every active user in one
+   * statement: a cross join of {@code app_user} (excluding soft-deleted {@code in_keycloak = false}
+   * rows) with {@code default_blueprint}, inserting only the rows a user does not yet own. Backs
+   * the startup backfill, the periodic provisioning sweep, and the post-add grant when an admin
+   * extends the default set. Idempotent via {@code ON CONFLICT}; {@code flushAutomatically} makes a
+   * default just added in the same transaction visible.
+   *
+   * @return the number of newly inserted rows across all users
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          INSERT INTO personal_blueprint (id, owner_sub, product_key, product_name, output_item_id)
+          SELECT gen_random_uuid(), u.id::text, d.product_key, d.product_name, d.output_item_id
+          FROM app_user u
+          CROSS JOIN default_blueprint d
+          WHERE u.in_keycloak = true
+          ON CONFLICT (owner_sub, product_key) DO NOTHING
+          """,
+      nativeQuery = true)
+  int grantDefaultBlueprintsToAllUsers();
 }

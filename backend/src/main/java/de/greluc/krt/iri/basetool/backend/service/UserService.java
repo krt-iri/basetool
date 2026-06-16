@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.event.UserProvisionedEvent;
 import de.greluc.krt.iri.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.backend.model.Role;
 import de.greluc.krt.iri.basetool.backend.model.User;
@@ -44,6 +45,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -88,6 +90,7 @@ public class UserService {
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -198,6 +201,10 @@ public class UserService {
       }
     }
 
+    // A truly new user (no row by id and none by username) is provisioned for the first time; the
+    // post-save event grants their default blueprints after commit (REQ-INV-016).
+    final boolean created = existingUser.isEmpty();
+
     User user =
         existingUser.orElseGet(
             () -> {
@@ -232,7 +239,13 @@ public class UserService {
     }
 
     if (changed || user.isNew()) {
-      return userRepository.save(user);
+      User saved = userRepository.save(user);
+      if (created) {
+        // The id is the Keycloak sub, set before the first save, so it is safe to read here
+        // regardless of what the persistence layer returns.
+        eventPublisher.publishEvent(new UserProvisionedEvent(user.getId()));
+      }
+      return saved;
     }
 
     return user;
@@ -251,15 +264,15 @@ public class UserService {
       return;
     }
 
+    Optional<User> existingUser = userRepository.findById(dto.id());
+    final boolean created = existingUser.isEmpty();
     User user =
-        userRepository
-            .findById(dto.id())
-            .orElseGet(
-                () -> {
-                  User u = new User();
-                  u.setId(dto.id());
-                  return u;
-                });
+        existingUser.orElseGet(
+            () -> {
+              User u = new User();
+              u.setId(dto.id());
+              return u;
+            });
 
     boolean changed = false;
 
@@ -289,6 +302,10 @@ public class UserService {
 
     if (changed || user.isNew()) {
       userRepository.save(user);
+      if (created) {
+        // The id is the Keycloak sub, set before the first save, so it is safe to read here.
+        eventPublisher.publishEvent(new UserProvisionedEvent(user.getId()));
+      }
     }
   }
 
