@@ -20,7 +20,6 @@
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -75,8 +74,8 @@ class DefaultBlueprintsE2eTest {
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     if (STACK.managesStack()) {
-      // Materialises the user row → fires the after-commit provisioning event → grants the
-      // defaults.
+      // Materialises the user row on first login, which grants the default blueprints synchronously
+      // in UserService.syncUser before the call returns.
       new BackendSeeder().getUserId(USERNAME, PASSWORD);
     }
   }
@@ -110,16 +109,14 @@ class DefaultBlueprintsE2eTest {
         E2eSupport.navigate(page, baseUrl + "/personal-inventory/blueprints");
         page.waitForLoadState();
 
-        Locator rows = page.locator("#krt-bp-master-rows .master-row");
-        // The user owns only the granted defaults on a fresh stack, so the first row is a default.
-        assertThat(rows.first())
-            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        assertEquals(
-            "false",
-            rows.first().getAttribute("data-removable"),
-            "an auto-granted default blueprint must be flagged non-removable");
+        // Target an auto-granted default explicitly (data-removable="false") rather than assuming
+        // row order, so the test stays valid even if the user later owns non-default blueprints.
+        Locator defaultRow =
+            page.locator("#krt-bp-master-rows .master-row[data-removable='false']").first();
+        assertThat(defaultRow)
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
 
-        rows.first().click();
+        defaultRow.click();
 
         // The detail pane renders with the edit control but the delete control stays hidden.
         assertThat(page.locator("#krt-bp-detail-edit")).isVisible();
@@ -151,19 +148,20 @@ class DefaultBlueprintsE2eTest {
 
         Locator removeButtons = page.locator("[data-trigger='dbp-open-delete']");
         assertThat(removeButtons.first())
-            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
+        // The set is fully server-rendered on load, so this count is stable here.
         int before = removeButtons.count();
 
-        // Open the confirm modal for the first default, then submit the classic POST→redirect.
+        // Open the confirm modal for the first default, then submit it (the confirm button
+        // JS-submits the row's server-rendered POST form → redirect).
         removeButtons.first().click();
         assertThat(page.locator("#krt-dbp-delete-modal")).isVisible();
-        // The confirm button JS-submits the selected row's server-rendered POST form.
-        Locator submit = page.locator("#krt-dbp-delete-confirm");
-        E2eSupport.clickSubmitClearingFooter(submit);
+        E2eSupport.clickSubmitClearingFooter(page.locator("#krt-dbp-delete-confirm"));
 
-        int after = page.locator("[data-trigger='dbp-open-delete']").count();
-        assertEquals(
-            before - 1, after, "removing a default must drop exactly one entry from the set");
+        // Web-first count assertion: auto-retries until the reloaded set shows one fewer entry, so
+        // it
+        // never races the post-redirect paint (a one-shot count() flakes on WebKit / Firefox).
+        assertThat(page.locator("[data-trigger='dbp-open-delete']")).hasCount(before - 1);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "default-blueprint-admin-remove");
         throw failure;
