@@ -52,19 +52,20 @@ network only.
 
 ### REQ-INGEST-002 — Authentication & authorization
 
-The gateway is a Keycloak JWT resource server. Tokens are issued to a new **public**
-Keycloak client via the **Device Authorization Grant** (RFC 8628) with PKCE and **no client
-secret**. The gateway requires `isAuthenticated()` — no elevated role; any member may
-ingest, mirroring `REQ-REFINERY-011`. Tokens must carry audience `basetool-ingest`; the
-gateway enforces the audience. The forwarded bearer must also be accepted by the backend
-(audience `basetool-backend` once the backend audience check is enabled — see
-REQ-INGEST-008). All data is scoped to the token's `sub`; the gateway never acts for a
-different user.
+The gateway is a Keycloak JWT resource server in the existing realm. Tokens are issued to a
+new **public** Keycloak client (`basetool-sc-extractor`) via the **Device Authorization
+Grant** (RFC 8628) with PKCE and **no client secret**. The gateway requires
+`isAuthenticated()` — no elevated role; any member may ingest, mirroring `REQ-REFINERY-011`.
+The token carries `aud=basetool-backend` (stamped by the dedicated `extractor-ingest` client
+scope, #641); the **same** bearer is forwarded to and accepted by the backend. No separate
+ingest audience is provisioned — the gateway only relays to the backend, so it accepts the
+same `basetool-backend` audience the backend requires. All data is scoped to the token's
+`sub`; the gateway never acts for a different user.
 
 **Acceptance**
 
-- [ ] A request without a valid `basetool-ingest`-audience token is rejected 401/403; no
-  forward happens.
+- [ ] A request without a valid signed realm token (carrying `aud=basetool-backend`) is
+  rejected 401/403; no forward happens.
 - [ ] The device-grant client is public (no secret) and the secret is never embedded in the
   desktop binary or in any committed config.
 - [ ] The handoff staged by an ingest call is readable only under the same `sub`.
@@ -176,10 +177,11 @@ the user's name/email are never logged (project-wide logging rule).
 Direct ingest introduces **no new Keycloak role or Spring authority** — it is
 `isAuthenticated()` end to end (ROLES_AND_PERMISSIONS.md unchanged). The backend remains
 internet-unreachable; only the gateway is published. If/when the backend's opt-in audience
-check (`app.security.jwt.expected-audiences`) is enabled, the `aud=basetool-backend` mapper
-must already be present on **both** the ingest client **and** the existing frontend client,
-or enabling it rejects every frontend token. Turning the check on and adding the mappers
-must therefore happen in that order, in a single coordinated change.
+check (`app.security.jwt.expected-audiences`) is enabled, the `aud=basetool-backend` audience
+mapper must already be emitting on **both** token sets — the new client's `extractor-ingest`
+scope **and** the existing frontend client's scope — or enabling it rejects every frontend
+token. Adding the mappers (and verifying both token sets carry the claim) must therefore
+precede turning the check on, in that order.
 
 **Acceptance**
 

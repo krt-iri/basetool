@@ -51,7 +51,9 @@ does the pre-fill. Concretely:
 
 1. **Gateway module (transport "C3").** A new Spring Boot service on the proxy network with
    its own `nginx-proxy-manager` host (e.g. `ingest.profit-base.online`). It is a JWT
-   resource server validating Keycloak tokens with audience `basetool-ingest`. It exposes
+   resource server in the existing realm; it accepts the same `aud=basetool-backend` token
+   the backend requires (no separate ingest audience is provisioned — the gateway only
+   relays to the backend). It exposes
    **exactly two forward-only endpoints** — one per existing import (refinery-extract,
    blueprint-preview). Each endpoint: validates the bearer, **forwards the same bearer** to
    the corresponding internal backend import endpoint over the internal network, stages the
@@ -61,10 +63,11 @@ does the pre-fill. Concretely:
    internet-unreachable; only this tiny new surface is published.
 
 2. **Auth = Device Authorization Grant, public client.** A new public Keycloak client
-   (`basetool-ingest-desktop`) with PKCE and no secret, device-grant enabled. The extractor
-   runs the device flow; under an existing browser SSO session the user approves with one
-   click. The token's audience includes `basetool-ingest` (gateway) — and, when the backend
-   audience check is later enabled, `basetool-backend` so the forwarded bearer is accepted.
+   (`basetool-sc-extractor`) with PKCE and no secret, device-grant enabled, ROPC and service
+   accounts disabled. The extractor runs the device flow; under an existing browser SSO
+   session the user approves with one click. A dedicated `extractor-ingest` client scope
+   carries an Audience mapper that stamps `aud=basetool-backend` on the access token, so the
+   forwarded bearer is accepted once the backend audience check is enabled (#641).
 
 3. **Browser handoff via the existing frontend + review form.** The extractor opens
    `https://<frontend>/refinery-orders/create?handoff=<id>` (and the blueprint equivalent).
@@ -93,10 +96,11 @@ does the pre-fill. Concretely:
   and rate limits mirrored from the existing frontend proxy; refresh-token rotation +
   reuse-detection for remember-me.
 - **Audience-validator sequencing trap.** The backend's `app.security.jwt.expected-audiences`
-  check is currently off. Before it is ever switched on, the `aud=basetool-backend` mapper
-  must be added to **both** the new ingest client **and** the existing frontend client —
-  otherwise enabling the check rejects every frontend token and breaks the app. This
-  ordering is a tracked task in the Keycloak sub-issue (#641).
+  check is currently off. Before it is ever switched on, the `aud=basetool-backend` audience
+  mapper must already be emitting on **both** token sets — the new client's `extractor-ingest`
+  scope **and** the existing frontend client's scope — and both verified to carry the claim;
+  otherwise enabling the check rejects every frontend token and breaks the app. This ordering
+  is a tracked task in the Keycloak sub-issue (#641).
 - **Egress becomes opt-in, not automatic.** The extractor only ever transmits when the user
   clicks Send; the CLI / offline mode never transmits. The extractor's "nothing leaves your
   machine" documentation must be reconciled to "until you choose to send it" (#646).
