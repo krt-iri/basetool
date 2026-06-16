@@ -25,12 +25,6 @@
     const deleteForm = document.getElementById('krt-dbp-delete-form');
     const deleteMessage = document.getElementById('krt-dbp-delete-message');
 
-    function esc(value) {
-        const div = document.createElement('div');
-        div.textContent = value == null ? '' : String(value);
-        return div.innerHTML;
-    }
-
     function debounce(fn, wait) {
         let timer = null;
         return function () {
@@ -42,20 +36,29 @@
         };
     }
 
+    function str(value) {
+        return value == null ? '' : String(value);
+    }
+
     /* ------------------------------------------------------------- type-ahead */
 
     function hideResults() {
         if (resultsEl) {
             resultsEl.hidden = true;
-            resultsEl.innerHTML = '';
+            resultsEl.replaceChildren();
         }
     }
 
+    // Builds nodes with the DOM API (textContent) rather than innerHTML, so untrusted product
+    // names from the search response can never be reinterpreted as HTML (CodeQL js/xss-through-dom).
     function renderMessage(text) {
         if (!resultsEl) {
             return;
         }
-        resultsEl.innerHTML = '<div class="krt-pi-typeahead-empty">' + esc(text) + '</div>';
+        const empty = document.createElement('div');
+        empty.className = 'krt-pi-typeahead-empty';
+        empty.textContent = str(text);
+        resultsEl.replaceChildren(empty);
         resultsEl.hidden = false;
     }
 
@@ -67,37 +70,36 @@
             renderMessage(i18n.noResults || 'Keine Treffer');
             return;
         }
-        const html = items
-            .map(function (item) {
-                const isDefault = defaultKeys.has(item.productKey);
-                const isStaged = staged.has(item.productKey);
-                const disabled = isDefault || isStaged;
-                const tag = isDefault ? ' · ' + esc(i18n.alreadyDefault || 'Bereits Standard') : '';
-                const variants =
-                    item.variantCount > 1
-                        ? ' <span class="krt-pi-typeahead-variants">(' +
-                          item.variantCount +
-                          ' ' +
-                          esc(i18n.variants || 'Varianten') +
-                          ')</span>'
-                        : '';
-                return (
-                    '<button type="button" class="krt-pi-typeahead-item"' +
-                    (disabled ? ' disabled' : '') +
-                    ' data-key="' +
-                    esc(item.productKey) +
-                    '" data-name="' +
-                    esc(item.name) +
-                    '"><span>' +
-                    esc(item.name) +
-                    variants +
-                    '</span><span class="krt-pi-typeahead-tag">' +
-                    tag +
-                    '</span></button>'
-                );
-            })
-            .join('');
-        resultsEl.innerHTML = html;
+        resultsEl.replaceChildren();
+        items.forEach(function (item) {
+            const isDefault = defaultKeys.has(item.productKey);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'krt-pi-typeahead-item';
+            button.disabled = isDefault || staged.has(item.productKey);
+            button.setAttribute('data-key', str(item.productKey));
+            button.setAttribute('data-name', str(item.name));
+
+            const label = document.createElement('span');
+            label.textContent = str(item.name);
+            if (item.variantCount > 1) {
+                const variants = document.createElement('span');
+                variants.className = 'krt-pi-typeahead-variants';
+                variants.textContent =
+                    ' (' + item.variantCount + ' ' + (i18n.variants || 'Varianten') + ')';
+                label.appendChild(variants);
+            }
+            button.appendChild(label);
+
+            const tag = document.createElement('span');
+            tag.className = 'krt-pi-typeahead-tag';
+            if (isDefault) {
+                tag.textContent = ' · ' + (i18n.alreadyDefault || 'Bereits Standard');
+            }
+            button.appendChild(tag);
+
+            resultsEl.appendChild(button);
+        });
         resultsEl.hidden = false;
     }
 
@@ -142,19 +144,30 @@
         const chip = document.createElement('span');
         chip.className = 'krt-bp-chip';
         chip.setAttribute('data-key', key);
-        chip.innerHTML =
-            '<span class="krt-bp-chip-label">' +
-            esc(name || key) +
-            '</span>' +
-            '<button type="button" class="krt-bp-chip-remove" aria-label="x">&times;</button>' +
-            '<input type="hidden" name="productKeys" value="' +
-            esc(key) +
-            '">';
-        chip.querySelector('.krt-bp-chip-remove').addEventListener('click', function () {
+
+        const label = document.createElement('span');
+        label.className = 'krt-bp-chip-label';
+        label.textContent = str(name || key);
+        chip.appendChild(label);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'krt-bp-chip-remove';
+        removeBtn.setAttribute('aria-label', 'x');
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', function () {
             staged.delete(key);
             chip.remove();
             refreshStagingEmptyState();
         });
+        chip.appendChild(removeBtn);
+
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'productKeys';
+        hidden.value = key;
+        chip.appendChild(hidden);
+
         stagingList.appendChild(chip);
         refreshStagingEmptyState();
     }
