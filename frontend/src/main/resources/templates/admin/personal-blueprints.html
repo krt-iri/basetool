@@ -132,6 +132,7 @@
                                         th:title="#{personalInventory.blueprints.action.editNote}"
                                         th:aria-label="#{personalInventory.blueprints.action.editNote}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                                 <button type="button" class="btn btn-quiet-danger btn-icon"
+                                        th:if="${bp.removable}"
                                         data-trigger="bp-open-delete"
                                         th:attr="data-id=${bp.id},
                                                  data-name=${bp.productName}"

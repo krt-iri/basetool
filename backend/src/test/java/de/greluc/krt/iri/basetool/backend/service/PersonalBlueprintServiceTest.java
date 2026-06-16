@@ -24,11 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.iri.basetool.backend.mapper.PersonalBlueprintMapper;
 import de.greluc.krt.iri.basetool.backend.model.GameItem;
@@ -67,6 +69,7 @@ class PersonalBlueprintServiceTest {
   @Mock private PersonalBlueprintMapper mapper;
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private GameItemRepository gameItemRepository;
+  @Mock private DefaultBlueprintKeyService defaultBlueprintKeyService;
 
   private PersonalBlueprintService service;
 
@@ -74,20 +77,24 @@ class PersonalBlueprintServiceTest {
   void setUp() {
     service =
         new PersonalBlueprintService(
-            repository, mapper, blueprintProductService, gameItemRepository);
+            repository,
+            mapper,
+            blueprintProductService,
+            gameItemRepository,
+            defaultBlueprintKeyService);
   }
 
   private static PersonalBlueprintResponse sampleResponse() {
     Instant now = Instant.parse("2026-01-01T00:00:00Z");
     return new PersonalBlueprintResponse(
-        UUID.randomUUID(), "k", "Name", null, null, null, 0L, now, now);
+        UUID.randomUUID(), "k", "Name", null, null, null, true, 0L, now, now);
   }
 
   @Test
   void listOwn_blankQuery_usesUnfilteredOwnerLookup() {
     PersonalBlueprint entity = PersonalBlueprint.builder().productKey("k").build();
     when(repository.findAllByOwnerSub(eq(SUB), any())).thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toResponse(entity)).thenReturn(sampleResponse());
+    when(mapper.toResponse(eq(entity), anyBoolean())).thenReturn(sampleResponse());
 
     var page = service.listOwn(SUB, "  ", PageRequest.of(0, 10));
 
@@ -112,7 +119,7 @@ class PersonalBlueprintServiceTest {
         .thenReturn(Optional.of(new ResolvedProduct("k", "Arclight Pistol", null)));
     when(repository.existsByOwnerSubAndProductKey(SUB, "k")).thenReturn(false);
     when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(mapper.toResponse(any())).thenReturn(sampleResponse());
+    when(mapper.toResponse(any(), anyBoolean())).thenReturn(sampleResponse());
 
     Instant acquired = Instant.parse("2026-02-03T00:00:00Z");
     service.add(SUB, new PersonalBlueprintCreateRequest("k", acquired, "note"));
@@ -136,7 +143,7 @@ class PersonalBlueprintServiceTest {
     when(repository.existsByOwnerSubAndProductKey(SUB, "k")).thenReturn(false);
     when(gameItemRepository.getReferenceById(itemId)).thenReturn(ref);
     when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(mapper.toResponse(any())).thenReturn(sampleResponse());
+    when(mapper.toResponse(any(), anyBoolean())).thenReturn(sampleResponse());
 
     service.add(SUB, new PersonalBlueprintCreateRequest("k", null, null));
 
@@ -196,7 +203,7 @@ class PersonalBlueprintServiceTest {
     entity.setVersion(3L);
     when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
     when(repository.save(entity)).thenReturn(entity);
-    when(mapper.toResponse(entity)).thenReturn(sampleResponse());
+    when(mapper.toResponse(eq(entity), anyBoolean())).thenReturn(sampleResponse());
 
     Instant acquired = Instant.parse("2026-03-04T00:00:00Z");
     service.update(SUB, id, new PersonalBlueprintUpdateRequest(acquired, "edited", 3L));
@@ -246,6 +253,18 @@ class PersonalBlueprintServiceTest {
     when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.empty());
 
     assertThrows(EntityNotFoundException.class, () -> service.delete(SUB, id));
+  }
+
+  @Test
+  void delete_throwsConflict_andDoesNotDelete_whenEntryIsDefault() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder().id(id).ownerSub(SUB).productKey("s-38 pistol").build();
+    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+    when(defaultBlueprintKeyService.isDefault("s-38 pistol")).thenReturn(true);
+
+    assertThrows(BusinessConflictException.class, () -> service.delete(SUB, id));
+    verify(repository, never()).delete(any());
   }
 
   @Test
@@ -314,7 +333,7 @@ class PersonalBlueprintServiceTest {
     entity.setVersion(5L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(repository.save(entity)).thenReturn(entity);
-    when(mapper.toResponse(entity)).thenReturn(sampleResponse());
+    when(mapper.toResponse(eq(entity), anyBoolean())).thenReturn(sampleResponse());
 
     service.updateForUser(id, new PersonalBlueprintUpdateRequest(null, "edited", 5L));
 
@@ -349,5 +368,17 @@ class PersonalBlueprintServiceTest {
     when(repository.findById(id)).thenReturn(Optional.empty());
 
     assertThrows(EntityNotFoundException.class, () -> service.deleteForUser(id));
+  }
+
+  @Test
+  void deleteForUser_throwsConflict_andDoesNotDelete_whenEntryIsDefault() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder().id(id).ownerSub("other-user").productKey("p4-ar rifle").build();
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(defaultBlueprintKeyService.isDefault("p4-ar rifle")).thenReturn(true);
+
+    assertThrows(BusinessConflictException.class, () -> service.deleteForUser(id));
+    verify(repository, never()).delete(any());
   }
 }

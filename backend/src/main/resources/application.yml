@@ -129,6 +129,13 @@ app:
       enabled: ${APP_NOTIFICATIONS_RETENTION_ENABLED:true}
       max-age: ${APP_NOTIFICATIONS_RETENTION_MAX_AGE:P90D}
       interval: ${APP_NOTIFICATIONS_RETENTION_INTERVAL:PT24H}
+  default-blueprints:
+    provisioning:
+      # One-time seed of the starter default blueprints + idempotent backfill/sweep that keeps the
+      # "always present" guarantee (REQ-INV-016) true. Disabling stops both the startup bootstrap
+      # and the periodic sweep; the first-login grant still runs. Disable or retune per environment.
+      enabled: ${APP_DEFAULT_BLUEPRINTS_PROVISIONING_ENABLED:true}
+      interval: ${APP_DEFAULT_BLUEPRINTS_PROVISIONING_INTERVAL:PT1H}
   rate-limit:
     enabled: true
     paths:

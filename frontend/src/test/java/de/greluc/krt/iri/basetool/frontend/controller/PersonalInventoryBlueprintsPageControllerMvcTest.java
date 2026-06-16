@@ -81,6 +81,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
             null,
             Instant.parse("2026-01-01T00:00:00Z"),
             "note",
+            true,
             0L,
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-01-01T00:00:00Z"));
@@ -115,6 +116,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
             null,
             Instant.parse("2026-01-01T00:00:00Z"),
             "note",
+            true,
             0L,
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-01-01T00:00:00Z"));

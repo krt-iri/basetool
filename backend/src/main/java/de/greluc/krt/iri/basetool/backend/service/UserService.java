@@ -88,6 +88,7 @@ public class UserService {
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
+  private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -198,6 +199,10 @@ public class UserService {
       }
     }
 
+    // A truly new user (no row by id and none by username) is provisioned for the first time; the
+    // post-save event grants their default blueprints after commit (REQ-INV-016).
+    final boolean created = existingUser.isEmpty();
+
     User user =
         existingUser.orElseGet(
             () -> {
@@ -232,7 +237,16 @@ public class UserService {
     }
 
     if (changed || user.isNew()) {
-      return userRepository.save(user);
+      User saved = userRepository.save(user);
+      if (created) {
+        // Grant the default blueprints in THIS transaction so a brand-new user has them committed
+        // before the request returns (REQ-INV-016). The grant is an idempotent bulk INSERT … ON
+        // CONFLICT touching only personal_blueprint (never the app_user row), so it neither bumps
+        // the user's @Version nor collides with the converter's retry. The id is the Keycloak sub,
+        // set before the first save.
+        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
+      }
+      return saved;
     }
 
     return user;
@@ -251,15 +265,15 @@ public class UserService {
       return;
     }
 
+    Optional<User> existingUser = userRepository.findById(dto.id());
+    final boolean created = existingUser.isEmpty();
     User user =
-        userRepository
-            .findById(dto.id())
-            .orElseGet(
-                () -> {
-                  User u = new User();
-                  u.setId(dto.id());
-                  return u;
-                });
+        existingUser.orElseGet(
+            () -> {
+              User u = new User();
+              u.setId(dto.id());
+              return u;
+            });
 
     boolean changed = false;
 
@@ -289,6 +303,10 @@ public class UserService {
 
     if (changed || user.isNew()) {
       userRepository.save(user);
+      if (created) {
+        // Grant the default blueprints synchronously on first creation (REQ-INV-016); idempotent.
+        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
+      }
     }
   }
 

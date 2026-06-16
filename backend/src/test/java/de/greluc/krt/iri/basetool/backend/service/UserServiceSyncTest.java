@@ -95,6 +95,7 @@ class UserServiceSyncTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
 
   @InjectMocks private UserService userService;
 
@@ -164,6 +165,8 @@ class UserServiceSyncTest {
       assertEquals(1, result.getRoles().size());
       assertEquals("Guest", result.getRoles().iterator().next().getName());
       verify(userRepository, times(1)).save(any(User.class));
+      // A brand-new user is granted the default blueprints synchronously (REQ-INV-016).
+      verify(defaultBlueprintProvisioningService).grantDefaultsToUser(USER_ID.toString());
     }
 
     @Test
@@ -210,6 +213,8 @@ class UserServiceSyncTest {
 
       assertSame(existing, result);
       verify(userRepository, never()).save(any(User.class));
+      // An already-known user is never re-granted the defaults.
+      verify(defaultBlueprintProvisioningService, never()).grantDefaultsToUser(any());
     }
 
     @Test

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.iri.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.iri.basetool.backend.mapper.PersonalBlueprintMapper;
 import de.greluc.krt.iri.basetool.backend.model.PersonalBlueprint;
@@ -75,6 +76,7 @@ public class PersonalBlueprintService {
   private final PersonalBlueprintMapper mapper;
   private final BlueprintProductService blueprintProductService;
   private final GameItemRepository gameItemRepository;
+  private final DefaultBlueprintKeyService defaultBlueprintKeyService;
 
   /**
    * Owner-scoped paged list of owned blueprints, optionally filtered by a case-insensitive product
@@ -92,7 +94,7 @@ public class PersonalBlueprintService {
             ? repository.findAllByOwnerSub(ownerSub, pageable)
             : repository.findAllByOwnerSubAndProductNameContainingIgnoreCase(
                 ownerSub, query.trim(), pageable);
-    return page.map(mapper::toResponse);
+    return page.map(this::toResponse);
   }
 
   /**
@@ -126,7 +128,7 @@ public class PersonalBlueprintService {
         saved.getId(),
         product.productKey(),
         ownerSub);
-    return mapper.toResponse(saved);
+    return toResponse(saved);
   }
 
   /**
@@ -200,6 +202,7 @@ public class PersonalBlueprintService {
   @Transactional
   public void delete(@NotNull String ownerSub, @NotNull UUID id) {
     PersonalBlueprint entity = loadOwn(ownerSub, id);
+    requireRemovable(entity);
     repository.delete(entity);
     log.info("Deleted personal blueprint id={} ownerSub={}", id, ownerSub);
   }
@@ -313,6 +316,7 @@ public class PersonalBlueprintService {
         repository
             .findById(id)
             .orElseThrow(() -> new EntityNotFoundException("PersonalBlueprint not found: " + id));
+    requireRemovable(entity);
     repository.delete(entity);
     log.info("Admin deleted blueprint id={} ownerSub={}", id, entity.getOwnerSub());
   }
@@ -335,7 +339,34 @@ public class PersonalBlueprintService {
     }
     entity.setAcquiredAt(request.acquiredAt());
     entity.setNote(request.note());
-    return mapper.toResponse(repository.save(entity));
+    return toResponse(repository.save(entity));
+  }
+
+  /**
+   * Maps an owned blueprint to its response DTO, computing the {@code removable} flag from the
+   * cached default-blueprint key set: a default blueprint (REQ-INV-016) is non-removable so the UI
+   * can hide its delete control.
+   *
+   * @param entity the owned blueprint
+   * @return the response DTO with {@code removable} populated
+   */
+  @NotNull
+  private PersonalBlueprintResponse toResponse(@NotNull PersonalBlueprint entity) {
+    return mapper.toResponse(entity, !defaultBlueprintKeyService.isDefault(entity.getProductKey()));
+  }
+
+  /**
+   * Guards a delete: refuses to remove an owned blueprint whose product is in the default set
+   * (REQ-INV-016). The frontend already hides the delete control for these, so this is the
+   * server-side enforcement for a hand-crafted request.
+   *
+   * @param entity the owned blueprint about to be deleted
+   * @throws BusinessConflictException when the entry is an auto-granted default
+   */
+  private void requireRemovable(@NotNull PersonalBlueprint entity) {
+    if (defaultBlueprintKeyService.isDefault(entity.getProductKey())) {
+      throw new BusinessConflictException("error.personalBlueprint.defaultNotRemovable");
+    }
   }
 
   /**

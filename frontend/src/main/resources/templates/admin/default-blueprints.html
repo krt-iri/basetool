@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.defaultBlueprints.title}">Admin: Standard-Blueprints</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/personal-inventory.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span><span></span><span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="krt-admin-banner" th:text="#{admin.defaultBlueprints.bannerMode}">ADMIN MODE</div>
+
+    <div class="greeting hud-box krt-personal-inventory-header">
+        <h1 th:text="#{admin.defaultBlueprints.title}">Admin: Standard-Blueprints</h1>
+        <p class="krt-subtitle" th:text="#{admin.defaultBlueprints.subtitle}">Standard-Blueprints verwalten</p>
+    </div>
+
+    <!-- Add bar -->
+    <div class="hud-box krt-personal-inventory mt-2">
+        <h2 class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.add.heading}">Standard-Blueprint hinzuf&uuml;gen</h2>
+
+        <div class="form-group krt-pi-typeahead krt-bp-search">
+            <label for="krt-dbp-search-input" th:text="#{admin.defaultBlueprints.add.search}">Blueprints suchen</label>
+            <input id="krt-dbp-search-input" type="text" autocomplete="off"
+                   th:placeholder="#{admin.defaultBlueprints.add.searchPlaceholder}">
+            <div id="krt-dbp-search-results" class="krt-pi-typeahead-results" hidden></div>
+        </div>
+
+        <form id="krt-dbp-add-form" th:action="@{/admin/default-blueprints/add}" method="post">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <div class="krt-bp-staging">
+                <span class="krt-bp-staging-label" th:text="#{admin.defaultBlueprints.add.selectedHeading}">Auswahl</span>
+                <div id="krt-dbp-staging-list" class="krt-bp-chip-list"
+                     th:attr="data-empty-text=#{admin.defaultBlueprints.add.empty}">
+                    <span class="krt-bp-staging-empty" th:text="#{admin.defaultBlueprints.add.empty}">Noch nichts ausgew&auml;hlt.</span>
+                </div>
+                <div class="krt-pi-modal-actions">
+                    <button type="submit" id="krt-dbp-add-submit" class="btn btn--cta" disabled
+                            th:text="#{admin.defaultBlueprints.add.submit}">Auswahl hinzuf&uuml;gen</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Current default set -->
+    <div class="hud-box krt-personal-inventory mt-2">
+        <h2 class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.list.heading}">Aktuelle Standard-Blueprints</h2>
+        <div class="table-responsive krt-pi-table-wrapper">
+            <table class="krt-table krt-pi-table">
+                <thead>
+                <tr>
+                    <th th:text="#{admin.defaultBlueprints.table.product}">Produkt</th>
+                    <th th:text="#{admin.defaultBlueprints.table.actions}">Aktionen</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:if="${#lists.isEmpty(defaults)}">
+                    <td colspan="2" class="krt-pi-empty" th:text="#{admin.defaultBlueprints.empty}">Keine Standard-Blueprints.</td>
+                </tr>
+                <tr th:each="d : ${defaults}">
+                    <td th:text="${d.productName}">Produkt</td>
+                    <td>
+                        <!-- Per-row server-rendered POST form: the action is baked by Thymeleaf and
+                             never touched by JS, so no URL flows from the DOM into a form action
+                             (avoids the CodeQL js/xss-through-dom sink). The remove button opens the
+                             shared confirm modal, whose confirm submits THIS form by element id. -->
+                        <form th:id="${'krt-dbp-del-' + d.id}"
+                              th:action="@{/admin/default-blueprints/{id}/delete(id=${d.id})}"
+                              method="post" class="krt-dbp-del-form">
+                            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                            <button type="button" class="btn btn-quiet-danger btn-icon"
+                                    data-trigger="dbp-open-delete"
+                                    th:attr="data-form=${'krt-dbp-del-' + d.id},
+                                             data-name=${d.productName}"
+                                    th:title="#{admin.defaultBlueprints.action.remove}"
+                                    th:aria-label="#{admin.defaultBlueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<!-- Remove confirmation modal -->
+<div id="krt-dbp-delete-modal" class="modal" style="display:none;">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="dbp-close-delete">&times;</span>
+        <h2 th:text="#{admin.defaultBlueprints.modal.remove.title}">Standard-Blueprint entfernen</h2>
+        <p id="krt-dbp-delete-message" th:text="#{admin.defaultBlueprints.modal.remove.body}">Wirklich entfernen?</p>
+        <div class="krt-pi-modal-actions">
+            <button type="button" id="krt-dbp-delete-confirm" class="btn krt-danger" th:text="#{admin.defaultBlueprints.action.remove}">Entfernen</button>
+            <button type="button" class="btn btn-ghost" data-trigger="dbp-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    /*<![CDATA[*/
+    window.krtDefaultBlueprints = {
+        searchUrl: /*[[@{/admin/default-blueprints/search}]]*/ '/admin/default-blueprints/search',
+        defaultKeys: /*[[${defaults.![productKey]}]]*/ [],
+        i18n: {
+            searching:      /*[[#{admin.defaultBlueprints.searching}]]*/      'Suche...',
+            noResults:      /*[[#{admin.defaultBlueprints.noResults}]]*/      'Keine Treffer',
+            alreadyDefault: /*[[#{admin.defaultBlueprints.add.alreadyDefault}]]*/ 'Bereits Standard',
+            variants:       /*[[#{admin.defaultBlueprints.add.variants}]]*/   'Varianten',
+            removeBody:     /*[[#{admin.defaultBlueprints.modal.remove.body}]]*/ 'Wirklich entfernen?'
+        }
+    };
+    /*]]>*/
+</script>
+<script th:src="@{/js/admin-default-blueprints.js}" th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>
