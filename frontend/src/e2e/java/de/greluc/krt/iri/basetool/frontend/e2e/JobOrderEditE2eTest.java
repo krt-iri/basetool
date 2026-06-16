@@ -122,7 +122,7 @@ class JobOrderEditE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/orders/" + jobOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
 
         // The edit button toggles the LOGISTICIAN-gated modal open via the global modal delegation;
         // the controller pre-fills the form, but the material <select> is built from a

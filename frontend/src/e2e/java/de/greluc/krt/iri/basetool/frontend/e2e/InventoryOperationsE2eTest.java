@@ -215,7 +215,7 @@ class InventoryOperationsE2eTest {
     runFlow(
         "inventory-einbuchen",
         page -> {
-          page.navigate(STACK.baseUrl() + "/inventory/input?source=my");
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
           page.locator("#materialId").selectOption(new SelectOption().setIndex(1));
@@ -445,7 +445,7 @@ class InventoryOperationsE2eTest {
     runFlow(
         "inventory-personal-assignment",
         page -> {
-          page.navigate(STACK.baseUrl() + "/inventory/input?source=my");
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
           page.locator("#materialId").selectOption(new SelectOption().setIndex(1));
@@ -527,7 +527,7 @@ class InventoryOperationsE2eTest {
    * @param itemId the seeded inventory item id whose leaf row signals the entries loaded
    */
   private static void openMyInventoryToEntry(Page page, String materialId, String itemId) {
-    page.navigate(STACK.baseUrl() + "/inventory/my");
+    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/my");
     page.waitForLoadState();
     page.locator("div.tree-row--group[data-material-id='" + materialId + "']").click();
     page.locator("div.stack-header[data-material-id='" + materialId + "']").click();

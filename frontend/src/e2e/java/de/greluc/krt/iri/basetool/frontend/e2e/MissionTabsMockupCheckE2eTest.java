@@ -91,7 +91,7 @@ class MissionTabsMockupCheckE2eTest {
       E2eSupport.login(page, baseUrl, "test-admin", "test-admin-pw");
 
       for (String tab : new String[] {"ueb", "crew", "fin", "verw"}) {
-        page.navigate(baseUrl + "/missions/" + missionId + "?tab=" + tab);
+        E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=" + tab);
         page.waitForLoadState();
         page.waitForTimeout(800);
         page.screenshot(
@@ -101,7 +101,7 @@ class MissionTabsMockupCheckE2eTest {
       }
 
       // Probe the chip-select rendering on the crew board.
-      page.navigate(baseUrl + "/missions/" + missionId + "?tab=crew");
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       Locator chip = page.locator(".crew-role-select").first();
       if (chip.count() > 0) {
@@ -117,7 +117,7 @@ class MissionTabsMockupCheckE2eTest {
       }
 
       // Finance pane probe: which mock sections rendered for an admin?
-      page.navigate(baseUrl + "/missions/" + missionId + "?tab=fin");
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
       page.waitForLoadState();
       Object finProbe =
           page.evaluate(
@@ -129,7 +129,7 @@ class MissionTabsMockupCheckE2eTest {
       System.out.println("[mockup-check] fin probe: " + finProbe);
 
       // One real drag&drop: first pool row onto the first unit zone.
-      page.navigate(baseUrl + "/missions/" + missionId + "?tab=crew");
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       int poolBefore = page.locator("#board-pool .person-row").count();
       System.out.println("[mockup-check] pool rows before drag: " + poolBefore);
@@ -138,7 +138,7 @@ class MissionTabsMockupCheckE2eTest {
             .first()
             .dragTo(page.locator(".board-units .drop-zone").first());
         page.waitForTimeout(2500);
-        page.navigate(baseUrl + "/missions/" + missionId + "?tab=crew");
+        E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
         page.waitForLoadState();
         int poolAfter = page.locator("#board-pool .person-row").count();
         System.out.println("[mockup-check] pool rows after drag: " + poolAfter);

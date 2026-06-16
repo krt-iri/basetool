@@ -120,7 +120,7 @@ class OrgChartPositionCrudE2eTest {
     try (BrowserContext context = authedContext()) {
       Page page = context.newPage();
       try {
-        page.navigate(STACK.baseUrl() + "/org-chart");
+        E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
         clearAllKommandos(page);
 
         // CREATE
@@ -159,7 +159,7 @@ class OrgChartPositionCrudE2eTest {
     try (BrowserContext context = authedContext()) {
       Page page = context.newPage();
       try {
-        page.navigate(STACK.baseUrl() + "/org-chart");
+        E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
         clearAllKommandos(page);
 
         createLeaderlessKommando(page, "E2E CRUD Lead");

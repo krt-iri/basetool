@@ -124,7 +124,7 @@ class CrossStaffelHandoverE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
-        page.navigate(baseUrl + "/orders/" + jobOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
 
         page.waitForResponse(
             response ->

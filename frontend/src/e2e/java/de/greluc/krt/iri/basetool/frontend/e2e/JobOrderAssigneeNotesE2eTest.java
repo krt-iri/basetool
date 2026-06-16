@@ -121,7 +121,7 @@ class JobOrderAssigneeNotesE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(detailUrl);
+        E2eSupport.navigate(page, detailUrl);
 
         // 1) Enroll self (AJAX POST /orders/{id}/assignees, no reload).
         page.waitForResponse(

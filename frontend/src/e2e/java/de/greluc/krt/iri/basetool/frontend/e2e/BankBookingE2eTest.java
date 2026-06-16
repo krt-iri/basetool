@@ -275,6 +275,10 @@ class BankBookingE2eTest {
     page.locator("[data-testid='bank-deposit-holder']").selectOption(uiHolderId);
     page.waitForResponse(
         r -> r.url().contains("/api/proxy/bank/deposits") && "POST".equals(r.request().method()),
+        // 60 s (above the 30 s default): the deposit's proxied XHR round-trip can outrun 30 s on a
+        // contended CI runner (the Firefox-only flake window), timing out an otherwise-correct
+        // POST.
+        new Page.WaitForResponseOptions().setTimeout(60_000),
         () -> page.locator("[data-testid='bank-deposit-submit']").click());
     // The accountBody swap repaints the facts strip; wait for the balance text to actually change
     // so

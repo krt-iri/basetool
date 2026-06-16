@@ -133,7 +133,7 @@ class AnonymousJobOrderE2eTest {
     try (BrowserContext context = anonymousContext()) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/orders/create");
+        E2eSupport.navigate(page, baseUrl + "/orders/create");
 
         // Requesting picker offers every active org unit, including the non-profit SK.
         assertThat(page.locator("#requestingOrgUnitId option[value='" + nonProfitSkId + "']"))
@@ -185,7 +185,7 @@ class AnonymousJobOrderE2eTest {
     try (BrowserContext context = anonymousContext()) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/orders/create");
+        E2eSupport.navigate(page, baseUrl + "/orders/create");
         page.getByTestId("order-mode-item").check();
 
         // The item form's responsible picker is pre-selected to the configured intake SK.

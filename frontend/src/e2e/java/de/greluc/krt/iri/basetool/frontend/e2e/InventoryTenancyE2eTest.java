@@ -396,7 +396,7 @@ class InventoryTenancyE2eTest {
         browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/inventory/all");
+        E2eSupport.navigate(page, baseUrl + "/inventory/all");
         page.waitForLoadState();
         // An anonymous request to a protected Lager page lands on the public landing page carrying
         // the OIDC login affordance (not the Keycloak form directly), and the protected Lager table

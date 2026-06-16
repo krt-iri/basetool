@@ -113,7 +113,7 @@ class InventoryStackViewE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + "/inventory/all");
+        E2eSupport.navigate(page, baseUrl + "/inventory/all");
         page.waitForLoadState();
         // Before the LEFT-JOIN fix the grouped table came back empty ("Keine Einträge gefunden"),
         // so no group row existed; the seeded material's tree-row--group must now be present.

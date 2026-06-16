@@ -156,7 +156,7 @@ class JobOrderTenancyE2eTest {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
         // scope=all returns the caller's natural cross-staffel union (own squadron + SK-public),
         // unfiltered by the "mine" active-squadron narrowing.
-        page.navigate(baseUrl + "/orders?scope=all&status=OPEN");
+        E2eSupport.navigate(page, baseUrl + "/orders?scope=all&status=OPEN");
         page.waitForLoadState();
         assertThat(page.getByTestId("nav-logout")).isVisible();
 
@@ -189,13 +189,13 @@ class JobOrderTenancyE2eTest {
 
         // The list redirects to the create form — asserting the create-only mode toggle is a
         // locale-independent proof we landed there.
-        page.navigate(baseUrl + "/orders");
+        E2eSupport.navigate(page, baseUrl + "/orders");
         page.waitForLoadState();
         assertThat(page.getByTestId("order-mode-material")).isVisible();
 
         // A direct SK-public order link redirects the same way: the profit gate short-circuits
         // before any per-order visibility is even considered.
-        page.navigate(baseUrl + "/orders/" + skOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + skOrderId);
         page.waitForLoadState();
         assertThat(page.getByTestId("order-mode-material")).isVisible();
       } catch (RuntimeException | AssertionError failure) {

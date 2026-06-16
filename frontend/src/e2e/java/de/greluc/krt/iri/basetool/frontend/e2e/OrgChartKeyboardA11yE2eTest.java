@@ -117,7 +117,7 @@ class OrgChartKeyboardA11yE2eTest {
     try (BrowserContext context = authedContext(1280, 800)) {
       Page page = context.newPage();
       try {
-        page.navigate(STACK.baseUrl() + "/org-chart");
+        E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
         // The roving init runs in the end-of-body script; wait until a node is actually tabbable
         // rather than merely present, so the assertions below never race the initialisation.
         page.waitForSelector(TABBABLE_ITEM);
@@ -169,7 +169,7 @@ class OrgChartKeyboardA11yE2eTest {
     try (BrowserContext context = authedContext(1280, 800)) {
       Page page = context.newPage();
       try {
-        page.navigate(STACK.baseUrl() + "/org-chart");
+        E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
         enterEditMode(page);
 
         // The "Stab hinzufügen" button is always present for an admin and opens the dialog with
@@ -239,7 +239,7 @@ class OrgChartKeyboardA11yE2eTest {
     try (BrowserContext context = authedContext(500, 900)) {
       Page page = context.newPage();
       try {
-        page.navigate(STACK.baseUrl() + "/org-chart");
+        E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
 
         // Always create at least one leaderless Kommando (so a renameable node exists for the
         // oc-rename step below), then keep adding — up to the 4/Staffel cap — until the chart

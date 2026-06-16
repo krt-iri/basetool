@@ -88,7 +88,7 @@ class ItemsMockupCheckE2eTest {
 
       E2eSupport.login(page, baseUrl, "test-admin", "test-admin-pw");
 
-      page.navigate(baseUrl + "/personal-inventory");
+      E2eSupport.navigate(page, baseUrl + "/personal-inventory");
       page.waitForLoadState();
       page.waitForTimeout(500);
       Object probe =

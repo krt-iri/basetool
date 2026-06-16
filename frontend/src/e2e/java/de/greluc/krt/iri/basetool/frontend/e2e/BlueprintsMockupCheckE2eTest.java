@@ -88,7 +88,7 @@ class BlueprintsMockupCheckE2eTest {
 
       E2eSupport.login(page, baseUrl, "test-admin", "test-admin-pw");
 
-      page.navigate(baseUrl + "/personal-inventory/blueprints");
+      E2eSupport.navigate(page, baseUrl + "/personal-inventory/blueprints");
       page.waitForLoadState();
       page.waitForTimeout(600);
       page.screenshot(
@@ -112,7 +112,7 @@ class BlueprintsMockupCheckE2eTest {
                   .setPath(Paths.get("build", "e2e", "bp-staged.png")));
           page.locator("#krt-bp-add-selected").click();
           page.waitForTimeout(2000);
-          page.navigate(baseUrl + "/personal-inventory/blueprints");
+          E2eSupport.navigate(page, baseUrl + "/personal-inventory/blueprints");
           page.waitForLoadState();
         }
       }

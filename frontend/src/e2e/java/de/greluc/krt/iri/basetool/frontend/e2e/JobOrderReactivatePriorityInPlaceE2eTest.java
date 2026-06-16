@@ -117,7 +117,7 @@ class JobOrderReactivatePriorityInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(detailUrl);
+        E2eSupport.navigate(page, detailUrl);
 
         // Complete the order: a terminal target opens the warning modal first; only the confirm
         // click posts and nulls the priority server-side.

@@ -116,7 +116,7 @@ class AccessibilitySmokeE2eTest {
                 .setIgnoreHTTPSErrors(true)
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
-      page.navigate(STACK.baseUrl() + path);
+      E2eSupport.navigate(page, STACK.baseUrl() + path);
 
       AxeResults results = new AxeBuilder(page).withTags(WCAG_TAGS).analyze();
       List<Rule> violations = results.getViolations();

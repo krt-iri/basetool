@@ -99,7 +99,7 @@ class CorePagesSmokeE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        page.navigate(baseUrl + path);
+        E2eSupport.navigate(page, baseUrl + path);
         assertThat(page.getByTestId("nav-logout")).isVisible();
       } catch (RuntimeException | AssertionError failure) {
         String slug = path.equals("/") ? "home" : path.substring(1).replace('/', '-');

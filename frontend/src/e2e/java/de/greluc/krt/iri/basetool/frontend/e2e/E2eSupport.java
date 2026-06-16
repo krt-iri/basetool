@@ -76,18 +76,30 @@ final class E2eSupport {
   private static final int NAVIGATE_RETRY_BACKOFF_MILLIS = 500;
 
   /**
+   * Per-attempt navigation timeout, in milliseconds, applied to each {@code page.navigate(...)} in
+   * {@link #navigate}. Set above Playwright's 30 s default so a slow-but-progressing document load
+   * on a contended CI runner is not cut off prematurely; when an attempt does exceed it, {@link
+   * #navigate} treats the {@link TimeoutError} as transient and retries on a fresh GET rather than
+   * failing outright. The {@link #NAVIGATE_MAX_ATTEMPTS} bound keeps the worst case finite.
+   */
+  private static final double NAVIGATE_TIMEOUT_MILLIS = 45_000;
+
+  /**
    * Lowercase substrings that mark a {@code page.navigate(...)} failure as a transient connection
    * reset of the navigation request rather than a genuine page failure (see {@link
    * #isTransientNavigationAbort}): WebKit's HTTP/2 {@code INTERNAL_ERROR} and its {@code
-   * frameAbortedNavigation} wrapper, Firefox's {@code NS_BINDING_ABORTED}, Chromium's {@code
-   * net::ERR_ABORTED}, and Playwright's own "Navigation interrupted by another one". Deliberately
-   * narrow so only a genuine abort is retried and every real error propagates unmasked.
+   * frameAbortedNavigation} wrapper, Firefox's {@code NS_BINDING_ABORTED} and {@code
+   * NS_ERROR_ABORT} (Gecko aborts a main-frame navigation under CI load with either code — the
+   * latter surfaced as the dominant Firefox-only flake), Chromium's {@code net::ERR_ABORTED}, and
+   * Playwright's own "Navigation interrupted by another one". Deliberately narrow so only a genuine
+   * abort is retried and every real error propagates unmasked.
    */
   private static final List<String> NAVIGATION_ABORT_SIGNATURES =
       List.of(
           "internal_error",
           "frameabortednavigation",
           "ns_binding_aborted",
+          "ns_error_abort",
           "err_aborted",
           "interrupted");
 
@@ -389,16 +401,23 @@ final class E2eSupport {
    * target page genuinely failing.
    *
    * <p>This hardens the post-submit list re-load that several flows perform immediately after
-   * {@link #awaitFormPost} / {@link #clickSubmitClearingFooter}. {@code awaitFormPost} already
-   * blocks until the submit's Post/Redirect/Get has fully settled — so the mutation is safe and no
-   * submit navigation is in flight — but the very next {@code navigate(...)} still issues a fresh
-   * GET on a connection WebKit has, under CI load, been seen to tear down mid-flight. WebKit
-   * surfaces that aborted main-frame navigation as {@code HTTP/2 Error: INTERNAL_ERROR} ({@code
-   * frameAbortedNavigation}), thrown as a {@link PlaywrightException} (concretely a {@code
+   * {@link #awaitFormPost} / {@link #clickSubmitClearingFooter}, and every other content navigation
+   * the suite drives. {@code awaitFormPost} already blocks until the submit's Post/Redirect/Get has
+   * fully settled — so the mutation is safe and no submit navigation is in flight — but the very
+   * next {@code navigate(...)} still issues a fresh GET on a connection the browser has, under CI
+   * load, been seen to tear down mid-flight. The engines surface that aborted main-frame navigation
+   * differently: WebKit as {@code HTTP/2 Error: INTERNAL_ERROR} ({@code frameAbortedNavigation}),
+   * Firefox as {@code NS_ERROR_ABORT} / {@code NS_BINDING_ABORTED}, Chromium as {@code
+   * net::ERR_ABORTED} — all thrown as a {@link PlaywrightException} (concretely a {@code
    * DriverException}). The reset is transient — a brief settle plus a fresh GET succeeds — so
-   * {@link #isTransientNavigationAbort} gates the retry to exactly those abort signatures and lets
-   * every other failure (a real 4xx/5xx document, a timeout, a wrong URL) propagate immediately and
-   * unmasked. The final attempt runs uncaught, so a persistent abort still fails the test with the
+   * {@link #isTransientNavigationAbort} gates the abort retry to exactly those signatures and lets
+   * every other navigation failure (a real 4xx/5xx document, a wrong URL) propagate immediately and
+   * unmasked.
+   *
+   * <p>It is also timeout-tolerant: each attempt is bounded by {@link #NAVIGATE_TIMEOUT_MILLIS}
+   * (above Playwright's 30 s default), and a {@link TimeoutError} from a slow-but-progressing load
+   * on a contended runner is retried on a fresh GET rather than failing the test outright. The
+   * final attempt runs uncaught, so a persistent abort or timeout still fails the test with the
    * genuine Playwright error.
    *
    * @param page the page to navigate
@@ -406,15 +425,21 @@ final class E2eSupport {
    * @return the main-frame {@link Response} of the successful navigation (never {@code null} for a
    *     document load), so callers can assert on its HTTP status — e.g. that a reopened page
    *     renders {@code 200} rather than {@code 500}
-   * @throws PlaywrightException if every attempt is aborted, or on the first non-transient
-   *     navigation failure
+   * @throws PlaywrightException if every attempt is aborted or times out, or on the first
+   *     non-transient navigation failure
    */
   static Response navigate(Page page, String url) {
-    // Attempts 1..N-1 retry a transient abort; the final attempt (below the loop) runs uncaught,
-    // so a persistent failure propagates with its real error — mirrors login()/attemptLogin.
+    Page.NavigateOptions options = new Page.NavigateOptions().setTimeout(NAVIGATE_TIMEOUT_MILLIS);
+    // Attempts 1..N-1 retry a transient abort or timeout; the final attempt (below the loop) runs
+    // uncaught, so a persistent failure propagates with its real error — mirrors
+    // login()/attemptLogin.
     for (int attempt = 1; attempt < NAVIGATE_MAX_ATTEMPTS; attempt++) {
       try {
-        return page.navigate(url);
+        return page.navigate(url, options);
+      } catch (TimeoutError timeout) {
+        System.out.printf(
+            "[E2E][navigate] attempt %d/%d to %s timed out after %.0f ms; settling then retrying%n",
+            attempt, NAVIGATE_MAX_ATTEMPTS, url, NAVIGATE_TIMEOUT_MILLIS);
       } catch (PlaywrightException abort) {
         if (!isTransientNavigationAbort(abort)) {
           throw abort;
@@ -426,13 +451,13 @@ final class E2eSupport {
             url,
             String.valueOf(abort.getMessage()).lines().findFirst().orElse("navigation aborted"));
       }
-      // Let the reset HTTP/2 stream tear down and the page fall back to its prior, already-loaded
-      // document before re-issuing the GET. The settle runs between attempts, outside the catch, so
-      // it can never mask the abort it follows.
+      // Let the reset stream tear down and the page fall back to its prior, already-loaded document
+      // before re-issuing the GET. The settle runs between attempts, outside the catch, so it can
+      // never mask the abort/timeout it follows.
       page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
       page.waitForLoadState();
     }
-    return page.navigate(url);
+    return page.navigate(url, options);
   }
 
   /**
