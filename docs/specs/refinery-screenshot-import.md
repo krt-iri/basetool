@@ -351,6 +351,18 @@ ignored).
 `RefineryImportProxyController#toForm`; extractor repo: `CaptureTime`,
 `RefineryPipeline` · **Issues:** epic #439
 
+### REQ-REFINERY-018 — Direct ingest is an alternative transport, not a new write path
+
+The desktop one-click ingest (epic #639, [`desktop-ingest.md`](desktop-ingest.md)
+`REQ-INGEST-*`, [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md)) gives the
+user an alternative to the manual file upload (REQ-REFINERY-013): the extractor sends the
+`RefineryExtract` JSON to the basetool and the browser opens the create page with the draft
+already pre-filled. This path changes **only how the draft request is delivered** — the
+backend matching (REQ-REFINERY-004), the issue model (REQ-REFINERY-009), and crucially
+**REQ-REFINERY-002 (import persists nothing)** are unchanged. The reviewed draft is still
+saved exclusively through `POST /api/v1/refinery-orders` after the user reviews it. Direct
+ingest must never persist a refinery order without that human review-and-save step.
+
 ## Traceability
 
 - `RefineryImportServiceTest`, `RefineryImportControllerTest`,
@@ -375,8 +387,11 @@ ignored).
 - The desktop extractor's internals ([#436](https://github.com/krt-iri/basetool/issues/436),
   shipped) — they live in the `basetool-bp-extractor` repo; this spec only governs the
   cross-repo contract and the basetool-side import behaviour.
-- The deferred phases 4 (#437, direct upload) and 5 (#438, log hints) — deferred by owner
-  decision; their GitHub issues govern them if they are ever revived.
+- Direct one-click ingest (the former deferred Phase 4, #437) is now its own epic #639,
+  specced in [`desktop-ingest.md`](desktop-ingest.md) (`REQ-INGEST-*`, ADR-0018) and
+  cross-referenced from REQ-REFINERY-018; #437 is continued/superseded by that epic. The
+  deferred phase 5 (#438, log hints) stays deferred by owner decision; its GitHub issue
+  governs it if it is ever revived.
 - `blueprint_external_alias` — the blueprint import keeps its own alias table and matching
   rules, specced in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md).
 
