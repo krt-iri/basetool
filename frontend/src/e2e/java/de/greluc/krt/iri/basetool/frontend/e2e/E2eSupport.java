@@ -34,6 +34,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -163,19 +164,39 @@ final class E2eSupport {
   }
 
   /**
-   * Launches headless Firefox, resolving {@code host.docker.internal} to the loopback via the
-   * {@code network.dns.localDomains} preference for the ephemeral stack (Firefox has no {@code
-   * --host-resolver-rules} equivalent).
+   * Launches headless Firefox with HTTP keep-alive disabled and, for the ephemeral stack, {@code
+   * host.docker.internal} resolved to the loopback.
+   *
+   * <p><b>{@code network.http.keep-alive = false}</b> is the root-cause fix for the suite's
+   * dominant Firefox-only flake. Under CI load Gecko reuses an HTTP/1.1 persistent connection at
+   * the instant the frontend's Tomcat is closing it, and — unlike an idempotent GET, which it
+   * transparently re-sends — it does NOT auto-retry a non-idempotent POST, so the reset surfaces as
+   * {@code NS_ERROR_ABORT} / {@code NS_BINDING_ABORTED}. That tore down the in-place bank
+   * wipe/deposit XHRs (the server logged 200/400 while the browser saw the connection drop, so the
+   * success handler never ran and {@code waitForResponse} hung to its timeout) and the content
+   * navigations that {@link #navigate} retries. Forcing a fresh connection per request removes the
+   * race at its source for every request the suite makes — XHR and navigation alike — so it
+   * complements {@link #navigate}'s abort retry rather than relying on it. The cost is a few extra
+   * localhost TLS handshakes, negligible for the suite, and it hardens transport only: it changes
+   * neither the app nor any assertion, so a genuine failure still fails. Streaming responses (the
+   * notification SSE) are unaffected — keep-alive governs connection <em>reuse after</em> a
+   * completed request, not a response that stays open.
+   *
+   * <p>For the ephemeral stack {@code network.dns.localDomains} additionally maps the Keycloak
+   * issuer host to the loopback (Firefox has no {@code --host-resolver-rules} equivalent).
    *
    * @param playwright the Playwright entry point
    * @param managesStack whether the ephemeral stack is in play (enables the local-domain remap)
    * @return a launched headless Firefox browser
    */
   private static Browser launchFirefox(Playwright playwright, boolean managesStack) {
-    BrowserType.LaunchOptions options = new BrowserType.LaunchOptions().setHeadless(true);
+    Map<String, Object> prefs = new HashMap<>();
+    prefs.put("network.http.keep-alive", false);
     if (managesStack) {
-      options.setFirefoxUserPrefs(Map.of("network.dns.localDomains", "host.docker.internal"));
+      prefs.put("network.dns.localDomains", "host.docker.internal");
     }
+    BrowserType.LaunchOptions options =
+        new BrowserType.LaunchOptions().setHeadless(true).setFirefoxUserPrefs(prefs);
     return playwright.firefox().launch(options);
   }
 
@@ -453,9 +474,21 @@ final class E2eSupport {
       }
       // Let the reset stream tear down and the page fall back to its prior, already-loaded document
       // before re-issuing the GET. The settle runs between attempts, outside the catch, so it can
-      // never mask the abort/timeout it follows.
+      // never mask the abort/timeout it follows. The load-state wait is best-effort and explicitly
+      // bounded: the next attempt issues a fresh GET that establishes its own load state, so a
+      // settle that itself outruns the timeout on a contended runner must not become the test's
+      // failure — swallow that TimeoutError and retry. Only the final attempt (below the loop)
+      // propagates a genuine navigation failure.
       page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
-      page.waitForLoadState();
+      try {
+        page.waitForLoadState(
+            null, new Page.WaitForLoadStateOptions().setTimeout(NAVIGATE_TIMEOUT_MILLIS));
+      } catch (TimeoutError settleTimeout) {
+        System.out.printf(
+            "[E2E][navigate] settle after attempt %d/%d to %s did not reach load state in time;"
+                + " retrying anyway%n",
+            attempt, NAVIGATE_MAX_ATTEMPTS, url);
+      }
     }
     return page.navigate(url, options);
   }
