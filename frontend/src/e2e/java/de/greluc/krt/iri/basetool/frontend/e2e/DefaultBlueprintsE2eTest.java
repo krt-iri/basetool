@@ -157,7 +157,8 @@ class DefaultBlueprintsE2eTest {
         // Open the confirm modal for the first default, then submit the classic POST→redirect.
         removeButtons.first().click();
         assertThat(page.locator("#krt-dbp-delete-modal")).isVisible();
-        Locator submit = page.locator("#krt-dbp-delete-form button[type='submit']");
+        // The confirm button JS-submits the selected row's server-rendered POST form.
+        Locator submit = page.locator("#krt-dbp-delete-confirm");
         E2eSupport.clickSubmitClearingFooter(submit);
 
         int after = page.locator("[data-trigger='dbp-open-delete']").count();

@@ -74,12 +74,21 @@
                 <tr th:each="d : ${defaults}">
                     <td th:text="${d.productName}">Produkt</td>
                     <td>
-                        <button type="button" class="btn btn-quiet-danger btn-icon"
-                                data-trigger="dbp-open-delete"
-                                th:attr="data-action=@{/admin/default-blueprints/{id}/delete(id=${d.id})},
-                                         data-name=${d.productName}"
-                                th:title="#{admin.defaultBlueprints.action.remove}"
-                                th:aria-label="#{admin.defaultBlueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        <!-- Per-row server-rendered POST form: the action is baked by Thymeleaf and
+                             never touched by JS, so no URL flows from the DOM into a form action
+                             (avoids the CodeQL js/xss-through-dom sink). The remove button opens the
+                             shared confirm modal, whose confirm submits THIS form by element id. -->
+                        <form th:id="${'krt-dbp-del-' + d.id}"
+                              th:action="@{/admin/default-blueprints/{id}/delete(id=${d.id})}"
+                              method="post" class="krt-dbp-del-form">
+                            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                            <button type="button" class="btn btn-quiet-danger btn-icon"
+                                    data-trigger="dbp-open-delete"
+                                    th:attr="data-form=${'krt-dbp-del-' + d.id},
+                                             data-name=${d.productName}"
+                                    th:title="#{admin.defaultBlueprints.action.remove}"
+                                    th:aria-label="#{admin.defaultBlueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        </form>
                     </td>
                 </tr>
                 </tbody>
@@ -94,13 +103,10 @@
         <span class="close" data-trigger="dbp-close-delete">&times;</span>
         <h2 th:text="#{admin.defaultBlueprints.modal.remove.title}">Standard-Blueprint entfernen</h2>
         <p id="krt-dbp-delete-message" th:text="#{admin.defaultBlueprints.modal.remove.body}">Wirklich entfernen?</p>
-        <form id="krt-dbp-delete-form" method="post">
-            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <div class="krt-pi-modal-actions">
-                <button type="submit" class="btn krt-danger" th:text="#{admin.defaultBlueprints.action.remove}">Entfernen</button>
-                <button type="button" class="btn btn-ghost" data-trigger="dbp-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
-            </div>
-        </form>
+        <div class="krt-pi-modal-actions">
+            <button type="button" id="krt-dbp-delete-confirm" class="btn krt-danger" th:text="#{admin.defaultBlueprints.action.remove}">Entfernen</button>
+            <button type="button" class="btn btn-ghost" data-trigger="dbp-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+        </div>
     </div>
 </div>
 

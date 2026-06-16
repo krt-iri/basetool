@@ -22,8 +22,11 @@
     const stagingList = document.getElementById('krt-dbp-staging-list');
     const addSubmit = document.getElementById('krt-dbp-add-submit');
     const deleteModal = document.getElementById('krt-dbp-delete-modal');
-    const deleteForm = document.getElementById('krt-dbp-delete-form');
+    const deleteConfirm = document.getElementById('krt-dbp-delete-confirm');
     const deleteMessage = document.getElementById('krt-dbp-delete-message');
+    // The per-row form to submit when the modal is confirmed (set on open). Its action is
+    // server-rendered, so no URL ever flows from the DOM into JS.
+    let pendingForm = null;
 
     function debounce(fn, wait) {
         let timer = null;
@@ -174,11 +177,11 @@
 
     /* ------------------------------------------------------------- remove modal */
 
-    function openDeleteModal(action, name) {
-        if (!deleteModal || !deleteForm) {
+    function openDeleteModal(formId, name) {
+        if (!deleteModal) {
             return;
         }
-        deleteForm.setAttribute('action', action);
+        pendingForm = formId ? document.getElementById(formId) : null;
         if (deleteMessage) {
             const base = i18n.removeBody || 'Wirklich entfernen?';
             deleteMessage.textContent = name ? base + ' (' + name + ')' : base;
@@ -218,11 +221,19 @@
         });
     }
 
+    if (deleteConfirm) {
+        deleteConfirm.addEventListener('click', function () {
+            if (pendingForm) {
+                pendingForm.requestSubmit();
+            }
+        });
+    }
+
     document.addEventListener('click', function (e) {
         const removeBtn = e.target.closest('[data-trigger="dbp-open-delete"]');
         if (removeBtn) {
             openDeleteModal(
-                removeBtn.getAttribute('data-action'),
+                removeBtn.getAttribute('data-form'),
                 removeBtn.getAttribute('data-name'),
             );
             return;
