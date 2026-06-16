@@ -30,9 +30,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -92,8 +94,21 @@ public class NotificationRule extends AbstractEntity<UUID> {
       cascade = CascadeType.ALL,
       orphanRemoval = true,
       fetch = FetchType.LAZY)
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
   @Builder.Default
   private Set<NotificationRuleSelector> selectors = new HashSet<>();
+
+  /**
+   * Returns an unmodifiable view of the recipient selectors. Callers mutate the collection only
+   * through {@link #addSelector(NotificationRuleSelector)} / {@link #clearSelectors()} so the
+   * owning set (and its orphan-removal bookkeeping) stays encapsulated.
+   *
+   * @return an unmodifiable view of the selectors
+   */
+  public Set<NotificationRuleSelector> getSelectors() {
+    return Collections.unmodifiableSet(selectors);
+  }
 
   /**
    * Attaches a selector to this rule, wiring the back-reference so the cascade persists it.
@@ -103,5 +118,13 @@ public class NotificationRule extends AbstractEntity<UUID> {
   public void addSelector(NotificationRuleSelector selector) {
     selector.setRule(this);
     selectors.add(selector);
+  }
+
+  /**
+   * Removes all selectors in place, triggering orphan removal on flush. Used by the update path
+   * before the new selectors are re-added.
+   */
+  public void clearSelectors() {
+    selectors.clear();
   }
 }

@@ -51,6 +51,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString
 public class NotificationRuleSelector extends AbstractEntity<UUID> {
 
   /** Primary key; database-generated UUID. */

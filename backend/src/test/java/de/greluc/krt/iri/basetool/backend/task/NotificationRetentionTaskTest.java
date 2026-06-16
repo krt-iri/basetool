@@ -43,7 +43,6 @@ class NotificationRetentionTaskTest {
     NotificationRetentionTask task = new NotificationRetentionTask(notificationService, maxAge);
     when(notificationService.purgeReadOlderThan(org.mockito.ArgumentMatchers.any())).thenReturn(3);
 
-    Instant before = Instant.now().minus(maxAge);
     task.purgeExpiredReadNotifications();
 
     ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);

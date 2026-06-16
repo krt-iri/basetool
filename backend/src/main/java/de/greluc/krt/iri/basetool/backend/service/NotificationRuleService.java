@@ -112,7 +112,7 @@ public class NotificationRuleService {
       throw new ObjectOptimisticLockingFailureException(NotificationRule.class, id);
     }
     applyScalars(rule, request);
-    rule.getSelectors().clear();
+    rule.clearSelectors();
     applySelectors(rule, request);
     NotificationRule saved = notificationRuleRepository.saveAndFlush(rule);
     log.info("Updated notification rule id={}", saved.getId());
