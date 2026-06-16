@@ -436,7 +436,7 @@
         // chart itself inside <main>) out of the tab order and hide it from assistive
         // tech, so Tab and the screen-reader cursor stay inside the dialog.
         function setBackgroundInert(inert) {
-            const regions = ['header', 'main', '#sidebar', '#sidebar-overlay', '#squadron-context-chip'];
+            const regions = ['header', 'main', '#sidebar', '#sidebar-overlay'];
             regions.forEach(function (sel) {
                 const el = document.querySelector(sel);
                 if (!el) {

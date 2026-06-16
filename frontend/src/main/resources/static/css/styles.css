@@ -2731,40 +2731,12 @@ input[type='radio']:focus {
     top: -0.6rem !important;
 }
 
-/* Multi-squadron switcher + context chip.
-   The chip is fixed top-right and shown to every authenticated user so the
-   active squadron context is visible from any page without opening the
-   sidebar. The switcher form lives inside the sidebar's content area and
-   submits the selection through the frontend proxy (POST /me/active-squadron). */
-.squadron-context-chip {
-    position: fixed;
-    top: 1rem;
-    /* Shifted left of the notification bell (fixed at right:1rem). The chip is right-anchored and
-       grows leftward, so this offset clears the fixed-width bell regardless of the chip's width. */
-    right: 4rem;
-    z-index: 1200; /* above header, below sidebar overlay */
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: 0.35rem var(--space-3);
-    background-color: rgb(20 20 20 / 85%);
-    border: var(--border-accent);
-    border-radius: var(--radius-pill);
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    font-size: 0.85rem;
-    line-height: 1;
-    pointer-events: none; /* tooltip-only, never intercepts clicks */
-    backdrop-filter: blur(2px);
-    box-shadow: 0 2px 6px rgb(0 0 0 / 40%);
-}
-
 /* ===== Notification bell + dropdown + list (epic #622, REQ-NOTIF-006) ===== */
 .notification-bell {
     position: fixed;
     top: 1rem;
     right: 1rem;
-    z-index: 1300; /* above the context chip so the bell stays clickable */
+    z-index: 1300; /* above the header, below the sidebar overlay */
 }
 
 .notification-bell-btn {
@@ -2909,59 +2881,6 @@ input[type='radio']:focus {
     display: flex;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
-}
-
-.squadron-context-chip-label {
-    /*
-     * gray-1, not the "muted" gray-2: #646464 on the ~#141414 chip is only
-     * ~3.1:1, below WCAG AA 4.5:1 for this fs-2xs label (#441). The uppercase
-     * + letter-spacing + small size keep it visually subordinate to the bold
-     * orange value beside it without relying on a sub-AA ink.
-     */
-    color: var(--color-gray-1);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: var(--fs-2xs);
-}
-
-.squadron-context-chip-value {
-    color: var(--color-primary);
-    font-weight: var(--fw-bold);
-}
-
-.squadron-context-chip-all {
-    color: var(--color-gray-1);
-}
-
-.squadron-context-chip-empty {
-    color: var(--color-gray-3);
-}
-
-/* Spezialkommando variant — visually distinct from the brand-orange Staffel chip.
-   Per SPEZIALKOMMANDO_PLAN.md §7.2 the SK chip uses a neutral border colour and
-   a desaturated value so SK pins do not compete with the IRIDIUM brand colour
-   that the Staffel chip claims. */
-.squadron-context-chip-sk {
-    border-color: var(--color-gray-2);
-}
-
-.squadron-context-chip-sk .squadron-context-chip-value {
-    color: var(--color-gray-1);
-}
-
-@media (width <= 768px) {
-    /* On smartphones the chip collapses to the shorthand only - the label
-       takes too much room next to the hamburger and brand at 320-768 px. */
-    .squadron-context-chip-label {
-        display: none;
-    }
-
-    .squadron-context-chip {
-        top: 0.6rem;
-        right: 0.6rem;
-        padding: var(--space-1) 0.6rem;
-        font-size: var(--fs-xs);
-    }
 }
 
 .squadron-switcher {

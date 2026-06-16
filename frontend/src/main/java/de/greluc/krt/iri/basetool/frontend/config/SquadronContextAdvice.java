@@ -63,10 +63,10 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * </ul>
  *
  * <p>Beyond those it also exposes the merged OrgUnit switcher catalogue ({@code availableOrgUnits},
- * {@code activeOrgUnit}, {@code isActiveOrgUnitSpecialCommand}), the per-principal capability flags
- * resolved once via {@code meCapabilities} ({@code canSeeBlueprintOverview} / {@code
- * canViewJobOrders}), the dynamic {@code appTitle}, {@code promotionFeatureEnabled}, and {@code
- * currentRequestUri} — each documented on its own {@code @ModelAttribute} method below.
+ * {@code activeOrgUnit}), the per-principal capability flags resolved once via {@code
+ * meCapabilities} ({@code canSeeBlueprintOverview} / {@code canViewJobOrders}), the dynamic {@code
+ * appTitle}, {@code promotionFeatureEnabled}, and {@code currentRequestUri} — each documented on
+ * its own {@code @ModelAttribute} method below.
  *
  * <p>Failures from the backend round-trip degrade gracefully: a non-resolvable active-squadron call
  * leaves the badge empty; a non-resolvable squadron list leaves the dropdown empty. We never let an
@@ -197,20 +197,6 @@ public class SquadronContextAdvice {
         .filter(o -> activeOrgUnitId.equals(o.orgUnitId()))
         .findFirst()
         .orElse(null);
-  }
-
-  /**
-   * Convenience model attribute: {@code true} when {@link #activeOrgUnit} resolves to a {@code
-   * SPECIAL_COMMAND}-kind option. Lets the sidebar chip toggle its kind label + style without
-   * duplicating the discriminator check across the two chip branches.
-   *
-   * @param activeOrgUnit previously-resolved option; may be {@code null}.
-   * @return {@code true} iff the active context is an SK pin.
-   */
-  @ModelAttribute("isActiveOrgUnitSpecialCommand")
-  public boolean isActiveOrgUnitSpecialCommand(
-      @ModelAttribute("activeOrgUnit") OrgUnitMembershipOptionDto activeOrgUnit) {
-    return activeOrgUnit != null && "SPECIAL_COMMAND".equals(activeOrgUnit.kind());
   }
 
   /**
@@ -356,28 +342,41 @@ public class SquadronContextAdvice {
   }
 
   /**
-   * Composes the dynamic application title for the {@code <title>} tag and the sidebar logo: a
-   * plain "Basetool" when no squadron context applies, "Basetool – &lt;shorthand&gt;" when a
-   * concrete squadron is active, and "Basetool – Alle Staffeln" when an admin is in the
-   * cross-staffel view. Replaces the previous hardcoded "Profit Basetool" title
-   * (MULTI_SQUADRON_PLAN.md section 5.4: app.title generic or dynamic).
+   * Composes the dynamic application title rendered in the {@code <title>} tag and the sidebar
+   * brand logo — the single place the active OrgUnit context surfaces to the user (REQ-ORG-010; the
+   * previously-redundant top-right context chip was removed). Resolution:
    *
-   * <p>Resolution uses the request locale via {@link LocaleContextHolder} so the squadron suffix is
+   * <ul>
+   *   <li>An active pin of <em>either</em> kind ({@code SQUADRON} or {@code SPECIAL_COMMAND}) →
+   *       "Profit Basetool – &lt;shorthand&gt;", falling back to the OrgUnit name when it carries
+   *       no shorthand. Reading from {@link #activeOrgUnit} (the merged Staffel + SK catalogue) —
+   *       rather than the Squadron-only {@link #activeSquadron} — is what lets an SK pin show in
+   *       the title at all; the chip used to be the only surface that did.
+   *   <li>Admin in all-OrgUnits mode (no pin) → "Profit Basetool – Alle Staffeln".
+   *   <li>No context (squadron-less non-admin, anonymous) → plain "Profit Basetool".
+   * </ul>
+   *
+   * <p>Resolution uses the request locale via {@link LocaleContextHolder} so the suffix is
    * localised consistently with the rest of the page (the message-format pattern {@code {0}} is
-   * filled with the squadron shorthand or the localised "all squadrons" label).
+   * filled with the OrgUnit shorthand/name or the localised "all squadrons" label). The {@code
+   * app.title.with.squadron} key name predates SK support and is kept generic — it now serves any
+   * OrgUnit kind.
    *
-   * @param activeSquadron resolved squadron, or {@code null}.
+   * @param activeOrgUnit resolved active OrgUnit (Staffel or SK), or {@code null}.
    * @param isAllSquadronsMode whether the current viewer is an admin without a selection.
    * @return the rendered title string, never {@code null}.
    */
   @ModelAttribute("appTitle")
   public String appTitle(
-      @ModelAttribute("activeSquadron") SquadronDto activeSquadron,
+      @ModelAttribute("activeOrgUnit") OrgUnitMembershipOptionDto activeOrgUnit,
       @ModelAttribute("isAllSquadronsMode") boolean isAllSquadronsMode) {
     Locale locale = LocaleContextHolder.getLocale();
-    if (activeSquadron != null) {
-      return messageSource.getMessage(
-          "app.title.with.squadron", new Object[] {activeSquadron.shorthand()}, locale);
+    if (activeOrgUnit != null) {
+      String label =
+          activeOrgUnit.orgUnitShorthand() != null
+              ? activeOrgUnit.orgUnitShorthand()
+              : activeOrgUnit.orgUnitName();
+      return messageSource.getMessage("app.title.with.squadron", new Object[] {label}, locale);
     }
     if (isAllSquadronsMode) {
       String allLabel = messageSource.getMessage("squadron.switcher.all", null, locale);
