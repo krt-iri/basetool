@@ -50,6 +50,7 @@ re-reads.
 | SC Extractor GUI design                   | [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md)                                                                           | Design spec        | Current — implemented, binding               | REFINERY           |
 | Frontend confidential OAuth2 client       | [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) + [runbook](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)          | Decision + runbook | Accepted — implementation pending            | AUTH               |
 | Frontend AJAX mutations (krtFetch)        | [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md)                                                                      | Living             | Current — Phase 0 (#572)                     | FE/UI              |
+| Notifications & alerting                  | [`notifications.md`](notifications.md)                                                                                          | Living             | Current — Phases 1–3,5,6,8 (epic #622)       | NOTIF              |
 
 Architecture *decisions* (the "why we chose X over Y") live next door in
 [`docs/adr/`](../adr/README.md), not here. A spec says what must hold; an ADR records the
@@ -90,7 +91,7 @@ REQ-<AREA>-<NNN>     e.g. REQ-ORDERS-012, REQ-AUTH-003
 
 `<AREA>` is drawn from the same vocabulary as the issue "Affected Area" and the labels:
 `AUTH`, `ORG`, `ORDERS`, `INV`, `MISSION`, `REFINERY`, `HANGAR`, `PROMO`, `BANK`,
-`ADMIN`, `UEX`, `UI`, `I18N`, `DB`, `OPS`. Numbers are never reused, even after a
+`ADMIN`, `UEX`, `UI`, `I18N`, `DB`, `OPS`, `NOTIF`. Numbers are never reused, even after a
 requirement is removed (mark it superseded instead).
 
 In a test, name the requirement it pins down:

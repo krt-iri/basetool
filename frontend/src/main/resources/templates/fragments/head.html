@@ -120,6 +120,12 @@
       retry-on-403, RFC7807 409 handling, syncVersion, and fragment swaps.
     -->
     <script th:src="@{/js/krt-fetch.js}" th:attr="nonce=${cspNonce}"></script>
+    <!--
+      Notification bell (epic #622): lazy dropdown load, no-reload mark-read/delete via krtFetch,
+      and the always-on unread-badge poll. Deferred — it self-initialises on DOMContentLoaded and
+      only runs where the bell is present (authenticated pages).
+    -->
+    <script th:src="@{/js/notifications.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/datetime-splitter.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/scu-decimal-input.js}" defer th:attr="nonce=${cspNonce}"></script>
 

@@ -60,6 +60,15 @@ public class AsyncConfig {
   public static final String IMPORT_EXECUTOR = "importExecutor";
 
   /**
+   * Spring-bean name of the notification executor, referenced from
+   * {@code @Async("notificationExecutor")}. Carries the after-commit notification-creation work off
+   * the request thread so producing notifications never adds latency to (or fails) the originating
+   * business transaction. Kept distinct from the sync pools so a notification burst cannot starve
+   * the UEX / Wiki / import sweeps and vice-versa.
+   */
+  public static final String NOTIFICATION_EXECUTOR = "notificationExecutor";
+
+  /**
    * Bounded executor for the periodic UEX sync sweep dispatched by {@link
    * de.greluc.krt.iri.basetool.backend.service.UexScheduler}.
    *
@@ -171,6 +180,38 @@ public class AsyncConfig {
     executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
     executor.setWaitForTasksToCompleteOnShutdown(true);
     executor.setAwaitTerminationSeconds(60);
+    executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
+    executor.initialize();
+    return executor;
+  }
+
+  /**
+   * Bounded executor for after-commit notification creation dispatched by the notification event
+   * listener.
+   *
+   * <p>Sizing rationale: each task resolves a handful of recipients and writes a small batch of
+   * rows — short, IO-light work. A core pool of two with head-room to four absorbs bursts (e.g.
+   * several job orders created back-to-back) without unbounded thread growth; the 200-slot queue
+   * tolerates a spike before {@link ThreadPoolExecutor.AbortPolicy} engages and surfaces a {@link
+   * java.util.concurrent.RejectedExecutionException} in the logs. Dropping a notification task is
+   * non-fatal (the business transaction already committed), but a loud rejection is still the
+   * desired signal that something is wrong upstream.
+   *
+   * <p>{@link MdcPropagatingTaskDecorator} keeps the correlation / user / org-unit MDC fields of
+   * the publishing request on the worker thread, exactly as for the other executors.
+   *
+   * @return configured notification async executor
+   */
+  @Bean(name = NOTIFICATION_EXECUTOR)
+  public Executor notificationExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(2);
+    executor.setMaxPoolSize(4);
+    executor.setQueueCapacity(200);
+    executor.setThreadNamePrefix("notification-async-");
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+    executor.setWaitForTasksToCompleteOnShutdown(true);
+    executor.setAwaitTerminationSeconds(20);
     executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
     executor.initialize();
     return executor;

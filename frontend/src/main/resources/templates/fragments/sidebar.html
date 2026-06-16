@@ -30,12 +30,42 @@
               th:if="${activeOrgUnit == null and !isAllSquadronsMode}"
               th:text="#{squadron.context.none}">No org-unit context</span>
     </div>
+    <!-- Notification bell + always-on unread badge (epic #622, REQ-NOTIF-006). Top-right on every
+         page; the badge shows whenever unreadNotificationCount > 0 and is kept fresh by polling
+         in notifications.js. The dropdown content is loaded lazily via AJAX on open. -->
+    <div sec:authorize="isAuthenticated()" id="notification-bell" class="notification-bell">
+        <span id="notification-i18n" hidden
+              th:attr="data-loading=#{notifications.loading},data-empty=#{notifications.empty},data-mark-read=#{notifications.markRead},data-delete=#{notifications.delete},data-deleted=#{notifications.success.deleted},data-all-read=#{notifications.success.allRead},data-cleared=#{notifications.success.cleared},data-confirm-delete-title=#{notifications.confirm.delete.title},data-confirm-delete-body=#{notifications.confirm.delete.body},data-confirm-clear-title=#{notifications.confirm.clear.title},data-confirm-clear-body=#{notifications.confirm.clear.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-error=#{notification.error.title}"></span>
+        <button type="button" id="notification-toggle" class="notification-bell-btn"
+                th:title="#{notifications.bell.title}" th:aria-label="#{notifications.bell.aria}"
+                aria-haspopup="true" aria-expanded="false">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
+            <span id="notification-badge" class="notification-badge"
+                  th:classappend="${unreadNotificationCount > 0} ? '' : 'notification-badge-hidden'"
+                  th:text="${unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}">0</span>
+        </button>
+        <div id="notification-dropdown" class="notification-dropdown notification-dropdown-hidden"
+             role="region" th:aria-label="#{notifications.bell.title}">
+            <div class="notification-dropdown-header">
+                <span th:text="#{notifications.title}">Notifications</span>
+                <button type="button" class="notification-link-btn" data-notif-mark-all
+                        th:text="#{notifications.markAllRead}">Mark all read</button>
+            </div>
+            <ul id="notification-dropdown-list" class="notification-dropdown-list"></ul>
+            <p id="notification-dropdown-empty" class="notification-dropdown-empty notification-badge-hidden"
+               data-notif-empty th:text="#{notifications.empty}">No notifications</p>
+            <div class="notification-dropdown-footer">
+                <a th:href="@{/notifications}" th:text="#{notifications.viewAll}">View all</a>
+            </div>
+        </div>
+    </div>
     <div id="sidebar" class="sidebar">
         <div class="sidebar-content">
             <button id="close-sidebar" class="close-sidebar-btn">&times;</button>
             <div class="sidebar-links">
                 <a th:href="@{/}" th:text="#{nav.home}">Home</a>
                 <span sec:authorize="isAuthenticated()">
+                <a th:href="@{/notifications}" data-testid="nav-notifications" th:text="#{nav.notifications}">Notifications</a>
                 <details class="sidebar-group" data-group-key="missions">
                     <summary th:text="#{nav.section.mission_planning}">Einsatzplanung</summary>
                     <div class="sidebar-sublinks">
@@ -115,6 +145,7 @@
                         <a th:href="@{/admin/bank-audit}" data-testid="nav-admin-bank-audit" th:text="#{nav.admin.bankAudit}">Bank-Audit-Log</a>
                         <span class="sidebar-subheading" th:text="#{nav.admin.group.system}">System &amp; Daten</span>
                         <a th:href="@{/admin/settings}" th:text="#{nav.admin.settings}">Systemeinstellungen</a>
+                        <a th:href="@{/admin/notification-rules}" th:text="#{nav.admin.notificationRules}">Notification rules</a>
                         <a th:href="@{/admin/sync-reports}" th:text="#{nav.admin.syncReports}">Sync-Berichte</a>
                         <a th:href="@{/admin/personal-inventory}" th:text="#{admin.personalInventory.menu}">Pers. Inventar (Admin)</a>
                         <a th:href="@{/admin/personal-blueprints}" th:text="#{admin.personalInventory.blueprints.menu}">Pers. Blueprints (Admin)</a>

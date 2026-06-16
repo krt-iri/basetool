@@ -23,6 +23,7 @@ import de.greluc.krt.iri.basetool.backend.model.User;
 import de.greluc.krt.iri.basetool.backend.model.dto.UserReferenceDto;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -77,6 +78,35 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + " u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <> '') THEN"
           + " u.displayName ELSE u.username END, u.rank) FROM User u ORDER BY u.displayName")
   List<UserReferenceDto> findAllReference();
+
+  /**
+   * Returns the ids ({@code sub}s) of every user holding the global role with the given stable
+   * {@code code} (e.g. {@code ADMIN}). Backs the notification rule engine's {@code ROLE} selector.
+   *
+   * @param roleCode the stable role code to match (e.g. {@code ADMIN}, {@code OFFICER})
+   * @return the matching user ids; never {@code null}, possibly empty
+   */
+  @Query("SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode")
+  Set<UUID> findUserIdsByRoleCode(
+      @org.springframework.data.repository.query.Param("roleCode") String roleCode);
+
+  /**
+   * Returns the ids ({@code sub}s) of users who both hold the global role {@code roleCode} and are
+   * members of the given org unit. Backs the notification rule engine's {@code ORG_RELATIVE_ROLE}
+   * resolution of "officers of the responsible squadron" (role {@code OFFICER} intersected with
+   * membership of that org unit).
+   *
+   * @param roleCode the stable role code to match (e.g. {@code OFFICER})
+   * @param orgUnitId the org unit the user must be a member of
+   * @return the matching user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      "SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode AND EXISTS"
+          + " (SELECT 1 FROM OrgUnitMembership m WHERE m.id.userId = u.id AND m.id.orgUnitId ="
+          + " :orgUnitId)")
+  Set<UUID> findUserIdsByRoleCodeAndOrgUnitMembership(
+      @org.springframework.data.repository.query.Param("roleCode") String roleCode,
+      @org.springframework.data.repository.query.Param("orgUnitId") UUID orgUnitId);
 
   /**
    * Squadron-scoped paged listing. Filters by the user's single SQUADRON-kind membership in {@code
