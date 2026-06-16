@@ -34,6 +34,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -163,19 +164,55 @@ final class E2eSupport {
   }
 
   /**
-   * Launches headless Firefox, resolving {@code host.docker.internal} to the loopback via the
-   * {@code network.dns.localDomains} preference for the ephemeral stack (Firefox has no {@code
-   * --host-resolver-rules} equivalent).
+   * Launches headless Firefox pinned to a fresh HTTP/1.1 connection per request and, for the
+   * ephemeral stack, with {@code host.docker.internal} resolved to the loopback.
+   *
+   * <p>Two transport preferences together are the root-cause fix for the suite's dominant
+   * Firefox-only flake — the bank wipe/deposit {@code waitForResponse} hangs that survived raising
+   * the timeout to 60 s. The frontend serves <b>HTTP/2</b> (WebKit reports its aborts as {@code
+   * HTTP/2 Error: INTERNAL_ERROR}), and under CI load Gecko's h2 stack <b>resets the POST stream
+   * mid-flight</b>: the captured deposit reset truncated the request body (the frontend logged
+   * {@code POST /api/proxy/bank/deposits -> 400 "I/O error while reading input message"}) and the
+   * wipe reset dropped the response after the server had already committed {@code 200}. Either way
+   * the browser's {@code fetch()} rejects with a <em>network error</em> rather than delivering an
+   * HTTP response — the in-place handler shows its generic failure toast, and Playwright's {@code
+   * waitForResponse} never matches and hangs to its timeout. Chromium and WebKit absorb the same
+   * reset; Firefox does not, and (unlike an idempotent GET) never auto-retries a non-idempotent
+   * POST.
+   *
+   * <ul>
+   *   <li><b>{@code network.http.http2.enabled = false}</b> drops Firefox to HTTP/1.1, eliminating
+   *       the h2 stream-reset entirely. {@code network.http.keep-alive} is an HTTP/1.1-only knob,
+   *       so it could never touch the h2 streams that were actually failing — hence the timeout
+   *       bump and a bare keep-alive toggle did not help.
+   *   <li><b>{@code network.http.keep-alive = false}</b> then forces a fresh connection per request
+   *       on that HTTP/1.1 transport, so the analogous HTTP/1.1 connection-reuse race (Gecko
+   *       reusing a persistent connection the instant the server closes it → {@code NS_ERROR_ABORT}
+   *       / {@code NS_BINDING_ABORTED}) cannot occur either.
+   * </ul>
+   *
+   * <p>Together they give every request — XHR and navigation alike — a clean, dedicated HTTP/1.1
+   * connection, complementing {@link #navigate}'s abort retry rather than relying on it. The cost
+   * is a few extra localhost TLS handshakes, negligible for the suite, and this hardens transport
+   * only: it changes neither the app nor any assertion, so a genuine failure still fails. The
+   * notification SSE is unaffected — its response streams open over its own HTTP/1.1 connection.
+   *
+   * <p>For the ephemeral stack {@code network.dns.localDomains} additionally maps the Keycloak
+   * issuer host to the loopback (Firefox has no {@code --host-resolver-rules} equivalent).
    *
    * @param playwright the Playwright entry point
    * @param managesStack whether the ephemeral stack is in play (enables the local-domain remap)
    * @return a launched headless Firefox browser
    */
   private static Browser launchFirefox(Playwright playwright, boolean managesStack) {
-    BrowserType.LaunchOptions options = new BrowserType.LaunchOptions().setHeadless(true);
+    Map<String, Object> prefs = new HashMap<>();
+    prefs.put("network.http.http2.enabled", false);
+    prefs.put("network.http.keep-alive", false);
     if (managesStack) {
-      options.setFirefoxUserPrefs(Map.of("network.dns.localDomains", "host.docker.internal"));
+      prefs.put("network.dns.localDomains", "host.docker.internal");
     }
+    BrowserType.LaunchOptions options =
+        new BrowserType.LaunchOptions().setHeadless(true).setFirefoxUserPrefs(prefs);
     return playwright.firefox().launch(options);
   }
 
@@ -453,9 +490,21 @@ final class E2eSupport {
       }
       // Let the reset stream tear down and the page fall back to its prior, already-loaded document
       // before re-issuing the GET. The settle runs between attempts, outside the catch, so it can
-      // never mask the abort/timeout it follows.
+      // never mask the abort/timeout it follows. The load-state wait is best-effort and explicitly
+      // bounded: the next attempt issues a fresh GET that establishes its own load state, so a
+      // settle that itself outruns the timeout on a contended runner must not become the test's
+      // failure — swallow that TimeoutError and retry. Only the final attempt (below the loop)
+      // propagates a genuine navigation failure.
       page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
-      page.waitForLoadState();
+      try {
+        page.waitForLoadState(
+            null, new Page.WaitForLoadStateOptions().setTimeout(NAVIGATE_TIMEOUT_MILLIS));
+      } catch (TimeoutError settleTimeout) {
+        System.out.printf(
+            "[E2E][navigate] settle after attempt %d/%d to %s did not reach load state in time;"
+                + " retrying anyway%n",
+            attempt, NAVIGATE_MAX_ATTEMPTS, url);
+      }
     }
     return page.navigate(url, options);
   }
