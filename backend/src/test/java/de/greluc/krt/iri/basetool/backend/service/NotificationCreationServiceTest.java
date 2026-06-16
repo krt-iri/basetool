@@ -51,6 +51,7 @@ class NotificationCreationServiceTest {
   @Mock private RuleEvaluationService ruleEvaluationService;
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationParamsCodec notificationParamsCodec;
+  @Mock private NotificationStreamService notificationStreamService;
   @InjectMocks private NotificationCreationService service;
 
   private static JobOrderCreatedEvent event() {

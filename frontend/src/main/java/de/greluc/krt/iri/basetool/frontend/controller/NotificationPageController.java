@@ -26,6 +26,8 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.NotificationViewDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.constraints.NotNull;
+import java.io.IOException;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -41,6 +43,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -50,6 +53,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.Disposable;
 
 /**
  * Frontend page + AJAX relay for the per-user notification inbox. The browser never talks to the
@@ -71,9 +77,13 @@ public class NotificationPageController {
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
   private static final ParameterizedTypeReference<List<NotificationDto>> LIST_TYPE =
       new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<ServerSentEvent<String>> SSE_TYPE =
+      new ParameterizedTypeReference<>() {};
+  private static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
 
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
+  private final WebClient sseWebClient;
 
   /**
    * Renders the full notifications page (most recent first), fail-soft to an empty list.
@@ -102,6 +112,36 @@ public class NotificationPageController {
   @GetMapping(value = "/recent", headers = "X-Requested-With=XMLHttpRequest")
   public List<NotificationViewDto> recent() {
     return loadView(DROPDOWN_LIMIT);
+  }
+
+  /**
+   * Relays the backend notification SSE stream to the browser (REQ-NOTIF-010). The browser opens an
+   * {@code EventSource} here; this controller subscribes to the backend stream via the
+   * resilience-free {@code sseWebClient} and forwards each event. Best-effort: if the backend
+   * stream errors, the emitter completes with the error and the browser's polling fallback keeps
+   * the badge fresh.
+   *
+   * @return the SSE emitter writing to the browser
+   */
+  @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  public SseEmitter stream() {
+    SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
+    Disposable subscription =
+        sseWebClient
+            .get()
+            .uri(BACKEND_BASE + "/stream")
+            .retrieve()
+            .bodyToFlux(SSE_TYPE)
+            .subscribe(
+                event -> forward(emitter, event), emitter::completeWithError, emitter::complete);
+    emitter.onCompletion(subscription::dispose);
+    emitter.onTimeout(
+        () -> {
+          subscription.dispose();
+          emitter.complete();
+        });
+    emitter.onError(error -> subscription.dispose());
+    return emitter;
   }
 
   /**
@@ -241,6 +281,24 @@ public class NotificationPageController {
     } catch (Exception e) {
       log.debug("Failed to load unread count", e);
       return 0L;
+    }
+  }
+
+  private static void forward(SseEmitter emitter, ServerSentEvent<String> event) {
+    try {
+      SseEmitter.SseEventBuilder builder = SseEmitter.event();
+      if (event.event() != null) {
+        builder.name(event.event());
+      }
+      if (event.comment() != null) {
+        builder.comment(event.comment());
+      }
+      if (event.data() != null) {
+        builder.data(event.data());
+      }
+      emitter.send(builder);
+    } catch (IOException | RuntimeException e) {
+      emitter.completeWithError(e);
     }
   }
 

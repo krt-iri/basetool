@@ -422,6 +422,30 @@
         }
     }
 
+    // Best-effort real-time push (REQ-NOTIF-010): refresh immediately when the server pushes a
+    // "notification" event. The browser EventSource auto-reconnects on error, and the polling
+    // above is the guaranteed fallback, so SSE never needs to be reliable for correctness.
+    function startSse() {
+        if (
+            typeof window.EventSource !== 'function' ||
+            !document.getElementById('notification-badge')
+        ) {
+            return;
+        }
+        try {
+            const source = new EventSource('/notifications/stream');
+            source.addEventListener('notification', function () {
+                refreshUnreadCount();
+                const dropdown = document.getElementById('notification-dropdown');
+                if (dropdown && !dropdown.classList.contains('notification-dropdown-hidden')) {
+                    loadDropdown();
+                }
+            });
+        } catch (_error) {
+            /* SSE unavailable; the polling fallback remains */
+        }
+    }
+
     document.addEventListener('click', onDocumentClick);
     document.addEventListener('visibilitychange', onVisibilityChange);
 
@@ -429,4 +453,5 @@
     // /notifications page even when the bell is absent on a given render, so wiring is
     // unconditional; the badge poll only starts when a badge is present.
     startPolling();
+    startSse();
 })();

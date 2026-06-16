@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Neues Benachrichtigungssystem (Epic #622).** Eine Glocke oben rechts zeigt auf jeder Seite dauerhaft die Anzahl ungelesener Benachrichtigungen; Nutzer können Benachrichtigungen als gelesen markieren und einzeln oder gesammelt (gelesene) löschen — gelesene werden zusätzlich nach 90 Tagen automatisch entfernt. Beim Anlegen eines Auftrags werden die Offiziere der zuständigen Staffel bzw. die Leads des zuständigen Spezialkommandos sowie die Logistiker dieser Einheit und die Admins benachrichtigt (der Ersteller ausgenommen); wer wofür benachrichtigt wird, steuern Admins über datengetriebene Regeln. Neue Konfiguration: `APP_NOTIFICATIONS_RETENTION_ENABLED`, `APP_NOTIFICATIONS_RETENTION_MAX_AGE`, `APP_NOTIFICATIONS_RETENTION_INTERVAL`.
+- **Neues Benachrichtigungssystem (Epic #622).** Eine Glocke oben rechts zeigt auf jeder Seite dauerhaft die Anzahl ungelesener Benachrichtigungen; Nutzer können Benachrichtigungen als gelesen markieren und einzeln oder gesammelt (gelesene) löschen — gelesene werden zusätzlich nach 90 Tagen automatisch entfernt. Beim Anlegen eines Auftrags werden die Offiziere der zuständigen Staffel bzw. die Leads des zuständigen Spezialkommandos sowie die Logistiker dieser Einheit und die Admins benachrichtigt (der Ersteller ausgenommen); wer wofür benachrichtigt wird, steuern Admins über datengetriebene Regeln auf einer eigenen Verwaltungsseite. Neue Benachrichtigungen erscheinen per Echtzeit-Push (SSE) sofort, mit Polling als Rückfallebene. Neue Konfiguration: `APP_NOTIFICATIONS_RETENTION_ENABLED`, `APP_NOTIFICATIONS_RETENTION_MAX_AGE`, `APP_NOTIFICATIONS_RETENTION_INTERVAL`.
 
 ## [v0.5.1](https://github.com/krt-iri/basetool/releases/tag/v0.5.1) - 2026-06-15
 

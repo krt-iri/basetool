@@ -1,0 +1,42 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.iri.basetool.frontend.model.dto;
+
+import java.util.UUID;
+
+/**
+ * Frontend mirror of the backend {@code NotificationRuleSelectorDto}. Enum-typed backend fields are
+ * mirrored as {@link String} so the frontend stays decoupled from the backend enums; field names
+ * match the backend record (mirror-DTO rule).
+ *
+ * @param id selector id
+ * @param kind selector kind ({@code SPECIFIC_USER} / {@code ROLE} / {@code ORG_RELATIVE_ROLE})
+ * @param userSub target user for {@code SPECIFIC_USER}, else {@code null}
+ * @param roleCode role code for {@code ROLE}, else {@code null}
+ * @param orgRelativeRole org-relative role for {@code ORG_RELATIVE_ROLE}, else {@code null}
+ * @param contextRole context org unit for {@code ORG_RELATIVE_ROLE}, else {@code null}
+ */
+public record NotificationRuleSelectorDto(
+    UUID id,
+    String kind,
+    UUID userSub,
+    String roleCode,
+    String orgRelativeRole,
+    String contextRole) {}

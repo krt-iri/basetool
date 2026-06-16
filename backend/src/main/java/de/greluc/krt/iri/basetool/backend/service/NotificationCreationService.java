@@ -24,6 +24,7 @@ import de.greluc.krt.iri.basetool.backend.model.Notification;
 import de.greluc.krt.iri.basetool.backend.model.NotificationType;
 import de.greluc.krt.iri.basetool.backend.repository.NotificationRepository;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +52,7 @@ public class NotificationCreationService {
   private final RuleEvaluationService ruleEvaluationService;
   private final NotificationRepository notificationRepository;
   private final NotificationParamsCodec notificationParamsCodec;
+  private final NotificationStreamService notificationStreamService;
 
   /**
    * Resolves recipients for the event and writes one notification per recipient per produced type.
@@ -89,6 +91,24 @@ public class NotificationCreationService {
         toCreate.size(),
         event.eventType(),
         event.entityId());
+    pushRealtime(recipientsByType);
     return toCreate.size();
+  }
+
+  /**
+   * Best-effort real-time push: notifies the live SSE subscribers of every recipient so their
+   * client refreshes its unread state. A push failure is swallowed — the frontend polling fallback
+   * keeps the unread badge correct regardless (REQ-NOTIF-010).
+   *
+   * @param recipientsByType the resolved recipients grouped by produced type
+   */
+  private void pushRealtime(Map<NotificationType, Set<UUID>> recipientsByType) {
+    Set<UUID> recipientSubs = new HashSet<>();
+    recipientsByType.values().forEach(recipientSubs::addAll);
+    try {
+      notificationStreamService.publish(recipientSubs);
+    } catch (RuntimeException e) {
+      log.debug("Real-time notification push failed; polling fallback remains", e);
+    }
   }
 }

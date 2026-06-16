@@ -24,6 +24,7 @@ import de.greluc.krt.iri.basetool.backend.model.dto.NotificationDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.NotificationUnreadCountDto;
 import de.greluc.krt.iri.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.backend.service.NotificationService;
+import de.greluc.krt.iri.basetool.backend.service.NotificationStreamService;
 import de.greluc.krt.iri.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -50,6 +51,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * REST surface over the caller's own notification inbox. Every endpoint derives the recipient from
@@ -67,6 +69,25 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationController {
 
   private final NotificationService service;
+  private final NotificationStreamService streamService;
+
+  /**
+   * Opens a Server-Sent-Event stream for the caller (REQ-NOTIF-010). Best-effort real-time push;
+   * the frontend falls back to polling if the stream is unavailable. The recipient is the JWT
+   * {@code sub}, so a caller only ever streams their own notifications.
+   *
+   * @param authentication the caller's JWT authentication
+   * @return the SSE emitter registered for the caller
+   */
+  @GetMapping("/stream")
+  @Operation(summary = "Subscribe to the caller's notification stream (Server-Sent Events).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "SSE stream opened."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public SseEmitter stream(JwtAuthenticationToken authentication) {
+    return streamService.subscribe(requireSub(authentication));
+  }
 
   /**
    * Lists the caller's notifications, newest first by default.

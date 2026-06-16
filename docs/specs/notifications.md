@@ -5,10 +5,9 @@
 > [ADR-0015](../adr/0015-notification-data-driven-rule-engine.md),
 > [ADR-0016](../adr/0016-notification-transport-polling-sse.md) · **Epic:**
 > [#622](https://github.com/krt-iri/basetool/issues/622)
-> **Status:** Implemented — Phases 1–3, 5, 6, 8 delivered (epic
-> [#622](https://github.com/krt-iri/basetool/issues/622)). The admin rule UI (Phase 4) and the
-> real-time SSE push (Phase 7) are tracked separately; the seeded default rule and the in-app
-> polling deliver the first use case end-to-end without them.
+> **Status:** Implemented — all phases (0–8) delivered (epic
+> [#622](https://github.com/krt-iri/basetool/issues/622)). Real-time SSE push is best-effort with
+> in-app polling as the guaranteed fallback.
 
 ## Context & goal
 
@@ -143,10 +142,15 @@ API.
 - [x] The engine unions a rule's selectors, applies `exclude_actor`, and de-duplicates
   recipients.
 
+Admins manage rules through a dedicated admin page (list + create/edit form with a dynamic
+selector editor) that relays to the rule API.
+
 **Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest` ·
 **Code:** `model/NotificationRule`, `model/NotificationRuleSelector`,
 `service/RuleEvaluationService`, `service/NotificationRuleService`,
-`controller/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`
+`controller/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,
+frontend `controller/AdminNotificationRulePageController`,
+`templates/admin/notification-rules.html`, `static/js/notification-rules.js`
 
 ### REQ-NOTIF-008 — UC1: notify on job-order creation
 
@@ -184,14 +188,27 @@ independent of the user-initiated delete (REQ-NOTIF-005).
 (`deleteReadOlderThan`) · **Code:** `task/NotificationRetentionTask`,
 `service/NotificationService#purgeReadOlderThan`
 
-### REQ-NOTIF-010 — Real-time push (planned)
+### REQ-NOTIF-010 — Real-time push (SSE)
 
-Beyond the in-app polling baseline (REQ-NOTIF-006), real-time server push via SSE is planned
-(single-backend-instance in-memory emitter registry for v1; multi-instance fan-out via Redis
-pub/sub deferred). Polling remains the always-available fallback.
+Beyond the in-app polling baseline (REQ-NOTIF-006), real-time server push uses Server-Sent
+Events: a backend in-memory emitter registry keyed by `sub` (`NotificationStreamService`) with a
+heartbeat, exposed at `GET /api/v1/notifications/stream`; the frontend relays it to the browser
+via a resilience-free streaming WebClient (`WebClientConfig#sseWebClient`) and an `EventSource`.
+On a `notification` event the client refreshes its unread state immediately. Push is
+**best-effort** — the polling of REQ-NOTIF-006 is the guaranteed fallback, and a failed push or
+broken stream never affects correctness. The registry is single-backend-instance; multi-instance
+fan-out via Redis pub/sub remains a follow-up.
 
-**Status:** Planned — Phase 7 ([#630](https://github.com/krt-iri/basetool/issues/630)). Not yet
-implemented; the in-app polling of REQ-NOTIF-006 is the shipped real-time mechanism.
+**Acceptance**
+
+- [x] A created notification pushes a `notification` SSE event to the recipient's live streams.
+- [x] The push is best-effort: a failed send drops the emitter and the client falls back to
+  polling.
+
+**Enforced by:** full build (bean wiring), frontend lint gate · **Code:**
+`service/NotificationStreamService`, `controller/NotificationController#stream`, frontend
+`controller/NotificationPageController#stream`, `config/WebClientConfig#sseWebClient`,
+`static/js/notifications.js`
 
 ## Out of scope (v1)
 

@@ -123,7 +123,7 @@ public class WebClientConfig {
    * enabled — that path validates against a well-known CA pool where the hostname check is the only
    * thing tying the cert to the target host.
    */
-  private ReactorClientHttpConnector connector() {
+  private ReactorClientHttpConnector connector(boolean streaming) {
     try {
       SslContextBuilder builder = SslContextBuilder.forClient();
       java.util.List<String> profiles = java.util.Arrays.asList(environment.getActiveProfiles());
@@ -183,18 +183,32 @@ public class WebClientConfig {
                   })
               .option(
                   ChannelOption.CONNECT_TIMEOUT_MILLIS,
-                  Math.toIntExact(httpProperties.getConnectTimeout().toMillis()))
-              .responseTimeout(httpProperties.getResponseTimeout())
-              .doOnConnected(
-                  conn ->
-                      conn.addHandlerLast(
-                              new ReadTimeoutHandler(
-                                  httpProperties.getReadTimeout().toMillis(),
-                                  TimeUnit.MILLISECONDS))
-                          .addHandlerLast(
-                              new WriteTimeoutHandler(
-                                  httpProperties.getWriteTimeout().toMillis(),
-                                  TimeUnit.MILLISECONDS)));
+                  Math.toIntExact(httpProperties.getConnectTimeout().toMillis()));
+      if (streaming) {
+        // SSE relay: a long-lived response delivering sparse events. A response / read timeout
+        // would sever the stream between events, so neither is applied (the backend heartbeat
+        // keeps the connection warm); only a write timeout guards the outbound request.
+        httpClient =
+            httpClient.doOnConnected(
+                conn ->
+                    conn.addHandlerLast(
+                        new WriteTimeoutHandler(
+                            httpProperties.getWriteTimeout().toMillis(), TimeUnit.MILLISECONDS)));
+      } else {
+        httpClient =
+            httpClient
+                .responseTimeout(httpProperties.getResponseTimeout())
+                .doOnConnected(
+                    conn ->
+                        conn.addHandlerLast(
+                                new ReadTimeoutHandler(
+                                    httpProperties.getReadTimeout().toMillis(),
+                                    TimeUnit.MILLISECONDS))
+                            .addHandlerLast(
+                                new WriteTimeoutHandler(
+                                    httpProperties.getWriteTimeout().toMillis(),
+                                    TimeUnit.MILLISECONDS)));
+      }
       return new ReactorClientHttpConnector(httpClient);
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize SSL context", e);
@@ -287,7 +301,7 @@ public class WebClientConfig {
 
     return WebClient.builder()
         .exchangeStrategies(strategies)
-        .clientConnector(connector())
+        .clientConnector(connector(false))
         .apply(oauth2Client.oauth2Configuration())
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
@@ -318,7 +332,7 @@ public class WebClientConfig {
 
     return WebClient.builder()
         .exchangeStrategies(strategies)
-        .clientConnector(connector())
+        .clientConnector(connector(false))
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(webClientLoggingFilter.callLogging())
@@ -326,6 +340,36 @@ public class WebClientConfig {
             resilienceFilter(
                 "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
         .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
+        .baseUrl(backendProperties.getBackendUrl())
+        .build();
+  }
+
+  /**
+   * Streaming WebClient for the notification SSE relay (REQ-NOTIF-010). Relays the OAuth2 bearer
+   * and the correlation / active-org-unit / locale headers like {@link #webClient}, but
+   * deliberately omits the Resilience4j chain (its 5-second {@code TimeLimiter} and retry would
+   * sever a long-lived stream) and the response / read timeouts (see {@link #connector(boolean)}).
+   * Used only by the frontend stream relay; all request/response traffic still goes through {@link
+   * #webClient}.
+   *
+   * @param authorizedClientManager the OAuth2 authorised-client manager for bearer relay
+   * @return the streaming WebClient
+   */
+  @Bean
+  public WebClient sseWebClient(OAuth2AuthorizedClientManager authorizedClientManager) {
+    ServletOAuth2AuthorizedClientExchangeFilterFunction oauth2Client =
+        new ServletOAuth2AuthorizedClientExchangeFilterFunction(authorizedClientManager);
+    oauth2Client.setDefaultOAuth2AuthorizedClient(true);
+    oauth2Client.setDefaultClientRegistrationId("keycloak");
+
+    return WebClient.builder()
+        .clientConnector(connector(true))
+        .apply(oauth2Client.oauth2Configuration())
+        .filter(webClientLoggingFilter.correlationIdPropagation())
+        .filter(activeSquadronRelayFilter.relayActiveSquadron())
+        .filter(userLocaleRelayFilter.relayUserLocale())
+        .defaultHeaders(
+            headers -> headers.setAccept(java.util.List.of(MediaType.TEXT_EVENT_STREAM)))
         .baseUrl(backendProperties.getBackendUrl())
         .build();
   }
