@@ -164,23 +164,38 @@ final class E2eSupport {
   }
 
   /**
-   * Launches headless Firefox with HTTP keep-alive disabled and, for the ephemeral stack, {@code
-   * host.docker.internal} resolved to the loopback.
+   * Launches headless Firefox pinned to a fresh HTTP/1.1 connection per request and, for the
+   * ephemeral stack, with {@code host.docker.internal} resolved to the loopback.
    *
-   * <p><b>{@code network.http.keep-alive = false}</b> is the root-cause fix for the suite's
-   * dominant Firefox-only flake. Under CI load Gecko reuses an HTTP/1.1 persistent connection at
-   * the instant the frontend's Tomcat is closing it, and — unlike an idempotent GET, which it
-   * transparently re-sends — it does NOT auto-retry a non-idempotent POST, so the reset surfaces as
-   * {@code NS_ERROR_ABORT} / {@code NS_BINDING_ABORTED}. That tore down the in-place bank
-   * wipe/deposit XHRs (the server logged 200/400 while the browser saw the connection drop, so the
-   * success handler never ran and {@code waitForResponse} hung to its timeout) and the content
-   * navigations that {@link #navigate} retries. Forcing a fresh connection per request removes the
-   * race at its source for every request the suite makes — XHR and navigation alike — so it
-   * complements {@link #navigate}'s abort retry rather than relying on it. The cost is a few extra
-   * localhost TLS handshakes, negligible for the suite, and it hardens transport only: it changes
-   * neither the app nor any assertion, so a genuine failure still fails. Streaming responses (the
-   * notification SSE) are unaffected — keep-alive governs connection <em>reuse after</em> a
-   * completed request, not a response that stays open.
+   * <p>Two transport preferences together are the root-cause fix for the suite's dominant
+   * Firefox-only flake — the bank wipe/deposit {@code waitForResponse} hangs that survived raising
+   * the timeout to 60 s. The frontend serves <b>HTTP/2</b> (WebKit reports its aborts as {@code
+   * HTTP/2 Error: INTERNAL_ERROR}), and under CI load Gecko's h2 stack <b>resets the POST stream
+   * mid-flight</b>: the captured deposit reset truncated the request body (the frontend logged
+   * {@code POST /api/proxy/bank/deposits -> 400 "I/O error while reading input message"}) and the
+   * wipe reset dropped the response after the server had already committed {@code 200}. Either way
+   * the browser's {@code fetch()} rejects with a <em>network error</em> rather than delivering an
+   * HTTP response — the in-place handler shows its generic failure toast, and Playwright's {@code
+   * waitForResponse} never matches and hangs to its timeout. Chromium and WebKit absorb the same
+   * reset; Firefox does not, and (unlike an idempotent GET) never auto-retries a non-idempotent
+   * POST.
+   *
+   * <ul>
+   *   <li><b>{@code network.http.http2.enabled = false}</b> drops Firefox to HTTP/1.1, eliminating
+   *       the h2 stream-reset entirely. {@code network.http.keep-alive} is an HTTP/1.1-only knob,
+   *       so it could never touch the h2 streams that were actually failing — hence the timeout
+   *       bump and a bare keep-alive toggle did not help.
+   *   <li><b>{@code network.http.keep-alive = false}</b> then forces a fresh connection per request
+   *       on that HTTP/1.1 transport, so the analogous HTTP/1.1 connection-reuse race (Gecko
+   *       reusing a persistent connection the instant the server closes it → {@code NS_ERROR_ABORT}
+   *       / {@code NS_BINDING_ABORTED}) cannot occur either.
+   * </ul>
+   *
+   * <p>Together they give every request — XHR and navigation alike — a clean, dedicated HTTP/1.1
+   * connection, complementing {@link #navigate}'s abort retry rather than relying on it. The cost
+   * is a few extra localhost TLS handshakes, negligible for the suite, and this hardens transport
+   * only: it changes neither the app nor any assertion, so a genuine failure still fails. The
+   * notification SSE is unaffected — its response streams open over its own HTTP/1.1 connection.
    *
    * <p>For the ephemeral stack {@code network.dns.localDomains} additionally maps the Keycloak
    * issuer host to the loopback (Firefox has no {@code --host-resolver-rules} equivalent).
@@ -191,6 +206,7 @@ final class E2eSupport {
    */
   private static Browser launchFirefox(Playwright playwright, boolean managesStack) {
     Map<String, Object> prefs = new HashMap<>();
+    prefs.put("network.http.http2.enabled", false);
     prefs.put("network.http.keep-alive", false);
     if (managesStack) {
       prefs.put("network.dns.localDomains", "host.docker.internal");
