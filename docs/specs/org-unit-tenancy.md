@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-09.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-16.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -183,3 +183,22 @@ creator column and no `is_internal` flag:
 
 Only `Mission` and `Operation` gain this carve-out; `JobOrder` stays NOT NULL (org-owned by
 construction, no creator-owner fallback and no ownerless-leadership use case).
+
+### REQ-ORG-010 — Active-context surfacing in the UI
+
+The active OrgUnit context is surfaced to the user **only** by appending it to the application
+title (`appTitle`, resolved in
+[`SquadronContextAdvice`](../../frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/config/SquadronContextAdvice.java)),
+which renders in both the browser `<title>` tag and the sidebar brand logo text. The suffix is:
+
+- the active OrgUnit's **shorthand** (falling back to its name) for an active pin of **either**
+  kind — `SQUADRON` *or* `SPECIAL_COMMAND`. `appTitle` reads the merged `activeOrgUnit` catalogue,
+  not the Squadron-only `activeSquadron`, so an SK pin shows in the title;
+- the localised "Alle Staffeln" label for an admin in all-OrgUnits mode (no pin);
+- nothing (plain "Profit Basetool") when no context applies (squadron-less non-admin, anonymous).
+
+There is **no separate context chip**. An always-on top-right context chip used to render the same
+information (and was the only surface that distinguished/showed an SK pin); it was removed as
+redundant once `appTitle` carried the context for every kind. Do not reintroduce a parallel
+always-on context badge — the title is the single source. The Staffel-vs-SK *kind* distinction the
+chip carried is intentionally not reproduced in the title; the shorthand identifies the unit.

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.frontend.config;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,8 +28,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.iri.basetool.frontend.config.SquadronContextAdvice.CapabilitiesResponse;
+import de.greluc.krt.iri.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.FrontendAuthHelperService;
+import java.util.Locale;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -36,10 +40,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 
 /**
- * Unit tests for the per-principal capability gates in {@link SquadronContextAdvice}: the shared
- * {@code meCapabilities} resolver (a single backend round-trip, admins short-circuited, anonymous
- * short-circuited, fail-closed on error) and the two derived sidebar flags {@code
- * canSeeBlueprintOverview} (#364) and {@code canViewJobOrders} (profit-eligible order visibility).
+ * Unit tests for {@link SquadronContextAdvice}. Two groups: (1) the per-principal capability gates
+ * — the shared {@code meCapabilities} resolver (a single backend round-trip, admins
+ * short-circuited, anonymous short-circuited, fail-closed on error) and the two derived sidebar
+ * flags {@code canSeeBlueprintOverview} (#364) and {@code canViewJobOrders} (profit-eligible order
+ * visibility); (2) the {@code appTitle} composition (REQ-ORG-010) — the single surface for the
+ * active OrgUnit context after the redundant top-right chip was removed, including the SK-pin case
+ * the chip used to be the only surface for.
  */
 @ExtendWith(MockitoExtension.class)
 class SquadronContextAdviceTest {
@@ -113,5 +120,70 @@ class SquadronContextAdviceTest {
   void derivedFlags_nullCapabilities_areFalse() {
     assertFalse(advice().canSeeBlueprintOverview(null));
     assertFalse(advice().canViewJobOrders(null));
+  }
+
+  @Test
+  void appTitle_squadronPin_appendsShorthand() {
+    // covers REQ-ORG-010 — a Staffel pin surfaces in the app title.
+    stubEchoMessages();
+    OrgUnitMembershipOptionDto pin =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON", true);
+
+    assertEquals("app.title.with.squadron:IRI", advice().appTitle(pin, false));
+  }
+
+  @Test
+  void appTitle_specialCommandPin_appendsShorthand() {
+    // covers REQ-ORG-010 — an SK pin now surfaces in the app title. The removed context chip used
+    // to be the only surface that showed an SK pin (appTitle previously read the Squadron-only
+    // catalogue); this guards against that regression.
+    stubEchoMessages();
+    OrgUnitMembershipOptionDto pin =
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "Spezialkommando Alpha", "SK-A", "SPECIAL_COMMAND", true);
+
+    assertEquals("app.title.with.squadron:SK-A", advice().appTitle(pin, false));
+  }
+
+  @Test
+  void appTitle_pinWithoutShorthand_fallsBackToName() {
+    // covers REQ-ORG-010 — shorthand is optional; the OrgUnit name is the fallback suffix.
+    stubEchoMessages();
+    OrgUnitMembershipOptionDto pin =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Leadership", null, "SQUADRON", true);
+
+    assertEquals("app.title.with.squadron:Leadership", advice().appTitle(pin, false));
+  }
+
+  @Test
+  void appTitle_adminAllOrgUnitsMode_usesAllLabel() {
+    // covers REQ-ORG-010 — admin without a pin shows the localised "all squadrons" label.
+    stubEchoMessages();
+
+    assertEquals("app.title.all.squadrons:squadron.switcher.all", advice().appTitle(null, true));
+  }
+
+  @Test
+  void appTitle_noContext_isPlain() {
+    // covers REQ-ORG-010 — no active context renders the plain product title.
+    stubEchoMessages();
+
+    assertEquals("app.title", advice().appTitle(null, false));
+  }
+
+  /**
+   * Stubs the mocked {@link MessageSource} to echo each requested code, suffixed with the first
+   * format argument when one is present (e.g. {@code "app.title.with.squadron:IRI"}). Keeps the
+   * {@code appTitle} assertions focused on the resolved code + argument without binding to real
+   * bundle text or fiddly array matchers.
+   */
+  private void stubEchoMessages() {
+    when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
+        .thenAnswer(
+            inv -> {
+              String code = inv.getArgument(0);
+              Object[] args = inv.getArgument(1);
+              return args != null && args.length > 0 ? code + ":" + args[0] : code;
+            });
   }
 }

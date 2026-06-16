@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der aktive Bereichskontext (z. B. „IRIDIUM" oder „Alle Staffeln") wird nicht mehr doppelt angezeigt.** Bisher stand er gleichzeitig im Chip oben rechts und hinter dem App-Titel. Der überflüssige Chip entfällt; der aktive Bereich bleibt hinter dem App-Titel sichtbar — jetzt auch bei aktivem Spezialkommando, das der Titel zuvor nicht anzeigte.
+
 ## [v0.5.2](https://github.com/krt-iri/basetool/releases/tag/v0.5.2) - 2026-06-16
 
 ### Added

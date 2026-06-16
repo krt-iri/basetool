@@ -2,34 +2,10 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <body>
 <th:block th:fragment="sidebar">
-    <!-- Persistent org-unit-context chip (always visible top-right). Shows the active
-         org-unit shorthand with a [Staffel: …] vs [SK: …] kind label per
-         SPEZIALKOMMANDO_PLAN.md §7.2, or "ALL" for admins viewing the cross-staffel union.
-         Anonymous callers see nothing. The kind label hooks the SK chip onto the neutral
-         orgunit-context-chip-sk variant so SK pins are visually distinct from Staffel pins
-         without competing with the brand-orange Staffel chip. -->
-    <div sec:authorize="isAuthenticated()" id="squadron-context-chip" class="squadron-context-chip"
-         th:classappend="${isActiveOrgUnitSpecialCommand ? ' squadron-context-chip-sk' : ''}"
-         th:title="${isAllSquadronsMode ? #messages.msg('squadron.badge.admin') : #messages.msg('squadron.context.badge')}">
-        <span class="squadron-context-chip-label"
-              th:if="${activeOrgUnit != null and isActiveOrgUnitSpecialCommand}"
-              th:text="#{orgUnit.context.label.specialCommand}">SK</span>
-        <span class="squadron-context-chip-label"
-              th:if="${activeOrgUnit != null and !isActiveOrgUnitSpecialCommand}"
-              th:text="#{orgUnit.context.label.squadron}">Staffel</span>
-        <span class="squadron-context-chip-label"
-              th:if="${activeOrgUnit == null}"
-              th:text="#{squadron.context.badge}">Org-unit context</span>
-        <span class="squadron-context-chip-value"
-              th:if="${activeOrgUnit != null}"
-              th:text="${activeOrgUnit.orgUnitShorthand() != null ? activeOrgUnit.orgUnitShorthand() : activeOrgUnit.orgUnitName()}">IRI</span>
-        <span class="squadron-context-chip-value squadron-context-chip-all"
-              th:if="${activeOrgUnit == null and isAllSquadronsMode}"
-              th:text="#{squadron.switcher.all}">All squadrons</span>
-        <span class="squadron-context-chip-value squadron-context-chip-empty"
-              th:if="${activeOrgUnit == null and !isAllSquadronsMode}"
-              th:text="#{squadron.context.none}">No org-unit context</span>
-    </div>
+    <!-- The active org-unit context is surfaced solely via the application title (see
+         SquadronContextAdvice#appTitle and REQ-ORG-010) — the brand logo text in the header
+         and the browser <title>. The previously-rendered top-right context chip was removed
+         as redundant; do not reintroduce a parallel always-on context badge here. -->
     <!-- Notification bell + always-on unread badge (epic #622, REQ-NOTIF-006). Top-right on every
          page; the badge shows whenever unreadNotificationCount > 0 and is kept fresh by polling
          in notifications.js. The dropdown content is loaded lazily via AJAX on open. -->
