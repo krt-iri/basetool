@@ -210,11 +210,29 @@ Kosten, Erzverkäufe, Start) with the empty/uncertain ones amber. CTA **„Als J
 exportieren"**.
 
 **5.5 Export & Upload.** Green success alert with the written
-`RefineryExtract.json` path + a small summary. A large "Upload into the basetool"
-card spelling out the **manual-upload v1 flow** (Refinery → Import order → pick the
-JSON → review the pre-filled form), with outline "Basetool öffnen" + ghost "Neue
-Extraktion". A side **provenance** panel mirrors the contract fields (tool, model,
-schemaVersion, panelType=SETUP, generatedAt).
+`RefineryExtract.json` path + a small summary. The step's single filled CTA is now
+**„An Basetool senden"** — the **one-click send** of epic
+[#639](https://github.com/krt-iri/basetool/issues/639) (transport spec
+[`docs/specs/desktop-ingest.md`](specs/desktop-ingest.md), `REQ-INGEST-*`;
+[ADR-0018](adr/0018-desktop-ingest-gateway-device-grant.md)). Pressing it:
+
+1. **First send only — consent.** A KRT scrim modal (never a native dialog) names
+   the artifact, the destination (your own basetool account), and the exact personal
+   fields that leave the machine, and is confirmed once; the choice is persisted
+   (non-secret) so later sends skip it. This is the opt-in that scopes the README's
+   *„nichts verlässt deinen Rechner"* promise — egress is explicit and user-triggered.
+2. **Browser approval (device grant).** The modal shows a short user code and opens
+   the browser; under an existing Keycloak SSO session the approval is one click.
+3. **Send + open.** The exact exported bytes go to the ingest gateway over TLS (the
+   gateway forwards the per-`sub` token to the backend's import endpoint and stages
+   the matched draft in single-use Redis), then the browser opens the **pre-filled**
+   review form via `…?handoff=<id>`. The human **review-before-commit** step (§6) is
+   unchanged — nothing is persisted until the user confirms in the browser.
+
+The earlier **manual-upload flow** (Refinery → Import order → pick the JSON → review
+the pre-filled form) remains documented as the offline fallback; **„Neue Extraktion"**
+is demoted to a ghost action. A side **provenance** panel mirrors the contract fields
+(tool, model, schemaVersion, panelType=SETUP, generatedAt). The CLI never sends.
 
 ---
 
