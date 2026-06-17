@@ -600,20 +600,14 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void reauthRequired_htmlNavigation_redirectsToKeycloakLoginFlow() {
-    ReauthenticationRequiredException ex =
-        new ReauthenticationRequiredException("token gone", null);
-
-    Object result = handler.handleReauthenticationRequired(ex, navigationRequest());
+    Object result = handler.handleReauthenticationRequired(navigationRequest());
 
     assertEquals("redirect:/oauth2/authorization/keycloak", result);
   }
 
   @Test
   void reauthRequired_ajax_returns401WithReauthenticateHeaderAndBody() {
-    ReauthenticationRequiredException ex =
-        new ReauthenticationRequiredException("token gone", null);
-
-    Object result = handler.handleReauthenticationRequired(ex, ajaxRequest());
+    Object result = handler.handleReauthenticationRequired(ajaxRequest());
 
     assertInstanceOf(ResponseEntity.class, result);
     ResponseEntity<?> response = (ResponseEntity<?>) result;
@@ -636,10 +630,8 @@ class GlobalExceptionHandlerTest {
     when(req.getContextPath()).thenReturn("/app");
     when(req.getMethod()).thenReturn("GET");
     when(req.getRequestURI()).thenReturn("/app/inventory");
-    ReauthenticationRequiredException ex =
-        new ReauthenticationRequiredException("token gone", null);
 
-    Object result = handler.handleReauthenticationRequired(ex, req);
+    Object result = handler.handleReauthenticationRequired(req);
 
     assertEquals("redirect:/app/oauth2/authorization/keycloak", result);
   }

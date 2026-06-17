@@ -141,15 +141,13 @@ public class GlobalExceptionHandler {
    * can redirect the whole browser window — an in-place toast would strand the user on a dead
    * session.
    *
-   * @param ex the typed re-authentication signal raised by {@code BackendApiClient}
    * @param request the current request, used to decide HTML-redirect vs JSON and to prefix the
    *     context path
    * @return a {@code redirect:} view name for HTML, or a {@code 401} {@link ResponseEntity} for
    *     JSON
    */
   @ExceptionHandler(ReauthenticationRequiredException.class)
-  public Object handleReauthenticationRequired(
-      @NotNull ReauthenticationRequiredException ex, @NotNull HttpServletRequest request) {
+  public Object handleReauthenticationRequired(@NotNull HttpServletRequest request) {
     String reauthUrl = request.getContextPath() + ReauthenticationRequiredException.REAUTH_PATH;
     log.warn(
         "Re-authentication required for {} {}: redirecting to the Keycloak login flow.",
