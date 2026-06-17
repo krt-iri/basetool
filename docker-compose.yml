@@ -297,7 +297,11 @@ x-ingest: &ingest-template
     # has BOTH the extractor and frontend tokens carrying aud=basetool-backend. Only then set this to
     # basetool-backend — enabling it earlier rejects every frontend token and breaks the app.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
-    # Truststore only (the gateway serves HTTP); same keystore + password the other modules use.
+    # Truststore only (the gateway serves plain HTTP behind NPM); same keystore + password the other
+    # modules use. These also bind to `server.ssl.key-store`, which would otherwise switch the
+    # gateway's own connector to HTTPS on 11262 and break NPM's http:// proxy + the Docker
+    # HEALTHCHECK — the ingest module pins `server.ssl.enabled=false` (ingest application.yml) so
+    # these stay truststore-only.
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0

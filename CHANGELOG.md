@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Ein-Klick-Versand aus dem SC-Extractor schlug mit „HTTP 400" fehl und der `ingest`-Dienst blieb dauerhaft `unhealthy`.** Der Gateway-Dienst startete fälschlich mit TLS auf Port 11262 — die nur als Truststore gedachten `SERVER_SSL_KEY_STORE`-Variablen aktivierten zugleich den Server-Connector —, sodass der per Plain-HTTP anbindende Reverse-Proxy (nackte 400) und der Container-Healthcheck abgewiesen wurden. Der Dienst serviert jetzt wie vorgesehen Plain-HTTP hinter dem Proxy (`server.ssl.enabled=false`); die Truststore-Nutzung für die Backend-Verbindung bleibt unverändert.
+
 ## [v0.5.4](https://github.com/krt-iri/basetool/releases/tag/v0.5.4) - 2026-06-17
 
 ### Added
