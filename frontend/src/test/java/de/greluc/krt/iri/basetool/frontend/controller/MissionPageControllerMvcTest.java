@@ -239,7 +239,9 @@ class MissionPageControllerMvcTest {
    */
   private void stubEmptyFinance(UUID missionId) {
     when(backendApiClient.get(
-            contains("/finance-entries"), any(ParameterizedTypeReference.class), eq(false)))
+            eq("/api/v1/missions/" + missionId + "/finance-entries?size=1000"),
+            any(ParameterizedTypeReference.class),
+            eq(false)))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList()));
   }
