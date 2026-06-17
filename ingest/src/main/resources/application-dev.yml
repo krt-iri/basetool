@@ -1,0 +1,17 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+
+app:
+  ingest:
+    # Dev talks to the locally-bound backend (self-signed; the dev profile trusts it insecurely)
+    # and opens the dev frontend.
+    backend-base-url: ${BACKEND_URL:https://localhost:11261}
+    frontend-base-url: ${FRONTEND_URL:http://localhost:18081}
+
+logging:
+  level:
+    de.greluc.krt.iri.basetool.ingest: DEBUG

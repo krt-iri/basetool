@@ -1,0 +1,18 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Unreachable placeholder issuer; the JWKS fetch is lazy, and slice tests supply their own
+          # JwtDecoder / mock authentication so no network call is made.
+          issuer-uri: http://keycloak.example.com/realms/test
+
+app:
+  ingest:
+    backend-base-url: http://localhost:19999
+    frontend-base-url: http://localhost:18081
+    handoff-ttl: PT1M
+    max-payload-bytes: 1048576
+  rate-limit:
+    # Disabled by default for tests; the rate-limit test re-enables it explicitly.
+    enabled: false

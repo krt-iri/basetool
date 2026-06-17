@@ -1,0 +1,83 @@
+server:
+  port: 11262
+  # Behind nginx-proxy-manager (TLS terminated at the proxy); `framework` makes Spring consume
+  # X-Forwarded-* so the rate-limit filter sees the real client IP, not the proxy's.
+  forward-headers-strategy: framework
+  max-http-request-header-size: 65536
+  shutdown: graceful
+
+spring:
+  application:
+    name: ingest
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  messages:
+    fallback-to-system-locale: false
+  web:
+    error:
+      whitelabel:
+        enabled: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+
+app:
+  ingest:
+    backend-base-url: ${BACKEND_URL:https://backend:11261}
+    frontend-base-url: ${FRONTEND_URL:https://app.profit-base.online}
+    refinery-path: /refinery-orders/create
+    blueprint-path: /personal-blueprints/import
+    handoff-ttl: PT5M
+    max-payload-bytes: 2097152
+  rate-limit:
+    enabled: true
+    capacity: 30
+    refill-tokens: 30
+    refill-period: PT1M
+  security:
+    jwt:
+      # Opt-in audience check. Empty by default; set to `basetool-backend` ONLY after both the
+      # extractor and frontend tokens carry that audience (docs/INGEST_KEYCLOAK_SETUP.md).
+      expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
+
+# Resilience4j around the backend relay. HTTP response errors are ignored (a 400 envelope reject is
+# a client problem, not a backend-health signal); only transport failures open the breaker.
+resilience4j:
+  circuitbreaker:
+    instances:
+      backend:
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 10s
+        ignore-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException
+
+logging:
+  level:
+    root: INFO
+    io.github.resilience4j: INFO
+
+# Actuator: expose only `health` (Docker HEALTHCHECK / compose service_healthy gating); bare status.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      probes:
+        enabled: true
