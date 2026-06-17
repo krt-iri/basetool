@@ -128,6 +128,27 @@ REDIS_PASSWORD=CHANGE_ME
 Compose uses `${VAR:?...}` references throughout — if any required variable
 is missing, the stack refuses to start.
 
+#### Ingest gateway (epic #639 — desktop one-click send)
+
+The `ingest` service is the only **new** internet-reachable component: it lets the
+desktop extractor push its JSON straight into the basetool (design: [ADR-0018](docs/adr/0018-desktop-ingest-gateway-device-grant.md),
+[`docs/specs/desktop-ingest.md`](docs/specs/desktop-ingest.md)). It serves plain HTTP on
+port `11262` (TLS is terminated at NPM), owns no database, and relays to the backend over
+the internal network — **the backend stays internet-unreachable**.
+
+To expose it, add a new **NPM proxy host** (alongside the existing frontend/keycloak hosts):
+
+- Domain: `ingest.<your-domain>` (e.g. `ingest.profit-base.online`), with a Let's Encrypt cert.
+- Forward: scheme `http`, host `ingest`, port `11262`. (Not HTTPS — the gateway has no keystore.)
+- Set `client_max_body_size 2m` for this host to match the gateway's payload cap; a real
+  extract is a few KB.
+
+Optional `.env` keys (defaults shown, see `.env.example`): `IRI_FRONTEND_PUBLIC_URL` (the public
+frontend URL the gateway returns to the extractor) and `IRI_INGEST_EXPECTED_AUDIENCES` (leave
+empty until the Keycloak audience runbook [`docs/INGEST_KEYCLOAK_SETUP.md`](docs/INGEST_KEYCLOAK_SETUP.md)
+is applied). Verify from outside afterwards that `https://ingest.<domain>/v1/...` requires a token
+and that the backend's `/api/v1/**` remains unreachable.
+
 ### 3.2 Production deployment (GHCR pull + systemd timer)
 
 Production hosts do **not** build images locally. The

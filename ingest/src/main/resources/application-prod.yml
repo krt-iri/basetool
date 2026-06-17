@@ -4,6 +4,19 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
+  # SSL bundle that exposes the bind-mounted keystore.p12 as a TRUSTSTORE for the backend WebClient
+  # (the gateway itself serves plain HTTP behind NPM, but it must trust the backend's self-signed
+  # https://backend:11261 cert). WebClientConfig consumes this via SslBundles.getBundle("backend-trust")
+  # on the prod path; if absent it falls back to the default JVM trust store. Same env vars the other
+  # modules already use — no new compose secret. Mirrors the frontend's backend-trust bundle.
+  ssl:
+    bundle:
+      jks:
+        backend-trust:
+          truststore:
+            location: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
+            password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+            type: PKCS12
 
 # OpenAPI document is disabled in prod (parity with the backend) — never reachable from outside.
 springdoc:

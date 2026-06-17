@@ -82,6 +82,24 @@ x-frontend-watch: &frontend-watch
       - action: rebuild
         path: ./versions.properties
 
+x-ingest-build: &ingest-build
+  build:
+    context: .
+    dockerfile: ingest/Dockerfile
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-ingest:${IRI_BASETOOL_VERSION:-local}
+
+x-ingest-watch: &ingest-watch
+  develop:
+    watch:
+      - action: rebuild
+        path: ./ingest/src
+      - action: rebuild
+        path: ./ingest/build.gradle.kts
+      - action: rebuild
+        path: ./build.gradle.kts
+      - action: rebuild
+        path: ./versions.properties
+
 services:
   backend:
     <<: *backend-build
@@ -94,3 +112,9 @@ services:
 
   frontend-dev:
     <<: [*frontend-build, *frontend-watch]
+
+  ingest:
+    <<: *ingest-build
+
+  ingest-dev:
+    <<: [*ingest-build, *ingest-watch]

@@ -263,12 +263,54 @@ x-frontend: &frontend-template
     - /var/iri/frontend/log:/app/logs
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
 
+x-ingest: &ingest-template
+  # The desktop one-click ingest gateway (epic #639, ADR-0018) — the ONLY new internet-reachable
+  # service. NPM terminates TLS and proxies to its plain-HTTP port, so unlike backend/frontend it
+  # carries no server keystore; the bind-mounted keystore.p12 is used only as a TRUSTSTORE so the
+  # gateway can validate the backend's self-signed https://backend:11261 cert (backend-trust bundle
+  # in application-prod.yml). It owns no database — it relays to the backend and stages a short-lived
+  # single-use handoff in the shared Redis. See x-backend for the GHCR / IRI_BASETOOL_VERSION
+  # rationale; local rebuilds use docker-compose.build.yml.
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
+  restart: always
+  logging: *default-logging
+  stop_grace_period: 30s
+  # Lightweight: a JWT-validating relay + Redis staging, no JPA, no business logic. 512 MB →
+  # ~384 MB heap with MaxRAMPercentage=75 covers Tomcat, the reactive WebClient and Lettuce.
+  deploy:
+    resources:
+      limits:
+        memory: 512M
+        cpus: '1.0'
+  environment:
+    SPRING_PROFILES_ACTIVE: prod
+    SERVER_PORT: 11262
+    KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
+    BACKEND_URL: https://backend:11261
+    # Public frontend URL the extractor's browser is sent to (…?handoff=<id>). Override per
+    # deployment in .env; the local dev stack should point this at http://localhost:18081.
+    FRONTEND_URL: ${IRI_FRONTEND_PUBLIC_URL:-https://profit-base.online}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    # Audience enforcement stays OFF until the Keycloak runbook (#641, docs/INGEST_KEYCLOAK_SETUP.md)
+    # has BOTH the extractor and frontend tokens carrying aud=basetool-backend. Only then set this to
+    # basetool-backend — enabling it earlier rejects every frontend token and breaks the app.
+    APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
+    # Truststore only (the gateway serves HTTP); same keystore + password the other modules use.
+    SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
+    SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
+  volumes:
+    - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+
 services:
   redis:
     <<: *redis-template
     profiles: ["prod"]
     networks:
       - net-redis-frontend
+      - net-redis-ingest
 
   redis-dev:
     <<: *redis-template
@@ -277,6 +319,9 @@ services:
       - "127.0.0.1:6379:6379"
     networks:
       net-redis-frontend:
+        aliases:
+          - redis
+      net-redis-ingest:
         aliases:
           - redis
 
@@ -355,6 +400,7 @@ services:
       - net-db-backend
       - net-backend-frontend
       - net-backend-keycloak
+      - net-backend-ingest
 
   backend-dev:
     <<: *backend-template
@@ -374,6 +420,9 @@ services:
         aliases:
           - backend
       net-backend-keycloak:
+        aliases:
+          - backend
+      net-backend-ingest:
         aliases:
           - backend
 
@@ -419,6 +468,40 @@ services:
         aliases:
           - frontend
 
+  ingest:
+    <<: *ingest-template
+    profiles: ["prod"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - net-proxy-ingest
+      - net-backend-ingest
+      - net-redis-ingest
+
+  ingest-dev:
+    <<: *ingest-template
+    profiles: ["dev"]
+    ports:
+      - "127.0.0.1:11262:11262"
+    depends_on:
+      backend-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_healthy
+    networks:
+      net-proxy-ingest:
+        aliases:
+          - ingest
+      net-backend-ingest:
+        aliases:
+          - ingest
+      net-redis-ingest:
+        aliases:
+          - ingest
+
   npm:
     # Pin to a concrete release. Bump deliberately as part of an upgrade workflow;
     # do not move back to `:latest` (silent upstream changes are a supply-chain risk
@@ -462,6 +545,7 @@ services:
     networks:
       - net-proxy-frontend
       - net-proxy-keycloak
+      - net-proxy-ingest
 
 networks:
   net-db-backend:
@@ -477,4 +561,12 @@ networks:
   net-backend-keycloak:
     driver: bridge
   net-redis-frontend:
+    driver: bridge
+  # Ingest gateway (epic #639): proxy → ingest (the only new internet-facing edge),
+  # ingest → backend, ingest → redis. backend stays OFF net-proxy-ingest.
+  net-proxy-ingest:
+    driver: bridge
+  net-backend-ingest:
+    driver: bridge
+  net-redis-ingest:
     driver: bridge

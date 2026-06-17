@@ -87,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [backend, frontend]
+        module: [backend, frontend, ingest]
         platform: [linux/amd64, linux/arm64]
         # `include` augments the cartesian product without expanding it: each
         # of the 4 (module, platform) combinations gets the matching `runs-on`
@@ -289,7 +289,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [backend, frontend]
+        module: [backend, frontend, ingest]
 
     steps:
       - name: Download per-arch digests
