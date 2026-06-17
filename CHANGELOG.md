@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Im Finanzen-Tab einer Mission fehlte der Abstand zwischen dem Auszahlungsblock und der Raffinerieaufträge-Liste.** Der AJAX-Umbau der Mission-Detailseite hatte die Finanzblöcke in einen gemeinsamen Container verschachtelt und dabei den standardmäßigen Abstand zwischen ihnen verloren; der gewohnte Abstand ist jetzt wiederhergestellt.
+
 ## [v0.5.6](https://github.com/krt-iri/basetool/releases/tag/v0.5.6) - 2026-06-17
 
 ### Changed

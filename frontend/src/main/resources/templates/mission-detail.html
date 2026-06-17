@@ -61,6 +61,12 @@
         .tab-panes { padding: 14px 16px 18px; }
         .tab-pane { display: none; flex-direction: column; gap: 12px; }
         .tab-pane.on { display: flex; }
+        /* #574 wrapped the finance pane's blocks (summary strip, ledger/payout grid,
+           Wirtschaft details) in #finance-results for in-place AJAX swaps, demoting them
+           from direct flex children of .tab-pane to plain block-flow and dropping the
+           standard 12px inter-block gap (e.g. payout block -> Raffinerieauftraege).
+           Re-establish the same flex column here. */
+        #finance-results { display: flex; flex-direction: column; gap: 12px; }
         .pane-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
         .pane-grid-fin { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; align-items: start; }
         .pane-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
