@@ -27,10 +27,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Per-IP rate-limit budget for the ingest endpoints (prefix {@code app.rate-limit}). The new
- * ingress must not become a way to hammer the backend's import endpoints, so each client IP gets a
- * small token bucket refilled on a fixed interval (REQ-INGEST-005). Modelled on the backend's
- * bucket4j limiter but scoped to this module's two endpoints.
+ * Rate-limit budget for the ingest endpoints (prefix {@code app.rate-limit}). The new ingress must
+ * not become a way to hammer the backend's import endpoints, so each caller gets a small token
+ * bucket refilled on a fixed interval (REQ-INGEST-005). This single budget is applied on two keys:
+ * per authenticated JWT subject ({@link
+ * de.greluc.krt.iri.basetool.ingest.ratelimit.SubjectRateLimiter}, the enforceable control) and per
+ * source IP ({@link de.greluc.krt.iri.basetool.ingest.filter.RateLimitingFilter}, a coarse pre-auth
+ * front line). Modelled on the backend's bucket4j limiter but scoped to this module's two
+ * endpoints.
  */
 @Data
 @Validated
@@ -40,7 +44,7 @@ public class RateLimitProperties {
   /** Master switch; set {@code false} (e.g. in the e2e stack) to disable throttling entirely. */
   private boolean enabled = true;
 
-  /** Bucket size: the maximum burst of ingest calls a single client IP may make. */
+  /** Bucket size: the maximum burst of ingest calls a single caller (subject / IP) may make. */
   @Min(1)
   private int capacity = 30;
 

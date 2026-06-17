@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.config;
 
 import de.greluc.krt.iri.basetool.frontend.logging.ActiveSquadronContext;
+import de.greluc.krt.iri.basetool.frontend.logging.ClientIpContext;
 import de.greluc.krt.iri.basetool.frontend.logging.CorrelationContext;
 import io.micrometer.context.ContextRegistry;
 import jakarta.annotation.PostConstruct;
@@ -93,6 +94,14 @@ public class ReactorContextPropagationConfig {
   public static final String USER_LOCALE_CONTEXT_KEY = "iridium.userLocale";
 
   /**
+   * Context-registry key under which the resolved originating client IP ({@link ClientIpContext})
+   * is propagated through Reactor pipelines, feeding the {@code X-Forwarded-For} relay of {@link
+   * de.greluc.krt.iri.basetool.frontend.logging.ClientIpRelayFilter} so the backend's per-IP rate
+   * limiter sees the real client rather than the frontend container (security audit DOS-1).
+   */
+  public static final String CLIENT_IP_CONTEXT_KEY = "iridium.clientIp";
+
+  /**
    * Activates {@link Hooks#enableAutomaticContextPropagation()} and registers {@code
    * ThreadLocalAccessor}s for {@link ActiveSquadronContext} and {@link CorrelationContext} on the
    * global {@link ContextRegistry}. Runs once at bean-init time; the registry is a process-wide
@@ -148,11 +157,25 @@ public class ReactorContextPropagationConfig {
         },
         LocaleContextHolder::resetLocaleContext);
 
+    registry.registerThreadLocalAccessor(
+        CLIENT_IP_CONTEXT_KEY,
+        ClientIpContext::get,
+        (String value) -> {
+          if (value == null || value.isBlank()) {
+            ClientIpContext.clear();
+          } else {
+            ClientIpContext.set(value);
+          }
+        },
+        ClientIpContext::clear);
+
     log.info(
         "Reactor automatic context propagation enabled; registered ThreadLocalAccessors for "
-            + "ActiveSquadronContext ({}), CorrelationContext ({}) and the user locale ({}).",
+            + "ActiveSquadronContext ({}), CorrelationContext ({}), the user locale ({}) and the "
+            + "client IP ({}).",
         ACTIVE_ORG_UNIT_CONTEXT_KEY,
         CORRELATION_CONTEXT_KEY,
-        USER_LOCALE_CONTEXT_KEY);
+        USER_LOCALE_CONTEXT_KEY,
+        CLIENT_IP_CONTEXT_KEY);
   }
 }

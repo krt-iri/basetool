@@ -191,11 +191,14 @@ public class UserService {
     if (existingUser.isEmpty() && username != null) {
       existingUser = userRepository.findByUsername(username);
       if (existingUser.isPresent()) {
+        // REQ-OBS-004: never log names/handles. preferred_username can be a real callsign that the
+        // PiiMasker cannot scrub (it only matches JWTs, e-mails and token keywords), so log the
+        // matched row's UUID instead — same non-PII fix already applied to UserSyncTask (M-4).
         log.warn(
-            "User lookup by ID {} failed, but found by username {}. associating session with"
-                + " existing user.",
+            "User lookup by ID {} failed; matched an existing row by preferred_username (value"
+                + " omitted, PII). Associating session with existing user id {}.",
             finalUserId,
-            username);
+            existingUser.get().getId());
       }
     }
 

@@ -85,6 +85,7 @@ public class WebClientConfig {
   private final WebClientLoggingFilter webClientLoggingFilter;
   private final ActiveSquadronRelayFilter activeSquadronRelayFilter;
   private final UserLocaleRelayFilter userLocaleRelayFilter;
+  private final de.greluc.krt.iri.basetool.frontend.logging.ClientIpRelayFilter clientIpRelayFilter;
   private final org.springframework.core.env.Environment environment;
   private final SslBundles sslBundles;
 
@@ -306,6 +307,7 @@ public class WebClientConfig {
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(userLocaleRelayFilter.relayUserLocale())
+        .filter(clientIpRelayFilter.relayClientIp())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(
@@ -335,6 +337,7 @@ public class WebClientConfig {
         .clientConnector(connector(false))
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(userLocaleRelayFilter.relayUserLocale())
+        .filter(clientIpRelayFilter.relayClientIp())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(

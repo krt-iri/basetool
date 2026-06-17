@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Missions-Teilnehmer fremder Staffeln sind nicht mehr durch einen Missions-Manager einer anderen Einheit veränderbar.** Wer in einer Staffel Missions-Manager war, konnte bei internen Missionen anderer Staffeln verknüpfte Teilnehmer ein-/auschecken, deren Auszahlungspräferenz umstellen oder sie entfernen — Werte, die in die Auszahlungsberechnung einfließen. Bei verknüpften Teilnehmern greift jetzt dieselbe Eigentumsprüfung (besitzende Org-Einheit) wie bei allen anderen Missions-Schreibzugriffen; offene Gast-Teilnehmer öffentlicher Missionen bleiben unverändert bearbeitbar.
+- **Das pro-IP-Anti-Spam-Limit öffentlicher Formulare trifft wieder einzelne Clients statt alle.** Da das Backend nur über das Frontend erreichbar ist, sah es bisher für sämtliche Nutzer nur eine einzige IP — ein einzelner, auch nicht angemeldeter Nutzer konnte so das Limit z. B. des Auftragsformulars für die gesamte Organisation auslösen. Das Frontend reicht die echte Client-IP jetzt an das Backend weiter, sodass die Begrenzung wieder pro Client wirkt.
+- **Der Ingest-Dienst drosselt jetzt zusätzlich pro angemeldetem Nutzer.** Bisher begrenzte er nur pro Quell-IP, die sich über einen `X-Forwarded-For`-Header fälschen ließ; jetzt gilt zusätzlich ein nicht fälschbares Limit pro Nutzer (mit `Retry-After`), die IP-Erkennung vertraut dem Header nur noch vom Reverse-Proxy, und die internen Zähler-Tabellen sind nach oben beschränkt.
+- **Die 2-MB-Obergrenze des Ingest-Dienstes lässt sich nicht mehr per Chunked-Upload umgehen.** Ein Upload ohne deklarierte Länge konnte die Größenprüfung passieren; sie wird jetzt anhand der tatsächlich gelesenen Datenmenge durchgesetzt und übergroße Anfragen werden mit 413 abgewiesen.
+- **Der Keycloak-Benutzername wird nicht mehr im Klartext protokolliert.** Eine selten genutzte Fallback-Logzeile gab den Callsign eines Mitglieds unmaskiert in die Logs aus; sie protokolliert jetzt nur noch die anonyme Nutzer-ID.
+
 ### Added
 
 - **Ein-Klick-Versand aus dem SC-Extractor (Epic #639).** Ein eigenständiger, bewusst minimal gehaltener Ingest-Dienst nimmt die im Extractor erzeugten Refinery- und Blueprint-Daten authentifiziert entgegen, reicht sie an die bestehenden Import-Endpunkte weiter und legt den Entwurf kurzlebig und einmalig abrufbar ab. Öffnet der Extractor anschließend die Basetool-Seite mit `?handoff=<id>`, landet man — nach ggf. nötiger Anmeldung — direkt auf dem vorausgefüllten Review: das Raffinerie-Anlegen-Formular bzw. die Blueprint-Import-Vorschau sind bereits befüllt, gespeichert wird weiterhin erst nach Prüfung. Ein abgelaufener oder ungültiger Link zeigt einen freundlichen Hinweis und das leere Formular. Neue Konfiguration (Dienst `ingest`, Port 11262): `BACKEND_URL`, `FRONTEND_URL`, `KEYCLOAK_ISSUER_URI`, `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`, `APP_SECURITY_JWT_EXPECTED_AUDIENCES`.

@@ -50,6 +50,15 @@ An SK `is_lead` membership additionally grants both roles (flat + contextual
 / `is_mission_manager` are read only as a fallback for users with no membership row;
 dropped in the destructive cleanup release.
 
+The flat authority is the OR-union over *all* of a caller's memberships and therefore carries
+**no** OrgUnit context on its own — it MUST never authorise a write against another OrgUnit's
+aggregate by itself. Every elevated-mission-role write path (mission edit, manager/owner change,
+**and participant management** — check-in/out, attribute edit, payout-preference, removal) gates the
+flat role behind `OwnerScopeService.canEditMission(...)`; `MissionSecurityService.canAccessParticipant`
+does so by delegating its management branch to `canManageMission` rather than short-circuiting on the
+bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
+REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
+
 ### REQ-SEC-006 — Multi-user data isolation
 
 Every read/write filters by JWT `sub` unless the caller has an elevated role (`ADMIN`,
@@ -148,6 +157,27 @@ trust boundary and is not a change to the CSRF repository/handler (ADR-0012).
 - [ ] `GET /csrf` does not serve a token to an anonymous caller.
 
 **Enforced by:** `CsrfTokenControllerMvcTest` · **Code:** `CsrfTokenController` · **Issues:** #572
+
+### REQ-SEC-011 — Rate-limit client-IP attribution
+
+The backend's per-IP / per-endpoint rate limiter (`RateLimitingFilter`) is only meaningful if it can
+tell clients apart. Because the backend is a pure resource server reached **only** server-side by the
+frontend (no browser hits it directly), the frontend MUST relay the originating client IP on every
+outbound backend call as `X-Forwarded-For` (`ClientIpRelayFilter`, snapshotted per request by
+`ClientIpContextFilter` and carried across the Reactor hop via the registered `ThreadLocalAccessor`).
+The backend honours `X-Forwarded-For` only from its configured `app.rate-limit.trusted-proxies` (the
+frontend container) and reads the first hop as the client. Without the relay every per-IP bucket
+collapses onto the single frontend container IP, so one caller can trip a public endpoint's budget for
+the whole organisation. The relay never overwrites an existing header and degrades silently to
+"frontend IP" for background tasks with no bound request.
+
+**Acceptance**
+
+- [ ] A backend call issued for a browser request carries `X-Forwarded-For` with the real client IP.
+- [ ] Two distinct clients hitting the same anonymous endpoint consume separate per-IP buckets.
+
+**Enforced by:** `ClientIpRelayFilterTest` · **Code:** `ClientIpRelayFilter` / `ClientIpContextFilter`
+/ `RateLimitingFilter.resolveClientIp` · **Issues:** security audit DOS-1
 
 ## Out of scope
 

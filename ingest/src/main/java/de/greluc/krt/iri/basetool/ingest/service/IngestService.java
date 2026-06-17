@@ -23,6 +23,7 @@ import de.greluc.krt.iri.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.iri.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.iri.basetool.ingest.model.dto.IngestResponseDto;
 import de.greluc.krt.iri.basetool.ingest.model.dto.RefineryExtractDto;
+import de.greluc.krt.iri.basetool.ingest.ratelimit.SubjectRateLimiter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -42,6 +43,7 @@ public class IngestService {
   private final BackendImportClient backendImportClient;
   private final HandoffStagingService handoffStagingService;
   private final IngestProperties ingestProperties;
+  private final SubjectRateLimiter subjectRateLimiter;
 
   /**
    * Relays a refinery extract to the backend, stages the resulting draft, and returns the handoff.
@@ -59,6 +61,10 @@ public class IngestService {
       String acceptLanguage,
       String correlationId,
       @NotNull RefineryExtractDto extract) {
+    // Per-subject throttle (REQ-INGEST-005): bound how hard one authenticated caller can drive the
+    // backend import endpoints. Checked before the backend relay so an over-budget caller is
+    // rejected without forwarding.
+    subjectRateLimiter.requireWithinLimit(sub);
     String draftJson =
         backendImportClient.forwardRefineryExtract(bearer, acceptLanguage, correlationId, extract);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.REFINERY, draftJson);
@@ -82,6 +88,8 @@ public class IngestService {
       String acceptLanguage,
       String correlationId,
       byte @NotNull [] blueprintJson) {
+    // Per-subject throttle (REQ-INGEST-005); see ingestRefinery for the rationale.
+    subjectRateLimiter.requireWithinLimit(sub);
     String draftJson =
         backendImportClient.forwardBlueprintPreview(
             bearer, acceptLanguage, correlationId, blueprintJson);

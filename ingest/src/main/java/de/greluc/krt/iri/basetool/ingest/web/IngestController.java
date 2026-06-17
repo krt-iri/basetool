@@ -80,7 +80,7 @@ public class IngestController {
     @ApiResponse(responseCode = "400", description = "Payload invalid or backend envelope reject."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
     @ApiResponse(responseCode = "413", description = "Payload exceeds the size cap."),
-    @ApiResponse(responseCode = "429", description = "Per-IP rate limit exceeded."),
+    @ApiResponse(responseCode = "429", description = "Per-subject or per-IP rate limit exceeded."),
     @ApiResponse(responseCode = "502", description = "Backend relay failed.")
   })
   public @NotNull IngestResponseDto ingestRefineryExtract(
@@ -118,7 +118,7 @@ public class IngestController {
         description = "Body is not a JSON object or backend reject."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
     @ApiResponse(responseCode = "413", description = "Payload exceeds the size cap."),
-    @ApiResponse(responseCode = "429", description = "Per-IP rate limit exceeded."),
+    @ApiResponse(responseCode = "429", description = "Per-subject or per-IP rate limit exceeded."),
     @ApiResponse(responseCode = "502", description = "Backend relay failed.")
   })
   public @NotNull IngestResponseDto ingestBlueprintPreview(

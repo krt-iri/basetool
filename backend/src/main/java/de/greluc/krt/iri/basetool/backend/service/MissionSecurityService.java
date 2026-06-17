@@ -100,22 +100,31 @@ public class MissionSecurityService {
     }
 
     // Handle anonymous authentication correctly
-    boolean isAnonymous = "anonymousUser".equals(authentication.getPrincipal());
+    if ("anonymousUser".equals(authentication.getPrincipal())) {
+      return false;
+    }
 
-    boolean canManage =
-        !isAnonymous
-            && (authentication.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_MISSION_MANAGER"))
-                || canManageMission(missionId, authentication));
-
+    // Self-edit first: the participant's own linked user may always manage their row. Checked
+    // before
+    // the scope gate so a member editing their own participation never needs mission-management
+    // rights — and so the common self-edit path does not load the mission aggregate at all.
     UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
-    if (isAnonymous) {
-      return false;
+    if (currentUserId != null && p.getUser().getId().equals(currentUserId)) {
+      return true;
     }
-    if (!canManage && (currentUserId == null || !p.getUser().getId().equals(currentUserId))) {
-      return false;
-    }
-    return true;
+
+    // Managing ANOTHER user's participant row is a mission write, so it must pass the same
+    // owning-OrgUnit scope gate as every other mission write: canManageMission only admits an
+    // elevated mission role (MISSION_MANAGER / OFFICER) when ownerScopeService.canEditMission also
+    // passes, plus ADMIN and the mission owner / co-managers. An earlier version instead
+    // short-circuited on the bare ROLE_MISSION_MANAGER authority, which CustomJwtGrantedAuthorities
+    // Converter grants as the OR-union over ALL of a caller's memberships — letting a mission
+    // manager
+    // of squadron A check in/out, remove, or flip the payout preference of participants on squadron
+    // B's internal missions (security audit AUTHZ-1; REQ-ORG-009 / MULTI_SQUADRON_PLAN.md section
+    // 1:
+    // editing is the owning OrgUnit's prerogative).
+    return canManageMission(missionId, authentication);
   }
 
   /**

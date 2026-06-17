@@ -33,4 +33,7 @@ split into `*-error.log` for fast triage. Configurable via `APP_LOGGING_*` env v
 ### REQ-OBS-004 — Never log PII
 
 **Never log names, emails, or tokens.** This is unconditional and applies to every log
-level and both modules.
+level and both modules. "Names" includes the Keycloak `preferred_username` / callsign handle:
+the `PiiMasker` only scrubs JWTs, e-mail-shaped strings and token keywords, so a bare handle
+would reach the appenders verbatim — log the user's `sub` UUID instead (the row id is in the
+same UUID space and is not PII).
