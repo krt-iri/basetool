@@ -47,15 +47,14 @@ import org.springframework.util.StringUtils;
  *
  * <p>It is an <b>enrichment-only</b> pass: it never inserts a row (a Wiki manufacturer with no
  * local UEX counterpart is simply skipped — {@code manufacturer} has no {@code WIKI_ONLY} concept
- * and its {@code name} / {@code abbreviation} are {@code NOT NULL UNIQUE}) and it never overwrites
- * the UEX-canonical {@code name} / {@code abbreviation} / {@code industry}. Only {@code
- * scwiki_uuid}, {@code scwiki_code} and {@code scwiki_synced_at} are written (and {@code
- * scwiki_deleted_at} cleared) — mirroring the §6.3.5 "each side owns its columns" rule used by the
- * item / vehicle syncs.
+ * and its {@code name} is {@code NOT NULL UNIQUE}) and it never overwrites the UEX-canonical {@code
+ * name} / {@code abbreviation} / {@code industry}. Only {@code scwiki_uuid}, {@code scwiki_code}
+ * and {@code scwiki_synced_at} are written (and {@code scwiki_deleted_at} cleared) — mirroring the
+ * §6.3.5 "each side owns its columns" rule used by the item / vehicle syncs.
  *
  * <p>Resolution chain (§6.4): {@code scwiki_uuid} → case-insensitive {@code name} →
  * case-insensitive {@code abbreviation == code} (the §6.4 chain's third step is {@code
- * industry+name}, but the Wiki manufacturer payload exposes no industry; the UNIQUE local {@code
+ * industry+name}, but the Wiki manufacturer payload exposes no industry; the local {@code
  * abbreviation} matched against the Wiki {@code code} is the available analogue and lifts the link
  * rate for companies whose full name differs between catalogues). A candidate already linked to a
  * <em>different</em> Wiki UUID is left untouched and logged {@link
@@ -202,7 +201,9 @@ public class ScWikiManufacturerSyncService {
       }
     }
     if (StringUtils.hasText(dto.code())) {
-      return manufacturerRepository.findByAbbreviationIgnoreCase(dto.code()).orElse(null);
+      return manufacturerRepository
+          .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(dto.code())
+          .orElse(null);
     }
     return null;
   }

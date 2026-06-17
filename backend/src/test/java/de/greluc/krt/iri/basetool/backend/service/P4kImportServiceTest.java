@@ -614,7 +614,8 @@ class P4kImportServiceTest {
     when(manufacturerRepository.findByScwikiUuid(mfgGuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
         .thenReturn(Optional.empty());
-    when(manufacturerRepository.findByAbbreviationIgnoreCase("AEGS")).thenReturn(Optional.empty());
+    when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("AEGS"))
+        .thenReturn(Optional.empty());
 
     // Item is an existing GUID match with no manufacturer yet.
     GameItem existing = new GameItem();

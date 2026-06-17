@@ -49,7 +49,15 @@ public class Manufacturer extends AbstractEntity<UUID> {
   @Column(nullable = false, unique = true)
   private String name;
 
-  @Column(nullable = false, unique = true)
+  /**
+   * Short display code (e.g. {@code "AEGS"}, {@code "Esperia"}). Deliberately <strong>not</strong>
+   * UNIQUE: the UEX {@code /companies} sync derives it from each company's nickname, and UEX ships
+   * distinct companies that share a nickname (observed: two Esperia-derived companies both reduce
+   * to {@code "Esperia"}). A UNIQUE constraint here made the second company's sync UPDATE collide
+   * and roll the whole sweep back — see {@code V158} / REQ-DATA-004. Identity lives on {@link
+   * #uexCompanyId} / {@link #scwikiUuid} / {@link #name}, not on this label.
+   */
+  @Column(nullable = false)
   private String abbreviation;
 
   @Column private String nickname;

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der geplante UEX-Hersteller-Abgleich aktualisiert wieder die Herstellerdaten.** Mehrere unterschiedliche UEX-Firmen teilen sich dieselbe Abkürzung (z. B. „Esperia"), was an einer Eindeutigkeitsbedingung der Hersteller-Abkürzung scheiterte und — weil der gesamte Abgleich in einer einzigen Transaktion lief — jede Hersteller-Aktualisierung samt der nachfolgenden UEX-Schritte (Fahrzeuge, Items, Raffinerie) des Laufs verwarf. Die Abkürzung ist nun kein eindeutiger Schlüssel mehr, und jede Firma wird einzeln verarbeitet, sodass eine einzelne fehlerhafte Zeile den restlichen Lauf nicht mehr zurückrollt.
+
 ## [v0.5.4](https://github.com/krt-iri/basetool/releases/tag/v0.5.4) - 2026-06-17
 
 ### Added

@@ -28,7 +28,9 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -42,31 +44,51 @@ import org.springframework.util.StringUtils;
  * it serves.
  *
  * <p>Match chain: {@code byUexCompanyId(dto.id)} → {@code byNameIgnoreCase(dto.name)} → {@code
- * byAbbreviationIgnoreCase(nickname)}. The abbreviation step is load-bearing, not cosmetic: {@code
- * abbreviation} is UNIQUE, and the vehicle-manufacturer rows seeded before this sync persisted
- * every company store the short nickname as their {@code name} — local {@code "Esperia"} vs UEX
- * {@code name="Esperia Incorporation"}, {@code nickname="Esperia"}. Such a row misses the id and
- * name lookups, so without the abbreviation fallback the insert collides on {@code
- * manufacturer_abbreviation_key}. Probing all three unique keys before insert also guarantees no
- * upsert can violate a unique constraint and poison the single-transaction sweep. Once a row's
- * {@code uex_company_id} is populated the fallbacks never fire on subsequent syncs.
+ * byAbbreviation(nickname) on an unclaimed row}. The abbreviation step is load-bearing, not
+ * cosmetic: the vehicle-manufacturer rows seeded before this sync persisted every company store the
+ * short nickname as their {@code name} — local {@code "Esperia"} vs UEX {@code name="Esperia
+ * Incorporation"}, {@code nickname="Esperia"}. Such a legacy row misses the id and name lookups, so
+ * without the abbreviation fallback it would be left orphaned and a parallel row inserted. The
+ * fallback is scoped to <em>unclaimed</em> rows ({@code uex_company_id IS NULL}) so it adopts only
+ * the legacy seed and never hijacks a row that already belongs to another UEX company that happens
+ * to share the nickname. Once a row's {@code uex_company_id} is populated the fallback never fires
+ * for it again.
+ *
+ * <p><strong>Per-company isolation.</strong> Each company is upserted in its own {@code
+ * REQUIRES_NEW} transaction via {@link #upsertCompanyWithinTransaction(UexCompanyDto, Instant)},
+ * invoked through the {@link #self} proxy (a direct {@code this} call would be self-invocation and
+ * silently skip the new transaction — the CLAUDE.md self-invocation trap). The sweep used to run as
+ * one transaction, so a single row that violated a unique constraint (notably the now-dropped
+ * {@code abbreviation} UNIQUE — two distinct UEX companies sharing the nickname {@code "Esperia"})
+ * marked the whole transaction rollback-only and discarded every other manufacturer update for the
+ * day, surfacing only at commit as an {@code UnexpectedRollbackException} that also aborted the
+ * rest of the UEX sweep. With per-company transactions a bad row rolls back only itself; the {@code
+ * catch} in the loop counts it as skipped and the remaining companies still commit (REQ-DATA-004).
  *
  * <p>Empty UEX response short-circuits without wiping local data.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class UexManufacturerService {
 
   private final UexClient uexClient;
   private final ManufacturerRepository manufacturerRepository;
 
   /**
-   * Pulls the company catalogue and upserts every row. Single transaction for the full sweep;
-   * counter summary at INFO when done.
+   * Self-reference, resolved lazily so each per-company upsert runs through the Spring transaction
+   * proxy. Calling {@link #upsertCompanyWithinTransaction(UexCompanyDto, Instant)} via {@code this}
+   * would be self-invocation and run in the caller's (here absent) transaction instead of opening
+   * the {@code REQUIRES_NEW} one, defeating the per-company isolation.
    */
-  @Transactional
+  private final ObjectProvider<UexManufacturerService> self;
+
+  /**
+   * Pulls the company catalogue and upserts every row, each in its own {@code REQUIRES_NEW}
+   * transaction so one constraint violation cannot roll back the whole sweep. Deliberately not
+   * {@code @Transactional}: the HTTP fetch and the loop hold no transaction, and the only writes
+   * happen inside the per-company nested transactions. Counter summary at INFO when done.
+   */
   public void syncManufacturers() {
     log.info("Starting synchronization of UEX manufacturers...");
     List<UexCompanyDto> companies = uexClient.getCompanies();
@@ -86,13 +108,15 @@ public class UexManufacturerService {
         continue;
       }
       try {
-        boolean isNew = upsertCompany(dto, now);
+        boolean isNew = self.getObject().upsertCompanyWithinTransaction(dto, now);
         if (isNew) {
           added++;
         } else {
           updated++;
         }
       } catch (Exception e) {
+        // The failed company's own REQUIRES_NEW transaction has rolled back; the outer sweep is
+        // untouched, so we just tally it and carry on with the next company.
         log.error("Failed to process UEX company dto: {}", dto, e);
         skipped++;
       }
@@ -105,16 +129,20 @@ public class UexManufacturerService {
   }
 
   /**
-   * Upserts a single UEX company DTO via the {@code uexCompanyId → name → abbreviation} match
-   * chain, adopting a pre-existing row (e.g. a legacy short-named vehicle manufacturer) instead of
-   * inserting a duplicate that would violate the UNIQUE {@code abbreviation} and abort the whole
-   * sweep. {@code true} return = a new row was inserted.
+   * Upserts a single UEX company DTO in its own {@code REQUIRES_NEW} transaction via the {@code
+   * uexCompanyId → name → unclaimed-abbreviation} match chain, adopting a pre-existing row (e.g. a
+   * legacy short-named vehicle manufacturer) instead of inserting a parallel one. Running in a
+   * dedicated nested transaction means a failure here (e.g. a residual unique-constraint clash)
+   * rolls back only this company and never poisons the rest of the sweep; the caller's loop catches
+   * it and continues. Must be invoked through the {@link #self} proxy — a direct {@code this} call
+   * would be self-invocation and skip the new transaction.
    *
    * @param dto inbound UEX row
    * @param now timestamp to stamp on the row
    * @return {@code true} when the row was newly inserted
    */
-  private boolean upsertCompany(UexCompanyDto dto, Instant now) {
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public boolean upsertCompanyWithinTransaction(UexCompanyDto dto, Instant now) {
     String abbreviation = StringUtils.hasText(dto.nickname()) ? dto.nickname() : dto.name();
 
     Optional<Manufacturer> existingOpt = Optional.empty();
@@ -125,10 +153,13 @@ public class UexManufacturerService {
       existingOpt = manufacturerRepository.findByNameIgnoreCase(dto.name());
     }
     if (existingOpt.isEmpty()) {
-      // The UNIQUE key is abbreviation, so a miss on both id and name still has to reconcile here
-      // before inserting — otherwise a legacy row whose name is the short nickname (Esperia,
-      // Banu, Vanduul) collides on manufacturer_abbreviation_key.
-      existingOpt = manufacturerRepository.findByAbbreviationIgnoreCase(abbreviation);
+      // Adopt a legacy row whose name is the short nickname (Esperia, Banu, Vanduul) so we don't
+      // strand it and insert a parallel row. Scoped to unclaimed rows (uex_company_id IS NULL): a
+      // row already stamped by another UEX company that shares this nickname must keep its own
+      // identity — two such companies then each get their own row (abbreviation is no longer
+      // UNIQUE, V158 / REQ-DATA-004), instead of fighting over one.
+      existingOpt =
+          manufacturerRepository.findOldestUnclaimedByAbbreviationIgnoreCase(abbreviation);
     }
 
     final boolean isNew = existingOpt.isEmpty();
