@@ -61,6 +61,9 @@
     "name" : "Personal Blueprints",
     "description" : "Per-user owned crafting blueprints (#327)."
   }, {
+    "name" : "org-unit-bank-controller",
+    "description" : "Org-unit officer/lead bank access (balance view, booking requests)"
+  }, {
     "name" : "Admin – Default Blueprints",
     "description" : "Administrator endpoints for curating the auto-granted default blueprint set."
   }, {
@@ -14557,6 +14560,291 @@
         } ]
       }
     },
+    "/api/v1/org-units/bank/requests" : {
+      "get" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "List the caller's own booking requests and their status",
+        "operationId" : "listOwnBookingRequests",
+        "responses" : {
+          "200" : {
+            "description" : "The caller's requests",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/BankBookingRequestDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Raise a confirm-before-post booking request for an overseen org unit",
+        "description" : "Creates a PENDING deposit/withdrawal request against the bank account of an org unit the authenticated officer/lead oversees. The request is audited immediately but moves no money until a bank employee confirms it; no holder is chosen by the requester.",
+        "operationId" : "createBookingRequest",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateBankBookingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Request created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankBookingRequestDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/requests/{id}/cancel" : {
+      "post" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Cancel one of the caller's own pending booking requests",
+        "operationId" : "cancelOwnBookingRequest",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CancelBankBookingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Request cancelled",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankBookingRequestDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/org-chart/positions" : {
       "post" : {
         "tags" : [ "org-chart-controller" ],
@@ -21224,6 +21512,202 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/BankTransactionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bank/requests/{id}/reject" : {
+      "post" : {
+        "tags" : [ "bank-request-controller" ],
+        "summary" : "Reject a pending booking request with a reason",
+        "operationId" : "reject",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RejectBankBookingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankBookingRequestDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bank/requests/{id}/confirm" : {
+      "post" : {
+        "tags" : [ "bank-request-controller" ],
+        "summary" : "Confirm a pending booking request and book it onto the ledger",
+        "operationId" : "confirm",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfirmBankBookingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankBookingRequestDto"
                 }
               }
             }
@@ -30630,6 +31114,106 @@
         }
       }
     },
+    "/api/v1/org-units/bank/balances" : {
+      "get" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "List the balances of the org-unit accounts the caller oversees",
+        "description" : "Returns the current balance of each org-unit bank account the authenticated officer or lead oversees (their own Staffel / the Spezialkommando(s) they lead; admins see all or the pinned org unit). Balance-only by design — no history, no holders, no audit. A caller with no oversight scope receives an empty list.",
+        "operationId" : "listOverseenBalances",
+        "responses" : {
+          "200" : {
+            "description" : "Overseen org-unit balances",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/OrgUnitBankBalanceDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/org-units/active" : {
       "get" : {
         "tags" : [ "org-unit-controller" ],
@@ -37108,6 +37692,134 @@
         } ]
       }
     },
+    "/api/v1/bank/requests" : {
+      "get" : {
+        "tags" : [ "bank-request-controller" ],
+        "summary" : "List booking requests for the bank-staff confirmation queue (paged)",
+        "operationId" : "getQueue",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "PENDING", "CONFIRMED", "REJECTED", "CANCELLED" ]
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseBankBookingRequestDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/bank/export/three-month-report" : {
       "get" : {
         "tags" : [ "bank-export-controller" ],
@@ -37352,7 +38064,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED" ]
           }
         }, {
           "name" : "page",
@@ -41456,7 +42168,7 @@
         "properties" : {
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT" ]
           },
           "userSub" : {
             "type" : "string",
@@ -41481,11 +42193,11 @@
         "properties" : {
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED" ]
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED" ]
           },
           "description" : {
             "type" : "string",
@@ -41520,11 +42232,11 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED" ]
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED" ]
           },
           "description" : {
             "type" : "string"
@@ -41564,7 +42276,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT" ]
           },
           "userSub" : {
             "type" : "string",
@@ -43220,6 +43932,112 @@
           }
         }
       },
+      "CreateBankBookingRequest" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "DEPOSIT", "WITHDRAWAL" ]
+          },
+          "amount" : {
+            "type" : "number",
+            "maximum" : 1.0E12,
+            "minimum" : 1
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "amount", "orgUnitId", "type" ]
+      },
+      "BankBookingRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountNo" : {
+            "type" : "string"
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "orgUnitName" : {
+            "type" : "string"
+          },
+          "orgUnitShorthand" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "DEPOSIT", "WITHDRAWAL" ]
+          },
+          "amount" : {
+            "type" : "number"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "PENDING", "CONFIRMED", "REJECTED", "CANCELLED" ]
+          },
+          "requesterHandle" : {
+            "type" : "string"
+          },
+          "holderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "holderHandle" : {
+            "type" : "string"
+          },
+          "resultingTransactionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "deciderHandle" : {
+            "type" : "string"
+          },
+          "rejectReason" : {
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "CancelBankBookingRequest" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
+      },
       "OrgChartPositionCreateRequest" : {
         "type" : "object",
         "properties" : {
@@ -43937,6 +44755,35 @@
             "minLength" : 0
           }
         }
+      },
+      "RejectBankBookingRequest" : {
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "reason", "version" ]
+      },
+      "ConfirmBankBookingRequest" : {
+        "type" : "object",
+        "properties" : {
+          "holderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "holderId", "version" ]
       },
       "RegisterBankHolderRequest" : {
         "type" : "object",
@@ -45748,6 +46595,42 @@
           }
         }
       },
+      "OrgUnitBankBalanceDto" : {
+        "type" : "object",
+        "properties" : {
+          "accountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountNo" : {
+            "type" : "string"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "ACTIVE", "CLOSED" ]
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "orgUnitName" : {
+            "type" : "string"
+          },
+          "orgUnitShorthand" : {
+            "type" : "string"
+          },
+          "orgUnitKind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND" ]
+          },
+          "balance" : {
+            "type" : "number"
+          }
+        }
+      },
       "AreaLeadershipDto" : {
         "type" : "object",
         "properties" : {
@@ -47388,6 +48271,39 @@
           }
         }
       },
+      "PageResponseBankBookingRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BankBookingRequestDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "BankDashboardAccountDto" : {
         "type" : "object",
         "properties" : {
@@ -47478,7 +48394,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED" ]
           },
           "accountId" : {
             "type" : "string",

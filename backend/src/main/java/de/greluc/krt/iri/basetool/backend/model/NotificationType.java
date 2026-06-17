@@ -36,5 +36,12 @@ public enum NotificationType {
    * (officers of the responsible squadron / leads of the responsible special command, plus the
    * logisticians of that unit and the global admins; the creating actor is excluded).
    */
-  JOB_ORDER_CREATED
+  JOB_ORDER_CREATED,
+
+  /**
+   * An org-unit officer/lead raised a confirm-before-post bank deposit/withdrawal request (epic
+   * #666 F2, REQ-BANK-026). Recipients are resolved per the seeded default rule (the bank
+   * management plus every employee granted on the target account; the requester is excluded).
+   */
+  BANK_BOOKING_REQUEST_CREATED
 }

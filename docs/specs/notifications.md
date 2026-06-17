@@ -128,12 +128,14 @@ go stale). This is **in-app only** — OS / browser push notifications are out o
 
 Recipients are decided by admin-managed `notification_rule` rows, each owning a set of
 `notification_rule_selector` rows. Selector kinds: `SPECIFIC_USER` (a `sub`), `ROLE` (a global
-`role.code`), and `ORG_RELATIVE_ROLE` (a role — `OFFICER` / `LEAD` / `LOGISTICIAN` /
+`role.code`), `ORG_RELATIVE_ROLE` (a role — `OFFICER` / `LEAD` / `LOGISTICIAN` /
 `MISSION_MANAGER` — evaluated against an org unit the event carries, by `context_role`
-`RESPONSIBLE` / `REQUESTING`). A rule's `exclude_actor` flag drops the triggering user. The
-selector `kind` is an open enum so a future `GROUP` selector slots in without reworking the
-engine. Rules are created, edited, enabled / disabled and deleted at runtime via an admin-only
-API.
+`RESPONSIBLE` / `REQUESTING`), and `ACCOUNT_GRANT` (the bank employees holding a
+`bank_account_grant` on the **bank account** the event carries — see `NotificationEvent.contextAccountId()`;
+added for the bank booking-request use case, ADR-0022/REQ-NOTIF-011, reads no selector columns).
+A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
+future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
+disabled and deleted at runtime via an admin-only API.
 
 **Acceptance**
 
@@ -209,6 +211,31 @@ fan-out via Redis pub/sub remains a follow-up.
 `service/NotificationStreamService`, `controller/NotificationController#stream`, frontend
 `controller/NotificationPageController#stream`, `config/WebClientConfig#sseWebClient`,
 `static/js/notifications.js`
+
+### REQ-NOTIF-011 — UC2: notify on bank booking-request creation
+
+When an org-unit officer/lead raises a bank booking request (REQ-BANK-026), the bank
+employees who can act on it must be told. A `BANK_BOOKING_REQUEST_CREATED` event carries the
+target **account id** (`NotificationEvent.contextAccountId()`) and is mapped by a seeded
+default rule (V160) to a `BANK_BOOKING_REQUEST_CREATED` notification with two selectors: a
+`ROLE` selector for `BANK_MANAGEMENT` and an `ACCOUNT_GRANT` selector resolving every employee
+granted on that account. The requester is excluded (`exclude_actor = TRUE`). This is the first
+use of the `ACCOUNT_GRANT` selector kind (REQ-NOTIF-007), which couples recipient resolution to
+`bank_account_grant` without any schema change — the account comes from the event, mirroring how
+`ORG_RELATIVE_ROLE` reads the org unit. The rule stays admin-editable at runtime.
+
+**Acceptance**
+
+- [x] Creating a booking request (after commit) notifies bank management + the account's grant
+  holders, excluding the requester (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
+- [x] Adding the `BANK_BOOKING_REQUEST_CREATED` event/notification types and the `ACCOUNT_GRANT`
+  selector kind needs no schema migration (open enums; the seed rule is V160 data).
+- [ ] _(frontend, P6)_ The notification renders via `notifications.type.BANK_BOOKING_REQUEST_CREATED`.
+
+**Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:**
+`event/BankBookingRequestCreatedEvent`, `service/RecipientResolutionService#resolveAccountGrantHolders`,
+`model/SelectorKind#ACCOUNT_GRANT`, `model/NotificationEventType`, `model/NotificationType`,
+`db/migration/V160__seed_bank_booking_request_notification_rule.sql` · **Issues:** #666
 
 ## Out of scope (v1)
 

@@ -1,0 +1,515 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.iri.basetool.backend.service;
+
+import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestCreatedEvent;
+import de.greluc.krt.iri.basetool.backend.exception.BankConflictException;
+import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.iri.basetool.backend.model.BankAccount;
+import de.greluc.krt.iri.basetool.backend.model.BankAccountStatus;
+import de.greluc.krt.iri.basetool.backend.model.BankAuditEventType;
+import de.greluc.krt.iri.basetool.backend.model.BankBookingRequest;
+import de.greluc.krt.iri.basetool.backend.model.BankBookingRequestStatus;
+import de.greluc.krt.iri.basetool.backend.model.BankBookingRequestType;
+import de.greluc.krt.iri.basetool.backend.model.BankHolder;
+import de.greluc.krt.iri.basetool.backend.model.BankTransaction;
+import de.greluc.krt.iri.basetool.backend.model.OrgUnit;
+import de.greluc.krt.iri.basetool.backend.model.User;
+import de.greluc.krt.iri.basetool.backend.model.dto.BankBookingRequestDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.BankTransactionDto;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.BankDepositRequest;
+import de.greluc.krt.iri.basetool.backend.model.dto.request.BankWithdrawalRequest;
+import de.greluc.krt.iri.basetool.backend.repository.BankAccountGrantRepository;
+import de.greluc.krt.iri.basetool.backend.repository.BankAccountRepository;
+import de.greluc.krt.iri.basetool.backend.repository.BankBookingRequestRepository;
+import de.greluc.krt.iri.basetool.backend.repository.BankHolderRepository;
+import de.greluc.krt.iri.basetool.backend.repository.BankTransactionRepository;
+import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * The lifecycle engine for confirm-before-post bank booking requests (epic #666 F2,
+ * REQ-BANK-022/-023). Deliberately <strong>org-unit-blind</strong>: like every {@code Bank*}-named
+ * class it consults only bank roles and {@code bank_account_grant} rows (REQ-BANK-008, never {@code
+ * OwnerScopeService}). The org-unit authorization for the requester side lives one layer up in
+ * {@link OrgUnitBankAccessService}, which resolves the caller's overseen account and then delegates
+ * the actual persistence here.
+ *
+ * <p><strong>Off-ledger, then booked.</strong> A request is a mutable aggregate (ADR-0021) and
+ * moves no money while {@code PENDING}; it is audited on creation. Only {@link #confirm} books
+ * value, by reusing the existing {@link BankLedgerService} path — which gives the request the same
+ * account-locking, holder-at-confirmation, holder-activity and overdraft-at-confirmation guards as
+ * a direct deposit/withdrawal for free (REQ-BANK-006). Every decision path locks the request row
+ * first ({@code findByIdForUpdate}) so two decisions serialize, and the request's {@code @Version}
+ * guards against a stale double-decision; the request is mutated in place and flushed by dirty
+ * checking — no explicit {@code save} that would risk a second version bump (the {@code
+ * …WithinTransaction} discipline of CLAUDE.md).
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional(readOnly = true)
+public class BankBookingRequestService {
+
+  private final BankBookingRequestRepository requestRepository;
+  private final BankAccountRepository accountRepository;
+  private final BankHolderRepository holderRepository;
+  private final BankTransactionRepository transactionRepository;
+  private final BankAccountGrantRepository grantRepository;
+  private final BankLedgerService bankLedgerService;
+  private final BankSecurityService bankSecurityService;
+  private final BankAuditService bankAuditService;
+  private final AuthHelperService authHelperService;
+  private final UserRepository userRepository;
+  private final ApplicationEventPublisher eventPublisher;
+
+  /**
+   * Persists a new {@code PENDING} booking request against the given account, audits it and fires
+   * the notification event (REQ-BANK-022/-026). Called by {@link OrgUnitBankAccessService} after it
+   * has verified the caller oversees the account's org unit — this method itself only enforces the
+   * bank-domain rule that a closed account accepts no request.
+   *
+   * @param accountId the target org-unit account (already scope-checked by the caller)
+   * @param type deposit or withdrawal
+   * @param amount the requested whole-aUEC amount
+   * @param note the requester's optional note
+   * @return the created request
+   * @throws NotFoundException when the account does not exist
+   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account
+   */
+  @Transactional
+  public BankBookingRequestDto create(
+      @NotNull UUID accountId,
+      @NotNull BankBookingRequestType type,
+      @NotNull BigDecimal amount,
+      String note) {
+    BankAccount account =
+        accountRepository
+            .findById(accountId)
+            .orElseThrow(() -> new NotFoundException("Bank account not found"));
+    if (account.getStatus() != BankAccountStatus.ACTIVE) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
+          "The account is closed and accepts no booking requests",
+          Map.of("accountNo", account.getAccountNo()));
+    }
+    UUID requesterSub = authHelperService.currentUserId().orElse(null);
+    String requesterHandle = resolveHandle(requesterSub);
+
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(account);
+    request.setType(type);
+    request.setAmount(amount);
+    request.setNote(note);
+    request.setStatus(BankBookingRequestStatus.PENDING);
+    request.setRequestedBy(requesterSub);
+    request.setRequesterHandle(requesterHandle);
+    BankBookingRequest saved = requestRepository.save(request);
+
+    bankAuditService.record(
+        BankAuditEventType.BOOKING_REQUEST_CREATED,
+        account.getId(),
+        null,
+        requesterSub,
+        type + " request " + plain(amount) + " aUEC " + shortId(saved.getId()));
+
+    OrgUnit orgUnit = account.getOrgUnit();
+    eventPublisher.publishEvent(
+        new BankBookingRequestCreatedEvent(
+            saved.getId(),
+            account.getId(),
+            type,
+            amount,
+            account.getAccountNo(),
+            requesterHandle,
+            orgUnit == null ? null : orgUnit.getShorthand(),
+            requesterSub));
+    return toDto(saved);
+  }
+
+  /**
+   * Lists the current caller's own booking requests, newest first (REQ-BANK-022). Per-user
+   * isolation: it reads strictly the caller's {@code sub}, so it can never surface a foreign
+   * request.
+   *
+   * @return the caller's requests; never {@code null}, empty when unauthenticated or none exist
+   */
+  @NotNull
+  public List<BankBookingRequestDto> listForCurrentRequester() {
+    return authHelperService
+        .currentUserId()
+        .map(
+            sub ->
+                requestRepository.findByRequestedByOrderByCreatedAtDesc(sub).stream()
+                    .map(this::toDto)
+                    .toList())
+        .orElseGet(List::of);
+  }
+
+  /**
+   * Cancels the caller's own pending request (REQ-BANK-022). A request that does not belong to the
+   * caller is reported as not found (per-user isolation never reveals foreign requests); a request
+   * that is no longer pending yields a 409.
+   *
+   * @param requestId the request to cancel
+   * @param version the echoed optimistic-locking version
+   * @return the cancelled request
+   * @throws NotFoundException when the request does not exist or belongs to another user
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when already decided
+   * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
+   */
+  @Transactional
+  public BankBookingRequestDto cancelOwn(@NotNull UUID requestId, long version) {
+    BankBookingRequest request = lockRequest(requestId);
+    UUID caller = authHelperService.currentUserId().orElse(null);
+    if (caller == null || !caller.equals(request.getRequestedBy())) {
+      throw new NotFoundException("Booking request not found");
+    }
+    requireVersion(request, version);
+    requirePending(request);
+    request.setStatus(BankBookingRequestStatus.CANCELLED);
+    request.setDecidedAt(Instant.now());
+    bankAuditService.record(
+        BankAuditEventType.BOOKING_REQUEST_CANCELLED,
+        request.getAccount().getId(),
+        null,
+        caller,
+        "cancelled request " + shortId(request.getId()));
+    return toDto(request);
+  }
+
+  /**
+   * One page of booking requests in the given lifecycle state for the bank-staff confirmation queue
+   * (REQ-BANK-023). Management sees every account; an employee sees only requests on accounts they
+   * are granted on. This is a pure bank-staff surface — it consults grants, never org-unit scope.
+   *
+   * @param status the lifecycle state to list (e.g. {@code PENDING})
+   * @param pageable page, size and whitelisted sort
+   * @param authentication the current authentication
+   * @return one page of requests visible to the caller
+   */
+  @NotNull
+  public Page<BankBookingRequestDto> listQueue(
+      @NotNull BankBookingRequestStatus status,
+      @NotNull Pageable pageable,
+      Authentication authentication) {
+    if (bankSecurityService.isManagement()) {
+      return requestRepository.findByStatus(status, pageable).map(this::toDto);
+    }
+    Optional<UUID> caller = authHelperService.currentUserId();
+    if (caller.isEmpty()) {
+      return Page.empty(pageable);
+    }
+    Set<UUID> grantedAccountIds =
+        grantRepository.findByUserId(caller.get()).stream()
+            .map(grant -> grant.getId().getAccountId())
+            .collect(Collectors.toSet());
+    if (grantedAccountIds.isEmpty()) {
+      return Page.empty(pageable);
+    }
+    return requestRepository
+        .findByStatusAndAccountIdIn(status, grantedAccountIds, pageable)
+        .map(this::toDto);
+  }
+
+  /**
+   * Confirms a pending request: a bank employee records the holder and books the movement onto the
+   * ledger (REQ-BANK-023). The booking reuses {@link BankLedgerService}, so the
+   * holder-at-confirmation and overdraft-at-confirmation guards apply exactly as for a direct
+   * deposit/withdrawal, then the request flips to {@code CONFIRMED} carrying the recorded holder
+   * and the resulting transaction.
+   *
+   * @param requestId the request to confirm
+   * @param holderId the holder the employee records for the booking
+   * @param version the echoed optimistic-locking version
+   * @param authentication the current authentication (capability check)
+   * @return the confirmed request
+   * @throws NotFoundException when the request does not exist
+   * @throws AccessDeniedException when the employee lacks the matching per-account capability
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING}, or a ledger conflict
+   *     ({@code BANK_ACCOUNT_CLOSED}, {@code BANK_HOLDER_INACTIVE}, {@code BANK_OVERDRAFT}, {@code
+   *     BANK_HOLDER_OVERDRAFT})
+   * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
+   */
+  @Transactional
+  public BankBookingRequestDto confirm(
+      @NotNull UUID requestId,
+      @NotNull UUID holderId,
+      long version,
+      Authentication authentication) {
+    BankBookingRequest request = lockRequest(requestId);
+    requireVersion(request, version);
+    requirePending(request);
+    UUID accountId = request.getAccount().getId();
+    requireConfirmCapability(request.getType(), accountId, authentication);
+
+    BankTransactionDto booked =
+        switch (request.getType()) {
+          case DEPOSIT ->
+              bankLedgerService.bookDeposit(
+                  new BankDepositRequest(
+                      accountId, holderId, request.getAmount(), request.getNote()));
+          case WITHDRAWAL ->
+              bankLedgerService.bookWithdrawal(
+                  new BankWithdrawalRequest(
+                      accountId, holderId, request.getAmount(), request.getNote()));
+        };
+
+    BankHolder holder =
+        holderRepository
+            .findById(holderId)
+            .orElseThrow(() -> new NotFoundException("Bank holder not found"));
+    BankTransaction transaction =
+        transactionRepository
+            .findById(booked.id())
+            .orElseThrow(() -> new NotFoundException("Bank transaction not found"));
+    UUID decider = authHelperService.currentUserId().orElse(null);
+    request.setHolder(holder);
+    request.setResultingTransaction(transaction);
+    request.setStatus(BankBookingRequestStatus.CONFIRMED);
+    request.setDecidedBy(decider);
+    request.setDeciderHandle(resolveHandle(decider));
+    request.setDecidedAt(Instant.now());
+
+    bankAuditService.record(
+        BankAuditEventType.BOOKING_REQUEST_CONFIRMED,
+        accountId,
+        booked.id(),
+        request.getRequestedBy(),
+        "confirmed "
+            + request.getType()
+            + " request "
+            + shortId(request.getId())
+            + " @"
+            + holder.getHandle());
+    return toDto(request);
+  }
+
+  /**
+   * Rejects a pending request (REQ-BANK-023): the bank employee declines it with a reason; no money
+   * moves. Gated by visibility of the account ({@code canSee}); the request flips to {@code
+   * REJECTED}.
+   *
+   * @param requestId the request to reject
+   * @param reason the rejection reason
+   * @param version the echoed optimistic-locking version
+   * @param authentication the current authentication (visibility check)
+   * @return the rejected request
+   * @throws NotFoundException when the request does not exist
+   * @throws AccessDeniedException when the employee may not see the account
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when already decided
+   * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
+   */
+  @Transactional
+  public BankBookingRequestDto reject(
+      @NotNull UUID requestId,
+      @NotNull String reason,
+      long version,
+      Authentication authentication) {
+    BankBookingRequest request = lockRequest(requestId);
+    requireVersion(request, version);
+    requirePending(request);
+    UUID accountId = request.getAccount().getId();
+    if (!bankSecurityService.canSee(accountId, authentication)) {
+      throw new AccessDeniedException("The caller may not see the request's account");
+    }
+    UUID decider = authHelperService.currentUserId().orElse(null);
+    request.setStatus(BankBookingRequestStatus.REJECTED);
+    request.setRejectReason(reason);
+    request.setDecidedBy(decider);
+    request.setDeciderHandle(resolveHandle(decider));
+    request.setDecidedAt(Instant.now());
+    bankAuditService.record(
+        BankAuditEventType.BOOKING_REQUEST_REJECTED,
+        accountId,
+        null,
+        request.getRequestedBy(),
+        "rejected request " + shortId(request.getId()));
+    return toDto(request);
+  }
+
+  /**
+   * Whether the given account has at least one open ({@code PENDING}) booking request — the input
+   * to the close-account guard (REQ-BANK-025).
+   *
+   * @param accountId the account to probe
+   * @return {@code true} when an open request exists
+   */
+  public boolean hasOpenRequests(@NotNull UUID accountId) {
+    return requestRepository.existsByAccountIdAndStatus(
+        accountId, BankBookingRequestStatus.PENDING);
+  }
+
+  /**
+   * Enforces that the confirming employee holds the per-account capability matching the request
+   * type: {@code can_deposit} for a deposit, {@code can_withdraw} for a withdrawal (REQ-BANK-023).
+   *
+   * @param type the request type
+   * @param accountId the target account
+   * @param authentication the current authentication
+   * @throws AccessDeniedException when the capability is missing
+   */
+  private void requireConfirmCapability(
+      @NotNull BankBookingRequestType type,
+      @NotNull UUID accountId,
+      Authentication authentication) {
+    boolean allowed =
+        switch (type) {
+          case DEPOSIT -> bankSecurityService.canDeposit(accountId, authentication);
+          case WITHDRAWAL -> bankSecurityService.canWithdraw(accountId, authentication);
+        };
+    if (!allowed) {
+      throw new AccessDeniedException(
+          "The caller lacks the bank capability to confirm this request");
+    }
+  }
+
+  /**
+   * Loads and pessimistically locks a request for a decision, or fails with 404.
+   *
+   * @param requestId the request id
+   * @return the locked, managed request
+   * @throws NotFoundException when the request does not exist
+   */
+  private BankBookingRequest lockRequest(@NotNull UUID requestId) {
+    return requestRepository
+        .findByIdForUpdate(requestId)
+        .orElseThrow(() -> new NotFoundException("Booking request not found"));
+  }
+
+  /**
+   * Fails the decision when the echoed version no longer matches the stored one (concurrent
+   * change).
+   *
+   * @param request the locked request
+   * @param version the echoed version
+   * @throws ObjectOptimisticLockingFailureException on a mismatch
+   */
+  private void requireVersion(@NotNull BankBookingRequest request, long version) {
+    if (request.getVersion() == null || request.getVersion() != version) {
+      throw new ObjectOptimisticLockingFailureException(BankBookingRequest.class, request.getId());
+    }
+  }
+
+  /**
+   * Rejects a decision on a request that is no longer pending (already
+   * confirmed/rejected/cancelled) — blocks double-decisions (REQ-BANK-023).
+   *
+   * @param request the locked request
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when not pending
+   */
+  private void requirePending(@NotNull BankBookingRequest request) {
+    if (request.getStatus() != BankBookingRequestStatus.PENDING) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_REQUEST_NOT_PENDING,
+          "The booking request is no longer pending",
+          Map.of("status", request.getStatus().name()));
+    }
+  }
+
+  /**
+   * Snapshots a user's effective name for the requester/decider handle column, falling back to a
+   * neutral marker when the user cannot be resolved (never a PII leak).
+   *
+   * @param userId the user id, possibly {@code null}
+   * @return the effective name, or {@code "unknown"}
+   */
+  private String resolveHandle(UUID userId) {
+    return Optional.ofNullable(userId)
+        .flatMap(userRepository::findById)
+        .map(User::getEffectiveName)
+        .orElse("unknown");
+  }
+
+  /**
+   * Maps a request entity to its wire shape, resolving the owning org unit, recorded holder and
+   * resulting transaction (all eagerly fetched on the list/queue reads, lazily resolvable within
+   * the single-row transactional paths).
+   *
+   * @param request the request entity
+   * @return the wire DTO
+   */
+  private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
+    BankAccount account = request.getAccount();
+    OrgUnit orgUnit = account.getOrgUnit();
+    BankHolder holder = request.getHolder();
+    BankTransaction transaction = request.getResultingTransaction();
+    return new BankBookingRequestDto(
+        request.getId(),
+        account.getId(),
+        account.getAccountNo(),
+        orgUnit == null ? null : orgUnit.getId(),
+        orgUnit == null ? null : orgUnit.getName(),
+        orgUnit == null ? null : orgUnit.getShorthand(),
+        request.getType(),
+        request.getAmount(),
+        request.getNote(),
+        request.getStatus(),
+        request.getRequesterHandle(),
+        holder == null ? null : holder.getId(),
+        holder == null ? null : holder.getHandle(),
+        transaction == null ? null : transaction.getId(),
+        request.getDeciderHandle(),
+        request.getRejectReason(),
+        request.getDecidedAt(),
+        request.getCreatedAt(),
+        request.getVersion());
+  }
+
+  /**
+   * Renders a whole-aUEC amount for an audit detail without trailing zeros or scientific notation.
+   *
+   * @param amount the amount
+   * @return the plain whole-number string
+   */
+  private static String plain(@NotNull BigDecimal amount) {
+    return amount.stripTrailingZeros().toPlainString();
+  }
+
+  /**
+   * Shortens an id to its first hex group for compact audit details.
+   *
+   * @param id the id
+   * @return the first id segment
+   */
+  private static String shortId(@NotNull UUID id) {
+    String s = id.toString();
+    int dash = s.indexOf('-');
+    return dash < 0 ? s : s.substring(0, dash);
+  }
+}

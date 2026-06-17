@@ -215,6 +215,15 @@ contextual `ROLE_X@orgUnitId` authorities and the `X-Active-Org-Unit-Id` admin p
 no influence on any bank gate — `BankSecurityService` evaluates only the bank roles and
 the grant table.
 
+> **Amendment (epic #666, owner-approved):** REQ-BANK-021/-022 add a single, narrow org-unit
+> capability — officers/leads may see the **balance** of, and raise **booking requests**
+> against, their own org unit's account. This does **not** weaken the rule above:
+> `BankSecurityService` and the ledger stay 100% org-unit-blind. All org-unit logic is
+> isolated in one deliberately non-`Bank*`-named seam, `OrgUnitBankAccessService` (ADR-0020),
+> which is the **only** class permitted to bridge `OwnerScopeService` and the bank
+> (pinned by `ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`). The officer/lead
+> surface lives outside the bank URL/role space (`/api/v1/org-units/bank/**`).
+
 **Acceptance**
 
 - [x] A user who is a Staffel/SK member **and** holds `Bank Employee` plus a grant can
@@ -251,12 +260,13 @@ an org unit is irrelevant (REQ-BANK-008).
 
 ### REQ-BANK-010 — Visibility matrix
 
-|                                                Actor                                                 |                 Sees                 |                    May change                    |
-|------------------------------------------------------------------------------------------------------|--------------------------------------|--------------------------------------------------|
-| Everyone without a bank role (anonymous, `GUEST`, members, officers, logisticians, mission managers) | **nothing** (no bank surface at all) | nothing                                          |
-| Bank employee (role + grants; org-unit membership irrelevant, REQ-BANK-008)                          | accounts they hold a grant on        | bookings per their capability flags              |
-| Bank management (role; org-unit membership irrelevant)                                               | **all** accounts, holders, grants    | all bookings, account lifecycle, holders, grants |
-| Admin (`ROLE_ADMIN`)                                                                                 | everything incl. the **audit log**   | everything incl. wipe reset (REQ-BANK-013)       |
+|                                         Actor                                          |                                               Sees                                               |                                          May change                                           |
+|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| Everyone without a bank role (anonymous, `GUEST`, members)                             | **nothing** (no bank surface at all)                                                             | nothing                                                                                       |
+| Officer / lead of an org unit (no bank role; via the org-unit seam, REQ-BANK-021/-022) | **balance only** of their overseen org unit's account + status of their **own** booking requests | raise / cancel own **booking requests** (off-ledger; book nothing)                            |
+| Bank employee (role + grants; org-unit membership irrelevant, REQ-BANK-008)            | accounts they hold a grant on                                                                    | bookings per their capability flags; confirm/reject requests on those accounts per capability |
+| Bank management (role; org-unit membership irrelevant)                                 | **all** accounts, holders, grants                                                                | all bookings, account lifecycle, holders, grants                                              |
+| Admin (`ROLE_ADMIN`)                                                                   | everything incl. the **audit log**                                                               | everything incl. wipe reset (REQ-BANK-013)                                                    |
 
 The audit log is **admin-only** — bank management does **not** see it. The bank area
 contributes nothing to the anonymous/guest surface (consistent with REQ-SEC-009). Bank
@@ -497,6 +507,142 @@ with `correlationId`.
 
 **Enforced by:** `BankLedgerIntegrityServiceTest` (synthetic corruption incl. missing audit row), `BankReadNoNPlusOneTest` (statement-count bound), `DatabaseIndexMigrationTest` (composite indexes) · **Code:** `service/BankLedgerIntegrityService`, `task/BankLedgerIntegrityTask`, `db/migration/V150`+`V153` indexes · **Issues:** #556
 
+### REQ-BANK-021 — Org-unit officer/lead balance view
+
+Officers and leads may see the **current balance — and nothing else** — of the bank
+account of an org unit they oversee (epic #666 F1). "Oversee" is the existing oversight
+scope (ADR-0020): an officer oversees their own Staffel, an SK lead the Spezialkommando(s)
+they lead, an admin all org units (or the one pinned). The view is **balance-only**: no
+transaction history, no holder distribution, no audit — those stay a bank-staff surface
+(REQ-BANK-010). It is exposed **outside** the bank role space, under
+`/api/v1/org-units/bank/balances` (authenticated; the scope decides the result), so an
+officer/lead needs **no** bank role and reaching it never grants any other bank surface.
+This is the sole, owner-approved relaxation of REQ-BANK-008's "members see nothing" rule,
+and it is mediated entirely by a non-`Bank*` seam so `BankSecurityService` stays
+org-unit-blind.
+
+**Acceptance**
+
+- [x] An officer/lead sees only the balance of org units in their oversight scope; a plain
+  member receives an empty list (no leak of account existence). (`OrgUnitBankAccessServiceTest`)
+- [x] The response carries no history/holders/audit — balance + account identity only.
+- [x] The seam is the only class bridging `OwnerScopeService` and the bank accounts
+  repository (`ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`); `BankSecurityService`
+  never depends on `OwnerScopeService` (`bankClassesMustNotConsultOrgUnitScope`).
+- [ ] _(frontend, P2)_ A slim standalone page lists the overseen balances, gated to officers/leads, not `BANK_EMPLOYEE`.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest` · **Code:** `service/OrgUnitBankAccessService`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId` · **Issues:** #666, #668, #669
+
+### REQ-BANK-022 — Confirm-before-post booking requests: create & cancel
+
+Officers/leads may raise **deposit/withdrawal requests** against their overseen org unit's
+account (epic #666 F2). A request is recorded **`PENDING`** and **off-ledger** (ADR-0021):
+it is audited on creation (`BOOKING_REQUEST_CREATED`) and visible, but moves **no money** —
+the balance does not change until a bank employee confirms it (REQ-BANK-023). The requester
+chooses **no holder** (that is recorded at confirmation). A requester sees the status of
+their **own** requests only (per-user isolation) and may **cancel** an own request while it
+is still `PENDING` (`BOOKING_REQUEST_CANCELLED`). The requester endpoints live under
+`/api/v1/org-units/bank/requests/**`, scope-checked by the same seam (create requires the
+caller to oversee the org unit; cancel requires owning the request). A request cannot be
+raised against a `CLOSED` account.
+
+**Acceptance**
+
+- [x] Create stamps `PENDING`, the requester + requester-handle snapshot, audits
+  `BOOKING_REQUEST_CREATED`, and books nothing (`BankBookingRequestServiceTest`).
+- [x] Create outside the caller's oversight scope is denied **before** the account is
+  resolved (no existence leak); a closed account is rejected `BANK_ACCOUNT_CLOSED`
+  (`OrgUnitBankAccessServiceTest`, `BankBookingRequestServiceTest`).
+- [x] Cancel is restricted to the requester's own `PENDING` request (foreign id → 404,
+  already-decided → 409 `BANK_REQUEST_NOT_PENDING`), with optimistic-lock echo.
+- [ ] _(frontend, P5)_ Request form (no holder field) + own-status list with cancel on the slim page.
+
+**Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest` · **Code:** `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `model/BankBookingRequest`, `db/migration/V159` · **Issues:** #666, #670, #672
+
+### REQ-BANK-023 — Booking-request confirmation/rejection by bank staff
+
+A **bank employee** confirms or rejects a `PENDING` request under
+`/api/v1/bank/requests/**` (`BANK_EMPLOYEE` URL+method gate). **Confirmation** records the
+**holder** (deposit → who received the money; withdrawal → who paid it out) and books a real
+ledger transaction by reusing `BankLedgerService` — so the account lock, holder-activity
+guard and the **overdraft check are re-evaluated at confirmation time** (not at request
+time), exactly like a direct booking (REQ-BANK-006). It requires the per-account capability
+matching the type (`can_deposit` for a deposit, `can_withdraw` for a withdrawal); the request
+then flips to `CONFIRMED`, links the resulting transaction, and writes both the
+`DEPOSIT_BOOKED`/`WITHDRAWAL_BOOKED` ledger audit and a `BOOKING_REQUEST_CONFIRMED` event.
+**Rejection** requires visibility of the account, records a reason, flips to `REJECTED` and
+moves no money. A non-`PENDING` request is rejected `BANK_REQUEST_NOT_PENDING`; the request
+row is pessimistically locked and `@Version`-guarded so two decisions cannot double-book.
+
+**Acceptance**
+
+- [x] Confirm books exactly one transaction with the recorded holder, re-checks overdraft at
+  confirmation, requires the matching capability (else 403), and double-confirm/stale-version
+  → 409 (`BankBookingRequestServiceTest`, reusing `BankLedgerServiceTest` ledger guarantees).
+- [x] Reject flips to `REJECTED` with a reason and books nothing; needs account visibility.
+- [ ] _(frontend, P5)_ Staff confirmation queue + confirm modal (holder selector) + reject modal.
+
+**Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest` · **Code:** `service/BankBookingRequestService`, `controller/BankRequestController` · **Issues:** #666, #671, #672
+
+### REQ-BANK-024 — Off-ledger requests: audit & ledger-integrity isolation
+
+The `bank_booking_request` table is **mutable** (`@Version`) and **off the append-only
+ledger** (ADR-0021): a `PENDING`/`REJECTED`/`CANCELLED` request never has a posting, and a
+`CONFIRMED` request has exactly one linked transaction whose postings reconcile normally
+(V159 `chk_bank_booking_request_confirmed_refs`). The four `BOOKING_REQUEST_*` audit events
+join the existing admin-only audit log (REQ-BANK-012) — requests are auditable from creation,
+before any money moves. The ledger-integrity invariants (REQ-BANK-020) are **unaffected**:
+off-ledger requests contribute no postings and are intentionally excluded from the integrity
+sweep.
+
+**Acceptance**
+
+- [x] V159 enforces that only a `CONFIRMED` request carries a holder + resulting transaction.
+- [x] The four `BOOKING_REQUEST_*` events are append-only audit rows (no DB CHECK on
+  `event_type`, enum is source of truth).
+- [ ] _(frontend, P6)_ Admin audit log surfaces + filters the four new event types (still admin-only).
+
+**Enforced by:** `db/migration/V159`, `BankBookingRequestServiceTest` (audit on each transition) · **Code:** `model/BankBookingRequest`, `model/BankAuditEventType` · **Issues:** #666, #673
+
+### REQ-BANK-025 — Close-account guard & org-unit-feature role matrix
+
+An account with an open (`PENDING`) booking request **cannot be closed** — it is rejected
+`BANK_ACCOUNT_HAS_PENDING_REQUESTS`, alongside the existing zero-balance rule (REQ-BANK-002):
+the requests must be confirmed, rejected or cancelled first. The org-unit features extend the
+visibility matrix (REQ-BANK-010) with exactly one capability for officers/leads — balance-only
+view + own-request status — and nothing else; bank staff/management/admin gain the
+confirm/reject/queue surface; the audit log stays admin-only.
+
+**Acceptance**
+
+- [x] Close with an open `PENDING` request → 409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`
+  (`BankAccountServiceTest`).
+- [ ] _(frontend, P6)_ Full role-matrix e2e (officer/lead balance-only + own requests; member/guest/anonymous nothing; employee confirm needs the capability; audit admin-only).
+
+**Enforced by:** `BankAccountServiceTest` · **Code:** `service/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
+
+### REQ-BANK-026 — Notifications on new booking requests
+
+When an officer/lead raises a booking request, the **bank management** and the **employees
+granted on the target account** are notified in-app (epic #666; owner-requested addition).
+This reuses the data-driven notification engine (REQ-NOTIF-007, ADR-0015) rather than
+hardcoding recipients: a `BANK_BOOKING_REQUEST_CREATED` event drives a seeded default rule
+(V160) with a `ROLE` selector (`BANK_MANAGEMENT`) and a new **`ACCOUNT_GRANT`** selector that
+resolves the employees holding a `bank_account_grant` on the account carried by the event
+(ADR-0022, REQ-NOTIF-011). The requesting actor is excluded; the rule is admin-editable at
+runtime. Confirmation/rejection notifications are out of scope for now.
+
+**Acceptance**
+
+- [x] Creating a request fires `BANK_BOOKING_REQUEST_CREATED` after commit; the seeded rule
+  resolves bank management + the account's grant holders, excluding the requester
+  (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
+- [x] The `ACCOUNT_GRANT` selector reads the account from the event and needs no schema
+  change to the selector table.
+- [ ] _(frontend, P6)_ The notification renders in the bell/inbox via `notifications.type.BANK_BOOKING_REQUEST_CREATED`.
+
+**Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:** `event/BankBookingRequestCreatedEvent`, `service/RecipientResolutionService#resolveAccountGrantHolders`, `model/SelectorKind#ACCOUNT_GRANT`, `db/migration/V160` · **Issues:** #666, #673
+
 ## Out of scope
 
 - **Accounts for individual players** — an explicit owner decision: players appear only
@@ -504,8 +650,13 @@ with `correlationId`.
 - **Automated money flows** from missions/operations/orders into the bank (REQ-BANK-019)
   — a possible future epic, requires its own spec.
 - **Interest, fees, loans, currencies other than aUEC.**
-- **Bank access for org-unit members** (a member viewing "their" Staffel account) — v1
-  is staff-only by design; the org units interact with the bank off-tool.
+- **Full bank access for org-unit members** — plain members still see nothing. Epic #666
+  grants officers/leads only a **balance-only view** and **confirm-before-post booking
+  requests** for their own org unit's account (REQ-BANK-021/-022); the transaction history,
+  holder distribution and audit log stay a bank-staff surface.
+- **Confirmation/rejection notifications & request auto-expiry** — only request *creation*
+  notifies (REQ-BANK-026); a decided request shows its status in the requester's list, and
+  requests do not expire automatically (they are confirmed, rejected or cancelled).
 - **English PDF variants** — v1 statements/exports render German labels (from the
   message bundles, so a locale switch stays cheap later).
 - **A "Bereich" (area) entity** — area accounts carry a free-form name; the org chart

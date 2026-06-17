@@ -1637,6 +1637,48 @@ class ArchitectureTest {
   }
 
   /**
+   * ADR-0020 (org-unit-aware bank seam): the bank stays org-unit-blind (see {@link
+   * #bankClassesMustNotConsultOrgUnitScope()}), and the officer/lead features (REQ-BANK-021/-022)
+   * route their org-unit logic through exactly one sanctioned, deliberately non-{@code Bank*}-named
+   * bridge — {@code OrgUnitBankAccessService}. Any class that couples {@code OwnerScopeService} to
+   * the bank-account repository must be that seam, so a future accidental bridge fails the build
+   * instead of silently eroding REQ-BANK-008.
+   */
+  @Test
+  void orgUnitAwareBankSeamIsContainedToOneClass() {
+    String ownerScope = "de.greluc.krt.iri.basetool.backend.service.OwnerScopeService";
+    String bankAccountRepo = "de.greluc.krt.iri.basetool.backend.repository.BankAccountRepository";
+    DescribedPredicate<JavaClass> bridgeOrgUnitScopeAndBankAccounts =
+        new DescribedPredicate<>(
+            "depend on both OwnerScopeService and the bank accounts repository") {
+          @Override
+          public boolean test(JavaClass input) {
+            boolean dependsOnOwnerScope = false;
+            boolean dependsOnBankAccounts = false;
+            for (com.tngtech.archunit.core.domain.Dependency dependency :
+                input.getDirectDependenciesFromSelf()) {
+              String target = dependency.getTargetClass().getFullName();
+              if (ownerScope.equals(target)) {
+                dependsOnOwnerScope = true;
+              } else if (bankAccountRepo.equals(target)) {
+                dependsOnBankAccounts = true;
+              }
+            }
+            return dependsOnOwnerScope && dependsOnBankAccounts;
+          }
+        };
+    classes()
+        .that(bridgeOrgUnitScopeAndBankAccounts)
+        .should()
+        .haveSimpleName("OrgUnitBankAccessService")
+        .because(
+            "officer/lead bank access bridges org-unit oversight and the bank through exactly one"
+                + " sanctioned, non-Bank*-named seam (ADR-0020); BankSecurityService stays"
+                + " org-unit-blind (REQ-BANK-008)")
+        .check(CLASSES);
+  }
+
+  /**
    * REQ-BANK-004 / ADR-0010 (append-only ledger): {@code bank_transaction} and {@code bank_posting}
    * rows are never updated or deleted — corrections are {@code REVERSAL} transactions. Two static
    * pins: the ledger repositories declare no {@code @Modifying} methods, and no production class

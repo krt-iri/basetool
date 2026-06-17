@@ -58,6 +58,17 @@ public interface NotificationEvent {
   Map<NotificationContextRole, OrgUnitRef> contextOrgUnits();
 
   /**
+   * The bank account this event concerns, for {@code ACCOUNT_GRANT} selector resolution (the
+   * employees holding a {@code bank_account_grant} on it). {@code null} for events that concern no
+   * account — the default, so non-bank producers need not implement it.
+   *
+   * @return the context bank account id, or {@code null}
+   */
+  default UUID contextAccountId() {
+    return null;
+  }
+
+  /**
    * Loose type tag of the originating aggregate stored on each notification for deep-linking.
    *
    * @return the entity type tag (e.g. {@code JOB_ORDER})

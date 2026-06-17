@@ -93,7 +93,20 @@ public class RuleEvaluationService {
               ? Set.of()
               : recipientResolutionService.resolveByRole(selector.getRoleCode());
       case ORG_RELATIVE_ROLE -> resolveOrgRelative(selector, event);
+      case ACCOUNT_GRANT -> resolveAccountGrant(event);
     };
+  }
+
+  @NotNull
+  private Set<UUID> resolveAccountGrant(@NotNull NotificationEvent event) {
+    UUID accountId = event.contextAccountId();
+    if (accountId == null) {
+      log.debug(
+          "Event {} carries no bank account; ACCOUNT_GRANT selector resolves to nobody",
+          event.eventType());
+      return Set.of();
+    }
+    return recipientResolutionService.resolveAccountGrantHolders(accountId);
   }
 
   @NotNull

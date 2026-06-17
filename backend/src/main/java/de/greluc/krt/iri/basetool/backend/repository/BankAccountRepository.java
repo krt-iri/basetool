@@ -84,6 +84,20 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   boolean existsByOrgUnitId(UUID orgUnitId);
 
   /**
+   * Loads the single {@code ORG_UNIT} account owned by the given org unit, with the owning org unit
+   * pre-fetched. Backs the org-unit officer/lead balance view (REQ-BANK-021) and the
+   * confirm-before- post request flow (REQ-BANK-022): both resolve a caller's overseen org unit to
+   * its account. The V150 partial unique index {@code uq_bank_account_org_unit} guarantees at most
+   * one row.
+   *
+   * @param orgUnitId the owning org unit
+   * @return the org-unit account, or empty when the org unit owns none
+   */
+  @EntityGraph(attributePaths = {"orgUnit"})
+  @Query("SELECT a FROM BankAccount a WHERE a.orgUnit.id = :orgUnitId")
+  Optional<BankAccount> findByOrgUnitId(@Param("orgUnitId") UUID orgUnitId);
+
+  /**
    * Draws the next value from the {@code bank_account_no_seq} sequence (V150) backing the
    * server-generated, never-reused {@code KB-<n>} account numbers.
    *

@@ -76,6 +76,19 @@ public class BankConflictException extends RuntimeException {
    */
   public static final String CODE_BANK_NOT_REVERSIBLE = "BANK_NOT_REVERSIBLE";
 
+  /**
+   * Decision (confirm/reject/cancel) attempt on a booking request that is no longer {@code PENDING}
+   * — it was already confirmed, rejected or cancelled. Blocks double-decisions (REQ-BANK-023).
+   */
+  public static final String CODE_BANK_REQUEST_NOT_PENDING = "BANK_REQUEST_NOT_PENDING";
+
+  /**
+   * Close attempt on an account that still has at least one open {@code PENDING} booking request —
+   * the request must be confirmed, rejected or cancelled first (REQ-BANK-025).
+   */
+  public static final String CODE_BANK_ACCOUNT_HAS_PENDING_REQUESTS =
+      "BANK_ACCOUNT_HAS_PENDING_REQUESTS";
+
   /** The stable machine-readable problem code, one of the {@code CODE_BANK_*} constants. */
   private final String code;
 

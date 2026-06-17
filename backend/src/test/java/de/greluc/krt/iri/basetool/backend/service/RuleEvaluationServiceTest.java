@@ -22,8 +22,10 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestCreatedEvent;
 import de.greluc.krt.iri.basetool.backend.event.JobOrderCreatedEvent;
 import de.greluc.krt.iri.basetool.backend.event.OrgUnitRef;
+import de.greluc.krt.iri.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.iri.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.iri.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.iri.basetool.backend.model.NotificationRule;
@@ -33,6 +35,7 @@ import de.greluc.krt.iri.basetool.backend.model.OrgRelativeRole;
 import de.greluc.krt.iri.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.iri.basetool.backend.model.SelectorKind;
 import de.greluc.krt.iri.basetool.backend.repository.NotificationRuleRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -147,5 +150,48 @@ class RuleEvaluationServiceTest {
     Map<NotificationType, Set<UUID>> result = service.resolveRecipients(event(ACTOR));
 
     assertThat(result.get(NotificationType.JOB_ORDER_CREATED)).containsExactly(OFFICER_A);
+  }
+
+  @Test
+  void accountGrantSelectorResolvesGrantHoldersOfTheEventsAccount() {
+    // Given the UC2 rule: bank management (ROLE) + employees granted on the account (ACCOUNT_GRANT)
+    UUID accountId = UUID.fromString("00000000-0000-0000-0000-0000000000c2");
+    UUID grantedEmployee = UUID.fromString("00000000-0000-0000-0000-0000000000a2");
+    UUID manager = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
+    NotificationRule rule =
+        NotificationRule.builder()
+            .eventType(NotificationEventType.BANK_BOOKING_REQUEST_CREATED)
+            .notificationType(NotificationType.BANK_BOOKING_REQUEST_CREATED)
+            .enabled(true)
+            .excludeActor(true)
+            .build();
+    rule.addSelector(
+        NotificationRuleSelector.builder()
+            .kind(SelectorKind.ROLE)
+            .roleCode("BANK_MANAGEMENT")
+            .build());
+    rule.addSelector(NotificationRuleSelector.builder().kind(SelectorKind.ACCOUNT_GRANT).build());
+    BankBookingRequestCreatedEvent bankEvent =
+        new BankBookingRequestCreatedEvent(
+            UUID.randomUUID(),
+            accountId,
+            BankBookingRequestType.DEPOSIT,
+            new BigDecimal("500"),
+            "KB-0001",
+            "greluc",
+            "IRI",
+            ACTOR);
+    when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
+            NotificationEventType.BANK_BOOKING_REQUEST_CREATED))
+        .thenReturn(List.of(rule));
+    when(recipientResolutionService.resolveByRole("BANK_MANAGEMENT")).thenReturn(Set.of(manager));
+    when(recipientResolutionService.resolveAccountGrantHolders(accountId))
+        .thenReturn(Set.of(grantedEmployee, ACTOR));
+
+    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(bankEvent);
+
+    // The requesting actor is excluded; manager + granted employee remain.
+    assertThat(result.get(NotificationType.BANK_BOOKING_REQUEST_CREATED))
+        .containsExactlyInAnyOrder(manager, grantedEmployee);
   }
 }
