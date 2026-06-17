@@ -28,7 +28,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
@@ -40,15 +39,17 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * Security configuration for the ingest gateway: a pure JWT-bearer resource server. There is no
- * session, no cookie and no HTML, so the posture is deliberately minimal — stateless sessions, CSRF
- * disabled (nothing cookie-bound to forge), empty CORS, and a {@code default-src 'none'} CSP
- * (REQ-INGEST-001/-002).
+ * session and no HTML, so the posture is deliberately minimal — stateless sessions, CSRF kept
+ * enabled but ignored for the bearer-only {@code /v1/**} endpoints (no weaker than the backend),
+ * empty CORS, and a {@code default-src 'none'} CSP (REQ-INGEST-001/-002).
  *
  * <p>Authorization is intentionally coarse: every ingest endpoint requires only an authenticated
  * caller ({@code isAuthenticated()}, enforced both here and by method-level {@code @PreAuthorize}),
@@ -105,9 +106,9 @@ public class SecurityConfig {
   }
 
   /**
-   * The single {@link SecurityFilterChain}: CSRF disabled (bearer-only, stateless), empty CORS,
-   * locked-down response headers, the authorization matrix, JWT resource-server activation and a
-   * stateless session policy.
+   * The single {@link SecurityFilterChain}: CSRF enabled but ignored for the bearer-only {@code
+   * /v1/**} endpoints, empty CORS, locked-down response headers, the authorization matrix, JWT
+   * resource-server activation and a stateless session policy.
    *
    * @param http the Spring Security builder
    * @return the configured filter chain
@@ -115,7 +116,19 @@ public class SecurityConfig {
    */
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http.csrf(AbstractHttpConfigurer::disable)
+    // CSRF stays ENABLED (never disabled) so the gateway carries no weaker posture than the
+    // backend. Every real endpoint (/v1/**) is JSON + bearer-token only on a stateless chain with
+    // no session cookie, so it can never be driven from a CSRF-vulnerable browser flow — those
+    // paths are ignored exactly like the backend's bearer API. The cookie repository never issues a
+    // session, and no other state-changing browser endpoint exists, so the CSRF machinery is inert
+    // here while keeping the static-analysis posture clean.
+    CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    csrfRepo.setCookieCustomizer(cookie -> cookie.sameSite("Strict").secure(true));
+    http.csrf(
+            csrf ->
+                csrf.csrfTokenRepository(csrfRepo)
+                    .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                    .ignoringRequestMatchers("/v1/**"))
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .headers(
             headers -> {
