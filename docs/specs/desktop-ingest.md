@@ -47,12 +47,14 @@ network only.
   endpoint, carrying the caller's bearer, and no backend write.
 - [ ] The gateway declares no `DataSource`/JPA and runs no schema migration (architecture
   test / startup assertion).
-- [ ] The gateway listens on **plain HTTP** behind nginx-proxy-manager (which terminates TLS):
-  its server TLS connector is disabled (`server.ssl.enabled=false`) so the shared
-  `SERVER_SSL_KEY_STORE` env vars feed **only** the `backend-trust` truststore, and both the
-  Docker `HEALTHCHECK` and the NPM upstream address the gateway over `http://…:11262`. (A
-  keystore that also enables the server connector makes NPM's plain-HTTP proxy return a bare 400
-  and keeps the container `unhealthy`.)
+- [ ] The gateway serves **HTTPS** on 11262 (`server.ssl.enabled=true`), mirroring backend/frontend.
+  nginx-proxy-manager terminates the public TLS and **re-encrypts** to the gateway over
+  `https://…:11262` (NPM upstream scheme `https`, upstream-certificate verification **off** for the
+  shared self-signed cert). The shared `SERVER_SSL_KEY_STORE` env vars feed **both** the server
+  connector and the `backend-trust` truststore. Both the Docker `HEALTHCHECK` and the NPM upstream
+  address the gateway over `https://…:11262` (the healthcheck skips cert verification). The connector
+  scheme, the NPM upstream scheme and the healthcheck scheme must stay aligned — a mismatch makes the
+  proxy return a bare 400 and keeps the container `unhealthy`.
 
 **Enforced by:** _(pending — #642)_ · **Code:** _(new `ingest` module — #642)_ · **Issues:** #642
 

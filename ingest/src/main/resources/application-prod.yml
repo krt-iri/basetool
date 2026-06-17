@@ -5,8 +5,9 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
   # SSL bundle that exposes the bind-mounted keystore.p12 as a TRUSTSTORE for the backend WebClient
-  # (the gateway itself serves plain HTTP behind NPM, but it must trust the backend's self-signed
-  # https://backend:11261 cert). WebClientConfig consumes this via SslBundles.getBundle("backend-trust")
+  # (the same keystore also backs the gateway's own HTTPS connector — see application.yml — but as a
+  # trust anchor it must validate the backend's self-signed https://backend:11261 cert).
+  # WebClientConfig consumes this via SslBundles.getBundle("backend-trust")
   # on the prod path; if absent it falls back to the default JVM trust store. Same env vars the other
   # modules already use — no new compose secret. Mirrors the frontend's backend-trust bundle.
   ssl:

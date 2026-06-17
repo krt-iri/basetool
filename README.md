@@ -132,14 +132,15 @@ is missing, the stack refuses to start.
 
 The `ingest` service is the only **new** internet-reachable component: it lets the
 desktop extractor push its JSON straight into the basetool (design: [ADR-0018](docs/adr/0018-desktop-ingest-gateway-device-grant.md),
-[`docs/specs/desktop-ingest.md`](docs/specs/desktop-ingest.md)). It serves plain HTTP on
-port `11262` (TLS is terminated at NPM), owns no database, and relays to the backend over
-the internal network — **the backend stays internet-unreachable**.
+[`docs/specs/desktop-ingest.md`](docs/specs/desktop-ingest.md)). It serves HTTPS on
+port `11262` (NPM terminates the public TLS and re-encrypts to it), owns no database, and relays to
+the backend over the internal network — **the backend stays internet-unreachable**.
 
 To expose it, add a new **NPM proxy host** (alongside the existing frontend/keycloak hosts):
 
 - Domain: `ingest.<your-domain>` (e.g. `ingest.profit-base.online`), with a Let's Encrypt cert.
-- Forward: scheme `http`, host `ingest`, port `11262`. (Not HTTPS — the gateway has no keystore.)
+- Forward: scheme `https`, host `ingest`, port `11262`. Enable the host's SSL options so NPM does
+  **not** verify the upstream certificate — the gateway presents the shared self-signed cert.
 - Set `client_max_body_size 2m` for this host to match the gateway's payload cap; a real
   extract is a few KB.
 
@@ -447,7 +448,7 @@ worktree; the commands are identical).
      -keypass  "keystore-test-pw-do-not-use-in-prod" \
      -keyalg RSA -keysize 2048 -validity 365 \
      -dname "CN=localhost, OU=Test, O=KRT Basetool Test, L=Test, ST=Test, C=DE" \
-     -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend"
+     -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:ingest"
    ```
 3. **Provide a test `realm-export.json`** at the repo root containing a
    Keycloak realm named `iri` with a `basetool-frontend` public client, a

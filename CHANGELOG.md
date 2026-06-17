@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der `ingest`-Gateway serviert jetzt durchgehend HTTPS auf Port 11262 statt Plain-HTTP** — analog zu Backend und Frontend. Beim Deployment muss der nginx-proxy-manager-Proxy-Host des Gateways auf Upstream-Schema `https` umgestellt und die Upstream-Zertifikatsprüfung deaktiviert werden (selbstsigniertes Zertifikat); Container-Healthcheck und Reverse-Proxy sprechen den Dienst entsprechend über `https://` an.
+
 ## [v0.5.5](https://github.com/krt-iri/basetool/releases/tag/v0.5.5) - 2026-06-17
 
 ### Fixed

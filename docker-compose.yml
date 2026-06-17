@@ -265,12 +265,13 @@ x-frontend: &frontend-template
 
 x-ingest: &ingest-template
   # The desktop one-click ingest gateway (epic #639, ADR-0018) — the ONLY new internet-reachable
-  # service. NPM terminates TLS and proxies to its plain-HTTP port, so unlike backend/frontend it
-  # carries no server keystore; the bind-mounted keystore.p12 is used only as a TRUSTSTORE so the
-  # gateway can validate the backend's self-signed https://backend:11261 cert (backend-trust bundle
-  # in application-prod.yml). It owns no database — it relays to the backend and stages a short-lived
-  # single-use handoff in the shared Redis. See x-backend for the GHCR / IRI_BASETOOL_VERSION
-  # rationale; local rebuilds use docker-compose.build.yml.
+  # service. NPM terminates the public TLS and re-encrypts to this gateway over https://ingest:11262
+  # (NPM upstream: scheme https, upstream-cert verification OFF — the shared cert is self-signed), so
+  # like backend/frontend the gateway serves HTTPS. The bind-mounted keystore.p12 is used BOTH as the
+  # server keystore AND as the TRUSTSTORE that validates the backend's self-signed https://backend:11261
+  # cert (backend-trust bundle in application-prod.yml). It owns no database — it relays to the backend
+  # and stages a short-lived single-use handoff in the shared Redis. See x-backend for the GHCR /
+  # IRI_BASETOOL_VERSION rationale; local rebuilds use docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   logging: *default-logging
@@ -297,11 +298,11 @@ x-ingest: &ingest-template
     # has BOTH the extractor and frontend tokens carrying aud=basetool-backend. Only then set this to
     # basetool-backend — enabling it earlier rejects every frontend token and breaks the app.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
-    # Truststore only (the gateway serves plain HTTP behind NPM); same keystore + password the other
-    # modules use. These also bind to `server.ssl.key-store`, which would otherwise switch the
-    # gateway's own connector to HTTPS on 11262 and break NPM's http:// proxy + the Docker
-    # HEALTHCHECK — the ingest module pins `server.ssl.enabled=false` (ingest application.yml) so
-    # these stay truststore-only.
+    # Same keystore + password the other modules use. These bind BOTH the server connector
+    # (`server.ssl.*`, enabled in ingest application.yml so the gateway serves HTTPS on 11262) AND the
+    # `spring.ssl.bundle.backend-trust` truststore that validates the backend's self-signed cert. NPM
+    # re-encrypts to this connector (upstream scheme https, upstream-cert verification OFF for the
+    # self-signed cert).
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0

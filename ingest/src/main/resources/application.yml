@@ -10,16 +10,20 @@ server:
   max-http-request-header-size: 65536
   shutdown: graceful
   ssl:
-    # The gateway serves PLAIN HTTP — nginx-proxy-manager terminates TLS and proxies to this port
-    # over http://. The SERVER_SSL_KEY_STORE / SERVER_SSL_KEY_STORE_PASSWORD env vars are passed to
-    # this module ONLY to feed the `backend-trust` SSL *bundle* (the truststore that validates the
-    # backend's self-signed https://backend:11261 cert — see application-prod.yml). Spring, however,
-    # also binds `server.ssl.key-store` from that same env var, which would switch the embedded
-    # Tomcat connector to HTTPS on 11262 — breaking NPM's plain-HTTP proxy (→ bare 400) and the
-    # Docker HEALTHCHECK (wget http://localhost:11262/... → container stays unhealthy). Forcing the
-    # server connector off here keeps the gateway on HTTP regardless of the keystore env vars; the
-    # `spring.ssl.bundle.*` truststore is independent of this flag and stays available.
-    enabled: false
+    # The gateway serves HTTPS on 11262, mirroring backend/frontend (REQ-INGEST-001). nginx-proxy-
+    # manager terminates the public TLS and re-encrypts to this connector over https:// on the
+    # internal network (NPM upstream: scheme https, upstream-certificate verification OFF, since the
+    # shared cert is self-signed). The SERVER_SSL_KEY_STORE / SERVER_SSL_KEY_STORE_PASSWORD env vars
+    # feed BOTH this server connector AND the `backend-trust` SSL *bundle* (the truststore that
+    # validates the backend's self-signed https://backend:11261 cert — see application-prod.yml); the
+    # same PKCS12 file serves as both server identity and trust anchor. The Docker HEALTHCHECK probes
+    # https://localhost:11262/... with --no-check-certificate (self-signed). The test profile disables
+    # this connector (application-test.yml) since the MOCK web environment ships no keystore.
+    enabled: true
+    key-store: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+    key-store-type: PKCS12
+    key-alias: basetool
 
 spring:
   application:
