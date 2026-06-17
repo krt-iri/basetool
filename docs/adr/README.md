@@ -55,4 +55,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0015](0015-notification-data-driven-rule-engine.md)          | Notification recipients via a data-driven rule engine                                   | Accepted                          |
 | [0016](0016-notification-transport-polling-sse.md)            | Notification delivery: in-app polling baseline, SSE push as enhancement                 | Accepted                          |
 | [0017](0017-default-blueprints-admin-curated-materialized.md) | Default blueprints: admin-curated set materialised per-user, non-removable              | Accepted                          |
+| [0018](0018-desktop-ingest-gateway-device-grant.md)           | Desktop one-click ingest: dedicated gateway + Keycloak device grant                     | Accepted — implementation pending |
 
