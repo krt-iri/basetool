@@ -23,7 +23,9 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintImportApplyRequest
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintImportResolutionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.BlueprintImportResultDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.HandoffKind;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.IngestHandoffService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -72,6 +77,29 @@ public class PersonalBlueprintImportProxyController {
 
   private final WebClient webClient;
   private final BackendApiClient backendApiClient;
+  private final IngestHandoffService ingestHandoffService;
+
+  /**
+   * Returns the one-click ingest handoff staged for the current user (epic #639, REQ-INGEST-004):
+   * the desktop extractor sent a blueprint export and opened {@code
+   * /personal-inventory/blueprints?handoff=<id>}; the import JS fetches the staged preview here and
+   * renders it without an upload. Single-use and scoped to the session subject — an unknown,
+   * expired, consumed or foreign id is a 404 (no IDOR leak), which the JS treats as "nothing
+   * staged".
+   *
+   * @param handoff the handoff id from the {@code ?handoff=} parameter
+   * @param principal the authenticated user (its subject scopes the staged lookup)
+   * @return the staged blueprint import preview
+   * @throws ResponseStatusException 404 when there is no staged handoff for this user/id
+   */
+  @GetMapping("/staged")
+  public BlueprintImportPreviewDto staged(
+      @RequestParam("handoff") String handoff, @AuthenticationPrincipal OidcUser principal) {
+    String sub = principal != null ? principal.getSubject() : null;
+    return ingestHandoffService
+        .consume(sub, handoff, HandoffKind.BLUEPRINT, BlueprintImportPreviewDto.class)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+  }
 
   /**
    * Proxies a blueprint export JSON upload to the backend import-preview endpoint and returns the

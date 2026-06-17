@@ -62,7 +62,7 @@ public class IngestProperties {
    * Frontend path that renders the pre-filled personal-blueprint import preview; the handoff id is
    * appended as {@code ?handoff=<id>} (REQ-INGEST-004).
    */
-  @NotBlank private String blueprintPath = "/personal-blueprints/import";
+  @NotBlank private String blueprintPath = "/personal-inventory/blueprints";
 
   /**
    * Lifetime of a staged handoff entry in Redis. Short by design — the browser picks the draft up
