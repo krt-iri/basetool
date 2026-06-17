@@ -46,6 +46,30 @@ class FiltersTest {
     return request;
   }
 
+  /**
+   * A request that carries a body but reports no {@code Content-Length} — the shape of a {@code
+   * Transfer-Encoding: chunked} request, used to exercise the size filter's streaming guard.
+   *
+   * @param bodyLength the actual body size served via the input stream
+   * @return a mock request whose {@code getContentLength*} return {@code -1}
+   */
+  private static MockHttpServletRequest chunkedIngestRequest(int bodyLength) {
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/v1/refinery-extract") {
+          @Override
+          public long getContentLengthLong() {
+            return -1;
+          }
+
+          @Override
+          public int getContentLength() {
+            return -1;
+          }
+        };
+    request.setContent(new byte[bodyLength]);
+    return request;
+  }
+
   @Test
   void sizeFilterRejectsOversizedPayloadWith413() throws Exception {
     IngestProperties properties = new IngestProperties();
@@ -73,6 +97,37 @@ class FiltersTest {
     filter.doFilter(ingestRequestWithBody(50), response, chain);
 
     assertThat(chain.getRequest()).isNotNull();
+  }
+
+  @Test
+  void sizeFilterRejectsOversizedChunkedPayloadWith413() throws Exception {
+    // INGEST-DOS-1: a chunked body (no Content-Length) over the cap must still be rejected.
+    IngestProperties properties = new IngestProperties();
+    properties.setMaxPayloadBytes(10);
+    PayloadSizeLimitFilter filter = new PayloadSizeLimitFilter(properties, objectMapper);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(chunkedIngestRequest(100), response, chain);
+
+    assertThat(response.getStatus()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE.value());
+    assertThat(response.getContentAsString()).contains("PAYLOAD_TOO_LARGE");
+    assertThat(chain.getRequest()).isNull();
+  }
+
+  @Test
+  void sizeFilterPassesChunkedPayloadWithinLimitAndReplaysBody() throws Exception {
+    IngestProperties properties = new IngestProperties();
+    properties.setMaxPayloadBytes(1024);
+    PayloadSizeLimitFilter filter = new PayloadSizeLimitFilter(properties, objectMapper);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(chunkedIngestRequest(50), response, chain);
+
+    // The within-cap chunked body is buffered and re-served unchanged to the controller.
+    assertThat(chain.getRequest()).isNotNull();
+    assertThat(chain.getRequest().getInputStream().readAllBytes()).hasSize(50);
   }
 
   @Test

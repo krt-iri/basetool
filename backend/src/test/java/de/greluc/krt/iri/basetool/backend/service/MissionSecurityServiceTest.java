@@ -174,12 +174,10 @@ class MissionSecurityServiceTest {
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
-    when(authentication.getAuthorities())
-        .thenAnswer(
-            i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
-    // When / Then: self-edit allowed
+    // When / Then: self-edit allowed without any mission-management authority (the self-edit branch
+    // returns before the scope gate, so no authorities are inspected).
     assertTrue(
         missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
   }
@@ -210,8 +208,9 @@ class MissionSecurityServiceTest {
   }
 
   @Test
-  void canAccessParticipant_MissionManager_ShouldReturnTrueForAnyParticipant() {
-    // Given: participant belongs to a DIFFERENT user, but caller is MISSION_MANAGER
+  void canAccessParticipant_MissionManagerOwnOrgUnit_ShouldReturnTrue() {
+    // Given: participant belongs to a DIFFERENT user, but the caller is a MISSION_MANAGER whose
+    // owning-OrgUnit scope DOES cover the target mission (canEditMission == true).
     UUID participantId = UUID.randomUUID();
     User otherUser = new User();
     otherUser.setId(UUID.randomUUID());
@@ -226,9 +225,40 @@ class MissionSecurityServiceTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
 
-    // When / Then: privileged access granted without owner match
+    // When / Then: scoped mission-manager may manage the participant
     assertTrue(
+        missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+  }
+
+  @Test
+  void canAccessParticipant_MissionManagerForeignOrgUnit_ShouldReturnFalse() {
+    // Security audit AUTHZ-1 regression: a MISSION_MANAGER of a DIFFERENT OrgUnit must NOT manage a
+    // user-linked participant on a mission outside their owning-OrgUnit scope. canEditMission is
+    // false for the target mission and the caller is neither the owner nor a co-manager, so the
+    // only
+    // remaining path (self-edit) fails because the participant belongs to someone else.
+    UUID participantId = UUID.randomUUID();
+    User otherUser = new User();
+    otherUser.setId(UUID.randomUUID());
+    MissionParticipant participant = new MissionParticipant();
+    participant.setId(participantId);
+    participant.setMission(mission);
+    participant.setUser(otherUser);
+
+    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
+    when(authentication.getAuthorities())
+        .thenAnswer(
+            i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(false);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+    // When / Then: cross-OrgUnit mission-manager is denied
+    assertFalse(
         missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
   }
 

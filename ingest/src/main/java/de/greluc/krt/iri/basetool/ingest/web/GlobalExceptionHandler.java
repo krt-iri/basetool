@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.ingest.web;
 
+import de.greluc.krt.iri.basetool.ingest.ratelimit.RateLimitedException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   private static final String CODE_BAD_REQUEST = "BAD_REQUEST";
   private static final String CODE_UPSTREAM = "BACKEND_RELAY_FAILED";
   private static final String CODE_INTERNAL = "INTERNAL_ERROR";
+  private static final String CODE_RATE_LIMITED = "RATE_LIMITED";
 
   @Override
   protected ResponseEntity<Object> handleMethodArgumentNotValid(
@@ -123,6 +125,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         "Backend unavailable",
         CODE_UPSTREAM,
         "The import backend returned an error. Please try again.");
+  }
+
+  /**
+   * The authenticated caller exhausted their per-subject ingest budget → 429 with {@code
+   * Retry-After} (REQ-INGEST-005). Returned as a {@link ResponseEntity} rather than a bare {@link
+   * ProblemDetail} so the {@code Retry-After} header can be attached.
+   *
+   * @param ex the rate-limit exception carrying the suggested retry delay
+   * @return a 429 problem with a {@code Retry-After} header
+   */
+  @ExceptionHandler(RateLimitedException.class)
+  public @NotNull ResponseEntity<ProblemDetail> handleRateLimited(
+      @NotNull RateLimitedException ex) {
+    ProblemDetail problem =
+        problem(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "Rate limit exceeded",
+            CODE_RATE_LIMITED,
+            "Too many ingest requests. Please retry later.");
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(ex.getRetryAfterSeconds()))
+        .body(problem);
   }
 
   /**

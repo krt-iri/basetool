@@ -119,19 +119,33 @@ REQ-UI-008); it never errors the page out.
 ### REQ-INGEST-005 — Size and rate limits
 
 The gateway caps each ingest payload at the same ceiling the existing frontend proxy uses
-(2 MB — a real extract is a few KB) and rejects larger bodies before forwarding. Ingest
-calls are rate-limited per `sub` (and per source IP) so the new ingress cannot be used to
-hammer the backend import endpoints. Defensive payload caps inherited from the backend DTOs
+(2 MB — a real extract is a few KB) and rejects larger bodies before forwarding. The cap is
+enforced on the **real** body size, not just a declared `Content-Length`: a chunked request
+(no `Content-Length`) is counted while reading and rejected the moment it crosses the cap, so
+it cannot be used to slip an oversized body past the guard (`PayloadSizeLimitFilter`).
+
+Ingest calls are rate-limited **per `sub` and per source IP** so the new ingress cannot be
+used to hammer the backend import endpoints. The per-`sub` limit (`SubjectRateLimiter`,
+invoked from `IngestService` inside the authenticated context) is the enforceable control —
+it keys on the unforgeable JWT subject. The per-IP limit (`RateLimitingFilter`) is a coarse
+pre-auth front line; the source IP is resolved through Tomcat's `RemoteIpValve`
+(`forward-headers-strategy: native`), which honours `X-Forwarded-For` only from a trusted
+internal proxy, so an external client cannot trivially mint a fresh budget by spoofing the
+header. Both bucket maps are bounded (LRU, capped key count) so neither grows without limit
+under key churn. Defensive payload caps inherited from the backend DTOs
 (`REQ-REFINERY-001` envelope limits) still apply at the backend; the gateway does not relax
 them.
 
 **Acceptance**
 
 - [ ] A body over the size cap is rejected by the gateway with a localized problem response
-  and is never forwarded.
-- [ ] A burst of ingest calls from one `sub`/IP is throttled, not passed straight through.
+  and is never forwarded — including a chunked body with no `Content-Length`.
+- [ ] A burst of ingest calls from one `sub` is throttled with a `Retry-After`, not passed
+  straight through; rotating the source IP does not defeat the per-`sub` limit.
 
-**Enforced by:** _(pending — #642)_ · **Code:** _(ingest gateway limits — #642)_ · **Issues:** #642
+**Enforced by:** `FiltersTest`, `SubjectRateLimiterTest` · **Code:** `PayloadSizeLimitFilter`,
+`SubjectRateLimiter`, `RateLimitingFilter` · **Issues:** #642, security audit
+INGEST-DOS-1 / INGEST-RATELIMIT-1
 
 ### REQ-INGEST-006 — Egress is opt-in; the CLI stays offline
 

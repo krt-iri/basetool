@@ -1,8 +1,12 @@
 server:
   port: 11262
-  # Behind nginx-proxy-manager (TLS terminated at the proxy); `framework` makes Spring consume
-  # X-Forwarded-* so the rate-limit filter sees the real client IP, not the proxy's.
-  forward-headers-strategy: framework
+  # Behind nginx-proxy-manager (TLS terminated at the proxy). `native` routes X-Forwarded-* through
+  # Tomcat's RemoteIpValve, which only honours the header from a TRUSTED internal proxy (its default
+  # internal-proxies regex covers the Docker private ranges, including the NPM hop). Unlike
+  # `framework`, this stops an external client spoofing an arbitrary X-Forwarded-For to mint a fresh
+  # per-IP rate-limit budget (security audit INGEST-RATELIMIT-1). The enforceable throttle is the
+  # per-subject limiter; this only hardens the coarse per-IP front line.
+  forward-headers-strategy: native
   max-http-request-header-size: 65536
   shutdown: graceful
 

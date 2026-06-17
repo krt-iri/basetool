@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.ingest.filter;
 
 import de.greluc.krt.iri.basetool.ingest.config.RateLimitProperties;
+import de.greluc.krt.iri.basetool.ingest.ratelimit.RateLimitBuckets;
 import de.greluc.krt.iri.basetool.ingest.web.ProblemResponseWriter;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
@@ -29,7 +30,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -45,8 +46,17 @@ import tools.jackson.databind.ObjectMapper;
  * Per-client-IP token-bucket rate limiter for the ingest endpoints (REQ-INGEST-005). The new
  * ingress must not be usable to hammer the backend's import endpoints, so each source IP gets a
  * small bucket; an exhausted bucket yields 429 with a {@code Retry-After}. Mirrors the backend's
- * bucket4j approach. With {@code server.forward-headers-strategy=framework} the remote address is
- * the real client IP behind the proxy, not the proxy's.
+ * bucket4j approach.
+ *
+ * <p>This filter runs before the security chain and keys on the source IP, which a caller can
+ * influence via {@code X-Forwarded-For}. It is therefore only a coarse front line; the enforceable
+ * throttle is the per-subject {@link
+ * de.greluc.krt.iri.basetool.ingest.ratelimit.SubjectRateLimiter}, which keys on the unforgeable
+ * JWT {@code sub}. The {@code native} forward-headers strategy (see {@code application.yml}) routes
+ * the IP through Tomcat's {@code RemoteIpValve}, which only honours {@code X-Forwarded-For} from
+ * trusted internal proxies, so an external client cannot trivially spoof an arbitrary IP. The
+ * bucket map is bounded ({@link RateLimitBuckets#boundedLru(int)}) so a flood of distinct IPs
+ * cannot grow it without limit (security audit INGEST-RATELIMIT-1).
  */
 @Component
 @Order(RateLimitingFilter.ORDER)
@@ -56,7 +66,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   /** After correlation id and size cap, still before Spring Security. */
   public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 30;
 
-  private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+  /** Hard cap on simultaneously-tracked source IPs, bounding the bucket map's memory footprint. */
+  static final int MAX_TRACKED_IPS = 50_000;
+
+  private final Map<String, Bucket> buckets = RateLimitBuckets.boundedLru(MAX_TRACKED_IPS);
   private final RateLimitProperties properties;
   private final ObjectMapper objectMapper;
 
