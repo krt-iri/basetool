@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.frontend.exception.ReauthenticationRequiredException;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import java.net.ConnectException;
@@ -32,6 +33,7 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.client.ClientAuthorizationRequiredException;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
@@ -158,6 +160,30 @@ class BackendApiClientResilienceTest {
           "the catch-all branch must map unknown exceptions to UNKNOWN, not crash");
       assert ex.getMessage().contains("GET");
       assert ex.getMessage().contains("backend");
+    }
+
+    @Test
+    void clientAuthorizationRequired_yieldsReauthenticationRequiredException() {
+      // The OAuth2 manager throws this when the session has no usable token; it must be
+      // reclassified
+      // (not mapped to a generic 500) so GlobalExceptionHandler can bounce the user to re-login.
+      stubGet(webClient, "/api/v1/x", new ClientAuthorizationRequiredException("keycloak"));
+
+      assertThrows(
+          ReauthenticationRequiredException.class, () -> client.get("/api/v1/x", String.class));
+    }
+
+    @Test
+    void wrappedClientAuthorizationException_isUnwrappedToReauthenticationRequired() {
+      // Reactor wraps the cause; the cause-chain walk must still detect the auth failure.
+      stubGet(
+          webClient,
+          "/api/v1/x",
+          new RuntimeException(
+              "reactor wrap", new ClientAuthorizationRequiredException("keycloak")));
+
+      assertThrows(
+          ReauthenticationRequiredException.class, () -> client.get("/api/v1/x", String.class));
     }
 
     @Test

@@ -179,6 +179,45 @@ the whole organisation. The relay never overwrites an existing header and degrad
 **Enforced by:** `ClientIpRelayFilterTest` · **Code:** `ClientIpRelayFilter` / `ClientIpContextFilter`
 / `RateLimitingFilter.resolveClientIp` · **Issues:** security audit DOS-1
 
+### REQ-SEC-012 — Re-authentication on lost frontend OAuth2 token
+
+When a frontend &rarr; backend call fails with Spring Security's `ClientAuthorizationException`
+(`client_authorization_required`, or a refresh-grant `invalid_grant` after a revoked/rotated refresh
+token) the user MUST be bounced through a fresh Keycloak login rather than shown an empty page / 500
+or a stack-trace log flood. Because the exception is a `RuntimeException` (not an
+`AuthenticationException`) it bypasses `SsoReAuthenticationEntryPoint` (REQ-SEC-008), so it is handled
+explicitly at the MVC boundary: `BackendApiClient` rethrows it as `ReauthenticationRequiredException`
+(logged at DEBUG, no stack trace) and `GlobalExceptionHandler` answers an HTML navigation with a
+`302` to `/oauth2/authorization/keycloak` and an AJAX caller with a `401` carrying the
+`X-Reauthenticate` header (mirrored in the JSON body) so the shared `krtFetch`/`krtReauth` client
+redirects the window; the notification SSE relay pushes a `reauth` event for the same effect. The
+exception is added to the Resilience4j `ignoreExceptions` so it is neither retried nor counted toward
+the circuit breaker.
+
+To stop the in-session refresh race that produces this (parallel page + SSE + poll requests each
+replaying the same refresh token, which Keycloak's rotation + reuse detection then revokes — see
+`INGEST_KEYCLOAK_SETUP.md` step 4), the `OAuth2AuthorizedClientManager` is wrapped in a
+`SingleFlightAuthorizedClientManager` that serialises refreshes per session and serves a
+short-lived freshness cache, issuing at most one refresh-token grant per expiry window. Single-flight
+is JVM-local; horizontally-scaled deployments rely on `Refresh Token Max Reuse > 0` on Keycloak for
+the residual cross-instance race. `offline_access` MUST NOT be re-added to paper over this (audit
+finding L-4). See ADR-0019.
+
+**Acceptance**
+
+- [ ] A `client_authorization_required` on an HTML navigation redirects (302) to the Keycloak login
+  flow instead of rendering an empty page / 500.
+- [ ] The same failure on an AJAX call returns `401` with an `X-Reauthenticate` header and the
+  client redirects the window.
+- [ ] A burst of concurrent same-session authorize calls issues exactly one refresh-token grant.
+- [ ] `ClientAuthorizationException` is not retried and does not open the backend circuit breaker.
+
+**Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `GlobalExceptionHandlerTest`,
+`BackendApiClientResilienceTest` · **Code:** `SingleFlightAuthorizedClientManager`,
+`ReauthenticationRequiredException`, `BackendApiClient`, `GlobalExceptionHandler`,
+`NotificationPageController`, `krt-fetch.js` · **Issues:** ingest-rollout regression · **ADR:**
+ADR-0019
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
