@@ -23,7 +23,10 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -37,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto;
+import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.util.Collections;
 import java.util.List;
@@ -107,51 +111,16 @@ class MissionPageControllerMvcTest {
     // that were never actually attached to the mission; they have been removed because
     // unused container literals tripped CodeQL's "Container contents are never accessed"
     // rule and added confusion to anyone reading this test.
-    UUID managerId = UUID.randomUUID();
-    de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto manager =
-        new de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto(
-            managerId, "manager", null, "Test Manager", 0);
-
-    MissionDto mission =
-        new MissionDto(
-            missionId,
-            "Test Mission",
-            null,
-            null,
-            "PLANNED",
-            null,
-            null,
-            null,
-            null,
-            null,
-            false,
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
-            null,
-            null,
-            java.util.Set.of(manager),
-            true,
-            true,
-            1L,
-            1L,
-            1L,
-            1L,
-            0,
-            0,
-            null,
-            null,
-            null,
-            0L);
+    MissionDto mission = minimalMission(missionId);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
     when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(Collections.emptyList());
+    // OFFICER is a member, so the member-only finance ledger fetch now runs (REQ-SEC-013); stub it
+    // empty so the page renders without exercising the entry-row template here.
+    stubEmptyFinance(missionId);
 
     // This will fail with TemplateProcessingException if the template syntax is invalid
     mockMvc
@@ -173,6 +142,106 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(not(containsString("mission-columns-container"))))
         // Legacy horizontal-scroll markers must be gone
         .andExpect(content().string(not(containsString("vertical-title"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "SQUADRON_MEMBER")
+  void missionDetail_asMember_fetchesFinanceLedger() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(minimalMission(missionId));
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+    stubEmptyFinance(missionId);
+
+    mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
+
+    // REQ-SEC-013 regression: a member must trigger the member-only finance ledger fetch. Before
+    // the
+    // fix isMemberOrAbove read the OidcUser principal authorities (which lack the Keycloak-mapped
+    // ROLE_*), so this fetch was silently skipped and the "Finanzen" panel rendered empty.
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries?size=1000"),
+            any(ParameterizedTypeReference.class),
+            eq(false));
+  }
+
+  @Test
+  void missionDetail_asAnonymous_skipsFinanceLedger() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(minimalMission(missionId));
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
+
+    // An anonymous visitor must NOT trigger the member-only finance fetch (it would 403 anyway).
+    verify(backendApiClient, never())
+        .get(contains("/finance-entries"), any(ParameterizedTypeReference.class), eq(false));
+  }
+
+  /**
+   * Builds a minimal renderable {@link MissionDto} (empty sub-collections, one manager, editable)
+   * for the mission-detail template tests, so the 32-argument constructor lives in one place.
+   *
+   * @param missionId the id to stamp on the mission
+   * @return a minimal mission fixture
+   */
+  private MissionDto minimalMission(UUID missionId) {
+    de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto manager =
+        new de.greluc.krt.iri.basetool.frontend.model.dto.UserReferenceDto(
+            UUID.randomUUID(), "manager", null, "Test Manager", 0);
+    return new MissionDto(
+        missionId,
+        "Test Mission",
+        null,
+        null,
+        "PLANNED",
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        Collections.emptySet(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        Collections.emptySet(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        null,
+        null,
+        java.util.Set.of(manager),
+        true,
+        true,
+        1L,
+        1L,
+        1L,
+        1L,
+        0,
+        0,
+        null,
+        null,
+        null,
+        0L);
+  }
+
+  /**
+   * Stubs the member-only finance ledger list fetch to an empty page so a member-rendered
+   * mission-detail page does not NPE on the absent finance payload. The sum and refinery fetches
+   * are intentionally left unstubbed (the controller null-handles them).
+   *
+   * @param missionId the mission whose finance-entries fetch is stubbed
+   */
+  private void stubEmptyFinance(UUID missionId) {
+    when(backendApiClient.get(
+            contains("/finance-entries"), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(
+            new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList()));
   }
 
   @Test

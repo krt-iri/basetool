@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-17.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -217,6 +217,39 @@ finding L-4). See ADR-0019.
 `ReauthenticationRequiredException`, `BackendApiClient`, `GlobalExceptionHandler`,
 `NotificationPageController`, `krt-fetch.js` · **Issues:** ingest-rollout regression · **ADR:**
 ADR-0019
+
+### REQ-SEC-013 — Frontend role checks read the Authentication token, not the OidcUser principal
+
+Frontend membership/role predicates (e.g. the member-only mission finance/refinery gate) MUST read
+the request `Authentication`'s authorities — the same source `sec:authorize` and `@PreAuthorize`
+consult — via `FrontendAuthHelperService`, never the `@AuthenticationPrincipal OidcUser`'s own
+`getAuthorities()`. Spring's `userAuthoritiesMapper` maps the Keycloak `realm_access.roles` onto the
+`OAuth2AuthenticationToken`, not onto the `OidcUser` principal object, so a check that reads the
+principal sees none of the mapped `ROLE_*` unless `BackendRoleSyncFilter` happened to rebuild the
+principal that session. The mission-detail finance gate (`MissionPageController.isMemberOrAbove`)
+regressed exactly this way: it read the principal, so the "Finanzen" panel silently collapsed
+(database rows intact, backend returning `200`) for any session whose one-shot role sync had been
+skipped, while the panel chrome still rendered because the template's `sec:authorize` correctly read
+the token.
+
+`BackendRoleSyncFilter` (which enriches the principal with backend-DB roles/permissions) MUST mark a
+session synced (`BACKEND_ROLES_SYNCED`) only when the `/api/v1/users/me` read genuinely succeeded. A
+Resilience4j fallback (`null`, no exception) or a thrown error MUST leave the flag unset so the next
+request retries, rather than poisoning the whole session with an under-privileged principal until the
+user re-logs in.
+
+**Acceptance**
+
+- [ ] `FrontendAuthHelperService.isMemberOrAbove()` is true for any member/elevated `ROLE_*` on the
+  Authentication token and false for anonymous, missing-context and role-less GUEST callers.
+- [ ] A member's `GET /missions/{id}` triggers the member-only finance-entries fetch; an anonymous
+  visitor's does not.
+- [ ] `BackendRoleSyncFilter` does not set `BACKEND_ROLES_SYNCED` when `/api/v1/users/me` returns
+  `null` or throws; it does set it when the read succeeds.
+
+**Enforced by:** `FrontendAuthHelperServiceTest`, `BackendRoleSyncFilterTest`,
+`MissionPageControllerMvcTest` · **Code:** `FrontendAuthHelperService`, `MissionPageController`,
+`BackendRoleSyncFilter` · **Issues:** mission-finance-panel regression
 
 ## Out of scope
 
