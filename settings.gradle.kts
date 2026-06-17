@@ -5,3 +5,5 @@ rootProject.name = "basetool"
 include("backend")
 
 include("frontend")
+
+include("ingest")
