@@ -71,6 +71,52 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') closeModal();
         });
+        loadHandoff();
+    }
+
+    /* --------------------------------------------------------------- handoff */
+
+    // One-click ingest (epic #639): the desktop extractor opened this page with a `?handoff=<id>`.
+    // Fetch the staged preview (single-use, scoped to the session user server-side) and render it
+    // straight into the import modal — no file upload. An expired/foreign/unknown id is a 404,
+    // surfaced as a friendly toast. The id is stripped from the URL so a reload does not re-attempt.
+    function loadHandoff() {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('handoff');
+        if (!id) return;
+        params.delete('handoff');
+        const cleaned =
+            window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', cleaned);
+        }
+        const url =
+            (endpoints().importStaged || '/personal-inventory/blueprints/import/staged') +
+            '?handoff=' +
+            encodeURIComponent(id);
+        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+            .then(function (resp) {
+                return resp.ok ? resp.json() : null;
+            })
+            .then(function (preview) {
+                if (!preview) {
+                    handoffNotFound();
+                    return;
+                }
+                renderPreview(preview);
+                openModal();
+            })
+            .catch(function () {
+                handoffNotFound();
+            });
+    }
+
+    function handoffNotFound() {
+        if (window.showFrontendErrorToast) {
+            window.showFrontendErrorToast(
+                i18n().handoffNotFound || i18n().error || 'Import link expired.',
+            );
+        }
     }
 
     function pickFile() {

@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Neuer interner Ingest-Dienst als Grundlage für den Ein-Klick-Versand aus dem SC-Extractor (Epic #639).** Ein eigenständiger, bewusst minimal gehaltener Dienst nimmt die im Extractor erzeugten Refinery- und Blueprint-Daten authentifiziert entgegen, reicht sie an die bestehenden Import-Endpunkte weiter und legt den Entwurf kurzlebig und einmalig abrufbar für die Browser-Übernahme ab; gespeichert wird weiterhin erst nach Prüfung im Formular. Noch nicht im UI verdrahtet. Neue Konfiguration (Dienst `ingest`, Port 11262): `BACKEND_URL`, `FRONTEND_URL`, `KEYCLOAK_ISSUER_URI`, `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`, `APP_SECURITY_JWT_EXPECTED_AUDIENCES`.
+- **Ein-Klick-Versand aus dem SC-Extractor (Epic #639).** Ein eigenständiger, bewusst minimal gehaltener Ingest-Dienst nimmt die im Extractor erzeugten Refinery- und Blueprint-Daten authentifiziert entgegen, reicht sie an die bestehenden Import-Endpunkte weiter und legt den Entwurf kurzlebig und einmalig abrufbar ab. Öffnet der Extractor anschließend die Basetool-Seite mit `?handoff=<id>`, landet man — nach ggf. nötiger Anmeldung — direkt auf dem vorausgefüllten Review: das Raffinerie-Anlegen-Formular bzw. die Blueprint-Import-Vorschau sind bereits befüllt, gespeichert wird weiterhin erst nach Prüfung. Ein abgelaufener oder ungültiger Link zeigt einen freundlichen Hinweis und das leere Formular. Neue Konfiguration (Dienst `ingest`, Port 11262): `BACKEND_URL`, `FRONTEND_URL`, `KEYCLOAK_ISSUER_URI`, `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`, `APP_SECURITY_JWT_EXPECTED_AUDIENCES`.
 
 ## [v0.5.3](https://github.com/krt-iri/basetool/releases/tag/v0.5.3) - 2026-06-16
 

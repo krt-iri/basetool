@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.model.dto.HandoffKind;
 import de.greluc.krt.iri.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MaterialDto;
@@ -39,6 +40,7 @@ import de.greluc.krt.iri.basetool.frontend.model.form.RefineryOrderStoreForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.RefineryOrderStoreItemForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.iri.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.iri.basetool.frontend.service.IngestHandoffService;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -78,6 +80,7 @@ public class RefineryOrderPageController {
 
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
+  private final IngestHandoffService ingestHandoffService;
 
   /**
    * Parses the start instant submitted by the form as a UTC {@link java.time.Instant}.
@@ -185,24 +188,67 @@ public class RefineryOrderPageController {
   @PreAuthorize("isAuthenticated()")
   public String viewCreateForm(
       @RequestParam(required = false) String source,
+      @RequestParam(required = false) String handoff,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     RefineryOrderForm form;
-    if (!model.containsAttribute("refineryOrderForm")) {
+    if (model.containsAttribute("refineryOrderForm")) {
+      // A flashed form (the classic upload redirect) wins over a fresh / handoff form.
+      form = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
+      if (form != null && form.getSource() == null) {
+        form.setSource(source);
+      }
+    } else {
       form = new RefineryOrderForm();
       form.setSource(source);
       UUID currentUserId = getCurrentUserId(principal);
       if (currentUserId != null) {
         form.setOwnerId(currentUserId);
       }
-    } else {
-      form = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
-      if (form != null && form.getSource() == null) {
-        form.setSource(source);
+      // One-click ingest (epic #639, REQ-INGEST-004): a `?handoff=<id>` from the desktop extractor
+      // pre-fills the form from the Redis-staged draft (single-use, scoped to this user) via the
+      // exact draft→form mapping the manual upload uses. An unknown / expired / foreign id degrades
+      // to the fresh form plus a friendly inline notice — never an error page.
+      if (handoff != null && !handoff.isBlank() && principal != null) {
+        RefineryOrderForm prefilled = applyRefineryHandoff(handoff, principal, model);
+        if (prefilled != null) {
+          prefilled.setSource(source);
+          form = prefilled;
+        } else {
+          model.addAttribute("importErrorKey", "ingest.handoff.notFound");
+        }
       }
     }
     populateCreateFormModel(model, form, principal);
     return "refinery-orders-create";
+  }
+
+  /**
+   * Consumes a one-click ingest handoff and maps its staged refinery draft into a pre-filled form,
+   * adding the same review attributes (issues + counters) the manual import renders. Returns {@code
+   * null} when the handoff is unknown / expired / foreign / wrong-kind or carries no order, so the
+   * caller falls back to the fresh form plus an inline notice.
+   *
+   * @param handoff the {@code ?handoff=} id from the extractor
+   * @param principal the authenticated user (its Keycloak subject scopes the staged lookup)
+   * @param model the model to enrich with the import review attributes on success
+   * @return the pre-filled form, or {@code null} when there is nothing to hand off
+   */
+  private RefineryOrderForm applyRefineryHandoff(String handoff, OidcUser principal, Model model) {
+    RefineryImportDraftDto draft =
+        ingestHandoffService
+            .consume(
+                principal.getSubject(), handoff, HandoffKind.REFINERY, RefineryImportDraftDto.class)
+            .orElse(null);
+    if (draft == null || draft.order() == null) {
+      return null;
+    }
+    model.addAttribute("importIssues", RefineryImportProxyController.generalIssues(draft.issues()));
+    model.addAttribute("importRowIssues", RefineryImportProxyController.rowIssues(draft.issues()));
+    model.addAttribute("importGoodsMatched", draft.goodsMatched());
+    model.addAttribute("importGoodsTotal", draft.goodsTotal());
+    model.addAttribute("importRowsSkipped", draft.rowsSkipped());
+    return RefineryImportProxyController.toForm(draft.order());
   }
 
   /**

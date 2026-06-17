@@ -67,7 +67,11 @@ class PersonalBlueprintImportProxyControllerTest {
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     backendApiClient = mock(BackendApiClient.class);
-    controller = new PersonalBlueprintImportProxyController(webClient, backendApiClient);
+    controller =
+        new PersonalBlueprintImportProxyController(
+            webClient,
+            backendApiClient,
+            mock(de.greluc.krt.iri.basetool.frontend.service.IngestHandoffService.class));
   }
 
   @AfterEach
