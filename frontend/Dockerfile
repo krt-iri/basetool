@@ -24,6 +24,9 @@ COPY versions.properties .
 COPY gradle.properties .
 COPY backend/build.gradle.kts backend/
 COPY frontend/build.gradle.kts frontend/
+# settings.gradle.kts includes all three modules, so Gradle configuration needs every module's
+# build script present even when only :frontend is built.
+COPY ingest/build.gradle.kts ingest/
 
 # Dependencies herunterladen, um sie im Docker-Cache zu behalten. The previous
 # `|| true` masked legitimate failures (wrapper download problems, transient
