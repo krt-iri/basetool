@@ -67,7 +67,7 @@ jobs:
       # the next time the timer ticks. fail-fast is the correct policy here.
       fail-fast: true
       matrix:
-        module: [backend, frontend]
+        module: [backend, frontend, ingest]
 
     steps:
       - name: Set up Docker Buildx
