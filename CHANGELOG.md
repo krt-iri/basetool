@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Der Ein-Klick-Versand aus dem SC-Extractor schlug mit „HTTP 400" fehl und der `ingest`-Dienst blieb dauerhaft `unhealthy`.** Der Gateway-Dienst startete fälschlich mit TLS auf Port 11262 — die nur als Truststore gedachten `SERVER_SSL_KEY_STORE`-Variablen aktivierten zugleich den Server-Connector —, sodass der per Plain-HTTP anbindende Reverse-Proxy (nackte 400) und der Container-Healthcheck abgewiesen wurden. Der Dienst serviert jetzt wie vorgesehen Plain-HTTP hinter dem Proxy (`server.ssl.enabled=false`); die Truststore-Nutzung für die Backend-Verbindung bleibt unverändert.
+
+- **Der geplante UEX-Hersteller-Abgleich aktualisiert wieder die Herstellerdaten.** Mehrere unterschiedliche UEX-Firmen teilen sich dieselbe Abkürzung (z. B. „Esperia"), was an einer Eindeutigkeitsbedingung der Hersteller-Abkürzung scheiterte und — weil der gesamte Abgleich in einer einzigen Transaktion lief — jede Hersteller-Aktualisierung samt der nachfolgenden UEX-Schritte (Fahrzeuge, Items, Raffinerie) des Laufs verwarf. Die Abkürzung ist nun kein eindeutiger Schlüssel mehr, und jede Firma wird einzeln verarbeitet, sodass eine einzelne fehlerhafte Zeile den restlichen Lauf nicht mehr zurückrollt.
+
 - **Die App meldet sich jetzt automatisch neu an, statt leere Seiten zu zeigen, wenn das Login-Token der Sitzung verfällt.** Nach bestimmten Abläufen (z. B. Anmeldung über den Extractor-Handoff) konnte es passieren, dass plötzlich keine Aufträge, Lager- oder Raffinerieeinträge mehr angezeigt wurden und nur ein manuelles Ab- und Wiederanmelden half, während im Hintergrund das Log volllief. Solche Fälle lösen jetzt eine stille Neuanmeldung über Keycloak aus (AJAX-Aufrufe leiten den Browser dorthin um), und die parallelen Backend-Aufrufe einer Seite erneuern das Token nur noch ein einziges Mal gemeinsam, sodass die Sitzung gar nicht erst ungültig wird.
 
 ## [v0.5.4](https://github.com/krt-iri/basetool/releases/tag/v0.5.4) - 2026-06-17

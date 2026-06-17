@@ -340,7 +340,8 @@ public class P4kImportService {
     }
     if (dto.code() != null && !dto.code().isBlank()) {
       Optional<Manufacturer> byCode =
-          manufacturerRepository.findByAbbreviationIgnoreCase(dto.code().trim());
+          manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(
+              dto.code().trim());
       if (byCode.isPresent()) {
         return byCode.get();
       }
@@ -823,8 +824,9 @@ public class P4kImportService {
    * Seeds a brand-new {@code manufacturer} for an unmatched record and registers it in {@code
    * byGuid} so items / ships in the same run can link to it — including on a dry-run preview (the
    * entity is built and indexed but only persisted on apply) so the preview's item/ship enrichment
-   * counts match the apply. Requires a parseable GUID, a resolved name and a non-blank code (both
-   * {@code name} and {@code abbreviation} are NOT NULL + UNIQUE); guards all three keys.
+   * counts match the apply. Requires a parseable GUID, a resolved name and a non-blank code ({@code
+   * name} is NOT NULL + UNIQUE, {@code abbreviation} is NOT NULL but no longer UNIQUE since V158);
+   * guards all three keys so it never re-seeds a manufacturer the run already knows.
    *
    * @return whether a row was (or would be) inserted
    */
@@ -848,7 +850,9 @@ public class P4kImportService {
     String code = dto.code().trim();
     if (manufacturerRepository.findByScwikiUuid(guid).isPresent()
         || manufacturerRepository.findByNameIgnoreCase(name).isPresent()
-        || manufacturerRepository.findByAbbreviationIgnoreCase(code).isPresent()) {
+        || manufacturerRepository
+            .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(code)
+            .isPresent()) {
       return false;
     }
     Manufacturer manufacturer = new Manufacturer();

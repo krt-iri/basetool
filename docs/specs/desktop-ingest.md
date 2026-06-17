@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-16.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-17.
 > **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md) · **Related:** epic [#639](https://github.com/krt-iri/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
@@ -47,6 +47,12 @@ network only.
   endpoint, carrying the caller's bearer, and no backend write.
 - [ ] The gateway declares no `DataSource`/JPA and runs no schema migration (architecture
   test / startup assertion).
+- [ ] The gateway listens on **plain HTTP** behind nginx-proxy-manager (which terminates TLS):
+  its server TLS connector is disabled (`server.ssl.enabled=false`) so the shared
+  `SERVER_SSL_KEY_STORE` env vars feed **only** the `backend-trust` truststore, and both the
+  Docker `HEALTHCHECK` and the NPM upstream address the gateway over `http://…:11262`. (A
+  keystore that also enables the server connector makes NPM's plain-HTTP proxy return a bare 400
+  and keeps the container `unhealthy`.)
 
 **Enforced by:** _(pending — #642)_ · **Code:** _(new `ingest` module — #642)_ · **Issues:** #642
 

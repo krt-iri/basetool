@@ -151,7 +151,7 @@ class ScWikiManufacturerSyncServiceTest {
         .thenReturn(List.of(dto(uuid, "Aegis", "AEGS"))); // wiki name differs from UEX name
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Aegis")).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByAbbreviationIgnoreCase("AEGS"))
+    when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("AEGS"))
         .thenReturn(Optional.of(local));
 
     service.syncManufacturers();
@@ -197,7 +197,8 @@ class ScWikiManufacturerSyncServiceTest {
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Some Indie Studio"))
         .thenReturn(Optional.empty());
-    when(manufacturerRepository.findByAbbreviationIgnoreCase("INDIE")).thenReturn(Optional.empty());
+    when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("INDIE"))
+        .thenReturn(Optional.empty());
 
     service.syncManufacturers();
 

@@ -147,7 +147,10 @@ class P4kImportMatchingVerificationTest {
 
     // 2) Strip the canonical UUIDs (the UEX-origin "no UUID yet" state) and unresolve the blueprint
     // ingredient. The resource material keeps its UUID so the ingredient can resolve back to it.
-    Manufacturer mfg = manufacturerRepository.findByAbbreviationIgnoreCase("UPS").orElseThrow();
+    Manufacturer mfg =
+        manufacturerRepository
+            .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("UPS")
+            .orElseThrow();
     mfg.setScwikiUuid(null);
     manufacturerRepository.saveAndFlush(mfg);
 
@@ -193,7 +196,10 @@ class P4kImportMatchingVerificationTest {
     // The backfill actually restored the canonical UUIDs on the rows.
     assertEquals(
         UUID.fromString(MFG_GUID),
-        manufacturerRepository.findByAbbreviationIgnoreCase("UPS").orElseThrow().getScwikiUuid(),
+        manufacturerRepository
+            .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("UPS")
+            .orElseThrow()
+            .getScwikiUuid(),
         "manufacturer scwiki_uuid restored from the P4K guid");
     assertEquals(
         UUID.fromString(ITEM_GUID),
