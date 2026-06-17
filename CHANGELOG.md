@@ -6,6 +6,8 @@
 
 - **Der Ein-Klick-Versand aus dem SC-Extractor schlug mit „HTTP 400" fehl und der `ingest`-Dienst blieb dauerhaft `unhealthy`.** Der Gateway-Dienst startete fälschlich mit TLS auf Port 11262 — die nur als Truststore gedachten `SERVER_SSL_KEY_STORE`-Variablen aktivierten zugleich den Server-Connector —, sodass der per Plain-HTTP anbindende Reverse-Proxy (nackte 400) und der Container-Healthcheck abgewiesen wurden. Der Dienst serviert jetzt wie vorgesehen Plain-HTTP hinter dem Proxy (`server.ssl.enabled=false`); die Truststore-Nutzung für die Backend-Verbindung bleibt unverändert.
 
+- **Der geplante UEX-Hersteller-Abgleich aktualisiert wieder die Herstellerdaten.** Mehrere unterschiedliche UEX-Firmen teilen sich dieselbe Abkürzung (z. B. „Esperia"), was an einer Eindeutigkeitsbedingung der Hersteller-Abkürzung scheiterte und — weil der gesamte Abgleich in einer einzigen Transaktion lief — jede Hersteller-Aktualisierung samt der nachfolgenden UEX-Schritte (Fahrzeuge, Items, Raffinerie) des Laufs verwarf. Die Abkürzung ist nun kein eindeutiger Schlüssel mehr, und jede Firma wird einzeln verarbeitet, sodass eine einzelne fehlerhafte Zeile den restlichen Lauf nicht mehr zurückrollt.
+
 ## [v0.5.4](https://github.com/krt-iri/basetool/releases/tag/v0.5.4) - 2026-06-17
 
 ### Added

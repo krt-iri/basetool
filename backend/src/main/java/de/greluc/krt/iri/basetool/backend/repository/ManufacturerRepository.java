@@ -75,15 +75,41 @@ public interface ManufacturerRepository extends JpaRepository<Manufacturer, UUID
   Optional<Manufacturer> findByScwikiUuid(UUID scwikiUuid);
 
   /**
-   * Resolution-chain fallback for the R6 manufacturer reconciliation: match a Wiki manufacturer by
-   * its short {@code code} (e.g. {@code "AEGS"}) against the local UNIQUE {@code abbreviation} when
-   * the case-insensitive name match missed (UEX and Wiki occasionally spell the full name
-   * differently while sharing the code).
+   * Resolution-chain fallback used by the R6 manufacturer reconciliation and the P4K import: match
+   * a Wiki/P4K manufacturer by its short {@code code} (e.g. {@code "AEGS"}) against the local
+   * {@code abbreviation} when the case-insensitive name match missed (UEX and Wiki occasionally
+   * spell the full name differently while sharing the code).
+   *
+   * <p>{@code abbreviation} is no longer UNIQUE (see {@code V158} / REQ-DATA-004 — distinct UEX
+   * companies can share a nickname-derived code), so this deliberately returns the
+   * <em>oldest-created</em> match via {@code findFirst … OrderBy createdAt asc} instead of a bare
+   * {@code findBy …} that would throw {@code IncorrectResultSizeDataAccessException} the moment two
+   * rows share the code.
    *
    * @param abbreviation manufacturer short code / abbreviation
-   * @return matching manufacturer if present
+   * @return the oldest matching manufacturer if any
    */
-  Optional<Manufacturer> findByAbbreviationIgnoreCase(String abbreviation);
+  Optional<Manufacturer> findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(String abbreviation);
+
+  /**
+   * Resolution-chain step 3 for the UEX manufacturer sync: adopt a pre-existing, <em>unclaimed</em>
+   * row whose {@code abbreviation} matches but which UEX has not yet stamped (legacy hand-seeded
+   * vehicle-manufacturer rows whose {@code name} is the short nickname). Scoped to {@code
+   * uex_company_id IS NULL} so the sync can never hijack a row that already belongs to a different
+   * UEX company — that scoping is what lets two companies sharing an abbreviation each keep their
+   * own row instead of fighting over one. {@code ORDER BY created_at ASC LIMIT 1} keeps the result
+   * deterministic now that {@code abbreviation} is non-unique (V158 / REQ-DATA-004). Uses an
+   * explicit query so the method name stays short.
+   *
+   * @param abbreviation manufacturer short code / abbreviation
+   * @return the oldest unclaimed matching manufacturer if any
+   */
+  @Query(
+      "SELECT m FROM Manufacturer m "
+          + "WHERE LOWER(m.abbreviation) = LOWER(:abbreviation) AND m.uexCompanyId IS NULL "
+          + "ORDER BY m.createdAt ASC LIMIT 1")
+  Optional<Manufacturer> findOldestUnclaimedByAbbreviationIgnoreCase(
+      @Param("abbreviation") String abbreviation);
 
   /**
    * Soft-deletes SC Wiki ownership of every <em>Wiki-linked</em> manufacturer ({@code
