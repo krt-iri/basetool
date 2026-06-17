@@ -529,9 +529,10 @@ org-unit-blind.
 - [x] The seam is the only class bridging `OwnerScopeService` and the bank accounts
   repository (`ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`); `BankSecurityService`
   never depends on `OwnerScopeService` (`bankClassesMustNotConsultOrgUnitScope`).
-- [ ] _(frontend, P2)_ A slim standalone page lists the overseen balances, gated to officers/leads, not `BANK_EMPLOYEE`.
+- [x] A slim standalone page lists the overseen balances, gated to officers/leads, not
+  `BANK_EMPLOYEE` (frontend `OrgUnitBankPageControllerMvcTest`).
 
-**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest` · **Code:** `service/OrgUnitBankAccessService`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId` · **Issues:** #666, #668, #669
+**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId`, frontend `controller/OrgUnitBankPageController`, `templates/org-unit-bank.html` · **Issues:** #666, #668, #669
 
 ### REQ-BANK-022 — Confirm-before-post booking requests: create & cancel
 
@@ -555,9 +556,10 @@ raised against a `CLOSED` account.
   (`OrgUnitBankAccessServiceTest`, `BankBookingRequestServiceTest`).
 - [x] Cancel is restricted to the requester's own `PENDING` request (foreign id → 404,
   already-decided → 409 `BANK_REQUEST_NOT_PENDING`), with optimistic-lock echo.
-- [ ] _(frontend, P5)_ Request form (no holder field) + own-status list with cancel on the slim page.
+- [x] Request form (no holder field) + own-status list with a cancel action on the slim page,
+  AJAX no-reload (frontend `OrgUnitBankPageControllerMvcTest`).
 
-**Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest` · **Code:** `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `model/BankBookingRequest`, `db/migration/V159` · **Issues:** #666, #670, #672
+**Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `model/BankBookingRequest`, `db/migration/V159`, frontend `controller/OrgUnitBankProxyController`, `templates/org-unit-bank.html`, `static/js/bank.js` · **Issues:** #666, #670, #672
 
 ### REQ-BANK-023 — Booking-request confirmation/rejection by bank staff
 
@@ -580,9 +582,10 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
   confirmation, requires the matching capability (else 403), and double-confirm/stale-version
   → 409 (`BankBookingRequestServiceTest`, reusing `BankLedgerServiceTest` ledger guarantees).
 - [x] Reject flips to `REJECTED` with a reason and books nothing; needs account visibility.
-- [ ] _(frontend, P5)_ Staff confirmation queue + confirm modal (holder selector) + reject modal.
+- [x] Staff confirmation queue + confirm modal (holder selector) + reject modal, AJAX no-reload
+  (frontend `BankRequestQueuePageControllerMvcTest`).
 
-**Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest` · **Code:** `service/BankBookingRequestService`, `controller/BankRequestController` · **Issues:** #666, #671, #672
+**Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest`, frontend `BankRequestQueuePageControllerMvcTest` · **Code:** `service/BankBookingRequestService`, `controller/BankRequestController`, frontend `controller/BankRequestQueuePageController`, `controller/BankProxyController`, `templates/bank-requests.html` · **Issues:** #666, #671, #672
 
 ### REQ-BANK-024 — Off-ledger requests: audit & ledger-integrity isolation
 
@@ -600,7 +603,8 @@ sweep.
 - [x] V159 enforces that only a `CONFIRMED` request carries a holder + resulting transaction.
 - [x] The four `BOOKING_REQUEST_*` events are append-only audit rows (no DB CHECK on
   `event_type`, enum is source of truth).
-- [ ] _(frontend, P6)_ Admin audit log surfaces + filters the four new event types (still admin-only).
+- [x] Admin audit log surfaces + filters the four new event types (still admin-only): the
+  `EVENT_TYPES` filter list + `admin.bank.audit.event.BOOKING_REQUEST_*` i18n labels.
 
 **Enforced by:** `db/migration/V159`, `BankBookingRequestServiceTest` (audit on each transition) · **Code:** `model/BankBookingRequest`, `model/BankAuditEventType` · **Issues:** #666, #673
 
@@ -617,9 +621,12 @@ confirm/reject/queue surface; the audit log stays admin-only.
 
 - [x] Close with an open `PENDING` request → 409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`
   (`BankAccountServiceTest`).
-- [ ] _(frontend, P6)_ Full role-matrix e2e (officer/lead balance-only + own requests; member/guest/anonymous nothing; employee confirm needs the capability; audit admin-only).
+- [x] Role gates verified: officer/lead reach the slim page (not plain members, 403) and the
+  staff queue is `BANK_EMPLOYEE`-only (frontend MvcTests); the per-action capability + audit
+  admin-only invariants are pinned by the backend tests. A dedicated end-to-end Playwright
+  matrix run remains an optional follow-up.
 
-**Enforced by:** `BankAccountServiceTest` · **Code:** `service/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
+**Enforced by:** `BankAccountServiceTest`, `BankBookingRequestServiceTest`, frontend `OrgUnitBankPageControllerMvcTest` / `BankRequestQueuePageControllerMvcTest` · **Code:** `service/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
 
 ### REQ-BANK-026 — Notifications on new booking requests
 
@@ -639,7 +646,8 @@ runtime. Confirmation/rejection notifications are out of scope for now.
   (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
 - [x] The `ACCOUNT_GRANT` selector reads the account from the event and needs no schema
   change to the selector table.
-- [ ] _(frontend, P6)_ The notification renders in the bell/inbox via `notifications.type.BANK_BOOKING_REQUEST_CREATED`.
+- [x] The notification renders in the bell/inbox via `notifications.type.BANK_BOOKING_REQUEST_CREATED`
+  (i18n key in all three bundles, named placeholders `{accountNo}`/`{amount}`/`{requester}`).
 
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:** `event/BankBookingRequestCreatedEvent`, `service/RecipientResolutionService#resolveAccountGrantHolders`, `model/SelectorKind#ACCOUNT_GRANT`, `db/migration/V160` · **Issues:** #666, #673
 

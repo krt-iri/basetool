@@ -1,6 +1,6 @@
 # ADR-0022 — Bank booking-request notifications via an `ACCOUNT_GRANT` selector kind
 
-- **Status:** Accepted (backend implemented; frontend rendering pending)
+- **Status:** Accepted
 - **Date:** 2026-06-17
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-026 · REQ-NOTIF-011 · REQ-NOTIF-007 · ADR-0015 · issue #666

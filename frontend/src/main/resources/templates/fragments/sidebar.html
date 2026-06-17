@@ -90,6 +90,7 @@
                     <summary th:text="#{nav.section.organisation}">Organisation</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
+                        <a th:href="@{/org-unit-bank}" sec:authorize="hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER')" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
                     </div>
                 </details>
                 <details class="sidebar-group" data-group-key="bank" sec:authorize="hasRole('BANK_EMPLOYEE')">
@@ -98,6 +99,7 @@
                         <a th:href="@{/bank}" data-testid="nav-bank" th:text="#{nav.bank.dashboard}">Bank-Dashboard</a>
                         <a th:href="@{/bank/manage}" sec:authorize="hasRole('BANK_MANAGEMENT')" data-testid="nav-bank-manage" th:text="#{nav.bank.manage}">Bankverwaltung</a>
                         <a th:href="@{/bank/grants}" sec:authorize="hasRole('BANK_MANAGEMENT')" data-testid="nav-bank-grants" th:text="#{nav.bank.grants}">Berechtigungen</a>
+                        <a th:href="@{/bank/requests}" data-testid="nav-bank-requests" th:text="#{nav.bank.requests}">Antr&auml;ge</a>
                     </div>
                 </details>
                 <details class="sidebar-group" data-group-key="admin" sec:authorize="hasRole('ADMIN')">

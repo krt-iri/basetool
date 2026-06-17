@@ -1,6 +1,6 @@
 # ADR-0021 — Confirm-before-post booking requests as a mutable, off-ledger aggregate
 
-- **Status:** Accepted (backend implemented; frontend pending)
+- **Status:** Accepted
 - **Date:** 2026-06-17
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-022 · REQ-BANK-023 · REQ-BANK-024 · ADR-0010 · issue #666

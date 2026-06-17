@@ -1,6 +1,6 @@
 # ADR-0020 — Org-unit officer/lead bank access via a single non-`Bank*` seam
 
-- **Status:** Accepted (backend implemented; frontend pending)
+- **Status:** Accepted
 - **Date:** 2026-06-17
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-021 · REQ-BANK-022 · REQ-BANK-008 (amended) · ADR-0011 · issue #666

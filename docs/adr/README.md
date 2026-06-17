@@ -57,7 +57,7 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0017](0017-default-blueprints-admin-curated-materialized.md)             | Default blueprints: admin-curated set materialised per-user, non-removable              | Accepted                          |
 | [0018](0018-desktop-ingest-gateway-device-grant.md)                       | Desktop one-click ingest: dedicated gateway + Keycloak device grant                     | Accepted — implementation pending |
 | [0019](0019-frontend-reauth-on-client-authorization-required.md)          | Frontend recovery from `client_authorization_required` + single-flight token refresh    | Accepted                          |
-| [0020](0020-bank-org-unit-aware-access-seam.md)                           | Org-unit officer/lead bank access via a single non-`Bank*` seam                         | Accepted — frontend pending       |
-| [0021](0021-bank-off-ledger-booking-requests.md)                          | Confirm-before-post booking requests as a mutable, off-ledger aggregate                 | Accepted — frontend pending       |
-| [0022](0022-bank-booking-request-notifications-account-grant-selector.md) | Bank booking-request notifications via an `ACCOUNT_GRANT` selector kind                 | Accepted — frontend pending       |
+| [0020](0020-bank-org-unit-aware-access-seam.md)                           | Org-unit officer/lead bank access via a single non-`Bank*` seam                         | Accepted                          |
+| [0021](0021-bank-off-ledger-booking-requests.md)                          | Confirm-before-post booking requests as a mutable, off-ledger aggregate                 | Accepted                          |
+| [0022](0022-bank-booking-request-notifications-account-grant-selector.md) | Bank booking-request notifications via an `ACCOUNT_GRANT` selector kind                 | Accepted                          |
 

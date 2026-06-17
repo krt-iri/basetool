@@ -230,7 +230,8 @@ use of the `ACCOUNT_GRANT` selector kind (REQ-NOTIF-007), which couples recipien
   holders, excluding the requester (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
 - [x] Adding the `BANK_BOOKING_REQUEST_CREATED` event/notification types and the `ACCOUNT_GRANT`
   selector kind needs no schema migration (open enums; the seed rule is V160 data).
-- [ ] _(frontend, P6)_ The notification renders via `notifications.type.BANK_BOOKING_REQUEST_CREATED`.
+- [x] The notification renders via `notifications.type.BANK_BOOKING_REQUEST_CREATED` (i18n key in
+  all three bundles, named placeholders `{accountNo}`/`{amount}`/`{requester}`).
 
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:**
 `event/BankBookingRequestCreatedEvent`, `service/RecipientResolutionService#resolveAccountGrantHolders`,

@@ -51,6 +51,12 @@
         accountBody: { container: '#bank-account-results', preserveQuery: false },
         manageBody: { container: '#bank-manage-results', preserveQuery: true },
         grantsMatrix: { container: '#bank-grants-results', preserveQuery: true },
+        // Org-unit officer/lead page (#666 F2): balance cards + own-request list re-render after a
+        // create/cancel; query dropped (the page carries no list filter).
+        orgUnitBank: { container: '#org-unit-bank-results', preserveQuery: false },
+        // Bank-staff confirmation queue (#666 F2): the request table re-renders after a
+        // confirm/reject; `?status=` preserved so the staffer stays on the filtered view.
+        requestQueue: { container: '#bank-request-queue-results', preserveQuery: true },
     };
 
     /** Maps a grant flag name onto the row attribute the next toggle click reads. */
