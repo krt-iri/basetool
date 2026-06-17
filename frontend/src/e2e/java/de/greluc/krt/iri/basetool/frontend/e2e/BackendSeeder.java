@@ -1190,6 +1190,41 @@ public final class BackendSeeder {
   }
 
   /**
+   * Posts a {@code RefineryExtract} JSON to {@code POST /api/v1/refinery-orders/import-extract} and
+   * returns the backend's draft answer verbatim — exactly what the ingest gateway forwards and then
+   * stages in Redis as a handoff's {@code draftJson}. Used by the ingest-handoff e2e to reproduce a
+   * staged handoff from the real backend matcher (resolving the fixture's names against the seeded
+   * catalog) rather than hand-crafting draft JSON with fragile per-run ids.
+   *
+   * @param username the Keycloak username of the (member) test user
+   * @param password the Keycloak password
+   * @param extractJson the {@code RefineryExtract} document to match
+   * @return the backend {@code RefineryImportDraftDto} JSON (the draft is not persisted)
+   */
+  public String importRefineryExtractDraft(String username, String password, String extractJson) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(
+                  URI.create(BACKEND_BASE_URL + "/api/v1/refinery-orders/import-extract"))
+              .header("Authorization", "Bearer " + token)
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(extractJson))
+              .build();
+      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        throw new IllegalStateException(
+            "import-extract failed: HTTP " + response.statusCode() + " " + response.body());
+      }
+      return response.body();
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.importRefineryExtractDraft failed", e);
+    }
+  }
+
+  /**
    * Creates a second {@code SQUADRON} OrgUnit via {@code POST /api/v1/squadrons} (admin-only) and
    * returns its id, so cross-Staffel flows have a Staffel B alongside the canonical IRIDIUM.
    *
