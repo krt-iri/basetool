@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:a0a0aa65-5b27-4af7-9095-a37c7c194848" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:6cee69e8-45f3-4989-942f-80d38ec5841f" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-06-16T14:00:27Z</timestamp>
+    <timestamp>2026-06-17T10:44:31Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-iri/basetool/actions/runs/27622968971</url>
+          <url>https://github.com/krt-iri/basetool/actions/runs/27683305860</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-iri/basetool</url>
@@ -944,21 +944,21 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.6.0?type=jar">
       <group>com.puppycrawl.tools</group>
       <name>checkstyle</name>
-      <version>13.5.0</version>
+      <version>13.6.0</version>
       <description>Checkstyle is a development tool to help programmers write Java code
     that adheres to a coding standard</description>
       <hashes>
-        <hash alg="MD5">58280dbe38a876d74550a2479c016825</hash>
-        <hash alg="SHA-1">f3f0eff4e17b6c6c359a95f692260aa2d3d8b60c</hash>
-        <hash alg="SHA-256">18ecffa374e9ff1d1eb29a2f906b333339d2bfd984b91cc27c599486506d1e49</hash>
-        <hash alg="SHA-512">816b9215369fc7cbcabf20d9814c607e795c0938c17ab538edac98062aadf36dfe226c8ccce510b21d359169d6c9ca60a7ee3473d8134d1fdf62786ad8eab444</hash>
-        <hash alg="SHA-384">7f451bfc8d681c821eae5eaf364d5e3b2ee7c59df6af0503a14421a4fe91d395eff1c09e9610849355529011d3171cba</hash>
-        <hash alg="SHA3-384">5943ade9eedaebd6932a8339252a1935d32eceb81613aea2f72a49a4d2f6014e0017993e4cc631e5c85ce1bd8166455c</hash>
-        <hash alg="SHA3-256">531baee04f14c5232608012e1b157417e406d7187ec686a294a359032baa5828</hash>
-        <hash alg="SHA3-512">27b2d74f9a7103a51a35d08837ee82be29cb5576655b0ddcc8120fb1fe8e591fdc6226c088ca62ff8dac552258397f97cd5837f8e08739ff11b301bca0d508a9</hash>
+        <hash alg="MD5">5f8540822bbeb124a001246b37e65a5b</hash>
+        <hash alg="SHA-1">23cb19ce1b37f6c7f6ceb73d50b707b36bbe1a33</hash>
+        <hash alg="SHA-256">2bb38a900e88727a20117471d6985762cf3c5d6767d56644ebf19327cbe6a886</hash>
+        <hash alg="SHA-512">7b5a141978f18856948a88425b3273685ba9e6aab9e418f4615f2d8405e4da8a51504632b4b0c02e2a3ad293312e0369f1845a3733c5b5168afc226288e7156a</hash>
+        <hash alg="SHA-384">1f6b25f1a7f0139fc1915963104c87ad1f9429263dbc8624dd7581d393a77026fcf1e4c920501fbf45803e9de2d8158b</hash>
+        <hash alg="SHA3-384">70f0c26ba31687e1ca2967a7361102679ec8b2f3d8f9f435b2e7b7a188cb10ec6c4b2840dbd49280fa08a88d7e81d1d5</hash>
+        <hash alg="SHA3-256">cf8865cd3c015032efd4039eb2301c418db65383ae4ac240a75094a81689f854</hash>
+        <hash alg="SHA3-512">99462472255a898b41f2c4d28922bb522ef9c4dacde9583eaf936e18663008c0ade679cacdc4e14ab25df2d783c60484bc30648b8ce2f2006440be3762e063f6</hash>
       </hashes>
       <licenses>
         <license>
@@ -966,7 +966,7 @@ of Jackson components maintained by FasterXML.com</description>
           <url>https://www.gnu.org/licenses/old-licenses/lgpl-2.1-standalone.html</url>
         </license>
       </licenses>
-      <purl>pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar</purl>
+      <purl>pkg:maven/com.puppycrawl.tools/checkstyle@13.6.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="issue-tracker">
@@ -9303,7 +9303,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.nimbusds/nimbus-jose-jwt@10.9?type=jar"/>
       <dependency ref="pkg:maven/net.minidev/json-smart@2.6.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar">
+    <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.6.0?type=jar">
       <dependency ref="pkg:maven/com.google.guava/guava@33.6.0-jre?type=jar"/>
       <dependency ref="pkg:maven/commons-beanutils/commons-beanutils@1.11.0?type=jar"/>
       <dependency ref="pkg:maven/info.picocli/picocli@4.7.7?type=jar"/>
@@ -9354,7 +9354,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar"/>
       <dependency ref="pkg:maven/com.github.spotbugs/spotbugs@4.10.2?type=jar"/>
       <dependency ref="pkg:maven/com.h3xstream.findsecbugs/findsecbugs-plugin@1.14.0?type=jar"/>
-      <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.5.0?type=jar"/>
+      <dependency ref="pkg:maven/com.puppycrawl.tools/checkstyle@13.6.0?type=jar"/>
       <dependency ref="pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar"/>
       <dependency ref="pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar"/>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar"/>
