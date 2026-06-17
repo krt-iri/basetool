@@ -14,7 +14,7 @@ plugins {
   // which configures the per-module Java formatting. Applying via the plugins DSL
   // (rather than an imperative `apply(...)` in the script body) keeps task
   // registration in the right phase under `--configure-on-demand`.
-  id("com.diffplug.spotless") version "8.6.0"
+  id("com.diffplug.spotless") version "8.7.0"
 }
 
 allprojects {
@@ -295,7 +295,7 @@ subprojects {
 
   // Checkstyle (Gradle core plugin). Uses the Google Java Style config
   // (`config/checkstyle/google_checks.xml`, downloaded from the Checkstyle
-  // 13.5.0 release tag) which enforces 2-space indents, 100-char lines,
+  // 13.6.0 release tag) which enforces 2-space indents, 100-char lines,
   // Google-style imports, naming conventions, Javadoc on public API, etc.
   //
   // Phase 4 (this configuration): the gate is now STRICT.
@@ -308,7 +308,7 @@ subprojects {
   // BDD-style assertions) that Google's style flags as noise.
   plugins.withId("checkstyle") {
     extensions.configure<CheckstyleExtension>("checkstyle") {
-      toolVersion = "13.5.0"
+      toolVersion = "13.6.0"
       configFile = rootProject.file("config/checkstyle/google_checks.xml")
       isIgnoreFailures = false
       maxWarnings = 0
