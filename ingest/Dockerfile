@@ -72,6 +72,7 @@ RUN java -XX:ArchiveClassesAtExit=/app/application.jsa \
         -Dspring.context.exit=onRefresh \
         -Dspring.main.lazy-initialization=true \
         -Dspring.security.oauth2.resourceserver.jwt.issuer-uri= \
+        -Dserver.ssl.enabled=false \
         -jar app.jar 2>&1 || true ; \
     if [ -f /app/application.jsa ]; then \
         chown 10001:10001 /app/application.jsa ; \
@@ -84,10 +85,11 @@ USER 10001:10001
 
 EXPOSE 11262
 
-# The gateway serves plain HTTP (TLS terminated at nginx-proxy-manager), so no --no-check-certificate
-# is needed. Readiness only goes UP after ApplicationReadyEvent, so a 200 means the context is up.
+# The gateway serves HTTPS with the shared self-signed cert (NPM terminates the public TLS and
+# re-encrypts to this connector), so wget runs with --no-check-certificate. Readiness only goes UP
+# after ApplicationReadyEvent, so a 200 means the context is up.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --start-interval=5s --retries=3 \
-    CMD wget -q -O /dev/null http://localhost:11262/actuator/health/readiness || exit 1
+    CMD wget -q --no-check-certificate -O /dev/null https://localhost:11262/actuator/health/readiness || exit 1
 
 # Conditional CDS: load the archive if training produced one, else start without it.
 ENTRYPOINT ["sh", "-c", "if [ -f /app/application.jsa ]; then exec java -XX:SharedArchiveFile=/app/application.jsa -jar /app/app.jar; else exec java -jar /app/app.jar; fi"]

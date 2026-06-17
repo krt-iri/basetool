@@ -1,3 +1,12 @@
+# The server connector serves HTTPS in dev/prod (REQ-INGEST-001), but tests run with the MOCK web
+# environment (IngestControllerTest uses MockMvc) and ship no keystore. Disabling SSL here keeps the
+# test context off the keystore entirely and resolves the `key-store-password` placeholder that would
+# otherwise be unresolved under the test profile (mirrors backend application-test.yml).
+server:
+  ssl:
+    enabled: false
+    key-store-password: test-keystore-password
+
 spring:
   security:
     oauth2:
