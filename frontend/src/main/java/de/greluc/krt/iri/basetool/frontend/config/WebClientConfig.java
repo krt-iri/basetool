@@ -261,6 +261,13 @@ public class WebClientConfig {
   /**
    * OAuth2 authorised-client manager providing {@code authorization_code} and {@code refresh_token}
    * flows for the authenticated backend WebClient.
+   *
+   * <p>The {@code DefaultOAuth2AuthorizedClientManager} is wrapped in a {@link
+   * SingleFlightAuthorizedClientManager} so the parallel backend calls a single page render fans
+   * out (page + notification SSE relay + unread-count poll) collapse into <b>one</b> refresh-token
+   * grant per expiry window. Without it, concurrent requests each replay the same refresh token and
+   * Keycloak's reuse detection revokes the whole token family, surfacing as a flood of {@code
+   * client_authorization_required} until the user logs in again (REQ-SEC-012, ADR-0019).
    */
   @Bean
   public OAuth2AuthorizedClientManager authorizedClientManager(
@@ -270,12 +277,12 @@ public class WebClientConfig {
     OAuth2AuthorizedClientProvider authorizedClientProvider =
         OAuth2AuthorizedClientProviderBuilder.builder().authorizationCode().refreshToken().build();
 
-    DefaultOAuth2AuthorizedClientManager authorizedClientManager =
+    DefaultOAuth2AuthorizedClientManager delegate =
         new DefaultOAuth2AuthorizedClientManager(
             clientRegistrationRepository, authorizedClientRepository);
-    authorizedClientManager.setAuthorizedClientProvider(authorizedClientProvider);
+    delegate.setAuthorizedClientProvider(authorizedClientProvider);
 
-    return authorizedClientManager;
+    return new SingleFlightAuthorizedClientManager(delegate);
   }
 
   /**

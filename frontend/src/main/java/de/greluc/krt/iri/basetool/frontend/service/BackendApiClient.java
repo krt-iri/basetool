@@ -20,6 +20,7 @@
 package de.greluc.krt.iri.basetool.frontend.service;
 
 import de.greluc.krt.iri.basetool.frontend.config.CacheConfig;
+import de.greluc.krt.iri.basetool.frontend.exception.ReauthenticationRequiredException;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -27,6 +28,7 @@ import io.github.resilience4j.retry.annotation.Retry;
 import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -361,6 +363,20 @@ public class BackendApiClient {
   }
 
   private <T> T handleException(Exception e, String method, String uri) {
+    if (ReauthenticationRequiredException.isReauthSignal(e)) {
+      // The frontend OAuth2 client has no usable token for this session (access token expired and
+      // the refresh token was rejected / rotated away). This is a per-session auth state, not a
+      // backend health problem — log it tersely (no stack trace, DEBUG) and rethrow a typed
+      // exception so GlobalExceptionHandler can bounce the user through a fresh Keycloak login
+      // instead of rendering an empty page and flooding the log with stack traces (REQ-SEC-012).
+      log.debug(
+          "Re-authentication required on {} {} (correlationId={})",
+          method,
+          uri,
+          MDC.get("correlationId"));
+      throw new ReauthenticationRequiredException(
+          "Re-authentication required for " + method + " " + uri, e);
+    }
     Throwable root = unwrap(e);
     if (root instanceof CallNotPermittedException) {
       log.warn("Circuit breaker open for {} {}: {}", method, uri, root.getMessage());

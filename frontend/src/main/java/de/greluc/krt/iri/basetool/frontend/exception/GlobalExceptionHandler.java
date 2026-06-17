@@ -128,6 +128,47 @@ public class GlobalExceptionHandler {
     return "error/error";
   }
 
+  /**
+   * Bounces a caller whose frontend OAuth2 session lost its usable token through a fresh Keycloak
+   * login instead of letting the failure render an empty page / 500 and flood the log (REQ-SEC-012,
+   * ADR-0019).
+   *
+   * <p>For a normal HTML navigation this returns a {@code 302} to the Keycloak authorization
+   * endpoint; while the Keycloak SSO session is still alive the re-authentication is transparent
+   * and the user lands back in the app with a freshly minted token. For an AJAX/JSON caller (the
+   * unread-count poll, a {@code krtFetch} write) it returns {@code 401} carrying the {@code
+   * X-Reauthenticate} response header (and a mirrored JSON body) so the shared client-side helper
+   * can redirect the whole browser window — an in-place toast would strand the user on a dead
+   * session.
+   *
+   * @param ex the typed re-authentication signal raised by {@code BackendApiClient}
+   * @param request the current request, used to decide HTML-redirect vs JSON and to prefix the
+   *     context path
+   * @return a {@code redirect:} view name for HTML, or a {@code 401} {@link ResponseEntity} for
+   *     JSON
+   */
+  @ExceptionHandler(ReauthenticationRequiredException.class)
+  public Object handleReauthenticationRequired(
+      @NotNull ReauthenticationRequiredException ex, @NotNull HttpServletRequest request) {
+    String reauthUrl = request.getContextPath() + ReauthenticationRequiredException.REAUTH_PATH;
+    log.warn(
+        "Re-authentication required for {} {}: redirecting to the Keycloak login flow.",
+        request.getMethod(),
+        request.getRequestURI());
+    if (wantsJson(request)) {
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("code", "REAUTH_REQUIRED");
+      body.put("status", HttpStatus.UNAUTHORIZED.value());
+      body.put("reauthenticate", Boolean.TRUE);
+      body.put("location", reauthUrl);
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .header("X-Reauthenticate", reauthUrl)
+          .contentType(MediaType.APPLICATION_JSON)
+          .body(body);
+    }
+    return "redirect:" + reauthUrl;
+  }
+
   /** Renders the 404 error page for unmapped static resource / page requests. */
   @ExceptionHandler(NoResourceFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)

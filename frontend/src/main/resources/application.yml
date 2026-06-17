@@ -188,6 +188,12 @@ resilience4j:
         waitDurationInOpenState: 5s
         failureRateThreshold: 50
         eventConsumerBufferSize: 10
+        # A missing/expired frontend OAuth2 token (client_authorization_required) is a per-session
+        # auth state, not a backend-health signal — it must neither count toward the failure rate
+        # nor open the breaker for everyone else. GlobalExceptionHandler turns it into a re-login
+        # redirect instead (REQ-SEC-012).
+        ignoreExceptions:
+          - org.springframework.security.oauth2.client.ClientAuthorizationException
     instances:
       backend:
         baseConfig: default
@@ -216,6 +222,11 @@ resilience4j:
       default:
         maxAttempts: 2
         waitDuration: 500ms
+        # Retrying a client_authorization_required gains nothing (the token is gone until an
+        # interactive re-login) and only multiplies the log lines — fail fast so the user is
+        # redirected promptly (REQ-SEC-012).
+        ignoreExceptions:
+          - org.springframework.security.oauth2.client.ClientAuthorizationException
     instances:
       backend:
         baseConfig: default

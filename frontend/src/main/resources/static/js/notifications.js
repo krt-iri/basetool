@@ -84,6 +84,11 @@
     function refreshUnreadCount() {
         return fetch('/notifications/unread-count', csrfRequestInit())
             .then(function (res) {
+                // A poisoned/expired session answers 401 + X-Reauthenticate: re-login instead of
+                // silently reporting zero forever (REQ-SEC-012).
+                if (window.krtReauth && window.krtReauth.check(res)) {
+                    return null;
+                }
                 return res.ok ? res.json() : null;
             })
             .then(function (data) {
@@ -165,6 +170,9 @@
         }
         fetch('/notifications/recent', csrfRequestInit())
             .then(function (res) {
+                if (window.krtReauth && window.krtReauth.check(res)) {
+                    return [];
+                }
                 return res.ok ? res.json() : [];
             })
             .then(function (items) {
@@ -439,6 +447,14 @@
                 const dropdown = document.getElementById('notification-dropdown');
                 if (dropdown && !dropdown.classList.contains('notification-dropdown-hidden')) {
                     loadDropdown();
+                }
+            });
+            // The server pushes a `reauth` event when the stream's session lost its OAuth2 token,
+            // then closes the stream: redirect to the Keycloak login flow instead of letting the
+            // EventSource reconnect-loop against a dead session (REQ-SEC-012).
+            source.addEventListener('reauth', function (event) {
+                if (window.krtReauth) {
+                    window.krtReauth.redirect(event && event.data ? event.data : null);
                 }
             });
         } catch (_error) {

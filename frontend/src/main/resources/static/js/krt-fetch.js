@@ -134,6 +134,55 @@
         refresh: refreshCsrf,
     };
 
+    // ------------------------------------------------------------- re-auth
+
+    // When the frontend OAuth2 session loses its usable token (Keycloak refresh-token rotation
+    // revoked the family, the session idled out, ...) the backend relay fails with
+    // client_authorization_required. The server answers HTML navigations with a 302 to the Keycloak
+    // login flow (browser follows it automatically) and AJAX callers with a 401 carrying the
+    // `X-Reauthenticate: <path>` header. This helper redirects the whole window to that path so the
+    // user silently re-authenticates against the still-alive Keycloak SSO session instead of being
+    // stranded on a dead session (REQ-SEC-012). A short sessionStorage guard prevents a redirect
+    // loop if the fresh session were to be revoked again immediately.
+    const REAUTH_GUARD_KEY = 'krtReauthAt';
+    const REAUTH_MIN_INTERVAL_MS = 10000;
+    const DEFAULT_REAUTH_PATH = '/oauth2/authorization/keycloak';
+
+    function reauthRedirect(url) {
+        // Only ever follow a same-origin absolute path — never an attacker-controllable absolute URL
+        // (open-redirect guard), even though the value originates from our own server.
+        const target = typeof url === 'string' && url.charAt(0) === '/' ? url : DEFAULT_REAUTH_PATH;
+        try {
+            const last = Number(window.sessionStorage.getItem(REAUTH_GUARD_KEY) || 0);
+            const now = Date.now();
+            if (now - last < REAUTH_MIN_INTERVAL_MS) {
+                return false;
+            }
+            window.sessionStorage.setItem(REAUTH_GUARD_KEY, String(now));
+        } catch (_storageUnavailable) {
+            /* sessionStorage may be blocked; proceed without the loop guard */
+        }
+        window.location.assign(target);
+        return true;
+    }
+
+    /**
+     * If response is a 401 carrying the X-Reauthenticate header, redirects the browser to the
+     * Keycloak login flow and returns true; otherwise returns false. Safe to call with any Response.
+     */
+    function maybeReauthenticate(response) {
+        if (!response || response.status !== 401 || !response.headers) {
+            return false;
+        }
+        const header =
+            typeof response.headers.get === 'function'
+                ? response.headers.get('X-Reauthenticate')
+                : null;
+        return header ? reauthRedirect(header) : false;
+    }
+
+    window.krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
+
     // --------------------------------------------------------------- helpers
 
     /**
@@ -333,6 +382,12 @@
 
             const body = await parseBody(response);
 
+            // A 401 with X-Reauthenticate means the session lost its OAuth2 token: redirect the
+            // window to re-login instead of toasting an error the user cannot act on.
+            if (maybeReauthenticate(response)) {
+                return { ok: false, status: response.status, body: body };
+            }
+
             if (!response.ok) {
                 await handleProblem(response, body, opts);
                 return { ok: false, status: response.status, body: body };
@@ -440,6 +495,11 @@
         }
         return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (res) {
+                // Session lost its OAuth2 token: redirect to re-login rather than painting an
+                // error/empty fragment (REQ-SEC-012).
+                if (maybeReauthenticate(res)) {
+                    return null;
+                }
                 // A fragment swap must only ever paint section-sized HTML into a small
                 // container. If the request was redirected (an expired session bounced to
                 // the login page, or a controller error handler answered with a redirect)
@@ -541,6 +601,8 @@
         bindSwap: bindSwap,
         syncVersion: syncVersion,
         handleProblem: handleProblem,
+        maybeReauthenticate: maybeReauthenticate,
+        reauthRedirect: reauthRedirect,
         csrf: window.krtCsrf,
     };
 

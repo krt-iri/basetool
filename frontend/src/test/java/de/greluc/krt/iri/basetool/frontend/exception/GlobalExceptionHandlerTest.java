@@ -577,4 +577,70 @@ class GlobalExceptionHandlerTest {
         "When the cause is a WebClientResponseException, surface its status");
     assertEquals("error.503.title", model.getAttribute("error"));
   }
+
+  // ─── handleReauthenticationRequired (REQ-SEC-012) ───────────────────────
+
+  private static HttpServletRequest navigationRequest() {
+    HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+    when(req.getHeader("Accept")).thenReturn("text/html");
+    when(req.getContextPath()).thenReturn("");
+    when(req.getMethod()).thenReturn("GET");
+    when(req.getRequestURI()).thenReturn("/orders");
+    return req;
+  }
+
+  private static HttpServletRequest ajaxRequest() {
+    HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+    when(req.getHeader("X-Requested-With")).thenReturn("XMLHttpRequest");
+    when(req.getContextPath()).thenReturn("");
+    when(req.getMethod()).thenReturn("GET");
+    when(req.getRequestURI()).thenReturn("/notifications/unread-count");
+    return req;
+  }
+
+  @Test
+  void reauthRequired_htmlNavigation_redirectsToKeycloakLoginFlow() {
+    ReauthenticationRequiredException ex =
+        new ReauthenticationRequiredException("token gone", null);
+
+    Object result = handler.handleReauthenticationRequired(ex, navigationRequest());
+
+    assertEquals("redirect:/oauth2/authorization/keycloak", result);
+  }
+
+  @Test
+  void reauthRequired_ajax_returns401WithReauthenticateHeaderAndBody() {
+    ReauthenticationRequiredException ex =
+        new ReauthenticationRequiredException("token gone", null);
+
+    Object result = handler.handleReauthenticationRequired(ex, ajaxRequest());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    assertEquals(
+        "/oauth2/authorization/keycloak", response.getHeaders().getFirst("X-Reauthenticate"));
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("REAUTH_REQUIRED", body.get("code"));
+    assertEquals(401, body.get("status"));
+    assertEquals(Boolean.TRUE, body.get("reauthenticate"));
+    assertEquals("/oauth2/authorization/keycloak", body.get("location"));
+  }
+
+  @Test
+  void reauthRequired_honoursContextPathPrefix() {
+    HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+    when(req.getHeader("Accept")).thenReturn("text/html");
+    when(req.getContextPath()).thenReturn("/app");
+    when(req.getMethod()).thenReturn("GET");
+    when(req.getRequestURI()).thenReturn("/app/inventory");
+    ReauthenticationRequiredException ex =
+        new ReauthenticationRequiredException("token gone", null);
+
+    Object result = handler.handleReauthenticationRequired(ex, req);
+
+    assertEquals("redirect:/app/oauth2/authorization/keycloak", result);
+  }
 }

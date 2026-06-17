@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die App meldet sich jetzt automatisch neu an, statt leere Seiten zu zeigen, wenn das Login-Token der Sitzung verfällt.** Nach bestimmten Abläufen (z. B. Anmeldung über den Extractor-Handoff) konnte es passieren, dass plötzlich keine Aufträge, Lager- oder Raffinerieeinträge mehr angezeigt wurden und nur ein manuelles Ab- und Wiederanmelden half, während im Hintergrund das Log volllief. Solche Fälle lösen jetzt eine stille Neuanmeldung über Keycloak aus (AJAX-Aufrufe leiten den Browser dorthin um), und die parallelen Backend-Aufrufe einer Seite erneuern das Token nur noch ein einziges Mal gemeinsam, sodass die Sitzung gar nicht erst ungültig wird.
+
 ## [v0.5.4](https://github.com/krt-iri/basetool/releases/tag/v0.5.4) - 2026-06-17
 
 ### Added

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.frontend.controller;
 
+import de.greluc.krt.iri.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.iri.basetool.frontend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.NotificationCountResponse;
 import de.greluc.krt.iri.basetool.frontend.model.dto.NotificationDto;
@@ -95,6 +96,10 @@ public class NotificationPageController {
   public String page(Model model) {
     try {
       model.addAttribute("notifications", loadView(PAGE_LIMIT));
+    } catch (ReauthenticationRequiredException e) {
+      // Let GlobalExceptionHandler bounce the user through a fresh Keycloak login (302) rather than
+      // rendering an empty inbox on a dead session.
+      throw e;
     } catch (Exception e) {
       log.debug("Failed to load notifications page", e);
       model.addAttribute("notifications", List.of());
@@ -133,7 +138,9 @@ public class NotificationPageController {
             .retrieve()
             .bodyToFlux(SSE_TYPE)
             .subscribe(
-                event -> forward(emitter, event), emitter::completeWithError, emitter::complete);
+                event -> forward(emitter, event),
+                error -> handleStreamError(emitter, error),
+                emitter::complete);
     emitter.onCompletion(subscription::dispose);
     emitter.onTimeout(
         () -> {
@@ -169,6 +176,8 @@ public class NotificationPageController {
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
+    } catch (ReauthenticationRequiredException e) {
+      throw e;
     } catch (Exception e) {
       log.error("Mark-read {} (ajax) failed", id, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -189,6 +198,8 @@ public class NotificationPageController {
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
+    } catch (ReauthenticationRequiredException e) {
+      throw e;
     } catch (Exception e) {
       log.error("Mark-all-read (ajax) failed", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -209,6 +220,8 @@ public class NotificationPageController {
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
+    } catch (ReauthenticationRequiredException e) {
+      throw e;
     } catch (Exception e) {
       log.error("Delete notification {} (ajax) failed", id, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -229,6 +242,8 @@ public class NotificationPageController {
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
+    } catch (ReauthenticationRequiredException e) {
+      throw e;
     } catch (Exception e) {
       log.error("Clear-read (ajax) failed", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -278,10 +293,41 @@ public class NotificationPageController {
       NotificationCountResponse response =
           backendApiClient.get(BACKEND_BASE + "/unread-count", NotificationCountResponse.class);
       return response != null && response.count() != null ? response.count() : 0L;
+    } catch (ReauthenticationRequiredException e) {
+      // Surface a 401 + X-Reauthenticate (via GlobalExceptionHandler) so the always-on badge poll
+      // re-logs the user in instead of silently reporting zero on a dead session.
+      throw e;
     } catch (Exception e) {
       log.debug("Failed to load unread count", e);
       return 0L;
     }
+  }
+
+  /**
+   * Terminates the relayed SSE stream on a backend error. When the error is a re-authentication
+   * signal (the session's OAuth2 token is gone, see {@link
+   * ReauthenticationRequiredException#isReauthSignal}), a named {@code reauth} event carrying the
+   * Keycloak login path is pushed so the browser can redirect the whole window instead of entering
+   * an {@code EventSource} reconnect loop against a dead session; the stream then completes
+   * cleanly. Any other error completes the emitter with the error (the browser's polling fallback
+   * keeps the badge fresh).
+   *
+   * @param emitter the browser-facing emitter to terminate
+   * @param error the error raised by the backend stream subscription
+   */
+  private static void handleStreamError(SseEmitter emitter, Throwable error) {
+    if (ReauthenticationRequiredException.isReauthSignal(error)) {
+      log.debug("Notification stream needs re-authentication; signalling the browser to re-login");
+      try {
+        emitter.send(
+            SseEmitter.event().name("reauth").data(ReauthenticationRequiredException.REAUTH_PATH));
+        emitter.complete();
+      } catch (IOException | RuntimeException sendFailure) {
+        emitter.complete();
+      }
+      return;
+    }
+    emitter.completeWithError(error);
   }
 
   private static void forward(SseEmitter emitter, ServerSentEvent<String> event) {
