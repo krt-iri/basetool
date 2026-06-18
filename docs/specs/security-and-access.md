@@ -229,11 +229,15 @@ stack: `HomeController` → `BackendApiClient` → `ReauthenticationRequiredExce
 relay, while the backend stays healthy (every `GET /api/v1/missions/next` that reaches it returns
 `200`). Keycloak logged the full reuse-detection chain on one SSO session —
 `REFRESH_TOKEN_ERROR reason="Stale token"` → `"Session doesn't have required client"` →
-`"refresh token issued before the client session started"`, with `client_auth_method="client-secret"`
-(the `basetool-frontend` token requests authenticate as a **confidential** client). Because the
-frontend is a confidential server-side BFF whose refresh token lives only in the Redis session and
-never reaches the browser, refresh-token **rotation + reuse detection adds no security here and is the
-direct cause of the session revocations**. The realm-wide control is therefore turned **off**
+`"refresh token issued before the client session started"`. (The event field
+`client_auth_method="client-secret"` reflects the client's default `clientAuthenticatorType`
+attribute, not secret-based authentication — `basetool-frontend` is a **public** client,
+`publicClient: true`; the public→confidential migration is ADR-0001, implementation pending.) Because
+the frontend is a **server-rendered Spring BFF** whose refresh token is held only in the Redis-backed
+Spring Session and never reaches the browser, refresh-token rotation + reuse detection — whose purpose
+is to bound the damage of a refresh token leaking from an *untrusted* client environment (browser /
+SPA / native) — adds little here while being the **direct cause of the session revocations** under the
+BFF's unavoidable concurrent-refresh race. The realm-wide control is therefore turned **off**
 (`Revoke Refresh Token = Off`; realm-export `"revokeRefreshToken": false`): a replayed or duplicate
 online refresh token is no longer treated as stale-token reuse, so the SSO session is not revoked and
 the homepage no longer shows "Fehler beim Laden der Einsätze". The `SingleFlightAuthorizedClientManager`,
