@@ -6,6 +6,8 @@
 
 - **Einzelne UEX-Items (z. B. die Skin-Variante „Pulse Greycat Laser Pistol") wurden bei jedem Item-Abgleich übersprungen und protokollierten einen Fehler.** UEX teilt sich ein Basis-Item und seine Skins eine in-game-UUID, die nur einmal vergeben werden kann (`external_uuid` ist eindeutig). Beim Nachtragen der UUID auf die Skin-Zeile kollidierte diese mit dem bereits belegten Basis-Item. Der Abgleich übernimmt eine UUID jetzt nur noch, wenn sie frei ist; andernfalls bleibt sie leer und die übrigen Felder des Items werden trotzdem aktualisiert.
 
+- **Die Startseite zeigte trotz der bisherigen Korrekturen weiter „Fehler beim Laden der Einsätze" und der nächste Einsatz fehlte.** Ursache war Keycloaks Refresh-Token-Rotation mit Wiederverwendungs-Erkennung, die beim serverseitigen Frontend-Client (Token liegt nur in Redis, nie im Browser) keinen Sicherheitsgewinn bringt, aber bei den parallelen Token-Erneuerungen einer Sitzung wiederholt die ganze Sitzung verwarf. Die Rotation wird daher realm-weit in Keycloak abgeschaltet (`Revoke Refresh Token = Off`) — eine manuell beim Deployment zu setzende Keycloak-Einstellung; die Anmeldung bleibt damit bestehen, bis sie regulär abläuft (Details in `docs/INGEST_KEYCLOAK_SETUP.md`).
+
 ## [v0.5.10](https://github.com/krt-profit/basetool/releases/tag/v0.5.10) - 2026-06-18
 
 ### Changed

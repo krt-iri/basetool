@@ -217,9 +217,31 @@ verbatim even when expired; the backend rejects it and the always-on unread-coun
 drives re-authentication. The relay fails soft when no token is bound. The single-flight freshness
 margin (`EXPIRY_SKEW`) MUST be ≥ the `RefreshTokenOAuth2AuthorizedClientProvider` clock skew (Spring's
 default is 60s), so a freshness-cache hit never serves a token the provider would itself refresh.
-Single-flight is JVM-local; horizontally-scaled deployments rely on `Refresh Token Max Reuse > 0` on
-Keycloak for the residual cross-instance race. `offline_access` MUST NOT be re-added to paper over
-this (audit finding L-4). See ADR-0019 (and its 2026-06-18 amendments).
+Single-flight is JVM-local; horizontally-scaled deployments previously relied on `Refresh Token Max
+Reuse > 0` on Keycloak for the residual cross-instance race. `offline_access` MUST NOT be re-added to
+paper over this (audit finding L-4). See ADR-0019 (and its 2026-06-18 amendments).
+
+**2026-06-18 — the root mitigation is on Keycloak, not in code.** Three iterations of the code-side
+single-flight / relay hardening above did not stop the cascade in production. The failing
+refresh-token grant surfaces on the **ordinary** page-render and unread-count-poll path (frontend
+stack: `HomeController` → `BackendApiClient` → `ReauthenticationRequiredException` →
+`ClientAuthorizationException` → `SingleFlightAuthorizedClientManager.authorize`), not only on the SSE
+relay, while the backend stays healthy (every `GET /api/v1/missions/next` that reaches it returns
+`200`). Keycloak logged the full reuse-detection chain on one SSO session —
+`REFRESH_TOKEN_ERROR reason="Stale token"` → `"Session doesn't have required client"` →
+`"refresh token issued before the client session started"`, with `client_auth_method="client-secret"`
+(the `basetool-frontend` token requests authenticate as a **confidential** client). Because the
+frontend is a confidential server-side BFF whose refresh token lives only in the Redis session and
+never reaches the browser, refresh-token **rotation + reuse detection adds no security here and is the
+direct cause of the session revocations**. The realm-wide control is therefore turned **off**
+(`Revoke Refresh Token = Off`; realm-export `"revokeRefreshToken": false`): a replayed or duplicate
+online refresh token is no longer treated as stale-token reuse, so the SSO session is not revoked and
+the homepage no longer shows "Fehler beim Laden der Einsätze". The `SingleFlightAuthorizedClientManager`,
+the structurally-refresh-free SSE relay and the `EXPIRY_SKEW ≥ 60s` invariant above are **retained as
+defense-in-depth** but are no longer load-bearing. Consequence to weigh: rotation/reuse-detection no
+longer protects the persisted desktop-extractor refresh token — the runbook already records this as a
+reversible, ingest-independent operator lever (`INGEST_KEYCLOAK_SETUP.md`). See ADR-0019
+(2026-06-18 amendment #4).
 
 **Acceptance**
 
@@ -235,6 +257,8 @@ this (audit finding L-4). See ADR-0019 (and its 2026-06-18 amendments).
 - [ ] `EXPIRY_SKEW` ≥ the refresh provider's clock skew (60s) so a freshness-cache hit never serves a
   token the provider would refresh.
 - [ ] `ClientAuthorizationException` is not retried and does not open the backend circuit breaker.
+- [ ] The `iri` realm has `Revoke Refresh Token = Off` (`"revokeRefreshToken": false`), so a replayed
+  or duplicate online refresh token does not trip reuse detection and does not revoke the SSO session.
 
 **Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `NotificationPageControllerStreamTest`,
 `GlobalExceptionHandlerTest`, `BackendApiClientResilienceTest` · **Code:**
