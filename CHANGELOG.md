@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Projekt von `krt-iri` auf `krt-profit` umgezogen (GitHub-Organisation, Container-Images und internes Java-Package `de.greluc.krt.profit.basetool`).** Repository und Images liegen jetzt unter `krt-profit/basetool` bzw. `ghcr.io/krt-profit/*`; der Standardwert von `IRI_IMAGE_NAMESPACE` ist `krt-profit`. Beim Deploy müssen Image-Namespace, GHCR-Pull-Token und Release-Pipeline auf `krt-profit` zeigen. Keine funktionale Änderung.
+
 ## [v0.5.7](https://github.com/krt-profit/basetool/releases/tag/v0.5.7) - 2026-06-18
 
 ### Added
