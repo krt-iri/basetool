@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.springframework.security.oauth2.client.web.reactive.function.client.ServletOAuth2AuthorizedClientExchangeFilterFunction.oauth2AuthorizedClient;
-
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
@@ -133,13 +131,16 @@ public class NotificationPageController {
    * {@code sseWebClient}. Best-effort: if the backend stream errors, the emitter completes with the
    * error and the browser's polling fallback keeps the badge fresh.
    *
-   * <p>The OAuth2 bearer is resolved <b>read-only</b> on the servlet thread and attached explicitly
-   * to the upstream call, so this long-lived relay never asks the {@code
-   * OAuth2AuthorizedClientManager} to refresh. A refresh on this 30-minute async request could
-   * rotate and then — via a late Spring Session write-back — resurrect a stale online refresh
-   * token, which Keycloak's reuse detection punishes by revoking the whole session and forcing an
-   * interactive re-login (REQ-SEC-012). When no usable token is bound the stream fails soft; the
-   * always-on unread-count poll keeps the token fresh and drives any re-authentication.
+   * <p>The OAuth2 bearer is resolved <b>read-only</b> on the servlet thread and set as a plain
+   * {@code Authorization} header on the upstream call. The {@code sseWebClient} carries no OAuth2
+   * exchange filter (see the {@code sseWebClient} bean in {@code WebClientConfig}), so this
+   * long-lived relay is structurally incapable of asking the {@code OAuth2AuthorizedClientManager}
+   * to refresh — it can neither rotate the session's online refresh token nor write a stale one
+   * back, which Keycloak's reuse detection would otherwise punish by revoking the whole SSO session
+   * and forcing an interactive re-login (REQ-SEC-012). The snapshot token is relayed verbatim even
+   * when already expired: the backend rejects it, the stream fails soft, and the always-on
+   * unread-count poll — not this relay — keeps the token fresh and drives any re-authentication.
+   * When no usable token is bound the stream fails soft immediately.
    *
    * @param request the current servlet request, used to read the session-stored authorized client
    * @param authentication the authenticated principal owning the session
@@ -156,11 +157,12 @@ public class NotificationPageController {
       emitter.complete();
       return emitter;
     }
+    String bearerToken = authorizedClient.getAccessToken().getTokenValue();
     Disposable subscription =
         sseWebClient
             .get()
             .uri(BACKEND_BASE + "/stream")
-            .attributes(oauth2AuthorizedClient(authorizedClient))
+            .headers(headers -> headers.setBearerAuth(bearerToken))
             .retrieve()
             .bodyToFlux(SSE_TYPE)
             .subscribe(

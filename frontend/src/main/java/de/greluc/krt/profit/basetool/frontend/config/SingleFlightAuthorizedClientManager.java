@@ -89,8 +89,15 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
    * Safety margin subtracted from the access-token expiry: a token within this window of expiring
    * is treated as stale so the next request refreshes proactively rather than relaying a token that
    * dies mid-flight.
+   *
+   * <p><b>Invariant:</b> this MUST be &ge; the {@code RefreshTokenOAuth2AuthorizedClientProvider}
+   * clock skew (Spring's default is 60s), so a freshness-cache hit never hands back a token the
+   * provider would itself refresh on a cache-miss path. With a smaller margin (the prior 30s) the
+   * cache served tokens in the 30–60s-before-expiry band that a sibling refresh path treated as
+   * refreshable — an asymmetry that let two paths disagree on whether a refresh was due and widened
+   * the window for a redundant refresh-token grant (REQ-SEC-012, ADR-0019).
    */
-  private static final Duration EXPIRY_SKEW = Duration.ofSeconds(30);
+  private static final Duration EXPIRY_SKEW = Duration.ofSeconds(60);
 
   private final OAuth2AuthorizedClientManager delegate;
   private final ReentrantLock[] stripes;
