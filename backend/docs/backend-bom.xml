@@ -11,18 +11,18 @@
         </component>
       </components>
     </tools>
-    <component type="application" bom-ref="pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend">
-      <group>de.greluc.krt.iri.basetool</group>
+    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend">
+      <group>de.greluc.krt.profit.basetool</group>
       <name>backend</name>
       <version>0.0.1-SNAPSHOT</version>
-      <purl>pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend</purl>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-iri/basetool/actions/runs/27742110904</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/27742110904</url>
         </reference>
         <reference type="vcs">
-          <url>https://github.com/krt-iri/basetool</url>
+          <url>https://github.com/krt-profit/basetool</url>
         </reference>
       </externalReferences>
     </component>
@@ -9758,7 +9758,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/commons-io/commons-io@2.20.0?type=jar"/>
     <dependency ref="pkg:maven/commons-io/commons-io@2.21.0?type=jar"/>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
-    <dependency ref="pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend">
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar"/>
       <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar"/>

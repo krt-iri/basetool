@@ -384,7 +384,7 @@ ingest must never persist a refinery order without that human review-and-save st
 
 ## Out of scope
 
-- The desktop extractor's internals ([#436](https://github.com/krt-iri/basetool/issues/436),
+- The desktop extractor's internals ([#436](https://github.com/krt-profit/basetool/issues/436),
   shipped) — they live in the `basetool-bp-extractor` repo; this spec only governs the
   cross-repo contract and the basetool-side import behaviour.
 - Direct one-click ingest (the former deferred Phase 4, #437) is now its own epic #639,

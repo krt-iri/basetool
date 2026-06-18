@@ -1,10 +1,10 @@
 # UC-21 — Refinery Order: Mandanten-Scope (wer sieht/erstellt/bearbeitet/lagert ein)
 
-|                |                                                                                                                                       |
-|----------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-21                                                                                                                                 |
-| **Tag**        | `e2e`                                                                                                                                 |
-| **Testklasse** | [`RefineryOrderTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/RefineryOrderTenancyE2eTest.java) |
+|                |                                                                                                                                          |
+|----------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-21                                                                                                                                    |
+| **Tag**        | `e2e`                                                                                                                                    |
+| **Testklasse** | [`RefineryOrderTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RefineryOrderTenancyE2eTest.java) |
 
 ## Akteur
 

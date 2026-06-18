@@ -1,7 +1,7 @@
 # Design references — Basetool SC Extractor
 
 This folder holds the **offline-capable design prototype** for the SC Extractor rebuild
-(epic [#439](https://github.com/krt-iri/basetool/issues/439)).
+(epic [#439](https://github.com/krt-profit/basetool/issues/439)).
 
 - **[`basetool-sc-extractor.offline.zip`](basetool-sc-extractor.offline.zip)** — a single,
   fully self-contained HTML file (all CSS, JS, fonts and images embedded as an inline

@@ -20,7 +20,7 @@ single-sign-on via Keycloak and a clear role and permission model.
 - **Terminals** — administer trade terminals, including UEX raw state (loading dock, auto-load) and the last UEX sync timestamp (`/admin/terminals`).
 - **User administration** — manage members, roles and the `LOGISTICIAN` / `MISSION_MANAGER` capability flags.
 - **Personal inventory** — every authenticated member maintains their own item list at `/personal-inventory`; admins manage other members' inventories at `/admin/personal-inventory`. Backend endpoints under `/api/v1/personal-inventory` (user) and `/api/v1/admin/personal-inventory` (admin) are paginated, validated, and protected by optimistic locking.
-- **Personal blueprints** — the personal-inventory area splits into *Items* and *Blueprints* sub-pages. On `/personal-inventory/blueprints` a member records the crafting blueprints they have unlocked in-game, added via a multi-select type-ahead over the SC Wiki product catalogue or by importing a JSON export from the **SCMDB log-watcher** or the **[Basetool Blueprint Extractor](https://github.com/krt-iri/basetool-bp-extractor)** (both carry a `blueprints` array of identically-named entries; the importer reads the acquisition time from either `ts` or `receivedAt`). The import previews each blueprint name, resolving it by normalized-exact match, a curated alias, or dependency-free fuzzy suggestions; the user resolves the rest manually and each manual pick is learned as an alias for future imports. Admins manage any member's blueprints at `/admin/personal-blueprints`. Backend endpoints under `/api/v1/personal-blueprints` (user) and `/api/v1/admin/personal-blueprints` (admin), plus the slim product search at `/api/v1/blueprints/products/search`.
+- **Personal blueprints** — the personal-inventory area splits into *Items* and *Blueprints* sub-pages. On `/personal-inventory/blueprints` a member records the crafting blueprints they have unlocked in-game, added via a multi-select type-ahead over the SC Wiki product catalogue or by importing a JSON export from the **SCMDB log-watcher** or the **[Basetool Blueprint Extractor](https://github.com/krt-profit/basetool-bp-extractor)** (both carry a `blueprints` array of identically-named entries; the importer reads the acquisition time from either `ts` or `receivedAt`). The import previews each blueprint name, resolving it by normalized-exact match, a curated alias, or dependency-free fuzzy suggestions; the user resolves the rest manually and each manual pick is learned as an alias for future imports. Admins manage any member's blueprints at `/admin/personal-blueprints`. Backend endpoints under `/api/v1/personal-blueprints` (user) and `/api/v1/admin/personal-blueprints` (admin), plus the slim product search at `/api/v1/blueprints/products/search`.
 - **Blueprint availability overview** — officers, admins and Spezialkommando leads can see which blueprints are available among the members of their org unit at `/blueprint-overview`, with a lazy per-blueprint drill-down to the owning members (display name only). Officers see their squadron, SK leads their SK, admins all org units (or a pinned one); the sidebar entry is hidden from everyone else. Backend endpoints `GET /api/v1/personal-blueprints/overview` (+ `/owners`) gate on the same check as the menu (`GET /api/v1/me/capabilities`). Item-order detail pages additionally show a *blueprint coverage* section — which members of the order's responsible squadron/SK own the blueprints for the requested items — visible only to members of that responsible unit (and admins).
 - **Org chart** — an interactive, keyboard-accessible organization chart (`/org-chart`) of squadrons, special commands and command groups; readable by every authenticated member, editable by admins.
 - **i18n** — every user-visible string is fully translated (German default, English).
@@ -60,23 +60,23 @@ The tenant unit is the **OrgUnit** — either a `SQUADRON` (Staffel) or a `SPECI
 The README focuses on getting the project up and running. The following
 documents cover everything else:
 
-| Document                                                                                               | Purpose                                                                                                                                                                                                                                     |
-|:-------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [CHANGELOG.md](CHANGELOG.md)                                                                           | Release notes and every user-visible change.                                                                                                                                                                                                |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                                                                     | How to report bugs, suggest features and submit pull requests, plus the coding style guide.                                                                                                                                                 |
-| [CLA.md](CLA.md)                                                                                       | Individual Contributor License Agreement every contributor signs before their first pull request; the public roster of signatures lives in [docs/cla-signatures.md](docs/cla-signatures.md).                                                |
-| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)                                                               | Community standards (Contributor Covenant 3.0).                                                                                                                                                                                             |
-| [.github/SECURITY.md](.github/SECURITY.md)                                                             | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM).                                                              |
-| [LICENSE.md](LICENSE.md)                                                                               | GNU General Public License v3.0.                                                                                                                                                                                                            |
-| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md)                                                   | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface.                                 |
-| [docs/specs/INDEX.md](docs/specs/INDEX.md)                                                             | Registry of the canonical, binding requirement specs (`REQ-<AREA>-NNN`) — security & access, org-unit tenancy, data persistence, API conventions, observability, UI design system and the per-feature specs.                                |
-| [docs/adr/README.md](docs/adr/README.md)                                                               | Architecture Decision Records — every architecturally significant decision, recorded before or with the change that implements it.                                                                                                          |
-| [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md)             | "DAS KARTELL" design system / Corporate Design Manual — the source of truth for brand colors, typography, the department palette and UI components. A git submodule of [`krt-iri/design-system`](https://github.com/krt-iri/design-system). |
-| [docs/deployment.md](docs/deployment.md)                                                               | Production deployment runbook — host bootstrap, normal releases, manual rollback, PAT rotation, troubleshooting.                                                                                                                            |
-| [backend/src/main/resources/db/migration/README.md](backend/src/main/resources/db/migration/README.md) | Flyway migration conventions — destructive-ops two-phase rule, data-migration patterns, performance / locking, pre-merge checklist.                                                                                                         |
-| [docs/e2e-test/README.md](docs/e2e-test/README.md)                                                     | End-to-end test use cases — one document per functional flow (actor, preconditions, steps, expected result) linking the Playwright test classes, plus the [role/scope reference](docs/e2e-test/rollen-und-scope.md).                        |
-| [CLAUDE.md](CLAUDE.md)                                                                                 | Project-specific guidance for the Claude Code AI assistant — build / run / test commands, architectural invariants, conventions.                                                                                                            |
-| [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)                                   | The pull-request template that ships with every PR.                                                                                                                                                                                         |
+| Document                                                                                               | Purpose                                                                                                                                                                                                                                           |
+|:-------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [CHANGELOG.md](CHANGELOG.md)                                                                           | Release notes and every user-visible change.                                                                                                                                                                                                      |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                                                                     | How to report bugs, suggest features and submit pull requests, plus the coding style guide.                                                                                                                                                       |
+| [CLA.md](CLA.md)                                                                                       | Individual Contributor License Agreement every contributor signs before their first pull request; the public roster of signatures lives in [docs/cla-signatures.md](docs/cla-signatures.md).                                                      |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)                                                               | Community standards (Contributor Covenant 3.0).                                                                                                                                                                                                   |
+| [.github/SECURITY.md](.github/SECURITY.md)                                                             | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM).                                                                    |
+| [LICENSE.md](LICENSE.md)                                                                               | GNU General Public License v3.0.                                                                                                                                                                                                                  |
+| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md)                                                   | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface.                                       |
+| [docs/specs/INDEX.md](docs/specs/INDEX.md)                                                             | Registry of the canonical, binding requirement specs (`REQ-<AREA>-NNN`) — security & access, org-unit tenancy, data persistence, API conventions, observability, UI design system and the per-feature specs.                                      |
+| [docs/adr/README.md](docs/adr/README.md)                                                               | Architecture Decision Records — every architecturally significant decision, recorded before or with the change that implements it.                                                                                                                |
+| [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md)             | "DAS KARTELL" design system / Corporate Design Manual — the source of truth for brand colors, typography, the department palette and UI components. A git submodule of [`krt-profit/design-system`](https://github.com/krt-profit/design-system). |
+| [docs/deployment.md](docs/deployment.md)                                                               | Production deployment runbook — host bootstrap, normal releases, manual rollback, PAT rotation, troubleshooting.                                                                                                                                  |
+| [backend/src/main/resources/db/migration/README.md](backend/src/main/resources/db/migration/README.md) | Flyway migration conventions — destructive-ops two-phase rule, data-migration patterns, performance / locking, pre-merge checklist.                                                                                                               |
+| [docs/e2e-test/README.md](docs/e2e-test/README.md)                                                     | End-to-end test use cases — one document per functional flow (actor, preconditions, steps, expected result) linking the Playwright test classes, plus the [role/scope reference](docs/e2e-test/rollen-und-scope.md).                              |
+| [CLAUDE.md](CLAUDE.md)                                                                                 | Project-specific guidance for the Claude Code AI assistant — build / run / test commands, architectural invariants, conventions.                                                                                                                  |
+| [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)                                   | The pull-request template that ships with every PR.                                                                                                                                                                                               |
 
 ---
 
@@ -190,7 +190,7 @@ existing "backend unreachable" toast. Mechanics live in
 Same images, same orchestration as production, but on your own machine:
 
 1. **Authenticate to GHCR** (one-time): create a fine-grained PAT with
-   `Packages: Read` on `krt-iri/basetool`, then
+   `Packages: Read` on `krt-profit/basetool`, then
 
    ```bash
    echo "$GHCR_TOKEN" | docker login ghcr.io --username your-gh-handle --password-stdin
@@ -244,7 +244,7 @@ What changed at the data layer:
 
 What changed at the authorization layer:
 
-* [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java)
+* [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
   (originally `SquadronScopeService`, later renamed and broadened to cover
   Staffeln **and** Spezialkommandos) centralises `currentOrgUnitId()` /
   `canSee…` / `canEdit…` for every staffel-scoped aggregate. Read paths
@@ -252,21 +252,21 @@ What changed at the authorization layer:
   `ScopePredicate` tuple), write paths stamp the owning OrgUnit at create
   time, and controllers use it via `@PreAuthorize("@ownerScopeService.canEdit…")`
   on detail-view endpoints.
-* [`MeController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MeController.java)
+* [`MeController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MeController.java)
   exposes `GET /api/v1/me/active-org-unit` (legacy alias
   `GET /active-squadron`) for every authenticated caller to **read** the
   resolved context. **Switching** is a frontend concern:
-  [`MeFrontendController`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/controller/MeFrontendController.java)
+  [`MeFrontendController`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/MeFrontendController.java)
   `POST /active-org-unit` updates the Redis-backed session pin and relays it
   to the backend on every outbound call via the `X-Active-Org-Unit-Id`
   header (legacy `X-Active-Squadron-Id` mirrored for one release).
 * MDC field `orgUnitId` (sentinels `all` / `none` / `anonymous`) is attached
-  by [`CorrelationIdFilter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/logging/CorrelationIdFilter.java)
+  by [`CorrelationIdFilter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/logging/CorrelationIdFilter.java)
   so log lines and access-log JSON show which OrgUnit context a request ran
   under; the legacy `squadronId` field is emitted in parallel for one release.
 * ArchUnit rule
   `staffelScopedServicesMustWireOwnerScopeOrAuthHelper` in
-  [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)
+  [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
   fails the build if a staffel-scoped service stops injecting one of
   the auth services.
 
@@ -537,8 +537,8 @@ Tests force `spring.profiles.active=test`; both `Test` and `BootRun` set
 ./gradlew :backend:test --tests "ClassName.methodName"      # single test method
 ```
 
-ArchUnit rules in [`backend/.../ArchitectureTest.java`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)
-and [`frontend/.../ArchitectureTest.java`](frontend/src/test/java/de/greluc/krt/iri/basetool/frontend/ArchitectureTest.java)
+ArchUnit rules in [`backend/.../ArchitectureTest.java`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
+and [`frontend/.../ArchitectureTest.java`](frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/ArchitectureTest.java)
 enforce architectural invariants (no `SecurityContextHolder` outside the
 auth-helper service, every `@RestController` carries at least one
 `@PreAuthorize`, controllers never return JPA entities, the frontend
@@ -639,7 +639,7 @@ top-level directories:
 * **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records, MapStruct `mapper`s, `config` (security, caching, OpenAPI, rate limiting, WebClient), `integration` (UEX external API), `task` (scheduled jobs), `filter`/`interceptor` (correlation ID, deprecation headers), `annotation` (`@ApiDeprecation`).
 * **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `service.BackendApiClient` is the single seam. Persistent state across frontend restarts lives in Redis (Spring Session).
 * **`keycloak-theme/krt-theme`** — Custom Keycloak login and account UI theme matching the IRIDIUM corporate design. See [§5.7 Keycloak theme](#57-keycloak-theme).
-* **`design`** — Brand font sources. The design system itself (colors, typography, components, the Corporate Design Manual) lives in the [`krt-iri/design-system`](https://github.com/krt-iri/design-system) git submodule mounted at [`.claude/skills/das-kartell-design/`](.claude/skills/das-kartell-design/README.md).
+* **`design`** — Brand font sources. The design system itself (colors, typography, components, the Corporate Design Manual) lives in the [`krt-profit/design-system`](https://github.com/krt-profit/design-system) git submodule mounted at [`.claude/skills/das-kartell-design/`](.claude/skills/das-kartell-design/README.md).
 * **`scripts`** — One-off Python helper scripts for repository maintenance (i18n key sync, umlaut escaping, untranslated-string detection, etc.).
 * **`docs`** — Long-form documentation: the binding requirement specs under [`docs/specs/`](docs/specs/INDEX.md), the ADRs under [`docs/adr/`](docs/adr/README.md), the [deployment runbook](docs/deployment.md) and the [E2E use cases](docs/e2e-test/README.md).
 
@@ -661,7 +661,7 @@ commonly tuned values:
 | `APP_LOGGING_STRUCTURED_ENABLED`             | Enables the JSON (Logstash) log appender. Automatically `true` in the `prod` profile.                                               | `false` (dev / test), `true` (prod)              |
 | `APP_LOGGING_SLOW_BACKEND_CALL_THRESHOLD_MS` | (Frontend only) Threshold (ms) above which an outbound backend call is logged at `WARN`.                                            | `1500`                                           |
 | `IRI_BASETOOL_VERSION`                       | Image tag pulled by the production compose stack.                                                                                   | `stable`                                         |
-| `IRI_IMAGE_NAMESPACE`                        | GHCR namespace for the image lookup.                                                                                                | `krt-iri`                                        |
+| `IRI_IMAGE_NAMESPACE`                        | GHCR namespace for the image lookup.                                                                                                | `krt-profit`                                     |
 | `IRI_KEYSTORE_HOST_PATH`                     | Absolute host path of the production `keystore.p12`. Bind-mounted read-only into backend + frontend at `/run/secrets/keystore.p12`. | `/var/iri/secrets/keystore.p12`                  |
 | `REDIS_PASSWORD`                             | Password for the Redis session store.                                                                                               | *(required, no default)*                         |
 

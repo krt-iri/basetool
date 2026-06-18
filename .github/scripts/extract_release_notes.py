@@ -22,7 +22,7 @@ release is still created.
 
 Usage:
     extract_release_notes.py <tag> [changelog]
-    extract_release_notes.py <tag> --version 0.3.55 --registry ghcr.io --owner krt-iri
+    extract_release_notes.py <tag> --version 0.3.55 --registry ghcr.io --owner krt-profit
 """
 
 from __future__ import annotations
@@ -94,7 +94,7 @@ def image_and_sbom_footer(version: str, registry: str, owner: str) -> str:
 
     :param version: the OCI image tag (the git tag without its leading ``v``).
     :param registry: the container registry host, e.g. ``ghcr.io``.
-    :param owner: the GHCR / GitHub owner namespace, e.g. ``krt-iri``.
+    :param owner: the GHCR / GitHub owner namespace, e.g. ``krt-profit``.
     :return: a markdown block linking the signed multi-arch images and noting the
              attached CycloneDX SBOMs.
     """
@@ -124,7 +124,7 @@ def main() -> None:
                         help="Path to CHANGELOG.md. Default: CHANGELOG.md.")
     parser.add_argument("--version", help="OCI image tag (git tag without 'v').")
     parser.add_argument("--registry", help="Container registry host, e.g. ghcr.io.")
-    parser.add_argument("--owner", help="GHCR/GitHub owner, e.g. krt-iri.")
+    parser.add_argument("--owner", help="GHCR/GitHub owner, e.g. krt-profit.")
     args = parser.parse_args()
 
     parts = [changelog_section(args.tag, args.changelog)]

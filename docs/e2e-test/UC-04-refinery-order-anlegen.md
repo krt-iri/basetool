@@ -1,10 +1,10 @@
 # UC-04 — Refinery Order anlegen
 
-|                |                                                                                                                                     |
-|----------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-04                                                                                                                               |
-| **Tag**        | `e2e`                                                                                                                               |
-| **Testklasse** | [`RefineryOrderCreateE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/RefineryOrderCreateE2eTest.java) |
+|                |                                                                                                                                        |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-04                                                                                                                                  |
+| **Tag**        | `e2e`                                                                                                                                  |
+| **Testklasse** | [`RefineryOrderCreateE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RefineryOrderCreateE2eTest.java) |
 
 ## Akteur
 

@@ -15,7 +15,7 @@
 
 [Unit]
 Description=Profit Basetool — periodic deploy check (every 5 minutes)
-Documentation=https://github.com/krt-iri/basetool/blob/main/docs/deployment.md
+Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
 Requires=iri-deploy.service
 
 [Timer]

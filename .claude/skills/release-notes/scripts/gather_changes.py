@@ -97,7 +97,7 @@ def run_git(repo: str, args: list[str]) -> str:
 
 
 # A reconciled version heading: "## [v0.3.41](url) - 2026-06-02". Anchor on the
-# trailing " - DATE" (the URL may itself contain dashes, e.g. ".../krt-iri/...",
+# trailing " - DATE" (the URL may itself contain dashes, e.g. ".../krt-profit/...",
 # so matching up to the first dash would break); the date's own dashes carry no
 # surrounding spaces, so " - " before an end-anchored date is unambiguous.
 VERSION_HEADER_RE = re.compile(

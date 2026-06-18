@@ -4,7 +4,7 @@
 - **Date:** 2026-06-16
 - **Deciders:** @greluc
 - **Related:** spec REQ-NOTIF-001..004, REQ-NOTIF-009 ([`notifications.md`](../specs/notifications.md)) ·
-  ADR-0015 · ADR-0016 · epic [#622](https://github.com/krt-iri/basetool/issues/622)
+  ADR-0015 · ADR-0016 · epic [#622](https://github.com/krt-profit/basetool/issues/622)
 
 ## Context
 

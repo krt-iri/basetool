@@ -212,7 +212,7 @@ exportieren"**.
 **5.5 Export & Upload.** Green success alert with the written
 `RefineryExtract.json` path + a small summary. The step's single filled CTA is now
 **„An Basetool senden"** — the **one-click send** of epic
-[#639](https://github.com/krt-iri/basetool/issues/639) (transport spec
+[#639](https://github.com/krt-profit/basetool/issues/639) (transport spec
 [`docs/specs/desktop-ingest.md`](specs/desktop-ingest.md), `REQ-INGEST-*`;
 [ADR-0018](adr/0018-desktop-ingest-gateway-device-grant.md)). Pressing it:
 

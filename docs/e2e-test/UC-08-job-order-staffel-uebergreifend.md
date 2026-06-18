@@ -1,11 +1,11 @@
 # UC-08 — Job Order staffel-übergreifend (Staffel A bestellt, Staffel B liefert)
 
-|                |                                                                                                                                       |
-|----------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-08                                                                                                                                 |
-| **Tag**        | `e2e`                                                                                                                                 |
-| **Testklasse** | [`CrossStaffelJobOrderE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/CrossStaffelJobOrderE2eTest.java) |
-| **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md) · Scope-Regeln: [Rollen & Scope](rollen-und-scope.md)                                             |
+|                |                                                                                                                                          |
+|----------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-08                                                                                                                                    |
+| **Tag**        | `e2e`                                                                                                                                    |
+| **Testklasse** | [`CrossStaffelJobOrderE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/CrossStaffelJobOrderE2eTest.java) |
+| **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md) · Scope-Regeln: [Rollen & Scope](rollen-und-scope.md)                                                |
 
 ## Akteure
 

@@ -12,7 +12,7 @@ plugins {
   id("com.diffplug.spotless")
 }
 
-group = "de.greluc.krt.iri.basetool"
+group = "de.greluc.krt.profit.basetool"
 
 version = "0.0.1-SNAPSHOT"
 

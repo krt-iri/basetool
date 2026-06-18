@@ -157,7 +157,7 @@ migrations are where things go subtly wrong.
   - be added with `-- ${flyway:noTransaction}` at the top of the file plus an
     explicit `CREATE INDEX CONCURRENTLY` statement.
     Currently the codebase does not need this; if you do, see
-    [`db.DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/iri/basetool/backend/db/DatabaseIndexMigrationTest.java)
+    [`db.DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/profit/basetool/backend/db/DatabaseIndexMigrationTest.java)
     for how the existing test enforces what indexes ship.
 
 ## Tests
@@ -227,7 +227,7 @@ comment should answer the obvious "why now?" question before they need to.
 - [ ] The matching JPA entity was updated in the same commit.
 - [ ] `./gradlew :backend:test` passed — the suite applies the migration to a
   Testcontainers Postgres and validates the schema against the entities.
-- [ ] If indexes were added, [`DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/iri/basetool/backend/db/DatabaseIndexMigrationTest.java)
+- [ ] If indexes were added, [`DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/profit/basetool/backend/db/DatabaseIndexMigrationTest.java)
   knows about them.
 - [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
   / `### Changed` / `### Migration` heading.

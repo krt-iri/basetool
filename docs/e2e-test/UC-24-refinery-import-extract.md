@@ -1,10 +1,10 @@
 # UC-24 — Refinery Order aus Screenshot-Extract importieren
 
-|                |                                                                                                                           |
-|----------------|---------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-24                                                                                                                     |
-| **Tag**        | `e2e`                                                                                                                     |
-| **Testklasse** | [`RefineryImportE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/RefineryImportE2eTest.java) |
+|                |                                                                                                                              |
+|----------------|------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-24                                                                                                                        |
+| **Tag**        | `e2e`                                                                                                                        |
+| **Testklasse** | [`RefineryImportE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RefineryImportE2eTest.java) |
 
 ## Akteur
 

@@ -1,0 +1,207 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.e2e;
+
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.assertions.LocatorAssertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+
+/**
+ * Multi-tenancy visibility flow for Job Orders (REQ-ORG-003): a Job Order's visibility is driven by
+ * its <em>responsible</em> (processing) OrgUnit's kind, gated behind the profit-eligibility check
+ * ({@code canViewJobOrders}). This test pins down three rules through the real UI:
+ *
+ * <ul>
+ *   <li><b>SK-public queue</b> — an order whose responsible unit is a Spezialkommando is visible to
+ *       every profit-eligible member, including one of a different squadron (the SK-public escape
+ *       {@code TYPE(responsibleOrgUnit) = SpecialCommand}).
+ *   <li><b>Squadron-private</b> — an order whose responsible unit is a squadron is visible only to
+ *       that squadron's members + admins; a member of another squadron does NOT see it.
+ *   <li><b>Profit gate</b> — a member whose only membership is a non-profit squadron may not browse
+ *       the queue at all: {@code /orders} and any {@code /orders/{id}} redirect to the create form,
+ *       the one order surface still open to them.
+ * </ul>
+ *
+ * <p>Two non-admin actors carry the matrix: {@code test-officer} is homed in a fresh
+ * profit-eligible squadron B (its Officer realm role grants edit capability but no cross-squadron
+ * <em>visibility</em> — scope stays membership-based), and {@code test-member} is homed in a fresh
+ * non-profit squadron C. The SK-responsible and IRIDIUM-responsible orders are seeded by an admin.
+ * Assertions key on each order's own {@code data-id}, so the shared ephemeral DB's accumulated
+ * orders from sibling tests cannot perturb them.
+ */
+@Tag("e2e")
+class JobOrderTenancyE2eTest {
+
+  /** Provisions (or, in staging mode, targets) the shared stack for the whole run. */
+  @RegisterExtension static final E2eStackExtension STACK = new E2eStackExtension();
+
+  private static final String ADMIN_USER = System.getProperty("e2e.username", "test-admin");
+  private static final String ADMIN_PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
+  private static final String OFFICER_USER = "test-officer";
+  private static final String OFFICER_PASSWORD = "test-officer-pw";
+  private static final String MEMBER_USER = "test-member";
+  private static final String MEMBER_PASSWORD = "test-member-pw";
+  private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
+
+  private static Playwright playwright;
+  private static Browser browser;
+
+  /** An order whose responsible unit is a profit-eligible SK — the SK-public-queue case. */
+  private static String skOrderId;
+
+  /** An order whose responsible unit is the IRIDIUM squadron — the squadron-private case. */
+  private static String iridiumOrderId;
+
+  /**
+   * Seeds the tenancy fixture: a profit-eligible SK, a profit-eligible squadron B with {@code
+   * test-officer} homed in it, a non-profit squadron C with {@code test-member} homed in it, and
+   * two orders — one responsible to the SK (public) and one responsible to IRIDIUM
+   * (squadron-private).
+   */
+  @BeforeAll
+  static void setUp() {
+    playwright = Playwright.create();
+    browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
+    if (STACK.managesStack()) {
+      BackendSeeder seeder = new BackendSeeder();
+      seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
+
+      String profitSkId =
+          seeder.createSpecialCommand(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy SK", "ETSK");
+      seeder.setSpecialCommandProfitEligible(ADMIN_USER, ADMIN_PASSWORD, profitSkId, true);
+
+      String squadronBId =
+          seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy B", "ETNB");
+      seeder.setSquadronProfitEligible(ADMIN_USER, ADMIN_PASSWORD, squadronBId, true);
+      seeder.assignStaffelMembership(
+          ADMIN_USER,
+          ADMIN_PASSWORD,
+          seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
+          squadronBId,
+          false,
+          false);
+
+      // Squadron C is left non-profit (the default), so its member is outside the order workflow.
+      String squadronCId =
+          seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy C", "ETNC");
+      seeder.assignStaffelMembership(
+          ADMIN_USER,
+          ADMIN_PASSWORD,
+          seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD),
+          squadronCId,
+          false,
+          false);
+
+      String materialId =
+          seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Material");
+      skOrderId =
+          seeder.createJobOrder(
+              ADMIN_USER, ADMIN_PASSWORD, profitSkId, "E2E Tenancy SK Order", materialId, 700, 50);
+      iridiumOrderId =
+          seeder.createJobOrder(
+              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Tenancy IRI Order", materialId, 700, 50);
+    }
+  }
+
+  /** Releases the browser and the Playwright driver process. */
+  @AfterAll
+  static void tearDown() {
+    if (browser != null) {
+      browser.close();
+    }
+    if (playwright != null) {
+      playwright.close();
+    }
+  }
+
+  /**
+   * An officer of squadron B sees the SK-responsible order (SK-public queue) but not the
+   * IRIDIUM-responsible order (squadron-private to a squadron B is not a member of).
+   */
+  @Test
+  void officerSeesSkPublicOrderButNotForeignSquadronPrivateOrder() {
+    assumeTrue(STACK.managesStack(), "needs the ephemeral-seeded SK / squadrons / orders");
+    String baseUrl = STACK.baseUrl();
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
+        // scope=all returns the caller's natural cross-staffel union (own squadron + SK-public),
+        // unfiltered by the "mine" active-squadron narrowing.
+        E2eSupport.navigate(page, baseUrl + "/orders?scope=all&status=OPEN");
+        page.waitForLoadState();
+        assertThat(page.getByTestId("nav-logout")).isVisible();
+
+        // The SK-public order surfaces for the foreign-squadron officer (slow WebKit list render).
+        assertThat(page.locator("[data-testid='order-row'][data-id='" + skOrderId + "']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        // The IRIDIUM-private order does not.
+        assertThat(page.locator("[data-testid='order-row'][data-id='" + iridiumOrderId + "']"))
+            .hasCount(0);
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "tenancy-officer-list");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * A member whose only membership is a non-profit squadron is bounced from the queue: both the
+   * list and a direct order detail link redirect to the create form (their sole order surface).
+   */
+  @Test
+  void nonProfitMemberIsRedirectedFromTheQueueToTheCreateForm() {
+    assumeTrue(STACK.managesStack(), "needs the ephemeral-seeded non-profit squadron membership");
+    String baseUrl = STACK.baseUrl();
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
+
+        // The list redirects to the create form — asserting the create-only mode toggle is a
+        // locale-independent proof we landed there.
+        E2eSupport.navigate(page, baseUrl + "/orders");
+        page.waitForLoadState();
+        assertThat(page.getByTestId("order-mode-material")).isVisible();
+
+        // A direct SK-public order link redirects the same way: the profit gate short-circuits
+        // before any per-order visibility is even considered.
+        E2eSupport.navigate(page, baseUrl + "/orders/" + skOrderId);
+        page.waitForLoadState();
+        assertThat(page.getByTestId("order-mode-material")).isVisible();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "tenancy-nonprofit-member");
+        throw failure;
+      }
+    }
+  }
+}

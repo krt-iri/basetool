@@ -1,10 +1,10 @@
 # UC-07 — Kernseiten-Smoke (nicht-destruktiv)
 
-|                |                                                                                                                           |
-|----------------|---------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-07                                                                                                                     |
-| **Tag**        | `smoke`                                                                                                                   |
-| **Testklasse** | [`CorePagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/CorePagesSmokeE2eTest.java) |
+|                |                                                                                                                              |
+|----------------|------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-07                                                                                                                        |
+| **Tag**        | `smoke`                                                                                                                      |
+| **Testklasse** | [`CorePagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/CorePagesSmokeE2eTest.java) |
 
 ## Akteur
 

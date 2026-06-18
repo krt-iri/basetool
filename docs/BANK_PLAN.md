@@ -1,9 +1,9 @@
 > **Doc type:** Historical plan — frozen. All five phases shipped with epic
-> [#556](https://github.com/krt-iri/basetool/issues/556) (2026-06-13). The living truth is
+> [#556](https://github.com/krt-profit/basetool/issues/556) (2026-06-13). The living truth is
 > the spec [`docs/specs/bank.md`](specs/bank.md) (REQ-BANK-001..020, status *Implemented*);
 > this document is kept for the rationale and phase history only and is no longer updated.
 > Last reviewed: 2026-06-13.
-> **Epic:** [#556](https://github.com/krt-iri/basetool/issues/556) · **Spec:**
+> **Epic:** [#556](https://github.com/krt-profit/basetool/issues/556) · **Spec:**
 > [`docs/specs/bank.md`](specs/bank.md) (REQ-BANK-001..020) · **ADRs:** 0009 / 0010 / 0011
 
 # Kartell bank — implementation plan

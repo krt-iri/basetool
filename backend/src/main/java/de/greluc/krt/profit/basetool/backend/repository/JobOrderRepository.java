@@ -1,0 +1,198 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.repository;
+
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
+import jakarta.persistence.LockModeType;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+/** Spring Data repository for Job Order. */
+@Repository
+public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
+
+  /**
+   * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
+   * configured relations via {@code @EntityGraph}.
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "materials.material",
+        "handovers",
+        "handovers.items",
+        "handovers.items.material",
+        "assignees",
+        "assignees.user",
+        "responsibleOrgUnit",
+        "requestingOrgUnit"
+      })
+  @Override
+  Optional<JobOrder> findById(UUID id);
+
+  /**
+   * Loads every job-order in {@code OPEN} or {@code IN_PROGRESS} status together with its materials
+   * and handover items in one query, ordered by ascending {@code priority} (most-important first;
+   * orders without a priority sort last) and then by descending {@code displayId} as a stable
+   * tiebreaker — mirroring the Auftragsverwaltung's default {@code priority,asc} ranking so the
+   * warehouse (Lager) job-order filter and per-row pickers present the same order. Eager-fetch path
+   * matches what the active-orders board renders, so there is no N+1.
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "materials.material",
+        "handovers",
+        "handovers.items",
+        "handovers.items.material",
+        "responsibleOrgUnit",
+        "requestingOrgUnit"
+      })
+  @Query(
+      "SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.priority ASC"
+          + " NULLS LAST, o.displayId DESC")
+  List<JobOrder> findAllActiveWithMaterials();
+
+  /**
+   * Scoped, paged job-order list — the single entry point behind the {@code GET /api/v1/orders}
+   * list endpoint. Combines three concerns in one query so the service layer never has to fork its
+   * query builder:
+   *
+   * <ol>
+   *   <li><b>Visibility scope (Phase 3, #343).</b> Job Orders are a <em>conditionally</em>
+   *       staffel-scoped aggregate: an order whose {@code responsibleOrgUnit} is a Spezialkommando
+   *       is public to every squadron, while a squadron-responsible order is private to that
+   *       squadron + admins. The requester does NOT grant visibility. The scope is expressed with
+   *       the standard org-unit predicate triple ({@code isAdminAllScope} / {@code activeOrgUnitId}
+   *       / {@code memberOrgUnitIds}, see {@link
+   *       de.greluc.krt.profit.basetool.backend.service.ScopePredicate}) plus the SK-public escape
+   *       {@code TYPE(o.responsibleOrgUnit) = SpecialCommand}.
+   *   <li><b>Status filter.</b> The order's status must be in {@code statuses}. The service passes
+   *       the full enum set to disable status filtering (mirroring {@code searchMissions}), so the
+   *       {@code IN} clause is never bound with an empty collection.
+   *   <li><b>Optional {@code squadronId} display filter.</b> A pure UI preference on top of the
+   *       scope gate — the orders-index "involving my squadron" toggle, matching responsible OR
+   *       requesting side. {@code null} disables it. It can only ever narrow the already-scoped
+   *       result, never widen it past the security scope above.
+   * </ol>
+   *
+   * @param statuses status values to keep; pass the full enum set to disable status filtering
+   *     (never empty).
+   * @param squadronId optional display filter (responsible OR requesting side); {@code null}
+   *     disables it.
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection —
+   *     disables the scope filter entirely.
+   * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
+   *     admins and anonymous callers.
+   * @param pageable page request.
+   * @return paged job-orders visible to the caller, matching the optional status + squadron
+   *     filters.
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "assignees",
+        "assignees.user",
+        "handovers",
+        "handovers.items",
+        "responsibleOrgUnit",
+        "requestingOrgUnit"
+      })
+  @Query(
+      "SELECT o FROM JobOrder o WHERE ("
+          + "  :isAdminAllScope = true"
+          + "  OR TYPE(o.responsibleOrgUnit) = SpecialCommand"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND o.responsibleOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND o.responsibleOrgUnit.id IN :memberOrgUnitIds)"
+          + " ) AND o.status IN :statuses AND (:squadronId IS NULL OR o.responsibleOrgUnit.id ="
+          + " :squadronId OR o.requestingOrgUnit.id = :squadronId)")
+  Page<JobOrder> findScopedJobOrders(
+      @Param("statuses") List<JobOrderStatus> statuses,
+      @Param("squadronId") UUID squadronId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      Pageable pageable);
+
+  /**
+   * Loads a single job order together with its ordered item lines and, for each line, the chosen
+   * blueprint and the requested game item, in one query. Backs the item blueprint-coverage view
+   * ({@code JobOrderItemBlueprintOwnersService}), which reads {@code item.blueprint.outputName}
+   * (the product-key source) and {@code item.gameItem.name} (the display label) for every line — so
+   * the dedicated fetch join avoids the per-line N+1 that the default {@link #findById(UUID)}
+   * entity graph (which does not fetch {@code items}) would incur. Empty for a {@code MATERIAL}
+   * order, whose {@code items} set is empty.
+   *
+   * @param id the job-order id
+   * @return the order with its items + their blueprint/game-item to-one relations eagerly loaded,
+   *     or empty when the id is unknown
+   */
+  @Query(
+      "SELECT o FROM JobOrder o"
+          + " LEFT JOIN FETCH o.items i"
+          + " LEFT JOIN FETCH i.blueprint"
+          + " LEFT JOIN FETCH i.gameItem"
+          + " WHERE o.id = :id")
+  Optional<JobOrder> findByIdWithItemBlueprints(@Param("id") UUID id);
+
+  /**
+   * Returns the current maximum priority across all job-orders (used to assign the next priority
+   * slot when creating a new order); {@link Optional#empty} when the table is empty.
+   */
+  @Query("SELECT MAX(o.priority) FROM JobOrder o")
+  Optional<Integer> findMaxPriority();
+
+  /**
+   * Acquires a {@link LockModeType#PESSIMISTIC_WRITE} on every job-order ordered by id. Used by the
+   * bulk priority-reorder flow to serialise concurrent re-shuffles and avoid the optimistic-
+   * locking conflicts that would otherwise fall out of the {@code @Version} bumps - see the
+   * "Pessimistic locking for bulk reorders" note in CLAUDE.md.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM JobOrder o ORDER BY o.id")
+  List<JobOrder> lockAllJobOrders();
+
+  /** Returns every job order the given user is an assignee of. */
+  @Query("SELECT j FROM JobOrder j JOIN j.assignees a WHERE a.user.id = :userId")
+  List<JobOrder> findByAssigneeId(@Param("userId") UUID userId);
+
+  /**
+   * Removes the given user from every job-order's assignee set via a direct delete on the join
+   * table. Native query because a JPQL bulk-delete on a {@code @ManyToMany} association would
+   * require loading every job-order first.
+   */
+  @org.springframework.data.jpa.repository.Modifying
+  @org.springframework.data.jpa.repository.Query(
+      value = "DELETE FROM job_order_assignees WHERE user_id = :userId",
+      nativeQuery = true)
+  void removeAssignee(
+      @org.springframework.data.repository.query.Param("userId") java.util.UUID userId);
+}

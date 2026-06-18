@@ -4,9 +4,9 @@
 > **Owner area:** NOTIF · **Related ADRs:** [ADR-0014](../adr/0014-notification-system-architecture.md),
 > [ADR-0015](../adr/0015-notification-data-driven-rule-engine.md),
 > [ADR-0016](../adr/0016-notification-transport-polling-sse.md) · **Epic:**
-> [#622](https://github.com/krt-iri/basetool/issues/622)
+> [#622](https://github.com/krt-profit/basetool/issues/622)
 > **Status:** Implemented — all phases (0–8) delivered (epic
-> [#622](https://github.com/krt-iri/basetool/issues/622)). Real-time SSE push is best-effort with
+> [#622](https://github.com/krt-profit/basetool/issues/622)). Real-time SSE push is best-effort with
 > in-app polling as the guaranteed fallback.
 
 ## Context & goal

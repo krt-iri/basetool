@@ -5,7 +5,7 @@
   Scope so far: JPA entity collection exposure.
 
   ============================================================================
-  EI_EXPOSE_REP / EI_EXPOSE_REP2 on `de.greluc.krt.iri.basetool.backend.model.*`
+  EI_EXPOSE_REP / EI_EXPOSE_REP2 on `de.greluc.krt.profit.basetool.backend.model.*`
   ============================================================================
 
   Every JPA entity in this package exposes its `@OneToMany` / `@ManyToMany`
@@ -56,7 +56,7 @@
     xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/4.9.6/spotbugs/etc/findbugsfilter.xsd">
 
   <Match>
-    <Class name="~de\.greluc\.krt\.iri\.basetool\.backend\.model\..*"/>
+    <Class name="~de\.greluc\.krt\.profit\.basetool\.backend\.model\..*"/>
     <Or>
       <Bug pattern="EI_EXPOSE_REP"/>
       <Bug pattern="EI_EXPOSE_REP2"/>

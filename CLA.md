@@ -5,7 +5,7 @@
 This Contributor License Agreement ("Agreement") sets out the terms
 under which You ("the Contributor") license Your contributions to the
 Profit Basetool project ("the Project"), hosted at
-<https://github.com/krt-iri/basetool>. By submitting a Contribution to
+<https://github.com/krt-profit/basetool>. By submitting a Contribution to
 the Project, You accept and agree to the terms below for Your present
 and future Contributions.
 

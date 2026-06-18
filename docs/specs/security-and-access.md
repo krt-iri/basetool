@@ -24,7 +24,7 @@ business logic. Roles mapped from the JWT are prefixed `ROLE_` and uppercased.
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 
 The following must always hold and are enforced as ArchUnit rules in
-[`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)
+[`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
 (backend) and the frontend equivalent — a new violation fails `./gradlew test`:
 
 - No `SecurityContextHolder` use outside the auth-helper service.

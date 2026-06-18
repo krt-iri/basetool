@@ -14,4 +14,4 @@ app:
 
 logging:
   level:
-    de.greluc.krt.iri.basetool.ingest: DEBUG
+    de.greluc.krt.profit.basetool.ingest: DEBUG

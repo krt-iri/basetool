@@ -5,7 +5,7 @@
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-BANK-007..011 (`docs/specs/bank.md`) · REQ-SEC-002/005/006
   (`docs/specs/security-and-access.md`) · epic
-  [#556](https://github.com/krt-iri/basetool/issues/556)
+  [#556](https://github.com/krt-profit/basetool/issues/556)
 
 ## Context
 

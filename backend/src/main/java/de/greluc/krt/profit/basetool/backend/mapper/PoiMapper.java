@@ -1,0 +1,39 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.mapper;
+
+import de.greluc.krt.profit.basetool.backend.model.Poi;
+import de.greluc.krt.profit.basetool.backend.model.dto.PoiDto;
+import org.mapstruct.Mapper;
+import org.mapstruct.ReportingPolicy;
+
+/**
+ * MapStruct mapper between {@link Poi} entities and their admin-facing {@link PoiDto} projection.
+ */
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface PoiMapper {
+  /**
+   * Projects a POI entity into the slim DTO used by the admin UEX-overrides page.
+   *
+   * @param entity managed POI entity
+   * @return DTO carrying only the fields surfaced to the admin UI
+   */
+  PoiDto toDto(Poi entity);
+}

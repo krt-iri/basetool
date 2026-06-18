@@ -1,11 +1,11 @@
 # UC-16 — Job-Order-Status ändern
 
-|                |                                                                                                                           |
-|----------------|---------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-16                                                                                                                     |
-| **Tag**        | `e2e`                                                                                                                     |
-| **Testklasse** | [`JobOrderStatusE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/JobOrderStatusE2eTest.java) |
-| **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md)                                                                                       |
+|                |                                                                                                                              |
+|----------------|------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-16                                                                                                                        |
+| **Tag**        | `e2e`                                                                                                                        |
+| **Testklasse** | [`JobOrderStatusE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderStatusE2eTest.java) |
+| **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md)                                                                                          |
 
 ## Akteur
 

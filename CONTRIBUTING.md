@@ -11,10 +11,10 @@ If you only have a couple of minutes, the very short version is:
 1. **Security issues never go into public Issues** — use the confidential
    channel in [`.github/SECURITY.md`](.github/SECURITY.md).
 2. **General questions go into
-   [GitHub Discussions](https://github.com/krt-iri/basetool/discussions)**,
+   [GitHub Discussions](https://github.com/krt-profit/basetool/discussions)**,
    not the issue tracker.
 3. **Bugs and features go through the
-   [issue templates](https://github.com/krt-iri/basetool/issues/new/choose)**.
+   [issue templates](https://github.com/krt-profit/basetool/issues/new/choose)**.
 4. **Pull requests branch from `main`, target `main`**, follow
    [Conventional Commits](#commit-messages), and must pass
    `./gradlew check` + `./gradlew spotlessApply` locally before they are
@@ -97,7 +97,7 @@ could conceivably leak data across users.
 
 > [!IMPORTANT]
 > The issue tracker is **not** a Q&A forum. General questions land in
-> [GitHub Discussions](https://github.com/krt-iri/basetool/discussions);
+> [GitHub Discussions](https://github.com/krt-profit/basetool/discussions);
 > the [issue-template config](.github/ISSUE_TEMPLATE/config.yml) routes
 > "blank" issues there on purpose.
 
@@ -125,7 +125,7 @@ you believe is security-sensitive.** Public disclosure before a fix is
 available puts every operator running this project at risk.
 
 Report vulnerabilities confidentially through
-**[GitHub Private Vulnerability Reporting](https://github.com/krt-iri/basetool/security/advisories/new)**.
+**[GitHub Private Vulnerability Reporting](https://github.com/krt-profit/basetool/security/advisories/new)**.
 The full policy — supported versions, scope (cross-tenant data access,
 auth bypass, optimistic-lock bypass, SSRF, sensitive data in logs,
 supply-chain), coordinated-disclosure window, safe-harbor commitment,
@@ -137,7 +137,7 @@ in [`.github/SECURITY.md`](.github/SECURITY.md).
 ## Reporting bugs
 
 Bugs are tracked as
-[GitHub Issues](https://github.com/krt-iri/basetool/issues) via the
+[GitHub Issues](https://github.com/krt-profit/basetool/issues) via the
 [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.yml). The
 template asks for everything maintainers normally need: summary, area,
 version / commit SHA, environment, reproduction steps, expected vs.
@@ -189,8 +189,8 @@ use the
 
 Looking for an entry point? Filter the issue tracker by these labels:
 
-- [`good first issue`](https://github.com/krt-iri/basetool/labels/good%20first%20issue) — small, well-scoped fixes that don't require deep architectural knowledge.
-- [`help wanted`](https://github.com/krt-iri/basetool/labels/help%20wanted) — open tasks where additional contributors are explicitly welcome.
+- [`good first issue`](https://github.com/krt-profit/basetool/labels/good%20first%20issue) — small, well-scoped fixes that don't require deep architectural knowledge.
+- [`help wanted`](https://github.com/krt-profit/basetool/labels/help%20wanted) — open tasks where additional contributors are explicitly welcome.
 
 If you cannot find anything that suits you, opening a Discussion that
 describes what you would like to work on is a perfectly fine starting
@@ -643,13 +643,13 @@ you touch these areas.
   `creating_squadron_id` (immutable) and a `requesting_squadron_id`
   (editable on whose behalf the order runs).
 - Scope is enforced in the service layer via
-  [`SquadronScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/SquadronScopeService.java);
+  [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java);
   controllers gate detail / write endpoints with
-  `@PreAuthorize("@squadronScopeService.canEdit…")`.
-- ArchUnit rule `staffelScopedServicesMustWireSquadronOrAuthHelper`
+  `@PreAuthorize("@ownerScopeService.canEdit…")`.
+- ArchUnit rule `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
   breaks the build if a staffel-scoped service stops injecting
-  `AuthHelperService` / `SquadronScopeService`. Update the whitelist in
-  [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)
+  `AuthHelperService` / `OwnerScopeService`. Update the whitelist in
+  [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
   when you add a new staffel-scoped aggregate.
 - Full operational rules: [`CLAUDE.md`](CLAUDE.md) → *Multi-squadron tenancy*.
 
@@ -673,7 +673,7 @@ bugs that shipped. The short version:
   `@Transactional(propagation = MANDATORY)` that operates on the
   already-managed entity and relies on dirty-checking. Canonical
   example:
-  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/JobOrderService.java).
+  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderService.java).
 - **Pessimistic locking** for bulk reorders / priority shifts:
   `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL).
 

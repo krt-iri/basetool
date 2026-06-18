@@ -1,10 +1,10 @@
 # UC-22 — Einsatz: Finanzeintrag anlegen & Detailseite erneut öffnen
 
-|                |                                                                                                                                     |
-|----------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-22                                                                                                                               |
-| **Tag**        | `e2e`                                                                                                                               |
-| **Testklasse** | [`MissionFinanceEntryE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/MissionFinanceEntryE2eTest.java) |
+|                |                                                                                                                                        |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-22                                                                                                                                  |
+| **Tag**        | `e2e`                                                                                                                                  |
+| **Testklasse** | [`MissionFinanceEntryE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionFinanceEntryE2eTest.java) |
 
 ## Akteur
 

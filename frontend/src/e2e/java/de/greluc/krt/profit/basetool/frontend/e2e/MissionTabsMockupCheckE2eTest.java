@@ -1,0 +1,154 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.e2e;
+
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
+import java.nio.file.Paths;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Ad-hoc visual verification harness for the mission tab layout against an ALREADY RUNNING local
+ * test stack ({@code E2E_BASE_URL} + {@code MISSION_ID} env). Logs in as the synthetic test admin,
+ * walks all four tabs, captures full-page screenshots under {@code build/e2e/}, dumps console
+ * errors, probes the chip-select computed styles, and performs one board drag&drop. Not part of CI
+ * — it requires a pre-seeded mission id.
+ */
+@Tag("e2e")
+class MissionTabsMockupCheckE2eTest {
+
+  private static Playwright playwright;
+  private static Browser browser;
+
+  /** Boots a headless Chromium for the walk-through. */
+  @BeforeAll
+  static void setUp() {
+    playwright = Playwright.create();
+    browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+  }
+
+  /** Releases the browser and driver process. */
+  @AfterAll
+  static void tearDown() {
+    if (browser != null) {
+      browser.close();
+    }
+    if (playwright != null) {
+      playwright.close();
+    }
+  }
+
+  /** Walks all four tabs as test-admin, screenshotting each and probing the board controls. */
+  @Test
+  void walkTabsAndCaptureEvidence() {
+    String baseUrl = System.getenv().getOrDefault("E2E_BASE_URL", "https://localhost:18081");
+    String missionId = System.getenv("MISSION_ID");
+    if (missionId == null || missionId.isBlank()) {
+      System.out.println("[mockup-check] MISSION_ID env missing - skipping");
+      return;
+    }
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      StringBuilder consoleLog = new StringBuilder();
+      page.onConsoleMessage(
+          msg -> {
+            if ("error".equals(msg.type()) || "warning".equals(msg.type())) {
+              consoleLog
+                  .append('[')
+                  .append(msg.type())
+                  .append("] ")
+                  .append(msg.text())
+                  .append('\n');
+            }
+          });
+      page.onPageError(err -> consoleLog.append("[pageerror] ").append(err).append('\n'));
+
+      E2eSupport.login(page, baseUrl, "test-admin", "test-admin-pw");
+
+      for (String tab : new String[] {"ueb", "crew", "fin", "verw"}) {
+        E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=" + tab);
+        page.waitForLoadState();
+        page.waitForTimeout(800);
+        page.screenshot(
+            new Page.ScreenshotOptions()
+                .setFullPage(true)
+                .setPath(Paths.get("build", "e2e", "tab-" + tab + ".png")));
+      }
+
+      // Probe the chip-select rendering on the crew board.
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
+      page.waitForLoadState();
+      Locator chip = page.locator(".crew-role-select").first();
+      if (chip.count() > 0) {
+        Object probe =
+            chip.evaluate(
+                "el => { const cs = getComputedStyle(el); return { bg: cs.backgroundColor, color:"
+                    + " cs.color, appearance: cs.appearance, width: el.offsetWidth, options:"
+                    + " el.options.length, optBg: el.options.length ?"
+                    + " getComputedStyle(el.options[0]).backgroundColor : null }; }");
+        System.out.println("[mockup-check] chip-select probe: " + probe);
+      } else {
+        System.out.println("[mockup-check] no chip-select found");
+      }
+
+      // Finance pane probe: which mock sections rendered for an admin?
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
+      page.waitForLoadState();
+      Object finProbe =
+          page.evaluate(
+              "() => ({ sumstrip: !!document.querySelector('#pane-fin .sumstrip'),"
+                  + " sums: document.querySelectorAll('#pane-fin .sum').length,"
+                  + " financeRows: document.querySelectorAll('#pane-fin table tbody tr').length,"
+                  + " ecoDetails: document.querySelectorAll('#pane-fin details').length,"
+                  + " pageWidth: document.querySelector('.page-wrapper').offsetWidth })");
+      System.out.println("[mockup-check] fin probe: " + finProbe);
+
+      // One real drag&drop: first pool row onto the first unit zone.
+      E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
+      page.waitForLoadState();
+      int poolBefore = page.locator("#board-pool .person-row").count();
+      System.out.println("[mockup-check] pool rows before drag: " + poolBefore);
+      if (poolBefore > 0) {
+        page.locator("#board-pool .person-row")
+            .first()
+            .dragTo(page.locator(".board-units .drop-zone").first());
+        page.waitForTimeout(2500);
+        E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
+        page.waitForLoadState();
+        int poolAfter = page.locator("#board-pool .person-row").count();
+        System.out.println("[mockup-check] pool rows after drag: " + poolAfter);
+        page.screenshot(
+            new Page.ScreenshotOptions()
+                .setFullPage(true)
+                .setPath(Paths.get("build", "e2e", "tab-crew-after-drag.png")));
+      }
+
+      System.out.println("[mockup-check] console messages:\n" + consoleLog);
+    }
+  }
+}

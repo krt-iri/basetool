@@ -1,10 +1,10 @@
 # UC-03 — Job Order anlegen
 
-|                |                                                                                                                           |
-|----------------|---------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-03                                                                                                                     |
-| **Tag**        | `e2e`                                                                                                                     |
-| **Testklasse** | [`JobOrderCreateE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/JobOrderCreateE2eTest.java) |
+|                |                                                                                                                              |
+|----------------|------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-03                                                                                                                        |
+| **Tag**        | `e2e`                                                                                                                        |
+| **Testklasse** | [`JobOrderCreateE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderCreateE2eTest.java) |
 
 ## Akteur
 

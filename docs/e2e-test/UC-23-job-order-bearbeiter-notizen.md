@@ -1,12 +1,12 @@
 # UC-23 — Job-Order-Bearbeiter & Notizen
 
-|                |                                                                                                                                         |
-|----------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-23                                                                                                                                   |
-| **Tag**        | `e2e`                                                                                                                                   |
-| **Testklasse** | [`JobOrderAssigneeNotesE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/JobOrderAssigneeNotesE2eTest.java) |
-| **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md)                                                                                                     |
-| **Spec**       | [`orders-assignee-notes.md`](../specs/orders-assignee-notes.md) (REQ-ORDERS-013/014)                                                    |
+|                |                                                                                                                                            |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-23                                                                                                                                      |
+| **Tag**        | `e2e`                                                                                                                                      |
+| **Testklasse** | [`JobOrderAssigneeNotesE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderAssigneeNotesE2eTest.java) |
+| **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md)                                                                                                        |
+| **Spec**       | [`orders-assignee-notes.md`](../specs/orders-assignee-notes.md) (REQ-ORDERS-013/014)                                                       |
 
 ## Akteur
 

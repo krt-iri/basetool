@@ -198,7 +198,7 @@ jobs:
 
       - name: Open the release PR
         env:
-          # The krt-iri org policy forbids Actions from creating PRs with the
+          # The krt-profit org policy forbids Actions from creating PRs with the
           # default GITHUB_TOKEN (the same constraint refresh-versions.yml
           # documents), so a dedicated RELEASE_TOKEN -- a fine-grained PAT or
           # GitHub App token with contents:write + pull-requests:write -- opens

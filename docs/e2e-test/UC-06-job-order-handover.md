@@ -1,10 +1,10 @@
 # UC-06 — Job-Order-Handover protokollieren
 
-|                |                                                                                                                               |
-|----------------|-------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-06                                                                                                                         |
-| **Tag**        | `e2e`                                                                                                                         |
-| **Testklasse** | [`JobOrderHandoverE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/JobOrderHandoverE2eTest.java) |
+|                |                                                                                                                                  |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-06                                                                                                                            |
+| **Tag**        | `e2e`                                                                                                                            |
+| **Testklasse** | [`JobOrderHandoverE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderHandoverE2eTest.java) |
 
 ## Akteur
 

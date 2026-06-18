@@ -1,0 +1,182 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import okhttp3.mockwebserver.Dispatcher;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+/**
+ * Verifies that the {@link BackendApiClient} correctly parses RFC7807 Problem+JSON responses
+ * produced by the backend's {@code GlobalExceptionHandler} and exposes the stable {@code code},
+ * {@code correlationId} and {@code fieldErrors[]} via {@link BackendServiceException}. Covers the
+ * main error classes defined in the prompt (tasks 7-12): optimistic locking, access denied,
+ * validation errors and service-unavailable fall-through.
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+@TestPropertySource(
+    properties = {
+      "app.http.connect-timeout=500ms",
+      "app.http.response-timeout=2s",
+      "app.http.read-timeout=2s",
+      "app.http.write-timeout=2s",
+      "resilience4j.retry.instances.backendApi.max-attempts=1",
+      "resilience4j.retry.instances.backend.max-attempts=1"
+    })
+class BackendApiClientProblemJsonTest {
+
+  private static MockWebServer server;
+
+  @Autowired private BackendApiClient backendApiClient;
+
+  @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
+
+  @MockitoBean private OAuth2AuthorizedClientRepository authorizedClientRepository;
+
+  @BeforeAll
+  static void startServer() throws IOException {
+    server = new MockWebServer();
+    server.start(0);
+    server.setDispatcher(
+        new Dispatcher() {
+          @Override
+          public @NotNull MockResponse dispatch(@NotNull RecordedRequest request) {
+            String path = request.getPath();
+            if (path == null) {
+              return new MockResponse().setResponseCode(404);
+            }
+            return switch (path) {
+              case "/api/v1/optimistic-lock" ->
+                  problemJson(
+                      409,
+                      "{\"type\":\"urn:problem:optimistic-lock\",\"title\":\"Conflict\",\"status\":409,\"detail\":\"Entity"
+                          + " was updated concurrently\","
+                          + "\"code\":\"OPTIMISTIC_LOCK\",\"correlationId\":\"corr-123\"}");
+              case "/api/v1/forbidden" ->
+                  problemJson(
+                      403,
+                      "{\"type\":\"urn:problem:access-denied\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"Missing"
+                          + " privilege\","
+                          + "\"code\":\"ACCESS_DENIED\",\"correlationId\":\"corr-403\"}");
+              case "/api/v1/validation" ->
+                  problemJson(
+                      400,
+                      "{\"type\":\"urn:problem:validation\",\"title\":\"Bad"
+                          + " Request\",\"status\":400,\"detail\":\"Validation failed\","
+                          + "\"code\":\"VALIDATION_FAILED\",\"correlationId\":\"corr-400\",\"fieldErrors\":[{\"field\":\"name\",\"message\":\"must"
+                          + " not be blank\"},{\"field\":\"amount\",\"message\":\"must be"
+                          + " positive\"}]}");
+              case "/api/v1/no-body" -> new MockResponse().setResponseCode(500);
+              default -> new MockResponse().setResponseCode(404);
+            };
+          }
+        });
+  }
+
+  private static @NotNull MockResponse problemJson(int status, @NotNull String body) {
+    return new MockResponse()
+        .setResponseCode(status)
+        .setHeader("Content-Type", "application/problem+json")
+        .setBody(body);
+  }
+
+  @DynamicPropertySource
+  static void registerProps(@NotNull DynamicPropertyRegistry registry) {
+    registry.add("app.backend-url", () -> "http://localhost:" + server.getPort());
+  }
+
+  @AfterAll
+  static void stopServer() throws IOException {
+    if (server != null) {
+      server.shutdown();
+    }
+  }
+
+  @Test
+  void get_ShouldMapOptimisticLockProblemJsonTo409() {
+    BackendServiceException ex =
+        assertThrows(
+            BackendServiceException.class,
+            () -> backendApiClient.get("/api/v1/optimistic-lock", String.class, true));
+    assertEquals(409, ex.getStatusCode());
+    assertEquals("OPTIMISTIC_LOCK", ex.getProblemCode());
+    assertEquals("corr-123", ex.getCorrelationId());
+    assertEquals("Entity was updated concurrently", ex.getReadableErrorMessage());
+  }
+
+  @Test
+  void get_ShouldMapAccessDeniedProblemJsonTo403() {
+    BackendServiceException ex =
+        assertThrows(
+            BackendServiceException.class,
+            () -> backendApiClient.get("/api/v1/forbidden", String.class, true));
+    assertEquals(403, ex.getStatusCode());
+    assertEquals("ACCESS_DENIED", ex.getProblemCode());
+    assertEquals("corr-403", ex.getCorrelationId());
+  }
+
+  @Test
+  void get_ShouldExposeFieldErrorsFromValidationProblem() {
+    BackendServiceException ex =
+        assertThrows(
+            BackendServiceException.class,
+            () -> backendApiClient.get("/api/v1/validation", String.class, true));
+    assertEquals(400, ex.getStatusCode());
+    assertEquals("VALIDATION_FAILED", ex.getProblemCode());
+    assertEquals(2, ex.getFieldErrors().size());
+    assertTrue(
+        ex.getFieldErrors().stream()
+            .anyMatch(fe -> "name".equals(fe.field()) && "must not be blank".equals(fe.message())));
+    assertTrue(ex.getFieldErrors().stream().anyMatch(fe -> "amount".equals(fe.field())));
+  }
+
+  @Test
+  void get_ShouldFallBackToUnknownCode_WhenNoProblemBody() {
+    BackendServiceException ex =
+        assertThrows(
+            BackendServiceException.class,
+            () -> backendApiClient.get("/api/v1/no-body", String.class, true));
+    assertEquals(500, ex.getStatusCode());
+    assertNotNull(ex.getProblemCode());
+    assertFalse(ex.getProblemCode().isBlank());
+  }
+}

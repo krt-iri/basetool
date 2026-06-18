@@ -17,20 +17,20 @@
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
-      "group" : "de.greluc.krt.iri.basetool",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
+      "group" : "de.greluc.krt.profit.basetool",
       "name" : "backend",
       "version" : "0.0.1-SNAPSHOT",
-      "purl" : "pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-iri/basetool/actions/runs/27742110904"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/27742110904"
         },
         {
           "type" : "vcs",
-          "url" : "https://github.com/krt-iri/basetool"
+          "url" : "https://github.com/krt-profit/basetool"
         }
       ]
     }
@@ -19151,7 +19151,7 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.iri.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
       "dependsOn" : [
         "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",

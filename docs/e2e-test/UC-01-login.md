@@ -1,10 +1,10 @@
 # UC-01 — Login via Keycloak
 
-|                |                                                                                                                   |
-|----------------|-------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-01                                                                                                             |
-| **Tag**        | `e2e`                                                                                                             |
-| **Testklasse** | [`LoginSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/LoginSmokeE2eTest.java) |
+|                |                                                                                                                      |
+|----------------|----------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-01                                                                                                                |
+| **Tag**        | `e2e`                                                                                                                |
+| **Testklasse** | [`LoginSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/LoginSmokeE2eTest.java) |
 
 ## Akteur
 

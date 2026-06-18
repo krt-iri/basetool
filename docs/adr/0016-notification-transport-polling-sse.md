@@ -4,7 +4,7 @@
 - **Date:** 2026-06-16
 - **Deciders:** @greluc
 - **Related:** spec REQ-NOTIF-006, REQ-NOTIF-010 ([`notifications.md`](../specs/notifications.md)) ·
-  ADR-0014 · epic [#622](https://github.com/krt-iri/basetool/issues/622)
+  ADR-0014 · epic [#622](https://github.com/krt-profit/basetool/issues/622)
 
 ## Context
 
@@ -24,7 +24,7 @@ Real-time **push will use SSE** (one-way server→client, simpler than WebSocket
 for a notification stream), as an **enhancement layered on top of polling** with polling as the
 fallback. v1 push is a single-backend-instance in-memory emitter registry keyed by `sub`;
 multi-instance fan-out via Redis pub/sub is a noted follow-up. SSE delivery is tracked as its own
-phase ([#630](https://github.com/krt-iri/basetool/issues/630)) and is not required for the inbox
+phase ([#630](https://github.com/krt-profit/basetool/issues/630)) and is not required for the inbox
 to function.
 
 OS / browser push notifications are out of scope — the indicator is in-app only.
