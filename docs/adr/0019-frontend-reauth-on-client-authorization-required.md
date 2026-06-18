@@ -166,3 +166,54 @@ an Admin Console read on 2026-06-18); it is an operator backstop and does not ch
 The "never issues a refresh-token grant" guarantee in REQ-SEC-012 is now delivered by construction
 (no filter), not by cache warmth.
 
+## Amendment — 2026-06-18 (amendment #4): root mitigation moved to Keycloak (rotation off)
+
+Despite the three amendments above, production still showed `Fehler beim Laden der Einsätze` on the
+homepage and recurring forced re-logins. Three log sources, captured together, settle the cause:
+
+- **Backend:** every `GET /api/v1/missions/next` that reaches it returns `200` — the backend is
+  healthy and is not the source.
+- **Frontend:** the homepage fails in `HomeController.home` with
+  `ReauthenticationRequiredException: ... GET /api/v1/missions/next`, caused by
+  `ClientAuthorizationException [client_authorization_required]` thrown from
+  `SingleFlightAuthorizedClientManager.authorize` → `DefaultOAuth2AuthorizedClientManager.authorize`.
+  The failing refresh is on the **ordinary page-render / unread-count-poll path**, driven by the
+  `ServletOAuth2AuthorizedClientExchangeFilterFunction` for a normal authenticated call — **not** the
+  SSE relay (which amendment #3 already made refresh-incapable). The relay was never the only trigger.
+- **Keycloak:** one SSO session logged the full reuse-detection cascade —
+  `REFRESH_TOKEN_ERROR reason="Stale token"` (an already-rotated refresh token replayed → reuse
+  detection revokes the client session) → `"Session doesn't have required client"` (the dead token
+  replayed against the revoked session) → `"refresh token issued before the client session started"`
+  (after a silent re-login created a new client session, a stale authorized client persisted in Redis
+  replayed its old token). Crucially, `client_auth_method="client-secret"`: the `basetool-frontend`
+  token requests authenticate as a **confidential** client, not the public client the sanitized realm
+  reference recorded (a drift to confirm separately; it does not change this decision).
+
+**Decision.** Disable refresh-token rotation / reuse detection realm-wide
+(`Revoke Refresh Token = Off`; realm-export `"revokeRefreshToken": false`). This reverses the
+"rejected as the *code* fix" alternative above, on new evidence: `basetool-frontend` is a confidential
+server-side BFF whose refresh token lives only in the Redis session and never reaches the browser, so
+reuse detection — designed to limit the blast radius of a token leaked from a *public* client — buys
+no security here and is the *direct* mechanism revoking the session under the unavoidable
+concurrent-refresh / stale-session-write race of a session-backed BFF. With rotation off, a replayed
+or duplicate online refresh token is simply accepted, the cascade cannot start, and the access token
+is refreshed normally. `Revoke Refresh Token` is a realm-level control with no per-client override, so
+the change is realm-wide.
+
+**Consequences.**
+
+- The homepage `Fehler beim Laden der Einsätze` and the periodic forced re-logins stop, because the
+  only thing that was revoking live SSO sessions is gone.
+- The `SingleFlightAuthorizedClientManager`, the filter-free `sseWebClient` relay and the
+  `EXPIRY_SKEW ≥ 60s` invariant are **kept as defense-in-depth** (harmless, tested) but are no longer
+  load-bearing — with rotation off there is no reuse window for them to protect.
+- The persisted desktop-extractor refresh token (`basetool-sc-extractor`,
+  `INGEST_KEYCLOAK_SETUP.md`) loses rotation-based theft detection. The runbook already documents
+  turning rotation off as a reversible lever that is **independent of ingest**, so this is an accepted
+  trade, not a regression of a hard requirement. If stricter desktop-token protection is later
+  required, the robust options are a shorter SSO/offline session lifetime or a dedicated realm for the
+  desktop client rather than realm-wide reuse detection.
+
+This is an operator-applied Keycloak setting (the owner runs prod Keycloak directly); this PR carries
+the matching spec/runbook/reference updates so code-as-docs and the live config stay in step.
+
