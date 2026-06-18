@@ -7,9 +7,12 @@
 > [`docs/specs/INDEX.md`](specs/INDEX.md). Tracks GitHub issue #641 (epic #639).
 
 **Status:** open — the live Keycloak changes and the validator enablement are an operator
-deployment step that cannot be done by PR. The **prod realm is not in this repository**
-(only the throwaway `frontend/src/e2e/resources/realm-export.e2e.json` is, and it is a test
-artifact — do **not** copy its `directAccessGrantsEnabled: true`).
+deployment step that cannot be done by PR. The **prod realm dump (with secrets) is not in this
+repository**: only a **sanitized reference** of the prod realm config lives at
+[`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json) (secrets,
+SMTP and real URLs redacted — see [`docs/keycloak/README.md`](keycloak/README.md)), and the
+throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact — do **not** copy its
+`directAccessGrantsEnabled: true`.
 
 ## What this sets up
 

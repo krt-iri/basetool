@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.springframework.security.oauth2.client.web.reactive.function.client.ServletOAuth2AuthorizedClientExchangeFilterFunction.oauth2AuthorizedClient;
+
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
@@ -26,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationViewDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.time.Duration;
@@ -46,6 +49,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -81,10 +87,12 @@ public class NotificationPageController {
   private static final ParameterizedTypeReference<ServerSentEvent<String>> SSE_TYPE =
       new ParameterizedTypeReference<>() {};
   private static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
+  private static final String REGISTRATION_ID = "keycloak";
 
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
   private final WebClient sseWebClient;
+  private final OAuth2AuthorizedClientRepository authorizedClientRepository;
 
   /**
    * Renders the full notifications page (most recent first), fail-soft to an empty list.
@@ -121,20 +129,38 @@ public class NotificationPageController {
 
   /**
    * Relays the backend notification SSE stream to the browser (REQ-NOTIF-010). The browser opens an
-   * {@code EventSource} here; this controller subscribes to the backend stream via the
-   * resilience-free {@code sseWebClient} and forwards each event. Best-effort: if the backend
-   * stream errors, the emitter completes with the error and the browser's polling fallback keeps
-   * the badge fresh.
+   * {@code EventSource} here; this controller forwards each backend event over the resilience-free
+   * {@code sseWebClient}. Best-effort: if the backend stream errors, the emitter completes with the
+   * error and the browser's polling fallback keeps the badge fresh.
    *
+   * <p>The OAuth2 bearer is resolved <b>read-only</b> on the servlet thread and attached explicitly
+   * to the upstream call, so this long-lived relay never asks the {@code
+   * OAuth2AuthorizedClientManager} to refresh. A refresh on this 30-minute async request could
+   * rotate and then — via a late Spring Session write-back — resurrect a stale online refresh
+   * token, which Keycloak's reuse detection punishes by revoking the whole session and forcing an
+   * interactive re-login (REQ-SEC-012). When no usable token is bound the stream fails soft; the
+   * always-on unread-count poll keeps the token fresh and drives any re-authentication.
+   *
+   * @param request the current servlet request, used to read the session-stored authorized client
+   * @param authentication the authenticated principal owning the session
    * @return the SSE emitter writing to the browser
    */
   @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-  public SseEmitter stream() {
+  public SseEmitter stream(HttpServletRequest request, Authentication authentication) {
     SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
+    OAuth2AuthorizedClient authorizedClient =
+        authorizedClientRepository.loadAuthorizedClient(REGISTRATION_ID, authentication, request);
+    if (authorizedClient == null || authorizedClient.getAccessToken() == null) {
+      // No usable token snapshot (e.g. a freshly-lost session): fail soft. The 60s unread-count
+      // poll runs the same backend call through BackendApiClient and drives re-authentication.
+      emitter.complete();
+      return emitter;
+    }
     Disposable subscription =
         sseWebClient
             .get()
             .uri(BACKEND_BASE + "/stream")
+            .attributes(oauth2AuthorizedClient(authorizedClient))
             .retrieve()
             .bodyToFlux(SSE_TYPE)
             .subscribe(

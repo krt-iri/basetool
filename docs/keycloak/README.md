@@ -1,0 +1,71 @@
+# Keycloak realm configuration
+
+This directory documents the production Keycloak realm (`iri`) that backs the Profit Basetool
+deployment, **in sanitized form**, so the realm's configuration is versioned and reviewable
+without ever committing secrets or PII.
+
+## Files
+
+- [`realm-config.reference.json`](realm-config.reference.json) — a **sanitized reference** of the
+  prod `iri` realm. It is **not** an importable realm dump and **must not** be used to provision a
+  realm directly. It captures the configuration that matters for this codebase (token/session
+  lifetimes, the application clients, the `extractor-ingest` audience scope, roles, security
+  headers) and nothing else.
+
+The throwaway **test** realm used by the Playwright e2e suite lives elsewhere, at
+[`frontend/src/e2e/resources/realm-export.e2e.json`](../../frontend/src/e2e/resources/realm-export.e2e.json),
+and is deliberately different (10 h test token lifetimes, synthetic users, `directAccessGrants`
+on for ROPC test logins). Do not cross-contaminate the two.
+
+## Provenance & sanitization
+
+`realm-config.reference.json` was derived from a masked Admin-Console export of the prod realm
+(2026-06-18). The following were stripped or replaced — **never commit any of them**:
+
+- **Client secrets** → `__SET_AT_DEPLOY__` (the source export already masked them as `**********`).
+- **SMTP credentials & address** → `smtp.example.invalid` / `noreply@example.invalid` /
+  `__SMTP_USER__`. The real SMTP host, account and reply-to address are operator secrets and live
+  only in the deploy environment.
+- **Real public URLs** (`profit-base.online`, `iri-base.org`) → `basetool.example.invalid` in all
+  `redirectUris` / `webOrigins` / `post.logout.redirect.uris`. Internal Docker network aliases
+  (`backend:11261`, `frontend:18081`) are kept because they document the service topology and are
+  not secret.
+- **Users** — removed entirely (the only export entry was the `backend-service` service account).
+- **Realm signing keys / `components`** — not present in the masked export and never to be added.
+- **`id` UUIDs**, Keycloak built-in clients (`account`, `broker`, `realm-management`, …) and the
+  authentication flows — omitted as noise.
+
+This file is **reference documentation**, not a credential store. Treat it as read-mostly: when the
+prod realm config changes in a way that matters to the app (token settings, a new client/scope, a
+mapper), update this file in the same PR — secrets stay redacted.
+
+## Token & session settings (source of truth for session behaviour)
+
+The realm-level token settings reproduced verbatim in the reference are what govern login
+longevity and the refresh flow. As of 2026-06-18:
+
+|                    Setting                    |   Value    |                                    Meaning                                    |
+|-----------------------------------------------|------------|-------------------------------------------------------------------------------|
+| `accessTokenLifespan`                         | 300        | 5 min                                                                         |
+| `revokeRefreshToken` / `refreshTokenMaxReuse` | true / 5   | refresh-token rotation on; up to 5 replays tolerated before family revocation |
+| `ssoSessionIdleTimeout`                       | 2 592 000  | **30 days**                                                                   |
+| `ssoSessionMaxLifespan`                       | 15 552 000 | **180 days**                                                                  |
+| `clientSessionIdleTimeout` / `…Max`           | 0 / 0      | inherit the realm SSO values                                                  |
+
+These values mean **no session/idle timeout fires anywhere near 30–60 minutes** — relevant when
+diagnosing forced re-logins (see [ADR-0019](../adr/0019-frontend-reauth-on-client-authorization-required.md)
+and [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) step 4).
+
+## Open findings (hardening, tracked separately)
+
+- **`fullScopeAllowed: true`** on `basetool-frontend` and `basetool-sc-extractor` grants the full
+  realm role set into tokens rather than a least-privilege subset. `INGEST_KEYCLOAK_SETUP.md`
+  step 1 specifies `fullScopeAllowed: false` for the extractor; prod currently has it `true`.
+
+## Resolved
+
+- **ROPC disabled on `basetool-frontend` (2026-06-18).** `directAccessGrantsEnabled` is now `false`
+  on the public frontend client (it used the browser authorization-code flow anyway), so the
+  password can never traverse a direct-access (resource-owner-password) grant. The e2e test realm
+  (`realm-export.e2e.json`) deliberately keeps it `true` for its ROPC test logins.
+

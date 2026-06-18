@@ -8,6 +8,10 @@
 
 - **Projekt von `krt-iri` auf `krt-profit` umgezogen (GitHub-Organisation, Container-Images und internes Java-Package `de.greluc.krt.profit.basetool`).** Repository und Images liegen jetzt unter `krt-profit/basetool` bzw. `ghcr.io/krt-profit/*`; der Standardwert von `IRI_IMAGE_NAMESPACE` ist `krt-profit`. Beim Deploy müssen Image-Namespace, GHCR-Pull-Token und Release-Pipeline auf `krt-profit` zeigen. Keine funktionale Änderung.
 
+### Fixed
+
+- **Die App meldete sich im laufenden Betrieb etwa alle 30–60 Minuten von selbst ab und zeigte wieder die Login-Seite.** Der langlebige Benachrichtigungs-Stream erneuerte beim 30-Minuten-Reconnect das Login-Token und konnte dabei einen bereits veralteten Token in die Sitzung zurückschreiben, was Keycloak als unzulässige Token-Wiederverwendung wertete und die gesamte Sitzung verwarf. Der Stream nutzt das Token jetzt nur noch lesend (erneuert es nicht mehr), und die parallelen Token-Erneuerungen einer Sitzung werden zuverlässig gebündelt — die Sitzung bleibt bestehen, bis sie regulär abläuft.
+
 ## [v0.5.7](https://github.com/krt-profit/basetool/releases/tag/v0.5.7) - 2026-06-18
 
 ### Added
