@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Konto-Kacheln im Bankbereich (`/bank`) sind jetzt alphabetisch nach dem Kontonamen sortiert** statt nach Kontonummer — sowohl in der Bankleitungs- als auch in der Mitarbeiteransicht.
+
 ## [v0.5.7](https://github.com/krt-iri/basetool/releases/tag/v0.5.7) - 2026-06-18
 
 ### Added

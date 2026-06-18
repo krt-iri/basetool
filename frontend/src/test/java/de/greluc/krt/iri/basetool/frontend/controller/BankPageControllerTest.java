@@ -69,6 +69,18 @@ class BankPageControllerTest {
         sparkline);
   }
 
+  private static BankDashboardAccountDto dashboardAccount(String accountNo, String name) {
+    return new BankDashboardAccountDto(
+        UUID.randomUUID(),
+        accountNo,
+        name,
+        "ORG_UNIT",
+        "ACTIVE",
+        new BigDecimal("1000"),
+        BigDecimal.ZERO,
+        List.of());
+  }
+
   @Test
   void dashboard_ShouldScaleSparklineIntoPolylinePoints() {
     // Given
@@ -139,6 +151,35 @@ class BankPageControllerTest {
     assertNotNull(cards);
     assertNull(cards.get(0).sparklinePoints());
     assertTrue(cards.get(0).flat());
+  }
+
+  @Test
+  void dashboard_ShouldSortCardsAlphabeticallyByName() {
+    // Given — backend returns cards ordered by account number, names out of alphabetical order.
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankPageController controller = new BankPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    BankDashboardDto dashboard =
+        new BankDashboardDto(
+            true,
+            List.of(
+                dashboardAccount("KB-0001", "Zeta Vorrat"),
+                dashboardAccount("KB-0002", "alpha Reserve"),
+                dashboardAccount("KB-0003", "Mittelkasse")),
+            null);
+    when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
+        .thenReturn(dashboard);
+
+    // When
+    controller.dashboard(model);
+
+    // Then — cards are ordered case-insensitively by account name, not by account number.
+    List<BankPageController.BankDashboardCardView> cards =
+        (List<BankPageController.BankDashboardCardView>) model.getAttribute("cards");
+    assertNotNull(cards);
+    assertEquals(
+        List.of("alpha Reserve", "Mittelkasse", "Zeta Vorrat"),
+        cards.stream().map(card -> card.account().name()).toList());
   }
 
   @Test

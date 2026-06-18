@@ -29,6 +29,7 @@ import de.greluc.krt.iri.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -78,7 +79,9 @@ public class BankPageController {
 
   /**
    * Renders the bank dashboard (REQ-BANK-016): one KPI card per visible account plus the
-   * management-only totals strip.
+   * management-only totals strip. The cards are sorted alphabetically (case-insensitive) by account
+   * name regardless of the order the backend returns, so the grid reads the same for both the
+   * management (all accounts) and employee (granted accounts) perspectives.
    *
    * @param model Spring MVC model
    * @return the dashboard template
@@ -91,7 +94,13 @@ public class BankPageController {
     List<BankDashboardCardView> cards =
         dashboard == null
             ? List.of()
-            : dashboard.accounts().stream().map(BankPageController::toCardView).toList();
+            : dashboard.accounts().stream()
+                .map(BankPageController::toCardView)
+                .sorted(
+                    Comparator.comparing(
+                        card -> card.account().name() == null ? "" : card.account().name(),
+                        String.CASE_INSENSITIVE_ORDER))
+                .toList();
     model.addAttribute("dashboard", dashboard);
     model.addAttribute("cards", cards);
     model.addAttribute("now", java.time.Instant.now().toString());
