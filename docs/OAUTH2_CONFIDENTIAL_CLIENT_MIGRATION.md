@@ -347,7 +347,7 @@ zurück — ich führe die selber durch.
      ```
 
 6. Tests:
-   - `frontend/src/test/java/de/greluc/krt/iri/basetool/frontend/config/SecurityConfigTest.java`
+   - `frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/config/SecurityConfigTest.java`
      und `RoleHierarchyTest.java` prüfen — falls dort hartcodierte Assertions auf
      `client-authentication-method: none` existieren, anpassen.
    - Ergänze einen Pinning-Test (z.B. in `SecurityHeadersTest` oder neu in

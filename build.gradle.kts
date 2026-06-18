@@ -18,7 +18,7 @@ plugins {
 }
 
 allprojects {
-  group = "de.greluc.krt.iri.basetool"
+  group = "de.greluc.krt.profit.basetool"
   version = "0.0.1-SNAPSHOT"
 
   repositories { mavenCentral() }
@@ -268,8 +268,8 @@ subprojects {
   plugins.withId("info.solidsoft.pitest") {
     extensions.configure<info.solidsoft.gradle.pitest.PitestPluginExtension>("pitest") {
       junit5PluginVersion.set("1.2.3")
-      targetClasses.set(listOf("de.greluc.krt.iri.basetool.${project.name}.service.*"))
-      targetTests.set(listOf("de.greluc.krt.iri.basetool.${project.name}.service.*Test"))
+      targetClasses.set(listOf("de.greluc.krt.profit.basetool.${project.name}.service.*"))
+      targetTests.set(listOf("de.greluc.krt.profit.basetool.${project.name}.service.*Test"))
       threads.set(4)
       outputFormats.set(listOf("HTML", "XML"))
       timestampedReports.set(false)

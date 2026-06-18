@@ -1,10 +1,10 @@
 # UC-02 — Einsatz anlegen
 
-|                |                                                                                                                                                                                                    |
-|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-02                                                                                                                                                                                              |
-| **Tag**        | `e2e`                                                                                                                                                                                              |
-| **Testklasse** | [`MissionCreateE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/MissionCreateE2eTest.java) (Code-/Englisch-Begriff *Mission* = dt. **Einsatz**, Endpunkt `/missions`) |
+|                |                                                                                                                                                                                                       |
+|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-02                                                                                                                                                                                                 |
+| **Tag**        | `e2e`                                                                                                                                                                                                 |
+| **Testklasse** | [`MissionCreateE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionCreateE2eTest.java) (Code-/Englisch-Begriff *Mission* = dt. **Einsatz**, Endpunkt `/missions`) |
 
 ## Akteur
 

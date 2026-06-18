@@ -1,10 +1,10 @@
 # UC-13 — Inventar-Operationen (Ein-/Aus-/Umbuchen, Verkauf, Zuweisung)
 
-|                |                                                                                                                                     |
-|----------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-13                                                                                                                               |
-| **Tag**        | `e2e`                                                                                                                               |
-| **Testklasse** | [`InventoryOperationsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/InventoryOperationsE2eTest.java) |
+|                |                                                                                                                                        |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-13                                                                                                                                  |
+| **Tag**        | `e2e`                                                                                                                                  |
+| **Testklasse** | [`InventoryOperationsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventoryOperationsE2eTest.java) |
 
 ## Akteur
 

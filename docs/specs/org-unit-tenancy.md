@@ -22,7 +22,7 @@ release.
 
 ### REQ-ORG-002 — Scope is enforced in the service layer
 
-Use [`OwnerScopeService.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java)
+Use [`OwnerScopeService.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
 for list-endpoint filters (three-parameter `ScopePredicate`: `boolean isAdminAllScope`,
 `UUID activeOrgUnitId`, `Set<UUID> memberOrgUnitIds`) and `OwnerScopeService.canSee*` /
 `canEdit*` for `@PreAuthorize` SpEL on detail/write endpoints. Admins without an active pin
@@ -118,7 +118,7 @@ enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), ap
 
 ### REQ-ORG-006 — ArchUnit guards for new staffel-scoped aggregates
 
-[`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)
+[`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
 breaks the build if a staffel-scoped service stops injecting `AuthHelperService` /
 `OwnerScopeService` (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper` — update the
 whitelist when adding an aggregate), and `noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities`
@@ -188,7 +188,7 @@ construction, no creator-owner fallback and no ownerless-leadership use case).
 
 The active OrgUnit context is surfaced to the user **only** by appending it to the application
 title (`appTitle`, resolved in
-[`SquadronContextAdvice`](../../frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/config/SquadronContextAdvice.java)),
+[`SquadronContextAdvice`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/SquadronContextAdvice.java)),
 which renders in both the browser `<title>` tag and the sidebar brand logo text. The suffix is:
 
 - the active OrgUnit's **shorthand** (falling back to its name) for an active pin of **either**

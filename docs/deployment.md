@@ -8,7 +8,7 @@ Production deployment runs as a closed loop between three actors:
 ┌──────────────────────────────┐       ┌────────────────────────────┐
 │  GitHub Actions              │       │  GitHub Container Registry │
 │                              │       │                            │
-│  .github/workflows/          │  push │  ghcr.io/krt-iri/          │
+│  .github/workflows/          │  push │  ghcr.io/krt-profit/          │
 │    release-images.yml ───────┼──────►│    basetool-backend:1.4.2  │
 │      build  + push           │       │    basetool-frontend:1.4.2 │
 │      scan   (Trivy SARIF)    │       │      ... :latest, :edge,   │
@@ -177,7 +177,7 @@ sudo install -m 0640 -o deploy -g docker /path/to/realm-export.json /var/iri/cod
 #### 5.4 GHCR pull token
 
 Generate a fine-grained PAT in GitHub:
-- Repository access: `krt-iri/basetool` only
+- Repository access: `krt-profit/basetool` only
 - Permissions: `Packages: Read` (no other scopes)
 - Expiry: 90 days (calendar a rotation reminder)
 
@@ -270,8 +270,8 @@ Within ~10 minutes the images are built, scanned, signed, and available in GHCR
 as:
 
 ```
-ghcr.io/krt-iri/basetool-backend:1.4.3   (also :1.4, :1, :latest)
-ghcr.io/krt-iri/basetool-frontend:1.4.3
+ghcr.io/krt-profit/basetool-backend:1.4.3   (also :1.4, :1, :latest)
+ghcr.io/krt-profit/basetool-frontend:1.4.3
 ```
 
 At this point **nothing is deployed yet**. `:stable` still points at the

@@ -10,8 +10,8 @@ functional rank across the Bereichsleitung, the Staffeln and the Spezialkommando
 permission — authorization stays with the role model and the `org_unit_membership` flags — so it is
 deliberately not org-unit-scoped. An admin edits it inline; everyone else reads it. The aggregate is
 the `OrgChartPosition` row (Flyway `V136`, extended by `V138`); the read/write rules live in
-[`OrgChartService`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OrgChartService.java)
-and [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/OrgChartController.java).
+[`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartService.java)
+and [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/OrgChartController.java).
 
 ## Requirements
 

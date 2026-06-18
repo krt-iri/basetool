@@ -116,7 +116,7 @@ def create_commit(payload: dict, token: str) -> str:
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
-            "User-Agent": "krt-iri-release-prepare",
+            "User-Agent": "krt-profit-release-prepare",
         },
         method="POST",
     )

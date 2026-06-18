@@ -93,11 +93,11 @@ The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backe
 
 ### Security & access control
 
-Moved to [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md) (`REQ-SEC-*`): Keycloak OIDC topology (backend resource server, frontend OAuth2 client), `@PreAuthorize`-centralised authorization, the ArchUnit-enforced invariants ([`ArchitectureTest`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java)), the role hierarchy ([`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)), contextual LOGISTICIAN/MISSION_MANAGER + SK-lead grants, per-`sub` multi-user data isolation, and guest field redaction.
+Moved to [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md) (`REQ-SEC-*`): Keycloak OIDC topology (backend resource server, frontend OAuth2 client), `@PreAuthorize`-centralised authorization, the ArchUnit-enforced invariants ([`ArchitectureTest`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)), the role hierarchy ([`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)), contextual LOGISTICIAN/MISSION_MANAGER + SK-lead grants, per-`sub` multi-user data isolation, and guest field redaction.
 
 ### Multi-org-unit tenancy (CRITICAL)
 
-Moved to [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`): the two OrgUnit kinds (`SQUADRON` / `SPECIAL_COMMAND`) + dual-write soak, service-layer scope via [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java) (the `ScopePredicate` triple + admin-pin semantics), the aggregate scope kinds (strict-staffel / `Mission` public-escape / `JobOrder` SK-public queue), the create-time stamping matrix, the admin-area + promotion carve-outs, the ArchUnit guards, the `orgUnitId` MDC field, and the active-context relay headers.
+Moved to [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`): the two OrgUnit kinds (`SQUADRON` / `SPECIAL_COMMAND`) + dual-write soak, service-layer scope via [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java) (the `ScopePredicate` triple + admin-pin semantics), the aggregate scope kinds (strict-staffel / `Mission` public-escape / `JobOrder` SK-public queue), the create-time stamping matrix, the admin-area + promotion carve-outs, the ArchUnit guards, the `orgUnitId` MDC field, and the active-context relay headers.
 
 ### Database
 
@@ -125,7 +125,7 @@ Moved to [`docs/specs/api-conventions.md`](docs/specs/api-conventions.md) (`REQ-
 
 - **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts).
 - **Resilience4j** wraps every backend call (Timeout, Retry, CircuitBreaker, Bulkhead). State transitions are logged via `ResilienceEventLogger` so `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT` always have a matching log line.
-- **Reactor context propagation is mandatory for any new `ThreadLocal` you want to see inside `WebClient` exchange filters.** `WebClient.exchange()` runs on a Reactor-Netty worker thread, not the servlet thread; classic `ThreadLocal` values are not copied across threads. Register a `ThreadLocalAccessor` on `ContextRegistry.getInstance()` in [`ReactorContextPropagationConfig`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/config/ReactorContextPropagationConfig.java) (which also enables `Hooks.enableAutomaticContextPropagation()` at startup). The existing accessors cover `ActiveSquadronContext` (active-OrgUnit pin → `X-Active-Org-Unit-Id` outbound header) and `CorrelationContext` (correlation id propagation). Forgetting the accessor means the holder is invisible on the worker thread and the outbound call silently drops whatever it carried.
+- **Reactor context propagation is mandatory for any new `ThreadLocal` you want to see inside `WebClient` exchange filters.** `WebClient.exchange()` runs on a Reactor-Netty worker thread, not the servlet thread; classic `ThreadLocal` values are not copied across threads. Register a `ThreadLocalAccessor` on `ContextRegistry.getInstance()` in [`ReactorContextPropagationConfig`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ReactorContextPropagationConfig.java) (which also enables `Hooks.enableAutomaticContextPropagation()` at startup). The existing accessors cover `ActiveSquadronContext` (active-OrgUnit pin → `X-Active-Org-Unit-Id` outbound header) and `CorrelationContext` (correlation id propagation). Forgetting the accessor means the holder is invisible on the worker thread and the outbound call silently drops whatever it carried.
 - Use `MockWebServer` / WireMock to test error paths.
 - **Type-safe configuration** — relevant `application-*.yml` settings live in `@ConfigurationProperties` classes with `@Validated` (Keycloak URIs, backend URLs, limits). Constraints: `@NotBlank`, `@URL`, `@Min`/`@Max`. Test misconfiguration during startup (`test` profile). See `*Properties` classes under `config/`.
 
@@ -151,7 +151,7 @@ Moved to [`docs/specs/observability.md`](docs/specs/observability.md) (`REQ-OBS-
 Minimal example:
 
 ```java
-package de.greluc.krt.iri.basetool.backend;
+package de.greluc.krt.profit.basetool.backend;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;

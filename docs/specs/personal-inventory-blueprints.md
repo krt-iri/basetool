@@ -112,11 +112,11 @@ owned blueprints. Provisioning can be disabled per environment via
 - [ ] Given an admin removes a product from the default set, then users keep the rows they already
   hold and those rows become removable.
 
-**Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/DefaultBlueprintProvisioningService.java),
-[`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/repository/PersonalBlueprintRepository.java),
-[`UserService#syncUser`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/UserService.java),
-[`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/task/DefaultBlueprintProvisioningTask.java),
-[`PersonalBlueprintService#requireRemovable`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/PersonalBlueprintService.java).
+**Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintProvisioningService.java),
+[`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`UserService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserService.java),
+[`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/task/DefaultBlueprintProvisioningTask.java),
+[`PersonalBlueprintService#requireRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java).
 
 ### REQ-INV-017 — Admin curation of the default-blueprint set
 
@@ -142,7 +142,7 @@ duplicate add MUST return 409. Adding MUST immediately grant the new default to 
 - [ ] Given a non-admin calls the default-blueprint admin endpoints, then the request is rejected
   with 403.
 
-**Code links:** [`DefaultBlueprintService`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/DefaultBlueprintService.java),
-[`AdminDefaultBlueprintController`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/AdminDefaultBlueprintController.java),
-[`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DefaultBlueprintBootstrap.java),
+**Code links:** [`DefaultBlueprintService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintService.java),
+[`AdminDefaultBlueprintController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminDefaultBlueprintController.java),
+[`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DefaultBlueprintBootstrap.java),
 [`V157__create_default_blueprint.sql`](../../backend/src/main/resources/db/migration/V157__create_default_blueprint.sql).

@@ -93,7 +93,7 @@ dependencies {
   // primitive values to Thymeleaf's StandardJavaScriptSerializer and mirrors its character-escape
   // table, and it needs the JSR-310 module so [[${dto}]] inline expressions can render java.time.*
   // fields (Instant/OffsetDateTime/LocalDateTime). Drop both deps once Thymeleaf supports Jackson 3
-  // and the bridge is migrated — tracked in https://github.com/krt-iri/basetool/issues/294.
+  // and the bridge is migrated — tracked in https://github.com/krt-profit/basetool/issues/294.
   implementation("com.fasterxml.jackson.core:jackson-databind")
   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")

@@ -1,10 +1,10 @@
 # UC-14 — Inventar: Mandanten-Scope (wer sieht/erstellt/bearbeitet was)
 
-|                |                                                                                                                               |
-|----------------|-------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-14                                                                                                                         |
-| **Tag**        | `e2e`                                                                                                                         |
-| **Testklasse** | [`InventoryTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/InventoryTenancyE2eTest.java) |
+|                |                                                                                                                                  |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-14                                                                                                                            |
+| **Tag**        | `e2e`                                                                                                                            |
+| **Testklasse** | [`InventoryTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventoryTenancyE2eTest.java) |
 
 ## Akteur
 

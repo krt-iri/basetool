@@ -4,7 +4,7 @@
 - **Date:** 2026-06-12
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-BANK-003..006, REQ-BANK-013 (`docs/specs/bank.md`) · ADR-0003 ·
-  ADR-0009 · epic [#556](https://github.com/krt-iri/basetool/issues/556)
+  ADR-0009 · epic [#556](https://github.com/krt-profit/basetool/issues/556)
 
 ## Context
 

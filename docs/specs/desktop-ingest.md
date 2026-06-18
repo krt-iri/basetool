@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-17.
-> **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md) · **Related:** epic [#639](https://github.com/krt-iri/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
+> **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
 
@@ -16,7 +16,7 @@ The transport, auth and handoff design — a dedicated minimal-surface `ingest` 
 Keycloak Device-Authorization public client, and a short-lived single-use Redis handoff —
 is recorded in [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md). This spec
 holds the binding requirements that design must satisfy. It is the #640 decision and
-requirements gate of epic [#639](https://github.com/krt-iri/basetool/issues/639), the
+requirements gate of epic [#639](https://github.com/krt-profit/basetool/issues/639), the
 first of sub-issues #640–#648 to land.
 
 The non-negotiable property: **the one-click path may pre-fill, never persist.** Squadron

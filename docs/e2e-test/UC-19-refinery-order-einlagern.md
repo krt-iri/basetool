@@ -1,10 +1,10 @@
 # UC-19 — Refinery Order einlagern (in das Lager überführen)
 
-|                |                                                                                                                                   |
-|----------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-19                                                                                                                             |
-| **Tag**        | `e2e`                                                                                                                             |
-| **Testklasse** | [`RefineryOrderStoreE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/RefineryOrderStoreE2eTest.java) |
+|                |                                                                                                                                      |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-19                                                                                                                                |
+| **Tag**        | `e2e`                                                                                                                                |
+| **Testklasse** | [`RefineryOrderStoreE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RefineryOrderStoreE2eTest.java) |
 
 ## Akteur
 

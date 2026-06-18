@@ -13,7 +13,7 @@ is available puts every operator running this project at risk.
 The preferred channel is GitHub's **Private Vulnerability Reporting** via
 Security Advisories:
 
-> **[Report a vulnerability](https://github.com/krt-iri/basetool/security/advisories/new)**
+> **[Report a vulnerability](https://github.com/krt-profit/basetool/security/advisories/new)**
 
 That form gives us a private, structured place to triage the finding,
 collaborate on a patch, request a CVE, and coordinate disclosure with you.
@@ -74,9 +74,9 @@ The following are **in scope** for this policy:
 - Source code in this repository (`backend/`, `frontend/`, `keycloak-theme/`,
   `scripts/`, build configuration, Flyway migrations).
 - Published container images under
-  [`ghcr.io/krt-iri/basetool-backend`](https://github.com/krt-iri/basetool/pkgs/container/basetool-backend)
+  [`ghcr.io/krt-profit/basetool-backend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-backend)
   and
-  [`ghcr.io/krt-iri/basetool-frontend`](https://github.com/krt-iri/basetool/pkgs/container/basetool-frontend).
+  [`ghcr.io/krt-profit/basetool-frontend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-frontend).
 - GitHub Actions workflows under `.github/workflows/` and their pinned
   actions.
 - The Docker Compose definitions and deployment scripts shipped in this

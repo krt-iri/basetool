@@ -12,7 +12,7 @@ body:
         possible — incomplete reports delay the fix.
 
         **Do NOT report security vulnerabilities here.** Use the confidential
-        channel via [GitHub Security Advisories](https://github.com/krt-iri/basetool/security/advisories/new)
+        channel via [GitHub Security Advisories](https://github.com/krt-profit/basetool/security/advisories/new)
         instead.
 
   - type: textarea

@@ -46,7 +46,7 @@ TOKEN_FILE="${IRI_GHCR_TOKEN_FILE:-/etc/iri/ghcr-pull-token}"
 HEALTH_TIMEOUT="${IRI_HEALTH_TIMEOUT:-180}"
 
 REGISTRY="${IRI_REGISTRY:-ghcr.io}"
-NAMESPACE="${IRI_IMAGE_NAMESPACE:-krt-iri}"
+NAMESPACE="${IRI_IMAGE_NAMESPACE:-krt-profit}"
 GHCR_USERNAME="${IRI_GHCR_USERNAME:-deploy-bot}"
 
 PROFILE=prod
@@ -99,7 +99,7 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_BACKOFF_BASE=600     (first retry delay after a failed target, seconds)
   IRI_BACKOFF_MAX=21600    (cap for the exponential backoff, seconds)
   IRI_REGISTRY=ghcr.io
-  IRI_IMAGE_NAMESPACE=krt-iri
+  IRI_IMAGE_NAMESPACE=krt-profit
   IRI_GHCR_USERNAME=deploy-bot
   DOCKER_CONFIG=/var/lib/iri/.docker   (where `docker login` writes its
                                         credentials.json; defaults to a

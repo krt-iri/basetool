@@ -1,0 +1,252 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.service;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import de.greluc.krt.profit.basetool.backend.mapper.PromotionLevelContentMapper;
+import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
+import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
+import de.greluc.krt.profit.basetool.backend.model.PromotionLevelContent;
+import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
+import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentResponse;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
+import de.greluc.krt.profit.basetool.backend.repository.PromotionLevelContentRepository;
+import jakarta.persistence.EntityNotFoundException;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
+
+@ExtendWith(MockitoExtension.class)
+class PromotionLevelContentServiceTest {
+
+  @Mock private PromotionLevelContentRepository repository;
+
+  @Mock private PromotionCategoryRepository categoryRepository;
+
+  @Mock private PromotionLevelContentMapper mapper;
+
+  @Mock private OwnerScopeService ownerScopeService;
+
+  /**
+   * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
+   * "happy path" do not get short-circuited to empty by the new gate. {@code lenient()} keeps
+   * Mockito from failing tests that never trigger the gate.
+   */
+  @BeforeEach
+  void enablePromotionFeatureFlag() {
+    lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
+    lenient().when(ownerScopeService.hasPromotionReadAccess()).thenReturn(true);
+  }
+
+  @InjectMocks private PromotionLevelContentService service;
+
+  @Test
+  void listByCategory_shouldReturnContentsScopedToSquadron() {
+    // Given
+    UUID categoryId = UUID.randomUUID();
+    UUID scopeId = UUID.randomUUID();
+    PromotionCategory category =
+        PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
+    PromotionLevelContent content =
+        PromotionLevelContent.builder()
+            .category(category)
+            .level(PromotionLevel.LEVEL_A)
+            .description("Kann fliegen")
+            .build();
+    PromotionLevelContentResponse response =
+        new PromotionLevelContentResponse(
+            UUID.randomUUID(),
+            0L,
+            categoryId,
+            "Flug Kenntnisse",
+            PromotionLevel.LEVEL_A,
+            "Kann fliegen",
+            null,
+            null);
+    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
+    when(repository.findAllByCategoryIdScopedOrdered(categoryId, scopeId))
+        .thenReturn(List.of(content));
+    when(mapper.toResponse(content)).thenReturn(response);
+
+    // When
+    List<PromotionLevelContentResponse> result = service.listByCategory(categoryId);
+
+    // Then: the active squadron is forwarded to the scoped finder.
+    assertEquals(1, result.size());
+    assertEquals(PromotionLevel.LEVEL_A, result.get(0).level());
+    verify(repository).findAllByCategoryIdScopedOrdered(categoryId, scopeId);
+  }
+
+  @Test
+  void get_shouldRejectCrossSquadron() {
+    // Given: a level content whose category's topic is owned by a foreign squadron.
+    UUID id = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    Squadron owner = new Squadron();
+    owner.setId(squadronId);
+    PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
+    topic.setOwningSquadron(owner);
+    PromotionCategory category =
+        PromotionCategory.builder().topic(topic).name("Flug Kenntnisse").sortOrder(0).build();
+    PromotionLevelContent entity =
+        PromotionLevelContent.builder()
+            .category(category)
+            .level(PromotionLevel.LEVEL_A)
+            .description("Kann fliegen")
+            .build();
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(ownerScopeService.canSeeSquadron(squadronId)).thenReturn(false);
+
+    // When / Then
+    assertThrows(AccessDeniedException.class, () -> service.get(id));
+  }
+
+  @Test
+  void create_shouldThrow_whenCategoryNotFound() {
+    // Given
+    UUID categoryId = UUID.randomUUID();
+    PromotionLevelContentCreateRequest request =
+        new PromotionLevelContentCreateRequest(categoryId, PromotionLevel.LEVEL_A, "Beschreibung");
+    when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThrows(EntityNotFoundException.class, () -> service.create(request));
+  }
+
+  @Test
+  void create_shouldSaveAndReturn() {
+    // Given
+    UUID categoryId = UUID.randomUUID();
+    PromotionCategory category =
+        PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
+    PromotionLevelContentCreateRequest request =
+        new PromotionLevelContentCreateRequest(categoryId, PromotionLevel.LEVEL_A, "Beschreibung");
+    PromotionLevelContent entity =
+        PromotionLevelContent.builder()
+            .level(PromotionLevel.LEVEL_A)
+            .description("Beschreibung")
+            .build();
+    PromotionLevelContentResponse response =
+        new PromotionLevelContentResponse(
+            UUID.randomUUID(),
+            0L,
+            categoryId,
+            "Flug Kenntnisse",
+            PromotionLevel.LEVEL_A,
+            "Beschreibung",
+            null,
+            null);
+    when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+    when(mapper.toEntity(request)).thenReturn(entity);
+    when(repository.save(entity)).thenReturn(entity);
+    when(mapper.toResponse(entity)).thenReturn(response);
+
+    // When
+    PromotionLevelContentResponse result = service.create(request);
+
+    // Then
+    assertEquals(PromotionLevel.LEVEL_A, result.level());
+    verify(repository).save(entity);
+  }
+
+  /**
+   * Pins that {@code update} maps its response from a {@code saveAndFlush}, not a plain {@code
+   * save}: the level-content textarea writes the returned {@code @Version} back onto its {@code
+   * data-lc-version} attribute in place (no re-swap), so a stale {@code save} version would 409 the
+   * next consecutive edit. The create path (unchanged) still uses {@code save}.
+   */
+  @Test
+  void update_flushesSoResponseVersionIsFresh() {
+    // Given: an existing level content with a bare category (no owning squadron -> edit-guard
+    // returns early), version 4.
+    UUID id = UUID.randomUUID();
+    UUID categoryId = UUID.randomUUID();
+    PromotionCategory category =
+        PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
+    PromotionLevelContent entity =
+        PromotionLevelContent.builder()
+            .category(category)
+            .level(PromotionLevel.LEVEL_A)
+            .description("Kann fliegen")
+            .build();
+    entity.setVersion(4L);
+    PromotionLevelContentResponse response =
+        new PromotionLevelContentResponse(
+            id,
+            5L,
+            categoryId,
+            "Flug Kenntnisse",
+            PromotionLevel.LEVEL_A,
+            "Kann jetzt besser fliegen",
+            null,
+            null);
+    PromotionLevelContentUpdateRequest request =
+        new PromotionLevelContentUpdateRequest(
+            4L, categoryId, PromotionLevel.LEVEL_A, "Kann jetzt besser fliegen");
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+    when(repository.saveAndFlush(entity)).thenReturn(entity);
+    when(mapper.toResponse(entity)).thenReturn(response);
+
+    // When
+    service.update(id, request);
+
+    // Then: the flushed entity is what gets mapped, and a plain save never happens.
+    verify(repository).saveAndFlush(entity);
+    verify(repository, never()).save(entity);
+  }
+
+  @Test
+  void delete_shouldCallRepositoryDelete() {
+    // Given
+    UUID id = UUID.randomUUID();
+    PromotionLevelContent entity =
+        PromotionLevelContent.builder().level(PromotionLevel.LEVEL_B).description("Test").build();
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+
+    // When
+    service.delete(id);
+
+    // Then
+    verify(repository).delete(entity);
+  }
+
+  @Test
+  void get_shouldThrow_whenNotFound() {
+    // Given
+    UUID id = UUID.randomUUID();
+    when(repository.findById(id)).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThrows(EntityNotFoundException.class, () -> service.get(id));
+  }
+}

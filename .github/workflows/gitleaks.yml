@@ -7,7 +7,7 @@ name: Secret Scan
 #
 # Why the gitleaks BINARY and not gitleaks/gitleaks-action: the action's v2
 # requires a paid GITLEAKS_LICENSE for commits under a GitHub Organization
-# (this repo lives under the `krt-iri` org). Running the pinned release binary
+# (this repo lives under the `krt-profit` org). Running the pinned release binary
 # directly sidesteps that, keeps the tool version explicit, and adds no new
 # third-party action to the supply chain.
 #

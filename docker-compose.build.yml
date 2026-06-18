@@ -46,13 +46,13 @@ x-backend-build: &backend-build
   build:
     context: .
     dockerfile: backend/Dockerfile
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
 
 x-frontend-build: &frontend-build
   build:
     context: .
     dockerfile: frontend/Dockerfile
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
 
 # Watch specs are service-specific (they reference module source roots), so
 # they cannot live in the build anchor — define them inline on the dev
@@ -86,7 +86,7 @@ x-ingest-build: &ingest-build
   build:
     context: .
     dockerfile: ingest/Dockerfile
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-ingest:${IRI_BASETOOL_VERSION:-local}
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-local}
 
 x-ingest-watch: &ingest-watch
   develop:

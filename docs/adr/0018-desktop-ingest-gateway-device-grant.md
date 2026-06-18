@@ -1,9 +1,9 @@
 # ADR-0018 — Desktop one-click ingest: dedicated gateway + Keycloak device grant
 
-- **Status:** Accepted — implementation pending (epic [#639](https://github.com/krt-iri/basetool/issues/639))
+- **Status:** Accepted — implementation pending (epic [#639](https://github.com/krt-profit/basetool/issues/639))
 - **Date:** 2026-06-16
 - **Deciders:** Lucas Greuloch (@greluc)
-- **Related:** epic [#639](https://github.com/krt-iri/basetool/issues/639) · spec [`desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-*`) · runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) · [`refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md) `REQ-REFINERY-018` · [ADR-0007](0007-client-side-vlm-screenshot-extraction.md) · [ADR-0008](0008-refinery-extract-json-contract.md) · supersedes the deferred direct-upload phase [#437](https://github.com/krt-iri/basetool/issues/437)
+- **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639) · spec [`desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-*`) · runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) · [`refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md) `REQ-REFINERY-018` · [ADR-0007](0007-client-side-vlm-screenshot-extraction.md) · [ADR-0008](0008-refinery-extract-json-contract.md) · supersedes the deferred direct-upload phase [#437](https://github.com/krt-profit/basetool/issues/437)
 
 ## Context
 
@@ -14,7 +14,7 @@ and the personal-blueprint export (→ `POST /api/v1/personal-blueprints/import/
 Today the **only** way that JSON reaches the basetool is a manual file dance: the user
 saves the JSON to disk, opens the basetool in a browser, clicks the upload control, and
 picks the file (REQ-REFINERY-013). ADR-0007 explicitly deferred a "Phase 4" direct upload
-([#437](https://github.com/krt-iri/basetool/issues/437)).
+([#437](https://github.com/krt-profit/basetool/issues/437)).
 
 The owner's goal is a single button at the end of the extractor workflow that opens the
 matching basetool page **with the data already pre-filled** — logging the user in first if

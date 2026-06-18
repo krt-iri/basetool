@@ -1,11 +1,11 @@
 # UC-18 — Job-Order Mandanten-Sichtbarkeit (wer sieht was)
 
-|                |                                                                                                                             |
-|----------------|-----------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-18                                                                                                                       |
-| **Tag**        | `e2e`                                                                                                                       |
-| **Testklasse** | [`JobOrderTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/JobOrderTenancyE2eTest.java) |
-| **Basis-Flow** | [Rollen & Scope](rollen-und-scope.md) · Spec [`org-unit-tenancy.md` REQ-ORG-003](../specs/org-unit-tenancy.md)              |
+|                |                                                                                                                                |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-18                                                                                                                          |
+| **Tag**        | `e2e`                                                                                                                          |
+| **Testklasse** | [`JobOrderTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderTenancyE2eTest.java) |
+| **Basis-Flow** | [Rollen & Scope](rollen-und-scope.md) · Spec [`org-unit-tenancy.md` REQ-ORG-003](../specs/org-unit-tenancy.md)                 |
 
 ## Akteure
 
@@ -35,5 +35,5 @@ Officer bzw. Member rufen die Auftragsliste `/orders` bzw. eine Detailseite `/or
 - **Officer-Rolle ≠ Cross-Staffel-Sicht:** Die Officer-Realm-Rolle gibt Bearbeitungs-Capability (Rollen-Gate), aber **keine** staffel-übergreifende Sichtbarkeit — der Scope bleibt mitgliedschaftsbasiert. SK-Auftrags-*Edits* laufen über das Rollen-Gate (LOGISTICIAN+), nicht über den Staffel-Scope.
 - **Profit-Gate vor Per-Order:** `canViewJobOrders` (Admin, oder mindestens eine profit-eligible Mitgliedschaft) kurzschließt; ein non-profit Member sieht selbst SK-öffentliche Aufträge nicht und bekommt eine leere Liste bzw. einen Redirect.
 - **Shared-DB-robust:** Die Assertions prüfen je Auftrag die eigene `data-id`, sodass von Geschwistertests akkumulierte Aufträge (z. B. Intake-SK-Aufträge aus UC-12) die Erwartung nicht verfälschen.
-- **Ergänzung zur Schreib-Matrix:** Wer welche Aktions-Controls (Bearbeiten/Löschen/Handover) auf einem **sichtbaren** Auftrag sieht, deckt [`RolePermissionsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/RolePermissionsE2eTest.java) ab (Edit = LOGISTICIAN, Löschen = ADMIN, Handover = LOGISTICIAN/OFFICER/ADMIN).
+- **Ergänzung zur Schreib-Matrix:** Wer welche Aktions-Controls (Bearbeiten/Löschen/Handover) auf einem **sichtbaren** Auftrag sieht, deckt [`RolePermissionsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RolePermissionsE2eTest.java) ab (Edit = LOGISTICIAN, Löschen = ADMIN, Handover = LOGISTICIAN/OFFICER/ADMIN).
 

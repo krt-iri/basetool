@@ -153,7 +153,7 @@ x-backend: &backend-template
   # writes a concrete version (e.g. `1.4.2`) into the host .env for explicit
   # rollbacks. For local-iteration on the Dockerfile itself, use
   # docker-compose.build.yml as an override to add `build:` back in.
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   logging: *default-logging
   stop_grace_period: 30s
@@ -237,7 +237,7 @@ x-redis: &redis-template
 x-frontend: &frontend-template
   # See x-backend above for the GHCR / IRI_BASETOOL_VERSION rationale. Local
   # rebuilds happen via docker-compose.build.yml.
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   logging: *default-logging
   stop_grace_period: 30s
@@ -272,7 +272,7 @@ x-ingest: &ingest-template
   # cert (backend-trust bundle in application-prod.yml). It owns no database — it relays to the backend
   # and stages a short-lived single-use handoff in the shared Redis. See x-backend for the GHCR /
   # IRI_BASETOOL_VERSION rationale; local rebuilds use docker-compose.build.yml.
-  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-iri}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
+  image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   logging: *default-logging
   stop_grace_period: 30s

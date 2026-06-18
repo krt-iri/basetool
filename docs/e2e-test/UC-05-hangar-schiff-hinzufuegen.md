@@ -1,10 +1,10 @@
 # UC-05 — Schiff zum Hangar hinzufügen
 
-|                |                                                                                                                         |
-|----------------|-------------------------------------------------------------------------------------------------------------------------|
-| **ID**         | UC-05                                                                                                                   |
-| **Tag**        | `e2e`                                                                                                                   |
-| **Testklasse** | [`HangarAddShipE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/iri/basetool/frontend/e2e/HangarAddShipE2eTest.java) |
+|                |                                                                                                                            |
+|----------------|----------------------------------------------------------------------------------------------------------------------------|
+| **ID**         | UC-05                                                                                                                      |
+| **Tag**        | `e2e`                                                                                                                      |
+| **Testklasse** | [`HangarAddShipE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/HangarAddShipE2eTest.java) |
 
 ## Akteur
 

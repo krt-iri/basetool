@@ -33,7 +33,7 @@ Usage:
     python reconcile_changelog.py                       # dry-run report, cwd repo
     python reconcile_changelog.py --write               # rewrite CHANGELOG.md
     python reconcile_changelog.py --repo /path/to/basetool --write
-    python reconcile_changelog.py --rev HEAD --repo-url https://github.com/krt-iri/basetool
+    python reconcile_changelog.py --rev HEAD --repo-url https://github.com/krt-profit/basetool
 """
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def derive_repo_url(repo: str) -> str:
     try:
         url = run_git(repo, ["remote", "get-url", "origin"]).strip()
     except SystemExit:
-        return "https://github.com/krt-iri/basetool"
+        return "https://github.com/krt-profit/basetool"
     url = re.sub(r"\.git$", "", url)
     ssh = re.match(r"git@([^:]+):(.+)$", url)
     if ssh:

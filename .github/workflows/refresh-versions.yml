@@ -11,7 +11,7 @@ name: Refresh Versions
 #
 # The PR step uses a dedicated `REFRESH_VERSIONS_TOKEN` secret (fine-grained
 # PAT or GitHub App token) instead of the default `GITHUB_TOKEN`, because the
-# `krt-iri` organization policy forbids Actions from creating or approving
+# `krt-profit` organization policy forbids Actions from creating or approving
 # pull requests. Required token scopes on this repo: `pull-requests: write`
 # and `contents: write`.
 on:

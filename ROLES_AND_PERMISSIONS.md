@@ -4,13 +4,13 @@
 > Diese Matrix wurde gegen die tatsächliche Implementierung verifiziert:
 > die `@PreAuthorize`-Annotationen aller 54 Backend-Controller, die
 > URL-Matrix in
-> [`backend/.../config/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/SecurityConfig.java)
+> [`backend/.../config/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java)
 > und
-> [`frontend/.../config/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/iri/basetool/frontend/config/SecurityConfig.java),
+> [`frontend/.../config/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/SecurityConfig.java),
 > die Rollen-Seeds in
-> [`DataInitializer`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DataInitializer.java)
+> [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
 > und der Authority-Konverter
-> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java).
+> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java).
 > **Bei Abweichungen zwischen diesem Dokument und dem Code zählt immer der
 > Code** (`@PreAuthorize` + `SecurityConfig`).
 
@@ -71,7 +71,7 @@ auf `permitAll()` gesetzt; im Backend eine explizit aufgezählte Liste von
 
 **Warum die Teilnehmer-Endpunkte anonym funktionieren:** Ein **Gast-Teilnehmer
 ist nicht mit einem Benutzerkonto verknüpft** (`participant.user == null`).
-[`MissionSecurityService.canAccessParticipant`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/MissionSecurityService.java)
+[`MissionSecurityService.canAccessParticipant`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/MissionSecurityService.java)
 gibt für solche unverknüpften Teilnehmer **`true` für jeden** zurück — das ist
 die bewusste Konstruktionsnaht, die den Anmelde-Flow ohne Login nutzbar macht.
 Sobald ein Teilnehmer mit einem echten User verknüpft ist, dürfen nur noch
@@ -108,7 +108,7 @@ So landet jeder Gast-Auftrag in einer definierten SK-Warteschlange statt im Nich
 
 ### 1.3 Datenschutz für Outsider (zwei Redaktionsstufen)
 
-Mission-Antworten werden serverseitig in [`MissionController`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/controller/MissionController.java)
+Mission-Antworten werden serverseitig in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MissionController.java)
 in **zwei Stufen** bereinigt:
 
 - **Mitglied-Peer** (`cleanupMissionForGuest` / `cleanupParticipantForGuest`) — für ein
@@ -143,7 +143,7 @@ in **zwei Stufen** bereinigt:
 
 Rollen werden aus den Keycloak-Realm-Rollen abgeleitet (`ROLE_<GROSS_SNAKE>`)
 und im
-[`DataInitializer`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/DataInitializer.java)
+[`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
 mit Authorities geseedet. Zusätzlich gilt eine **Rollen-Hierarchie**.
 
 ### Rollen-Hierarchie (backend + frontend identisch)
@@ -182,7 +182,7 @@ sind seit dem Phase-4-Lockdown `hasRole('ADMIN')`).
 `LOGISTICIAN` und `MISSION_MANAGER` sind **keine** Keycloak-Rollen, sondern
 **Flags pro OrgUnit-Mitgliedschaft** (`org_unit_membership.is_logistician` /
 `is_mission_manager`). Der
-[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java)
+[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java)
 befördert daraus zwei Authority-Flächen:
 
 - **Flach** `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER`, sobald **irgendeine**
@@ -495,7 +495,7 @@ berechtigten Bank-MA per In-App-Benachrichtigung informiert (REQ-BANK-026,
 ## 4. Mehr-OrgUnit-Sichtbarkeit (Scoping)
 
 Lese- und Schreibpfade werden über
-[`OwnerScopeService`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/OwnerScopeService.java)
+[`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
 gefiltert (früher `SquadronScopeService`; deckt heute Staffeln **und**
 Spezialkommandos ab). Grundregel: Nicht-Admins sehen die Vereinigung ihrer
 Mitgliedschaften; Admins ohne aktiven Pin sehen alles, mit Pin dieselbe

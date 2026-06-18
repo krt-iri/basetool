@@ -1,7 +1,7 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-13.
 > **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011
 > **Status:** Implemented — epic
-> [#556](https://github.com/krt-iri/basetool/issues/556) delivered (Phases 1–5). The
+> [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
 > acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
 > tests; subsequent behaviour changes keep this spec in sync in the same PR.
 
@@ -23,7 +23,7 @@ an immutable audit log that only administrators can read. Account statements and
 as KRT-design PDFs. The feature is deliberately **independent of seasons, price lines and
 the mission/operation profit flows** — it is a standalone ledger.
 
-Work is tracked in epic [#556](https://github.com/krt-iri/basetool/issues/556); the
+Work is tracked in epic [#556](https://github.com/krt-profit/basetool/issues/556); the
 phase-by-phase implementation plan (including per-phase deployment steps) lives in
 [`docs/BANK_PLAN.md`](../BANK_PLAN.md).
 

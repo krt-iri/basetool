@@ -1,0 +1,93 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.ingest.ratelimit;
+
+import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.ConsumptionProbe;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.stereotype.Component;
+
+/**
+ * Per-authenticated-subject token-bucket rate limiter for the ingest endpoints (REQ-INGEST-005).
+ *
+ * <p>This is the gateway's <em>enforceable</em> throttle. The complementary per-IP {@link
+ * de.greluc.krt.profit.basetool.ingest.filter.RateLimitingFilter} runs before the security filter
+ * chain and keys on a client IP that a caller can rotate via a spoofed {@code X-Forwarded-For}
+ * header, so it can only ever be a coarse front line. This limiter keys on the JWT {@code sub},
+ * which is bound to a Keycloak identity and cannot be forged by the client, so it reliably bounds
+ * how hard a single authenticated caller can drive the backend's import endpoints (security audit
+ * INGEST-RATELIMIT-1). It is invoked from {@code IngestService} — i.e. after Spring Security has
+ * authenticated the request — so the subject is always available.
+ *
+ * <p>The bucket map is bounded ({@link RateLimitBuckets#boundedLru(int)}) so a flood of distinct
+ * subjects cannot grow it without limit.
+ */
+@Component
+@RequiredArgsConstructor
+public class SubjectRateLimiter {
+
+  /** Hard cap on simultaneously-tracked subjects, bounding the bucket map's memory footprint. */
+  static final int MAX_TRACKED_SUBJECTS = 50_000;
+
+  private final RateLimitProperties properties;
+  private final Map<String, Bucket> buckets = RateLimitBuckets.boundedLru(MAX_TRACKED_SUBJECTS);
+
+  /**
+   * Consumes one token from the calling subject's bucket, throwing when the budget is exhausted. A
+   * no-op when rate limiting is disabled (e.g. the e2e stack sets {@code app.rate-limit.enabled=
+   * false}).
+   *
+   * @param sub the authenticated caller's JWT subject; never {@code null}.
+   * @throws RateLimitedException when the subject has no token left, carrying the suggested {@code
+   *     Retry-After} delay.
+   */
+  public void requireWithinLimit(@NotNull String sub) {
+    if (!properties.isEnabled()) {
+      return;
+    }
+    Bucket bucket = buckets.computeIfAbsent(sub, key -> newBucket());
+    ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+    if (!probe.isConsumed()) {
+      long retryAfterSeconds =
+          Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
+      throw new RateLimitedException(retryAfterSeconds);
+    }
+  }
+
+  /**
+   * Builds a fresh per-subject bucket from the shared {@code app.rate-limit} capacity / refill
+   * budget.
+   *
+   * @return a new token bucket.
+   */
+  private @NotNull Bucket newBucket() {
+    Bandwidth limit =
+        Bandwidth.builder()
+            .capacity(properties.getCapacity())
+            .refillGreedy(properties.getRefillTokens(), properties.getRefillPeriod())
+            .build();
+    return Bucket.builder().addLimit(limit).build();
+  }
+}
