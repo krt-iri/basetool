@@ -222,14 +222,11 @@ public class BankBookingRequestService {
    *
    * @param status the lifecycle state to list (e.g. {@code PENDING})
    * @param pageable page, size and whitelisted sort
-   * @param authentication the current authentication
    * @return one page of requests visible to the caller
    */
   @NotNull
   public Page<BankBookingRequestDto> listQueue(
-      @NotNull BankBookingRequestStatus status,
-      @NotNull Pageable pageable,
-      Authentication authentication) {
+      @NotNull BankBookingRequestStatus status, @NotNull Pageable pageable) {
     if (bankSecurityService.isManagement()) {
       return requestRepository.findByStatus(status, pageable).map(this::toDto);
     }

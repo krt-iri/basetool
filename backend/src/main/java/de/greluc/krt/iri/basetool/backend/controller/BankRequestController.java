@@ -72,7 +72,6 @@ public class BankRequestController {
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
-   * @param authentication the current authentication (visibility scoping)
    * @return one page of requests visible to the caller
    */
   @Operation(summary = "List booking requests for the bank-staff confirmation queue (paged)")
@@ -81,15 +80,14 @@ public class BankRequestController {
       @RequestParam(required = false) BankBookingRequestStatus status,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort,
-      Authentication authentication) {
+      @RequestParam(required = false) String sort) {
     BankBookingRequestStatus effectiveStatus =
         status == null ? BankBookingRequestStatus.PENDING : status;
     String effectiveSort = sort == null || sort.isBlank() ? "createdAt,desc" : sort;
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, effectiveSort, QUEUE_SORT_FIELDS, "createdAt");
     Page<BankBookingRequestDto> result =
-        bankBookingRequestService.listQueue(effectiveStatus, pageable, authentication);
+        bankBookingRequestService.listQueue(effectiveStatus, pageable);
     return new PageResponse<>(
         result.getContent(),
         result.getNumber(),

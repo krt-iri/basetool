@@ -65,10 +65,10 @@ class BankRequestControllerTest {
     BankBookingRequestDto dto = requestDto();
     Page<BankBookingRequestDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(bankBookingRequestService.listQueue(
-            eq(BankBookingRequestStatus.PENDING), any(Pageable.class), any()))
+            eq(BankBookingRequestStatus.PENDING), any(Pageable.class)))
         .thenReturn(page);
 
-    PageResponse<BankBookingRequestDto> result = controller.getQueue(null, null, null, null, null);
+    PageResponse<BankBookingRequestDto> result = controller.getQueue(null, null, null, null);
 
     assertEquals(1, result.totalElements());
     assertSame(dto, result.content().getFirst());
