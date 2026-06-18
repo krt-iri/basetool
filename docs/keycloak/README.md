@@ -58,11 +58,14 @@ and [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) step 4).
 
 ## Open findings (hardening, tracked separately)
 
-- **`basetool-frontend` has `directAccessGrantsEnabled: true`** — ROPC (password grant) is enabled
-  on the public frontend client. The desktop-ingest runbook explicitly requires direct access
-  grants **off** for the user-facing clients (the password should never traverse a non-interactive
-  grant). Recommend turning this **off** in the prod realm unless a concrete consumer needs it.
 - **`fullScopeAllowed: true`** on `basetool-frontend` and `basetool-sc-extractor` grants the full
   realm role set into tokens rather than a least-privilege subset. `INGEST_KEYCLOAK_SETUP.md`
   step 1 specifies `fullScopeAllowed: false` for the extractor; prod currently has it `true`.
+
+## Resolved
+
+- **ROPC disabled on `basetool-frontend` (2026-06-18).** `directAccessGrantsEnabled` is now `false`
+  on the public frontend client (it used the browser authorization-code flow anyway), so the
+  password can never traverse a direct-access (resource-owner-password) grant. The e2e test realm
+  (`realm-export.e2e.json`) deliberately keeps it `true` for its ROPC test logins.
 
