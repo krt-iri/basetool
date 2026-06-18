@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.time.Instant;
 import java.util.HashSet;
@@ -73,6 +74,7 @@ public class UexVehicleService {
   private final UexClient uexClient;
   private final ShipTypeRepository shipTypeRepository;
   private final ManufacturerRepository manufacturerRepository;
+  private final ManufacturerUexCompanyRepository manufacturerAliasRepository;
 
   /** Pulls the UEX vehicle catalogue and upserts each row. */
   @Transactional
@@ -255,13 +257,25 @@ public class UexVehicleService {
   }
 
   /**
-   * Looks up the local manufacturer row from the inbound vehicle DTO. Falls back to NULL if no
-   * match — the linked manufacturer stays whatever the previous sync set.
+   * Looks up the local manufacturer row from the inbound vehicle DTO. Resolves by the UEX {@code
+   * id_company} via the {@code manufacturer_uex_company} alias table first (so a brand UEX splits
+   * across several company records — e.g. the ships sit on {@code 278 "Esperia Incorporation"}
+   * while the items sit on {@code 87 "Esperia"} — still reunites on one manufacturer row,
+   * ADR-0023), falling back to a case-insensitive {@code company_name} match for rows without an
+   * id. Returns {@code null} when nothing matches — the linked manufacturer then stays whatever the
+   * previous sync set.
    *
    * @param dto inbound vehicle row
    * @return resolved manufacturer, or {@code null}
    */
   private Manufacturer resolveManufacturer(UexVehicleDto dto) {
+    if (dto.idCompany() != null && dto.idCompany() != 0) {
+      Optional<Manufacturer> byId =
+          manufacturerAliasRepository.findManufacturerByUexCompanyId(dto.idCompany());
+      if (byId.isPresent()) {
+        return byId.orElseThrow();
+      }
+    }
     if (!StringUtils.hasText(dto.companyName())) {
       return null;
     }

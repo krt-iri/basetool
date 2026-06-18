@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.UexCategory;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +50,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 /** Unit tests for {@link UexItemSyncService}. */
 @ExtendWith(MockitoExtension.class)
@@ -58,8 +60,10 @@ class UexItemSyncServiceTest {
   @Mock private UexCategoryRefService categoryRefService;
   @Mock private GameItemRepository gameItemRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
+  @Mock private ManufacturerUexCompanyRepository manufacturerAliasRepository;
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private SyncReportService syncReportService;
+  @Mock private ObjectProvider<UexItemSyncService> self;
 
   @InjectMocks private UexItemSyncService service;
 
@@ -69,6 +73,10 @@ class UexItemSyncServiceTest {
 
   @BeforeEach
   void setUp() {
+    // self.getObject() must return the real instance so the per-item REQUIRES_NEW upsert runs its
+    // actual logic; lenient() because tests that fetch no items never enter the loop.
+    lenient().when(self.getObject()).thenReturn(service);
+
     helmetsCategory = new UexCategory();
     helmetsCategory.setId(3);
     helmetsCategory.setType("item");
@@ -127,7 +135,8 @@ class UexItemSyncServiceTest {
     when(uexClient.getItemsForCategory(3)).thenReturn(List.of(helmet));
     when(gameItemRepository.findByUexItemId(42)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByUexCompanyId(1)).thenReturn(Optional.of(rsi));
+    when(manufacturerAliasRepository.findManufacturerByUexCompanyId(1))
+        .thenReturn(Optional.of(rsi));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
     service.syncItems();

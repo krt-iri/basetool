@@ -6,6 +6,12 @@
 
 - **Die App zeigte beim Aktualisieren der Startseite gelegentlich „Fehler beim Laden der Einsätze" und meldete sich weiterhin von selbst neu an.** Der in v0.5.8 begonnene Fix reichte nicht: Der Benachrichtigungs-Stream konnte das Login-Token trotz nur lesendem Zugriff weiterhin erneuern und dabei einen bereits veralteten Token einreichen, was Keycloak als unzulässige Token-Wiederverwendung wertete und die Sitzung verwarf. Der Stream verwendet das Token jetzt als reinen `Authorization`-Header über eine Verbindung ohne OAuth2-Erneuerungsfilter und kann es damit grundsätzlich nicht mehr erneuern; die Sitzung bleibt bestehen, bis sie regulär abläuft.
 
+- **Der UEX-Item-Abgleich (Waffen, Rüstung, Lackierungen, Schiffskomponenten) brach bei jedem Lauf ab — der Item-Katalog war eingefroren und übernahm keine UEX-Änderungen mehr.** UEX vergibt mehreren Items dieselbe in-game-UUID (ein Basis-Item und seine Skins), wodurch ein Eintrag mit der Unique-Bedingung auf `external_uuid` kollidierte und den ganzen Lauf zurückrollte. Jedes Item wird jetzt in einer eigenen Transaktion abgeglichen, sodass ein kollidierender Eintrag nur sich selbst überspringt.
+
+### Changed
+
+- **Hersteller, die UEX doppelt führt (u. a. Esperia, DMC, Covalex), erscheinen nur noch einmal.** UEX liefert für dieselbe Marke teils mehrere Firmeneinträge mit unterschiedlichen IDs, wodurch z. B. Esperias Schiffe und Items auf zwei getrennten Herstellern landeten. Diese Dubletten werden jetzt zu einem Hersteller zusammengeführt, sodass Schiffe und Items wieder unter derselben Marke auftauchen.
+
 ## [v0.5.9](https://github.com/krt-profit/basetool/releases/tag/v0.5.9) - 2026-06-18
 
 ### Security

@@ -104,6 +104,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param isStarter UEX flag — set on starter-package eligible ships
  * @param isStealth UEX flag
  * @param isTractorBeam UEX flag
+ * @param idCompany UEX integer company id of the manufacturer — the stable key the vehicle sync
+ *     resolves the manufacturer through, so a brand UEX splits across several company records still
+ *     reunites on one manufacturer row (ADR-0023)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record UexVehicleDto(
@@ -174,4 +177,5 @@ public record UexVehicleDto(
     @JsonProperty("is_spaceship") Integer isSpaceship,
     @JsonProperty("is_starter") Integer isStarter,
     @JsonProperty("is_stealth") Integer isStealth,
-    @JsonProperty("is_tractor_beam") Integer isTractorBeam) {}
+    @JsonProperty("is_tractor_beam") Integer isTractorBeam,
+    @JsonProperty("id_company") Integer idCompany) {}
