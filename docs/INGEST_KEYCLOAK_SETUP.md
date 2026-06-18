@@ -168,9 +168,10 @@ Equivalent realm-export keys: `"revokeRefreshToken": false` (see
 
 > **Why this was turned off (2026-06-18).** Rotation + reuse-detection was originally enabled here
 > to protect the persisted desktop-extractor refresh token (a public client storing its token in the
-> OS keystore). But the same realm-wide control also governs `basetool-frontend`, a **confidential
-> server-side BFF** whose refresh token lives only in the Redis session and never reaches a browser.
-> On that BFF, rotation buys no security and — under the unavoidable concurrent-refresh / stale-session
+> OS keystore). But the same realm-wide control also governs `basetool-frontend`, a **server-rendered
+> Spring BFF** — a public Keycloak client whose refresh token is nonetheless held only in the
+> Redis-backed Spring Session and never reaches a browser. On that BFF, rotation buys little (the
+> token never leaves the trusted server) and — under the unavoidable concurrent-refresh / stale-session
 > race — was the *direct* cause of a production cascade that revoked live SSO sessions
 > (`REFRESH_TOKEN_ERROR reason="Stale token"` → `"Session doesn't have required client"`), surfacing
 > as `Fehler beim Laden der Einsätze` on the homepage and recurring forced re-logins (REQ-SEC-012,
@@ -218,7 +219,7 @@ issuer / expiry validation. Restart the backend. Smoke-test: the frontend still 
 - **Steps 1–3:** remove the `extractor-ingest` scope assignment / the `basetool-sc-extractor`
   client. Harmless to leave in place even if the gateway is not yet deployed — the client
   issues tokens nobody consumes until #642 is live.
-- **Step 4:** refresh-token rotation is **off** as of 2026-06-18 (it broke the confidential
+- **Step 4:** refresh-token rotation is **off** as of 2026-06-18 (it broke the server-rendered
   frontend BFF — REQ-SEC-012 / ADR-0019 amendment #4). Re-enabling it (`Revoke Refresh Token = On`)
   restores desktop-token rotation but re-introduces the frontend session-revocation cascade, so do
   not re-enable it realm-wide without a per-client / per-realm scoping plan for the frontend.
@@ -231,7 +232,7 @@ issuer / expiry validation. Restart the backend. Smoke-test: the frontend still 
 - [ ] `aud=basetool-backend` verified on **both** the extractor token and the frontend token
   **before** the validator is enabled.
 - [ ] Refresh-token rotation + reuse-detection **off** realm-wide (`"revokeRefreshToken": false`) —
-  disabled 2026-06-18 because it revoked the confidential frontend BFF's sessions (REQ-SEC-012,
+  disabled 2026-06-18 because it revoked the server-rendered frontend BFF's sessions (REQ-SEC-012,
   ADR-0019 amendment #4).
 - [ ] No client secret, refresh token, or user name/email is written to any config file or
   log (project-wide logging rule).
