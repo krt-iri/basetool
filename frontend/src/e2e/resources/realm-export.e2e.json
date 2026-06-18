@@ -90,24 +90,6 @@
       ]
     },
     {
-      "clientId": "basetool-sc-extractor",
-      "name": "Basetool SC Extractor (E2E)",
-      "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
-      "fullScopeAllowed": false,
-      "redirectUris": ["http://127.0.0.1/*", "http://localhost/*"],
-      "webOrigins": [],
-      "attributes": {
-        "oauth2.device.authorization.grant.enabled": "true",
-        "pkce.code.challenge.method": "S256"
-      },
-      "defaultClientScopes": ["web-origins", "roles", "profile", "email", "extractor-ingest"]
-    },
-    {
       "clientId": "backend-service",
       "name": "Backend Service Account (E2E)",
       "enabled": true,
@@ -118,30 +100,6 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "fullScopeAllowed": true
-    }
-  ],
-  "clientScopes": [
-    {
-      "name": "extractor-ingest",
-      "description": "Stamps aud=basetool-backend on access tokens (desktop ingest, REQ-INGEST-008).",
-      "protocol": "openid-connect",
-      "attributes": {
-        "include.in.token.scope": "false",
-        "display.on.consent.screen": "false"
-      },
-      "protocolMappers": [
-        {
-          "name": "aud-basetool-backend",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper",
-          "config": {
-            "included.custom.audience": "basetool-backend",
-            "access.token.claim": "true",
-            "id.token.claim": "false",
-            "introspection.token.claim": "true"
-          }
-        }
-      ]
     }
   ],
   "users": [
