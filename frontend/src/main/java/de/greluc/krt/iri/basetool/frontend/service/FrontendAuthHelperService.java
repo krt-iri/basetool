@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.frontend.service;
 
+import java.util.Set;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -42,6 +43,21 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class FrontendAuthHelperService {
+
+  /**
+   * Frontend mirror of the backend's "registered member or above" role set. Holding any one of
+   * these {@code ROLE_*} authorities marks the caller as an organisation member or above; holding
+   * none — anonymous OR an authenticated but role-less {@code GUEST} — marks a mission outsider.
+   * Kept in sync with the backend role matrix in {@code ROLES_AND_PERMISSIONS.md}.
+   */
+  private static final Set<String> MEMBER_ROLES =
+      Set.of(
+          "ROLE_ADMIN",
+          "ROLE_OFFICER",
+          "ROLE_MISSION_MANAGER",
+          "ROLE_LOGISTICIAN",
+          "ROLE_SQUADRON_MEMBER",
+          "ROLE_MEMBER");
 
   /**
    * {@code true} if the current request carries an authenticated, non-anonymous principal.
@@ -70,6 +86,30 @@ public class FrontendAuthHelperService {
       return false;
     }
     return auth.getAuthorities().stream().map(Object::toString).anyMatch("ROLE_ADMIN"::equals);
+  }
+
+  /**
+   * {@code true} if the current authentication carries at least one {@link #MEMBER_ROLES}
+   * authority, i.e. the caller is a registered organisation member or above.
+   *
+   * <p>Reads the authorities from the request {@link Authentication} — the SAME source {@code
+   * sec:authorize} and {@code @PreAuthorize} consult — rather than from {@code
+   * OidcUser#getAuthorities()}. Spring's {@code userAuthoritiesMapper} maps the Keycloak realm
+   * roles onto the {@link Authentication} token, NOT onto the {@code OidcUser} principal object, so
+   * a member check that reads the principal misses every {@code ROLE_*} unless {@code
+   * BackendRoleSyncFilter} happened to rebuild the principal that session — which made the
+   * member-only mission finance/refinery panel silently collapse whenever that one-shot sync was
+   * skipped (REQ-SEC-013). Anonymous tokens, missing security contexts and role-less {@code GUEST}
+   * callers all yield {@code false}.
+   *
+   * @return whether the current principal is a registered member or above.
+   */
+  public boolean isMemberOrAbove() {
+    Authentication auth = currentAuthentication();
+    if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+      return false;
+    }
+    return auth.getAuthorities().stream().map(Object::toString).anyMatch(MEMBER_ROLES::contains);
   }
 
   private Authentication currentAuthentication() {

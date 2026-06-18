@@ -43,13 +43,13 @@ import de.greluc.krt.iri.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.UnitForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -110,36 +110,14 @@ public class MissionPageController {
   private final MessageSource messageSource;
 
   /**
-   * Frontend mirror of the backend's "registered member or above" role set. A caller holding none
-   * of these — anonymous OR an authenticated but role-less {@code GUEST} — is a mission outsider
-   * and is treated like an anonymous visitor on the mission surface: the backend already redacts
-   * the mission payload for them, and the page additionally skips the member-only fetches (finance
-   * and refinery ledger) so the "Finanzen" panel collapses for a guest exactly as it does for an
-   * anonymous visitor.
+   * Resolves the "registered member or above" predicate against the request {@link
+   * org.springframework.security.core.Authentication} (the OAuth2 token authorities) — the same
+   * source {@code sec:authorize}/{@code @PreAuthorize} use. Gating the member-only finance/refinery
+   * fetches on the {@code OidcUser} principal's own authorities instead was the root cause of the
+   * silently-empty "Finanzen" panel (REQ-SEC-013): Spring maps the Keycloak realm roles onto the
+   * token, not the principal object.
    */
-  private static final Set<String> MEMBER_ROLES =
-      Set.of(
-          "ROLE_ADMIN",
-          "ROLE_OFFICER",
-          "ROLE_MISSION_MANAGER",
-          "ROLE_LOGISTICIAN",
-          "ROLE_SQUADRON_MEMBER",
-          "ROLE_MEMBER");
-
-  /**
-   * {@code true} when the OIDC principal carries at least one {@link #MEMBER_ROLES} authority, i.e.
-   * is a registered organisation member or above. Returns {@code false} for {@code null}
-   * (anonymous) and for an authenticated but role-less {@code GUEST}. Used to gate the member-only
-   * mission-detail fetches so a guest is treated like an anonymous visitor.
-   *
-   * @param principal the authenticated OIDC user, or {@code null} for anonymous callers
-   * @return whether the caller is a registered member or above
-   */
-  private boolean isMemberOrAbove(OidcUser principal) {
-    return principal != null
-        && principal.getAuthorities().stream()
-            .anyMatch(a -> MEMBER_ROLES.contains(a.getAuthority()));
-  }
+  private final FrontendAuthHelperService authHelperService;
 
   private void addOperationsToModel(Model model, boolean isPublic) {
     if (isPublic) {
@@ -625,7 +603,7 @@ public class MissionPageController {
       // mission's payout view). A guest is treated like an anonymous visitor here: the backend
       // would reject these reads with 403 anyway, and skipping them keeps the "Finanzen" panel
       // empty/collapsed instead of leaking refinery expenses through the shared finance table.
-      if (isMemberOrAbove(principal)) {
+      if (authHelperService.isMemberOrAbove()) {
         try {
           PageResponse<MissionFinanceEntryDto> financesPage =
               backendApiClient.get(

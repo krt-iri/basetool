@@ -6,6 +6,12 @@
 
 - **Offiziere und Leads können den Kontostand ihrer Org-Einheit sehen und Ein-/Auszahlungen zur Bestätigung anstoßen (Epic #666).** Offiziere bzw. SK-Leads sehen jetzt — ohne Bankrolle — ausschließlich den **Kontostand** des Bankkontos ihrer Org-Einheit (keine Historie, keine Halter) und können **Ein- und Auszahlungsanträge** dagegen stellen. Solche Anträge werden sofort im Audit-Log vermerkt, bewegen aber kein Geld: erst wenn ein Bankmitarbeiter den Antrag bestätigt und dabei den Halter hinterlegt, wird die Buchung aufs Hauptbuch gebucht (Überziehungs- und Halterprüfung erfolgen bei der Bestätigung). Antragsteller sehen den Status ihrer eigenen Anträge und können offene Anträge zurückziehen; Bankmitarbeiter bestätigen oder lehnen sie in einer Warteschlange ab. Beim Anlegen eines Antrags werden die Bankleitung und die für das Konto berechtigten Bankmitarbeiter per In-App-Benachrichtigung informiert; bei Bestätigung oder Ablehnung wird der Antragsteller benachrichtigt (mit Ablehnungsgrund). Ein Konto mit offenen Anträgen kann nicht geschlossen werden. Offiziere/Leads erreichen die schlanke Seite „Org-Einheits-Bank", Bankmitarbeiter eine Antrags-Warteschlange im Bankbereich; das Admin-Audit-Log zeigt die neuen Antrags-Ereignisse.
 
+### Fixed
+
+- **Im Finanzen-Tab einer Mission fehlte der Abstand zwischen dem Auszahlungsblock und der Raffinerieaufträge-Liste.** Der AJAX-Umbau der Mission-Detailseite hatte die Finanzblöcke in einen gemeinsamen Container verschachtelt und dabei den standardmäßigen Abstand zwischen ihnen verloren; der gewohnte Abstand ist jetzt wiederhergestellt.
+
+- **Die Finanzeinträge einer Mission (manuelle Buchungen und automatisch verknüpfte Raffineriekosten) wurden manchmal gar nicht mehr angezeigt — der Bereich blieb leer, obwohl die Daten vorhanden waren.** Nach einem kurzzeitigen Backend-Aussetzer traf die Mitglieder-Rollenprüfung im Frontend eine sitzungsweite Fehlentscheidung, die sich bisher nur durch Ab- und Wiederanmelden beheben ließ. Die Prüfung liest die Rollen jetzt aus derselben Quelle wie die übrige Zugriffskontrolle, und ein fehlgeschlagener Rollenabgleich macht die Sitzung nicht mehr dauerhaft unbrauchbar.
+
 ## [v0.5.6](https://github.com/krt-iri/basetool/releases/tag/v0.5.6) - 2026-06-17
 
 ### Changed

@@ -28,6 +28,7 @@ import de.greluc.krt.iri.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.iri.basetool.frontend.model.dto.MissionParticipantDto;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.FrontendAuthHelperService;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
@@ -107,7 +108,8 @@ class ParticipationCalculationTest {
         .thenReturn(mission);
 
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     Model model = new ConcurrentModel();
 
     // Act
@@ -206,7 +208,8 @@ class ParticipationCalculationTest {
         .thenReturn(mission);
 
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     Model model = new ConcurrentModel();
 
     // Act
