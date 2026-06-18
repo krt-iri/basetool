@@ -406,8 +406,9 @@ account showing the current balance and the **net change over the last 30 days**
 (sign-colored `.kpi-delta--pos/--neg`), plus a compact 30-day trend visualization
 (server-computed inline SVG sparkline — no charting library exists or is introduced;
 visual spec: `preview/components-kpi-sparkline.html`). Cards link to the account
-detail; closed accounts render dimmed (`.kpi-card--closed`). Management totals render
-as the `.kpi-total` aggregate strip. Bank employees see the accounts they hold grants on;
+detail; closed accounts render dimmed (`.kpi-card--closed`). Cards are ordered
+alphabetically (case-insensitive) by account name in both perspectives. Management totals
+render as the `.kpi-total` aggregate strip. Bank employees see the accounts they hold grants on;
 bank management (and admins) see **all** accounts plus aggregate totals (sum of
 balances, total 30-day in/out). Itemized recent bookings deliberately live on the
 account **detail** page, not the dashboard — the dashboard shows the net change.
@@ -418,6 +419,7 @@ per-account N+1 (REQ-DATA-003).
 
 - [x] Employee dashboard lists exactly the granted accounts; management/admin dashboard
   lists all accounts + totals row.
+- [x] Cards are ordered alphabetically (case-insensitive) by account name.
 - [x] 30-day delta equals the sum of postings in the window (test-pinned).
 - [x] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
 
