@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Keycloak wird in Produktion nur noch über HTTPS angebunden** — sowohl der nginx-proxy-manager als auch der Benutzer-Abgleich des Backends sprechen Keycloak jetzt verschlüsselt an (HTTPS-only auf Port 18443, kein Klartext-Listener mehr; der Health-Port bleibt aus Healthcheck-Gründen HTTP und ist nur containerintern erreichbar). Beim Deployment muss der Keycloak-Proxy-Host im nginx-proxy-manager auf Schema `https`/Port `18443` umgestellt und das geteilte `keystore.p12` mit `dns:keycloak` im SAN neu erzeugt werden, sonst scheitert der Abgleich an der Hostnamen-Prüfung (Schritt-für-Schritt in `docs/deployment.md`).
+
 ## [v0.5.8](https://github.com/krt-profit/basetool/releases/tag/v0.5.8) - 2026-06-18
 
 ### Changed

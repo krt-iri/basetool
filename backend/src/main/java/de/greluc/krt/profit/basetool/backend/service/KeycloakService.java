@@ -21,6 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import java.net.http.HttpClient;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -28,11 +31,18 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.boot.ssl.NoSuchSslBundleException;
+import org.springframework.boot.ssl.SslBundle;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -54,7 +64,6 @@ import org.springframework.web.client.RestClientResponseException;
  * than auditing every new log line.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class KeycloakService {
 
@@ -67,7 +76,87 @@ public class KeycloakService {
    */
   private static final String BEARER_PREFIX = "Bearer ";
 
+  /**
+   * Name of the Spring SSL bundle whose truststore pins the self-signed certificate the production
+   * Keycloak presents on its internal {@code https://keycloak:18443} admin connector. Defined in
+   * {@code application-prod.yml}; absent in dev/test, where the admin URL is plain HTTP.
+   */
+  private static final String KEYCLOAK_TRUST_BUNDLE = "keycloak-trust";
+
   private final KeycloakSyncProperties properties;
+
+  /**
+   * Pre-built request factory whose JDK {@link HttpClient} trusts only the {@link
+   * #KEYCLOAK_TRUST_BUNDLE} truststore, or {@code null} when that bundle is not configured for the
+   * active profile. {@code null} makes {@link #adminClient()} fall back to the default {@link
+   * RestClient}, which trusts the JVM {@code cacerts} and is what the dev/test plain-HTTP admin URL
+   * needs. Built once at construction so the keystore is parsed a single time, not per request.
+   */
+  @Nullable private final ClientHttpRequestFactory trustedRequestFactory;
+
+  /**
+   * Wires the user-sync properties and resolves the TLS trust for the Keycloak Admin API once at
+   * startup.
+   *
+   * @param properties the {@code app.keycloak.sync.*} configuration (admin URL, realm, credentials)
+   * @param sslBundles the registered Spring SSL bundles; consulted for {@link
+   *     #KEYCLOAK_TRUST_BUNDLE} to pin the self-signed Keycloak certificate in production
+   */
+  public KeycloakService(KeycloakSyncProperties properties, SslBundles sslBundles) {
+    this.properties = properties;
+    this.trustedRequestFactory = buildTrustedRequestFactory(sslBundles);
+  }
+
+  /**
+   * Builds a {@link ClientHttpRequestFactory} backed by a JDK {@link HttpClient} whose trust set is
+   * pinned to the {@link #KEYCLOAK_TRUST_BUNDLE} truststore, or returns {@code null} when no such
+   * bundle is registered for the active profile. Hostname verification is intentionally left at the
+   * JDK default ({@code HTTPS}) — unlike the frontend/ingest WebClients it is NOT disabled here,
+   * because the synchronous JDK {@link HttpClient} cannot disable it reliably per-client; the
+   * pinned certificate must therefore carry {@code dns:keycloak} in its SAN.
+   *
+   * @param sslBundles the registered Spring SSL bundles
+   * @return a truststore-pinned request factory, or {@code null} to fall back to the default {@link
+   *     RestClient} (JVM trust store + plain HTTP for dev/test)
+   * @throws IllegalStateException if the bundle exists but a TLS context cannot be built from it
+   */
+  @Nullable
+  private static ClientHttpRequestFactory buildTrustedRequestFactory(SslBundles sslBundles) {
+    try {
+      SslBundle bundle = sslBundles.getBundle(KEYCLOAK_TRUST_BUNDLE);
+      KeyStore truststore = bundle.getStores().getTrustStore();
+      TrustManagerFactory tmf =
+          TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      tmf.init(truststore);
+      SSLContext sslContext = SSLContext.getInstance("TLS");
+      sslContext.init(null, tmf.getTrustManagers(), null);
+      HttpClient httpClient = HttpClient.newBuilder().sslContext(sslContext).build();
+      return new JdkClientHttpRequestFactory(httpClient);
+    } catch (NoSuchSslBundleException ex) {
+      log.debug(
+          "No '{}' SSL bundle configured; using the default Keycloak admin client",
+          KEYCLOAK_TRUST_BUNDLE);
+      return null;
+    } catch (GeneralSecurityException ex) {
+      throw new IllegalStateException("Failed to build the Keycloak admin TLS trust context", ex);
+    }
+  }
+
+  /**
+   * Creates a {@link RestClient} bound to the configured admin base URL, using the
+   * truststore-pinned request factory when one was resolved at construction. Callers guarantee the
+   * admin URL is non-null (see {@link #fetchUsers()}), so building the lightweight client per call
+   * is safe — the expensive TLS context lives in {@link #trustedRequestFactory} and is reused.
+   *
+   * @return a ready-to-use {@link RestClient} for the Keycloak Admin API
+   */
+  private RestClient adminClient() {
+    RestClient.Builder builder = RestClient.builder().baseUrl(properties.getAdminUrl());
+    if (trustedRequestFactory != null) {
+      builder.requestFactory(trustedRequestFactory);
+    }
+    return builder.build();
+  }
 
   /**
    * Fetches the entire realm user catalog plus role mappings.
@@ -90,9 +179,7 @@ public class KeycloakService {
       String token = getAccessToken();
 
       List<KeycloakUserDto> users =
-          RestClient.builder()
-              .baseUrl(properties.getAdminUrl())
-              .build()
+          adminClient()
               .get()
               .uri("/admin/realms/{realm}/users", properties.getRealm())
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
@@ -120,9 +207,7 @@ public class KeycloakService {
   private Set<String> fetchUserRoles(UUID userId, String token) {
     try {
       List<Map<String, Object>> roles =
-          RestClient.builder()
-              .baseUrl(properties.getAdminUrl())
-              .build()
+          adminClient()
               .get()
               .uri(
                   "/admin/realms/{realm}/users/{id}/role-mappings/realm",
@@ -153,9 +238,7 @@ public class KeycloakService {
 
     try {
       Map response =
-          RestClient.builder()
-              .baseUrl(properties.getAdminUrl())
-              .build()
+          adminClient()
               .post()
               .uri("/realms/{realm}/protocol/openid-connect/token", properties.getRealm())
               .contentType(MediaType.APPLICATION_FORM_URLENCODED)
