@@ -6,6 +6,8 @@
 
 - **Im Finanzen-Tab einer Mission fehlte der Abstand zwischen dem Auszahlungsblock und der Raffinerieaufträge-Liste.** Der AJAX-Umbau der Mission-Detailseite hatte die Finanzblöcke in einen gemeinsamen Container verschachtelt und dabei den standardmäßigen Abstand zwischen ihnen verloren; der gewohnte Abstand ist jetzt wiederhergestellt.
 
+- **Die Finanzeinträge einer Mission (manuelle Buchungen und automatisch verknüpfte Raffineriekosten) wurden manchmal gar nicht mehr angezeigt — der Bereich blieb leer, obwohl die Daten vorhanden waren.** Nach einem kurzzeitigen Backend-Aussetzer traf die Mitglieder-Rollenprüfung im Frontend eine sitzungsweite Fehlentscheidung, die sich bisher nur durch Ab- und Wiederanmelden beheben ließ. Die Prüfung liest die Rollen jetzt aus derselben Quelle wie die übrige Zugriffskontrolle, und ein fehlgeschlagener Rollenabgleich macht die Sitzung nicht mehr dauerhaft unbrauchbar.
+
 ## [v0.5.6](https://github.com/krt-iri/basetool/releases/tag/v0.5.6) - 2026-06-17
 
 ### Changed

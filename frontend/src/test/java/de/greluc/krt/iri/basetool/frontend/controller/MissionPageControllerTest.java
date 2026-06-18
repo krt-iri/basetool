@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.iri.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.iri.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.iri.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.iri.basetool.frontend.service.FrontendAuthHelperService;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,8 @@ class MissionPageControllerTest {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     Model model = new ConcurrentModel();
 
     // Act
@@ -75,7 +77,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -107,7 +110,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true)))
@@ -139,7 +143,8 @@ class MissionPageControllerTest {
     UUID userId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -166,7 +171,8 @@ class MissionPageControllerTest {
     UUID userId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -186,7 +192,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false)))
@@ -209,7 +216,8 @@ class MissionPageControllerTest {
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.delete(anyString(), eq(Void.class), eq(false))).thenReturn(null);
@@ -234,7 +242,8 @@ class MissionPageControllerTest {
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
 
     when(backendApiClient.delete(anyString(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -258,7 +267,8 @@ class MissionPageControllerTest {
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -292,7 +302,8 @@ class MissionPageControllerTest {
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -323,7 +334,8 @@ class MissionPageControllerTest {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     Model model = new ConcurrentModel();
     OidcUser user = mock(OidcUser.class); // Mock authenticated user
 
@@ -353,7 +365,8 @@ class MissionPageControllerTest {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     Model model = new ConcurrentModel();
     // No user (null)
 
@@ -386,7 +399,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     Model model = new ConcurrentModel();
 
     de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto mission =
@@ -458,7 +472,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, mock(MessageSource.class));
+        new MissionPageController(
+            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
     Model model = new ConcurrentModel();
 
     de.greluc.krt.iri.basetool.frontend.model.dto.MissionDto mission =
