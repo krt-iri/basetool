@@ -158,15 +158,21 @@ default `stable` is what the deploy script wants).
 #### 5.2 PKCS12 keystore
 
 Place the production `keystore.p12` at the canonical path. It is
-read-only-mounted into both containers as `/run/secrets/keystore.p12`:
+read-only-mounted as `/run/secrets/keystore.p12` into every service that
+serves or trusts the internal cert — backend, frontend, ingest **and**
+Keycloak:
 
 ```bash
-sudo install -m 0640 -o root -g 10001 /path/to/keystore.p12 /var/iri/secrets/keystore.p12
+sudo install -m 0644 -o root -g 10001 /path/to/keystore.p12 /var/iri/secrets/keystore.p12
 ```
 
-`gid=10001` matches the in-container app user, so the JVM can read the
-file. Owner root prevents the deploy user from rewriting it; rotation is a
-deliberate sudo action.
+It must be **world-readable (`0644`)**: the backend/frontend/ingest images
+run as uid `10001`, but the Keycloak (Quarkus) image runs as uid `1000`, so
+no single owner/group covers both — a stricter `0640` makes Keycloak fail to
+start with `AccessDeniedException /run/secrets/keystore.p12`. Owner root keeps
+the deploy user from rewriting it; rotation is a deliberate sudo action.
+(Acceptable exposure: a self-signed internal cert on a single-purpose host;
+the public Let's Encrypt cert lives in NPM, not here.)
 
 #### 5.3 Keycloak realm export
 
@@ -451,24 +457,45 @@ cannot disable it reliably per-client), so the cert presented on `https://keyclo
 the only cert the internal services present to each other; NPM's public Let's Encrypt cert is
 separate and untouched):
 
-```bash
-# As a deliberate sudo action — back up the old file first.
-sudo cp /var/iri/secrets/keystore.p12 /var/iri/secrets/keystore.p12.bak
+The prod host has **no JDK** (containers only), so there is no host `keytool`.
+Don't install one — the backend image is `eclipse-temurin:25-jre-alpine`, which
+bundles `keytool`; run it as a throwaway container with the secrets dir mounted
+read-write:
 
-sudo keytool -genkeypair -alias basetool -storetype PKCS12 \
-  -keystore /var/iri/secrets/keystore.p12 \
-  -storepass "$SERVER_SSL_KEY_STORE_PASSWORD" \
-  -keypass  "$SERVER_SSL_KEY_STORE_PASSWORD" \
+```bash
+cd /var/iri/code
+
+# Keystore password (= the value in /var/iri/code/.env) and the backend image
+# already on the host. Falls back to the upstream base if the stack image can't
+# be resolved.
+PW=$(sudo grep -E '^SERVER_SSL_KEY_STORE_PASSWORD=' .env | cut -d= -f2-)
+IMG=$(sudo docker compose --profile prod config --images | grep basetool-backend | head -1)
+IMG=${IMG:-eclipse-temurin:25-jre-alpine}
+
+# Back up + remove the old keystore so keytool creates a fresh one (it refuses
+# otherwise: alias 'basetool' already exists).
+sudo cp /var/iri/secrets/keystore.p12 /var/iri/secrets/keystore.p12.bak
+sudo rm -f /var/iri/secrets/keystore.p12
+
+# Generate via the JRE inside the image: --user 0 so it can write into the
+# root-owned secrets dir; --entrypoint keytool overrides the app entrypoint.
+sudo docker run --rm --user 0 --entrypoint keytool -v /var/iri/secrets:/work "$IMG" \
+  -genkeypair -alias basetool -storetype PKCS12 -keystore /work/keystore.p12 \
+  -storepass "$PW" -keypass "$PW" \
   -keyalg RSA -keysize 2048 -validity 3650 \
   -dname "CN=basetool, OU=IRIDIUM, O=DAS KARTELL, C=DE" \
   -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:ingest,dns:keycloak"
 
-# Match the ownership the app uid expects (gid 10001, see "PKCS12 keystore" above).
+# World-readable (0644) so BOTH the uid-10001 JVM services AND the uid-1000
+# Keycloak image can read it (see "5.2 PKCS12 keystore"). 0640 makes Keycloak
+# crash with AccessDeniedException.
 sudo chown root:10001 /var/iri/secrets/keystore.p12
-sudo chmod 0640        /var/iri/secrets/keystore.p12
-```
+sudo chmod 0644        /var/iri/secrets/keystore.p12
 
-`$SERVER_SSL_KEY_STORE_PASSWORD` must equal the value in `/var/iri/code/.env`.
+# Confirm the SAN carries dns:keycloak before restarting anything.
+sudo docker run --rm --entrypoint keytool -v /var/iri/secrets:/work "$IMG" \
+  -list -v -keystore /work/keystore.p12 -storepass "$PW" | grep -i keycloak
+```
 
 ### Host steps
 
@@ -598,15 +625,15 @@ journalctl -u iri-deploy.service -n 50
 
 ## Troubleshooting
 
-|                         Symptom                          |                   Where to look                    |                                                                              Common cause                                                                              |
-|----------------------------------------------------------|----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Timer fires but image never updates                      | `journalctl -u iri-deploy.service`                 | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                          |
-| `docker login` fails                                     | `/var/log/iri-deploy.log`                          | Expired or revoked PAT. See *Token rotation*.                                                                                                                          |
-| Health check times out                                   | `docker compose ps`, `docker logs <service>`       | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                           |
-| Service stays "unhealthy" after rollback                 | `docker logs db-backend` etc.                      | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                      |
-| Keystore mount fails on `up`                             | `docker compose config`, `ls -la /var/iri/secrets` | Keystore file missing or wrong owner. `gid=10001` must be readable.                                                                                                    |
-| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env`                                             | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                             |
-| Compose pulls but does not restart                       | journald log                                       | All target digests match the last-deployed digests — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart. |
+|                         Symptom                          |                       Where to look                       |                                                                                           Common cause                                                                                           |
+|----------------------------------------------------------|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Timer fires but image never updates                      | `journalctl -u iri-deploy.service`                        | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                                                    |
+| `docker login` fails                                     | `/var/log/iri-deploy.log`                                 | Expired or revoked PAT. See *Token rotation*.                                                                                                                                                    |
+| Health check times out                                   | `docker compose ps`, `docker logs <service>`              | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                                                     |
+| Service stays "unhealthy" after rollback                 | `docker logs db-backend` etc.                             | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                                                |
+| Keystore mount fails / Keycloak `AccessDeniedException`  | `docker compose logs keycloak`, `ls -la /var/iri/secrets` | Keystore missing or mode too strict. It must be `0644` — the JVM services run as uid 10001 but Keycloak runs as uid 1000, so `0640` denies Keycloak. `chmod 0644 /var/iri/secrets/keystore.p12`. |
+| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env`                                                    | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                                                       |
+| Compose pulls but does not restart                       | journald log                                              | All target digests match the last-deployed digests — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart.                           |
 
 ---
 
@@ -631,6 +658,8 @@ A few decisions worth keeping in mind when you touch any of the pieces:
 - **No image holds the keystore.** This is checked twice — by
   `.gitignore` (CI's checkout never has the file) and by `.dockerignore`
   (no local `docker build` accidentally bakes it in). The production
-  keystore lives only on the server, behind a root-owned 0640 file
-  whose group matches the in-container app uid.
+  keystore lives only on the server, in a root-owned `0644` file
+  (world-readable so both the uid-10001 JVM services and the uid-1000
+  Keycloak image can read the shared self-signed cert; root ownership still
+  blocks the deploy user from rewriting it).
 
