@@ -448,8 +448,15 @@ worktree; the commands are identical).
      -keypass  "keystore-test-pw-do-not-use-in-prod" \
      -keyalg RSA -keysize 2048 -validity 365 \
      -dname "CN=localhost, OU=Test, O=KRT Basetool Test, L=Test, ST=Test, C=DE" \
-     -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:ingest"
+     -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:ingest,dns:keycloak"
    ```
+
+   > The `dns:keycloak` SAN entry lets the backend's user-sync admin client validate the
+   > internal `https://keycloak:18443` connector with hostname verification on (see
+   > [Keycloak behind NPM over HTTPS](docs/deployment.md#keycloak-behind-npm-over-https)).
+   > A keystore generated without it still serves every other path (frontend/ingest disable
+   > hostname verification), but the backend→Keycloak sync would fail the TLS handshake.
+
 3. **Provide a test `realm-export.json`** at the repo root containing a
    Keycloak realm named `iri` with a `basetool-frontend` public client, a
    `backend-service` confidential client whose `secret` matches

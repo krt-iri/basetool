@@ -261,6 +261,38 @@ user re-logs in.
 `MissionPageControllerMvcTest` · **Code:** `FrontendAuthHelperService`, `MissionPageController`,
 `BackendRoleSyncFilter` · **Issues:** mission-finance-panel regression
 
+### REQ-SEC-014 — Encrypted transport to Keycloak (no cleartext edge)
+
+Production Keycloak MUST serve **HTTPS only** — `--http-enabled=false --https-port=18443`, with the
+shared bind-mounted `keystore.p12` — so neither edge that reaches it is cleartext:
+
+- **NPM &rarr; Keycloak:** `nginx-proxy-manager` terminates the public Let's Encrypt cert and
+  re-encrypts to `https://keycloak:18443` (nginx does not verify the self-signed upstream cert).
+- **backend &rarr; Keycloak (admin/user-sync):** `KeycloakService` calls `https://keycloak:18443`
+  directly over the isolated `net-backend-keycloak` network, pinning the self-signed cert via the
+  `keycloak-trust` Spring SSL bundle (mirrors the frontend/ingest `backend-trust` approach, audit
+  finding M-13). Unlike those reactive WebClients, the synchronous JDK `HttpClient` keeps **hostname
+  verification ON** (it cannot be disabled reliably per-client), so the cert's SAN MUST include
+  `dns:keycloak`.
+
+The management/health interface (port 9000) is exempt: it stays HTTP via
+`--http-management-scheme=http` because the Quarkus image ships no TLS-capable CLI client for the
+container healthcheck, and the port is container-loopback only (never published, never on a proxy
+network). Dev/test are exempt (Keycloak stays HTTP; the admin URL is plain HTTP and no
+`keycloak-trust` bundle is defined, so `KeycloakService` falls back to the default client).
+
+**Acceptance**
+
+- [ ] In prod, Keycloak exposes no plain-HTTP listener; the public host works through NPM over TLS.
+- [ ] The backend user sync succeeds against `https://keycloak:18443` with hostname verification on
+  (cert SAN carries `dns:keycloak`).
+- [ ] Keycloak reports `healthy` (the HTTP management healthcheck still passes after the HTTPS flip).
+- [ ] With no `keycloak-trust` bundle (dev/test), `KeycloakService` builds and talks plain HTTP.
+
+**Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService`, `application-prod.yml`
+(`spring.ssl.bundle.jks.keycloak-trust`), `docker-compose.yml` (`keycloak` command, backend
+`KEYCLOAK_ADMIN_URL`) · **Runbook:** [`deployment.md` &rarr; Keycloak behind NPM over HTTPS](../deployment.md#keycloak-behind-npm-over-https)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

@@ -120,6 +120,12 @@ x-keycloak: &keycloak-template
     KC_HEALTH_ENABLED: "true"
     KC_HTTP_ENABLED: "true"
     KC_HTTP_PORT: 18080
+    # Keystore password for the prod HTTPS connector. The `keycloak` (prod) service's command
+    # override enables `--https-*` and disables plain HTTP; Keycloak merges this env-supplied
+    # password with the CLI `--https-key-store-file`. Set in the shared template (not as a CLI arg)
+    # so the password never lands in the process arg list. Harmless for `keycloak-dev`, which keeps
+    # plain HTTP (start-dev) and configures no keystore file, so the value is simply unused there.
+    KC_HTTPS_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     KC_DB: postgres
     KC_DB_URL: jdbc:postgresql://db-keycloak:15433/${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set in .env}
     KC_DB_USERNAME: ${KC_POSTGRES_USER:?KC_POSTGRES_USER must be set in .env}
@@ -175,6 +181,13 @@ x-backend: &backend-template
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
+    # Internal admin / user-sync path: direct backend→Keycloak over the isolated
+    # net-backend-keycloak network, now TLS because the prod Keycloak serves HTTPS only. Trust is
+    # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
+    # (backend application-prod.yml); hostname verification stays ON, so the cert's SAN MUST include
+    # `dns:keycloak` (see the README keytool recipe). The dev/test stack overrides this back to
+    # http://keycloak:18080 in docker-compose.test.yml.
+    KEYCLOAK_ADMIN_URL: https://keycloak:18443
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
     # The keystore lives on the host filesystem (bind-mounted below) and is
     # explicitly NOT packaged into the GHCR image. Both backend and frontend
@@ -365,6 +378,34 @@ services:
   keycloak:
     <<: *keycloak-template
     profiles: ["prod"]
+    # Prod serves HTTPS ONLY. NPM re-encrypts the public host to https://keycloak:18443 (NPM upstream
+    # scheme https, upstream-cert verification OFF for the shared self-signed cert) and the backend
+    # admin client reaches the SAME connector over the internal net-backend-keycloak network. Plain
+    # HTTP is disabled (`--http-enabled=false`) so no cleartext Keycloak listener exists anywhere.
+    # The management/health interface (port 9000) is pinned to HTTP (`--http-management-scheme=http`)
+    # because the Quarkus image ships no TLS-capable CLI client (no curl/wget/openssl, only java) and
+    # the healthcheck talks plain HTTP via bash /dev/tcp — see the x-keycloak healthcheck. The
+    # keystore is the shared keystore.p12 (volume below); its password comes from the env
+    # KC_HTTPS_KEY_STORE_PASSWORD set in the template.
+    command: >
+      start
+      --proxy-headers xforwarded
+      --cache=local
+      --http-enabled=false
+      --https-port=18443
+      --https-key-store-file=/run/secrets/keystore.p12
+      --http-management-scheme=http
+      --log=console,file
+      --log-file=/var/log/keycloak/keycloak.log
+    # Re-list the template volumes (a service-level `volumes:` replaces the merged template value)
+    # and add the keystore bind mount. Kept off the shared template on purpose so the keystore stays
+    # a prod-only requirement and `keycloak-dev` (run keystore-free in the deps-only dev flow) is
+    # unaffected.
+    volumes:
+      - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
+      - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - /var/iri/keycloak/log:/var/log/keycloak
+      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     depends_on:
       db-keycloak:
         condition: service_healthy

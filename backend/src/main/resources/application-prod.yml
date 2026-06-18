@@ -44,6 +44,22 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+  # Truststore for the internal Keycloak Admin API call (KeycloakService / the scheduled user sync).
+  # In prod the backend reaches Keycloak directly over https://keycloak:18443 (net-backend-keycloak),
+  # and Keycloak presents the same bind-mounted self-signed keystore.p12 the other modules use. By
+  # pinning that cert as the only trust anchor, the admin client validates the connection without the
+  # InsecureTrustManagerFactory (mirrors the frontend's `backend-trust` bundle, audit finding M-13).
+  # Hostname verification stays ON, so the cert's SAN must carry `dns:keycloak`. If this bundle is
+  # absent (dev/test, or an operator fronting Keycloak with a publicly-trusted cert) KeycloakService
+  # falls back to the default JVM trust store / plain HTTP.
+  ssl:
+    bundle:
+      jks:
+        keycloak-trust:
+          truststore:
+            location: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
+            password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+            type: PKCS12
 server:
   shutdown: graceful
 

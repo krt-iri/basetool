@@ -426,6 +426,114 @@ maintenance") so it reads correctly for both.
 
 ---
 
+## Keycloak behind NPM over HTTPS
+
+Keycloak no longer serves plain HTTP in production. The `keycloak` service starts with
+`--http-enabled=false --https-port=18443`, so **both** edges that reach it are now TLS:
+
+- **NPM → Keycloak** — `nginx-proxy-manager` terminates the public Let's Encrypt cert for
+  `keycloak.profit-base.online` and **re-encrypts** to `https://keycloak:18443` on the internal
+  `net-proxy-keycloak` network.
+- **backend → Keycloak** — the scheduled user sync (`KeycloakService`) reaches the same connector
+  directly over the isolated `net-backend-keycloak` network via `KEYCLOAK_ADMIN_URL=https://keycloak:18443`,
+  pinning the shared self-signed cert through the `keycloak-trust` SSL bundle.
+
+The management/health interface (port 9000) is deliberately kept on **HTTP**
+(`--http-management-scheme=http`): the Quarkus image ships no TLS-capable CLI client (only `java`),
+and the container `HEALTHCHECK` opens a plain-HTTP socket to `/health/ready` via bash `/dev/tcp`.
+That port is container-loopback only — it is never published nor placed on a proxy network.
+
+### Prerequisite — the shared keystore must carry `dns:keycloak`
+
+The backend keeps **hostname verification on** for the admin call (the synchronous JDK `HttpClient`
+cannot disable it reliably per-client), so the cert presented on `https://keycloak:18443` must list
+`keycloak` in its SAN. The shared `keystore.p12` historically did **not**. Regenerate it (this is
+the only cert the internal services present to each other; NPM's public Let's Encrypt cert is
+separate and untouched):
+
+```bash
+# As a deliberate sudo action — back up the old file first.
+sudo cp /var/iri/secrets/keystore.p12 /var/iri/secrets/keystore.p12.bak
+
+sudo keytool -genkeypair -alias basetool -storetype PKCS12 \
+  -keystore /var/iri/secrets/keystore.p12 \
+  -storepass "$SERVER_SSL_KEY_STORE_PASSWORD" \
+  -keypass  "$SERVER_SSL_KEY_STORE_PASSWORD" \
+  -keyalg RSA -keysize 2048 -validity 3650 \
+  -dname "CN=basetool, OU=IRIDIUM, O=DAS KARTELL, C=DE" \
+  -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:ingest,dns:keycloak"
+
+# Match the ownership the app uid expects (gid 10001, see "PKCS12 keystore" above).
+sudo chown root:10001 /var/iri/secrets/keystore.p12
+sudo chmod 0640        /var/iri/secrets/keystore.p12
+```
+
+`$SERVER_SSL_KEY_STORE_PASSWORD` must equal the value in `/var/iri/code/.env`.
+
+### Host steps
+
+1. **Ship the release that contains this change.** Cut + promote a version whose `basetool-backend`
+   image carries the `keycloak-trust` bundle and the `KeycloakService` TLS wiring (see
+   [Normal deploy flow](#normal-deploy-flow)). An *old* backend image pointed at the HTTPS admin URL
+   would fail the handshake.
+2. **Update the compose file on the host** — the new `keycloak` command/volumes and the backend
+   `KEYCLOAK_ADMIN_URL` live in `docker-compose.yml`, which is copied manually:
+
+   ```bash
+   sudo cp docker-compose.yml /var/iri/code/docker-compose.yml
+   sudo chown deploy:docker   /var/iri/code/docker-compose.yml
+   ```
+3. **Regenerate the keystore** with `dns:keycloak` (previous section).
+4. **Reconfigure the NPM proxy host** for `keycloak.profit-base.online` (NPM admin UI on
+   `127.0.0.1:10081`): set **Forward Scheme = `https`** and **Forward Port = `18443`** (Forward
+   Hostname stays `keycloak`). nginx does **not** verify the upstream certificate by default, so the
+   self-signed cert is accepted with no extra toggle. The public SSL tab (Let's Encrypt) is unchanged.
+5. **Apply.** First re-create the services whose compose definition / image changed (`keycloak`
+   recreates for the new command + keystore mount; `backend` for the new image + `KEYCLOAK_ADMIN_URL`):
+
+   ```bash
+   sudo -u deploy /usr/bin/docker compose \
+       -f /var/iri/code/docker-compose.yml --profile prod \
+       up -d keycloak backend
+   ```
+
+   Then **restart `frontend` and `ingest`** so they reload the regenerated `keystore.p12`. This is
+   easy to miss: the keystore is a bind mount, so `up -d` does **not** recreate these two — but the
+   shared cert is loaded once at JVM start, both as each service's own HTTPS server cert *and* as its
+   `backend-trust` truststore. Without the restart they keep pinning the **old** cert and every
+   frontend/ingest → backend call fails with `PKIX path building failed` once the backend presents the
+   new one:
+
+   ```bash
+   sudo -u deploy /usr/bin/docker compose \
+       -f /var/iri/code/docker-compose.yml --profile prod \
+       restart frontend ingest
+   ```
+
+   The NPM proxy-host change (step 4) is applied live by nginx on save; restarting the `npm` container
+   is not required.
+
+### Verify
+
+```bash
+# Keycloak is healthy (proves the HTTP management healthcheck still works after the HTTPS flip).
+sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod ps keycloak
+
+# Public OIDC discovery still resolves through NPM (NPM → keycloak:18443 re-encryption works).
+curl -fsS https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
+
+# Backend user sync succeeds over TLS — no recurring "Failed to fetch users from Keycloak".
+sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
+    logs --since 5m backend | grep -i "fetch users from keycloak" || echo "no sync errors"
+```
+
+A `PKIX path building failed` or `No subject alternative DNS name matching keycloak` in the backend
+log means the keystore was not regenerated with `dns:keycloak` — redo the prerequisite. As an
+emergency fallback only, revert `KEYCLOAK_ADMIN_URL` to `http://keycloak:18080` **and** drop
+`--http-enabled=false` from the `keycloak` command, then re-`up`; fix the cert and switch back.
+
+---
+
 ## Manual deploy / rollback
 
 ### Pin to a specific version (forward or backward)
