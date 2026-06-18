@@ -356,26 +356,30 @@ public class WebClientConfig {
   }
 
   /**
-   * Streaming WebClient for the notification SSE relay (REQ-NOTIF-010). Relays the OAuth2 bearer
-   * and the correlation / active-org-unit / locale headers like {@link #webClient}, but
-   * deliberately omits the Resilience4j chain (its 5-second {@code TimeLimiter} and retry would
-   * sever a long-lived stream) and the response / read timeouts (see {@link #connector(boolean)}).
-   * Used only by the frontend stream relay; all request/response traffic still goes through {@link
-   * #webClient}.
+   * Streaming WebClient for the notification SSE relay (REQ-NOTIF-010). Relays the correlation /
+   * active-org-unit / locale headers like {@link #webClient}, but deliberately omits both the
+   * Resilience4j chain (its 5-second {@code TimeLimiter} and retry would sever a long-lived stream)
+   * and the response / read timeouts (see {@link #connector(boolean)}) <b>and</b> the OAuth2 {@code
+   * oauth2Configuration()} exchange filter.
    *
-   * @param authorizedClientManager the OAuth2 authorised-client manager for bearer relay
+   * <p>Dropping the OAuth2 filter is load-bearing for REQ-SEC-012 / ADR-0019. With the filter
+   * applied, attaching an authorized client routes the call into {@code
+   * ServletOAuth2AuthorizedClientExchangeFilterFunction.reauthorizeClient}, which invokes {@code
+   * OAuth2AuthorizedClientManager.authorize(...)} <i>unconditionally</i> — so on a stale/empty
+   * single-flight cache this 30-minute async relay could drive a refresh-token grant (and write the
+   * rotated client back to the session) against the snapshot it captured at stream-open, replaying
+   * a refresh token Keycloak's reuse detection then revokes the whole SSO session for. Without the
+   * filter the relay can never reach {@code authorize}; {@code NotificationPageController.stream}
+   * resolves the bearer read-only and sets it as a plain {@code Authorization} header instead, so
+   * the relay is structurally refresh-incapable rather than depending on a warm cache. Used only by
+   * the frontend stream relay; all request/response traffic still goes through {@link #webClient}.
+   *
    * @return the streaming WebClient
    */
   @Bean
-  public WebClient sseWebClient(OAuth2AuthorizedClientManager authorizedClientManager) {
-    ServletOAuth2AuthorizedClientExchangeFilterFunction oauth2Client =
-        new ServletOAuth2AuthorizedClientExchangeFilterFunction(authorizedClientManager);
-    oauth2Client.setDefaultOAuth2AuthorizedClient(true);
-    oauth2Client.setDefaultClientRegistrationId("keycloak");
-
+  public WebClient sseWebClient() {
     return WebClient.builder()
         .clientConnector(connector(true))
-        .apply(oauth2Client.oauth2Configuration())
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(userLocaleRelayFilter.relayUserLocale())

@@ -203,12 +203,23 @@ single-flight key MUST resolve consistently per session — the session id is re
 `RequestContextHolder` when the OAuth2 filter did not attach the servlet request, so the same
 session never splits across stripes and the principal fallback is reserved for request-less calls.
 The long-lived notification SSE relay (`/notifications/stream`, a 30-minute `SseEmitter`) MUST NOT
-drive a refresh: it resolves its bearer **read-only** (`OAuth2AuthorizedClientRepository.loadAuthorizedClient`)
-and attaches it explicitly, so a stale online refresh token can neither be replayed nor written back
-to the session — which would otherwise trip Keycloak's reuse detection and revoke the SSO session.
+drive a refresh. Resolving the bearer **read-only**
+(`OAuth2AuthorizedClientRepository.loadAuthorizedClient`) is necessary but **not sufficient** on its
+own: attaching an authorized client to a WebClient that still carries the OAuth2 exchange filter
+routes the call through `ServletOAuth2AuthorizedClientExchangeFilterFunction.reauthorizeClient`, which
+calls `OAuth2AuthorizedClientManager.authorize(...)` *unconditionally* and can therefore refresh (and
+write the rotated client back) on a stale/empty single-flight cache. The relay therefore uses a
+dedicated `sseWebClient` built **without** the `oauth2Configuration()` filter and sets the read-only
+bearer as a plain `Authorization` header, so it is structurally incapable of reaching `authorize` — a
+stale online refresh token can neither be replayed nor written back to the session (which would
+otherwise trip Keycloak's reuse detection and revoke the SSO session). The snapshot token is relayed
+verbatim even when expired; the backend rejects it and the always-on unread-count poll, not the relay,
+drives re-authentication. The relay fails soft when no token is bound. The single-flight freshness
+margin (`EXPIRY_SKEW`) MUST be ≥ the `RefreshTokenOAuth2AuthorizedClientProvider` clock skew (Spring's
+default is 60s), so a freshness-cache hit never serves a token the provider would itself refresh.
 Single-flight is JVM-local; horizontally-scaled deployments rely on `Refresh Token Max Reuse > 0` on
 Keycloak for the residual cross-instance race. `offline_access` MUST NOT be re-added to paper over
-this (audit finding L-4). See ADR-0019 (and its 2026-06-18 amendment).
+this (audit finding L-4). See ADR-0019 (and its 2026-06-18 amendments).
 
 **Acceptance**
 
@@ -218,8 +229,11 @@ this (audit finding L-4). See ADR-0019 (and its 2026-06-18 amendment).
   client redirects the window.
 - [ ] A burst of concurrent same-session authorize calls issues exactly one refresh-token grant,
   including when some callers lack the attached servlet request (session id recovered from context).
-- [ ] The notification SSE relay never issues a refresh-token grant: it resolves the bearer
-  read-only and fails soft when no token is bound.
+- [ ] The notification SSE relay never issues a refresh-token grant: it relays a read-only bearer as
+  a plain `Authorization` header over a WebClient with no OAuth2 exchange filter (verbatim even when
+  the token is already expired) and fails soft when no token is bound.
+- [ ] `EXPIRY_SKEW` ≥ the refresh provider's clock skew (60s) so a freshness-cache hit never serves a
+  token the provider would refresh.
 - [ ] `ClientAuthorizationException` is not retried and does not open the backend circuit breaker.
 
 **Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `NotificationPageControllerStreamTest`,

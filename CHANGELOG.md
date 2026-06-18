@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die App zeigte beim Aktualisieren der Startseite gelegentlich „Fehler beim Laden der Einsätze" und meldete sich weiterhin von selbst neu an.** Der in v0.5.8 begonnene Fix reichte nicht: Der Benachrichtigungs-Stream konnte das Login-Token trotz nur lesendem Zugriff weiterhin erneuern und dabei einen bereits veralteten Token einreichen, was Keycloak als unzulässige Token-Wiederverwendung wertete und die Sitzung verwarf. Der Stream verwendet das Token jetzt als reinen `Authorization`-Header über eine Verbindung ohne OAuth2-Erneuerungsfilter und kann es damit grundsätzlich nicht mehr erneuern; die Sitzung bleibt bestehen, bis sie regulär abläuft.
+
 ## [v0.5.9](https://github.com/krt-profit/basetool/releases/tag/v0.5.9) - 2026-06-18
 
 ### Security

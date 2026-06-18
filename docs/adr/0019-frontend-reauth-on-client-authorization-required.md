@@ -121,3 +121,48 @@ only with these two corrections. `Refresh Token Max Reuse > 0` remains the opera
 it is not a substitute for them. A sanitized snapshot of the prod realm's token settings now lives
 at `docs/keycloak/realm-config.reference.json` (see `docs/keycloak/README.md`).
 
+## Amendment — 2026-06-18 (follow-up): the read-only load did not make the relay refresh-free
+
+The first amendment's fix #2 claimed the relay's **read-only** `loadAuthorizedClient` + explicit
+attach stops it from refreshing. That is **not true at the resolved Spring Security version** (7.1.0,
+via Boot 4.1.0; the mechanism is identical in 7.0.x). Attaching an authorized client via
+`oauth2AuthorizedClient(...)` routes the upstream call into
+`ServletOAuth2AuthorizedClientExchangeFilterFunction.reauthorizeClient`, which calls
+`OAuth2AuthorizedClientManager.authorize(...)` **unconditionally**. Its only short-circuit
+(`servletRequest`/`servletResponse == null`) never fires, because `oauth2Configuration()` →
+`populateDefaultRequestResponse` bakes both in from `RequestContextHolder` on the servlet thread at
+build time. So `RefreshTokenOAuth2AuthorizedClientProvider` still refreshes whenever the attached
+token is within its 60s clock skew of expiry, and `DefaultOAuth2AuthorizedClientManager` writes the
+rotated client back to the Redis session. The read-only load only stopped the relay from *selecting
+and persisting a self-chosen* stale client; the **only** thing that suppressed an actual refresh was
+the JVM-local single-flight freshness cache being warm at reconnect.
+
+A production incident confirmed this: the homepage briefly showed "Fehler beim Laden der Einsätze"
+(and the periodic forced re-login recurred) when an SSE reconnect on the 5-minute access-token
+boundary found a stale/empty cache, drove a refresh against the snapshot it had captured read-only at
+stream-open (the deferred `authorize()` runs later on `boundedElastic`), and replayed a refresh token
+already rotated past — Keycloak logged `REFRESH_TOKEN_ERROR reason="Stale token"`, reuse detection
+revoked the client session, and subsequent reconnects logged `Session doesn't have required client`
+until the 60s poll bounced the user through a (usually silent) re-login. The single-flight key split
+this amendment's fix #1 addressed was **ruled out** for this incident: the relay carries the servlet
+request in the `OAuth2AuthorizeRequest` attribute, so `cacheKey()` derives the session key directly
+and the relay + poll share one stripe.
+
+**Fix:** make the relay **structurally** refresh-incapable instead of relying on a warm cache. The
+`sseWebClient` bean is built **without** the `oauth2Configuration()` exchange filter, and
+`NotificationPageController.stream` sets the read-only bearer as a plain `Authorization` header. With
+no OAuth2 filter on that client the upstream call can never reach `reauthorizeClient` → `authorize`,
+so the relay cannot refresh or write back under any cache state. The snapshot token is relayed
+verbatim even when expired (the backend rejects it, the stream fails soft, and the always-on poll
+drives re-auth); the relay still fails soft when no token is bound. Additionally,
+`SingleFlightAuthorizedClientManager.EXPIRY_SKEW` is raised from 30s to **60s** to match the refresh
+provider's clock skew, removing a 30–60s asymmetry window in which the cache and the provider
+disagreed on whether a refresh was due. A new `NotificationPageControllerStreamTest` case pins the
+exact production condition — a present-but-**expired** client relays its bearer verbatim and issues
+**zero** refresh grants.
+
+Note: the runbook prescribes `Refresh Token Max Reuse = 0`, but the prod realm runs `5` (confirmed by
+an Admin Console read on 2026-06-18); it is an operator backstop and does not change this code defect.
+The "never issues a refresh-token grant" guarantee in REQ-SEC-012 is now delivered by construction
+(no filter), not by cache warmth.
+
