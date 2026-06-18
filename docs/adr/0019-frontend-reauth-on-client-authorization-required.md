@@ -87,3 +87,37 @@ operator setting when scaled horizontally.
   deep in the WebClient exchange on a Reactor worker thread; handling it at the MVC boundary is
   simpler and also covers the AJAX/SSE transports the entry point does not.
 
+## Amendment — 2026-06-18: single-instance correctness was incomplete
+
+A production deployment (single frontend instance, Keycloak `Refresh Token Max Reuse = 5`,
+`ssoSessionIdleTimeout` = 30 days, `ssoSessionMaxLifespan` = 180 days) still forced an
+**interactive** re-login every ~30–60 minutes — i.e. Keycloak was revoking the whole SSO session,
+which at those settings can only be refresh-token **reuse detection** firing (no timeout fits that
+cadence, and a small in-session race stays under `Max Reuse = 5`). Two gaps in the original fix were
+responsible; neither is the multi-instance race this ADR anticipated:
+
+1. **The single-flight key was not stable per session.** `cacheKey()` keyed by session id only when
+   the servlet request was attached to the `OAuth2AuthorizeRequest`, otherwise by principal name,
+   otherwise `null`. A caller that authorized without the attribute and a sibling that had it used
+   different stripe locks / cache buckets for the *same* session, so their refreshes were not
+   serialised and each issued a grant off the same stored token. **Fix:** recover the session id
+   from `RequestContextHolder` when the attribute is missing, so the precise session key is used
+   consistently and the principal fallback is reserved for genuinely request-less calls.
+
+2. **The notification SSE relay drove token refresh on a long-lived request.** `/notifications/stream`
+   is an async `SseEmitter` capped at 30 minutes; it used the default-authorized-client filter, so
+   its `authorize()` could refresh and write the rotated client into the session. A long-lived
+   request that loaded the session early and persisted it late can write a now-many-rotations-stale
+   refresh token back to Redis, clobbering the current one — the next refresh then replays a dead
+   token and reuse detection revokes the session. The 30-minute stream timeout lines this up with
+   the observed re-login cadence. **Fix:** the relay resolves the access token **read-only** on the
+   servlet thread (`OAuth2AuthorizedClientRepository.loadAuthorizedClient`) and attaches it
+   explicitly to the upstream call, so it never refreshes or rewrites the session; it fails soft when
+   no token is bound, and the always-on 60 s unread-count poll keeps the token fresh and drives any
+   re-authentication.
+
+The original claim that single-flight "makes a single frontend instance correct on its own" holds
+only with these two corrections. `Refresh Token Max Reuse > 0` remains the operator-side backstop;
+it is not a substitute for them. A sanitized snapshot of the prod realm's token settings now lives
+at `docs/keycloak/realm-config.reference.json` (see `docs/keycloak/README.md`).
+

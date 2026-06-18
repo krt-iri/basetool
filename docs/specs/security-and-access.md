@@ -198,10 +198,17 @@ To stop the in-session refresh race that produces this (parallel page + SSE + po
 replaying the same refresh token, which Keycloak's rotation + reuse detection then revokes — see
 `INGEST_KEYCLOAK_SETUP.md` step 4), the `OAuth2AuthorizedClientManager` is wrapped in a
 `SingleFlightAuthorizedClientManager` that serialises refreshes per session and serves a
-short-lived freshness cache, issuing at most one refresh-token grant per expiry window. Single-flight
-is JVM-local; horizontally-scaled deployments rely on `Refresh Token Max Reuse > 0` on Keycloak for
-the residual cross-instance race. `offline_access` MUST NOT be re-added to paper over this (audit
-finding L-4). See ADR-0019.
+short-lived freshness cache, issuing at most one refresh-token grant per expiry window. The
+single-flight key MUST resolve consistently per session — the session id is recovered from
+`RequestContextHolder` when the OAuth2 filter did not attach the servlet request, so the same
+session never splits across stripes and the principal fallback is reserved for request-less calls.
+The long-lived notification SSE relay (`/notifications/stream`, a 30-minute `SseEmitter`) MUST NOT
+drive a refresh: it resolves its bearer **read-only** (`OAuth2AuthorizedClientRepository.loadAuthorizedClient`)
+and attaches it explicitly, so a stale online refresh token can neither be replayed nor written back
+to the session — which would otherwise trip Keycloak's reuse detection and revoke the SSO session.
+Single-flight is JVM-local; horizontally-scaled deployments rely on `Refresh Token Max Reuse > 0` on
+Keycloak for the residual cross-instance race. `offline_access` MUST NOT be re-added to paper over
+this (audit finding L-4). See ADR-0019 (and its 2026-06-18 amendment).
 
 **Acceptance**
 
@@ -209,14 +216,17 @@ finding L-4). See ADR-0019.
   flow instead of rendering an empty page / 500.
 - [ ] The same failure on an AJAX call returns `401` with an `X-Reauthenticate` header and the
   client redirects the window.
-- [ ] A burst of concurrent same-session authorize calls issues exactly one refresh-token grant.
+- [ ] A burst of concurrent same-session authorize calls issues exactly one refresh-token grant,
+  including when some callers lack the attached servlet request (session id recovered from context).
+- [ ] The notification SSE relay never issues a refresh-token grant: it resolves the bearer
+  read-only and fails soft when no token is bound.
 - [ ] `ClientAuthorizationException` is not retried and does not open the backend circuit breaker.
 
-**Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `GlobalExceptionHandlerTest`,
-`BackendApiClientResilienceTest` · **Code:** `SingleFlightAuthorizedClientManager`,
-`ReauthenticationRequiredException`, `BackendApiClient`, `GlobalExceptionHandler`,
-`NotificationPageController`, `krt-fetch.js` · **Issues:** ingest-rollout regression · **ADR:**
-ADR-0019
+**Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `NotificationPageControllerStreamTest`,
+`GlobalExceptionHandlerTest`, `BackendApiClientResilienceTest` · **Code:**
+`SingleFlightAuthorizedClientManager`, `ReauthenticationRequiredException`, `BackendApiClient`,
+`GlobalExceptionHandler`, `NotificationPageController`, `krt-fetch.js` · **Issues:** ingest-rollout
+regression · **ADR:** ADR-0019
 
 ### REQ-SEC-013 — Frontend role checks read the Authentication token, not the OidcUser principal
 

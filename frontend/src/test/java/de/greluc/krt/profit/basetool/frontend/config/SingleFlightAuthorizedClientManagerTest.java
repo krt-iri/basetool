@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -42,6 +43,8 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Unit tests for {@link SingleFlightAuthorizedClientManager}: the per-session refresh
@@ -51,6 +54,12 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 class SingleFlightAuthorizedClientManagerTest {
 
   private static final String REGISTRATION_ID = "keycloak";
+
+  /** Clears any servlet request bound by a test so the thread-local does not leak across tests. */
+  @AfterEach
+  void clearRequestContext() {
+    RequestContextHolder.resetRequestAttributes();
+  }
 
   /** Builds an authorized client whose access token expires {@code secondsFromNow} from now. */
   private static OAuth2AuthorizedClient clientExpiringIn(long secondsFromNow) {
@@ -134,6 +143,30 @@ class SingleFlightAuthorizedClientManagerTest {
     manager.authorize(requestForSession(null));
 
     // Same principal, no session → still de-duplicated by the principal-name fallback key.
+    verify(delegate, times(1)).authorize(any());
+  }
+
+  @Test
+  void missingServletAttribute_recoversSessionIdFromRequestContext_soSameSessionSingleFlights() {
+    OAuth2AuthorizedClientManager delegate = mock(OAuth2AuthorizedClientManager.class);
+    OAuth2AuthorizedClient fresh = clientExpiringIn(300);
+    when(delegate.authorize(any())).thenReturn(fresh);
+    SingleFlightAuthorizedClientManager manager = new SingleFlightAuthorizedClientManager(delegate);
+
+    // Bind a servlet request (session "sess-ctx") to the current thread, as a servlet/worker thread
+    // would have during a real request even when the authorize request did not carry the attribute.
+    HttpServletRequest boundRequest = mock(HttpServletRequest.class);
+    HttpSession session = mock(HttpSession.class);
+    when(boundRequest.getSession(false)).thenReturn(session);
+    when(session.getId()).thenReturn("sess-ctx");
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(boundRequest));
+
+    // First call carries NO servlet attribute → it must recover "sess-ctx" from the RequestContext
+    // instead of downgrading to the principal key; the second call carries the same session id
+    // explicitly. Both must resolve to the identical session key and collapse to one grant.
+    manager.authorize(requestForSession(null));
+    manager.authorize(requestForSession("sess-ctx"));
+
     verify(delegate, times(1)).authorize(any());
   }
 

@@ -1,0 +1,252 @@
+{
+  "_comment": "SANITIZED REFERENCE of the production 'iri' Keycloak realm config. NOT for direct import. Secrets, signing keys, SMTP credentials and all real PII/URLs have been stripped or replaced with *.example.invalid / __PLACEHOLDER__ tokens. Keycloak built-in clients (account, broker, realm-management, ...) and authentication flows are omitted as noise. The token/session settings are reproduced verbatim because they are configuration, not secrets, and are the source of truth for the session-lifetime behaviour documented in docs/INGEST_KEYCLOAK_SETUP.md and docs/adr/0019-*. See docs/keycloak/README.md for provenance, redactions and open findings.",
+  "realm": "iri",
+  "displayName": "IRIDIUM Basetool",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "rememberMe": true,
+  "verifyEmail": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": true,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "defaultSignatureAlgorithm": "RS256",
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 5,
+  "accessTokenLifespan": 300,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 2592000,
+  "ssoSessionMaxLifespan": 15552000,
+  "ssoSessionIdleTimeoutRememberMe": 2592000,
+  "ssoSessionMaxLifespanRememberMe": 15552000,
+  "offlineSessionIdleTimeout": 2592000,
+  "offlineSessionMaxLifespanEnabled": true,
+  "offlineSessionMaxLifespan": 7776000,
+  "clientSessionIdleTimeout": 0,
+  "clientSessionMaxLifespan": 0,
+  "clientOfflineSessionIdleTimeout": 0,
+  "clientOfflineSessionMaxLifespan": 0,
+  "accessCodeLifespan": 300,
+  "accessCodeLifespanUserAction": 300,
+  "accessCodeLifespanLogin": 1800,
+  "oauth2DeviceCodeLifespan": 600,
+  "oauth2DevicePollingInterval": 5,
+  "roles": {
+    "realm": [
+      {
+        "name": "Admin",
+        "description": "Administrator with full access"
+      },
+      {
+        "name": "Officer",
+        "description": "Officer with management permissions"
+      },
+      {
+        "name": "Squadron Member",
+        "description": "Standard member of the squadron"
+      },
+      {
+        "name": "Bank Employee",
+        "description": ""
+      },
+      {
+        "name": "Bank Management",
+        "description": ""
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "basetool-frontend",
+      "name": "IRIDIUM Basetool Frontend",
+      "description": "Frontend Application for IRIDIUM Basetool",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://basetool.example.invalid/login/oauth2/code/keycloak",
+        "https://basetool.example.invalid/*",
+        "http://frontend:18081/*"
+      ],
+      "webOrigins": [
+        "https://basetool.example.invalid",
+        "http://frontend:18081"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://basetool.example.invalid/*##https://basetool.example.invalid",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.session.required": "false",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "rank",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "rank",
+            "claim.name": "rank",
+            "jsonType.label": "int",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "description",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "description",
+            "claim.name": "description",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "lightweight.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "extractor-ingest",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "basetool-sc-extractor",
+      "name": "Basetool SC Extractor (desktop)",
+      "description": "Public device-grant client for the desktop blueprint extractor (REQ-INGEST-002).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://127.0.0.1/*",
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        ""
+      ],
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true",
+        "pkce.code.challenge.method": "S256",
+        "backchannel.logout.session.required": "true"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "extractor-ingest",
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "backend-service",
+      "name": "",
+      "description": "Confidential service-account client for backend-internal Keycloak Admin API access.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__SET_AT_DEPLOY__",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://backend:11261/*"
+      ],
+      "webOrigins": [
+        "http://backend:11261"
+      ]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "extractor-ingest",
+      "description": "Stamps aud=basetool-backend on access tokens (desktop ingest, REQ-INGEST-008).",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "true",
+        "include.in.openid.provider.metadata": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-basetool-backend",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "basetool-backend",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "contentSecurityPolicyReportOnly": "",
+    "xContentTypeOptions": "nosniff",
+    "xFrameOptions": "SAMEORIGIN",
+    "referrerPolicy": "no-referrer",
+    "xRobotsTag": "none",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
+  "smtpServer": {
+    "host": "smtp.example.invalid",
+    "port": "587",
+    "starttls": "true",
+    "ssl": "false",
+    "auth": "true",
+    "authType": "basic",
+    "user": "__SMTP_USER__",
+    "password": "__SET_AT_DEPLOY__",
+    "from": "noreply@example.invalid",
+    "fromDisplayName": "IRIDIUM Basetool",
+    "replyTo": "noreply@example.invalid",
+    "replyToDisplayName": "IRIDIUM Basetool",
+    "connectionTimeout": "10000",
+    "timeout": "10000",
+    "writeTimeout": "10000"
+  },
+  "loginTheme": "krt-theme",
+  "accountTheme": "krt-theme",
+  "eventsEnabled": false,
+  "adminEventsEnabled": false
+}

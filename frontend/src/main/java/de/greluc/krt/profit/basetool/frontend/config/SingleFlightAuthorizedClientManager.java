@@ -30,6 +30,9 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * A {@link OAuth2AuthorizedClientManager} decorator that collapses the concurrent token refreshes a
@@ -151,10 +154,21 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
 
   /**
    * Builds the per-session cache / lock key from the authorize request: {@code
-   * <registrationId>|s:<sessionId>} when an HTTP session is bound (the common case — the OAuth2
-   * exchange filter carries the servlet request through as a request attribute), falling back to
-   * the principal name when only that is available. Returns {@code null} when neither can be
-   * derived, in which case the caller delegates without single-flight.
+   * <registrationId>|s:<sessionId>} when an HTTP session can be resolved (the common case), falling
+   * back to {@code <registrationId>|p:<principalName>} when only the principal is available, and
+   * {@code null} when neither can be derived (then the caller delegates without single-flight).
+   *
+   * <p><b>Key stability matters.</b> Two concurrent authorize calls for the <i>same</i> user must
+   * resolve to the <i>same</i> key, or they land on different stripe locks / cache buckets,
+   * serialise against nobody, and each fire a refresh-token grant off the same stored token — which
+   * Keycloak's reuse detection then punishes by revoking the whole session. The OAuth2 exchange
+   * filter normally carries the servlet request through as a request attribute, but a caller that
+   * resolved the authorized client on a thread where that attribute was not propagated would
+   * otherwise downgrade to the principal key while a sibling kept the session key — a split that
+   * breaks single-flight. To close that gap the session id is also recovered from {@link
+   * RequestContextHolder} (any servlet/virtual worker thread with bound request attributes) when
+   * the request attribute is missing, so the precise session key is used consistently and the
+   * principal fallback is reserved for genuinely request-less calls.
    *
    * @param request the authorize request
    * @return the cache key, or {@code null} if no session / principal context is available
@@ -163,11 +177,31 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
   private static String cacheKey(@NotNull OAuth2AuthorizeRequest request) {
     String registrationId = request.getClientRegistrationId();
     HttpServletRequest servletRequest = request.getAttribute(HttpServletRequest.class.getName());
+    if (servletRequest == null) {
+      servletRequest = currentServletRequest();
+    }
     if (servletRequest != null && servletRequest.getSession(false) != null) {
       return registrationId + "|s:" + servletRequest.getSession(false).getId();
     }
     if (request.getPrincipal() != null && request.getPrincipal().getName() != null) {
       return registrationId + "|p:" + request.getPrincipal().getName();
+    }
+    return null;
+  }
+
+  /**
+   * Returns the {@link HttpServletRequest} bound to the current thread via {@link
+   * RequestContextHolder}, or {@code null} when no servlet request is bound (e.g. a true Reactor
+   * worker thread or a background task). Used only as a fallback to recover the session id when the
+   * authorize request did not carry the servlet request as an attribute.
+   *
+   * @return the current servlet request, or {@code null} if none is bound to this thread
+   */
+  @Nullable
+  private static HttpServletRequest currentServletRequest() {
+    RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+    if (attributes instanceof ServletRequestAttributes servletAttributes) {
+      return servletAttributes.getRequest();
     }
     return null;
   }
