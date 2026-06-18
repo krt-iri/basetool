@@ -87,12 +87,12 @@
                             <button type="button" class="btn btn--cta btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
                                     data-testid="bank-request-confirm-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-_version=${r.version()},data-field-reqlabel=${r.accountNo()}"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
                                     th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
                             <button type="button" class="btn btn-ghost btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
                                     data-testid="bank-request-reject-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-_version=${r.version()},data-field-reqlabel=${r.accountNo()}"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
                                     th:text="#{bank.request.action.reject}">Ablehnen</button>
                         </div>
                         <span th:unless="${r.status() == 'PENDING'}" class="text-muted"
