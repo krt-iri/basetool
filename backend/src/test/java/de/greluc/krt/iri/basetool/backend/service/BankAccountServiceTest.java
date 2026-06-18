@@ -66,6 +66,7 @@ class BankAccountServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BankAccountMapper bankAccountMapper;
   @Mock private BankAuditService bankAuditService;
+  @Mock private BankBookingRequestService bankBookingRequestService;
 
   @InjectMocks private BankAccountService bankAccountService;
 
@@ -168,6 +169,26 @@ class BankAccountServiceTest {
 
     // Then
     assertEquals(BankConflictException.CODE_BANK_ACCOUNT_NOT_EMPTY, ex.getCode());
+    verify(accountRepository, never()).save(any());
+  }
+
+  @Test
+  void closeAccount_rejectsOpenPendingRequestsWithStableCode() {
+    // Given a zero-balance account that still has an open pending booking request (REQ-BANK-025)
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = accountWithVersion(accountId, 2L);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(postingRepository.accountBalance(accountId)).thenReturn(BigDecimal.ZERO);
+    when(bankBookingRequestService.hasOpenRequests(accountId)).thenReturn(true);
+
+    // When
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () -> bankAccountService.closeAccount(accountId, new BankAccountLifecycleRequest(2L)));
+
+    // Then
+    assertEquals(BankConflictException.CODE_BANK_ACCOUNT_HAS_PENDING_REQUESTS, ex.getCode());
     verify(accountRepository, never()).save(any());
   }
 

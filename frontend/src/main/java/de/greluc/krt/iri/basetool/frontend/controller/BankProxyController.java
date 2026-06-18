@@ -111,6 +111,37 @@ public class BankProxyController {
   }
 
   /**
+   * Forwards a bank employee's confirmation of a pending booking request (epic #666 F2): records
+   * the holder and books it onto the ledger (REQ-BANK-023). Capability/visibility 409s and
+   * overdraft conflicts surface inline.
+   *
+   * @param id the request to confirm
+   * @param body the confirm payload (holderId + echoed version)
+   * @return the confirmed request
+   */
+  @PostMapping("/requests/{id}/confirm")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> confirmBookingRequest(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
+    return postMap("/api/v1/bank/requests/" + id + "/confirm", body);
+  }
+
+  /**
+   * Forwards a bank employee's rejection of a pending booking request (epic #666 F2, REQ-BANK-023):
+   * records a reason and books nothing.
+   *
+   * @param id the request to reject
+   * @param body the reject payload (reason + echoed version)
+   * @return the rejected request
+   */
+  @PostMapping("/requests/{id}/reject")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> rejectBookingRequest(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
+    return postMap("/api/v1/bank/requests/" + id + "/reject", body);
+  }
+
+  /**
    * Forwards an account creation (management-only on the backend; singleton 409s surface inline).
    *
    * @param body the raw creation payload

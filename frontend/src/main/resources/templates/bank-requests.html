@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{bank.requests.title} + ' - ' + ${appTitle}">Antr&auml;ge - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
+    <div class="greeting hud-box flex-between">
+        <div>
+            <h1 th:text="#{bank.requests.title}">Buchungsantr&auml;ge</h1>
+            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+               th:text="#{bank.requests.subtitle}">Antr&auml;ge der Org-Einheiten best&auml;tigen oder ablehnen.</p>
+        </div>
+        <div class="bank-head-actions">
+            <a th:href="@{/bank/requests(status='PENDING')}" class="btn btn-ghost btn-sm"
+               th:classappend="${status == 'PENDING'} ? ' btn--cta' : ''"
+               th:text="#{bank.request.status.PENDING}">Ausstehend</a>
+            <a th:href="@{/bank/requests(status='CONFIRMED')}" class="btn btn-ghost btn-sm"
+               th:classappend="${status == 'CONFIRMED'} ? ' btn--cta' : ''"
+               th:text="#{bank.request.status.CONFIRMED}">Best&auml;tigt</a>
+            <a th:href="@{/bank/requests(status='REJECTED')}" class="btn btn-ghost btn-sm"
+               th:classappend="${status == 'REJECTED'} ? ' btn--cta' : ''"
+               th:text="#{bank.request.status.REJECTED}">Abgelehnt</a>
+            <a th:href="@{/bank/requests(status='CANCELLED')}" class="btn btn-ghost btn-sm"
+               th:classappend="${status == 'CANCELLED'} ? ' btn--cta' : ''"
+               th:text="#{bank.request.status.CANCELLED}">Zur&uuml;ckgezogen</a>
+        </div>
+    </div>
+
+    <!-- requestQueue fragment: the filtered request table; swapped in place after a decision. -->
+    <div id="bank-request-queue-results" th:fragment="requestQueue">
+        <div class="hud-box mt-2">
+            <p class="text-center" th:if="${requests == null or #lists.isEmpty(requests.content())}"
+               data-testid="bank-requests-empty" th:text="#{bank.requests.empty}">
+                Keine Antr&auml;ge in diesem Status.
+            </p>
+            <table class="data-table" th:if="${requests != null and !#lists.isEmpty(requests.content())}"
+                   data-testid="bank-requests-table">
+                <thead>
+                <tr>
+                    <th th:text="#{bank.request.col.account}">Konto</th>
+                    <th th:text="#{bank.request.col.type}">Typ</th>
+                    <th th:text="#{bank.request.col.amount}">Betrag</th>
+                    <th th:text="#{bank.request.col.requester}">Antragsteller</th>
+                    <th th:text="#{bank.request.col.status}">Status</th>
+                    <th th:text="#{bank.request.col.created}">Erstellt</th>
+                    <th th:text="#{bank.request.col.actions}">Aktionen</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${requests.content()}" data-testid="bank-request-row">
+                    <td>
+                        <span th:text="${r.accountNo()}">KB-0001</span>
+                        <span class="text-muted" th:if="${r.orgUnitShorthand() != null}"
+                              th:text="' &middot; ' + ${r.orgUnitShorthand()}"></span>
+                    </td>
+                    <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
+                    <td th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
+                    <td th:text="${r.requesterHandle()}">greluc</td>
+                    <td>
+                        <span class="chip"
+                              th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : ''"
+                              th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                    </td>
+                    <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
+                    <td>
+                        <div th:if="${r.status() == 'PENDING'}" class="bank-row-actions">
+                            <button type="button" class="btn btn--cta btn-sm"
+                                    data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
+                                    data-testid="bank-request-confirm-btn"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
+                                    th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                    data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
+                                    data-testid="bank-request-reject-btn"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
+                                    th:text="#{bank.request.action.reject}">Ablehnen</button>
+                        </div>
+                        <span th:unless="${r.status() == 'PENDING'}" class="text-muted"
+                              th:text="${r.deciderHandle() != null} ? ${r.deciderHandle()} : '&ndash;'">&ndash;</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Confirm modal (records the holder; books the ledger). _id + version primed per row. -->
+    <div class="krt-modal-overlay" id="bank-confirm-request-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.confirm.modal.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.request.confirm.modal.title}">Antrag best&auml;tigen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-confirm-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-refresh="requestQueue"
+                  data-endpoint="/api/proxy/bank/requests/{id}/confirm" data-method="POST">
+                <div class="krt-modal-body">
+                    <input type="hidden" name="_id">
+                    <input type="hidden" name="version">
+                    <p class="text-muted"><span data-bank-label="reqlabel">KB-0001 &middot; Einzahlung 5.000</span></p>
+                    <div class="bank-form-row">
+                        <label for="bank-confirm-holder" th:text="#{bank.field.holder}">Halter</label>
+                        <select id="bank-confirm-holder" name="holderId" required data-testid="bank-confirm-holder">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="h : ${holders}" th:value="${h.id()}"
+                                    th:text="${h.active()} ? ${h.handle()} : (${h.handle()} + ' ' + #{bank.holder.inactive})">greluc</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="holderId"></span>
+                    </div>
+                    <p class="bank-field-hint" th:text="#{bank.request.confirm.modal.hint}">Erfasse den Halter, der das Geld erhalten bzw. ausgezahlt hat.</p>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-confirm-request-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-confirm-submit"
+                            th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reject modal. _id + version primed per row. -->
+    <div class="krt-modal-overlay" id="bank-reject-request-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.reject.modal.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.request.reject.modal.title}">Antrag ablehnen</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-reject-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-refresh="requestQueue"
+                  data-endpoint="/api/proxy/bank/requests/{id}/reject" data-method="POST">
+                <div class="krt-modal-body">
+                    <input type="hidden" name="_id">
+                    <input type="hidden" name="version">
+                    <p class="text-muted"><span data-bank-label="reqlabel">KB-0001 &middot; Einzahlung 5.000</span></p>
+                    <div class="bank-form-row">
+                        <label for="bank-reject-reason" th:text="#{bank.request.field.reason}">Grund</label>
+                        <input type="text" id="bank-reject-reason" name="reason" maxlength="500" required
+                               data-testid="bank-reject-reason" th:placeholder="#{bank.request.field.reason.placeholder}">
+                        <span class="bank-field-error" data-error-for="reason"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-reject-request-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--danger" data-testid="bank-reject-submit"
+                            th:text="#{bank.request.action.reject}">Ablehnen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

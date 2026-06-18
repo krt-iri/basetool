@@ -116,12 +116,18 @@
                     <label for="rule-eventType" th:text="#{admin.notificationRules.eventType}">Ereignis</label>
                     <select id="rule-eventType">
                         <option value="JOB_ORDER_CREATED">JOB_ORDER_CREATED</option>
+                        <option value="BANK_BOOKING_REQUEST_CREATED">BANK_BOOKING_REQUEST_CREATED</option>
+                        <option value="BANK_BOOKING_REQUEST_CONFIRMED">BANK_BOOKING_REQUEST_CONFIRMED</option>
+                        <option value="BANK_BOOKING_REQUEST_REJECTED">BANK_BOOKING_REQUEST_REJECTED</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="rule-notificationType" th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</label>
                     <select id="rule-notificationType">
                         <option value="JOB_ORDER_CREATED">JOB_ORDER_CREATED</option>
+                        <option value="BANK_BOOKING_REQUEST_CREATED">BANK_BOOKING_REQUEST_CREATED</option>
+                        <option value="BANK_BOOKING_REQUEST_CONFIRMED">BANK_BOOKING_REQUEST_CONFIRMED</option>
+                        <option value="BANK_BOOKING_REQUEST_REJECTED">BANK_BOOKING_REQUEST_REJECTED</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -161,6 +167,8 @@
                     <option value="ORG_RELATIVE_ROLE">ORG_RELATIVE_ROLE</option>
                     <option value="ROLE">ROLE</option>
                     <option value="SPECIFIC_USER">SPECIFIC_USER</option>
+                    <option value="ACCOUNT_GRANT">ACCOUNT_GRANT</option>
+                    <option value="EVENT_RECIPIENT">EVENT_RECIPIENT</option>
                 </select>
             </div>
             <div class="form-group" data-field="orgRelativeRole">

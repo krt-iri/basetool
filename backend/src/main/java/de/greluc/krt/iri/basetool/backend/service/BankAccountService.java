@@ -78,6 +78,7 @@ public class BankAccountService {
   private final OrgUnitRepository orgUnitRepository;
   private final BankAccountMapper bankAccountMapper;
   private final BankAuditService bankAuditService;
+  private final BankBookingRequestService bankBookingRequestService;
 
   /**
    * Pages over the accounts the caller may see: management/admin get all accounts, employees get
@@ -289,6 +290,12 @@ public class BankAccountService {
               account.getAccountNo(),
               "balance",
               balance.stripTrailingZeros().toPlainString()));
+    }
+    if (bankBookingRequestService.hasOpenRequests(accountId)) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_ACCOUNT_HAS_PENDING_REQUESTS,
+          "The account has open booking requests; decide them before closing",
+          Map.of("accountNo", account.getAccountNo()));
     }
     account.setStatus(BankAccountStatus.CLOSED);
     BankAccount saved = accountRepository.save(account);

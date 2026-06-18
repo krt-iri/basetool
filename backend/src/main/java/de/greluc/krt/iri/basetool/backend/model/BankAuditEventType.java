@@ -78,5 +78,30 @@ public enum BankAuditEventType {
   STATEMENT_EXPORTED,
 
   /** The management three-month report PDF was exported (REQ-BANK-015). */
-  MANAGEMENT_REPORT_EXPORTED
+  MANAGEMENT_REPORT_EXPORTED,
+
+  /**
+   * An org-unit officer/lead raised a confirm-before-post booking request (REQ-BANK-022). Audited
+   * on creation while still off-ledger (PENDING), before any money moves.
+   */
+  BOOKING_REQUEST_CREATED,
+
+  /**
+   * A bank employee confirmed a booking request; the linked ledger transaction is booked in the
+   * same step (REQ-BANK-023). The {@code DEPOSIT_BOOKED} / {@code WITHDRAWAL_BOOKED} event for the
+   * actual ledger movement is recorded alongside it.
+   */
+  BOOKING_REQUEST_CONFIRMED,
+
+  /**
+   * A bank employee rejected a booking request; no ledger effect, the reason is in details
+   * (REQ-BANK-023).
+   */
+  BOOKING_REQUEST_REJECTED,
+
+  /**
+   * The requesting officer/lead cancelled their own pending booking request; no ledger effect
+   * (REQ-BANK-022).
+   */
+  BOOKING_REQUEST_CANCELLED
 }

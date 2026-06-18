@@ -38,5 +38,21 @@ public enum SelectorKind {
    * Resolves to holders of a role <em>relative to an org unit carried by the event</em> — the role
    * given by {@code orgRelativeRole} within the org unit selected by {@code contextRole}.
    */
-  ORG_RELATIVE_ROLE
+  ORG_RELATIVE_ROLE,
+
+  /**
+   * Resolves to every employee holding a {@code bank_account_grant} on the <em>bank account carried
+   * by the event</em> ({@link
+   * de.greluc.krt.iri.basetool.backend.event.NotificationEvent#contextAccountId()}). Reads no
+   * selector columns — the account comes from the event, mirroring {@link #ORG_RELATIVE_ROLE}.
+   */
+  ACCOUNT_GRANT,
+
+  /**
+   * Resolves to the single user the event is directed at ({@link
+   * de.greluc.krt.iri.basetool.backend.event.NotificationEvent#contextRecipientSub()}) — e.g. the
+   * officer/lead who raised a booking request, notified when it is confirmed or rejected. Reads no
+   * selector columns — the recipient comes from the event.
+   */
+  EVENT_RECIPIENT
 }

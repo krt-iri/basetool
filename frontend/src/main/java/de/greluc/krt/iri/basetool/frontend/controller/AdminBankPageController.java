@@ -81,7 +81,11 @@ public class AdminBankPageController {
           "TRANSACTION_REVERSED",
           "WIPE_RESET_EXECUTED",
           "STATEMENT_EXPORTED",
-          "MANAGEMENT_REPORT_EXPORTED");
+          "MANAGEMENT_REPORT_EXPORTED",
+          "BOOKING_REQUEST_CREATED",
+          "BOOKING_REQUEST_CONFIRMED",
+          "BOOKING_REQUEST_REJECTED",
+          "BOOKING_REQUEST_CANCELLED");
 
   private final BackendApiClient backendApiClient;
 

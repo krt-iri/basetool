@@ -31,5 +31,24 @@ package de.greluc.krt.iri.basetool.backend.model;
 public enum NotificationEventType {
 
   /** A new job order ("Auftrag") was created. */
-  JOB_ORDER_CREATED
+  JOB_ORDER_CREATED,
+
+  /**
+   * An org-unit officer/lead raised a confirm-before-post bank deposit/withdrawal request (epic
+   * #666 F2, REQ-BANK-026). The default rule notifies the bank management and the employees granted
+   * on the target account.
+   */
+  BANK_BOOKING_REQUEST_CREATED,
+
+  /**
+   * A bank employee confirmed a booking request (epic #666 F2, REQ-BANK-026). The default rule
+   * notifies the requesting officer/lead.
+   */
+  BANK_BOOKING_REQUEST_CONFIRMED,
+
+  /**
+   * A bank employee rejected a booking request (epic #666 F2, REQ-BANK-026). The default rule
+   * notifies the requesting officer/lead.
+   */
+  BANK_BOOKING_REQUEST_REJECTED
 }

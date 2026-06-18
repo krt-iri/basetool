@@ -463,6 +463,33 @@ Die Bankleitung sieht das Audit-Log **nicht** — es ist bewusst Admin-only
 vergeben werden (409 `BANK_GRANTEE_MISSING_ROLE`); ob die Person zusätzlich in
 einer Staffel/einem SK ist, spielt keine Rolle.
 
+#### 3.11.1 Org-Einheits-Zugang für Offiziere/Leads (epic #666)
+
+Epic #666 ergänzt **eine einzige, eng umrissene** Org-Einheits-Fähigkeit, **ohne**
+die Unabhängigkeit aus REQ-BANK-008 aufzuweichen: `BankSecurityService` und das
+Hauptbuch bleiben zu 100 % OrgUnit-blind. Die gesamte OrgUnit-Logik liegt in genau
+einem bewusst **nicht** mit `Bank` benannten Seam, `OrgUnitBankAccessService`
+(ADR-0020), der als einziger `OwnerScopeService` und Bank verbinden darf
+(ArchUnit-pinned). Diese Oberfläche liegt **außerhalb** des Bank-URL-/Rollenraums
+unter `/api/v1/org-units/bank/**` und braucht **keine** Bankrolle. „Off./Lead" =
+Offizier der eigenen Staffel bzw. Lead des eigenen Spezialkommandos (Aufsichtsscope
+`currentBlueprintOversightScope()`); ein einfacher Member sieht weiterhin nichts.
+
+| Funktion (Gate)                                                                                                          | Anonym | Member | Off./Lead |  Bank-MA  | Bankleitung | Admin |
+|:-------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:---------:|:-----------:|:-----:|
+| **Nur Kontostand** des eigenen OrgUnit-Kontos sehen (`GET /api/v1/org-units/bank/balances`, Aufsichtsscope)              |   ❌    |   ❌    |     ✅     |   (✅)*    |    (✅)*     |   ✅   |
+| Ein-/Auszahlungs**antrag** anlegen / eigene Anträge sehen / eigenen Antrag zurückziehen (`/org-units/bank/requests/**`)  |   ❌    |   ❌    |     ✅     |   (✅)*    |    (✅)*     |   ✅   |
+| Antrag **bestätigen** (bucht, Halter erfassen) / **ablehnen** (`/api/v1/bank/requests/**`, `BANK_EMPLOYEE` + Konto-Flag) |   ❌    |   ❌    |     ❌     | ✅ je Flag |      ✅      |   ✅   |
+
+\* Bank-MA/Bankleitung erreichen die Offiziers-Endpunkte nur, soweit sie selbst der
+Aufsichtsscope abdeckt (sie sind als Bankpersonal nicht automatisch Offizier/Lead) —
+ihre eigentliche Bankarbeit läuft über den Bankbereich oben. Der Antrag bewegt erst
+bei der Bestätigung Geld; Überziehungs-/Halterprüfung greifen dann wie bei einer
+direkten Buchung (REQ-BANK-023). Beim Anlegen werden Bankleitung + die für das Konto
+berechtigten Bank-MA per In-App-Benachrichtigung informiert (REQ-BANK-026,
+`ACCOUNT_GRANT`-Selektor). Ein Konto mit offenem Antrag lässt sich nicht schließen
+(409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). Das Audit-Log bleibt Admin-only.
+
 ---
 
 ## 4. Mehr-OrgUnit-Sichtbarkeit (Scoping)

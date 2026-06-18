@@ -19,9 +19,12 @@
 
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.model.BankAccountGrant;
 import de.greluc.krt.iri.basetool.backend.model.OrgRelativeRole;
+import de.greluc.krt.iri.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.iri.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.iri.basetool.backend.repository.UserRepository;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +50,7 @@ public class RecipientResolutionService {
 
   private final UserRepository userRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+  private final BankAccountGrantRepository bankAccountGrantRepository;
 
   /**
    * Resolves every holder of a global role by its stable code.
@@ -76,5 +80,23 @@ public class RecipientResolutionService {
       case MISSION_MANAGER ->
           orgUnitMembershipRepository.findMissionManagerUserIdsByOrgUnit(orgUnitId);
     };
+  }
+
+  /**
+   * Resolves every bank employee holding a {@code bank_account_grant} on the given account — the
+   * {@code ACCOUNT_GRANT} selector's recipients (REQ-BANK-026). Row existence on the account is the
+   * "appropriately authorized for this account" signal (REQ-BANK-009); the per-action capability
+   * flag still gates whether such an employee may later confirm the request.
+   *
+   * @param accountId the bank account whose grant holders to notify
+   * @return the granted employees' user subs; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> resolveAccountGrantHolders(@NotNull UUID accountId) {
+    Set<UUID> recipients = new HashSet<>();
+    for (BankAccountGrant grant : bankAccountGrantRepository.findByAccountId(accountId)) {
+      recipients.add(grant.getId().getUserId());
+    }
+    return recipients;
   }
 }
