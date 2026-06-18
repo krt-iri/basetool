@@ -170,8 +170,7 @@ public class GlobalExceptionHandler {
   /** Renders the 404 error page for unmapped static resource / page requests. */
   @ExceptionHandler(NoResourceFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public String handleNoResourceFoundException(
-      @NotNull NoResourceFoundException e, @NotNull Model model) {
+  public String handleNoResourceFoundException(@NotNull Model model) {
     Locale locale = LocaleContextHolder.getLocale();
     model.addAttribute("error", resolve("error.404.title", locale, "Not Found"));
     model.addAttribute(

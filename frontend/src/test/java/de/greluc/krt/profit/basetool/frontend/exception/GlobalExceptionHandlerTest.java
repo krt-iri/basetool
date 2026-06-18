@@ -331,15 +331,10 @@ class GlobalExceptionHandlerTest {
   // ─── handleNoResourceFoundException ─────────────────────────────────────
 
   @Test
-  void noResourceFound_setsModelAttributes_andReturnsErrorView() throws Exception {
-    // The 3-arg constructor is the Spring 6.2+ signature
-    // (method, resourcePath, message).
-    org.springframework.web.servlet.resource.NoResourceFoundException ex =
-        new org.springframework.web.servlet.resource.NoResourceFoundException(
-            org.springframework.http.HttpMethod.GET, "/missing", "not there");
+  void noResourceFound_setsModelAttributes_andReturnsErrorView() {
     Model model = new ConcurrentModel();
 
-    String view = handler.handleNoResourceFoundException(ex, model);
+    String view = handler.handleNoResourceFoundException(model);
 
     assertEquals("error/error", view);
     assertEquals("error.404.title", model.getAttribute("error"));
