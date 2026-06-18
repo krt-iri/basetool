@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.5.11](https://github.com/krt-profit/basetool/releases/tag/v0.5.11) - 2026-06-18
+
 ### Fixed
 
 - **Einzelne UEX-Items (z. B. die Skin-Variante „Pulse Greycat Laser Pistol") wurden bei jedem Item-Abgleich übersprungen und protokollierten einen Fehler.** UEX teilt sich ein Basis-Item und seine Skins eine in-game-UUID, die nur einmal vergeben werden kann (`external_uuid` ist eindeutig). Beim Nachtragen der UUID auf die Skin-Zeile kollidierte diese mit dem bereits belegten Basis-Item. Der Abgleich übernimmt eine UUID jetzt nur noch, wenn sie frei ist; andernfalls bleibt sie leer und die übrigen Felder des Items werden trotzdem aktualisiert.
