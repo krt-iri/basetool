@@ -208,6 +208,50 @@ class UexItemSyncServiceTest {
   }
 
   @Test
+  void syncItems_leavesExternalUuidNull_whenIncomingUuidAlreadyOwnedByAnotherRow() {
+    // The prod failure on item 4752 ("Pulse Greycat Laser Pistol"): UEX gives a base weapon and its
+    // skins ONE shared in-game uuid, but external_uuid is UNIQUE. This skin already has its own row
+    // (resolved by uex_item_id, external_uuid still null); the base weapon's row already owns the
+    // shared uuid. Backfilling it onto the skin would hit uk_game_item_external_uuid. The guard
+    // must
+    // leave external_uuid null and sync every other column instead of throwing.
+    UUID sharedUuid = UUID.randomUUID();
+    UexItemDto skin =
+        helmetDto(4752, "Pulse Greycat Laser Pistol", sharedUuid.toString(), helmetsCategory);
+
+    GameItem skinRow = new GameItem();
+    skinRow.setId(UUID.randomUUID());
+    skinRow.setUexItemId(4752);
+    skinRow.setExternalUuid(null);
+    skinRow.setName("Pulse Greycat Laser Pistol (stale)");
+    skinRow.setKind(GameItemKind.GENERIC);
+    skinRow.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
+
+    GameItem uuidOwner = new GameItem();
+    uuidOwner.setId(UUID.randomUUID());
+    uuidOwner.setUexItemId(879);
+    uuidOwner.setExternalUuid(sharedUuid);
+
+    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(skin));
+    when(gameItemRepository.findByUexItemId(4752)).thenReturn(Optional.of(skinRow));
+    when(gameItemRepository.findByExternalUuid(sharedUuid)).thenReturn(Optional.of(uuidOwner));
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertDoesNotThrow(service::syncItems);
+
+    ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
+    verify(gameItemRepository).save(saved.capture());
+    GameItem persisted = saved.getValue();
+    assertSame(skinRow, persisted, "must reuse the skin's own row, not the uuid owner's");
+    assertNull(
+        persisted.getExternalUuid(), "must not claim a uuid another game_item row already owns");
+    assertEquals(4752, persisted.getUexItemId());
+    assertEquals("Pulse Greycat Laser Pistol", persisted.getName(), "other columns still sync");
+    assertEquals(GameItemKind.ARMOR, persisted.getKind());
+  }
+
+  @Test
   void syncItems_doesNotDowngradeKindToGeneric_whenUexReCataloguesAWikiSpecificRow() {
     // A paint Wiki filed as VEHICLE_ITEM (via /vehicle-items); UEX later lists the same
     // external_uuid under the "Liveries" section (deriveKind → GENERIC). The §6.3.1
