@@ -25,9 +25,13 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCompanyDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.model.ManufacturerUexCompany;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,10 +45,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 /**
  * Unit tests for {@link UexManufacturerService}.
  *
- * <p>R2 expansion: the service now persists item manufacturers alongside vehicle manufacturers (R2
- * ships the UEX item catalogue, so both surfaces need rows). Matching is by UEX company id first,
- * falling back to case-insensitive name for legacy rows created before V107 added the {@code
- * uex_company_id} column, then to an unclaimed abbreviation match.
+ * <p>The sync merges the duplicate UEX company records of one brand onto a single manufacturer row
+ * (ADR-0023 / REQ-DATA-004): the canonical company — the lowest {@code uex_company_id}, processed
+ * first because the feed is sorted ascending — owns the row's identity, while every other company
+ * of the brand resolves to that row, registers its id in the {@code manufacturer_uex_company} alias
+ * table and only ORs the manufacturer-surface flags. Match chain: alias-by-id → name →
+ * abbreviation.
  *
  * <p>Each company is upserted through the {@link #self} proxy so its write runs in a dedicated
  * {@code REQUIRES_NEW} transaction (REQ-DATA-004). The proxy is stubbed to return the
@@ -59,6 +65,8 @@ class UexManufacturerServiceTest {
 
   @Mock private ManufacturerRepository manufacturerRepository;
 
+  @Mock private ManufacturerUexCompanyRepository aliasRepository;
+
   @Mock private ObjectProvider<UexManufacturerService> self;
 
   @InjectMocks private UexManufacturerService uexManufacturerService;
@@ -71,7 +79,7 @@ class UexManufacturerServiceTest {
   }
 
   @Test
-  void persistsBothVehicleAndItemManufacturers_andWritesR2CrossRefColumns() {
+  void persistsTwoDistinctBrands_eachAsCanonical_withCrossRefColumnsAndAliases() {
     UexCompanyDto vehicleDto =
         UexCompanyDto.builder()
             .id(1)
@@ -92,11 +100,7 @@ class UexManufacturerServiceTest {
             .build();
 
     when(uexClient.getCompanies()).thenReturn(List.of(vehicleDto, itemDto));
-    when(manufacturerRepository.findByUexCompanyId(1)).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByUexCompanyId(2)).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
-        .thenReturn(Optional.empty());
-    when(manufacturerRepository.findByNameIgnoreCase("Casaba Outlet")).thenReturn(Optional.empty());
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     uexManufacturerService.syncManufacturers();
 
@@ -117,10 +121,13 @@ class UexManufacturerServiceTest {
     assertEquals(2, casaba.getUexCompanyId());
     assertTrue(casaba.getIsItemManufacturer());
     assertFalse(casaba.getIsVehicleManufacturer());
+
+    // Each company's id is mapped to its (own) manufacturer in the alias table.
+    verify(aliasRepository, times(2)).save(any());
   }
 
   @Test
-  void matchByUexCompanyId_shortCircuitsTheNameFallback() {
+  void matchByAliasId_shortCircuitsTheNameAndAbbreviationFallbacks() {
     UexCompanyDto dto =
         UexCompanyDto.builder()
             .id(42)
@@ -135,18 +142,22 @@ class UexManufacturerServiceTest {
     existing.setUexCompanyId(42);
 
     when(uexClient.getCompanies()).thenReturn(List.of(dto));
-    when(manufacturerRepository.findByUexCompanyId(42)).thenReturn(Optional.of(existing));
+    when(aliasRepository.findManufacturerByUexCompanyId(42)).thenReturn(Optional.of(existing));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     uexManufacturerService.syncManufacturers();
 
-    verify(manufacturerRepository).findByUexCompanyId(42);
+    verify(aliasRepository).findManufacturerByUexCompanyId(42);
     verify(manufacturerRepository, never()).findByNameIgnoreCase(any());
+    verify(manufacturerRepository, never())
+        .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(any());
+    // alias id matches the row's canonical id, so this company owns the identity → full update.
     assertEquals("AEGS-New", existing.getAbbreviation());
     assertEquals("Aerospace-New", existing.getIndustry());
   }
 
   @Test
-  void nameFallback_fires_whenUexCompanyIdNotYetPopulated_onLegacyRow() {
+  void nameFallback_adoptsUnclaimedLegacyRow_andBackfillsCanonicalId_whenAliasMisses() {
     UexCompanyDto dto =
         UexCompanyDto.builder()
             .id(42)
@@ -158,24 +169,33 @@ class UexManufacturerServiceTest {
     Manufacturer legacy = new Manufacturer();
     legacy.setName("Aegis Dynamics");
     legacy.setAbbreviation("AEGS");
-    // legacy: no uexCompanyId populated yet (pre-V107)
+    // legacy: no uexCompanyId yet (hand-seeded / pre-alias) — still unclaimed.
 
     when(uexClient.getCompanies()).thenReturn(List.of(dto));
-    when(manufacturerRepository.findByUexCompanyId(42)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
         .thenReturn(Optional.of(legacy));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     uexManufacturerService.syncManufacturers();
 
     verify(manufacturerRepository).save(legacy);
-    assertEquals(42, legacy.getUexCompanyId(), "name-fallback hit must backfill uex_company_id");
+    assertEquals(
+        42,
+        legacy.getUexCompanyId(),
+        "name-fallback hit on an unclaimed row backfills the canonical id");
+
+    ArgumentCaptor<ManufacturerUexCompany> alias =
+        ArgumentCaptor.forClass(ManufacturerUexCompany.class);
+    verify(aliasRepository).save(alias.capture());
+    assertEquals(42, alias.getValue().getUexCompanyId());
+    assertSame(legacy, alias.getValue().getManufacturer());
   }
 
   @Test
   void abbreviationFallback_adoptsUnclaimedLegacyShortNamedRow_insteadOfInsertingDuplicate() {
     // UEX returns the full company name, but the legacy vehicle-manufacturer row was seeded with
     // its short nickname as the name: local "Esperia" vs UEX name "Esperia Incorporation" /
-    // nickname "Esperia". Both the id and name lookups miss, so the unclaimed-abbreviation fallback
+    // nickname "Esperia". Both the id (alias) and name lookups miss, so the abbreviation fallback
     // adopts the legacy row rather than stranding it and inserting a parallel one.
     UexCompanyDto dto =
         UexCompanyDto.builder()
@@ -189,83 +209,94 @@ class UexManufacturerServiceTest {
     Manufacturer legacy = new Manufacturer();
     legacy.setName("Esperia");
     legacy.setAbbreviation("Esperia");
-    // legacy: seeded before this sync persisted every company, so no uexCompanyId yet (unclaimed).
+    // legacy: unclaimed (no uexCompanyId yet).
 
     when(uexClient.getCompanies()).thenReturn(List.of(dto));
-    when(manufacturerRepository.findByUexCompanyId(278)).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByNameIgnoreCase("Esperia Incorporation"))
-        .thenReturn(Optional.empty());
-    when(manufacturerRepository.findOldestUnclaimedByAbbreviationIgnoreCase("Esperia"))
+    when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("Esperia"))
         .thenReturn(Optional.of(legacy));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     uexManufacturerService.syncManufacturers();
 
-    // Adopted the existing row: exactly one save, and it is the legacy instance — no duplicate row.
     ArgumentCaptor<Manufacturer> captor = ArgumentCaptor.forClass(Manufacturer.class);
     verify(manufacturerRepository, times(1)).save(captor.capture());
     Manufacturer saved = captor.getValue();
     assertSame(legacy, saved, "must adopt the abbreviation-matched row, not insert a new one");
     assertEquals(
-        278, saved.getUexCompanyId(), "abbreviation-fallback hit must backfill uex_company_id");
+        278, saved.getUexCompanyId(), "abbreviation-fallback hit must backfill the canonical id");
     assertEquals("Esperia", saved.getAbbreviation(), "the abbreviation label is preserved");
     assertEquals(
         "Esperia Incorporation", saved.getName(), "name is updated to the UEX-canonical full name");
   }
 
-  // covers REQ-DATA-004 — two distinct UEX companies sharing a nickname-derived abbreviation each
-  // keep their own row (abbreviation is no longer UNIQUE); the second is not merged into the first.
+  // covers REQ-DATA-004 / ADR-0023 — two distinct UEX companies that share an abbreviation are the
+  // SAME brand and MERGE onto one row: the lowest id stays canonical, the other becomes an alias
+  // and
+  // only widens the manufacturer-surface flags without hijacking the canonical identity.
   @Test
-  void twoCompaniesSharingAbbreviation_eachGetsItsOwnRow() {
-    UexCompanyDto first =
-        UexCompanyDto.builder().id(278).name("Esperia Incorporation").nickname("Esperia").build();
-    UexCompanyDto second =
-        UexCompanyDto.builder().id(279).name("Esperia Defense Systems").nickname("Esperia").build();
+  void twoCompaniesSharingAbbreviation_mergeOntoOneRow_secondBecomesAlias() {
+    UexCompanyDto canonical =
+        UexCompanyDto.builder()
+            .id(278)
+            .name("Esperia Incorporation")
+            .nickname("Esperia")
+            .isItemManufacturer(1)
+            .isVehicleManufacturer(0)
+            .build();
+    UexCompanyDto duplicate =
+        UexCompanyDto.builder()
+            .id(279)
+            .name("Esperia Defense Systems")
+            .nickname("Esperia")
+            .isItemManufacturer(0)
+            .isVehicleManufacturer(1)
+            .build();
 
-    when(uexClient.getCompanies()).thenReturn(List.of(first, second));
-    when(manufacturerRepository.findByUexCompanyId(278)).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByUexCompanyId(279)).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByNameIgnoreCase("Esperia Incorporation"))
-        .thenReturn(Optional.empty());
-    when(manufacturerRepository.findByNameIgnoreCase("Esperia Defense Systems"))
-        .thenReturn(Optional.empty());
-    // No unclaimed legacy row: the first company's row is claimed the moment it is stamped, so the
-    // second company's unclaimed-abbreviation lookup misses and it inserts its own row.
-    when(manufacturerRepository.findOldestUnclaimedByAbbreviationIgnoreCase("Esperia"))
-        .thenReturn(Optional.empty());
+    // Deliberately unsorted: the service must sort ascending so the lowest id (278) is canonical.
+    when(uexClient.getCompanies()).thenReturn(List.of(duplicate, canonical));
+    Manufacturer[] row = new Manufacturer[1];
+    when(manufacturerRepository.save(any()))
+        .thenAnswer(
+            inv -> {
+              row[0] = inv.getArgument(0);
+              return row[0];
+            });
+    // The abbreviation fallback returns whatever the canonical company persisted earlier this run.
+    when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("Esperia"))
+        .thenAnswer(inv -> Optional.ofNullable(row[0]));
 
     uexManufacturerService.syncManufacturers();
 
-    ArgumentCaptor<Manufacturer> captor = ArgumentCaptor.forClass(Manufacturer.class);
-    verify(manufacturerRepository, times(2)).save(captor.capture());
-    List<Manufacturer> saved = captor.getAllValues();
-    assertNotSame(saved.get(0), saved.get(1), "the two companies must not share a single row");
-    assertEquals(278, saved.get(0).getUexCompanyId());
-    assertEquals(279, saved.get(1).getUexCompanyId());
-    assertEquals("Esperia", saved.get(0).getAbbreviation());
+    assertNotNull(row[0]);
+    assertEquals(278, row[0].getUexCompanyId(), "the lowest id stays canonical");
     assertEquals(
-        "Esperia",
-        saved.get(1).getAbbreviation(),
-        "both keep the shared abbreviation — it is no longer a unique key");
+        "Esperia Incorporation", row[0].getName(), "the duplicate must not rename the row");
+    assertTrue(row[0].getIsItemManufacturer(), "item flag comes from the canonical (278)");
+    assertTrue(
+        row[0].getIsVehicleManufacturer(), "vehicle flag is OR'd in from the duplicate (279)");
+
+    // Exactly two alias rows — both company ids point at the one surviving manufacturer.
+    ArgumentCaptor<ManufacturerUexCompany> aliasCaptor =
+        ArgumentCaptor.forClass(ManufacturerUexCompany.class);
+    verify(aliasRepository, times(2)).save(aliasCaptor.capture());
+    Set<Integer> aliasedIds =
+        aliasCaptor.getAllValues().stream()
+            .map(ManufacturerUexCompany::getUexCompanyId)
+            .collect(Collectors.toSet());
+    assertEquals(Set.of(278, 279), aliasedIds);
   }
 
   // covers REQ-DATA-004 — a single failing company must not poison the batch: its REQUIRES_NEW
   // transaction rolls back alone and the loop continues, so the remaining companies still commit.
   @Test
   void oneCompanyUpsertFailing_doesNotAbortTheRestOfTheBatch() {
+    // Poison has the lower id, so it is processed first; the healthy company follows.
     UexCompanyDto poison =
-        UexCompanyDto.builder().id(278).name("Esperia Incorporation").nickname("Esperia").build();
+        UexCompanyDto.builder().id(1).name("Esperia Incorporation").nickname("Esperia").build();
     UexCompanyDto healthy =
-        UexCompanyDto.builder().id(1).name("Aegis Dynamics").nickname("AEGS").build();
+        UexCompanyDto.builder().id(2).name("Aegis Dynamics").nickname("AEGS").build();
 
-    when(uexClient.getCompanies()).thenReturn(List.of(poison, healthy));
-    when(manufacturerRepository.findByUexCompanyId(278)).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByUexCompanyId(1)).thenReturn(Optional.empty());
-    when(manufacturerRepository.findByNameIgnoreCase("Esperia Incorporation"))
-        .thenReturn(Optional.empty());
-    when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
-        .thenReturn(Optional.empty());
-    when(manufacturerRepository.findOldestUnclaimedByAbbreviationIgnoreCase(any()))
-        .thenReturn(Optional.empty());
+    when(uexClient.getCompanies()).thenReturn(List.of(healthy, poison));
     // First save simulates a residual constraint violation (as the per-company tx would surface);
     // the second company must still be saved.
     when(manufacturerRepository.save(any()))
@@ -290,5 +321,6 @@ class UexManufacturerServiceTest {
     uexManufacturerService.syncManufacturers();
 
     verify(manufacturerRepository, never()).save(any());
+    verify(aliasRepository, never()).save(any());
   }
 }

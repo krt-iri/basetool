@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +54,7 @@ class UexVehicleServiceUuidMatchTest {
   @Mock private UexClient uexClient;
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
+  @Mock private ManufacturerUexCompanyRepository manufacturerAliasRepository;
 
   @InjectMocks private UexVehicleService service;
 
@@ -227,7 +229,8 @@ class UexVehicleServiceUuidMatchTest {
             1, // is_spaceship
             0,
             0,
-            0);
+            0,
+            0); // id_company
     when(uexClient.getVehicles()).thenReturn(List.of(dto));
     when(shipTypeRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexVehicleId(12)).thenReturn(Optional.empty());
@@ -331,6 +334,7 @@ class UexVehicleServiceUuidMatchTest {
         0,
         0,
         0,
-        0);
+        0,
+        0); // id_company
   }
 }

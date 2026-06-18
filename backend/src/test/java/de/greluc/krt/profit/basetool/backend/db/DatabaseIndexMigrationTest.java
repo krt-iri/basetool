@@ -119,6 +119,9 @@ class DatabaseIndexMigrationTest {
     // V154 (REQ-BANK-012): the admin audit viewer (newest-first plus per-account filter).
     assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_occurred");
     assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_account");
+    // V162 (REQ-DATA-004 / ADR-0023): the UEX company-id → manufacturer alias lookup index.
+    assertIndexExists(
+        jdbc, "manufacturer_uex_company", "idx_manufacturer_uex_company_manufacturer");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {
