@@ -51,11 +51,13 @@ public class Manufacturer extends AbstractEntity<UUID> {
 
   /**
    * Short display code (e.g. {@code "AEGS"}, {@code "Esperia"}). Deliberately <strong>not</strong>
-   * UNIQUE: the UEX {@code /companies} sync derives it from each company's nickname, and UEX ships
-   * distinct companies that share a nickname (observed: two Esperia-derived companies both reduce
-   * to {@code "Esperia"}). A UNIQUE constraint here made the second company's sync UPDATE collide
-   * and roll the whole sweep back — see {@code V158} / REQ-DATA-004. Identity lives on {@link
-   * #uexCompanyId} / {@link #scwikiUuid} / {@link #name}, not on this label.
+   * UNIQUE (dropped in {@code V158}): the UEX {@code /companies} sync derives it from each
+   * company's nickname, and UEX ships several distinct company records for the same brand that all
+   * reduce to one code (observed: {@code 87 "Esperia"} + {@code 278 "Esperia Incorporation"} →
+   * {@code "Esperia"}). The sync now <em>merges</em> those duplicates onto one row keyed by the
+   * shared abbreviation (ADR-0023); the brand's several UEX company ids live in {@link
+   * ManufacturerUexCompany}. Identity lives on {@link #uexCompanyId} / {@link #scwikiUuid} / {@link
+   * #name}, not on this label.
    */
   @Column(nullable = false)
   private String abbreviation;
@@ -70,8 +72,12 @@ public class Manufacturer extends AbstractEntity<UUID> {
   private boolean hidden = false;
 
   /**
-   * UEX integer company id. Populated by the R2-hardened {@code UexManufacturerService} so the next
-   * sync can fast-path the lookup instead of falling back to a case-insensitive name match.
+   * The <em>canonical</em> UEX integer company id for this brand — the lowest id among the
+   * duplicate company records UEX ships for it (the feed is processed ascending, so the
+   * first/lowest claims the row). UNIQUE: it owns this row's display identity. The full set of UEX
+   * company ids a brand owns (canonical + duplicates) is mapped to this row by {@link
+   * ManufacturerUexCompany}; the item and vehicle syncs resolve through that alias table, not
+   * through this single column (ADR-0023).
    */
   @Column(name = "uex_company_id", unique = true)
   private Integer uexCompanyId;

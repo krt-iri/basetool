@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der UEX-Item-Abgleich (Waffen, Rüstung, Lackierungen, Schiffskomponenten) brach bei jedem Lauf ab — der Item-Katalog war eingefroren und übernahm keine UEX-Änderungen mehr.** UEX vergibt mehreren Items dieselbe in-game-UUID (ein Basis-Item und seine Skins), wodurch ein Eintrag mit der Unique-Bedingung auf `external_uuid` kollidierte und den ganzen Lauf zurückrollte. Jedes Item wird jetzt in einer eigenen Transaktion abgeglichen, sodass ein kollidierender Eintrag nur sich selbst überspringt.
+
+### Changed
+
+- **Hersteller, die UEX doppelt führt (u. a. Esperia, DMC, Covalex), erscheinen nur noch einmal.** UEX liefert für dieselbe Marke teils mehrere Firmeneinträge mit unterschiedlichen IDs, wodurch z. B. Esperias Schiffe und Items auf zwei getrennten Herstellern landeten. Diese Dubletten werden jetzt zu einem Hersteller zusammengeführt, sodass Schiffe und Items wieder unter derselben Marke auftauchen.
+
 ## [v0.5.9](https://github.com/krt-profit/basetool/releases/tag/v0.5.9) - 2026-06-18
 
 ### Security

@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.UexCategory;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.time.Instant;
 import java.util.HashSet;
@@ -41,7 +42,9 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriUtils;
@@ -77,6 +80,17 @@ import org.springframework.web.util.UriUtils;
  * their {@code uex_deleted_at} stamped via {@link
  * GameItemRepository#markUexDeletedExcept(java.util.Collection, Instant)}. The sweep is gated on a
  * non-empty seen-id set so a sync that fails on every category never wipes the local catalogue.
+ *
+ * <p><strong>Per-item isolation (REQ-DATA-004).</strong> Each item is upserted in its own {@code
+ * REQUIRES_NEW} transaction via {@link #upsertItemWithinTransaction(UexItemDto, UexCategory,
+ * Instant)}, invoked through the {@link #self} proxy. UEX ships several distinct item ids sharing
+ * one in-game {@code uuid} (a base weapon and its skins — e.g. ids 879/5457/5458 all carry the
+ * MaxLift tractor-beam uuid), so an insert can collide with the {@code uk_game_item_external_uuid}
+ * UNIQUE constraint. Before per-item isolation that single violation poisoned the one big
+ * transaction's Hibernate session, so every <em>subsequent</em> item's autoflush re-threw the dead
+ * insert and the whole run rolled back (observed in prod: 3376 cascade failures, no {@code
+ * Finished} line). With a dedicated nested transaction per item a colliding row rolls back only
+ * itself, the caller's {@code catch} skips it, and the rest of the catalogue still commits.
  */
 @Slf4j
 @Service
@@ -88,8 +102,17 @@ public class UexItemSyncService {
   private final UexCategoryRefService categoryRefService;
   private final GameItemRepository gameItemRepository;
   private final ManufacturerRepository manufacturerRepository;
+  private final ManufacturerUexCompanyRepository manufacturerAliasRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final SyncReportService syncReportService;
+
+  /**
+   * Self-reference, resolved lazily so each per-item upsert runs through the Spring transaction
+   * proxy. Calling {@link #upsertItemWithinTransaction(UexItemDto, UexCategory, Instant)} via
+   * {@code this} would be self-invocation and run in the {@code syncItems} transaction instead of
+   * opening the {@code REQUIRES_NEW} one, re-introducing the session-poisoning cascade.
+   */
+  private final ObjectProvider<UexItemSyncService> self;
 
   /**
    * Runs the full UEX item sync: ensures the category reference table is fresh, then walks every
@@ -129,7 +152,7 @@ public class UexItemSyncService {
       categoriesProcessed++;
       for (UexItemDto dto : dtos) {
         try {
-          GameItem item = upsertItem(dto, category, now);
+          GameItem item = self.getObject().upsertItemWithinTransaction(dto, category, now);
           if (item != null) {
             itemsProcessed++;
             if (item.getCreatedAt() == null || item.getCreatedAt().equals(item.getUpdatedAt())) {
@@ -186,14 +209,19 @@ public class UexItemSyncService {
   }
 
   /**
-   * Upserts a single UEX item DTO into the {@code game_item} table.
+   * Upserts a single UEX item DTO into the {@code game_item} table in its own {@code REQUIRES_NEW}
+   * transaction (REQ-DATA-004). The dedicated nested transaction is what makes a {@code
+   * uk_game_item_external_uuid} collision — two UEX item ids sharing one in-game uuid — roll back
+   * only this row instead of poisoning the whole run's session. Must be invoked through the {@link
+   * #self} proxy; a direct {@code this} call would be self-invocation and skip the new transaction.
    *
    * @param dto inbound UEX row
    * @param category resolved category for kind derivation + FK
    * @param now timestamp to stamp on the row
    * @return the persisted entity, or {@code null} if the DTO was unusable
    */
-  private GameItem upsertItem(UexItemDto dto, UexCategory category, Instant now) {
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public GameItem upsertItemWithinTransaction(UexItemDto dto, UexCategory category, Instant now) {
     if (dto.id() == null || !StringUtils.hasText(dto.name())) {
       log.debug("Skipping UEX item with missing id/name: {}", dto);
       return null;
@@ -285,9 +313,10 @@ public class UexItemSyncService {
   }
 
   /**
-   * Looks up the local manufacturer row by UEX company id (fast path), falling back to a
-   * case-insensitive name match. Returns {@code null} when the company can't be resolved — the row
-   * is still persisted; the FK stays NULL and the admin can fix it via {@code
+   * Looks up the local manufacturer row by UEX company id via the {@code manufacturer_uex_company}
+   * alias table (fast path — covers every id-variant of a brand UEX duplicates, ADR-0023), falling
+   * back to a case-insensitive name match. Returns {@code null} when the company can't be resolved
+   * — the row is still persisted; the FK stays NULL and the admin can fix it via {@code
    * /admin/material-aliases} once that surface is generalised (post-R2).
    *
    * @param dto inbound UEX row
@@ -295,7 +324,8 @@ public class UexItemSyncService {
    */
   private Manufacturer resolveManufacturer(UexItemDto dto) {
     if (dto.idCompany() != null && dto.idCompany() != 0) {
-      Optional<Manufacturer> byId = manufacturerRepository.findByUexCompanyId(dto.idCompany());
+      Optional<Manufacturer> byId =
+          manufacturerAliasRepository.findManufacturerByUexCompanyId(dto.idCompany());
       if (byId.isPresent()) {
         return byId.orElseThrow();
       }
