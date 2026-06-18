@@ -621,12 +621,14 @@ confirm/reject/queue surface; the audit log stays admin-only.
 
 - [x] Close with an open `PENDING` request → 409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`
   (`BankAccountServiceTest`).
-- [x] Role gates verified: officer/lead reach the slim page (not plain members, 403) and the
-  staff queue is `BANK_EMPLOYEE`-only (frontend MvcTests); the per-action capability + audit
-  admin-only invariants are pinned by the backend tests. A dedicated end-to-end Playwright
-  matrix run remains an optional follow-up.
+- [x] Role matrix verified end to end (`BankOrgUnitRequestsE2eTest`): an officer reaches the slim
+  page and raises a request, a plain member is locked out, a granted bank employee confirms it from
+  the staff queue moving the balance, the officer cancels and the employee rejects; the officer
+  cannot reach the `BANK_EMPLOYEE`-only queue and a pure bank employee cannot reach the
+  officer/lead page. The per-action capability + audit admin-only invariants are additionally
+  pinned by the backend tests.
 
-**Enforced by:** `BankAccountServiceTest`, `BankBookingRequestServiceTest`, frontend `OrgUnitBankPageControllerMvcTest` / `BankRequestQueuePageControllerMvcTest` · **Code:** `service/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
+**Enforced by:** `BankAccountServiceTest`, `BankBookingRequestServiceTest`, frontend `OrgUnitBankPageControllerMvcTest` / `BankRequestQueuePageControllerMvcTest`, e2e `BankOrgUnitRequestsE2eTest` · **Code:** `service/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
 
 ### REQ-BANK-026 — Notifications on new booking requests
 

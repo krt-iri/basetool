@@ -19,6 +19,7 @@
 
 package de.greluc.krt.iri.basetool.frontend.e2e;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -904,6 +905,129 @@ public final class BackendSeeder {
         + "\",\"amount\":"
         + amount
         + "}";
+  }
+
+  /**
+   * Get-or-creates the single {@code ORG_UNIT} bank account owned by the given org unit via {@code
+   * POST /api/v1/bank/accounts} (epic #666 F1) and returns its id. Idempotent across the shared
+   * ephemeral stack: the V150 partial unique index permits at most one account per org unit, so an
+   * existing one is reused rather than re-POSTed (which would 409).
+   *
+   * @param mgmtUser a {@code BANK_MANAGEMENT} (or admin) Keycloak username
+   * @param mgmtPassword the password
+   * @param name the account display name
+   * @param orgUnitId the owning org unit's id
+   * @return the existing or freshly created org-unit account's id
+   */
+  public String ensureOrgUnitBankAccount(
+      String mgmtUser, String mgmtPassword, String name, String orgUnitId) {
+    String existing = findOrgUnitBankAccountId(mgmtUser, mgmtPassword, orgUnitId);
+    if (existing != null) {
+      return existing;
+    }
+    String body =
+        "{\"name\":\"" + name + "\",\"type\":\"ORG_UNIT\",\"orgUnitId\":\"" + orgUnitId + "\"}";
+    return JsonParser.parseString(postBody(mgmtUser, mgmtPassword, "/api/v1/bank/accounts", body))
+        .getAsJsonObject()
+        .get("id")
+        .getAsString();
+  }
+
+  /**
+   * Resolves the id of the {@code ORG_UNIT} account owned by the given org unit from the management
+   * account list ({@code GET /api/v1/bank/accounts}), or {@code null} when none exists.
+   *
+   * @param mgmtUser a {@code BANK_MANAGEMENT} (or admin) Keycloak username
+   * @param mgmtPassword the password
+   * @param orgUnitId the owning org unit's id
+   * @return the matching account id, or {@code null}
+   */
+  private String findOrgUnitBankAccountId(String mgmtUser, String mgmtPassword, String orgUnitId) {
+    JsonObject page =
+        JsonParser.parseString(getBody(mgmtUser, mgmtPassword, "/api/v1/bank/accounts?size=500"))
+            .getAsJsonObject();
+    for (JsonElement element : page.getAsJsonArray("content")) {
+      JsonObject account = element.getAsJsonObject();
+      if (account.has("orgUnit") && account.get("orgUnit").isJsonObject()) {
+        JsonObject orgUnit = account.getAsJsonObject("orgUnit");
+        if (orgUnit.has("id") && orgUnitId.equals(orgUnit.get("id").getAsString())) {
+          return account.get("id").getAsString();
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Reads the compute-on-read balance of a bank account via the management detail endpoint ({@code
+   * GET /api/v1/bank/accounts/{id}}), as whole aUEC. Used to assert a confirmation actually moved
+   * money (epic #666 F2).
+   *
+   * @param username a username that may see the account (management / admin / a grantee)
+   * @param password the password
+   * @param accountId the account id
+   * @return the account balance, truncated to whole aUEC
+   */
+  public long bankAccountBalance(String username, String password, String accountId) {
+    JsonObject detail =
+        JsonParser.parseString(getBody(username, password, "/api/v1/bank/accounts/" + accountId))
+            .getAsJsonObject();
+    return detail.getAsJsonObject("account").get("balance").getAsBigDecimal().longValue();
+  }
+
+  /**
+   * Finds the id of the caller's own {@code PENDING} booking request on the given account with the
+   * given amount, from {@code GET /api/v1/org-units/bank/requests} (epic #666 F2), or {@code null}.
+   * Lets a test target the exact request it just raised (distinct amounts per test method).
+   *
+   * @param username the requesting officer/lead's Keycloak username
+   * @param password the password
+   * @param accountId the target account id
+   * @param amount the requested whole-aUEC amount
+   * @return the matching pending request's id, or {@code null}
+   */
+  public String findOwnPendingBookingRequestId(
+      String username, String password, String accountId, long amount) {
+    for (JsonElement element : ownBookingRequests(username, password)) {
+      JsonObject request = element.getAsJsonObject();
+      if ("PENDING".equals(request.get("status").getAsString())
+          && accountId.equals(request.get("accountId").getAsString())
+          && request.get("amount").getAsBigDecimal().longValue() == amount) {
+        return request.get("id").getAsString();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Reads the lifecycle status of one of the caller's own booking requests by id, from {@code GET
+   * /api/v1/org-units/bank/requests} (epic #666 F2), or {@code null} when absent.
+   *
+   * @param username the requesting officer/lead's Keycloak username
+   * @param password the password
+   * @param requestId the request id
+   * @return the status (PENDING / CONFIRMED / REJECTED / CANCELLED), or {@code null}
+   */
+  public String bookingRequestStatus(String username, String password, String requestId) {
+    for (JsonElement element : ownBookingRequests(username, password)) {
+      JsonObject request = element.getAsJsonObject();
+      if (requestId.equals(request.get("id").getAsString())) {
+        return request.get("status").getAsString();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Fetches the caller's own booking requests as a JSON array.
+   *
+   * @param username the requesting officer/lead's Keycloak username
+   * @param password the password
+   * @return the caller's requests
+   */
+  private JsonArray ownBookingRequests(String username, String password) {
+    return JsonParser.parseString(getBody(username, password, "/api/v1/org-units/bank/requests"))
+        .getAsJsonArray();
   }
 
   /**
