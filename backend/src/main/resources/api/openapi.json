@@ -42168,7 +42168,7 @@
         "properties" : {
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT" ]
           },
           "userSub" : {
             "type" : "string",
@@ -42193,11 +42193,11 @@
         "properties" : {
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED" ]
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED" ]
           },
           "description" : {
             "type" : "string",
@@ -42232,11 +42232,11 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED" ]
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED" ]
           },
           "description" : {
             "type" : "string"
@@ -42276,7 +42276,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT" ]
           },
           "userSub" : {
             "type" : "string",

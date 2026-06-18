@@ -43,5 +43,17 @@ public enum NotificationType {
    * #666 F2, REQ-BANK-026). Recipients are resolved per the seeded default rule (the bank
    * management plus every employee granted on the target account; the requester is excluded).
    */
-  BANK_BOOKING_REQUEST_CREATED
+  BANK_BOOKING_REQUEST_CREATED,
+
+  /**
+   * A bank employee confirmed the requester's booking request (epic #666 F2, REQ-BANK-026). The
+   * seeded default rule notifies the requesting officer/lead.
+   */
+  BANK_BOOKING_REQUEST_CONFIRMED,
+
+  /**
+   * A bank employee rejected the requester's booking request (epic #666 F2, REQ-BANK-026). The
+   * seeded default rule notifies the requesting officer/lead (the reason is rendered in the text).
+   */
+  BANK_BOOKING_REQUEST_REJECTED
 }

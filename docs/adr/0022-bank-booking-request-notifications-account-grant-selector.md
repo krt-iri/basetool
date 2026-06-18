@@ -1,4 +1,4 @@
-# ADR-0022 — Bank booking-request notifications via an `ACCOUNT_GRANT` selector kind
+# ADR-0022 — Bank booking-request notifications via `ACCOUNT_GRANT` + `EVENT_RECIPIENT` selector kinds
 
 - **Status:** Accepted
 - **Date:** 2026-06-17
@@ -14,7 +14,10 @@ REQ-NOTIF-007) with `SPECIFIC_USER`, `ROLE` and `ORG_RELATIVE_ROLE` selectors re
 `RecipientResolutionService`. "Bank management" maps cleanly onto a `ROLE` selector, but
 "employees granted on *this* account" cannot be expressed: the account is **per-event** (it
 differs for every request) and no existing selector reads it, mirroring how a `JobOrderCreated`
-event's org unit is per-event.
+event's org unit is per-event. The owner subsequently asked to also notify the **requesting
+officer/lead** when their request is **confirmed or rejected** — again a per-event recipient (the
+requester differs for every request) that no existing selector addresses; the actor of a decision
+event is the deciding employee, not the recipient.
 
 ## Decision
 
@@ -25,8 +28,15 @@ the existing `contextOrgUnits()` used by `ORG_RELATIVE_ROLE`. `RecipientResoluti
 a `resolveAccountGrantHolders(accountId)` backed by `BankAccountGrantRepository.findByAccountId`.
 A seeded default rule (V160) maps `BANK_BOOKING_REQUEST_CREATED` to a notification with a
 `ROLE` selector (`BANK_MANAGEMENT`) and an `ACCOUNT_GRANT` selector, excluding the requester.
-No schema migration is needed for the selector table — the kind reads the account from the event,
-not from a selector column, and the type/event-type columns carry no CHECK (open enums).
+
+For the decision direction we add a second selector kind, **`EVENT_RECIPIENT`**, that resolves to
+the single user the event is directed at. The event contract gains a `default UUID
+contextRecipientSub()` (returning `null` by default); the confirm/reject events return the
+requester's `sub` while their `actorSub()` is the deciding employee. Seeded rules (V161) map
+`BANK_BOOKING_REQUEST_CONFIRMED` / `BANK_BOOKING_REQUEST_REJECTED` to same-named notifications, each
+with a single `EVENT_RECIPIENT` selector. No schema migration is needed for the selector table —
+both kinds read their context from the event, not from a selector column, and the type/event-type
+columns carry no CHECK (open enums).
 
 ## Consequences
 
@@ -39,6 +49,13 @@ not from a selector column, and the type/event-type columns carry no CHECK (open
   touch `OwnerScopeService`, so no bank ArchUnit rule is affected.) "Appropriately authorized for
   the account" is interpreted as *holds a grant on it*; the per-action capability flag still gates
   who may actually confirm (REQ-BANK-023).
+- `EVENT_RECIPIENT` is a **general** "notify the subject of this event" primitive (it reads only the
+  generic `contextRecipientSub()`), reusable by any future event with a single directed recipient —
+  no bank coupling, unlike `ACCOUNT_GRANT`.
+- The admin notification-rule editor (`admin/notification-rules.html`) lists both new selector kinds
+  and the three `BANK_BOOKING_REQUEST_*` event/notification types, so a seeded rule edits correctly
+  and the kinds are selectable; both read their context from the event, so they need no extra
+  per-selector fields in the editor.
 
 ## Alternatives considered
 

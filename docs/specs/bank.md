@@ -630,28 +630,39 @@ confirm/reject/queue surface; the audit log stays admin-only.
 
 **Enforced by:** `BankAccountServiceTest`, `BankBookingRequestServiceTest`, frontend `OrgUnitBankPageControllerMvcTest` / `BankRequestQueuePageControllerMvcTest`, e2e `BankOrgUnitRequestsE2eTest` · **Code:** `service/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
 
-### REQ-BANK-026 — Notifications on new booking requests
+### REQ-BANK-026 — Notifications on booking-request lifecycle
 
-When an officer/lead raises a booking request, the **bank management** and the **employees
-granted on the target account** are notified in-app (epic #666; owner-requested addition).
-This reuses the data-driven notification engine (REQ-NOTIF-007, ADR-0015) rather than
-hardcoding recipients: a `BANK_BOOKING_REQUEST_CREATED` event drives a seeded default rule
-(V160) with a `ROLE` selector (`BANK_MANAGEMENT`) and a new **`ACCOUNT_GRANT`** selector that
-resolves the employees holding a `bank_account_grant` on the account carried by the event
-(ADR-0022, REQ-NOTIF-011). The requesting actor is excluded; the rule is admin-editable at
-runtime. Confirmation/rejection notifications are out of scope for now.
+The booking-request lifecycle is notified in-app (epic #666; owner-requested addition), reusing
+the data-driven notification engine (REQ-NOTIF-007, ADR-0015) rather than hardcoding recipients:
+
+- **On creation**, the **bank management** and the **employees granted on the target account** are
+  notified. A `BANK_BOOKING_REQUEST_CREATED` event drives a seeded default rule (V160) with a
+  `ROLE` selector (`BANK_MANAGEMENT`) and a new **`ACCOUNT_GRANT`** selector that resolves the
+  employees holding a `bank_account_grant` on the account carried by the event.
+- **On confirmation/rejection**, the **requesting officer/lead** is notified of the outcome (the
+  rejection reason is rendered in the text). `BANK_BOOKING_REQUEST_CONFIRMED` /
+  `BANK_BOOKING_REQUEST_REJECTED` events drive seeded rules (V161) with a new **`EVENT_RECIPIENT`**
+  selector that resolves the directed recipient (the requester) carried by the event.
+
+Both `ACCOUNT_GRANT` and `EVENT_RECIPIENT` read their context off the event and populate no selector
+columns (ADR-0022, REQ-NOTIF-011). The deciding/requesting actor is excluded; every rule is
+admin-editable at runtime.
 
 **Acceptance**
 
 - [x] Creating a request fires `BANK_BOOKING_REQUEST_CREATED` after commit; the seeded rule
   resolves bank management + the account's grant holders, excluding the requester
   (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
-- [x] The `ACCOUNT_GRANT` selector reads the account from the event and needs no schema
-  change to the selector table.
-- [x] The notification renders in the bell/inbox via `notifications.type.BANK_BOOKING_REQUEST_CREATED`
-  (i18n key in all three bundles, named placeholders `{accountNo}`/`{amount}`/`{requester}`).
+- [x] Confirming/rejecting a request fires `BANK_BOOKING_REQUEST_CONFIRMED` /
+  `BANK_BOOKING_REQUEST_REJECTED` after commit; the seeded rules notify the requester via the
+  `EVENT_RECIPIENT` selector, excluding the deciding employee
+  (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
+- [x] The `ACCOUNT_GRANT` / `EVENT_RECIPIENT` selectors read their context from the event and need
+  no schema change to the selector table.
+- [x] The notifications render in the bell/inbox via `notifications.type.BANK_BOOKING_REQUEST_*`
+  (i18n keys in all three bundles, named placeholders `{accountNo}`/`{amount}`/`{requester}`/`{reason}`).
 
-**Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:** `event/BankBookingRequestCreatedEvent`, `service/RecipientResolutionService#resolveAccountGrantHolders`, `model/SelectorKind#ACCOUNT_GRANT`, `db/migration/V160` · **Issues:** #666, #673
+**Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:** `event/BankBookingRequest{Created,Confirmed,Rejected}Event`, `service/RecipientResolutionService#resolveAccountGrantHolders`, `model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT}`, `db/migration/V160`, `db/migration/V161` · **Issues:** #666, #673
 
 ## Out of scope
 

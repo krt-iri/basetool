@@ -22,6 +22,7 @@ package de.greluc.krt.iri.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestCreatedEvent;
 import de.greluc.krt.iri.basetool.backend.event.JobOrderCreatedEvent;
 import de.greluc.krt.iri.basetool.backend.event.OrgUnitRef;
@@ -193,5 +194,32 @@ class RuleEvaluationServiceTest {
     // The requesting actor is excluded; manager + granted employee remain.
     assertThat(result.get(NotificationType.BANK_BOOKING_REQUEST_CREATED))
         .containsExactlyInAnyOrder(manager, grantedEmployee);
+  }
+
+  @Test
+  void eventRecipientSelectorResolvesToTheEventsDirectedRecipient() {
+    // The decision-notification rule: notify the requester carried by the event (EVENT_RECIPIENT).
+    UUID requester = UUID.fromString("00000000-0000-0000-0000-0000000000a4");
+    UUID decider = UUID.fromString("00000000-0000-0000-0000-0000000000b4");
+    NotificationRule rule =
+        NotificationRule.builder()
+            .eventType(NotificationEventType.BANK_BOOKING_REQUEST_CONFIRMED)
+            .notificationType(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED)
+            .enabled(true)
+            .excludeActor(true)
+            .build();
+    rule.addSelector(NotificationRuleSelector.builder().kind(SelectorKind.EVENT_RECIPIENT).build());
+    BankBookingRequestConfirmedEvent confirmedEvent =
+        new BankBookingRequestConfirmedEvent(
+            UUID.randomUUID(), "KB-0001", new BigDecimal("500"), requester, decider);
+    when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
+            NotificationEventType.BANK_BOOKING_REQUEST_CONFIRMED))
+        .thenReturn(List.of(rule));
+
+    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(confirmedEvent);
+
+    // The directed recipient is the requester; the deciding actor is not among the recipients.
+    assertThat(result.get(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED))
+        .containsExactly(requester);
   }
 }

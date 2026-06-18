@@ -38,5 +38,17 @@ public enum NotificationEventType {
    * #666 F2, REQ-BANK-026). The default rule notifies the bank management and the employees granted
    * on the target account.
    */
-  BANK_BOOKING_REQUEST_CREATED
+  BANK_BOOKING_REQUEST_CREATED,
+
+  /**
+   * A bank employee confirmed a booking request (epic #666 F2, REQ-BANK-026). The default rule
+   * notifies the requesting officer/lead.
+   */
+  BANK_BOOKING_REQUEST_CONFIRMED,
+
+  /**
+   * A bank employee rejected a booking request (epic #666 F2, REQ-BANK-026). The default rule
+   * notifies the requesting officer/lead.
+   */
+  BANK_BOOKING_REQUEST_REJECTED
 }

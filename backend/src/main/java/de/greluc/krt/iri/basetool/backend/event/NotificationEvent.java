@@ -69,6 +69,18 @@ public interface NotificationEvent {
   }
 
   /**
+   * The single user this event is directed at, for {@code EVENT_RECIPIENT} selector resolution —
+   * for example the officer/lead who raised a booking request, notified when it is decided.
+   * Distinct from {@link #actorSub()} (who caused the event). {@code null} for events with no
+   * directed recipient — the default.
+   *
+   * @return the directed recipient's sub, or {@code null}
+   */
+  default UUID contextRecipientSub() {
+    return null;
+  }
+
+  /**
    * Loose type tag of the originating aggregate stored on each notification for deep-linking.
    *
    * @return the entity type tag (e.g. {@code JOB_ORDER})

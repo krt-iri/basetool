@@ -19,7 +19,9 @@
 
 package de.greluc.krt.iri.basetool.backend.service;
 
+import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestCreatedEvent;
+import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestRejectedEvent;
 import de.greluc.krt.iri.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.BankAccount;
@@ -317,6 +319,13 @@ public class BankBookingRequestService {
             + shortId(request.getId())
             + " @"
             + holder.getHandle());
+    eventPublisher.publishEvent(
+        new BankBookingRequestConfirmedEvent(
+            request.getId(),
+            request.getAccount().getAccountNo(),
+            request.getAmount(),
+            request.getRequestedBy(),
+            decider));
     return toDto(request);
   }
 
@@ -360,6 +369,14 @@ public class BankBookingRequestService {
         null,
         request.getRequestedBy(),
         "rejected request " + shortId(request.getId()));
+    eventPublisher.publishEvent(
+        new BankBookingRequestRejectedEvent(
+            request.getId(),
+            request.getAccount().getAccountNo(),
+            request.getAmount(),
+            reason,
+            request.getRequestedBy(),
+            decider));
     return toDto(request);
   }
 

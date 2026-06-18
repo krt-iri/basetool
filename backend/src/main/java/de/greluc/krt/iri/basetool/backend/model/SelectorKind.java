@@ -46,5 +46,13 @@ public enum SelectorKind {
    * de.greluc.krt.iri.basetool.backend.event.NotificationEvent#contextAccountId()}). Reads no
    * selector columns — the account comes from the event, mirroring {@link #ORG_RELATIVE_ROLE}.
    */
-  ACCOUNT_GRANT
+  ACCOUNT_GRANT,
+
+  /**
+   * Resolves to the single user the event is directed at ({@link
+   * de.greluc.krt.iri.basetool.backend.event.NotificationEvent#contextRecipientSub()}) — e.g. the
+   * officer/lead who raised a booking request, notified when it is confirmed or rejected. Reads no
+   * selector columns — the recipient comes from the event.
+   */
+  EVENT_RECIPIENT
 }

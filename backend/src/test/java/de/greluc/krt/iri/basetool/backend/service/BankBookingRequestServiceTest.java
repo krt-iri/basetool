@@ -27,7 +27,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestCreatedEvent;
+import de.greluc.krt.iri.basetool.backend.event.BankBookingRequestRejectedEvent;
 import de.greluc.krt.iri.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.iri.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.iri.basetool.backend.model.BankAccount;
@@ -272,6 +274,11 @@ class BankBookingRequestServiceTest {
             eq(txId),
             eq(requester),
             any());
+    ArgumentCaptor<BankBookingRequestConfirmedEvent> event =
+        ArgumentCaptor.forClass(BankBookingRequestConfirmedEvent.class);
+    verify(eventPublisher).publishEvent(event.capture());
+    assertThat(event.getValue().contextRecipientSub()).isEqualTo(requester);
+    assertThat(event.getValue().actorSub()).isEqualTo(decider);
   }
 
   @Test
@@ -350,6 +357,10 @@ class BankBookingRequestServiceTest {
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.REJECTED);
     assertThat(dto.rejectReason()).isEqualTo("duplicate");
     verify(bankLedgerService, never()).bookDeposit(any());
+    ArgumentCaptor<BankBookingRequestRejectedEvent> event =
+        ArgumentCaptor.forClass(BankBookingRequestRejectedEvent.class);
+    verify(eventPublisher).publishEvent(event.capture());
+    assertThat(event.getValue().reason()).isEqualTo("duplicate");
   }
 
   @Test
