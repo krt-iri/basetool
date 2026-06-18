@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.5.8](https://github.com/krt-profit/basetool/releases/tag/v0.5.8) - 2026-06-18
+
 ### Changed
 
 - **Die Konto-Kacheln im Bankbereich (`/bank`) sind jetzt alphabetisch nach dem Kontonamen sortiert** statt nach Kontonummer — sowohl in der Bankleitungs- als auch in der Mitarbeiteransicht.
