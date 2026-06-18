@@ -215,6 +215,13 @@ public class UexItemSyncService {
    * only this row instead of poisoning the whole run's session. Must be invoked through the {@link
    * #self} proxy; a direct {@code this} call would be self-invocation and skip the new transaction.
    *
+   * <p>Belt-and-braces against that same shared-uuid case: when an existing row (resolved by {@code
+   * uex_item_id}) would have its still-null {@code external_uuid} backfilled with a uuid a
+   * <em>different</em> row already owns, this leaves {@code external_uuid} null rather than letting
+   * the write hit {@code uk_game_item_external_uuid}. The row keeps its {@code uex_item_id} key and
+   * every other UEX column still syncs, so the loser sibling no longer fails every run
+   * (REQ-DATA-005).
+   *
    * @param dto inbound UEX row
    * @param category resolved category for kind derivation + FK
    * @param now timestamp to stamp on the row
@@ -236,9 +243,29 @@ public class UexItemSyncService {
 
     UUID externalUuid = parseUuid(dto.uuid());
     if (item.getExternalUuid() == null && externalUuid != null) {
-      // R2 first write for a row UEX exposes with a UUID. R3 slug-fallback may later
-      // backfill external_uuid on rows where UEX returned an empty uuid (the ~30% case).
-      item.setExternalUuid(externalUuid);
+      // R2 first write for a row UEX exposes with a UUID (R3 slug-fallback may later backfill rows
+      // where UEX returned an empty uuid — the ~30% case). Claim the uuid only if no other row
+      // already owns it: UEX gives a base weapon and its skins ONE shared in-game uuid (e.g. ids
+      // 879/5457/5458) while external_uuid is UNIQUE. A brand-new row's uuid is free by
+      // construction (resolveExistingItem just missed on it), but a row resolved by uex_item_id can
+      // be asked to backfill a uuid a *different* row already holds — setting it would hit
+      // uk_game_item_external_uuid (the prod failure on item 4752, the "Pulse Greycat Laser Pistol"
+      // skin). Leave external_uuid null in that case so the row keeps its uex_item_id key and every
+      // other UEX column still syncs (REQ-DATA-005).
+      Optional<GameItem> uuidOwner =
+          newRow ? Optional.empty() : gameItemRepository.findByExternalUuid(externalUuid);
+      if (uuidOwner.isPresent()) {
+        GameItem owner = uuidOwner.orElseThrow();
+        log.warn(
+            "UEX item {} carries uuid={} already owned by game_item id={} (uex_item_id={}); leaving"
+                + " external_uuid null to avoid uk_game_item_external_uuid collision",
+            dto.id(),
+            externalUuid,
+            owner.getId(),
+            owner.getUexItemId());
+      } else {
+        item.setExternalUuid(externalUuid);
+      }
     } else if (item.getExternalUuid() != null
         && externalUuid != null
         && !item.getExternalUuid().equals(externalUuid)) {

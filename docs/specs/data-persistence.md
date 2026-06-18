@@ -95,8 +95,17 @@ The reason this is mandatory: when the whole `syncItems()` run was a single tran
 autoflush re-threw the dead insert — the entire run rolled back (observed in prod: 3376 cascade
 failures, no `Finished` line, the item catalogue frozen for weeks).
 
+Per-item isolation keeps the catalogue healthy but does not stop a sibling that shares a uuid from
+failing *every* run on its own. So the upsert also **declines a colliding backfill**: a row resolved
+by `uex_item_id` whose `external_uuid` is still null is given the incoming uuid only when no other
+row already owns it; otherwise `external_uuid` stays null, the row keeps its `uex_item_id` key, and
+every other UEX column still syncs. Without this guard the loser sibling (e.g. UEX item `4752`, the
+"Pulse Greycat Laser Pistol" skin) logged a `uk_game_item_external_uuid` ERROR on each sync and never
+updated any of its own columns.
+
 **Acceptance** (`UexItemSyncServiceTest`): each item upsert runs through the `self` proxy; the
-per-item `catch` keeps the run going past a failure so the remaining items still persist.
+per-item `catch` keeps the run going past a failure so the remaining items still persist; and an
+incoming uuid already owned by another row leaves the row's `external_uuid` null instead of throwing.
 
 ## Out of scope
 
