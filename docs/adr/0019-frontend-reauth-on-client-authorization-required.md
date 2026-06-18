@@ -185,17 +185,20 @@ homepage and recurring forced re-logins. Three log sources, captured together, s
   detection revokes the client session) → `"Session doesn't have required client"` (the dead token
   replayed against the revoked session) → `"refresh token issued before the client session started"`
   (after a silent re-login created a new client session, a stale authorized client persisted in Redis
-  replayed its old token). Crucially, `client_auth_method="client-secret"`: the `basetool-frontend`
-  token requests authenticate as a **confidential** client, not the public client the sanitized realm
-  reference recorded (a drift to confirm separately; it does not change this decision).
+  replayed its old token). The event field `client_auth_method="client-secret"` is **not** evidence of
+  a confidential client: it reflects the client's default `clientAuthenticatorType` attribute (which
+  is `client-secret` even on public clients), not secret-based authentication. `basetool-frontend` is
+  a **public** client (`publicClient: true`, as the sanitized realm reference records); the
+  public→confidential migration is ADR-0001, implementation pending.
 
 **Decision.** Disable refresh-token rotation / reuse detection realm-wide
 (`Revoke Refresh Token = Off`; realm-export `"revokeRefreshToken": false`). This reverses the
-"rejected as the *code* fix" alternative above, on new evidence: `basetool-frontend` is a confidential
-server-side BFF whose refresh token lives only in the Redis session and never reaches the browser, so
-reuse detection — designed to limit the blast radius of a token leaked from a *public* client — buys
-no security here and is the *direct* mechanism revoking the session under the unavoidable
-concurrent-refresh / stale-session-write race of a session-backed BFF. With rotation off, a replayed
+"rejected as the *code* fix" alternative above, on new evidence: although `basetool-frontend` is a
+public Keycloak client, it is driven by a **server-rendered Spring BFF** — the refresh token is held
+only in the Redis-backed Spring Session and never reaches the browser. Reuse detection — designed to
+limit the blast radius of a token leaked from an *untrusted* client environment (browser / SPA /
+native) — therefore buys little here, while it is the *direct* mechanism revoking the session under
+the unavoidable concurrent-refresh / stale-session-write race of a session-backed BFF. With rotation off, a replayed
 or duplicate online refresh token is simply accepted, the cascade cannot start, and the access token
 is refreshed normally. `Revoke Refresh Token` is a realm-level control with no per-client override, so
 the change is realm-wide.
