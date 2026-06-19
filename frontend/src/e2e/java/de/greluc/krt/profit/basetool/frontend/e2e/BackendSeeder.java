@@ -1625,6 +1625,46 @@ public final class BackendSeeder {
   }
 
   /**
+   * Removes the given user from a Spezialkommando (SK) via {@code DELETE
+   * /api/v1/special-commands/{id}/members/{userId}} (admin-only here), deleting the {@code
+   * org_unit_membership} row. Used by tenancy tests to model a user leaving an org unit they still
+   * own inventory in: when this is <em>not</em> the user's last membership, the {@code
+   * InventoryOrgUnitReconciler} leaves the {@code owning_org_unit_id} stamp untouched
+   * (REQ-INV-004), so the user keeps an org-stamped inventory item without belonging to that org
+   * unit — the REQ-ORG-011 owner-escape scenario.
+   *
+   * @param adminUser an admin Keycloak username (the endpoint gates on ADMIN or SK-lead)
+   * @param adminPassword the admin password
+   * @param specialCommandId the SK OrgUnit id to remove the user from
+   * @param targetUserId the app_user id to remove
+   */
+  public void removeSpecialCommandMember(
+      String adminUser, String adminPassword, String specialCommandId, String targetUserId) {
+    try {
+      String token = passwordGrant(adminUser, adminPassword);
+      HttpRequest request =
+          HttpRequest.newBuilder(
+                  URI.create(
+                      BACKEND_BASE_URL
+                          + "/api/v1/special-commands/"
+                          + specialCommandId
+                          + "/members/"
+                          + targetUserId))
+              .header("Authorization", "Bearer " + token)
+              .DELETE()
+              .build();
+      int status = http.send(request, BodyHandlers.ofString()).statusCode();
+      if (status < 200 || status >= 300) {
+        throw new IllegalStateException("SK member remove failed: HTTP " + status);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.removeSpecialCommandMember failed", e);
+    }
+  }
+
+  /**
    * Creates a non-personal inventory item and explicitly stamps its owning OrgUnit via the {@code
    * owningOrgUnitId} picker field, returning its id. Needed when the creating user belongs to more
    * than one OrgUnit (squadron + SK), where the create endpoint refuses to auto-stamp and demands

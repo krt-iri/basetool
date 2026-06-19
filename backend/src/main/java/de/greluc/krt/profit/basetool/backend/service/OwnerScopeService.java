@@ -1053,6 +1053,20 @@ public class OwnerScopeService {
     if (authHelper.isAdmin() && readActiveSquadronFromHeader().isEmpty()) {
       return true;
     }
+    return isCurrentUserOwner(owner);
+  }
+
+  /**
+   * {@code true} iff the current authenticated principal is the per-user owner of the row carrying
+   * {@code owner}. The JWT {@code sub} is the {@code app_user} primary key, so {@link
+   * AuthHelperService#currentUserId()} compares directly against {@code owner.getId()}. An
+   * anonymous caller (no {@code currentUserId}) and a {@code null} / id-less owner never match.
+   *
+   * @param owner the row's per-user owner ({@code inventory_item.user}, {@code ship.owner}, {@code
+   *     refinery_order.owner}); may be {@code null}, which never matches.
+   * @return {@code true} iff the caller is that owner.
+   */
+  private boolean isCurrentUserOwner(@Nullable User owner) {
     return owner != null
         && owner.getId() != null
         && authHelper.currentUserId().map(uid -> uid.equals(owner.getId())).orElse(false);
@@ -1060,10 +1074,22 @@ public class OwnerScopeService {
 
   /**
    * {@code true} iff the current principal may read inventory item {@code itemId} directly (the
-   * Lager-direct path — NOT the Job-Order-Kontext path, which is ungated by design). Strict
-   * owning-squadron check for org-owned items; for an ownerless personal item ({@code owningOrgUnit
-   * == null}) it defers to {@link #canAccessOwnerlessPersonalRow(User)} (owner-only, plus admins in
-   * all-scopes mode). Non-existent ids return {@code false}.
+   * Lager-direct path — NOT the Job-Order-Kontext path, which is ungated by design). Resolution
+   * order:
+   *
+   * <ul>
+   *   <li><b>Owner escape (REQ-ORG-011)</b>: the item's per-user owner ({@code
+   *       inventory_item.user}) may always read it, regardless of the org-unit stamp — even after
+   *       they switch org units or lose their last membership while the row is still stamped to an
+   *       org unit. This mirrors the service layer, which gates every owner action on {@code
+   *       item.user == currentUser} with no org-unit narrowing, so the gate never denies what the
+   *       service would allow.
+   *   <li>otherwise, for an ownerless personal item ({@code owningOrgUnit == null}) it defers to
+   *       {@link #canAccessOwnerlessPersonalRow(User)} (admins in all-scopes mode);
+   *   <li>otherwise the strict owning-org-unit scope check ({@link #canSeeSquadron(UUID)}).
+   * </ul>
+   *
+   * <p>Non-existent ids return {@code false}.
    *
    * @param itemId inventory item to inspect; never {@code null}.
    * @return {@code true} iff the caller may read the item.
@@ -1073,19 +1099,33 @@ public class OwnerScopeService {
         .findById(itemId)
         .map(
             i ->
-                i.getOwningOrgUnit() == null
-                    ? canAccessOwnerlessPersonalRow(i.getUser())
-                    : canSeeSquadron(i.getOwningOrgUnit().getId()))
+                isCurrentUserOwner(i.getUser())
+                    || (i.getOwningOrgUnit() == null
+                        ? canAccessOwnerlessPersonalRow(i.getUser())
+                        : canSeeSquadron(i.getOwningOrgUnit().getId())))
         .orElse(false);
   }
 
   /**
-   * {@code true} iff the current principal may edit inventory item {@code itemId} directly. Strict
-   * owning-squadron check for org-owned items — Job-Order-Kontext handover writes are gated
-   * separately by {@code JobOrderHandoverService}'s {@code item.jobOrderId == currentOrder.id}
-   * guard. For an ownerless personal item ({@code owningOrgUnit == null}) it defers to {@link
-   * #canAccessOwnerlessPersonalRow(User)} (owner-only, plus admins in all-scopes mode).
-   * Non-existent ids return {@code false}.
+   * {@code true} iff the current principal may edit inventory item {@code itemId} directly.
+   * Resolution order:
+   *
+   * <ul>
+   *   <li><b>Owner escape (REQ-ORG-011)</b>: the item's per-user owner ({@code
+   *       inventory_item.user}) may always edit it, regardless of the org-unit stamp — even after
+   *       they switch org units or lose their last membership while the row is still stamped to an
+   *       org unit. This mirrors the service-layer owner check ({@code InventoryItemService} gates
+   *       owner book-out / note / delivered / association writes on {@code item.user ==
+   *       currentUser} with no org-unit narrowing), so the {@code @PreAuthorize} gate never denies
+   *       what the service would allow.
+   *   <li>otherwise, for an ownerless personal item ({@code owningOrgUnit == null}) it defers to
+   *       {@link #canAccessOwnerlessPersonalRow(User)} (admins in all-scopes mode);
+   *   <li>otherwise the strict owning-org-unit scope check ({@link #canEditSquadron(UUID)}) —
+   *       Job-Order-Kontext handover writes are gated separately by {@code
+   *       JobOrderHandoverService}'s {@code item.jobOrderId == currentOrder.id} guard.
+   * </ul>
+   *
+   * <p>Non-existent ids return {@code false}.
    *
    * @param itemId inventory item to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the item.
@@ -1095,17 +1135,20 @@ public class OwnerScopeService {
         .findById(itemId)
         .map(
             i ->
-                i.getOwningOrgUnit() == null
-                    ? canAccessOwnerlessPersonalRow(i.getUser())
-                    : canEditSquadron(i.getOwningOrgUnit().getId()))
+                isCurrentUserOwner(i.getUser())
+                    || (i.getOwningOrgUnit() == null
+                        ? canAccessOwnerlessPersonalRow(i.getUser())
+                        : canEditSquadron(i.getOwningOrgUnit().getId())))
         .orElse(false);
   }
 
   /**
-   * {@code true} iff the current principal may read refinery order {@code orderId}. Strict
-   * owning-squadron check for org-owned orders (refinery is a strict-staffel aggregate without a
-   * public escape); for an ownerless personal order ({@code owningOrgUnit == null}) it defers to
-   * {@link #canAccessOwnerlessPersonalRow(User)} (owner-only, plus admins in all-scopes mode).
+   * {@code true} iff the current principal may read refinery order {@code orderId}. The per-user
+   * owner escape (REQ-ORG-011) applies first — the order's {@code refinery_order.owner} may always
+   * read it regardless of the org-unit stamp; otherwise an ownerless personal order ({@code
+   * owningOrgUnit == null}) defers to {@link #canAccessOwnerlessPersonalRow(User)} (admins in
+   * all-scopes mode) and an org-owned order to the strict owning-org-unit check ({@link
+   * #canSeeSquadron(UUID)}; refinery is a strict-staffel aggregate without a public escape).
    * Non-existent ids return {@code false}.
    *
    * @param orderId refinery order to inspect; never {@code null}.
@@ -1118,24 +1161,31 @@ public class OwnerScopeService {
   /**
    * Entity overload of {@link #canSeeRefineryOrder(UUID)} for callers that already hold a managed
    * {@link RefineryOrder} (e.g. the mission-scoped refinery list) — avoids a per-row {@code
-   * findById} re-fetch. Strict owning-squadron check (refinery is a strict-staffel aggregate with
-   * no public escape); an ownerless personal order ({@code owningOrgUnit == null}) defers to {@link
-   * #canAccessOwnerlessPersonalRow(User)}.
+   * findById} re-fetch. Same resolution as the id overload: per-user owner escape (REQ-ORG-011)
+   * first, then the ownerless ({@link #canAccessOwnerlessPersonalRow(User)}) / strict
+   * owning-org-unit ({@link #canSeeSquadron(UUID)}) branches.
    *
    * @param order the refinery order to inspect; never {@code null}.
    * @return {@code true} iff the caller may read the order.
    */
   public boolean canSeeRefineryOrder(@NotNull RefineryOrder order) {
-    return order.getOwningOrgUnit() == null
-        ? canAccessOwnerlessPersonalRow(order.getOwner())
-        : canSeeSquadron(order.getOwningOrgUnit().getId());
+    return isCurrentUserOwner(order.getOwner())
+        || (order.getOwningOrgUnit() == null
+            ? canAccessOwnerlessPersonalRow(order.getOwner())
+            : canSeeSquadron(order.getOwningOrgUnit().getId()));
   }
 
   /**
-   * {@code true} iff the current principal may edit refinery order {@code orderId}. Strict
-   * owning-squadron check for org-owned orders; for an ownerless personal order ({@code
-   * owningOrgUnit == null}) it defers to {@link #canAccessOwnerlessPersonalRow(User)} (owner-only,
-   * plus admins in all-scopes mode). Non-existent ids return {@code false}.
+   * {@code true} iff the current principal may edit refinery order {@code orderId}. The per-user
+   * owner escape (REQ-ORG-011) applies first — the order's {@code refinery_order.owner} may always
+   * edit it regardless of the org-unit stamp, mirroring {@code
+   * RefineryOrderService.updateRefineryOrder} / {@code #deleteRefineryOrder} / {@code
+   * #storeRefineryOrder}, which authorise the owner with no org-unit narrowing — so the
+   * {@code @PreAuthorize} gate never denies a write the service would accept. Otherwise an
+   * ownerless personal order ({@code owningOrgUnit == null}) defers to {@link
+   * #canAccessOwnerlessPersonalRow(User)} (admins in all-scopes mode) and an org-owned order to the
+   * strict owning-org-unit check ({@link #canEditSquadron(UUID)}). Non-existent ids return {@code
+   * false}.
    *
    * @param orderId refinery order to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the order.
@@ -1145,9 +1195,10 @@ public class OwnerScopeService {
         .findById(orderId)
         .map(
             o ->
-                o.getOwningOrgUnit() == null
-                    ? canAccessOwnerlessPersonalRow(o.getOwner())
-                    : canEditSquadron(o.getOwningOrgUnit().getId()))
+                isCurrentUserOwner(o.getOwner())
+                    || (o.getOwningOrgUnit() == null
+                        ? canAccessOwnerlessPersonalRow(o.getOwner())
+                        : canEditSquadron(o.getOwningOrgUnit().getId())))
         .orElse(false);
   }
 
@@ -1220,10 +1271,12 @@ public class OwnerScopeService {
   }
 
   /**
-   * {@code true} iff the current principal may read ship {@code shipId}. Strict owning-squadron
-   * check for org-owned ships (Hangar = strict eigene Staffel); for an ownerless personal ship
-   * ({@code owningOrgUnit == null}) it defers to {@link #canAccessOwnerlessPersonalRow(User)}
-   * (owner-only, plus admins in all-scopes mode). Non-existent ids return {@code false}.
+   * {@code true} iff the current principal may read ship {@code shipId}. The per-user owner escape
+   * (REQ-ORG-011) applies first — the ship's {@code ship.owner} may always read it regardless of
+   * the org-unit stamp; otherwise an ownerless personal ship ({@code owningOrgUnit == null}) defers
+   * to {@link #canAccessOwnerlessPersonalRow(User)} (admins in all-scopes mode) and an org-owned
+   * ship to the strict owning-org-unit check ({@link #canSeeSquadron(UUID)}; Hangar = strict eigene
+   * Staffel). Non-existent ids return {@code false}.
    *
    * @param shipId ship to inspect; never {@code null}.
    * @return {@code true} iff the caller may read the ship.
@@ -1233,17 +1286,22 @@ public class OwnerScopeService {
         .findById(shipId)
         .map(
             s ->
-                s.getOwningOrgUnit() == null
-                    ? canAccessOwnerlessPersonalRow(s.getOwner())
-                    : canSeeSquadron(s.getOwningOrgUnit().getId()))
+                isCurrentUserOwner(s.getOwner())
+                    || (s.getOwningOrgUnit() == null
+                        ? canAccessOwnerlessPersonalRow(s.getOwner())
+                        : canSeeSquadron(s.getOwningOrgUnit().getId())))
         .orElse(false);
   }
 
   /**
-   * {@code true} iff the current principal may edit ship {@code shipId}. Strict owning-squadron
-   * check for org-owned ships; for an ownerless personal ship ({@code owningOrgUnit == null}) it
-   * defers to {@link #canAccessOwnerlessPersonalRow(User)} (owner-only, plus admins in all-scopes
-   * mode). Non-existent ids return {@code false}.
+   * {@code true} iff the current principal may edit ship {@code shipId}. The per-user owner escape
+   * (REQ-ORG-011) applies first — the ship's {@code ship.owner} may always edit it regardless of
+   * the org-unit stamp, mirroring {@code HangarService.updateShip} / {@code #deleteShip}, which
+   * reject any non-owner caller, so the {@code @PreAuthorize} gate never denies a write the service
+   * would accept. Otherwise an ownerless personal ship ({@code owningOrgUnit == null}) defers to
+   * {@link #canAccessOwnerlessPersonalRow(User)} (admins in all-scopes mode) and an org-owned ship
+   * to the strict owning-org-unit check ({@link #canEditSquadron(UUID)}). Non-existent ids return
+   * {@code false}.
    *
    * @param shipId ship to inspect; never {@code null}.
    * @return {@code true} iff the caller may edit the ship.
@@ -1253,9 +1311,10 @@ public class OwnerScopeService {
         .findById(shipId)
         .map(
             s ->
-                s.getOwningOrgUnit() == null
-                    ? canAccessOwnerlessPersonalRow(s.getOwner())
-                    : canEditSquadron(s.getOwningOrgUnit().getId()))
+                isCurrentUserOwner(s.getOwner())
+                    || (s.getOwningOrgUnit() == null
+                        ? canAccessOwnerlessPersonalRow(s.getOwner())
+                        : canEditSquadron(s.getOwningOrgUnit().getId())))
         .orElse(false);
   }
 

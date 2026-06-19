@@ -40,7 +40,8 @@ Zusätzlich abgedeckt:
 
 - **Persönliche View** (`/inventory/my`): rein nutzer-gescopt — jeder sieht nur seine eigenen Zeilen, unabhängig vom Eigentümer; eigentümerlose Stocks sieht der Ersteller hier, im globalen Lager aber nur der ungepinnte Admin.
 - **Create-Stamping** (REQ-ORG-004): 1 Mitgliedschaft → Auto-Stamp; mehrere ohne Auswahl → 400; gültige Auswahl → übernommen; fremde Auswahl → 400; mitgliedschaftslos ohne Auswahl → eigentümerlos.
-- **Edit-Gate** (`canEditInventoryItem`): ein Viewer außerhalb des Eigentümer-Scopes kann nicht ausbuchen (403), ein Mitglied der besitzenden OrgUnit schon.
+- **Edit-Gate** (`canEditInventoryItem`): ein **Nicht-Eigentümer** außerhalb des OrgUnit-Scopes kann nicht ausbuchen (403), ein Mitglied der besitzenden OrgUnit schon.
+- **Eigentümer-Escape** (REQ-ORG-011): der **Eigentümer** (`inventory_item.user`) eines Eintrags darf ihn **immer** ausbuchen/bearbeiten, auch nachdem er die besitzende OrgUnit verlassen hat, während der Eintrag noch auf diese OrgUnit gebucht ist. Geseedet, indem `test-member` (Staffel A) kurzfristig einer frischen SK beitritt, einen darauf gestempelten Eintrag anlegt und die SK wieder verlässt — die SK-Mitgliedschaft war nicht die *letzte*, daher demotet der `InventoryOrgUnitReconciler` den Eintrag nicht auf `NULL` (REQ-INV-004), und `test-member` besitzt nun einen SK-gestempelten Eintrag, ohne Mitglied der SK zu sein. Ein Nicht-Eigentümer außerhalb dieser SK bleibt 403.
 
 ## Sonderfälle & Lehren
 

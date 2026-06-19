@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-16.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-19.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -36,7 +36,11 @@ non-admins see the union of their memberships unless they pin one.
   `canSee*`/`canEdit*`. `InventoryItem` rows are append-only and collapsed into display
   *stacks* only at read time (see [`inventory-lager.md`](inventory-lager.md), `REQ-INV-*`);
   the grouping is a display concern keyed within a single `owning_org_unit_id` pool and never
-  widens this scope.
+  widens this scope. **All three of these personal aggregates (`Ship`, `InventoryItem`,
+  `RefineryOrder`) carry the per-user owner escape of REQ-ORG-011** — the row's own owner
+  (`ship.owner` / `inventory_item.user` / `refinery_order.owner`) may always see/edit it regardless
+  of the `owning_org_unit_id` stamp; this is a per-owner detail/edit carve-out only and does not
+  widen the shared Lager-/Hangar-/refinery views. A non-owner stays strictly scoped.
 - **Strict-staffel with two read-only escapes:** `Operation` — owned by a Staffel/SK and filtered
   by `owning_org_unit_id` like the strict aggregates, but visible beyond the owning scope in two
   cases (view only; editing stays role+scope via `canEditOperation`): (1) an **ownerless** operation
@@ -202,3 +206,42 @@ information (and was the only surface that distinguished/showed an SK pin); it w
 redundant once `appTitle` carried the context for every kind. Do not reintroduce a parallel
 always-on context badge — the title is the single source. The Staffel-vs-SK *kind* distinction the
 chip carried is intentionally not reproduced in the title; the shorthand identifies the unit.
+
+### REQ-ORG-011 — Personal-aggregate owner retains see/edit across org-unit changes
+
+The per-user owner of a **personal aggregate** — `InventoryItem` (`inventory_item.user`), `Ship`
+(`ship.owner`) and `RefineryOrder` (`refinery_order.owner`) — may **always see and edit their own
+row**, independent of the row's `owning_org_unit_id` stamp. This must hold in both boundary cases the
+product owner called out:
+
+- the owner **switched org units** — the row stays stamped to the former unit (a unit-switch is
+  not a `NULL`↔non-`NULL` transition, so the [`InventoryOrgUnitReconciler`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/InventoryOrgUnitReconciler.java)
+  does not re-stamp inventory, see `REQ-INV-004`; ships and refinery orders have no reconciler at
+  all), so the owner is no longer a member of the row's owning unit;
+- the owner **has no org unit at all** yet the row is **still stamped to one** (the demote to
+  `NULL` has not happened / does not apply).
+
+Enforced in
+[`OwnerScopeService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
+(`canSee/canEditInventoryItem`, `canSee/canEditShip`, `canSee/canEditRefineryOrder`): a shared
+`isCurrentUserOwner(owner)` check runs **before** the strict `owning_org_unit_id` scope check (and
+before the ownerless-row branch), so the `@PreAuthorize` gate can never deny a write the service
+layer would accept. The service layers already authorise the owner with no org-unit narrowing —
+`InventoryItemService` on every owner action (book-out, note, delivered toggle, association change,
+bulk-checkout) `item.user == currentUser`; `HangarService.updateShip`/`deleteShip` reject any
+non-owner; `RefineryOrderService.updateRefineryOrder`/`deleteRefineryOrder`/`storeRefineryOrder`
+admit `owner == currentUser` (or a logistician). Before this, the gates delegated org-owned rows
+straight to `canEditSquadron(owning_org_unit_id)`, which 403'd the owner the moment they left the
+row's unit even though the service would have allowed the edit.
+
+**Visibility surface is unchanged.** Each aggregate's personal view already lists the owner's rows
+regardless of org unit (`/inventory/my` is a pure `inventory_item.user` filter; the Hangar and
+refinery "my" lists are owner-scoped), exactly as ownerless rows already behave; the strict shared
+views (`/inventory/all`, the squadron Hangar/refinery lists) still filter by `owning_org_unit_id`
+and never surface a foreign-org row, so this carve-out does **not** widen cross-org visibility of the
+shared pools. A **non-owner** stays bound by the strict `owning_org_unit_id` scope.
+
+**Enforced by:** `OwnerScopeServiceTest` (`PersonalAggregateOwnerRetainsAccessTests`),
+`InventoryTenancyE2eTest` (`ownerRetainsEditAfterLeavingOwningOrgUnit`) · **Code:**
+`OwnerScopeService#canSeeInventoryItem` / `#canEditInventoryItem` / `#canSeeShip` / `#canEditShip` /
+`#canSeeRefineryOrder` / `#canEditRefineryOrder`.

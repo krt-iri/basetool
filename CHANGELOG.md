@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Eigentümer eines Lagereintrags, Schiffs (Hangar) oder Raffinerie-Auftrags konnte ihn nicht mehr bearbeiten, nachdem er die OrgUnit gewechselt hatte oder gar keiner OrgUnit mehr angehörte, das Objekt aber noch auf eine OrgUnit gebucht war (403).** Der Eigentümer darf seine eigenen Lagereinträge, Schiffe und Raffinerie-Aufträge jetzt immer sehen und bearbeiten, unabhängig vom OrgUnit-Stempel; Nicht-Eigentümer bleiben an den OrgUnit-Scope gebunden. Die persönlichen Ansichten zeigten die Objekte bereits, nur das Backend-Gate hatte blockiert.
+
 ## [v0.5.11](https://github.com/krt-profit/basetool/releases/tag/v0.5.11) - 2026-06-18
 
 ### Fixed

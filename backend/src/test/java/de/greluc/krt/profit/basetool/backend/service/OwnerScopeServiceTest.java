@@ -804,6 +804,137 @@ class OwnerScopeServiceTest {
     }
   }
 
+  /**
+   * REQ-ORG-011 owner-retains-access escape: the per-user owner of a personal aggregate (inventory
+   * item, ship, refinery order) may always see and edit it, even when the row is still stamped to
+   * an org unit the owner no longer belongs to (org-unit switch, or loss of the last membership). A
+   * non-owner stays bound by the strict owning-org-unit scope. Mirrors the service-layer owner
+   * check so the {@code @PreAuthorize} gate never denies a write the service would accept.
+   */
+  @Nested
+  class PersonalAggregateOwnerRetainsAccessTests {
+
+    private InventoryItem ownedItem(User owner, Squadron owningOrgUnit) {
+      InventoryItem item = new InventoryItem();
+      item.setId(UUID.randomUUID());
+      item.setUser(owner);
+      item.setOwningOrgUnit(owningOrgUnit);
+      return item;
+    }
+
+    private Ship ownedShip(User owner, Squadron owningOrgUnit) {
+      Ship ship = new Ship();
+      ship.setId(UUID.randomUUID());
+      ship.setOwner(owner);
+      ship.setOwningOrgUnit(owningOrgUnit);
+      return ship;
+    }
+
+    private RefineryOrder ownedRefineryOrder(User owner, Squadron owningOrgUnit) {
+      RefineryOrder order = new RefineryOrder();
+      order.setId(UUID.randomUUID());
+      order.setOwner(owner);
+      order.setOwningOrgUnit(owningOrgUnit);
+      return order;
+    }
+
+    @Test
+    void owner_retainsAccessToOwnItemStampedToForeignOrgUnit() {
+      // The caller owns the item but it is stamped to squadron B (e.g. they switched org units).
+      InventoryItem item = ownedItem(memberUserInA, squadronB);
+      when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+
+      assertTrue(
+          service.canSeeInventoryItem(item.getId()),
+          "owner sees their own item even when it is stamped to a foreign org unit");
+      assertTrue(
+          service.canEditInventoryItem(item.getId()),
+          "owner edits their own item even when it is stamped to a foreign org unit");
+    }
+
+    @Test
+    void owner_retainsAccessAfterLosingAllMembershipsWhileItemStaysStamped() {
+      // The caller owns the item, the row is still stamped to squadron A, but the caller now has no
+      // membership at all. The owner escape short-circuits before any scope/membership read.
+      InventoryItem item = ownedItem(memberUserInA, squadronA);
+      when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+
+      assertTrue(service.canSeeInventoryItem(item.getId()), "owner sees their own stamped item");
+      assertTrue(service.canEditInventoryItem(item.getId()), "owner edits their own stamped item");
+    }
+
+    @Test
+    void nonOwnerOutsideScope_isStillDeniedEvenWhenTheItemHasAnOwner() {
+      // A non-owner who is not a member of the item's owning org unit must still be rejected — the
+      // owner escape is per-owner, not a blanket open door.
+      User otherOwner = new User();
+      otherOwner.setId(UUID.randomUUID());
+      InventoryItem item = ownedItem(otherOwner, squadronB);
+      when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+      stubMemberInSquadronA();
+
+      assertFalse(
+          service.canSeeInventoryItem(item.getId()),
+          "a non-owner member of another org unit must not see the item");
+      assertFalse(
+          service.canEditInventoryItem(item.getId()),
+          "a non-owner member of another org unit must not edit the item");
+    }
+
+    @Test
+    void owner_retainsAccessToOwnShipStampedToForeignOrgUnit() {
+      // The caller owns the ship but it is stamped to squadron B (e.g. they switched org units).
+      Ship ship = ownedShip(memberUserInA, squadronB);
+      when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+
+      assertTrue(service.canSeeShip(ship.getId()), "owner sees their own foreign-org ship");
+      assertTrue(service.canEditShip(ship.getId()), "owner edits their own foreign-org ship");
+    }
+
+    @Test
+    void nonOwnerOutsideScope_isStillDeniedForShip() {
+      User otherOwner = new User();
+      otherOwner.setId(UUID.randomUUID());
+      Ship ship = ownedShip(otherOwner, squadronB);
+      when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
+      stubMemberInSquadronA();
+
+      assertFalse(service.canSeeShip(ship.getId()), "a non-owner outside scope must not see it");
+      assertFalse(service.canEditShip(ship.getId()), "a non-owner outside scope must not edit it");
+    }
+
+    @Test
+    void owner_retainsAccessToOwnRefineryOrderStampedToForeignOrgUnit() {
+      // The caller owns the order but it is stamped to squadron B (e.g. they switched org units).
+      RefineryOrder order = ownedRefineryOrder(memberUserInA, squadronB);
+      when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+
+      assertTrue(
+          service.canSeeRefineryOrder(order.getId()), "owner sees their own foreign-org order");
+      assertTrue(
+          service.canEditRefineryOrder(order.getId()), "owner edits their own foreign-org order");
+    }
+
+    @Test
+    void nonOwnerOutsideScope_isStillDeniedForRefineryOrder() {
+      User otherOwner = new User();
+      otherOwner.setId(UUID.randomUUID());
+      RefineryOrder order = ownedRefineryOrder(otherOwner, squadronB);
+      when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      stubMemberInSquadronA();
+
+      assertFalse(
+          service.canSeeRefineryOrder(order.getId()), "a non-owner outside scope must not see it");
+      assertFalse(
+          service.canEditRefineryOrder(order.getId()),
+          "a non-owner outside scope must not edit it");
+    }
+  }
+
   @Nested
   class CanSeeRefineryOrderAndOperationTests {
 
@@ -958,9 +1089,11 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_seesAndEditsOwnOwnerlessShip() {
+      // The owner escape (REQ-ORG-011) grants the owner directly, before the ownerless/admin
+      // branch,
+      // so no isAdmin() stub is needed.
       Ship ship = ownerlessShip(memberUserInA);
       when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
-      when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
       assertTrue(service.canSeeShip(ship.getId()));
@@ -996,9 +1129,11 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_seesAndEditsOwnOwnerlessRefineryOrder() {
+      // The owner escape (REQ-ORG-011) grants the owner directly, before the ownerless/admin
+      // branch,
+      // so no isAdmin() stub is needed.
       RefineryOrder order = ownerlessRefineryOrder(memberUserInA);
       when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
-      when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
       assertTrue(service.canSeeRefineryOrder(order.getId()));
@@ -1018,9 +1153,10 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_seesAndEditsOwnOwnerlessInventoryItem() {
+      // The owner escape (REQ-ORG-011) grants the owner directly, before the ownerless/admin branch
+      // is consulted — so no isAdmin() stub is needed.
       InventoryItem item = ownerlessInventoryItem(memberUserInA);
       when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
-      when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
       assertTrue(service.canSeeInventoryItem(item.getId()));
