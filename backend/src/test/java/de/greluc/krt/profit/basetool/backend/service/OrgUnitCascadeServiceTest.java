@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,18 +33,23 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Mockito unit tests for {@link OrgUnitCascadeService} — the single, shared definition of the
  * org-hierarchy scope cascade (epic #692, REQ-ORG-015). Verifies the exact reach a leadership
  * membership confers downward, the strict-silo isolation between Bereiche, the OL "everything"
- * branch, and — most importantly for the zero-regression mandate — that a caller with no leadership
- * flag is expanded to exactly their direct memberships with no hierarchy read at all.
+ * branch, that an SK-Lead does <em>not</em> cascade (REQ-ORG-017), the per-request memoisation of
+ * the hierarchy reads, and — most importantly for the zero-regression mandate — that a caller with
+ * no leadership flag is expanded to exactly their direct memberships with no hierarchy read at all.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitCascadeServiceTest {
@@ -199,5 +205,126 @@ class OrgUnitCascadeServiceTest {
     // The direct Staffel is NOT part of the cascade reach (it confers no downward leadership).
     org.junit.jupiter.api.Assertions.assertFalse(
         service.cascadedOfficerReach(List.of(ownStaffel, lead)).contains(FOREIGN_STAFFEL_ID));
+  }
+
+  @Test
+  void skLeadMembership_doesNotCascade_keepsSkOnlyReach() {
+    // REQ-ORG-017 (owner decision Q1): an SK-Lead keeps SK-only reach. is_lead promotes them to the
+    // flat officer role in the JWT converter, but it must NOT widen the cascade — their SK's
+    // contextual authority comes from the per-row loop, not from cascadedOfficerReach.
+    OrgUnitMembership skLead = membership(SK_A1_ID, OrgUnitKind.SPECIAL_COMMAND);
+    skLead.setLead(true);
+
+    assertTrue(service.cascadedOfficerReach(List.of(skLead)).isEmpty());
+    assertEquals(Set.of(SK_A1_ID), service.expandWithDescendants(List.of(skLead)));
+    verify(orgUnitRepository, never()).findChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
+    verify(orgUnitRepository, never()).findAllOrgUnitIds();
+  }
+
+  @Test
+  void cascadedReach_isMemoisedPerRequest_hierarchyReadOnce() {
+    OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
+    lead.setBereichsleiter(true);
+    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    bindRequest();
+
+    // Mirrors a real request: the converter computes the reach, then OwnerScopeService re-derives
+    // it (directly and via expandWithDescendants).
+    Set<UUID> first = service.cascadedOfficerReach(List.of(lead));
+    Set<UUID> viaExpand = service.expandWithDescendants(List.of(lead));
+    Set<UUID> third = service.cascadedOfficerReach(List.of(lead));
+
+    assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), first);
+    assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), third);
+    assertTrue(viaExpand.containsAll(Set.of(BEREICH_A_ID, STAFFEL_A1_ID)));
+    // Three cascade calls in one request, but the hierarchy is queried exactly once.
+    verify(orgUnitRepository, times(1)).findChildOrgUnitIds(BEREICH_A_ID);
+  }
+
+  @Test
+  void memoisedReach_returnsDefensiveCopy_callerMutationDoesNotCorruptCache() {
+    OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
+    lead.setBereichsleiter(true);
+    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    bindRequest();
+
+    // Mutate the set returned by the cache-STORE path (first, cache-miss call): must not corrupt
+    // the stored set.
+    Set<UUID> first = service.cascadedOfficerReach(List.of(lead));
+    first.clear();
+
+    // Mutate the set returned by the cache-HIT path (second call): must also not corrupt the
+    // stored set — otherwise dropping the hit-path defensive copy would slip through.
+    Set<UUID> second = service.cascadedOfficerReach(List.of(lead));
+    assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), second);
+    second.clear();
+
+    // A third read must still see the intact reach despite both prior hostile mutations.
+    assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), service.cascadedOfficerReach(List.of(lead)));
+  }
+
+  @Test
+  void olReach_isMemoisedPerRequest_findAllOrgUnitIdsReadOnce() {
+    OrgUnitMembership ol = membership(OL_ID, OrgUnitKind.ORGANISATIONSLEITUNG);
+    ol.setOlMember(true);
+    when(orgUnitRepository.findAllOrgUnitIds())
+        .thenReturn(List.of(OL_ID, BEREICH_A_ID, STAFFEL_A1_ID));
+    bindRequest();
+
+    // The OL branch hits the most expensive query (the whole org-unit table); three consults in
+    // one request must collapse to a single findAllOrgUnitIds() read.
+    service.cascadedOfficerReach(List.of(ol));
+    service.expandWithDescendants(List.of(ol));
+    Set<UUID> third = service.cascadedOfficerReach(List.of(ol));
+
+    assertEquals(Set.of(OL_ID, BEREICH_A_ID, STAFFEL_A1_ID), third);
+    verify(orgUnitRepository, times(1)).findAllOrgUnitIds();
+  }
+
+  @Test
+  void withoutBoundRequest_cascadeDoesNotMemoise_recomputesEachCall() {
+    // The "degrades to direct computation" half of the memoisation contract: with no request bound
+    // there is no per-request slot and no instance-level cache, so each call recomputes.
+    OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
+    lead.setBereichsleiter(true);
+    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+
+    service.cascadedOfficerReach(List.of(lead));
+    service.cascadedOfficerReach(List.of(lead));
+
+    verify(orgUnitRepository, times(2)).findChildOrgUnitIds(BEREICH_A_ID);
+  }
+
+  @Test
+  void perRequestCache_keyedByMembershipSet_doesNotServeOneReachForAnother() {
+    OrgUnitMembership leadA = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
+    leadA.setBereichsleiter(true);
+    OrgUnitMembership leadB = membership(BEREICH_B_ID, OrgUnitKind.BEREICH);
+    leadB.setBereichsleiter(true);
+    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_B_ID)).thenReturn(List.of(STAFFEL_B1_ID));
+    bindRequest();
+
+    Set<UUID> reachA = service.cascadedOfficerReach(List.of(leadA));
+    Set<UUID> reachB = service.cascadedOfficerReach(List.of(leadB));
+
+    assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), reachA);
+    // A different membership set must recompute — never reuse the cached reachA.
+    assertEquals(Set.of(BEREICH_B_ID, STAFFEL_B1_ID), reachB);
+  }
+
+  /**
+   * Clears any servlet request bound to the current thread by the memoisation tests, so it never
+   * leaks into a later test sharing the thread (a no-op when nothing is bound).
+   */
+  @AfterEach
+  void clearRequestContext() {
+    RequestContextHolder.resetRequestAttributes();
+  }
+
+  /** Binds a fresh mock servlet request to the current thread so the per-request cache engages. */
+  private static void bindRequest() {
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
   }
 }

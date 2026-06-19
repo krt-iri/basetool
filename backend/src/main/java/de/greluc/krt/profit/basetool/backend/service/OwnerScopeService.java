@@ -233,10 +233,11 @@ public class OwnerScopeService {
     }
     // R5.e: non-admin path. Read the same active-OrgUnit header the admin switcher uses — once
     // the frontend's R5.e switcher widening lets non-admins pick from their memberships, the
-    // header carries that selection. The pin is only honoured when it points to one of the
-    // caller's actual memberships (defence against a spoofed header from a curl call); a foreign
-    // pin silently collapses to the membership-union read so the user never sees data they did
-    // not opt into.
+    // header carries that selection. The pin is only honoured when it points to a unit the caller
+    // can actually reach — their direct memberships unioned with the epic #692 / REQ-ORG-015
+    // cascade, so a Bereichsleitung/OL may pin to a descendant unit but never to a foreign one.
+    // This is the defence against a spoofed header from a curl call; a pin outside that reach
+    // silently collapses to the reach-union read so the user never sees data they did not opt into.
     java.util.Set<UUID> memberOrgUnitIds = currentMemberOrgUnitIds();
     Optional<UUID> pinned = readActiveSquadronFromHeader();
     if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {

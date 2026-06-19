@@ -20,15 +20,21 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Computes the cascading-scope expansion of the org hierarchy (epic #692, REQ-ORG-015) in one
@@ -64,6 +70,17 @@ import org.springframework.transaction.annotation.Transactional;
  * persisted hierarchy, with no dependency on the security context, so they behave identically
  * whether invoked at authentication time (converter) or request-handling time (scope resolver).
  *
+ * <p><b>Per-request memoisation.</b> Within a single HTTP request both consumers run for the same
+ * authenticated principal — the converter computes the reach at authentication time and {@link
+ * OwnerScopeService} re-derives it at query time — so {@link #cascadedOfficerReach(Collection)}
+ * caches its result on the bound {@link HttpServletRequest}, keyed by the membership-id set it was
+ * computed from. This collapses the two otherwise-identical hierarchy reads ({@code
+ * findAllOrgUnitIds()} for an OL member, {@code findChildOrgUnitIds(...)} per Bereich seat) into
+ * one per request. The cache is transparent: it never changes the result (same inputs ⇒ same set),
+ * it hands out defensive copies so a caller cannot corrupt it, and when no request is bound (unit
+ * tests, scheduled jobs) the value is computed directly. The pure-function contract above therefore
+ * still holds.
+ *
  * <p>Class-level {@code @Transactional(readOnly = true)} matches the other scope-resolution beans:
  * every repository call here is a read.
  */
@@ -71,6 +88,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OrgUnitCascadeService {
+
+  /**
+   * Request-attribute key under which {@link #cascadedOfficerReach(Collection)} memoises its result
+   * for the duration of one request (see the class-level <i>Per-request memoisation</i> note). The
+   * fully-qualified class name avoids any clash with attributes set elsewhere on the request.
+   */
+  private static final String CACHE_KEY_CASCADED_REACH =
+      OrgUnitCascadeService.class.getName() + ".cascadedOfficerReach";
 
   private final OrgUnitRepository orgUnitRepository;
 
@@ -114,12 +139,51 @@ public class OrgUnitCascadeService {
    *   <li>A caller with no leadership flag yields the empty set.
    * </ul>
    *
+   * <p>Memoised per request (see the class-level <i>Per-request memoisation</i> note): the first
+   * call materialises the reach and the rest reuse it, so the hierarchy is read once per request
+   * regardless of how many times the converter and {@link OwnerScopeService} consult it.
+   *
    * @param memberships the caller's membership rows; never {@code null}.
    * @return the cascaded officer-equivalent reach; never {@code null}, possibly empty,
    *     insertion-ordered for determinism.
    */
   @NotNull
   public Set<UUID> cascadedOfficerReach(@NotNull Collection<OrgUnitMembership> memberships) {
+    if (memberships.isEmpty()) {
+      // No memberships → empty reach with no DB read; nothing worth caching.
+      return new LinkedHashSet<>();
+    }
+    HttpServletRequest request = currentRequest();
+    if (request == null) {
+      // No HTTP request bound (unit tests, scheduled jobs): compute directly — identical result.
+      return computeCascadedOfficerReach(memberships);
+    }
+    Set<OrgUnitMembershipId> inputKey = membershipKey(memberships);
+    Object cached = request.getAttribute(CACHE_KEY_CASCADED_REACH);
+    if (cached instanceof CachedReach hit && hit.inputs().equals(inputKey)) {
+      // Same principal within the same request → reuse the materialised reach, skipping the
+      // findAllOrgUnitIds() / findChildOrgUnitIds() round-trips the converter already paid. A
+      // defensive copy is returned so a caller can never corrupt the cached set.
+      return new LinkedHashSet<>(hit.reach());
+    }
+    Set<UUID> reach = computeCascadedOfficerReach(memberships);
+    request.setAttribute(CACHE_KEY_CASCADED_REACH, new CachedReach(inputKey, reach));
+    return new LinkedHashSet<>(reach);
+  }
+
+  /**
+   * The uncached cascade computation backing {@link #cascadedOfficerReach(Collection)}: an OL
+   * membership short-circuits to the materialised union of every org-unit id (never an admin-all
+   * marker, REQ-ORG-015), otherwise each Bereich-leadership membership contributes its Bereich id
+   * plus its direct children.
+   *
+   * @param memberships the caller's membership rows; never {@code null} and never empty (the public
+   *     method handles the empty case before delegating here).
+   * @return a freshly-allocated reach set; never {@code null}, insertion-ordered.
+   */
+  @NotNull
+  private Set<UUID> computeCascadedOfficerReach(
+      @NotNull Collection<OrgUnitMembership> memberships) {
     boolean olReach = memberships.stream().anyMatch(OrgUnitMembership::isOlMember);
     if (olReach) {
       // OL reach is the literal union of every org unit — materialised, never an admin-all marker.
@@ -135,4 +199,57 @@ public class OrgUnitCascadeService {
     }
     return reach;
   }
+
+  /**
+   * The {@link HttpServletRequest} bound to the current thread, or {@code null} when none is bound
+   * (e.g. a unit test or a scheduled job runs outside a servlet request). Read via {@link
+   * RequestContextHolder} rather than an injected request proxy so the bean stays usable — and the
+   * memoisation simply degrades to direct computation — when there is no request context.
+   *
+   * @return the current request, or {@code null} if the call is not running inside one.
+   */
+  @Nullable
+  private static HttpServletRequest currentRequest() {
+    RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+    if (attrs instanceof ServletRequestAttributes servletAttrs) {
+      return servletAttrs.getRequest();
+    }
+    return null;
+  }
+
+  /**
+   * Builds the memoisation key for {@code memberships}: the set of their composite ids. Within a
+   * request both consumers pass the authenticated principal's full membership list, so identical
+   * rows yield an equal key (cache hit) while a different principal's rows yield a different key
+   * (cache miss, recompute) — the cache can never serve one caller's reach to another.
+   *
+   * <p>The key deliberately carries only the {@code (userId, orgUnitId)} ids, not the leadership
+   * role flags the reach actually depends on. This is sound because a single request never mutates
+   * the calling principal's own membership flags and then re-resolves scope: both consumers read
+   * the same rows via {@code findAllByIdUserId(userId)}, so within one request a given id-set fully
+   * determines its flags. A future caller that breaks that assumption would need to key on the
+   * flags too.
+   *
+   * @param memberships the caller's membership rows; never {@code null}.
+   * @return the set of membership ids identifying this input; never {@code null}.
+   */
+  @NotNull
+  private static Set<OrgUnitMembershipId> membershipKey(
+      @NotNull Collection<OrgUnitMembership> memberships) {
+    Set<OrgUnitMembershipId> key = new LinkedHashSet<>();
+    for (OrgUnitMembership m : memberships) {
+      key.add(m.getId());
+    }
+    return key;
+  }
+
+  /**
+   * Request-scoped cache entry pairing a computed {@linkplain #cascadedOfficerReach(Collection)
+   * reach} with the membership-id set it was computed from, so a stale entry is detected (and
+   * recomputed) if the same request ever asks for a different principal's reach.
+   *
+   * @param inputs the membership-id set the reach was computed from; never {@code null}.
+   * @param reach the materialised cascaded reach for that input; never {@code null}.
+   */
+  private record CachedReach(Set<OrgUnitMembershipId> inputs, Set<UUID> reach) {}
 }

@@ -359,8 +359,9 @@ Hard invariants:
 - [ ] The REQ-ORG-011 owner-bypass and the ADR-0024 global-sharing union still hold for a leadership
   principal.
 
-**Enforced by:** `OrgUnitCascadeServiceTest` (cascade math + strict silo + no-flag short-circuit),
-`OwnerScopeServiceTest` (cascade routed into the scope predicate; `adminAllScope` never set),
+**Enforced by:** `OrgUnitCascadeServiceTest` (cascade math + strict silo + no-flag short-circuit +
+SK-lead no-cascade + per-request memoisation), `OwnerScopeServiceTest` (cascade routed into the
+scope predicate; `adminAllScope` never set),
 `CustomJwtGrantedAuthoritiesConverterTest` (flat + cascaded contextual authorities); visibility-matrix
 e2e *(planned, Phase 7)* · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · also pins
 [REQ-SEC-015](security-and-access.md) · **Issues:** #692, #696.

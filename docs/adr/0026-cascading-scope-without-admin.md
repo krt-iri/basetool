@@ -48,7 +48,7 @@ Further:
 
 ## Implementation note (Phase 3, #696)
 
-The decision holds; two refinements landed during implementation:
+The decision holds; three refinements landed during implementation:
 
 - **The helper lives in a dedicated `OrgUnitCascadeService`**, not as a private method on
   `OwnerScopeService`. It exposes `expandWithDescendants(memberships)` (full reach = direct ids ∪
@@ -64,6 +64,15 @@ The decision holds; two refinements landed during implementation:
   (aggregate lists + per-row gates + the Job-Order profit gate) plus the authority minting. A
   Bereichsleitung/OL therefore reaches descendant **aggregates** but not yet the descendant
   **blueprint-availability overview** — strictly fail-closed.
+- **`cascadedOfficerReach(...)` is memoised per request.** Both consumers run for the same
+  authenticated principal in a request (the converter at authentication time, `OwnerScopeService` at
+  query time), so the leadership reach is cached on the bound `HttpServletRequest` — keyed by the
+  membership-id set — to collapse the two otherwise-identical hierarchy reads (`findAllOrgUnitIds()`
+  for OL, `findChildOrgUnitIds(...)` per Bereich seat) into one. The cache is transparent (same
+  inputs ⇒ same set, defensive copies handed out, direct computation when no request is bound), so
+  the helper's pure-function contract is unchanged. This is the cheap first answer to the OL-union
+  cost flagged under *Consequences*; the closure-table swap stays available if the `IN` list itself
+  bites.
 
 ## Consequences
 

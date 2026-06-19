@@ -205,9 +205,9 @@ public class CustomJwtGrantedAuthoritiesConverter
     // back-compat surface for role-only @PreAuthorize gates; the cascade's org-unit scoping is
     // applied separately (contextual authorities below + OwnerScopeService's scope predicate).
     boolean anyLogistician =
-        memberships.stream().anyMatch(m -> m.isLogistician() || confersLeadershipReach(m));
+        memberships.stream().anyMatch(m -> m.isLogistician() || confersFlatOfficerRole(m));
     boolean anyMissionManager =
-        memberships.stream().anyMatch(m -> m.isMissionManager() || confersLeadershipReach(m));
+        memberships.stream().anyMatch(m -> m.isMissionManager() || confersFlatOfficerRole(m));
 
     if (anyLogistician) {
       authorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
@@ -247,17 +247,30 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * {@code true} iff the membership carries a Bereich/OL leadership flag and therefore confers
-   * cascading, officer-equivalent reach over its subordinate units (epic #692, REQ-ORG-015). A
-   * per-membership Logistician / MissionManager flag and a flag-less seat are deliberately excluded
-   * — those grant only the per-row contextual authority handled by the main loop, not the
-   * leadership promotion. The SK-Lead flag ({@code is_lead}) is handled by its own dedicated checks
-   * alongside this one, so it is not folded in here.
+   * {@code true} iff holding {@code m} promotes the caller to the flat, officer-equivalent {@code
+   * ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} (epic #692, REQ-ORG-015). A membership
+   * qualifies when it ranks at or above logistician + mission manager on its own unit: an SK-Lead
+   * ({@code is_lead}, which is logistician + mission manager of its SK, #344), a Bereichsleitung
+   * ({@code is_bereichsleiter} / {@code is_bereichskoordinator} / {@code is_bereichsoperator}), or
+   * the OL ({@code is_ol_member}). The flat role is the back-compat surface for role-only
+   * {@code @PreAuthorize} gates.
+   *
+   * <p>This is deliberately <b>not</b> the cascade-reach predicate. Which org units a leader
+   * reaches downward — and thus which contextual authorities are minted — is computed separately by
+   * {@link OrgUnitCascadeService#cascadedOfficerReach(Collection)}, which, unlike this method,
+   * <em>excludes</em> {@code is_lead}: an SK-Lead keeps SK-only reach (REQ-ORG-017, owner decision
+   * Q1) and receives their SK's contextual authority from the per-row loop above, not from the
+   * cascade.
+   *
+   * <p>A per-membership Logistician / MissionManager flag is handled by the explicit {@code
+   * m.isLogistician()} / {@code m.isMissionManager()} terms at the call sites (a plain logistician
+   * confers only the logistician flat role, not mission manager), and a flag-less Bereich/OL seat
+   * confers nothing — so both return {@code false} here.
    *
    * @param m the membership row to classify; never {@code null}.
-   * @return {@code true} iff {@code m} is a Bereichsleitung or OL leadership membership.
+   * @return {@code true} iff {@code m} is an SK-Lead, Bereichsleitung, or OL leadership membership.
    */
-  private static boolean confersLeadershipReach(@NonNull OrgUnitMembership m) {
+  private static boolean confersFlatOfficerRole(@NonNull OrgUnitMembership m) {
     return m.isLead()
         || m.isBereichsleiter()
         || m.isBereichskoordinator()
