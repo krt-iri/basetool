@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -112,40 +113,47 @@ class OrgHierarchyControllerSecurityTest {
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
     return Stream.of(
         arguments(
-            "listOrganisationsleitung",
-            get("/api/v1/org-hierarchy/organisationsleitung").accept(MediaType.APPLICATION_JSON)),
+            Named.of(
+                "listOrganisationsleitung",
+                get("/api/v1/org-hierarchy/organisationsleitung")
+                    .accept(MediaType.APPLICATION_JSON))),
         arguments(
-            "createOrganisationsleitung",
-            post("/api/v1/org-hierarchy/organisationsleitung")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Leitung\",\"shorthand\":\"OL\"}")),
+            Named.of(
+                "createOrganisationsleitung",
+                post("/api/v1/org-hierarchy/organisationsleitung")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"Leitung\",\"shorthand\":\"OL\"}"))),
         arguments(
-            "setParent",
-            patch("/api/v1/org-hierarchy/org-units/" + id + "/parent")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"version\":0}")),
+            Named.of(
+                "setParent",
+                patch("/api/v1/org-hierarchy/org-units/" + id + "/parent")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"version\":0}"))),
         arguments(
-            "addBereichLeader",
-            post("/api/v1/org-hierarchy/bereiche/" + id + "/members")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"userId\":\"" + id + "\",\"role\":\"LEITER\"}")),
+            Named.of(
+                "addBereichLeader",
+                post("/api/v1/org-hierarchy/bereiche/" + id + "/members")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"userId\":\"" + id + "\",\"role\":\"LEITER\"}"))),
         arguments(
-            "removeBereichLeader",
-            delete("/api/v1/org-hierarchy/bereiche/" + id + "/members/" + id)),
+            Named.of(
+                "removeBereichLeader",
+                delete("/api/v1/org-hierarchy/bereiche/" + id + "/members/" + id))),
         arguments(
-            "addOlMember",
-            post("/api/v1/org-hierarchy/organisationsleitung/" + id + "/members")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"userId\":\"" + id + "\"}")),
+            Named.of(
+                "addOlMember",
+                post("/api/v1/org-hierarchy/organisationsleitung/" + id + "/members")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"userId\":\"" + id + "\"}"))),
         arguments(
-            "removeOlMember",
-            delete("/api/v1/org-hierarchy/organisationsleitung/" + id + "/members/" + id)));
+            Named.of(
+                "removeOlMember",
+                delete("/api/v1/org-hierarchy/organisationsleitung/" + id + "/members/" + id))));
   }
 
   @ParameterizedTest(name = "{0} is forbidden for an OFFICER")
   @MethodSource("adminOnlyEndpoints")
-  void endpoint_forbiddenForOfficer(String endpoint, MockHttpServletRequestBuilder request)
-      throws Exception {
+  void endpoint_forbiddenForOfficer(MockHttpServletRequestBuilder request) throws Exception {
     mockMvc
         .perform(request.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isForbidden());
