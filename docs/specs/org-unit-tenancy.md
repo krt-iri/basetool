@@ -379,24 +379,48 @@ extended:
   `>1` direct forces an explicit pick; a foreign / out-of-oversight pick is a 400) — ordinary members'
   stamping is unchanged.
 - **Create-on-behalf is authorised by `canEditOrgUnit(target)`** (cascades per REQ-ORG-015), not by
-  admin-ness; every create/update path accepting a target owning-org-unit (incl.
-  `JobOrderService.resolveResponsibleOrgUnit`) gains this gate.
-- Visibility reuses the existing scope + public/internal escape rules unchanged; strict silo holds. The
-  ownerless `NULL` leadership path (REQ-ORG-009) is **preserved unchanged** (no backfill). Promotion
-  stays Squadron-only. The REQ-ORG-011 owner-bypass stays ahead of the scope check.
+  admin-ness. This gate lives in the shared **owning-org-unit picker resolver**
+  (`OwnerScopeService.resolveStampedOrgUnit`): an explicit pick is accepted when it is a DIRECT
+  membership of the **target user** *or* an org unit the current **caller** may edit. The gate keys
+  `canEditOrgUnit` on the caller while the membership set is the target user's, so the two coincide for
+  every **self-service** create (caller = target) — there an ordinary member, whose `canEditOrgUnit`
+  reach equals their own memberships, is byte-identical to today — and diverge only on the two
+  **create-on-behalf** paths where caller ≠ target (inventory book-out/transfer, refinery store): there
+  the accepted set is `(target's memberships) ∪ (caller's editable scope)` by design, so a leader may
+  place the recipient's row in any unit the leader already controls (never widening what the caller can
+  see; the REQ-ORG-011 owner-escape keeps the recipient's own visibility). The same `canEditOrgUnit` gate
+  already governs the job-order **reassign** path (`reassignResponsibleOrgUnit`, escalate-only for
+  non-admins).
+
+  > **Implementation note (Phase 4, #697):** the gate is **not** added to the create-time
+  > `JobOrderService.resolveResponsibleOrgUnit` / `resolveRequestingOrgUnit`. Those intentionally accept
+  > **any profit-eligible** (responsible) / **any** (requesting) org unit so the shared-SK-queue intake
+  > model (#343) keeps working — a squadron must be able to direct work to an SK it does not edit.
+  > Tightening them would regress that flow, so create-time responsible/requesting stay open and the
+  > nuanced reassign gate (already cascade-aware) remains the only scope check on the responsible field.
+
+- Visibility reuses the existing scope + public/internal escape rules unchanged; strict silo holds —
+  no per-aggregate code change was needed: a `BEREICH`/`OL`-owned row's `owning_org_unit_id` flows
+  through the same `canSee*`/`canEdit*` gates and `IN :memberOrgUnitIds` list queries, which the Phase-3
+  cascade already widens for the owning leadership and keeps closed for subordinates. The ownerless
+  `NULL` leadership path (REQ-ORG-009) is **preserved unchanged** (no backfill). Promotion stays
+  Squadron-only. The REQ-ORG-011 owner-bypass stays ahead of the scope check.
 
 **Acceptance**
 
 - [ ] A Bereich-owned and an OL-owned aggregate can be created, read and edited by that level's
   leadership; a subordinate cannot see the level above (strict silo).
 - [ ] Create-on-behalf of a descendant succeeds; of a non-descendant fails (400/403).
-- [ ] Ordinary-member and officer stamping is byte-identical to today.
+- [ ] Self-service stamping (caller = target user) is byte-identical to today for ordinary members and
+  officers; the only widening is the caller ≠ target create-on-behalf paths (book-out/transfer, store).
 - [ ] The ownerless `NULL` path behaves exactly as REQ-ORG-009.
 
-**Enforced by (planned):** per-aggregate stamping/visibility tests, `OwnerScopeServiceTest`,
-visibility-matrix e2e · **ADR:** [ADR-0027](../adr/0027-bereich-ol-aggregate-ownership.md) · **Issues:**
-
-# 692, #697.
+**Enforced by:** `OwnerScopeServiceTest` (the `BereichOlOwnershipStampingTests` nest — Bereich **and OL**
+resolved as owners, create-on-behalf of a descendant **Staffel and SK** via `canEditOrgUnit`, the
+caller ≠ target divergence keyed on the caller's scope, foreign-to-both pick still 400, strict-silo
+read/edit lock); existing picker-resolver + per-aggregate stamping/visibility tests stay green
+(self-service stamping unchanged); visibility-matrix e2e *(planned, Phase 7)* · **ADR:**
+[ADR-0027](../adr/0027-bereich-ol-aggregate-ownership.md) · **Issues:** #692, #697.
 
 ### REQ-ORG-017 — Membership cardinality & exclusivity rules
 

@@ -563,17 +563,27 @@ public class OwnerScopeService {
    * entity.setOwningOrgUnit(...)}. The lifecycle hook leaves the legacy column null for that row,
    * which is now legal.
    *
-   * <p>Decision matrix matches {@link #resolveSquadronForPickerOutput(User, UUID)} byte-for-byte: 0
-   * memberships → 400; 1 + null picker → auto-stamp; 1 + valid → honour; 1 + mismatch → 400; &gt;1
-   * + null picker → 400 (force explicit choice); &gt;1 + valid → honour; &gt;1 + foreign → 400.
+   * <p>Decision matrix (extends the legacy {@link #resolveSquadronForPickerOutput(User, UUID)}
+   * matrix, which stays strict): 0 memberships → 400; 1 + null picker → auto-stamp the sole direct
+   * membership; &gt;1 + null picker → 400 (force an explicit choice). An explicit pick is honoured
+   * when it is one of the target user's DIRECT memberships <em>or</em> — epic #692 Phase 4 /
+   * REQ-ORG-016 — an org unit the current <b>caller</b> may edit ({@link #canEditOrgUnit(UUID)},
+   * cascade-aware), the create-on-behalf widening; a pick that is neither → 400. Because of that
+   * widening this resolver and the still-strict (membership-only) {@code
+   * resolveSquadronForPickerOutput} no longer agree byte-for-byte: a pick foreign to the target
+   * user but within the caller's editable scope is rejected by the latter and honoured here.
    *
    * @param targetUser the user whose memberships gate the picker output validation; never {@code
    *     null}.
    * @param owningOrgUnitId the picker-supplied org unit id; {@code null} triggers the auto-stamp
    *     path when the user has exactly one membership.
-   * @return the resolved {@link OrgUnit} — either a {@link Squadron} or a {@link
-   *     de.greluc.krt.profit.basetool.backend.model.SpecialCommand}; never {@code null}.
-   * @throws BadRequestException per the matrix above.
+   * @return the resolved {@link OrgUnit} — a {@link Squadron}, a {@link
+   *     de.greluc.krt.profit.basetool.backend.model.SpecialCommand}, or (Phase 4) a {@link
+   *     de.greluc.krt.profit.basetool.backend.model.Bereich} / {@link
+   *     de.greluc.krt.profit.basetool.backend.model.Organisationsleitung}; never {@code null}.
+   * @throws BadRequestException on 0 memberships, a &gt;1-membership {@code null} picker, or an
+   *     explicit pick that is neither a direct membership of the target user nor within the
+   *     caller's editable scope.
    */
   public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
@@ -645,17 +655,26 @@ public class OwnerScopeService {
   /**
    * Applies the §5.5.1 picker-output matrix for a user known to have at least one membership, then
    * resolves the chosen id to its concrete {@link OrgUnit} subtype (Staffel via {@link
-   * SquadronRepository}, Spezialkommando via {@link SpecialCommandRepository}). Shared tail of
-   * {@link #resolveOrgUnitForPickerOutput(User, UUID)} and {@link
+   * SquadronRepository}, Spezialkommando via {@link SpecialCommandRepository}, and — epic #692
+   * Phase 4 / REQ-ORG-016 — a {@code BEREICH} / {@code ORGANISATIONSLEITUNG} owner via the
+   * polymorphic {@link OrgUnitRepository}). Shared tail of {@link
+   * #resolveOrgUnitForPickerOutput(User, UUID)} and {@link
    * #resolveOrgUnitForPickerOutputNullable(User, UUID)} — the empty-membership branch differs
    * between the two callers and is handled by each before delegating here.
    *
-   * @param memberOrgUnitIds the caller's non-empty membership set.
+   * <p>The auto-stamp ({@code owningOrgUnitId == null}) and {@code >1 → force a choice} rules stay
+   * keyed on the target user's DIRECT memberships, so a leader's default owner is their own
+   * Bereich/OL and ordinary-member stamping is unchanged. An explicit pick is accepted when it is a
+   * DIRECT membership <em>or</em> an org unit the current caller may edit ({@link
+   * #canEditOrgUnit(UUID)}) — the cascade-aware create-on-behalf widening.
+   *
+   * @param memberOrgUnitIds the target user's non-empty DIRECT membership set.
    * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} for the auto-stamp
    *     path.
    * @return the resolved {@link OrgUnit}; never {@code null}.
-   * @throws BadRequestException on a foreign choice, a &gt;1-membership {@code null} choice, or a
-   *     resolved id that no longer exists in either repository.
+   * @throws BadRequestException on a pick that is neither a direct membership nor within the
+   *     caller's editable scope, a &gt;1-membership {@code null} choice, or a resolved id that no
+   *     longer exists / is not an ownable kind.
    */
   @NotNull
   private OrgUnit resolveStampedOrgUnit(@NotNull Set<UUID> memberOrgUnitIds, UUID owningOrgUnitId) {
@@ -668,23 +687,53 @@ public class OwnerScopeService {
             "User belongs to multiple org units; owningOrgUnitId is required");
       }
     } else {
-      if (!memberOrgUnitIds.contains(owningOrgUnitId)) {
+      // Epic #692 Phase 4 (REQ-ORG-016): a picker choice is valid when it is one of the TARGET
+      // user's DIRECT memberships (the historical contract) OR an org unit the CURRENT CALLER may
+      // edit ({@link #canEditOrgUnit(UUID)}, cascade-aware since Phase 3). The latter is the
+      // create-on-behalf widening: a Bereichsleitung/OL leader may stamp a subordinate Staffel/SK
+      // (or its own Bereich/OL) they oversee.
+      //
+      // Note the gate keys canEditOrgUnit on the CALLER, while memberOrgUnitIds is the TARGET
+      // user's
+      // set. When caller == targetUser (every self-service create path) the two coincide, so an
+      // ordinary member's accepted set is exactly their own memberships and stamping is
+      // byte-identical
+      // to the pre-Phase-4 gate. They DIVERGE only on the two create-on-behalf paths where a caller
+      // stamps another user's row — inventory book-out/transfer and refinery store — and there the
+      // accepted set is the union of (target's memberships) and (caller's editable scope), by
+      // design:
+      // a leader may place the recipient's row in any unit the leader already controls. This never
+      // widens what the CALLER can see (canEditOrgUnit only admits units already in the caller's
+      // scope)
+      // and REQ-ORG-011 owner-escape keeps the recipient's own visibility of the row.
+      if (!memberOrgUnitIds.contains(owningOrgUnitId) && !canEditOrgUnit(owningOrgUnitId)) {
         throw new BadRequestException(
-            "Selected owner org unit is not a membership of the target user");
+            "Selected owner org unit is neither a membership of the target user nor within the"
+                + " caller's editable scope");
       }
       stampedOrgUnitId = owningOrgUnitId;
     }
 
     // Resolve to the concrete subtype. Staffel-side: SquadronRepository (discriminator filter
-    // matches). SK-side: SpecialCommandRepository. Picker output was validated against the
-    // membership set above so a missing row here is a hard contract violation, surfaced as 400.
+    // matches). SK-side: SpecialCommandRepository. Epic #692 Phase 4 (REQ-ORG-016): a Bereich or
+    // Organisationsleitung may own an aggregate directly, so a non-Squadron/non-SK id falls through
+    // to the polymorphic OrgUnitRepository and is accepted iff it resolves to a BEREICH / OL row.
+    // The picker output was validated above, so any other miss is a hard contract violation (400).
     Optional<Squadron> sq = squadronRepository.findById(stampedOrgUnitId);
     if (sq.isPresent()) {
       return sq.get();
     }
-    return specialCommandRepository
+    OrgUnit specialCommand =
+        specialCommandRepository.findById(stampedOrgUnitId).map(s -> (OrgUnit) s).orElse(null);
+    if (specialCommand != null) {
+      return specialCommand;
+    }
+    return orgUnitRepository
         .findById(stampedOrgUnitId)
-        .map(s -> (OrgUnit) s)
+        .filter(
+            ou ->
+                ou.getKind() == OrgUnitKind.BEREICH
+                    || ou.getKind() == OrgUnitKind.ORGANISATIONSLEITUNG)
         .orElseThrow(
             () ->
                 new BadRequestException(

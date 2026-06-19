@@ -597,12 +597,17 @@ public class RefineryOrderService {
       }
 
       // Resolve the assignee's owning org-unit pool up front — the eighth identity dimension — so
-      // the freshly created row is stamped with that pool. The store dialog now carries a per-item
+      // the freshly created row is stamped with that pool. The store dialog carries a per-item
       // owning-org-unit picker (#596 follow-up to the SK §5.5 stamping wave), pre-filled with the
       // order's own org unit: the resolver auto-stamps for a single-membership assignee, yields an
-      // ownerless personal row (owningOrgUnit == null, V132) for a membershipless one, honours the
-      // picked org unit for a multi-membership assignee, and only 400s when a multi-membership
-      // assignee arrives with no pick (foreign picks 400 either way). See InventoryItemService.
+      // ownerless personal row (owningOrgUnit == null, V132) for a membershipless one, and honours
+      // an
+      // explicit pick that is one of the assignee's memberships or — epic #692 Phase 4 /
+      // REQ-ORG-016,
+      // when the current caller differs from the assignee — a unit the caller may edit (create-on-
+      // behalf). It 400s a multi-membership assignee with no pick, or a pick foreign to BOTH the
+      // assignee's memberships and the caller's editable scope. See InventoryItemService and
+      // OwnerScopeService.resolveStampedOrgUnit.
       final de.greluc.krt.profit.basetool.backend.model.OrgUnit owningOrgUnit =
           ownerScopeService.resolveOrgUnitForPickerOutputNullable(
               assignee, itemDto.owningOrgUnitId());

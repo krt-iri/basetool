@@ -1,6 +1,6 @@
 # ADR-0027 — Bereich and Organisationsleitung as direct owners of org-unit-scoped aggregates
 
-- **Status:** Accepted — implementation pending (epic #692)
+- **Status:** Accepted — implemented in Phase 4 (#697). See *Implementation note*.
 - **Date:** 2026-06-19
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-ORG-016 · REQ-ORG-004 (amended) · REQ-ORG-009 · REQ-ORG-011 (#701) · ADR-0025 · ADR-0026 · issue #692 · #697
@@ -36,6 +36,37 @@ We will allow `owning_org_unit_id` to reference a `BEREICH` or `ORGANISATIONSLEI
   never own promotion data.
 - **The #701 `isCurrentUserOwner` bypass (REQ-ORG-011) stays ahead of the scope check** for personal
   aggregates, so a per-user owner keeps see/edit on their own row regardless of the new owning-kind.
+
+## Implementation note (Phase 4, #697)
+
+The decision holds; the change was smaller than anticipated because Phase 1 (owning columns already
+accept any kind) and Phase 3 (the cascade) did most of the work. The entire delivery is **one method**,
+`OwnerScopeService.resolveStampedOrgUnit`:
+
+- **Validation widening** — an explicit pick is accepted when it is a DIRECT membership of the target
+  user **or** `canEditOrgUnit(pick)` for the current **caller** (the create-on-behalf gate, cascade-aware
+  since Phase 3). Auto-stamp / `>1 → force a choice` stay keyed on the target's DIRECT memberships.
+  Because the gate keys `canEditOrgUnit` on the caller while the membership set is the target user's,
+  the two coincide for every **self-service** create (caller = target) — ordinary-member and officer
+  stamping is byte-identical there — and diverge only on the two **create-on-behalf** paths where
+  caller ≠ target (inventory book-out/transfer, refinery store): there the accepted set is `(target's
+  memberships) ∪ (caller's editable scope)` by design, letting a leader place the recipient's row in any
+  unit the leader already controls. This never widens what the caller can see (`canEditOrgUnit` only
+  admits units already in the caller's scope), and the REQ-ORG-011 owner-escape keeps the recipient's own
+  visibility of the row.
+- **Resolution** — a non-Squadron / non-SK id falls through to the polymorphic `OrgUnitRepository` and is
+  accepted iff it resolves to a `BEREICH` / `ORGANISATIONSLEITUNG` row.
+
+No per-aggregate change was needed: all five aggregates (`Ship`, `InventoryItem`, `RefineryOrder`,
+`Mission`, `Operation`) already stamp through the shared resolver for authenticated callers and their
+`owningOrgUnit` field is typed `OrgUnit`. The legacy `owningSquadron` mirror columns were already dropped,
+so a `BEREICH` / `OL` owner is just a polymorphic FK with no dual-write to break. **Refinement to the
+decision:** the
+`canEditOrgUnit` gate is **not** added to the create-time `JobOrderService.resolveResponsibleOrgUnit` /
+`resolveRequestingOrgUnit` — those intentionally accept any profit-eligible / any org unit so the
+shared-SK-queue intake (#343) is not regressed; the nuanced, already-cascade-aware
+`reassignResponsibleOrgUnit` gate remains the only scope check on the responsible field. REQ-ORG-016 was
+amended to record this.
 
 ## Consequences
 
