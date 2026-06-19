@@ -132,24 +132,49 @@ ALTER TABLE org_unit_membership ADD CONSTRAINT chk_org_unit_membership_ol_flag_o
 -- ---------------------------------------------------------------------
 -- A partial UNIQUE index can enforce "<=1" but not "<=2"; replace it with
 -- a counting trigger. Existing data (<=1 Staffel per user) stays valid; the
--- service layer adds a matching guard (REQ-ORG-017) in a later phase. The
--- trigger fires AFTER sync_org_unit_membership_kind (alphabetical order:
--- "..._kind_ins" < "..._max_two_squadron_ins"), so NEW.kind is resolved.
+-- service layer adds a matching guard (REQ-ORG-017) in a later phase.
+--
+-- Coverage parity: the dropped unique index enforced the cap on every write
+-- (INSERT and UPDATE), so the replacement runs on BOTH operations too. Each
+-- max-two trigger fires AFTER sync_org_unit_membership_kind on the same
+-- operation (alphabetical order: "..._kind_ins" < "..._max_two_squadron_ins"
+-- and "..._kind_upd" < "..._max_two_squadron_upd"), so NEW.kind is already
+-- resolved when the count runs.
+--
+-- INSERT vs UPDATE counting: the function counts the user's OTHER Staffel
+-- memberships and rejects when there are already >= 2 (the row being written
+-- would be the third). The row being written must be excluded from that
+-- count. On INSERT no such row exists yet, so excluding NEW's (not-yet-
+-- present) identity is a harmless no-op. On UPDATE the row still holds its
+-- OLD identity in the table, so it MUST be excluded by OLD -- otherwise a
+-- valid re-point (e.g. moving a membership from Staffel A to B while the user
+-- is also in C: A,C -> B,C, still two) would miscount the about-to-be-
+-- replaced A row as a third Staffel and be wrongly rejected.
 DROP INDEX IF EXISTS uq_org_unit_membership_one_squadron;
 
 CREATE OR REPLACE FUNCTION enforce_max_two_squadron_memberships()
 RETURNS TRIGGER AS $$
 DECLARE
     other_squadron_count INTEGER;
+    self_user_id     UUID;
+    self_org_unit_id UUID;
 BEGIN
     IF NEW.kind <> 'SQUADRON' THEN
         RETURN NEW;
+    END IF;
+    -- Identity of the row being written, so it is never counted against itself.
+    IF TG_OP = 'UPDATE' THEN
+        self_user_id     := OLD.user_id;
+        self_org_unit_id := OLD.org_unit_id;
+    ELSE
+        self_user_id     := NEW.user_id;
+        self_org_unit_id := NEW.org_unit_id;
     END IF;
     SELECT COUNT(*) INTO other_squadron_count
       FROM org_unit_membership
      WHERE user_id = NEW.user_id
        AND kind = 'SQUADRON'
-       AND org_unit_id <> NEW.org_unit_id;
+       AND NOT (user_id = self_user_id AND org_unit_id = self_org_unit_id);
     IF other_squadron_count >= 2 THEN
         RAISE EXCEPTION 'user % may belong to at most two Staffeln', NEW.user_id;
     END IF;
@@ -160,4 +185,9 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_org_unit_membership_max_two_squadron_ins ON org_unit_membership;
 CREATE TRIGGER trg_org_unit_membership_max_two_squadron_ins
 BEFORE INSERT ON org_unit_membership
+FOR EACH ROW EXECUTE FUNCTION enforce_max_two_squadron_memberships();
+
+DROP TRIGGER IF EXISTS trg_org_unit_membership_max_two_squadron_upd ON org_unit_membership;
+CREATE TRIGGER trg_org_unit_membership_max_two_squadron_upd
+BEFORE UPDATE OF user_id, org_unit_id ON org_unit_membership
 FOR EACH ROW EXECUTE FUNCTION enforce_max_two_squadron_memberships();

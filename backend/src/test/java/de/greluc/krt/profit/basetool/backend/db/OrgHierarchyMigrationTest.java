@@ -38,12 +38,18 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * Verifies the V164 org-hierarchy migration (epic #692, REQ-ORG-014/017): the two new {@code
  * org_unit} kinds, the {@code parent_org_unit_id} column with its index, the cross-row parent-kind
  * trigger, the OL-has-no-parent CHECK, the relaxed "at most two Staffeln" guard (the old single-
- * Staffel unique index is gone), and the new {@code org_unit_membership} leadership flags. The test
- * profile boots Postgres via Testcontainers and runs every migration at startup, so this exercises
- * the real DDL — the membership-side cross-row behaviour (the ≤2 trigger firing, the flag CHECKs
- * rejecting) is verified through the service layer in a later phase where user fixtures exist; here
- * it is confirmed structurally (the constraints/trigger/columns are present and the org_unit-side
- * triggers fire) so a renamed/dropped object is caught as an early-warning canary.
+ * Staffel unique index is gone, replaced by INSERT- and UPDATE-side counting triggers), and the new
+ * {@code org_unit_membership} leadership flags. The test profile boots Postgres via Testcontainers
+ * and runs every migration at startup, so this exercises the real DDL.
+ *
+ * <p>Three angles are covered: structural presence of every new object (so a renamed/dropped object
+ * is caught as an early-warning canary), the org_unit-side three-level parent invariants, and the
+ * membership-side ≤2-Staffel counting trigger on both INSERT and UPDATE (the UPDATE path proves the
+ * re-point edge case where the about-to-be-replaced row must not be counted against itself). The
+ * membership-flag CHECKs and the matching service-layer guard (REQ-ORG-017) are verified in a later
+ * phase where the service and its fixtures exist; here throwaway {@code app_user} / {@code
+ * org_unit} rows are inserted directly and removed in a finally block so the shared schema is left
+ * untouched.
  */
 @SpringBootTest
 class OrgHierarchyMigrationTest {
@@ -68,10 +74,13 @@ class OrgHierarchyMigrationTest {
     assertColumnExists(jdbc, "org_unit_membership", "is_bereichsoperator");
     assertColumnExists(jdbc, "org_unit_membership", "is_ol_member");
 
-    // The "at most one Staffel" partial unique index is replaced by the ≤2 counting trigger.
+    // The "at most one Staffel" partial unique index is replaced by the ≤2 counting triggers,
+    // which fire on BOTH INSERT and UPDATE to match the dropped index's full write coverage.
     assertIndexAbsent(jdbc, "uq_org_unit_membership_one_squadron");
     assertTriggerExists(
         jdbc, "org_unit_membership", "trg_org_unit_membership_max_two_squadron_ins");
+    assertTriggerExists(
+        jdbc, "org_unit_membership", "trg_org_unit_membership_max_two_squadron_upd");
 
     // New CHECK constraints and the parent-validation trigger are present.
     assertConstraintExists(jdbc, "chk_org_unit_ol_has_no_parent");
@@ -105,26 +114,91 @@ class OrgHierarchyMigrationTest {
       assertThat(countById(jdbc, bereichId)).isOne();
       assertThat(countById(jdbc, squadronId)).isOne();
 
-      // A Bereich must have an OL parent — a Squadron parent is rejected by the trigger.
+      // A Bereich must have an OL parent — a Squadron parent is rejected by the parent trigger.
+      // Asserting on the trigger's message (not just any DataAccessException) pins the failure to
+      // the parent-kind rule, so a coincidental constraint violation cannot green this case.
       assertThatThrownBy(
               () ->
                   insertOrgUnit(
                       jdbc, rejectedId, "BEREICH", "TEST_OH_X", "TOHX", false, squadronId))
-          .isInstanceOf(DataAccessException.class);
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("must have an ORGANISATIONSLEITUNG parent");
 
-      // An OL must have no parent — rejected by chk_org_unit_ol_has_no_parent / the trigger.
+      // An OL must have no parent — the BEFORE trigger fires before the CHECK, so its message wins.
       assertThatThrownBy(
               () ->
                   insertOrgUnit(
                       jdbc, rejectedId, "ORGANISATIONSLEITUNG", "TEST_OH_X", "TOHX", false, olId))
-          .isInstanceOf(DataAccessException.class);
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("must not have a parent");
 
       // A Bereich must never carry promotion — rejected by chk_org_unit_promotion_only_squadron.
       assertThatThrownBy(
               () -> insertOrgUnit(jdbc, rejectedId, "BEREICH", "TEST_OH_X", "TOHX", true, olId))
-          .isInstanceOf(DataAccessException.class);
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("chk_org_unit_promotion_only_squadron");
     } finally {
       cleanup(jdbc, squadronId, bereichId, olId, rejectedId);
+    }
+  }
+
+  /**
+   * Behavioural checks for the ≤2-Staffel counting trigger on both INSERT and UPDATE (REQ-ORG-017),
+   * the guard that replaced the old single-Staffel unique index. Inserts a throwaway user plus four
+   * org units (three Staffeln + one Spezialkommando), then drives the trigger: a third Staffel
+   * INSERT is rejected, a re-point that keeps the user at two Staffeln is allowed (the
+   * about-to-be-replaced row must not be counted against itself), and an UPDATE that would push the
+   * user to a third Staffel is rejected. All rows are removed in a finally block.
+   */
+  @Test
+  void v164EnforcesAtMostTwoSquadronMembershipsOnInsertAndUpdate() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    UUID userId = UUID.fromString("ffffff00-0000-0000-0000-0000000000b0");
+    UUID sqA = UUID.fromString("ffffff00-0000-0000-0000-0000000000b1");
+    UUID sqB = UUID.fromString("ffffff00-0000-0000-0000-0000000000b2");
+    UUID sqC = UUID.fromString("ffffff00-0000-0000-0000-0000000000b3");
+    UUID skX = UUID.fromString("ffffff00-0000-0000-0000-0000000000b4");
+
+    cleanupMemberships(jdbc, userId);
+    cleanup(jdbc, sqA, sqB, sqC, skX);
+    cleanupUser(jdbc, userId);
+    try {
+      insertUser(jdbc, userId);
+      insertOrgUnit(jdbc, sqA, "SQUADRON", "TEST_OH_SQA", "TOSA", false, null);
+      insertOrgUnit(jdbc, sqB, "SQUADRON", "TEST_OH_SQB", "TOSB", false, null);
+      insertOrgUnit(jdbc, sqC, "SQUADRON", "TEST_OH_SQC", "TOSC", false, null);
+      insertOrgUnit(jdbc, skX, "SPECIAL_COMMAND", "TEST_OH_SKX", "TOSX", false, null);
+
+      // Two Staffeln are fine; the kind is filled in by the sync trigger from the org_unit row.
+      insertMembership(jdbc, userId, sqA);
+      insertMembership(jdbc, userId, sqB);
+      assertThat(squadronMembershipCount(jdbc, userId)).isEqualTo(2);
+
+      // A third Staffel INSERT trips the counting trigger.
+      assertThatThrownBy(() -> insertMembership(jdbc, userId, sqC))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("at most two Staffeln");
+
+      // An SK membership does not count towards the Staffel cap.
+      insertMembership(jdbc, userId, skX);
+      assertThat(squadronMembershipCount(jdbc, userId)).isEqualTo(2);
+
+      // Re-pointing one of the two Staffeln to another Staffel keeps the user at two — allowed.
+      // Without OLD-row exclusion in the UPDATE trigger the replaced sqA row would miscount as a
+      // third Staffel and this valid move would be wrongly rejected.
+      repointMembership(jdbc, userId, sqA, sqC);
+      assertThat(membershipExists(jdbc, userId, sqC)).isTrue();
+      assertThat(membershipExists(jdbc, userId, sqA)).isFalse();
+      assertThat(squadronMembershipCount(jdbc, userId)).isEqualTo(2);
+
+      // Re-pointing the SK membership onto a Staffel would make a third Staffel — rejected.
+      assertThatThrownBy(() -> repointMembership(jdbc, userId, skX, sqA))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("at most two Staffeln");
+    } finally {
+      cleanupMemberships(jdbc, userId);
+      cleanup(jdbc, sqA, sqB, sqC, skX);
+      cleanupUser(jdbc, userId);
     }
   }
 
@@ -158,6 +232,59 @@ class OrgHierarchyMigrationTest {
     for (UUID id : idsChildFirst) {
       jdbc.update("DELETE FROM org_unit WHERE id = ?", id);
     }
+  }
+
+  /** Inserts a minimal throwaway user; only {@code id} is required (other columns default). */
+  private static void insertUser(JdbcTemplate jdbc, UUID id) {
+    jdbc.update("INSERT INTO app_user (id) VALUES (?)", id);
+  }
+
+  /**
+   * Inserts a membership; {@code kind} is denormalised from the referenced {@code org_unit} by the
+   * V98 sync trigger and the leadership flags default to {@code false}, so neither is set here.
+   */
+  private static void insertMembership(JdbcTemplate jdbc, UUID userId, UUID orgUnitId) {
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)", userId, orgUnitId);
+  }
+
+  /** Re-points a membership to a different org unit, exercising the UPDATE counting trigger. */
+  private static void repointMembership(
+      JdbcTemplate jdbc, UUID userId, UUID fromOrgUnitId, UUID toOrgUnitId) {
+    jdbc.update(
+        "UPDATE org_unit_membership SET org_unit_id = ? WHERE user_id = ? AND org_unit_id = ?",
+        toOrgUnitId,
+        userId,
+        fromOrgUnitId);
+  }
+
+  private static boolean membershipExists(JdbcTemplate jdbc, UUID userId, UUID orgUnitId) {
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM org_unit_membership WHERE user_id = ? AND org_unit_id = ?",
+            Integer.class,
+            userId,
+            orgUnitId);
+    return count != null && count > 0;
+  }
+
+  private static int squadronMembershipCount(JdbcTemplate jdbc, UUID userId) {
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM org_unit_membership WHERE user_id = ? AND kind = 'SQUADRON'",
+            Integer.class,
+            userId);
+    return count == null ? 0 : count;
+  }
+
+  /** Removes every membership of the throwaway user before its org units / row are deleted. */
+  private static void cleanupMemberships(JdbcTemplate jdbc, UUID userId) {
+    jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", userId);
+  }
+
+  /** Removes the throwaway user row (memberships must be gone first). */
+  private static void cleanupUser(JdbcTemplate jdbc, UUID id) {
+    jdbc.update("DELETE FROM app_user WHERE id = ?", id);
   }
 
   private static void assertColumnExists(JdbcTemplate jdbc, String table, String column) {
