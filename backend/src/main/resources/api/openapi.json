@@ -42986,7 +42986,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SQUADRON", "SPECIAL_COMMAND" ]
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
           }
         }
       },
@@ -43493,7 +43493,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SQUADRON", "SPECIAL_COMMAND" ]
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
           },
           "isLogistician" : {
             "type" : "boolean"
@@ -45806,7 +45806,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SQUADRON", "SPECIAL_COMMAND" ]
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
           },
           "isProfitEligible" : {
             "type" : "boolean"
@@ -46833,7 +46833,7 @@
           },
           "orgUnitKind" : {
             "type" : "string",
-            "enum" : [ "SQUADRON", "SPECIAL_COMMAND" ]
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
           },
           "balance" : {
             "type" : "number"
