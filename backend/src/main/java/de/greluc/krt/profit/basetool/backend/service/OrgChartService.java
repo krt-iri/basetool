@@ -101,6 +101,7 @@ public class OrgChartService {
 
   private static final String ERR_SCOPE_MISMATCH = "problem.org_chart.scope_mismatch";
   private static final String ERR_UNIT_NOT_PROFIT = "problem.org_chart.unit_not_profit_eligible";
+  private static final String ERR_UNIT_INACTIVE = "problem.org_chart.unit_inactive";
   private static final String ERR_INVALID_PARENT = "problem.org_chart.invalid_parent";
   private static final String ERR_COMMAND_LIMIT = "problem.org_chart.command_limit";
   private static final String ERR_ENSIGN_LIMIT = "problem.org_chart.ensign_limit";
@@ -555,13 +556,15 @@ public class OrgChartService {
     }
     // Profit-eligibility is required only for the Job-Order-processing tiers (Staffel/SK) — those
     // are the org chart's historical "Profit-Bereich" units. A Bereich/OL (epic #692, REQ-ORG-018)
-    // is never profit-eligible and must not be rejected for it; only its active flag is checked.
+    // is never profit-eligible and must not be rejected for it; only its active flag is checked,
+    // and an inactive Bereich/OL gets the precise "inactive" error rather than the (irrelevant)
+    // "not profit-eligible" one.
     if (scope == OrgChartScope.SQUADRON || scope == OrgChartScope.SPECIAL_COMMAND) {
       if (!unit.isActive() || !unit.isProfitEligible()) {
         throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
       }
     } else if (!unit.isActive()) {
-      throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
+      throw new BadRequestException(ERR_UNIT_INACTIVE);
     }
     return unit;
   }

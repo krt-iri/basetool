@@ -7,8 +7,9 @@
 -- (Profit, Sub-Radar, Raumueberlegenheit, Forschung, Marinekorps,
 -- Search & Rescue) that maps one-to-one to the design-system
 -- --color-dept-* tokens. This migration adds the nullable column that
--- stores it; an admin assigns a department when creating / editing a
--- Bereich. NULL is the additive-soak default: a Bereich without a
+-- stores it; an admin assigns a department when creating a Bereich (a
+-- dedicated edit path lands with the Bereich admin surface in a later
+-- epic-#692 phase). NULL is the additive-soak default: a Bereich without a
 -- department (and every non-Bereich kind) renders untinted, so the chart
 -- behaves exactly as today until departments are assigned.
 --

@@ -764,6 +764,35 @@ class OrgChartServiceTest {
   }
 
   @Test
+  void createPosition_inactiveBereich_throwsUnitInactive() {
+    // An inactive Bereich is rejected, but with the precise "inactive" error rather than the
+    // (irrelevant) "not profit-eligible" one a Bereich would never satisfy anyway.
+    UUID userId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    Bereich inactive = bereich(bereichId, "Sub-Radar", "SUB");
+    inactive.setActive(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "k")));
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(inactive));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.BEREICHSKOORDINATOR,
+                            bereichId,
+                            userId,
+                            null,
+                            null,
+                            null)));
+
+    assertTrue(ex.getMessage().contains("unit_inactive"), ex.getMessage());
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
   void createPosition_olMember_persists() {
     UUID userId = UUID.randomUUID();
     UUID olId = UUID.randomUUID();
