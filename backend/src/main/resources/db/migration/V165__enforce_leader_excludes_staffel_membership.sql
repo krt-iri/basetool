@@ -24,10 +24,11 @@
 -- INSERT before this check reads it; on a flag-only UPDATE the kind
 -- column is unchanged and already correct.
 --
--- A flag-LESS BEREICH/OL membership (e.g. the organisational
--- Bereichsleitung seat an SK-Leiter automatically holds) is unaffected:
--- it carries no leadership flag and is not a SQUADRON row, so neither
--- branch fires.
+-- A flag-LESS BEREICH/OL membership row (should one exist) is
+-- unaffected: it carries no leadership flag and is not a SQUADRON row,
+-- so neither branch fires. (The SK-Leiter's Bereichsleitung seat is
+-- derived, computed from is_lead + the SK's parent Bereich, NOT a stored
+-- membership row, so it never reaches this trigger at all.)
 --
 -- Idempotency: CREATE OR REPLACE FUNCTION + DROP TRIGGER IF EXISTS.
 -- Rollback: drop the triggers and the function.

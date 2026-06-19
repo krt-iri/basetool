@@ -401,7 +401,7 @@ class OrgUnitMembershipServiceTest {
         .thenReturn(List.of());
     when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
         .thenReturn(Optional.empty());
-    when(membershipRepository.save(any(OrgUnitMembership.class)))
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
         .thenAnswer(inv -> inv.getArgument(0));
 
     OrgUnitMembership m =
@@ -425,7 +425,7 @@ class OrgUnitMembershipServiceTest {
     assertThrows(
         BadRequestException.class,
         () -> membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.LEITER));
-    verify(membershipRepository, never()).save(any());
+    verify(membershipRepository, never()).saveAndFlush(any());
   }
 
   @Test
@@ -439,7 +439,7 @@ class OrgUnitMembershipServiceTest {
         BadRequestException.class,
         () ->
             membershipService.addBereichLeader(notBereichId, userId, BereichLeadershipRole.LEITER));
-    verify(membershipRepository, never()).save(any());
+    verify(membershipRepository, never()).saveAndFlush(any());
   }
 
   @Test
@@ -452,7 +452,7 @@ class OrgUnitMembershipServiceTest {
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(false);
-    when(membershipRepository.save(any(OrgUnitMembership.class)))
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
         .thenAnswer(inv -> inv.getArgument(0));
 
     OrgUnitMembership m = membershipService.addOlMember(olId, userId);
@@ -472,7 +472,7 @@ class OrgUnitMembershipServiceTest {
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(true);
 
     assertThrows(DuplicateEntityException.class, () -> membershipService.addOlMember(olId, userId));
-    verify(membershipRepository, never()).save(any());
+    verify(membershipRepository, never()).saveAndFlush(any());
   }
 
   // --- listOptionsForUser ---------------------------------------------------

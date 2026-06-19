@@ -147,7 +147,7 @@ class OrgHierarchyServiceTest {
     bereich.setId(bereichId);
     when(orgUnitRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
     when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
-    when(orgUnitRepository.save(any(OrgUnit.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(orgUnitRepository.saveAndFlush(any(OrgUnit.class))).thenAnswer(inv -> inv.getArgument(0));
 
     OrgUnit result = service.setParent(squadronId, bereichId, 0L);
 
@@ -167,7 +167,7 @@ class OrgHierarchyServiceTest {
     when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
 
     assertThrows(BadRequestException.class, () -> service.setParent(squadronId, olId, 0L));
-    verify(orgUnitRepository, never()).save(any());
+    verify(orgUnitRepository, never()).saveAndFlush(any());
   }
 
   @Test
@@ -181,7 +181,7 @@ class OrgHierarchyServiceTest {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> service.setParent(squadronId, UUID.randomUUID(), 0L));
-    verify(orgUnitRepository, never()).save(any());
+    verify(orgUnitRepository, never()).saveAndFlush(any());
   }
 
   @Test
@@ -193,7 +193,7 @@ class OrgHierarchyServiceTest {
     Bereich oldParent = new Bereich();
     squadron.setParent(oldParent);
     when(orgUnitRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
-    when(orgUnitRepository.save(any(OrgUnit.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(orgUnitRepository.saveAndFlush(any(OrgUnit.class))).thenAnswer(inv -> inv.getArgument(0));
 
     OrgUnit result = service.setParent(squadronId, null, 0L);
 

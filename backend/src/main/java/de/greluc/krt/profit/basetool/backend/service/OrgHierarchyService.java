@@ -166,7 +166,10 @@ public class OrgHierarchyService {
     }
     if (parentOrgUnitId == null) {
       child.setParent(null);
-      return orgUnitRepository.save(child);
+      // saveAndFlush (not save): the controller is class-@Transactional, so without an explicit
+      // flush the @Version increment would be deferred past the toDto mapping and the response
+      // would carry the stale pre-update version, 409-ing the caller's next chained edit.
+      return orgUnitRepository.saveAndFlush(child);
     }
     OrgUnit parent =
         orgUnitRepository
@@ -174,7 +177,7 @@ public class OrgHierarchyService {
             .orElseThrow(() -> new NotFoundException("Parent org unit not found"));
     validateParentKind(child, parent);
     child.setParent(parent);
-    return orgUnitRepository.save(child);
+    return orgUnitRepository.saveAndFlush(child);
   }
 
   /**

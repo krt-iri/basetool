@@ -19,14 +19,22 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -35,6 +43,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -88,6 +97,57 @@ class OrgHierarchyControllerSecurityTest {
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Profit\",\"shorthand\":\"PRF\"}"))
+        .andExpect(status().isForbidden());
+  }
+
+  /**
+   * Every remaining {@code /api/v1/org-hierarchy/**} read and write endpoint, each paired with a
+   * <em>valid</em> body / path so the only thing that can reject the request is the {@code
+   * hasRole('ADMIN')} gate (not bean validation or a missing path variable). Keeps the surface from
+   * silently losing its ADMIN gate as endpoints are added.
+   *
+   * @return one request builder per endpoint.
+   */
+  static Stream<Arguments> adminOnlyEndpoints() {
+    UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    return Stream.of(
+        arguments(
+            "listOrganisationsleitung",
+            get("/api/v1/org-hierarchy/organisationsleitung").accept(MediaType.APPLICATION_JSON)),
+        arguments(
+            "createOrganisationsleitung",
+            post("/api/v1/org-hierarchy/organisationsleitung")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Leitung\",\"shorthand\":\"OL\"}")),
+        arguments(
+            "setParent",
+            patch("/api/v1/org-hierarchy/org-units/" + id + "/parent")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":0}")),
+        arguments(
+            "addBereichLeader",
+            post("/api/v1/org-hierarchy/bereiche/" + id + "/members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + id + "\",\"role\":\"LEITER\"}")),
+        arguments(
+            "removeBereichLeader",
+            delete("/api/v1/org-hierarchy/bereiche/" + id + "/members/" + id)),
+        arguments(
+            "addOlMember",
+            post("/api/v1/org-hierarchy/organisationsleitung/" + id + "/members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + id + "\"}")),
+        arguments(
+            "removeOlMember",
+            delete("/api/v1/org-hierarchy/organisationsleitung/" + id + "/members/" + id)));
+  }
+
+  @ParameterizedTest(name = "{0} is forbidden for an OFFICER")
+  @MethodSource("adminOnlyEndpoints")
+  void endpoint_forbiddenForOfficer(String endpoint, MockHttpServletRequestBuilder request)
+      throws Exception {
+    mockMvc
+        .perform(request.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isForbidden());
   }
 }

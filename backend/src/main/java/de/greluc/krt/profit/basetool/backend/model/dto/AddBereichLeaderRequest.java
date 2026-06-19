@@ -24,9 +24,11 @@ import java.util.UUID;
 
 /**
  * Request body to add (or set the role of) a Bereichsleitung member (epic #692, REQ-ORG-017). The
- * user must hold no Staffel membership (enforced by the service guard and the V165 trigger). If the
- * user already has a membership on the Bereich (e.g. an organisational SK-Leiter seat), the role
- * flag is set on that row; otherwise a new membership is created.
+ * user must hold no Staffel membership (enforced by the service guard and the V165 trigger). This
+ * grants an explicit, reach-bearing Bereichsleitung role — distinct from the SK-Leiter's derived
+ * (computed, not stored) Bereichsleitung seat, which has no membership row. If the user already has
+ * a membership row on <em>this</em> Bereich (from a prior explicit grant), its role flag is updated
+ * in place; otherwise a new membership is created.
  *
  * @param userId the user to grant the Bereichsleitung role to; required.
  * @param role which Bereichsleitung role (Leiter / Koordinator / Operator); required.

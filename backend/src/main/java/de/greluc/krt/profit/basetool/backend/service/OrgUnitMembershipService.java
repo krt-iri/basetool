@@ -274,12 +274,14 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Grants a user a Bereichsleitung role on the given Bereich (epic #692, REQ-ORG-017). If the user
-   * already has a membership on the Bereich (e.g. an organisational SK-Leiter seat), the role flag
-   * is set on that row; otherwise a fresh membership is created. Exactly one of the three Bereich
-   * role flags ends up set. The user must hold no Staffel membership — the service guard returns a
-   * clean 400 before the V165 trigger would 500. Unlike a Staffel/SK join this does <em>not</em>
-   * adopt the user's ownerless inventory (a Bereich is not a personal-inventory home).
+   * Grants a user an explicit, reach-bearing Bereichsleitung role on the given Bereich (epic #692,
+   * REQ-ORG-017) — distinct from the SK-Leiter's derived (computed, not stored) Bereichsleitung
+   * seat, which has no membership row. If the user already has a membership row on this Bereich
+   * (from a prior explicit grant), its role flag is updated in place; otherwise a fresh membership
+   * is created. Exactly one of the three Bereich role flags ends up set. The user must hold no
+   * Staffel membership — the service guard returns a clean 400 before the V165 trigger would 500.
+   * Unlike a Staffel/SK join this does <em>not</em> adopt the user's ownerless inventory (a Bereich
+   * is not a personal-inventory home).
    *
    * @param bereichId the Bereich to add the leader to; must be a {@code BEREICH} org unit.
    * @param userId the user to grant the role to; never {@code null}.
@@ -319,7 +321,11 @@ public class OrgUnitMembershipService {
     m.setBereichsleiter(role == BereichLeadershipRole.LEITER);
     m.setBereichskoordinator(role == BereichLeadershipRole.KOORDINATOR);
     m.setBereichsoperator(role == BereichLeadershipRole.OPERATOR);
-    return membershipRepository.save(m);
+    // saveAndFlush (not save): on the upsert-onto-existing-row branch this is an UPDATE, so without
+    // an explicit flush the @Version increment would land after the controller maps the response
+    // and the caller would get a stale version. Flushing also surfaces the V165 trigger as a clean
+    // in-transaction failure rather than at commit.
+    return membershipRepository.saveAndFlush(m);
   }
 
   /**
@@ -376,7 +382,10 @@ public class OrgUnitMembershipService {
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
     m.setOlMember(true);
-    return membershipRepository.save(m);
+    // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
+    // in-transaction failure and keeps the flushed @Version in the response under the
+    // class-@Transactional controller.
+    return membershipRepository.saveAndFlush(m);
   }
 
   /**
