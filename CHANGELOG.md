@@ -8,10 +8,12 @@
 - **Bereiche und die Organisationsleitung können jetzt eigene Daten besitzen, und die Leitung kann stellvertretend für eine untergeordnete Einheit anlegen.** Beim Anlegen eines Eintrags (Lager, Hangar, Raffinerie, Einsatz, Operation) lässt sich als besitzende Einheit der eigene Bereich bzw. die OL oder eine untergeordnete Staffel/ein Spezialkommando wählen, die man verantwortet. Die Voreinstellung und das Verhalten für normale Mitglieder bleiben unverändert.
 - **Das Organigramm bildet jetzt die echte Organisationsstruktur ab: Organisationsleitung → Bereiche → Staffeln und Spezialkommandos.** Jeder Bereich erscheint als eigener Ast in seiner Bereichsfarbe (mit Bereichsleiter, -koordinatoren und -operatoren), darüber steht die Organisationsleitung mit ihren Mitgliedern. Administratoren können die neuen Positionen direkt im Organigramm besetzen; noch keinem Bereich zugeordnete Staffeln/Spezialkommandos bleiben in einem eigenen Abschnitt sichtbar. Tastatur- und Screenreader-Navigation bleiben je Ast erhalten.
 - **Bereichsleitung und Organisationsleitung haben jetzt Zugriff auf das Bankkonto ihrer Ebene.** Die Bereichsleitung sieht den Kontostand ihres Bereichskontos und kann dort Ein-/Auszahlungen beantragen, die Organisationsleitung dasselbe für das Kartellkonto — wie Offiziere für ihr Staffelkonto (Antrag erst nach Bestätigung durch die Bank). Zusätzlich können beide die Konten ihrer untergeordneten Einheiten einsehen (nur Ansicht, kein Antrag); ein fremder Bereich bleibt verborgen. Beim Anlegen eines Kontos werden Bereichskonten jetzt mit ihrem Bereich und das Kartellkonto mit der Organisationsleitung verknüpft. Die Bank bleibt unverändert organisationseinheiten-blind.
+- **„Mein Lager" hat jetzt einen Filter „Nur persönliche Einträge".** Damit blendet man alle geteilten Beiträge aus und sieht nur noch die eigenen persönlichen Lagereinträge. Der Filter lässt sich mit den übrigen Filtern kombinieren und bleibt über die Seiten-URL teilbar.
 
 ### Changed
 
 - **Die Blueprint-Verfügbarkeit in den Auftragsdetails lässt sich jetzt über ihre Überschrift ein- und ausklappen** (standardmäßig ausgeklappt), sodass die teils lange Liste bei Bedarf weggeklappt werden kann. Außerdem gibt es mehr Abstand vor dem Abschnitt „Item-Übergaben".
+- **In den Lagereinträgen entfällt die überflüssige Beschriftung „Eintrag" vor dem Auftrags-Dropdown**, sodass die Auftrags- und Einsatzauswahl direkt und aufgeräumter erscheint.
 
 ## [v0.5.12](https://github.com/krt-profit/basetool/releases/tag/v0.5.12) - 2026-06-19
 

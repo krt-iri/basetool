@@ -204,7 +204,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * Per-user group-on-read variant of {@link #findUserByFilters}: collapses the user's filtered
    * inventory (shared and personal alike) into one {@link InventoryStackAggregate} per stock
    * identity in SQL. Entries are fetched lazily via {@link #findUserStackEntries}. Same
-   * optional-filter contract as {@link #findUserByFilters}.
+   * optional-filter contract as {@link #findUserByFilters}, plus the {@code personalOnly} toggle:
+   * when {@code true} the result is narrowed to the caller's private stock ({@code personal = true}
+   * rows), powering the "Mein Lager" personal-entries-only filter; when {@code false} both shared
+   * and personal stacks are returned as before.
    */
   @Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate("
@@ -212,7 +215,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *"
           + " COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i"
           + " LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou"
-          + " WHERE i.user.id = :userId"
+          + " WHERE i.user.id = :userId AND (:personalOnly = false OR i.personal = true)"
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL"
           + " OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL"
           + " AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT"
@@ -226,7 +229,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("hasMissions") boolean hasMissions,
-      @Param("missionIds") List<UUID> missionIds);
+      @Param("missionIds") List<UUID> missionIds,
+      @Param("personalOnly") boolean personalOnly);
 
   /**
    * Lazily loads one global stack's underlying entries, oldest-first, paginated — the per-stack

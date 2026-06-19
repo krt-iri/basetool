@@ -203,7 +203,9 @@ class InventoryPageControllerMvcTest {
         .perform(get("/inventory/my"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"inventoryTable\"")))
-        .andExpect(content().string(containsString("data-user-id=\"test-user-123\"")));
+        .andExpect(content().string(containsString("data-user-id=\"test-user-123\"")))
+        // The personal-entries-only filter checkbox renders in the stable filter bar.
+        .andExpect(content().string(containsString("id=\"personalOnly\"")));
   }
 
   /**

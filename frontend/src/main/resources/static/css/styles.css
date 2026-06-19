@@ -603,14 +603,6 @@ tbody tr:nth-child(even):hover {
     padding: 0.4rem 0.8rem 0.4rem 3rem;
 }
 
-.tree-leaf-main .tree-leaf-tag {
-    flex: none;
-    color: var(--color-gray-2);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
 .tree-fieldset {
     display: flex;
     flex: 1;
