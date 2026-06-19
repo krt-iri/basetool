@@ -37,10 +37,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Thin delegation tests for {@link OrgUnitController}. The endpoint is a single-line passthrough to
- * {@link OrgUnitMembershipService#listAllActiveOptions} — the resolver / sort behaviour is pinned
- * by {@link de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipServiceTest}, so this
- * class only verifies the wiring (handler exists, response shape preserved, no surprise filtering).
+ * Thin delegation tests for {@link OrgUnitController}. Each endpoint is a single-line passthrough
+ * to {@link OrgUnitMembershipService} — the resolver / sort behaviour is pinned by {@link
+ * de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipServiceTest}, so this class only
+ * verifies the wiring (handlers exist, response shape preserved, no surprise filtering). The
+ * declarative {@code @PreAuthorize} gates (public {@code /active} vs authenticated {@code
+ * /active-all-kinds}) are enforced by Spring Security, not asserted here.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitControllerTest {
@@ -68,5 +70,23 @@ class OrgUnitControllerTest {
     when(orgUnitMembershipService.listAllActiveOptions()).thenReturn(List.of());
 
     assertTrue(controller.listActiveOrgUnits().isEmpty());
+  }
+
+  @Test
+  void listActiveOrgUnitsAllKinds_delegatesToService() {
+    // Epic #692 Phase 6 (REQ-ORG-019): the all-kinds picker (bank account-create form) surfaces the
+    // Bereich/OL tiers the public /active list omits, so the handler must wire to the all-kinds
+    // service method, not listAllActiveOptions.
+    OrgUnitMembershipOptionDto bereich =
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "Profit", "PRF", OrgUnitKind.BEREICH, false);
+    when(orgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds())
+        .thenReturn(List.of(bereich));
+
+    List<OrgUnitMembershipOptionDto> result = controller.listActiveOrgUnitsAllKinds();
+
+    assertEquals(1, result.size());
+    assertSame(bereich, result.getFirst());
+    verify(orgUnitMembershipService).listAllActiveOrgUnitOptionsAllKinds();
   }
 }

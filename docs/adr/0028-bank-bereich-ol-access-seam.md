@@ -49,6 +49,13 @@ We will **link `AREA` accounts to a Bereich and `CARTEL` to the OL**, and extend
   one-account-per-Bereich/OL cardinality for free. The view⊇request split is realised as two
   `OwnerScopeService` scopes (cascading `currentOversightScope` vs own-level
   `currentOwnLevelOversightScope`), surfaced to the UI via a `canRequest` flag on the balance DTO.
+- Soak limitation: legacy `areaName`-only `AREA` accounts (created before this phase) keep `org_unit_id
+  = NULL`, so they are **invisible to the Bereich cascade** and cannot be FK-migrated through the app
+  (`area_name` is `updatable = false` and no write path sets `org_unit_id` on an existing account).
+  There is no reliable name→Bereich mapping, so any such row must be reconciled by hand as part of the
+  **Phase 7 (#700) dual-write soak cleanup**; until then a legacy-by-name and an FK-by-Bereich account
+  for the same conceptual Bereich can coexist undetected (the partial unique index does not constrain a
+  `NULL org_unit_id`).
 
 ## Alternatives considered
 
