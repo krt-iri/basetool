@@ -49,16 +49,20 @@ We will **link `AREA` accounts to a Bereich and `CARTEL` to the OL**, and extend
   one-account-per-Bereich/OL cardinality for free. The view⊇request split is realised as two
   `OwnerScopeService` scopes (cascading `currentOversightScope` vs own-level
   `currentOwnLevelOversightScope`), surfaced to the UI via a `canRequest` flag on the balance DTO.
-- Soak limitation + reconciliation: V168 itself did **no** automatic backfill — in the general case
-  there is no reliable `areaName`→Bereich mapping, and `area_name` is `updatable = false` with no app
-  write path that sets `org_unit_id` on an existing account. A legacy `areaName`-only `AREA` account
-  (`org_unit_id = NULL`) is therefore invisible to the Bereich cascade and can also coexist undetected
-  with an FK-linked account for the same conceptual Bereich (the partial unique index does not constrain
-  a `NULL org_unit_id`). The prod soak check found **exactly one** such `AREA` account (`area_name =
-  'Profit'`) plus **one** unlinked singleton `CARTEL`; `V169` reconciles those by a conservative,
-  exactly-one-match name link (`AREA` → its Bereich, clearing `area_name` in the same statement; `CARTEL`
-  → the sole OL), a no-op in dev/test and idempotent. Any future legacy rows that this name-match does
-  not catch stay a **Phase 7 (#700) dual-write soak cleanup** item.
+- Soak limitation — reconciliation is a **manual operator step, not a migration**. V168 does **no**
+  automatic backfill: in the general case there is no reliable `areaName`→Bereich mapping, and
+  `area_name` is `updatable = false` with no app write path that sets `org_unit_id` on an existing
+  account. A legacy `areaName`-only `AREA` account (`org_unit_id = NULL`) is therefore invisible to the
+  Bereich cascade and can coexist undetected with an FK-linked account for the same conceptual Bereich
+  (the partial unique index does not constrain a `NULL org_unit_id`). The prod soak check found one such
+  `AREA` account (`area_name = 'Profit'`) and one unlinked singleton `CARTEL` — but **neither target
+  org_unit exists in prod yet**: there is no `ORGANISATIONSLEITUNG` row and no Bereich named `Profit`,
+  because the new hierarchy tier (REQ-ORG-014) has not been populated in prod. A Flyway migration is
+  therefore unsuitable — it runs exactly once, would no-op against the absent targets at deploy time,
+  and never re-fire. Reconciliation belongs to the **Phase 7 (#700) soak cleanup** and is operator-run
+  once the hierarchy exists: create the OL + Bereich rows (admin UI), then link the `AREA` account to
+  its Bereich (clearing `area_name` in the same statement, CHECK-safe) and the `CARTEL` to the OL via a
+  one-off `UPDATE`. Until then both accounts stay bank-staff-only — no regression.
 
 ## Alternatives considered
 
