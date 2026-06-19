@@ -43,17 +43,25 @@ The decision holds; the change was smaller than anticipated because Phase 1 (own
 accept any kind) and Phase 3 (the cascade) did most of the work. The entire delivery is **one method**,
 `OwnerScopeService.resolveStampedOrgUnit`:
 
-- **Validation widening** — an explicit pick is accepted when it is a DIRECT membership **or**
-  `canEditOrgUnit(pick)` (the create-on-behalf gate, cascade-aware since Phase 3). Auto-stamp / `>1 →
-  force a choice` stay keyed on DIRECT memberships, so ordinary-member and officer stamping is
-  byte-identical.
+- **Validation widening** — an explicit pick is accepted when it is a DIRECT membership of the target
+  user **or** `canEditOrgUnit(pick)` for the current **caller** (the create-on-behalf gate, cascade-aware
+  since Phase 3). Auto-stamp / `>1 → force a choice` stay keyed on the target's DIRECT memberships.
+  Because the gate keys `canEditOrgUnit` on the caller while the membership set is the target user's,
+  the two coincide for every **self-service** create (caller = target) — ordinary-member and officer
+  stamping is byte-identical there — and diverge only on the two **create-on-behalf** paths where
+  caller ≠ target (inventory book-out/transfer, refinery store): there the accepted set is `(target's
+  memberships) ∪ (caller's editable scope)` by design, letting a leader place the recipient's row in any
+  unit the leader already controls. This never widens what the caller can see (`canEditOrgUnit` only
+  admits units already in the caller's scope), and the REQ-ORG-011 owner-escape keeps the recipient's own
+  visibility of the row.
 - **Resolution** — a non-Squadron / non-SK id falls through to the polymorphic `OrgUnitRepository` and is
   accepted iff it resolves to a `BEREICH` / `ORGANISATIONSLEITUNG` row.
 
 No per-aggregate change was needed: all five aggregates (`Ship`, `InventoryItem`, `RefineryOrder`,
-`Mission`, `Operation`) already stamp through the shared resolver for authenticated callers, their
-`owningOrgUnit` field is typed `OrgUnit`, and the legacy `owningSquadron` mirror already tolerates a
-non-Squadron owner (the SK case proved that path). **Refinement to the decision:** the
+`Mission`, `Operation`) already stamp through the shared resolver for authenticated callers and their
+`owningOrgUnit` field is typed `OrgUnit`. The legacy `owningSquadron` mirror columns were already dropped,
+so a `BEREICH` / `OL` owner is just a polymorphic FK with no dual-write to break. **Refinement to the
+decision:** the
 `canEditOrgUnit` gate is **not** added to the create-time `JobOrderService.resolveResponsibleOrgUnit` /
 `resolveRequestingOrgUnit` — those intentionally accept any profit-eligible / any org unit so the
 shared-SK-queue intake (#343) is not regressed; the nuanced, already-cascade-aware

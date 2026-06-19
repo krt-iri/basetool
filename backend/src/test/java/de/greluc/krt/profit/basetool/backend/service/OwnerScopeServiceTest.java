@@ -1476,9 +1476,10 @@ class OwnerScopeServiceTest {
             BadRequestException.class,
             () -> service.resolveOrgUnitForPickerOutput(user, foreignId));
     // A foreign pick the caller cannot edit is still rejected (epic #692 Phase 4 only widens the
-    // accepted set to the caller's editable scope; this caller has none). The message now names
-    // both rejection reasons (not a membership, not in editable scope).
-    assertTrue(ex.getMessage().toLowerCase().contains("membership"), ex.getMessage());
+    // accepted set to the caller's editable scope; this caller has none). Pin to the explicit-pick
+    // rejection branch via its unique "editable scope" wording — the empty-membership branch also
+    // contains the word "membership", so asserting that alone would not discriminate the branches.
+    assertTrue(ex.getMessage().toLowerCase().contains("editable scope"), ex.getMessage());
   }
 
   @Test
@@ -1969,14 +1970,22 @@ class OwnerScopeServiceTest {
   /**
    * Epic #692 / REQ-ORG-016 (Phase 4): the picker resolvers may stamp a {@code BEREICH} / {@code
    * ORGANISATIONSLEITUNG} as the owning org unit, and a leadership caller may stamp a subordinate
-   * unit they oversee (create-on-behalf). Ordinary-member stamping is unchanged (covered by the
-   * existing {@code resolveOrgUnitForPickerOutput*} tests above).
+   * unit they oversee (create-on-behalf). Ordinary-member self-service stamping is unchanged
+   * (covered by the existing {@code resolveOrgUnitForPickerOutput*} tests above).
+   *
+   * <p>Coverage here pins, in addition to the Bereich owner case: the {@code ORGANISATIONSLEITUNG}
+   * arm of the resolution kind filter; both resolution legs of a create-on-behalf descendant pick
+   * (Staffel and Spezialkommando); and — the genuine production divergence — a create-on-behalf
+   * where the <b>caller differs from the target user</b> (inventory book-out/transfer, refinery
+   * store), proving the validation gate keys {@code canEditOrgUnit} on the caller rather than the
+   * target user.
    */
   @Nested
   class BereichOlOwnershipStampingTests {
 
     private static final UUID BEREICH_ID = UUID.randomUUID();
     private static final UUID DESCENDANT_STAFFEL_ID = UUID.randomUUID();
+    private static final UUID OL_ID = UUID.randomUUID();
 
     private de.greluc.krt.profit.basetool.backend.model.Bereich newBereich() {
       de.greluc.krt.profit.basetool.backend.model.Bereich b =
@@ -1991,6 +2000,13 @@ class OwnerScopeServiceTest {
       m.setId(new OrgUnitMembershipId(userId, BEREICH_ID));
       m.setKind(OrgUnitKind.BEREICH);
       m.setBereichsleiter(true);
+      return m;
+    }
+
+    private OrgUnitMembership olMembership(UUID userId) {
+      OrgUnitMembership m = new OrgUnitMembership();
+      m.setId(new OrgUnitMembershipId(userId, OL_ID));
+      m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
       return m;
     }
 
@@ -2068,6 +2084,117 @@ class OwnerScopeServiceTest {
 
       assertFalse(service.canSeeSquadron(BEREICH_ID));
       assertFalse(service.canEditSquadron(BEREICH_ID));
+    }
+
+    @Test
+    void leaderStampsOwnOrganisationsleitung_resolvesToOlOrgUnit() {
+      User olLeader = new User();
+      olLeader.setId(UUID.randomUUID());
+      de.greluc.krt.profit.basetool.backend.model.Organisationsleitung ol =
+          new de.greluc.krt.profit.basetool.backend.model.Organisationsleitung();
+      ol.setId(OL_ID);
+      ol.setShorthand("OL");
+      when(orgUnitMembershipRepository.findAllByIdUserId(olLeader.getId()))
+          .thenReturn(List.of(olMembership(olLeader.getId())));
+      // OL is neither a Squadron nor an SK; it resolves via the polymorphic repository and
+      // exercises
+      // the ORGANISATIONSLEITUNG arm of the kind filter (the Bereich tests cover the BEREICH arm).
+      when(squadronRepository.findById(OL_ID)).thenReturn(Optional.empty());
+      when(specialCommandRepository.findById(OL_ID)).thenReturn(Optional.empty());
+      when(orgUnitRepository.findById(OL_ID)).thenReturn(Optional.of(ol));
+
+      // Auto-stamp (null pick) onto the leader's single direct OL membership.
+      assertSame(ol, service.resolveOrgUnitForPickerOutput(olLeader, null));
+      // Explicit pick of the same OL resolves identically.
+      assertSame(ol, service.resolveOrgUnitForPickerOutput(olLeader, OL_ID));
+    }
+
+    @Test
+    void leaderCreatesOnBehalfOfDescendantSk_resolvesViaSpecialCommandRepository() {
+      // The cascade reaches a Bereich's SKs as well as its Staffeln, so a create-on-behalf pick can
+      // land on the Spezialkommando resolution leg (sibling to leaderCreatesOnBehalfOfDescendant,
+      // which covers the Staffel leg).
+      User leader = new User();
+      leader.setId(UUID.randomUUID());
+      UUID descendantSkId = UUID.randomUUID();
+      SpecialCommand descendantSk = new SpecialCommand();
+      descendantSk.setId(descendantSkId);
+      descendantSk.setShorthand("DSK");
+
+      when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
+          .thenReturn(List.of(bereichLeadMembership(leader.getId())));
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(leader.getId()));
+      when(orgUnitCascadeService.expandWithDescendants(any()))
+          .thenReturn(Set.of(BEREICH_ID, descendantSkId));
+      when(squadronRepository.findById(descendantSkId)).thenReturn(Optional.empty());
+      when(specialCommandRepository.findById(descendantSkId)).thenReturn(Optional.of(descendantSk));
+
+      assertSame(descendantSk, service.resolveOrgUnitForPickerOutput(leader, descendantSkId));
+    }
+
+    @Test
+    void createOnBehalfForAnotherUser_keysGateOnCallerScopeNotTargetMemberships() {
+      // The genuine caller != targetUser divergence (inventory book-out/transfer, refinery store):
+      // the row is attributed to the RECEIVER, but the pick is validated against the CALLER's
+      // editable scope. A pick foreign to the receiver yet within the leader-caller's cascade is
+      // honoured — proving the gate keys canEditOrgUnit on the caller, not the target user. (Were
+      // it
+      // keyed on the target user's memberships, this would 400, since the receiver is not a member
+      // of
+      // the descendant.)
+      User leaderCaller = new User();
+      leaderCaller.setId(UUID.randomUUID());
+      User receiver = new User();
+      receiver.setId(UUID.randomUUID());
+      UUID receiverHomeStaffelId = UUID.randomUUID();
+      Squadron descendant = new Squadron();
+      descendant.setId(DESCENDANT_STAFFEL_ID);
+      descendant.setShorthand("DSC");
+
+      // The RECEIVER's only direct membership is an unrelated Staffel — NOT the descendant.
+      when(orgUnitMembershipRepository.findAllByIdUserId(receiver.getId()))
+          .thenReturn(List.of(staffelMembership(receiver.getId(), receiverHomeStaffelId)));
+      // The CALLER is the Bereich leader; their cascade oversees the descendant.
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(leaderCaller.getId()));
+      when(orgUnitMembershipRepository.findAllByIdUserId(leaderCaller.getId()))
+          .thenReturn(List.of(bereichLeadMembership(leaderCaller.getId())));
+      when(orgUnitCascadeService.expandWithDescendants(any()))
+          .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID));
+      when(squadronRepository.findById(DESCENDANT_STAFFEL_ID)).thenReturn(Optional.of(descendant));
+
+      assertSame(
+          descendant, service.resolveOrgUnitForPickerOutput(receiver, DESCENDANT_STAFFEL_ID));
+    }
+
+    @Test
+    void createOnBehalf_pickForeignToBothReceiverAndCaller_throws() {
+      // The complement of the previous test: a pick that is in neither the receiver's memberships
+      // nor
+      // the caller's editable cascade is still rejected, so the widening cannot launder a fully
+      // foreign pick through the create-on-behalf path.
+      User leaderCaller = new User();
+      leaderCaller.setId(UUID.randomUUID());
+      User receiver = new User();
+      receiver.setId(UUID.randomUUID());
+      UUID receiverHomeStaffelId = UUID.randomUUID();
+      UUID foreignToBothId = UUID.randomUUID();
+
+      when(orgUnitMembershipRepository.findAllByIdUserId(receiver.getId()))
+          .thenReturn(List.of(staffelMembership(receiver.getId(), receiverHomeStaffelId)));
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(leaderCaller.getId()));
+      when(orgUnitMembershipRepository.findAllByIdUserId(leaderCaller.getId()))
+          .thenReturn(List.of(bereichLeadMembership(leaderCaller.getId())));
+      when(orgUnitCascadeService.expandWithDescendants(any()))
+          .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID));
+
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () -> service.resolveOrgUnitForPickerOutput(receiver, foreignToBothId));
+      assertTrue(ex.getMessage().toLowerCase().contains("editable scope"), ex.getMessage());
     }
   }
 }

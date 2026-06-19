@@ -381,10 +381,16 @@ extended:
 - **Create-on-behalf is authorised by `canEditOrgUnit(target)`** (cascades per REQ-ORG-015), not by
   admin-ness. This gate lives in the shared **owning-org-unit picker resolver**
   (`OwnerScopeService.resolveStampedOrgUnit`): an explicit pick is accepted when it is a DIRECT
-  membership of the owner *or* an org unit the caller may edit — so a leader may stamp a subordinate
-  Staffel/SK or its own Bereich/OL, while an ordinary member (whose `canEditOrgUnit` reach equals their
-  own memberships) is byte-identical to today. The same `canEditOrgUnit` gate already governs the
-  job-order **reassign** path (`reassignResponsibleOrgUnit`, escalate-only for non-admins).
+  membership of the **target user** *or* an org unit the current **caller** may edit. The gate keys
+  `canEditOrgUnit` on the caller while the membership set is the target user's, so the two coincide for
+  every **self-service** create (caller = target) — there an ordinary member, whose `canEditOrgUnit`
+  reach equals their own memberships, is byte-identical to today — and diverge only on the two
+  **create-on-behalf** paths where caller ≠ target (inventory book-out/transfer, refinery store): there
+  the accepted set is `(target's memberships) ∪ (caller's editable scope)` by design, so a leader may
+  place the recipient's row in any unit the leader already controls (never widening what the caller can
+  see; the REQ-ORG-011 owner-escape keeps the recipient's own visibility). The same `canEditOrgUnit` gate
+  already governs the job-order **reassign** path (`reassignResponsibleOrgUnit`, escalate-only for
+  non-admins).
 
   > **Implementation note (Phase 4, #697):** the gate is **not** added to the create-time
   > `JobOrderService.resolveResponsibleOrgUnit` / `resolveRequestingOrgUnit`. Those intentionally accept
@@ -405,13 +411,15 @@ extended:
 - [ ] A Bereich-owned and an OL-owned aggregate can be created, read and edited by that level's
   leadership; a subordinate cannot see the level above (strict silo).
 - [ ] Create-on-behalf of a descendant succeeds; of a non-descendant fails (400/403).
-- [ ] Ordinary-member and officer stamping is byte-identical to today.
+- [ ] Self-service stamping (caller = target user) is byte-identical to today for ordinary members and
+  officers; the only widening is the caller ≠ target create-on-behalf paths (book-out/transfer, store).
 - [ ] The ownerless `NULL` path behaves exactly as REQ-ORG-009.
 
-**Enforced by:** `OwnerScopeServiceTest` (the `BereichOlOwnershipStampingTests` nest — Bereich/OL
-resolved as owners, create-on-behalf of a descendant via `canEditOrgUnit`, foreign pick still 400);
-existing picker-resolver + per-aggregate stamping/visibility tests stay green (ordinary-member stamping
-unchanged); visibility-matrix e2e *(planned, Phase 7)* · **ADR:**
+**Enforced by:** `OwnerScopeServiceTest` (the `BereichOlOwnershipStampingTests` nest — Bereich **and OL**
+resolved as owners, create-on-behalf of a descendant **Staffel and SK** via `canEditOrgUnit`, the
+caller ≠ target divergence keyed on the caller's scope, foreign-to-both pick still 400, strict-silo
+read/edit lock); existing picker-resolver + per-aggregate stamping/visibility tests stay green
+(self-service stamping unchanged); visibility-matrix e2e *(planned, Phase 7)* · **ADR:**
 [ADR-0027](../adr/0027-bereich-ol-aggregate-ownership.md) · **Issues:** #692, #697.
 
 ### REQ-ORG-017 — Membership cardinality & exclusivity rules

@@ -563,17 +563,27 @@ public class OwnerScopeService {
    * entity.setOwningOrgUnit(...)}. The lifecycle hook leaves the legacy column null for that row,
    * which is now legal.
    *
-   * <p>Decision matrix matches {@link #resolveSquadronForPickerOutput(User, UUID)} byte-for-byte: 0
-   * memberships → 400; 1 + null picker → auto-stamp; 1 + valid → honour; 1 + mismatch → 400; &gt;1
-   * + null picker → 400 (force explicit choice); &gt;1 + valid → honour; &gt;1 + foreign → 400.
+   * <p>Decision matrix (extends the legacy {@link #resolveSquadronForPickerOutput(User, UUID)}
+   * matrix, which stays strict): 0 memberships → 400; 1 + null picker → auto-stamp the sole direct
+   * membership; &gt;1 + null picker → 400 (force an explicit choice). An explicit pick is honoured
+   * when it is one of the target user's DIRECT memberships <em>or</em> — epic #692 Phase 4 /
+   * REQ-ORG-016 — an org unit the current <b>caller</b> may edit ({@link #canEditOrgUnit(UUID)},
+   * cascade-aware), the create-on-behalf widening; a pick that is neither → 400. Because of that
+   * widening this resolver and the still-strict (membership-only) {@code
+   * resolveSquadronForPickerOutput} no longer agree byte-for-byte: a pick foreign to the target
+   * user but within the caller's editable scope is rejected by the latter and honoured here.
    *
    * @param targetUser the user whose memberships gate the picker output validation; never {@code
    *     null}.
    * @param owningOrgUnitId the picker-supplied org unit id; {@code null} triggers the auto-stamp
    *     path when the user has exactly one membership.
-   * @return the resolved {@link OrgUnit} — either a {@link Squadron} or a {@link
-   *     de.greluc.krt.profit.basetool.backend.model.SpecialCommand}; never {@code null}.
-   * @throws BadRequestException per the matrix above.
+   * @return the resolved {@link OrgUnit} — a {@link Squadron}, a {@link
+   *     de.greluc.krt.profit.basetool.backend.model.SpecialCommand}, or (Phase 4) a {@link
+   *     de.greluc.krt.profit.basetool.backend.model.Bereich} / {@link
+   *     de.greluc.krt.profit.basetool.backend.model.Organisationsleitung}; never {@code null}.
+   * @throws BadRequestException on 0 memberships, a &gt;1-membership {@code null} picker, or an
+   *     explicit pick that is neither a direct membership of the target user nor within the
+   *     caller's editable scope.
    */
   public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
@@ -677,13 +687,25 @@ public class OwnerScopeService {
             "User belongs to multiple org units; owningOrgUnitId is required");
       }
     } else {
-      // Epic #692 Phase 4 (REQ-ORG-016): a picker choice is valid when it is one of the target
-      // user's DIRECT memberships (the historical contract, and the only path a refinery-store
-      // receiver's pick travels) OR an org unit the CURRENT caller may edit ({@link
-      // #canEditOrgUnit(UUID)}, cascade-aware since Phase 3). The latter is the create-on-behalf
-      // widening: a Bereichsleitung/OL leader may stamp a subordinate Staffel/SK (or its own
-      // Bereich/OL) they oversee. For an ordinary member canEditOrgUnit is true exactly for their
-      // own membership units, so this adds nothing and stamping stays byte-identical.
+      // Epic #692 Phase 4 (REQ-ORG-016): a picker choice is valid when it is one of the TARGET
+      // user's DIRECT memberships (the historical contract) OR an org unit the CURRENT CALLER may
+      // edit ({@link #canEditOrgUnit(UUID)}, cascade-aware since Phase 3). The latter is the
+      // create-on-behalf widening: a Bereichsleitung/OL leader may stamp a subordinate Staffel/SK
+      // (or its own Bereich/OL) they oversee.
+      //
+      // Note the gate keys canEditOrgUnit on the CALLER, while memberOrgUnitIds is the TARGET
+      // user's
+      // set. When caller == targetUser (every self-service create path) the two coincide, so an
+      // ordinary member's accepted set is exactly their own memberships and stamping is
+      // byte-identical
+      // to the pre-Phase-4 gate. They DIVERGE only on the two create-on-behalf paths where a caller
+      // stamps another user's row — inventory book-out/transfer and refinery store — and there the
+      // accepted set is the union of (target's memberships) and (caller's editable scope), by
+      // design:
+      // a leader may place the recipient's row in any unit the leader already controls. This never
+      // widens what the CALLER can see (canEditOrgUnit only admits units already in the caller's
+      // scope)
+      // and REQ-ORG-011 owner-escape keeps the recipient's own visibility of the row.
       if (!memberOrgUnitIds.contains(owningOrgUnitId) && !canEditOrgUnit(owningOrgUnitId)) {
         throw new BadRequestException(
             "Selected owner org unit is neither a membership of the target user nor within the"
