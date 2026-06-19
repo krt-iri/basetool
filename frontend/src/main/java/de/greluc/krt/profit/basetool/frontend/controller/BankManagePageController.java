@@ -80,9 +80,12 @@ public class BankManagePageController {
       return "bank-manage :: manageBody";
     }
 
+    // Epic #692 Phase 6 (REQ-ORG-019): the create form links AREA accounts to a Bereich and the
+    // CARTEL account to the Organisationsleitung, so it needs the all-kinds option list (Staffel +
+    // SK + Bereich + OL), not the Staffel/SK-only /active list the public Job-Order form uses.
     List<OrgUnitMembershipOptionDto> orgUnits =
         backendApiClient.get(
-            "/api/v1/org-units/active",
+            "/api/v1/org-units/active-all-kinds",
             new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {});
     List<UserReferenceDto> users =
         backendApiClient.get(

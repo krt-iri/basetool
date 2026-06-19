@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
@@ -91,6 +92,26 @@ class OrgUnitBankAccessServiceTest {
     return account;
   }
 
+  private static OrgUnit bereich(UUID id, String name, String shorthand) {
+    Bereich bereich = new Bereich();
+    bereich.setId(id);
+    bereich.setName(name);
+    bereich.setShorthand(shorthand);
+    return bereich;
+  }
+
+  /** An AREA account linked to its Bereich via the org_unit FK (epic #692 Phase 6). */
+  private static BankAccount areaAccount(UUID id, String accountNo, OrgUnit bereich) {
+    BankAccount account = new BankAccount();
+    account.setId(id);
+    account.setAccountNo(accountNo);
+    account.setName(accountNo + " area account");
+    account.setType(BankAccountType.AREA);
+    account.setStatus(BankAccountStatus.ACTIVE);
+    account.setOrgUnit(bereich);
+    return account;
+  }
+
   @Test
   void listOverseenOrgUnitBalances_returnsOnlyAccountsTheOfficerOversees() {
     // Given an officer who oversees exactly one Staffel that owns an account
@@ -102,7 +123,9 @@ class OrgUnitBankAccessServiceTest {
     BankAccount foreignAccount =
         account(UUID.randomUUID(), "KB-0002", squadron(foreignStaffelId, "Foreign", "FRG"));
     BankAccount areaAccount = account(UUID.randomUUID(), "KB-0003", null);
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(ownStaffelId)));
+    when(ownerScopeService.currentOwnLevelOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(ownStaffelId)));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(ownAccount, foreignAccount, areaAccount));
@@ -119,12 +142,14 @@ class OrgUnitBankAccessServiceTest {
     assertThat(dto.orgUnitId()).isEqualTo(ownStaffelId);
     assertThat(dto.orgUnitShorthand()).isEqualTo("OWN");
     assertThat(dto.balance()).isEqualByComparingTo("12345");
+    // The officer's own account is requestable (own-level).
+    assertThat(dto.canRequest()).isTrue();
   }
 
   @Test
   void listOverseenOrgUnitBalances_emptyForCallerWithoutOversight() {
     // Given a plain member: empty oversight scope
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(
@@ -146,7 +171,9 @@ class OrgUnitBankAccessServiceTest {
     BankAccount accountA = account(accountAId, "KB-0001", squadron(UUID.randomUUID(), "A", "AAA"));
     BankAccount accountB = account(accountBId, "KB-0002", squadron(UUID.randomUUID(), "B", "BBB"));
     BankAccount areaAccount = account(UUID.randomUUID(), "KB-0003", null);
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(ownerScopeService.currentOwnLevelOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(accountA, accountB, areaAccount));
@@ -177,7 +204,9 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             orgUnitId, BankBookingRequestType.DEPOSIT, new BigDecimal("500"), "from sale");
     BankBookingRequestDto expected = dto(accountId, orgUnitId);
-    when(ownerScopeService.currentBlueprintOversightScope())
+    // F2 (booking request) gates on the OWN-LEVEL scope (owner decision Q4), not the cascading
+    // view scope that F1 uses — a subordinate account is view-only.
+    when(ownerScopeService.currentOwnLevelOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
     when(bankAccountRepository.findByOrgUnitId(orgUnitId)).thenReturn(Optional.of(account));
     when(bankBookingRequestService.create(
@@ -195,8 +224,86 @@ class OrgUnitBankAccessServiceTest {
     CreateBankBookingRequest request =
         new CreateBankBookingRequest(
             orgUnitId, BankBookingRequestType.WITHDRAWAL, new BigDecimal("500"), null);
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOwnLevelOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
+
+    assertThrows(AccessDeniedException.class, () -> service.createBookingRequest(request));
+    verify(bankAccountRepository, never()).findByOrgUnitId(any());
+    verifyNoInteractions(bankBookingRequestService);
+  }
+
+  @Test
+  void listOverseenOrgUnitBalances_bereichLeader_includesAreaAndChildAccountsNotForeign() {
+    // Epic #692 Phase 6 (F1, cascading view): a Bereichsleitung sees its AREA account (org_unit FK
+    // = Bereich) AND every child Staffel/SK ORG_UNIT account, but never a foreign Bereich's units.
+    UUID bereichId = UUID.randomUUID();
+    UUID childStaffelId = UUID.randomUUID();
+    UUID areaAccountId = UUID.randomUUID();
+    UUID childAccountId = UUID.randomUUID();
+    BankAccount areaAccount =
+        areaAccount(areaAccountId, "KB-0001", bereich(bereichId, "Profit", "PRF"));
+    BankAccount childAccount =
+        account(childAccountId, "KB-0002", squadron(childStaffelId, "Child", "CHD"));
+    BankAccount foreignAccount =
+        account(UUID.randomUUID(), "KB-0003", squadron(UUID.randomUUID(), "Foreign", "FRG"));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(bereichId, childStaffelId)));
+    // Own-level is the Bereich only — the AREA account is requestable, the child account is not.
+    when(ownerScopeService.currentOwnLevelOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(bereichId)));
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(List.of(areaAccount, childAccount, foreignAccount));
+    when(bankPostingRepository.accountBalances(List.of(areaAccountId, childAccountId)))
+        .thenReturn(List.of(new BankAccountBalance(areaAccountId, new BigDecimal("100"))));
+
+    List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
+
+    assertThat(result)
+        .extracting(OrgUnitBankBalanceDto::accountId)
+        .containsExactlyInAnyOrder(areaAccountId, childAccountId);
+    // The Bereich's own AREA account is requestable; the cascaded child account is view-only.
+    assertThat(result)
+        .filteredOn(dto -> dto.accountId().equals(areaAccountId))
+        .singleElement()
+        .satisfies(dto -> assertThat(dto.canRequest()).isTrue());
+    assertThat(result)
+        .filteredOn(dto -> dto.accountId().equals(childAccountId))
+        .singleElement()
+        .satisfies(dto -> assertThat(dto.canRequest()).isFalse());
+  }
+
+  @Test
+  void createBookingRequest_bereichOwnLevel_resolvesAreaAccountAndDelegates() {
+    UUID bereichId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount areaAccount =
+        areaAccount(accountId, "KB-0001", bereich(bereichId, "Profit", "PRF"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            bereichId, BankBookingRequestType.WITHDRAWAL, new BigDecimal("75"), "rent");
+    BankBookingRequestDto expected = dto(accountId, bereichId);
+    when(ownerScopeService.currentOwnLevelOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(bereichId)));
+    when(bankAccountRepository.findByOrgUnitId(bereichId)).thenReturn(Optional.of(areaAccount));
+    when(bankBookingRequestService.create(
+            eq(accountId), eq(BankBookingRequestType.WITHDRAWAL), eq(new BigDecimal("75")), any()))
+        .thenReturn(expected);
+
+    assertThat(service.createBookingRequest(request)).isSameAs(expected);
+  }
+
+  @Test
+  void createBookingRequest_subordinateAccount_rejectedAsViewOnly() {
+    // Owner decision Q4: subordinate accounts reached by the F1 drill-down are VIEW-ONLY — a
+    // Bereichsleitung may NOT raise a request against a child Staffel's account.
+    UUID bereichId = UUID.randomUUID();
+    UUID childStaffelId = UUID.randomUUID();
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            childStaffelId, BankBookingRequestType.DEPOSIT, new BigDecimal("50"), null);
+    // Own-level scope is the Bereich only; the child is not in it.
+    when(ownerScopeService.currentOwnLevelOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(bereichId)));
 
     assertThrows(AccessDeniedException.class, () -> service.createBookingRequest(request));
     verify(bankAccountRepository, never()).findByOrgUnitId(any());

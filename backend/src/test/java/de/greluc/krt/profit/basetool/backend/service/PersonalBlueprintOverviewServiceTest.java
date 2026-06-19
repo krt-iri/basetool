@@ -111,7 +111,7 @@ class PersonalBlueprintOverviewServiceTest {
 
   @Test
   void list_adminAllScope_aggregatesEveryOwner_includingOrgUnitLess() {
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     // Admin "all org units" must span EVERY blueprint owner — including USER_2, who holds no
     // org-unit membership. Resolving via the org-unit member list (the #371 bug) silently dropped
@@ -137,7 +137,7 @@ class PersonalBlueprintOverviewServiceTest {
 
   @Test
   void list_collapsesCosmeticVariantsIntoOneFamilyRow() {
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(personalBlueprintRepository.findAllDistinctOwnerSubs())
         .thenReturn(Set.of(USER_1.toString(), USER_2.toString()));
@@ -159,7 +159,7 @@ class PersonalBlueprintOverviewServiceTest {
 
   @Test
   void list_pinnedScope_resolvesMembersOfPinnedOrgUnit() {
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
@@ -174,7 +174,7 @@ class PersonalBlueprintOverviewServiceTest {
 
   @Test
   void list_emptyOversight_returnsEmptyWithoutQueryingBlueprints() {
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
@@ -186,7 +186,7 @@ class PersonalBlueprintOverviewServiceTest {
 
   @Test
   void list_descendingSort_reversesByName() {
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(personalBlueprintRepository.findAllDistinctOwnerSubs())
         .thenReturn(Set.of(USER_1.toString()));
@@ -206,7 +206,7 @@ class PersonalBlueprintOverviewServiceTest {
   // returned totals describe the filtered set and the filter spans every entry, not one page.
   @Test
   void list_search_filtersByProductNameCaseInsensitive_beforePagination() {
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(personalBlueprintRepository.findAllDistinctOwnerSubs())
         .thenReturn(Set.of(USER_1.toString()));
@@ -233,7 +233,7 @@ class PersonalBlueprintOverviewServiceTest {
     // USER_2 owns the variant — both surface for the family, sorted by display name.
     when(familyCatalog.familyIndex())
         .thenReturn(Map.of("custodian smg", Set.of("custodian smg", "custodian \"midnight\" smg")));
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1, USER_2));
@@ -259,7 +259,7 @@ class PersonalBlueprintOverviewServiceTest {
     when(familyCatalog.familyIndex()).thenReturn(Map.of());
 
     assertTrue(service.listOwnersForProduct("gone").isEmpty());
-    verify(ownerScopeService, never()).currentBlueprintOversightScope();
+    verify(ownerScopeService, never()).currentOversightScope();
     verify(personalBlueprintRepository, never()).findAllByProductKeyInAndOwnerSubIn(any(), any());
     verify(userRepository, never()).findAllById(any());
   }
@@ -267,7 +267,7 @@ class PersonalBlueprintOverviewServiceTest {
   @Test
   void owners_emptyOversight_returnsEmptyWithoutOwnerQueries() {
     when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     assertTrue(service.listOwnersForProduct("aurora mr").isEmpty());
@@ -278,7 +278,7 @@ class PersonalBlueprintOverviewServiceTest {
   @Test
   void owners_nobodyInScopeOwnsFamily_returnsEmpty() {
     when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
@@ -294,7 +294,7 @@ class PersonalBlueprintOverviewServiceTest {
   @Test
   void owners_adminAllScope_listsOwnersAcrossEveryOrgUnit_byFamilyProductKeys() {
     when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     // The drill-down for the admin "all org units" scope still spans every blueprint owner, not
     // just
@@ -323,7 +323,7 @@ class PersonalBlueprintOverviewServiceTest {
   @Test
   @SuppressWarnings("unchecked")
   void list_globalSharerOutsideOversight_isUnionedIntoOwnerSet() {
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
@@ -347,7 +347,7 @@ class PersonalBlueprintOverviewServiceTest {
   @SuppressWarnings("unchecked")
   void owners_globalSharerOutsideOversight_appearsInDrillDown() {
     when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
-    when(ownerScopeService.currentBlueprintOversightScope())
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));

@@ -510,9 +510,22 @@
     });
 
     /**
-     * Account-create modal: the org-unit select is only relevant (and required)
-     * for ORG_UNIT accounts, the area name only for AREA accounts; hidden rows
-     * are cleared so stale values never reach the backend.
+     * The org-unit kinds each account type may own (epic #692 Phase 6, REQ-ORG-019): an ORG_UNIT
+     * account is owned by a Staffel/SK, an AREA account by its Bereich, the CARTEL account by the
+     * Organisationsleitung. CARTEL_BANK / SPECIAL own no org unit (the picker is hidden).
+     */
+    const ACCOUNT_TYPE_OWNER_KINDS = {
+        ORG_UNIT: ['SQUADRON', 'SPECIAL_COMMAND'],
+        AREA: ['BEREICH'],
+        CARTEL: ['ORGANISATIONSLEITUNG'],
+    };
+
+    /**
+     * Account-create modal: a single org-unit picker is shown for the types that carry an owner
+     * (ORG_UNIT / AREA / CARTEL) and its options are filtered to the kinds that type may own, so an
+     * AREA account can only pick a Bereich and a CARTEL only the Organisationsleitung. The picker is
+     * required for ORG_UNIT and AREA (they must be linked) and optional for CARTEL (a CARTEL may
+     * predate the OL). Hidden / filtered-out values are cleared so stale ids never reach the backend.
      *
      * @param {HTMLSelectElement} select the account-type select
      */
@@ -522,27 +535,34 @@
             return;
         }
         const type = select.value;
+        const allowedKinds = ACCOUNT_TYPE_OWNER_KINDS[type];
         const orgRow = form.querySelector('.bank-row-orgunit');
-        if (orgRow) {
-            orgRow.style.display = type === 'ORG_UNIT' ? '' : 'none';
-            const control = orgRow.querySelector('select, input');
-            if (control) {
-                control.required = type === 'ORG_UNIT';
-                if (type !== 'ORG_UNIT') {
-                    control.value = '';
-                }
-            }
+        if (!orgRow) {
+            return;
         }
-        const areaRow = form.querySelector('.bank-row-area');
-        if (areaRow) {
-            areaRow.style.display = type === 'AREA' ? '' : 'none';
-            const control = areaRow.querySelector('input');
-            if (control) {
-                control.required = type === 'AREA';
-                if (type !== 'AREA') {
-                    control.value = '';
-                }
+        orgRow.style.display = allowedKinds ? '' : 'none';
+        const control = orgRow.querySelector('select');
+        if (!control) {
+            return;
+        }
+        // AREA and ORG_UNIT must be linked; CARTEL link is optional.
+        control.required = type === 'ORG_UNIT' || type === 'AREA';
+        let currentStillVisible = false;
+        Array.prototype.forEach.call(control.options, function (option) {
+            if (!option.value) {
+                return; // keep the "please choose" placeholder
             }
+            const kind = option.getAttribute('data-kind');
+            const visible = !!allowedKinds && allowedKinds.indexOf(kind) !== -1;
+            option.hidden = !visible;
+            option.disabled = !visible;
+            if (visible && option.value === control.value) {
+                currentStillVisible = true;
+            }
+        });
+        // Reset the selection when the picker is hidden or the current pick is now filtered out.
+        if (!allowedKinds || !currentStillVisible) {
+            control.value = '';
         }
     }
 

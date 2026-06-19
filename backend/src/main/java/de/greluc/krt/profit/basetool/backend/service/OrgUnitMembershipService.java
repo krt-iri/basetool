@@ -127,6 +127,42 @@ public class OrgUnitMembershipService {
   }
 
   /**
+   * Lists every active org unit of <em>all four</em> kinds (Staffel + Spezialkommando + Bereich +
+   * Organisationsleitung) as picker options (epic #692 Phase 6, REQ-ORG-019). Unlike {@link
+   * #listAllActiveOptions()} — which stays Staffel/SK-only because the public Job-Order form must
+   * not offer a Bereich/OL as a requesting/responsible unit — this also surfaces the Bereiche and
+   * the OL so the bank-management create form can link an {@code AREA} account to its Bereich and
+   * the {@code CARTEL} account to the Organisationsleitung. Bereich/OL options carry {@code
+   * isProfitEligible = false} (only Staffeln/SKs process orders). Ordered Staffel → SK → Bereich →
+   * OL, each alphabetical, so the picker groups by tier; the consumer filters by {@link
+   * OrgUnitMembershipOptionDto#kind()} per account type.
+   *
+   * @return active org-unit options across all four kinds; never {@code null}, possibly empty.
+   */
+  public List<OrgUnitMembershipOptionDto> listAllActiveOrgUnitOptionsAllKinds() {
+    List<OrgUnitMembershipOptionDto> options = new ArrayList<>(listAllActiveOptions());
+    orgUnitRepository.findActiveBereiche().stream()
+        .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+        .forEach(
+            b ->
+                options.add(
+                    new OrgUnitMembershipOptionDto(
+                        b.getId(), b.getName(), b.getShorthand(), OrgUnitKind.BEREICH, false)));
+    orgUnitRepository.findActiveOrganisationsleitung().stream()
+        .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+        .forEach(
+            ol ->
+                options.add(
+                    new OrgUnitMembershipOptionDto(
+                        ol.getId(),
+                        ol.getName(),
+                        ol.getShorthand(),
+                        OrgUnitKind.ORGANISATIONSLEITUNG,
+                        false)));
+    return options;
+  }
+
+  /**
    * Lists every org unit the given user is a member of, materialised as the picker-optimised {@link
    * OrgUnitMembershipOptionDto} wire shape. Backs the {@code GET
    * /api/v1/users/{userId}/memberships} endpoint that the R5.d owner-picker fragment consumes.

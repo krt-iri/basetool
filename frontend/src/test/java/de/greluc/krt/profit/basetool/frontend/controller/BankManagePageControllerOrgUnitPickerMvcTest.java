@@ -59,7 +59,9 @@ import org.springframework.web.context.WebApplicationContext;
 @SuppressWarnings("unchecked")
 class BankManagePageControllerOrgUnitPickerMvcTest {
 
-  private static final String ACTIVE_URI = "/api/v1/org-units/active";
+  // Epic #692 Phase 6 (REQ-ORG-019): the bank create form sources its picker from the all-kinds
+  // endpoint (Staffel + SK + Bereich + OL), so it can link AREA→Bereich and CARTEL→OL.
+  private static final String ACTIVE_URI = "/api/v1/org-units/active-all-kinds";
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;

@@ -92,7 +92,7 @@ class BankOrgUnitRequestsE2eTest {
     seeder = new BackendSeeder();
 
     // The officer holds the Keycloak OFFICER role; making them a member of IRIDIUM gives them
-    // oversight of IRIDIUM (currentBlueprintOversightScope → their own Staffel).
+    // oversight of IRIDIUM (currentOversightScope → their own Staffel).
     String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
     seeder.assignStaffelMembership(
         ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false, false);

@@ -50,12 +50,17 @@
                 <div class="kpi-value"
                      th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
                 <div class="kpi-card-foot">
-                    <button type="button" class="btn btn--cta btn-sm"
+                    <!-- Own-level account (officer's Staffel / Bereich's AREA / OL's CARTEL): the F2
+                         request affordance. A subordinate account reached by the cascade is view-only
+                         (epic #692 Phase 6, owner decision Q4). -->
+                    <button th:if="${b.canRequest()}" type="button" class="btn btn--cta btn-sm"
                             th:disabled="${b.status() == 'CLOSED'}"
                             data-trigger="open-modal-display" data-modal-id="org-unit-request-modal"
                             data-testid="org-unit-bank-request-btn"
                             th:attr="data-field-orgunitid=${b.orgUnitId()},data-field-orglabel=${b.accountName()} + ' (' + ${b.accountNo()} + ')'"
                             th:text="#{bank.orgUnit.requestAction}">Ein-/Auszahlung beantragen</button>
+                    <span th:unless="${b.canRequest()}" class="text-muted" style="font-size: 0.7rem;"
+                          data-testid="org-unit-bank-viewonly" th:text="#{bank.orgUnit.viewOnly}">Nur Ansicht</span>
                 </div>
             </div>
         </div>

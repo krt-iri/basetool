@@ -1,7 +1,7 @@
 # ADR-0026 — Cascading org-unit scope without admin rights, computed in one descent helper
 
 - **Status:** Accepted — implemented in Phase 3 (#696) for the aggregate scope + authorities; the
-  `currentBlueprintOversightScope()` half is deferred to Phase 6 (#699). See *Implementation note*.
+  `currentOversightScope()` half is deferred to Phase 6 (#699). See *Implementation note*.
 - **Date:** 2026-06-19
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-ORG-015 · REQ-SEC-015 · ADR-0025 · REQ-ORG-011 (#701) · ADR-0024 (#702) · issue #692 · #696
@@ -9,7 +9,7 @@
 ## Context
 
 Authorisation cascades today: `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`, with an officer reaching
-their one Staffel and an SK-lead their SK via `OwnerScopeService.currentBlueprintOversightScope()`, and
+their one Staffel and an SK-lead their SK via `OwnerScopeService.currentOversightScope()`, and
 an admin reaching everything via the `adminAllScope=true` branch. The restructure (ADR-0025) needs the
 **Bereichsleitung** (Bereichsleiter/-koordinator/-operator) to reach **all Staffeln + SKs of their
 Bereich**, and the **OL** to reach **everything** — but with **no admin rights**: `isAdmin()` unlocks
@@ -23,7 +23,7 @@ union into the oversight/coverage path.
 
 We will compute the cascade in **exactly one** private helper,
 `OwnerScopeService.expandWithDescendants(...)`, consumed by **both** `currentMemberOrgUnitIds()` and
-`currentBlueprintOversightScope()`. For a `BEREICH`-leadership membership it unions in all
+`currentOversightScope()`. For a `BEREICH`-leadership membership it unions in all
 `SQUADRON`+`SPECIAL_COMMAND` descendants of that Bereich; for an `is_ol_member` membership it unions in
 everything (all Bereiche + their descendants + the OL's own id). The result is a **concrete
 `memberOrgUnitIds` union** — the cascade **must never** route through the `adminAllScope=true` branch,
@@ -57,7 +57,7 @@ The decision holds; three refinements landed during implementation:
   independently-tested definition. Routing the cascade through an injected collaborator (rather than a
   body change) also let every pre-#692 `OwnerScopeServiceTest` scenario stay green with a single
   identity-default stub — concrete evidence of the zero-regression property.
-- **`currentBlueprintOversightScope()` is NOT cascaded yet.** That method is shared by the bank seam
+- **`currentOversightScope()` is NOT cascaded yet.** That method is shared by the bank seam
   (`OrgUnitBankAccessService`), where Q4 (REQ-BANK-027) requires the balance **view** to cascade but
   deposit/withdrawal **requests** to stay own-level. Widening it atomically with that read/write split
   belongs to the bank phase (#699), so Phase 3 wires the cascade into `currentMemberOrgUnitIds()` only

@@ -53,8 +53,8 @@ import org.springframework.transaction.annotation.Transactional;
  * by the Keycloak {@code sub}. This service bridges to org units in two steps, entirely in Java (no
  * cross-type SQL join between the {@code String owner_sub} and the {@code UUID} membership key): it
  * resolves the in-scope member user ids from {@link OrgUnitMembershipRepository} using the
- * oversight {@link ScopePredicate} from {@link OwnerScopeService#currentBlueprintOversightScope()},
- * then loads and groups those members' owned-blueprint rows by <em>variant family</em> (via {@link
+ * oversight {@link ScopePredicate} from {@link OwnerScopeService#currentOversightScope()}, then
+ * loads and groups those members' owned-blueprint rows by <em>variant family</em> (via {@link
  * BlueprintVariantFamilyResolver}, so a base item and its cosmetic variants collapse onto one row
  * whose count spans the whole family). The lazy owner drill-down expands a family back to its
  * product keys through the cached {@link BlueprintVariantFamilyCatalog} to stay bounded.
@@ -167,7 +167,7 @@ public class PersonalBlueprintOverviewService {
     if (productKeys.isEmpty()) {
       return List.of();
     }
-    ScopePredicate scope = ownerScopeService.currentBlueprintOversightScope();
+    ScopePredicate scope = ownerScopeService.currentOversightScope();
     boolean adminAll = scope.adminAllScope();
     List<PersonalBlueprint> owned;
     Set<String> memberSubs;
@@ -223,7 +223,7 @@ public class PersonalBlueprintOverviewService {
    */
   @NotNull
   private Set<String> inScopeOwnerSubs() {
-    ScopePredicate scope = ownerScopeService.currentBlueprintOversightScope();
+    ScopePredicate scope = ownerScopeService.currentOversightScope();
     if (scope.adminAllScope()) {
       // Admin all-scope already spans every owner, so the global-share opt-in adds nothing here.
       return personalBlueprintRepository.findAllDistinctOwnerSubs();

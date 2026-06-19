@@ -68,7 +68,8 @@ class OrgUnitBankControllerTest {
             "IRIDIUM",
             "IRI",
             OrgUnitKind.SQUADRON,
-            new BigDecimal("4200"));
+            new BigDecimal("4200"),
+            true);
     when(orgUnitBankAccessService.listOverseenOrgUnitBalances()).thenReturn(List.of(dto));
 
     List<OrgUnitBankBalanceDto> result = controller.listOverseenBalances();

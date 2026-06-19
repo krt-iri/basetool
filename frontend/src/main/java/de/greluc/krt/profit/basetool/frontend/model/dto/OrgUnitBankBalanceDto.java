@@ -37,8 +37,12 @@ import org.jetbrains.annotations.Nullable;
  * @param orgUnitId the owning org unit's id
  * @param orgUnitName the owning org unit's long-form name
  * @param orgUnitShorthand the owning org unit's shorthand, or {@code null}
- * @param orgUnitKind kind enum name ({@code SQUADRON} / {@code SPECIAL_COMMAND})
+ * @param orgUnitKind kind enum name ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH} /
+ *     {@code ORGANISATIONSLEITUNG})
  * @param balance the current balance (signed whole aUEC)
+ * @param canRequest {@code true} iff this is the caller's own-level account (the request button is
+ *     shown); {@code false} for a view-only subordinate account reached by the cascade (epic #692
+ *     Phase 6, owner decision Q4)
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
@@ -49,4 +53,5 @@ public record OrgUnitBankBalanceDto(
     String orgUnitName,
     @Nullable String orgUnitShorthand,
     String orgUnitKind,
-    BigDecimal balance) {}
+    BigDecimal balance,
+    boolean canRequest) {}

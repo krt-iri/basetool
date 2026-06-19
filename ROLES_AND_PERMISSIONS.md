@@ -478,7 +478,7 @@ einem bewusst **nicht** mit `Bank` benannten Seam, `OrgUnitBankAccessService`
 (ArchUnit-pinned). Diese Oberfläche liegt **außerhalb** des Bank-URL-/Rollenraums
 unter `/api/v1/org-units/bank/**` und braucht **keine** Bankrolle. „Off./Lead" =
 Offizier der eigenen Staffel bzw. Lead des eigenen Spezialkommandos (Aufsichtsscope
-`currentBlueprintOversightScope()`); ein einfacher Member sieht weiterhin nichts.
+`currentOversightScope()`); ein einfacher Member sieht weiterhin nichts.
 
 | Funktion (Gate)                                                                                                          | Anonym | Member | Off./Lead |  Bank-MA  | Bankleitung | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:---------:|:-----------:|:-----:|
@@ -539,7 +539,7 @@ restriktive Sicht wie ein Member.
   (`/blueprint-overview`) aggregiert die per-Nutzer-`personal_blueprint`-Zeilen über
   die Mitglieder der Orgeinheiten, die der Aufrufer **beaufsichtigt** — Officer ihre
   Staffel, SK-Leads ihre SK(s), Admins alle bzw. die angepinnte
-  (`OwnerScopeService.currentBlueprintOversightScope()`, enger als die
+  (`OwnerScopeService.currentOversightScope()`, enger als die
   Mitgliedschafts-Vereinigung der normalen Listen). Besitzer werden nur als
   Anzeigename ausgeliefert, nie als Sub/E-Mail.
 

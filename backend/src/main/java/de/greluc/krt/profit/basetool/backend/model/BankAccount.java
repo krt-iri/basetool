@@ -91,9 +91,15 @@ public class BankAccount extends AbstractEntity<UUID> {
   private BankAccountStatus status = BankAccountStatus.ACTIVE;
 
   /**
-   * Owning org unit for {@link BankAccountType#ORG_UNIT} accounts (Staffel or Spezialkommando);
-   * {@code null} for every other type. At most one account per org unit (V150 partial unique
-   * index). Lazy-fetched — listing accounts must not hydrate org-unit rows unless mapped.
+   * Owning org unit reference. For {@link BankAccountType#ORG_UNIT} accounts this is the Staffel or
+   * Spezialkommando; since epic #692 (REQ-ORG-019, V168) it also carries the Bereich for {@link
+   * BankAccountType#AREA} accounts and the Organisationsleitung for the {@link
+   * BankAccountType#CARTEL} account — Bereiche/OL are first-class {@link OrgUnit} rows now, so the
+   * AREA/CARTEL owner is the same FK rather than the legacy {@link #areaName}. {@code null} for a
+   * legacy {@code areaName}-based AREA account and for {@code CARTEL_BANK} / {@code SPECIAL}. At
+   * most one account per org unit (V150 {@code uq_bank_account_org_unit} partial unique index) — so
+   * one AREA per Bereich and one CARTEL per OL. Lazy-fetched — listing accounts must not hydrate
+   * org-unit rows unless mapped.
    */
   @Nullable
   @ManyToOne(fetch = FetchType.LAZY)
@@ -102,8 +108,10 @@ public class BankAccount extends AbstractEntity<UUID> {
   private OrgUnit orgUnit;
 
   /**
-   * Free-form Bereich name for {@link BankAccountType#AREA} accounts (Bereiche are not entities,
-   * REQ-ORG-010); {@code null} for every other type.
+   * Legacy free-form Bereich name for {@link BankAccountType#AREA} accounts created before the
+   * Bereich FK (epic #692). {@code null} for FK-linked AREA accounts (whose Bereich is carried by
+   * {@link #orgUnit}) and for every non-AREA type. New AREA accounts are created with the FK, not
+   * this field.
    */
   @Nullable
   @Column(name = "area_name", updatable = false)

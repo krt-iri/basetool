@@ -204,20 +204,19 @@
                         </select>
                         <span class="bank-field-error" data-error-for="type"></span>
                     </div>
+                    <!-- One picker for the owning org unit, filtered by the selected account type in
+                         bank.js: ORG_UNIT -> Staffeln/SKs, AREA -> Bereiche, CARTEL -> the
+                         Organisationsleitung (epic #692 Phase 6, REQ-ORG-019). The data-kind on each
+                         option drives that filter. AREA no longer carries a free-form name. -->
                     <div class="bank-form-row bank-row-orgunit">
                         <label for="bank-create-orgunit" th:text="#{bank.field.orgUnit}">Org-Einheit</label>
                         <select id="bank-create-orgunit" name="orgUnitId" data-testid="bank-create-orgunit">
                             <option value="" th:text="#{bank.field.orgUnit.placeholder}">Org-Einheit w&auml;hlen &hellip;</option>
                             <option th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId()}"
+                                    th:data-kind="${ou.kind()}"
                                     th:text="${ou.orgUnitName()} + (${ou.orgUnitShorthand() != null} ? ' (' + ${ou.orgUnitShorthand()} + ')' : '')">IRIDIUM</option>
                         </select>
                         <span class="bank-field-error" data-error-for="orgUnitId"></span>
-                    </div>
-                    <div class="bank-form-row bank-row-area" style="display: none;">
-                        <label for="bank-create-area" th:text="#{bank.field.areaName}">Bereichsname</label>
-                        <input type="text" id="bank-create-area" name="areaName" maxlength="255"
-                               data-testid="bank-create-area" th:placeholder="#{bank.field.areaName.placeholder}">
-                        <span class="bank-field-error" data-error-for="areaName"></span>
                     </div>
                     <span class="bank-field-error" data-error-for="_global"></span>
                 </div>

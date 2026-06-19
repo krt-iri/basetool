@@ -84,14 +84,16 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   boolean existsByOrgUnitId(UUID orgUnitId);
 
   /**
-   * Loads the single {@code ORG_UNIT} account owned by the given org unit, with the owning org unit
-   * pre-fetched. Backs the org-unit officer/lead balance view (REQ-BANK-021) and the
-   * confirm-before- post request flow (REQ-BANK-022): both resolve a caller's overseen org unit to
-   * its account. The V150 partial unique index {@code uq_bank_account_org_unit} guarantees at most
-   * one row.
+   * Loads the single account owned by the given org unit, with the owning org unit pre-fetched.
+   * Backs the org-unit officer/lead balance view (REQ-BANK-021) and the confirm-before-post request
+   * flow (REQ-BANK-022): both resolve a caller's own-level org unit to its account. Since epic #692
+   * Phase 6 (REQ-ORG-019) the owning org unit can be any account-owning kind — a Staffel/SK for an
+   * {@code ORG_UNIT} account, the Bereich for an {@code AREA} account, or the Organisationsleitung
+   * for the {@code CARTEL} account — all carried by the same {@code org_unit_id} FK. The V150
+   * partial unique index {@code uq_bank_account_org_unit} guarantees at most one row per org unit.
    *
    * @param orgUnitId the owning org unit
-   * @return the org-unit account, or empty when the org unit owns none
+   * @return the org unit's account (ORG_UNIT / AREA / CARTEL), or empty when it owns none
    */
   @EntityGraph(attributePaths = {"orgUnit"})
   @Query("SELECT a FROM BankAccount a WHERE a.orgUnit.id = :orgUnitId")

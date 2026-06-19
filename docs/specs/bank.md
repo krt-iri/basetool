@@ -698,16 +698,35 @@ logic stays in the single non-`Bank*` seam `OrgUnitBankAccessService` (ADR-0020/
 
 **Acceptance**
 
-- [ ] A Bereichsleitung sees its `AREA` balance + all child `ORG_UNIT` balances; the OL sees `CARTEL` +
+- [x] A Bereichsleitung sees its `AREA` balance + all child `ORG_UNIT` balances; the OL sees `CARTEL` +
   all `AREA` + all `ORG_UNIT`; no foreign-Bereich balance leaks.
-- [ ] A Bereichsleitung can file a request on its `AREA` account and the OL on `CARTEL`; a request on a
+- [x] A Bereichsleitung can file a request on its `AREA` account and the OL on `CARTEL`; a request on a
   **subordinate** account is rejected (view-only).
-- [ ] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay green;
+- [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay green;
   the existing officer flow and ledger tests are unchanged.
 
-**Enforced by (planned):** a bank role-matrix test (officer / SK-lead / Bereich / OL / admin × bank
-roles/grants), `ArchitectureTest` · **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md) ·
-**Issues:** #692, #699.
+**Implementation notes.** The linkage reuses the existing `bank_account.org_unit_id` FK — since
+Bereich/OL are first-class `org_unit` rows (REQ-ORG-014), an `AREA` account points it at the Bereich and
+`CARTEL` at the OL, so the existing `uq_bank_account_org_unit` partial unique index enforces one account
+per org unit for free (one `AREA` per Bereich, one `CARTEL` per OL). `V168` only **relaxes the
+`chk_bank_account_owner_ref` CHECK** (no column, no backfill — the legacy `areaName` form stays valid
+during the soak; `BankAccountService` validates `kind = BEREICH`/`ORGANISATIONSLEITUNG` on creation). The
+seam splits the scope: F1 view uses the cascading `OwnerScopeService.currentOversightScope()`,
+F2 request the non-cascading `currentOwnLevelOversightScope()`; the balance DTO carries a `canRequest`
+flag so the UI shows the request affordance only on the own-level account. The bank-management create
+form sources its picker from `GET /api/v1/org-units/active-all-kinds` (all four kinds) and filters the
+options by the selected account type.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (cascading view incl. AREA + child accounts and the
+foreign-Bereich exclusion, own-level `canRequest` split, subordinate-request rejection),
+`OwnerScopeServiceTest` (`CurrentOversightScopeTests` cascade, `CurrentOwnLevelOversightScopeTests`,
+`CanAccessBlueprintOverviewTests` Bereich/OL), `BankAccountServiceTest` (AREA→Bereich / CARTEL→OL
+creation + cardinality), `V168BankAreaCartelLinkageMigrationTest` (CHECK relax + one-account-per-org-unit),
+`ArchitectureTest` (both bank pins) · **Code:** `service/OrgUnitBankAccessService`,
+`service/OwnerScopeService` (`currentOversightScope` / `currentOwnLevelOversightScope`),
+`service/BankAccountService`, `db/migration/V168`, `controller/OrgUnitController#listActiveOrgUnitsAllKinds`,
+`templates/bank-manage.html` + `static/js/bank.js`, `templates/org-unit-bank.html` ·
+**ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md) · **Issues:** #692, #699.
 
 ## Out of scope
 
