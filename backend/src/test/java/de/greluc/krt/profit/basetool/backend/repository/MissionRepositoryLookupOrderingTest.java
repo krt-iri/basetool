@@ -32,6 +32,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -119,6 +120,107 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
+   * Verifies the org-unit-scoped next-mission lookup (REQ-MISSION-008) returns the caller's own
+   * unit's soonest {@code PLANNED}/{@code ACTIVE} mission and ignores both terminal-status missions
+   * and every foreign-unit mission — including a foreign <em>public</em> one with an earlier
+   * planned start. This is the core of the home-page banner narrowing: a member must see their own
+   * unit's next mission, never the organisation-wide one.
+   */
+  // covers REQ-MISSION-008 — banner scoped to the caller's own org unit(s)
+  @Test
+  void findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal() {
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    OrgUnit mine = newSquadron("Scoped-Mine-" + tag, "SM" + tag.substring(0, 3));
+    OrgUnit foreign = newSquadron("Scoped-Foreign-" + tag, "SF" + tag.substring(0, 3));
+
+    Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
+    // Foreign public mission with the globally-earliest start — must be excluded by scope.
+    saveMission(
+        foreign, "Foreign-Earliest", Instant.parse("2099-01-01T00:00:00Z"), "PLANNED", false);
+    // Own terminal mission earlier than the eligible one — must be excluded by status.
+    saveMission(mine, "Mine-Terminal", Instant.parse("2099-01-15T00:00:00Z"), "COMPLETED", false);
+    UUID mineSoonId =
+        saveMission(mine, "Mine-Soon", Instant.parse("2099-02-01T00:00:00Z"), "PLANNED", false);
+    UUID mineLaterId =
+        saveMission(mine, "Mine-Later", Instant.parse("2099-03-01T00:00:00Z"), "PLANNED", false);
+
+    List<Mission> head =
+        missionRepository.findNextScopedMission(
+            lowerBound,
+            List.of("PLANNED", "ACTIVE"),
+            true,
+            null,
+            Set.of(mine.getId()),
+            PageRequest.of(0, 1));
+
+    assertThat(head).extracting(Mission::getId).containsExactly(mineSoonId);
+
+    // A wider page proves the full eligible set is exactly the own unit's live missions in order.
+    List<Mission> all =
+        missionRepository.findNextScopedMission(
+            lowerBound,
+            List.of("PLANNED", "ACTIVE"),
+            true,
+            null,
+            Set.of(mine.getId()),
+            PageRequest.of(0, 50));
+    assertThat(all).extracting(Mission::getId).containsExactly(mineSoonId, mineLaterId);
+  }
+
+  /**
+   * Verifies that within the caller's own org unit the {@code allowInternal=false} gate still hides
+   * internal missions — the defensive flag the service passes for a (rare) non-member caller that
+   * nonetheless carries an org-unit scope.
+   */
+  // covers REQ-MISSION-008 — allowInternal gate applies inside the org-unit scope
+  @Test
+  void findNextScopedMission_allowInternalFalse_excludesOwnInternalMission() {
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    OrgUnit mine = newSquadron("Scoped-Int-" + tag, "SI" + tag.substring(0, 3));
+
+    Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
+    // Earlier but internal — excluded when allowInternal=false, returned when true.
+    UUID internalId =
+        saveMission(mine, "Mine-Internal", Instant.parse("2099-02-01T00:00:00Z"), "PLANNED", true);
+    UUID publicId =
+        saveMission(mine, "Mine-Public", Instant.parse("2099-03-01T00:00:00Z"), "PLANNED", false);
+
+    List<Mission> publicOnly =
+        missionRepository.findNextScopedMission(
+            lowerBound,
+            List.of("PLANNED", "ACTIVE"),
+            false,
+            null,
+            Set.of(mine.getId()),
+            PageRequest.of(0, 1));
+    assertThat(publicOnly).extracting(Mission::getId).containsExactly(publicId);
+
+    List<Mission> withInternal =
+        missionRepository.findNextScopedMission(
+            lowerBound,
+            List.of("PLANNED", "ACTIVE"),
+            true,
+            null,
+            Set.of(mine.getId()),
+            PageRequest.of(0, 1));
+    assertThat(withInternal).extracting(Mission::getId).containsExactly(internalId);
+  }
+
+  /**
+   * Persists a fresh {@link Squadron} owner for a scope fixture.
+   *
+   * @param name the squadron display name.
+   * @param shorthand the squadron shorthand (kept short to satisfy the column constraint).
+   * @return the persisted owner.
+   */
+  private OrgUnit newSquadron(String name, String shorthand) {
+    Squadron squadron = new Squadron();
+    squadron.setName(name);
+    squadron.setShorthand(shorthand);
+    return squadronRepository.save(squadron);
+  }
+
+  /**
    * Persists one {@code ACTIVE} mission so it is always returned by the lookup regardless of the
    * three-month terminal cut-off.
    *
@@ -132,7 +234,8 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
-   * Persists a mission with an explicit status, used by the next-mission status-filter test.
+   * Persists a non-internal mission with an explicit status, used by the next-mission status-filter
+   * test.
    *
    * @param owner the owning org unit (a {@code NOT NULL} FK on the mission row).
    * @param name the mission display name used by the {@code name} tiebreaker.
@@ -141,10 +244,26 @@ class MissionRepositoryLookupOrderingTest {
    * @return the generated mission id.
    */
   private UUID saveMission(OrgUnit owner, String name, Instant plannedStartTime, String status) {
+    return saveMission(owner, name, plannedStartTime, status, false);
+  }
+
+  /**
+   * Persists a mission with an explicit status and internal flag, used by the org-unit-scoped
+   * next-mission tests.
+   *
+   * @param owner the owning org unit (a {@code NOT NULL} FK on the mission row).
+   * @param name the mission display name used by the {@code name} tiebreaker.
+   * @param plannedStartTime the planned start, or {@code null} to exercise the NULLS-LAST branch.
+   * @param status the mission status (e.g. {@code PLANNED}, {@code ACTIVE}, {@code COMPLETED}).
+   * @param isInternal whether the mission is internal (hidden from public/guest visibility).
+   * @return the generated mission id.
+   */
+  private UUID saveMission(
+      OrgUnit owner, String name, Instant plannedStartTime, String status, boolean isInternal) {
     Mission mission = new Mission();
     mission.setName(name);
     mission.setStatus(status);
-    mission.setIsInternal(false);
+    mission.setIsInternal(isInternal);
     mission.setOwningOrgUnit(owner);
     mission.setPlannedStartTime(plannedStartTime);
     return missionRepository.save(mission).getId();

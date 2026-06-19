@@ -11,6 +11,7 @@
 
 ### Changed
 
+- **Der „Nächste Einsatz" auf der Startseite zeigt jetzt nur noch Einsätze der eigenen Organisationseinheit.** Mitglieder sehen den nächsten Einsatz ihrer Staffel(n)/Spezialkommandos; Bereichsleitung und Organisationsleitung den nächsten Einsatz ihrer untergeordneten Einheiten (die OL über alle). Fremde Einsätze — auch öffentliche anderer Einheiten — erscheinen dort nicht mehr. Wer keiner Organisationseinheit angehört (Gast, Administrator ohne aktive Auswahl), sieht weiterhin den organisationsweit nächsten Einsatz.
 - **Die Blueprint-Verfügbarkeit in den Auftragsdetails lässt sich jetzt über ihre Überschrift ein- und ausklappen** (standardmäßig ausgeklappt), sodass die teils lange Liste bei Bedarf weggeklappt werden kann. Außerdem gibt es mehr Abstand vor dem Abschnitt „Item-Übergaben".
 
 ## [v0.5.12](https://github.com/krt-profit/basetool/releases/tag/v0.5.12) - 2026-06-19

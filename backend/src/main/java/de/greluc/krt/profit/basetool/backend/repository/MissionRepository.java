@@ -133,6 +133,56 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
           Instant date, java.util.Collection<String> statuses);
 
   /**
+   * Org-unit-scoped next-mission lookup (REQ-MISSION-008). Returns the upcoming missions owned by
+   * the caller's org units, soonest planned start first, so the home-page "next mission" banner can
+   * surface only the next mission that belongs to the viewer's own unit(s) — or, for a Bereich/OL
+   * leader, their subordinate units — instead of the organisation-wide next one. Pass {@code
+   * PageRequest.of(0, 1)} to take only the head; the result is the soonest match.
+   *
+   * <p>Scope is the same org-unit-predicate shape used by {@link #searchMissions} minus the
+   * cross-staffel public escape: a pinned {@code activeOrgUnitId} narrows to that single OrgUnit;
+   * otherwise the mission's {@code owningOrgUnit} must be one of {@code memberOrgUnitIds} (the
+   * caller's membership union already expanded with the epic #692 / REQ-ORG-015 leadership cascade
+   * by {@link
+   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#currentScopePredicate()}).
+   * Foreign missions — including other OrgUnits' public ones — are deliberately excluded, because
+   * the banner answers "what is <em>my</em> unit heading towards". The admin-all and the
+   * no-org-unit (anonymous / membershipless) cases never reach this query; the service routes them
+   * to the unscoped {@link
+   * #findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(Instant,
+   * java.util.Collection)} pair instead.
+   *
+   * <p>{@code allowInternal} gates internal missions exactly like the unscoped guest variant: a
+   * member (the normal scoped caller) passes {@code true} and sees both internal and public
+   * missions of their own units; the flag keeps the query defensive should a non-member ever carry
+   * an org-unit scope. Deliberately NOT graphed — combining the {@code limit 1} with a collection
+   * {@code @EntityGraph} forces in-memory pagination (HHH90003004); the caller re-fetches the
+   * single hit by id through the graphed {@link #findById(UUID)}.
+   *
+   * @param now exclusive lower bound on {@code plannedStartTime}
+   * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
+   * @param allowInternal {@code true} to include internal missions, {@code false} for public only
+   * @param activeOrgUnitId the single pinned OrgUnit id, or {@code null} to use {@code
+   *     memberOrgUnitIds}
+   * @param memberOrgUnitIds the caller's effective (cascade-expanded) org-unit reach; consulted
+   *     only when {@code activeOrgUnitId} is {@code null}
+   * @param pageable limits the result to the head ({@code PageRequest.of(0, 1)})
+   * @return the matching missions in soonest-first order (at most {@code pageable} size)
+   */
+  @Query(
+      "SELECT m FROM Mission m WHERE m.plannedStartTime > :now AND m.status IN :statuses AND"
+          + " (:allowInternal = true OR m.isInternal = false) AND ((:activeOrgUnitId IS NOT NULL"
+          + " AND m.owningOrgUnit.id = :activeOrgUnitId) OR (:activeOrgUnitId IS NULL AND"
+          + " m.owningOrgUnit.id IN :memberOrgUnitIds)) ORDER BY m.plannedStartTime ASC")
+  List<Mission> findNextScopedMission(
+      @Param("now") Instant now,
+      @Param("statuses") java.util.Collection<String> statuses,
+      @Param("allowInternal") boolean allowInternal,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      Pageable pageable);
+
+  /**
    * Full-text + date-range + status + scope search across missions. Each parameter is optional - a
    * {@code null} cast removes the corresponding clause; the {@code status IN (:status)} list is
    * always applied (pass the full enum set to disable status filtering). Result is sorted by
