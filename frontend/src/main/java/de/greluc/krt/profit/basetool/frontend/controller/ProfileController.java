@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharingForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -155,6 +156,27 @@ public class ProfileController {
     }
     model.addAttribute("defaultPayoutPreference", defaultPayoutPreference);
 
+    // Global blueprint-sharing opt-in, fetched from its own lightweight endpoint (same isolation
+    // from the central UserDto as the payout preference). Resilient: a backend hiccup leaves the
+    // toggle off rather than failing the whole page.
+    boolean shareBlueprintsGlobally = false;
+    try {
+      Map<String, Object> sharing =
+          backendApiClient.get(
+              "/api/v1/users/me/blueprint-sharing",
+              new ParameterizedTypeReference<Map<String, Object>>() {});
+      if (sharing != null && sharing.get("shareBlueprintsGlobally") != null) {
+        shareBlueprintsGlobally =
+            Boolean.parseBoolean(String.valueOf(sharing.get("shareBlueprintsGlobally")));
+      }
+    } catch (Exception e) {
+      // Backend unavailable — keep the off default. Logged at debug (not error) because this is an
+      // optional sub-fetch on a page that still renders fine. No PII is logged.
+      log.debug(
+          "Could not load the global blueprint-sharing flag; defaulting the toggle to off", e);
+    }
+    model.addAttribute("shareBlueprintsGlobally", shareBlueprintsGlobally);
+
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
 
     if (!model.containsAttribute("profileDescriptionForm")) {
@@ -172,6 +194,13 @@ public class ProfileController {
       model.addAttribute(
           "profilePayoutPreferenceForm",
           new ProfilePayoutPreferenceForm(defaultPayoutPreference, version != null ? version : 0L));
+    }
+
+    if (!model.containsAttribute("profileBlueprintSharingForm")) {
+      Long version = (Long) model.getAttribute("version");
+      model.addAttribute(
+          "profileBlueprintSharingForm",
+          new ProfileBlueprintSharingForm(shareBlueprintsGlobally, version != null ? version : 0L));
     }
 
     return "profile";
@@ -414,6 +443,121 @@ public class ProfileController {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("version", refreshedUserVersion(form.version()));
     body.put("defaultPayoutPreference", preference);
+    return ResponseEntity.ok(body);
+  }
+
+  /**
+   * Handles the global blueprint-sharing toggle post (no-JS fallback). Kept as a separate form (and
+   * backend endpoint) from the description update so the central {@code UserDto} contract stays
+   * untouched; all profile forms echo the same user-row {@code version}, so the post-redirect-GET
+   * refresh re-renders the others with the bumped version. A 409 with problem type {@code
+   * concurrency-conflict} surfaces as the optimistic-lock toast; any other failure as the generic
+   * update-failed toast.
+   *
+   * @param form validated toggle payload (flag + version)
+   * @param bindingResult validation errors carrier
+   * @param model Thymeleaf model used when re-rendering inline
+   * @param principal authenticated OIDC user
+   * @param redirectAttributes flash attributes carrier for the result toast
+   * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
+   *     /profile}
+   */
+  @PostMapping("/profile/blueprint-sharing")
+  public String updateBlueprintSharing(
+      @Valid @ModelAttribute("profileBlueprintSharingForm") ProfileBlueprintSharingForm form,
+      BindingResult bindingResult,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal,
+      RedirectAttributes redirectAttributes) {
+    if (bindingResult.hasErrors()) {
+      // Render inline so the BindingResult stays request-scoped (never a Redis FlashMap).
+      return profile(model, principal);
+    }
+    try {
+      backendApiClient.put(
+          "/api/v1/users/me/blueprint-sharing",
+          Map.of(
+              "shareBlueprintsGlobally",
+              form.shareBlueprintsGlobally(),
+              "version",
+              form.version() == null ? 0L : form.version()),
+          Void.class);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.error("Update failed", e);
+      if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
+      } else {
+        redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
+      }
+      return "redirect:/profile";
+    } catch (Exception e) {
+      log.error("Update failed", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
+      return "redirect:/profile";
+    }
+    return "redirect:/profile";
+  }
+
+  /**
+   * AJAX variant of {@link #updateBlueprintSharing}: same update, JSON response, in-place save
+   * (epic #571, REQ-FE-001). Selected over the form handler only for the {@code krtFetch.write}
+   * call (which sends {@code X-Requested-With: XMLHttpRequest} with a JSON body); a script-disabled
+   * browser still posts the HTML form and lands on {@link #updateBlueprintSharing}.
+   *
+   * <p>On success the user row's bumped {@code version} is read back from {@code /me} and returned
+   * so the client can sync it into every {@code version} field on the page (all profile forms share
+   * one row version). A backend 409 with problem type {@code concurrency-conflict} maps to an
+   * {@code OPTIMISTIC_LOCK} 409 so {@code krtFetch} shows the reload-confirm; validation errors map
+   * to 400.
+   *
+   * @param form validated JSON payload (shareBlueprintsGlobally, version)
+   * @param bindingResult validation-errors carrier for the bound JSON body
+   * @param principal authenticated OIDC user
+   * @return 200 with {@code {version, shareBlueprintsGlobally}} on success; otherwise a 4xx/5xx
+   *     body carrying a localized {@code detail} (plus a {@code code} for the optimistic-lock case)
+   */
+  @PostMapping(
+      value = "/profile/blueprint-sharing",
+      headers = "X-Requested-With=XMLHttpRequest",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity<Map<String, Object>> updateBlueprintSharingAjax(
+      @Valid @RequestBody ProfileBlueprintSharingForm form,
+      BindingResult bindingResult,
+      @AuthenticationPrincipal OidcUser principal) {
+    if (principal == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    }
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
+    }
+    try {
+      backendApiClient.put(
+          "/api/v1/users/me/blueprint-sharing",
+          Map.of(
+              "shareBlueprintsGlobally",
+              form.shareBlueprintsGlobally(),
+              "version",
+              form.version() == null ? 0L : form.version()),
+          Void.class);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.error("AJAX blueprint-sharing update failed", e);
+      if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of("code", "OPTIMISTIC_LOCK", "detail", msg("error.concurrency.conflict")));
+      }
+      return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    } catch (Exception e) {
+      log.error("AJAX blueprint-sharing update failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(Map.of("detail", msg("error.profile.update.failed")));
+    }
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("version", refreshedUserVersion(form.version()));
+    body.put("shareBlueprintsGlobally", form.shareBlueprintsGlobally());
     return ResponseEntity.ok(body);
   }
 

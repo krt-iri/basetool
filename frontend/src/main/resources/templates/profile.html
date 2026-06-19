@@ -80,6 +80,21 @@
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.payout.save}">Save Payout Preference</span></button>
                 </form>
             </dd>
+
+            <dt class="kv-row-self-start" th:text="#{profile.blueprintSharing.label}">Blueprint Sharing</dt>
+            <dd>
+                <form id="profile-blueprint-sharing-form" th:action="@{/profile/blueprint-sharing}" method="post" th:object="${profileBlueprintSharingForm}">
+                    <input type="hidden" name="version" th:field="*{version}">
+                    <div class="form-group">
+                        <label class="flex-gap-2xs">
+                            <input type="checkbox" th:field="*{shareBlueprintsGlobally}" />
+                            <span th:text="#{profile.blueprintSharing.toggle}">Make my blueprints available to everyone</span>
+                        </label>
+                        <p th:text="#{profile.blueprintSharing.hint}" class="form-hint">When enabled, your owned blueprints are counted in the availability views for every org unit, not only your own.</p>
+                    </div>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.blueprintSharing.save}">Save</span></button>
+                </form>
+            </dd>
         </dl>
 
         <div class="mt-2-flex-gap">
@@ -166,6 +181,13 @@
             var select = form.querySelector('select[name="defaultPayoutPreference"]');
             return {
                 defaultPayoutPreference: select ? select.value : null,
+                version: version
+            };
+        });
+        bindInPlaceSave('profile-blueprint-sharing-form', function (form, version) {
+            var checkbox = form.querySelector('input[name="shareBlueprintsGlobally"]');
+            return {
+                shareBlueprintsGlobally: checkbox ? checkbox.checked : false,
                 version: version
             };
         });

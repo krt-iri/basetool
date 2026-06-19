@@ -85,7 +85,7 @@ class PersonalBlueprintOverviewControllerTest {
   @Test
   void owners_relaysProductKeyToService() {
     when(service.listOwnersForProduct("aurora"))
-        .thenReturn(List.of(new BlueprintOverviewOwnerDto("Alpha")));
+        .thenReturn(List.of(new BlueprintOverviewOwnerDto("Alpha", true)));
 
     List<BlueprintOverviewOwnerDto> result = controller.listOwners("aurora");
 

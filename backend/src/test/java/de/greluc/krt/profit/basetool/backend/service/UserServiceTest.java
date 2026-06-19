@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -121,5 +124,44 @@ class UserServiceTest {
 
     verify(userRepository).saveAndFlush(user);
     verify(userRepository, never()).save(user);
+  }
+
+  /**
+   * Pins that {@code updateUserShareBlueprintsGlobally} sets the opt-in flag and returns the user
+   * from a {@code saveAndFlush}, not a plain {@code save}: the profile blueprint-sharing toggle
+   * writes the returned {@code @Version} back in place via {@code syncAllVersions} (no reload), so
+   * a stale {@code save} version would 409 the next consecutive change (REQ-INV-018).
+   */
+  @Test
+  void updateUserShareBlueprintsGlobally_setsFlagAndFlushesSoVersionIsFresh() {
+    UUID id = UUID.randomUUID();
+    User user = userWithId(id);
+    when(userRepository.findById(id)).thenReturn(Optional.of(user));
+    when(userRepository.saveAndFlush(user)).thenReturn(user);
+
+    User result = userService.updateUserShareBlueprintsGlobally(id, true, 0L);
+
+    assertTrue(result.isShareBlueprintsGlobally());
+    verify(userRepository).saveAndFlush(user);
+    verify(userRepository, never()).save(user);
+  }
+
+  /**
+   * Pins the optimistic-lock contract of {@code updateUserShareBlueprintsGlobally}: a stale {@code
+   * version} surfaces as {@code ObjectOptimisticLockingFailureException} (HTTP 409) instead of a
+   * silent overwrite, and no write is attempted.
+   */
+  @Test
+  void updateUserShareBlueprintsGlobally_staleVersion_throwsAndDoesNotSave() {
+    UUID id = UUID.randomUUID();
+    User user = userWithId(id); // version 0
+    when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+    assertThrows(
+        org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+        () -> userService.updateUserShareBlueprintsGlobally(id, true, 1L));
+
+    verify(userRepository, never()).saveAndFlush(any());
+    verify(userRepository, never()).save(any());
   }
 }

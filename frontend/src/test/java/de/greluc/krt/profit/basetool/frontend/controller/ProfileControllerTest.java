@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharingForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -112,6 +113,10 @@ class ProfileControllerTest {
             eq("/api/v1/users/me/payout-preference"),
             any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenReturn(Map.of("defaultPayoutPreference", "DONATE", "version", 4L));
+    when(backendApiClient.<Map<String, Object>>get(
+            eq("/api/v1/users/me/blueprint-sharing"),
+            any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenReturn(Map.of("shareBlueprintsGlobally", true, "version", 4L));
 
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
@@ -147,6 +152,14 @@ class ProfileControllerTest {
     assertNotNull(payoutForm);
     assertEquals(PayoutPreference.DONATE, payoutForm.defaultPayoutPreference());
     assertEquals(4L, payoutForm.version());
+    // Global blueprint-sharing flag comes from its own endpoint and seeds the toggle form, echoing
+    // the same user-row version (REQ-INV-018).
+    assertEquals(true, model.getAttribute("shareBlueprintsGlobally"));
+    ProfileBlueprintSharingForm sharingForm =
+        (ProfileBlueprintSharingForm) model.getAttribute("profileBlueprintSharingForm");
+    assertNotNull(sharingForm);
+    assertTrue(sharingForm.shareBlueprintsGlobally());
+    assertEquals(4L, sharingForm.version());
   }
 
   @Test
@@ -162,6 +175,10 @@ class ProfileControllerTest {
             eq("/api/v1/users/me/payout-preference"),
             any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenThrow(new RuntimeException("backend down"));
+    when(backendApiClient.<Map<String, Object>>get(
+            eq("/api/v1/users/me/blueprint-sharing"),
+            any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
 
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
@@ -174,6 +191,8 @@ class ProfileControllerTest {
     assertEquals("JD", model.getAttribute("displayName"));
     // Payout preference falls back to PAYOUT when its endpoint is unreachable.
     assertEquals(PayoutPreference.PAYOUT, model.getAttribute("defaultPayoutPreference"));
+    // The blueprint-sharing toggle falls back to off when its endpoint is unreachable.
+    assertEquals(false, model.getAttribute("shareBlueprintsGlobally"));
   }
 
   @Test
@@ -667,5 +686,74 @@ class ProfileControllerTest {
     assertNotNull(response.getBody());
     assertEquals("validation-failed", response.getBody().get("detail"));
     verify(backendApiClient, never()).put(any(), any(), any());
+  }
+
+  // ── POST /profile/blueprint-sharing (REQ-INV-018) ────────────────────────
+
+  @Test
+  void updateBlueprintSharing_happyPath_putsAndRedirectsWithSuccessToast() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    ProfileBlueprintSharingForm form = new ProfileBlueprintSharingForm(true, 2L);
+
+    String view =
+        controller.updateBlueprintSharing(
+            form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
+
+    assertEquals("redirect:/profile", view);
+
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    verify(backendApiClient)
+        .put(eq("/api/v1/users/me/blueprint-sharing"), bodyCap.capture(), eq(Void.class));
+    Map<String, Object> body = bodyCap.getValue();
+    assertEquals(true, body.get("shareBlueprintsGlobally"));
+    assertEquals(2L, body.get("version"));
+    verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
+  }
+
+  @Test
+  void updateBlueprintSharingAjax_happyPath_returns200WithRefreshedVersion() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    when(backendApiClient.<Map<String, Object>>get(
+            eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
+        .thenReturn(Map.of("version", 9L));
+
+    ProfileBlueprintSharingForm form = new ProfileBlueprintSharingForm(true, 8L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updateBlueprintSharingAjax(form, bindingResult, principal);
+
+    assertEquals(200, response.getStatusCode().value());
+    Map<String, Object> body = response.getBody();
+    assertNotNull(body);
+    assertEquals(9L, body.get("version"));
+    assertEquals(true, body.get("shareBlueprintsGlobally"));
+
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    verify(backendApiClient)
+        .put(eq("/api/v1/users/me/blueprint-sharing"), bodyCap.capture(), eq(Void.class));
+    assertEquals(true, bodyCap.getValue().get("shareBlueprintsGlobally"));
+    assertEquals(8L, bodyCap.getValue().get("version"));
+  }
+
+  @Test
+  void updateBlueprintSharingAjax_optimisticLockConflict_returns409WithOptimisticLockCode() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    BackendServiceException conflict =
+        org.mockito.Mockito.spy(
+            new BackendServiceException(
+                "concurrency-conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), null));
+    org.mockito.Mockito.doReturn("concurrency-conflict").when(conflict).getProblemType();
+    doThrow(conflict)
+        .when(backendApiClient)
+        .put(eq("/api/v1/users/me/blueprint-sharing"), any(), eq(Void.class));
+    when(messageSource.getMessage(any(), any(), any(), any())).thenReturn("conflict-message");
+
+    ProfileBlueprintSharingForm form = new ProfileBlueprintSharingForm(false, 1L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updateBlueprintSharingAjax(form, bindingResult, principal);
+
+    assertEquals(409, response.getStatusCode().value());
+    assertNotNull(response.getBody());
+    assertEquals("OPTIMISTIC_LOCK", response.getBody().get("code"));
+    assertEquals("conflict-message", response.getBody().get("detail"));
   }
 }

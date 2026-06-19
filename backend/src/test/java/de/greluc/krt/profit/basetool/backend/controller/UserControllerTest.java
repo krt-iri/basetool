@@ -396,6 +396,42 @@ class UserControllerTest {
     verify(userService).updateUserDefaultPayoutPreference(CALLER_ID, PayoutPreference.DONATE, 2L);
   }
 
+  // ── GET/PUT /me/blueprint-sharing (REQ-INV-018) ─────────────────────────
+
+  @Test
+  void getMyBlueprintSharing_resolvesIdFromJwt_andReturnsFlagAndVersion() {
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+    User me = new User();
+    me.setId(CALLER_ID);
+    me.setShareBlueprintsGlobally(true);
+    me.setVersion(4L);
+    when(userService.findById(CALLER_ID)).thenReturn(me);
+
+    UserController.MyBlueprintSharingResponse result = controller.getMyBlueprintSharing(jwt);
+
+    assertTrue(result.shareBlueprintsGlobally());
+    assertEquals(4L, result.version());
+  }
+
+  @Test
+  void updateMyBlueprintSharing_resolvesIdFromJwt_andForwardsFlagAndVersion() {
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+    UserController.MyBlueprintSharingRequest req =
+        new UserController.MyBlueprintSharingRequest(true, 2L);
+    User updated = new User();
+    updated.setId(CALLER_ID);
+    updated.setShareBlueprintsGlobally(true);
+    updated.setVersion(3L);
+    when(userService.updateUserShareBlueprintsGlobally(CALLER_ID, true, 2L)).thenReturn(updated);
+
+    UserController.MyBlueprintSharingResponse result =
+        controller.updateMyBlueprintSharing(jwt, req);
+
+    assertTrue(result.shareBlueprintsGlobally());
+    assertEquals(3L, result.version());
+    verify(userService).updateUserShareBlueprintsGlobally(CALLER_ID, true, 2L);
+  }
+
   // ── PUT /me/read-announcement/{id} ──────────────────────────────────────
 
   @Test

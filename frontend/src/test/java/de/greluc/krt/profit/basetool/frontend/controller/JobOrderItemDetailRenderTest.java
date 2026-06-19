@@ -634,7 +634,9 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new JobOrderRequiredBlueprintDto("a03 sniper rifle", "A03 Sniper Rifle", 1, true),
                 new JobOrderRequiredBlueprintDto("a03 optic scope", "A03 Optic Scope", 0, true)),
-            List.of(new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"))));
+            List.of(
+                new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"), true),
+                new JobOrderBlueprintOwnerDto("Carla", List.of("A03 Sniper Rifle"), false)));
     when(backendApiClient.get(
             eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
             eq(JobOrderItemBlueprintOwnersDto.class)))
@@ -666,6 +668,10 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("variant-inclusive hint shown for the weapon coverage row")
         .contains("inkl. Varianten");
+    assertThat(html).as("global-sharer owner is also listed").contains("Carla");
+    assertThat(html)
+        .as("discreet not-a-member hint shown for the global-sharer owner (REQ-INV-018)")
+        .contains("kein Einheitsmitglied");
   }
 
   @Test

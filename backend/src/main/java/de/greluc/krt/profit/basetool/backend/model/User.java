@@ -96,6 +96,18 @@ public class User extends AbstractEntity<UUID> {
   @Column(name = "default_payout_preference")
   private PayoutPreference defaultPayoutPreference;
 
+  /**
+   * Opt-in flag: when {@code true}, the user's owned {@link PersonalBlueprint} rows are counted in
+   * the leadership blueprint-availability overview and the item-order blueprint-coverage view for
+   * <em>every</em> org unit, not only the ones the user is a member of — so a Staffel member's
+   * blueprint can satisfy an SK order's coverage even across org-unit boundaries. Defaults to
+   * {@code false}, preserving the strict org-unit scoping for everyone who does not opt in. The
+   * widening is read-only and exposes the owner by display name only (never the {@code sub} or
+   * e-mail); the viewer-access gates are unchanged. REQ-INV-018 / ADR-0024.
+   */
+  @Column(name = "share_blueprints_globally", nullable = false)
+  private boolean shareBlueprintsGlobally = false;
+
   public String getEffectiveName() {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;
   }

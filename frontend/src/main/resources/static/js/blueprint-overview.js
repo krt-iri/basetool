@@ -41,7 +41,22 @@
         }
         const list = el('ul', 'bp-owners-list');
         owners.forEach(function (owner) {
-            list.appendChild(el('li', 'bp-owner', owner.ownerName));
+            const item = el('li', 'bp-owner', owner.ownerName);
+            // Discreet marker for an owner who is visible only via global blueprint sharing
+            // (REQ-INV-018), i.e. not a member of the caller's oversight org unit.
+            if (owner.orgUnitMember === false) {
+                const hint = el(
+                    'span',
+                    'bp-owner-external',
+                    i18n().notMember || '(not a unit member)',
+                );
+                const tip = i18n().notMemberHint;
+                if (tip) {
+                    hint.title = tip;
+                }
+                item.appendChild(hint);
+            }
+            list.appendChild(item);
         });
         panel.appendChild(list);
     }

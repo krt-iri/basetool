@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Im Profil lässt sich jetzt einstellen, dass die eigenen Blueprints allen zur Verfügung stehen.** Ist die Option aktiv, wird man in der Blueprint-Verfügbarkeit und in der Blueprint-Verfügbarkeit der Aufträge mitgezählt, auch wenn man wegen der Organisationseinheit sonst nicht berücksichtigt würde. In beiden Ansichten wird ein so eingeblendeter Besitzer dezent als "kein Einheitsmitglied" gekennzeichnet. Standardmäßig ist die Option aus.
+
 ### Fixed
 
 - **Der Eigentümer eines Lagereintrags, Schiffs (Hangar) oder Raffinerie-Auftrags konnte ihn nicht mehr bearbeiten, nachdem er die OrgUnit gewechselt hatte oder gar keiner OrgUnit mehr angehörte, das Objekt aber noch auf eine OrgUnit gebucht war (403).** Der Eigentümer darf seine eigenen Lagereinträge, Schiffe und Raffinerie-Aufträge jetzt immer sehen und bearbeiten, unabhängig vom OrgUnit-Stempel; Nicht-Eigentümer bleiben an den OrgUnit-Scope gebunden. Die persönlichen Ansichten zeigten die Objekte bereits, nur das Backend-Gate hatte blockiert.

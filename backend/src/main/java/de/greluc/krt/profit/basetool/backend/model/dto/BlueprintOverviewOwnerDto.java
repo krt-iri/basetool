@@ -25,5 +25,9 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
  * Keycloak {@code sub} or e-mail — so the overview cannot leak account identifiers.
  *
  * @param ownerName the member's effective display name (display name, or username fallback)
+ * @param orgUnitMember {@code true} when this owner is a member of the caller's oversight org
+ *     unit(s) (always {@code true} for an admin "all org units" scope, where no single unit
+ *     applies); {@code false} when they appear only because they opted into global blueprint
+ *     sharing (REQ-INV-018), so the UI can mark them with a discreet "not a unit member" hint
  */
-public record BlueprintOverviewOwnerDto(String ownerName) {}
+public record BlueprintOverviewOwnerDto(String ownerName, boolean orgUnitMember) {}

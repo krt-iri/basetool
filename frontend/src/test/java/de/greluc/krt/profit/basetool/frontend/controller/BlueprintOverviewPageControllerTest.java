@@ -142,7 +142,7 @@ class BlueprintOverviewPageControllerTest {
             contains("/api/v1/personal-blueprints/overview/owners?productKey={productKey}"),
             any(ParameterizedTypeReference.class),
             eq("aurora")))
-        .thenReturn(List.of(new BlueprintOverviewOwnerDto("Alpha")));
+        .thenReturn(List.of(new BlueprintOverviewOwnerDto("Alpha", true)));
 
     List<BlueprintOverviewOwnerDto> result = controller.owners("aurora");
 
