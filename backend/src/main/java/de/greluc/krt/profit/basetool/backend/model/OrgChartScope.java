@@ -43,5 +43,22 @@ public enum OrgChartScope {
    * A single Spezialkommando (SK). Positions in this scope reference an {@link OrgUnit} of kind
    * {@link OrgUnitKind#SPECIAL_COMMAND} and only ever hold the 1-2 SK-Leiter (Commander).
    */
-  SPECIAL_COMMAND
+  SPECIAL_COMMAND,
+
+  /**
+   * A single Bereich (area/division) — epic #692, REQ-ORG-018. Positions in this scope reference an
+   * {@link OrgUnit} of kind {@link OrgUnitKind#BEREICH} and form that Bereich's Bereichsleitung
+   * sub-tree (Bereichsleiter / -koordinatoren / -operatoren). Unlike the legacy singleton {@link
+   * #AREA}, this is per-Bereich: each Bereich carries its own leadership and the cardinality caps
+   * (one Bereichsleiter) are scoped to the Bereich's {@code org_unit_id}.
+   */
+  BEREICH,
+
+  /**
+   * The Organisationsleitung (OL) — epic #692, REQ-ORG-018 — the single top tier above every
+   * Bereich. Positions in this scope reference the {@link OrgUnit} of kind {@link
+   * OrgUnitKind#ORGANISATIONSLEITUNG} and hold its members. Bound to the OL's {@code org_unit_id}
+   * (not {@code NULL}), distinguishing it from the legacy {@link #AREA} scope.
+   */
+  OL
 }

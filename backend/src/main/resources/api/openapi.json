@@ -42611,7 +42611,7 @@
           },
           "positionType" : {
             "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
           },
           "orgUnitId" : {
             "type" : "string",
@@ -45360,7 +45360,7 @@
         "properties" : {
           "positionType" : {
             "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
           },
           "orgUnitId" : {
             "type" : "string",
@@ -48077,7 +48077,7 @@
           },
           "positionType" : {
             "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
           },
           "userId" : {
             "type" : "string",

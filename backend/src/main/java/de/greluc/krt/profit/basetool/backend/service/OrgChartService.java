@@ -431,11 +431,24 @@ public class OrgChartService {
             .findById(orgUnitId)
             .orElseThrow(() -> new NotFoundException("OrgUnit not found: " + orgUnitId));
     OrgUnitKind expectedKind =
-        scope == OrgChartScope.SQUADRON ? OrgUnitKind.SQUADRON : OrgUnitKind.SPECIAL_COMMAND;
+        switch (scope) {
+          case SQUADRON -> OrgUnitKind.SQUADRON;
+          case SPECIAL_COMMAND -> OrgUnitKind.SPECIAL_COMMAND;
+          case BEREICH -> OrgUnitKind.BEREICH;
+          case OL -> OrgUnitKind.ORGANISATIONSLEITUNG;
+          case AREA -> throw new IllegalStateException("AREA scope handled above");
+        };
     if (unit.getKind() != expectedKind) {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
-    if (!unit.isActive() || !unit.isProfitEligible()) {
+    // Profit-eligibility is required only for the Job-Order-processing tiers (Staffel/SK) — those
+    // are the org chart's historical "Profit-Bereich" units. A Bereich/OL (epic #692, REQ-ORG-018)
+    // is never profit-eligible and must not be rejected for it; only its active flag is checked.
+    if (scope == OrgChartScope.SQUADRON || scope == OrgChartScope.SPECIAL_COMMAND) {
+      if (!unit.isActive() || !unit.isProfitEligible()) {
+        throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
+      }
+    } else if (!unit.isActive()) {
       throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
     }
     return unit;
@@ -514,8 +527,18 @@ public class OrgChartService {
           throw new BadRequestException(ERR_COMMANDER_LIMIT);
         }
       }
+      case BEREICHSLEITER -> {
+        // Epic #692, REQ-ORG-018: at most one Bereichsleiter PER Bereich (scoped to org_unit_id),
+        // unlike the legacy AREA_LEAD which is a global singleton.
+        if (positionRepository.countByOrgUnitIdAndPositionType(
+                orgUnit.getId(), OrgChartPositionType.BEREICHSLEITER)
+            > 0) {
+          throw new BadRequestException(ERR_DUPLICATE_LEAD);
+        }
+      }
       // DEPUTY_COMMAND_LEAD's "at most one per Kommando" is enforced during parent resolution;
-      // AREA_COORDINATOR / AREA_OPERATOR / AREA_COMMANDER are unbounded.
+      // AREA_COORDINATOR / AREA_OPERATOR / AREA_COMMANDER, BEREICHSKOORDINATOR / BEREICHSOPERATOR
+      // and OL_MEMBER are unbounded.
       default -> {
         // no cardinality limit
       }
