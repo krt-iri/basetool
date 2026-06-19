@@ -23,11 +23,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorColumn;
 import jakarta.persistence.DiscriminatorType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.Getter;
@@ -143,6 +146,22 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
    */
   @Column(name = "is_profit_eligible", nullable = false)
   private boolean isProfitEligible = false;
+
+  /**
+   * Parent org unit in the Kartell hierarchy (epic #692, REQ-ORG-014, ADR-0025): the {@link
+   * Bereich} that owns this Staffel/SK, the {@link Organisationsleitung} that owns this Bereich, or
+   * {@code null}. The hierarchy is fixed at three levels (OL &gt; Bereich &gt; Staffel/SK), so the
+   * parent's {@link #getKind()} is constrained by this row's kind — enforced at the data layer by
+   * the {@code validate_org_unit_parent} trigger and the {@code chk_org_unit_ol_has_no_parent}
+   * CHECK (V164), not at the JPA layer. A {@code null} parent is the additive-soak default; the
+   * scope cascade treats it as "no ancestor expansion", so the system behaves exactly as the flat
+   * two-kind model until an admin wires the hierarchy up. Lazy-fetched and excluded from {@code
+   * toString} so rendering a row never walks the parent chain.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "parent_org_unit_id")
+  @ToString.Exclude
+  private OrgUnit parent;
 
   /**
    * Returns the concrete {@link OrgUnitKind} this row represents. Each concrete subclass overrides

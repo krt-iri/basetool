@@ -69,4 +69,17 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    */
   @Query("SELECT o FROM OrgUnit o WHERE o.active = true AND o.isProfitEligible = true")
   List<OrgUnit> findActiveProfitEligible();
+
+  /**
+   * Returns the direct children of {@code parentOrgUnitId} in the org hierarchy (epic #692,
+   * REQ-ORG-014): the Staffeln + SKs of a Bereich, or the Bereiche of the Organisationsleitung.
+   * Returns every kind via single-table inheritance; the caller filters by {@link
+   * OrgUnit#getKind()} if it needs a specific tier. The cascading-scope resolver (REQ-ORG-015)
+   * walks this one level at a time to expand a leader's reach to their subordinate units.
+   *
+   * @param parentOrgUnitId the parent org unit whose direct children to load; never {@code null}.
+   * @return the direct children in arbitrary order; never {@code null}, possibly empty.
+   */
+  @Query("SELECT o FROM OrgUnit o WHERE o.parent.id = :parentOrgUnitId")
+  List<OrgUnit> findByParentOrgUnitId(@Param("parentOrgUnitId") UUID parentOrgUnitId);
 }

@@ -87,11 +87,13 @@ public interface SquadronMapper {
    * dedicated {@code PATCH /api/v1/squadrons/{id}/promotion-enabled} / {@code .../profit-eligible}
    * endpoints (see {@code SquadronService.setPromotionEnabled} / {@code
    * SquadronService.setProfitEligible}) so an accidental description edit cannot flip either
-   * per-squadron toggle.
+   * per-squadron toggle. The {@code parent} hierarchy link (epic #692) is ignored too — a unit's
+   * Bereich is assigned through the org-hierarchy admin, never a squadron create/update.
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "promotionEnabled", ignore = true)
   @Mapping(target = "profitEligible", ignore = true)
+  @Mapping(target = "parent", ignore = true)
   Squadron toEntity(SquadronDto dto);
 }

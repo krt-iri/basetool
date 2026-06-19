@@ -61,5 +61,26 @@ public enum OrgUnitKind {
    * {@code @DiscriminatorValue} on {@link SpecialCommand}. Permanently barred from the promotion
    * subsystem by the database CHECK constraint introduced in V94.
    */
-  SPECIAL_COMMAND
+  SPECIAL_COMMAND,
+
+  /**
+   * The Bereich (area / division) tenant — one level <em>above</em> Staffeln and Spezialkommandos
+   * in the Kartell hierarchy (epic #692, REQ-ORG-014, ADR-0025). Mapped to {@code org_unit.kind =
+   * 'BEREICH'} via {@code @DiscriminatorValue} on {@link Bereich}. A Bereich groups several
+   * Staffeln and SKs (its children via {@code org_unit.parent_org_unit_id}, set in a later phase)
+   * and is run by its Bereichsleitung (the {@code is_bereichsleiter} / {@code
+   * is_bereichskoordinator} / {@code is_bereichsoperator} membership flags). Permanently barred
+   * from promotion by {@code chk_org_unit_promotion_only_squadron} (only {@code SQUADRON} may carry
+   * it), like SK.
+   */
+  BEREICH,
+
+  /**
+   * The Organisationsleitung (OL) tenant — the top of the Kartell hierarchy, above every Bereich
+   * (epic #692, REQ-ORG-014, ADR-0025). Mapped to {@code org_unit.kind = 'ORGANISATIONSLEITUNG'}
+   * via {@code @DiscriminatorValue} on {@link Organisationsleitung}. Its members carry the {@code
+   * is_ol_member} membership flag and (per REQ-ORG-015) reach every org unit, without admin rights.
+   * Has no parent ({@code chk_org_unit_ol_has_no_parent}) and never carries promotion.
+   */
+  ORGANISATIONSLEITUNG
 }
