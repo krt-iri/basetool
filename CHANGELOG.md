@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.5.12](https://github.com/krt-profit/basetool/releases/tag/v0.5.12) - 2026-06-19
+
 ### Added
 
 - **Im Profil lässt sich jetzt einstellen, dass die eigenen Blueprints allen zur Verfügung stehen.** Ist die Option aktiv, wird man in der Blueprint-Verfügbarkeit und in der Blueprint-Verfügbarkeit der Aufträge mitgezählt, auch wenn man wegen der Organisationseinheit sonst nicht berücksichtigt würde. In beiden Ansichten wird ein so eingeblendeter Besitzer dezent als "kein Einheitsmitglied" gekennzeichnet. Standardmäßig ist die Option aus.
