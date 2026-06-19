@@ -341,15 +341,18 @@ public class OwnerScopeService {
    * <ul>
    *   <li>admins — always (they see every org unit, or the one they pinned);
    *   <li>officers — for their own Staffel;
-   *   <li>Spezialkommando leads — for the SK(s) they lead.
+   *   <li>Spezialkommando leads — for the SK(s) they lead;
+   *   <li>Bereichsleitung / OL members — for their Bereich's (or every) unit (epic #692 Phase 6).
    * </ul>
    *
-   * <p>A plain member, or a contextual logistician who is neither an officer nor an SK lead, is
-   * rejected (no menu entry, empty / forbidden API). The lead branch scans the caller's memberships
-   * for any {@code is_lead} row; the V95 CHECK constraint pins {@code is_lead} to Spezialkommando
-   * memberships, so a hit means the caller leads at least one SK.
+   * <p>A plain member, or a contextual logistician who holds no oversight seat, is rejected (no
+   * menu entry, empty / forbidden API). The leadership branch scans the caller's memberships for
+   * any oversight seat — see {@link #isOversightSeat(OrgUnitMembership)}: an SK-lead ({@code
+   * is_lead}, pinned to SK memberships by the V95 CHECK) or — since epic #692 Phase 6 — a
+   * Bereichsleitung / OL membership.
    *
-   * @return {@code true} iff the caller is an admin, an officer, or the lead of at least one SK.
+   * @return {@code true} iff the caller is an admin, an officer, or holds at least one oversight
+   *     seat (SK-lead / Bereichsleitung / OL).
    */
   public boolean canAccessBlueprintOverview() {
     if (authHelper.isAdmin() || authHelper.hasReachableRole("ROLE_OFFICER")) {
@@ -360,21 +363,28 @@ public class OwnerScopeService {
         .map(
             userId ->
                 orgUnitMembershipRepository.findAllByIdUserId(userId).stream()
-                    .anyMatch(OrgUnitMembership::isLead))
+                    .anyMatch(OwnerScopeService::isOversightSeat))
         .orElse(false);
   }
 
   /**
-   * #364 effective scope for the blueprint-availability overview, encoded as a {@link
-   * ScopePredicate} so the aggregation reuses the same three-field shape as the staffel-scoped list
-   * queries. Unlike {@link #currentScopePredicate()} — which returns the union of <em>all</em> of a
-   * non-admin's memberships — this restricts a non-admin to the org units they have oversight over,
-   * mirroring {@link #canAccessBlueprintOverview()}:
+   * #364 effective scope for the blueprint-availability overview <em>and</em> the org-unit bank
+   * balance-view (F1, REQ-BANK-021), encoded as a {@link ScopePredicate} so the aggregation reuses
+   * the same three-field shape as the staffel-scoped list queries. Unlike {@link
+   * #currentScopePredicate()} — which returns the union of <em>all</em> of a non-admin's
+   * memberships — this restricts a non-admin to the org units they have oversight over, mirroring
+   * {@link #canAccessBlueprintOverview()}. This is the <b>cascading</b> (view) scope — it drills
+   * down into subordinate units:
    *
    * <ul>
    *   <li>admin → delegates to {@link #currentScopePredicate()} (all org units, or the pinned one);
    *   <li>officer → their own Staffel (via {@link #readPersistentSquadronFromUser()});
    *   <li>SK lead → every SK they lead;
+   *   <li>Bereichsleitung → their Bereich <em>and</em> every Staffel/SK of it; OL member → every
+   *       org unit — the cascading, officer-equivalent reach (epic #692 Phase 6, REQ-ORG-015) via
+   *       {@link OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}, which also
+   *       contributes the Bereich/OL seat itself so the caller's own AREA/CARTEL account is in
+   *       scope. Never an admin-all marker (the HARD INVARIANT);
    *   <li>an active pin is honoured only when it points at one of those oversight org units,
    *       otherwise it is ignored and the full oversight union applies.
    * </ul>
@@ -382,10 +392,15 @@ public class OwnerScopeService {
    * <p>A caller with an empty oversight set (e.g. a plain member who reached the service despite
    * the gate) yields {@code memberOrgUnitIds = {}}, which the aggregation treats as "no rows".
    *
-   * @return a never-null scope vector of the org units whose blueprints the caller may oversee.
+   * <p>This cascading scope is for <b>reads</b> (view). The own-level write scope a
+   * Bereichsleitung/OL may raise a bank booking request against (F2, REQ-BANK-022, owner decision
+   * Q4) is {@link #currentOwnLevelOversightScope()} — deliberately <em>not</em> cascaded, so a
+   * subordinate account reached by drill-down is view-only.
+   *
+   * @return a never-null cascading scope vector of the org units whose data the caller may oversee.
    */
   @NotNull
-  public ScopePredicate currentBlueprintOversightScope() {
+  public ScopePredicate currentOversightScope() {
     if (authHelper.isAdmin()) {
       return currentScopePredicate();
     }
@@ -397,17 +412,96 @@ public class OwnerScopeService {
         .currentUserId()
         .ifPresent(
             userId -> {
-              for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userId)) {
+              List<OrgUnitMembership> memberships =
+                  orgUnitMembershipRepository.findAllByIdUserId(userId);
+              for (OrgUnitMembership m : memberships) {
                 if (m.isLead()) {
                   oversightOrgUnitIds.add(m.getId().getOrgUnitId());
                 }
               }
+              // Epic #692 Phase 6 (REQ-ORG-015/-019): a Bereichsleitung member oversees their
+              // Bereich + its Staffeln/SKs, an OL member every org unit — the cascading,
+              // officer-equivalent reach (never admin). cascadedOfficerReach also contributes the
+              // Bereich/OL seat itself, so the caller's own AREA/CARTEL account is in scope.
+              oversightOrgUnitIds.addAll(orgUnitCascadeService.cascadedOfficerReach(memberships));
             });
     Optional<UUID> pinned = readActiveSquadronFromHeader();
     if (pinned.isPresent() && oversightOrgUnitIds.contains(pinned.get())) {
       return new ScopePredicate(false, pinned.get(), Set.of());
     }
     return new ScopePredicate(false, null, oversightOrgUnitIds);
+  }
+
+  /**
+   * Epic #692 Phase 6 (REQ-BANK-022, owner decision Q4): the caller's <b>own-level</b> oversight
+   * seats, encoded as a {@link ScopePredicate}. This is the write-side companion of {@link
+   * #currentOversightScope()} and is deliberately <em>not</em> cascaded — it names only the org
+   * units the caller leads at their own level, never the descendants they may merely view:
+   *
+   * <ul>
+   *   <li>admin → delegates to {@link #currentScopePredicate()} (all org units, or the pinned one);
+   *   <li>officer → their own Staffel (the squadron {@code ORG_UNIT} account);
+   *   <li>SK lead → every SK they lead (its {@code ORG_UNIT} account);
+   *   <li>Bereichsleitung → their Bereich (its {@code AREA} account) — but <em>not</em> the child
+   *       Staffel/SK accounts;
+   *   <li>OL member → the Organisationsleitung (the {@code CARTEL} account) — but <em>not</em> the
+   *       AREA/ORG_UNIT accounts below it.
+   * </ul>
+   *
+   * <p>This backs the org-unit bank booking-request gate ({@code
+   * OrgUnitBankAccessService.createBookingRequest}): a Bereichsleitung/OL may raise a
+   * confirm-before-post request only against their own-level account, while subordinate accounts
+   * reached through the cascading view ({@link #currentOversightScope()}) stay view-only. The
+   * officer flow from epic #666 is unchanged — an officer's own-level scope is exactly their
+   * Staffel, as before. An active pin is honoured only when it points at one of the caller's
+   * own-level seats.
+   *
+   * @return a never-null, non-cascaded scope vector of the caller's own-level oversight seats.
+   */
+  @NotNull
+  public ScopePredicate currentOwnLevelOversightScope() {
+    if (authHelper.isAdmin()) {
+      return currentScopePredicate();
+    }
+    Set<UUID> ownLevelOrgUnitIds = new LinkedHashSet<>();
+    if (authHelper.hasReachableRole("ROLE_OFFICER")) {
+      readPersistentSquadronFromUser().ifPresent(ownLevelOrgUnitIds::add);
+    }
+    authHelper
+        .currentUserId()
+        .ifPresent(
+            userId -> {
+              for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userId)) {
+                if (isOversightSeat(m)) {
+                  ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
+                }
+              }
+            });
+    Optional<UUID> pinned = readActiveSquadronFromHeader();
+    if (pinned.isPresent() && ownLevelOrgUnitIds.contains(pinned.get())) {
+      return new ScopePredicate(false, pinned.get(), Set.of());
+    }
+    return new ScopePredicate(false, null, ownLevelOrgUnitIds);
+  }
+
+  /**
+   * {@code true} iff the membership is an <em>oversight seat</em> — one that confers
+   * officer-equivalent oversight over its own org unit (and, for Bereich/OL, cascading reach below
+   * it). These are the SK-lead seat ({@code is_lead}) and the Bereichsleitung / OL seats (epic #692
+   * Phase 6, REQ-ORG-015). A plain Staffel/SK membership or a flag-less Bereich/OL seat is not an
+   * oversight seat. Shared by {@link #canAccessBlueprintOverview()} and {@link
+   * #currentOwnLevelOversightScope()} so the gate and the own-level scope agree on what "oversight"
+   * means.
+   *
+   * @param m the membership row to classify; never {@code null}.
+   * @return {@code true} iff the membership grants own-level oversight over its org unit.
+   */
+  private static boolean isOversightSeat(@NotNull OrgUnitMembership m) {
+    return m.isLead()
+        || m.isBereichsleiter()
+        || m.isBereichskoordinator()
+        || m.isBereichsoperator()
+        || m.isOlMember();
   }
 
   /**

@@ -24,7 +24,7 @@ We will **keep `BankSecurityService` and the ledger 100% org-unit-blind** and is
 org-unit logic in a single, deliberately **non-`Bank*`-named** service,
 `OrgUnitBankAccessService`. Because the ArchUnit rule keys on the `Bank` name prefix, this
 seam may inject `OwnerScopeService` (using the existing oversight scope,
-`currentBlueprintOversightScope()`) without weakening the rule for any bank class. A
+`currentOversightScope()`) without weakening the rule for any bank class. A
 complementary positive ArchUnit pin — `orgUnitAwareBankSeamIsContainedToOneClass` — asserts
 that the seam is the **only** class that depends on both `OwnerScopeService` and the bank
 accounts repository, so a future accidental bridge fails the build. The officer/lead surface

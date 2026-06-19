@@ -32284,6 +32284,106 @@
         }
       }
     },
+    "/api/v1/org-units/active-all-kinds" : {
+      "get" : {
+        "tags" : [ "org-unit-controller" ],
+        "summary" : "List every active org unit of all kinds (incl. Bereich + OL)",
+        "description" : "Returns active Staffeln, Spezialkommandos, Bereiche and the Organisationsleitung as picker options. Drives the bank-management create form that links an AREA account to its Bereich and the CARTEL account to the OL. Authenticated; carries no PII.",
+        "operationId" : "listActiveOrgUnitsAllKinds",
+        "responses" : {
+          "200" : {
+            "description" : "Active org-unit options",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/OrgUnitMembershipOptionDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/org-chart" : {
       "get" : {
         "tags" : [ "org-chart-controller" ],
@@ -47983,6 +48083,9 @@
           },
           "balance" : {
             "type" : "number"
+          },
+          "canRequest" : {
+            "type" : "boolean"
           }
         }
       },

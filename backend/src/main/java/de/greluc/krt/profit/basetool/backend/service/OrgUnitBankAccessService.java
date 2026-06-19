@@ -54,10 +54,20 @@ import org.springframework.transaction.annotation.Transactional;
  * without weakening the bank's independence — the {@code BankSecurityService} stays 100%
  * org-unit-blind.
  *
- * <p>"Officer or lead of an org unit" is the existing oversight scope ({@link
- * OwnerScopeService#currentBlueprintOversightScope()}): an officer oversees their own Staffel, an
- * SK lead oversees the Spezialkommando(s) they lead, and an admin oversees all org units (or the
- * one they pinned). A plain member resolves to an empty oversight scope and therefore sees nothing.
+ * <p>Two oversight scopes feed the two features, split since epic #692 Phase 6 (owner decision Q4):
+ *
+ * <ul>
+ *   <li><b>F1 view — cascading</b> ({@link OwnerScopeService#currentOversightScope()}): an officer
+ *       oversees their own Staffel; an SK lead the SK(s) they lead; a Bereichsleitung its Bereich's
+ *       AREA account <em>and</em> every child Staffel/SK account; an OL member the CARTEL account
+ *       plus every AREA/ORG_UNIT account; an admin all (or the pinned one). A plain member resolves
+ *       to an empty scope and sees nothing.
+ *   <li><b>F2 request — own-level only</b> ({@link
+ *       OwnerScopeService#currentOwnLevelOversightScope()}): the same callers may raise a
+ *       confirm-before-post request only against their <em>own-level</em> account (officer →
+ *       Staffel, Bereichsleitung → AREA, OL → CARTEL); subordinate accounts reached by the F1
+ *       drill-down are view-only.
+ * </ul>
  */
 @Service
 @RequiredArgsConstructor
@@ -70,23 +80,32 @@ public class OrgUnitBankAccessService {
   private final BankBookingRequestService bankBookingRequestService;
 
   /**
-   * Lists the current balance of every org-unit bank account the caller oversees (REQ-BANK-021,
-   * F1).
+   * Lists the current balance of every bank account the caller oversees (REQ-BANK-021, F1).
    *
-   * <p>Resolves the caller's oversight scope and keeps only the {@code ORG_UNIT} accounts whose
-   * owning org unit that scope permits. The balance is the compute-on-read posting sum (ADR-0010),
-   * fetched for all matched accounts in a single grouped query (no N+1). The result is balance-only
-   * — no history, no holders, no audit — and excludes overseen org units that own no account. A
-   * caller with no oversight scope (plain member) receives an empty list rather than an error, so
-   * the endpoint never leaks the existence of accounts the caller may not see.
+   * <p>Resolves the caller's <em>cascading</em> oversight scope ({@link
+   * OwnerScopeService#currentOversightScope()}) and keeps only the accounts whose owning org unit
+   * that scope permits. Since epic #692 Phase 6 (REQ-ORG-019) the owning org unit is the uniform
+   * {@code org_unit_id} FK across all linked account kinds — a Staffel/SK for {@code ORG_UNIT}, the
+   * Bereich for {@code AREA}, the Organisationsleitung for {@code CARTEL} — so a Bereichsleitung
+   * sees its AREA account <em>and</em> every child Staffel/SK account, and an OL member sees the
+   * CARTEL account plus every AREA and ORG_UNIT account, all through the same filter with no
+   * per-kind branching. Strict silo holds: the cascade only contributes the caller's own subtree,
+   * so a foreign Bereich's accounts are never matched. Legacy {@code area_name}-only AREA accounts
+   * (no FK) carry no owning org unit and are excluded.
    *
-   * @return the overseen org-unit balances, ordered by account number; never {@code null}, empty
+   * <p>The balance is the compute-on-read posting sum (ADR-0010), fetched for all matched accounts
+   * in a single grouped query (no N+1). The result is balance-only — no history, no holders, no
+   * audit — and excludes overseen org units that own no account. A caller with no oversight scope
+   * (plain member) receives an empty list rather than an error, so the endpoint never leaks the
+   * existence of accounts the caller may not see.
+   *
+   * @return the overseen account balances, ordered by account number; never {@code null}, empty
    *     when the caller oversees no org unit that owns an account
    */
   @NotNull
   @Transactional(readOnly = true)
   public List<OrgUnitBankBalanceDto> listOverseenOrgUnitBalances() {
-    var scope = ownerScopeService.currentBlueprintOversightScope();
+    var scope = ownerScopeService.currentOversightScope();
     List<BankAccount> overseen =
         bankAccountRepository.findAllByOrderByAccountNoAsc().stream()
             .filter(account -> account.getOrgUnit() != null)
@@ -95,31 +114,52 @@ public class OrgUnitBankAccessService {
     if (overseen.isEmpty()) {
       return List.of();
     }
+    // The own-level (non-cascading) scope decides which of the overseen accounts the caller may
+    // also
+    // raise a booking request against (F2, owner decision Q4): their own-level account is
+    // requestable
+    // while subordinate accounts reached by the cascade above are view-only.
+    var requestScope = ownerScopeService.currentOwnLevelOversightScope();
     Map<UUID, BigDecimal> balances = balancesByAccountId(overseen);
     return overseen.stream()
-        .map(account -> toDto(account, balances.getOrDefault(account.getId(), BigDecimal.ZERO)))
+        .map(
+            account ->
+                toDto(
+                    account,
+                    balances.getOrDefault(account.getId(), BigDecimal.ZERO),
+                    requestScope.permits(account.getOrgUnit().getId())))
         .toList();
   }
 
   /**
-   * Raises a confirm-before-post booking request for the caller's overseen org unit (REQ-BANK-022,
-   * F2). Enforces the org-unit half of the authorization here — the caller must oversee the named
-   * org unit (officer of it / lead of it / admin) — then resolves the org unit to its bank account
-   * and delegates the actual persistence to the org-unit-blind {@link BankBookingRequestService}.
-   * The scope check runs <em>before</em> the account lookup so an out-of-scope org unit never even
-   * reveals whether it owns an account.
+   * Raises a confirm-before-post booking request for the caller's <b>own-level</b> org unit
+   * (REQ-BANK-022, F2). Enforces the org-unit half of the authorization here — the caller must hold
+   * the named org unit as an own-level oversight seat (officer of their Staffel / lead of an SK /
+   * Bereichsleitung of their Bereich → its AREA account / OL member → the CARTEL account / admin) —
+   * then resolves the org unit to its bank account and delegates the actual persistence to the
+   * org-unit-blind {@link BankBookingRequestService}. The scope check runs <em>before</em> the
+   * account lookup so an out-of-scope org unit never even reveals whether it owns an account.
+   *
+   * <p>Crucially this uses the <em>own-level</em> scope ({@link
+   * OwnerScopeService#currentOwnLevelOversightScope()}), NOT the cascading view scope of {@link
+   * #listOverseenOrgUnitBalances()}: a Bereichsleitung/OL may <em>view</em> every subordinate
+   * account but may raise a request only against their own-level account (owner decision Q4). A
+   * request targeting a subordinate account is therefore rejected as out-of-scope, and the
+   * epic-#666 officer flow (request against the officer's own Staffel) is unchanged.
    *
    * @param request the create payload (org unit, type, amount, note)
    * @return the created pending request
-   * @throws AccessDeniedException when the caller does not oversee the named org unit
+   * @throws AccessDeniedException when the caller does not hold the named org unit at their own
+   *     level
    * @throws NotFoundException when the org unit owns no bank account
    */
   @NotNull
   @Transactional
   public BankBookingRequestDto createBookingRequest(@NotNull CreateBankBookingRequest request) {
-    var scope = ownerScopeService.currentBlueprintOversightScope();
+    var scope = ownerScopeService.currentOwnLevelOversightScope();
     if (!scope.permits(request.orgUnitId())) {
-      throw new AccessDeniedException("The caller does not oversee the requested org unit");
+      throw new AccessDeniedException(
+          "The caller may not raise a booking request for the requested org unit");
     }
     BankAccount account =
         bankAccountRepository
@@ -177,10 +217,13 @@ public class OrgUnitBankAccessService {
    *
    * @param account the org-unit account (its {@code orgUnit} is non-null by the list filter)
    * @param balance the account's resolved balance, zero when it has no postings
+   * @param canRequest {@code true} iff the account is the caller's own-level account (the F2
+   *     request affordance applies); {@code false} for a view-only subordinate account
    * @return the balance-only DTO for the account's owning org unit
    */
   @NotNull
-  private OrgUnitBankBalanceDto toDto(@NotNull BankAccount account, @NotNull BigDecimal balance) {
+  private OrgUnitBankBalanceDto toDto(
+      @NotNull BankAccount account, @NotNull BigDecimal balance, boolean canRequest) {
     OrgUnit orgUnit = account.getOrgUnit();
     return new OrgUnitBankBalanceDto(
         account.getId(),
@@ -191,6 +234,7 @@ public class OrgUnitBankAccessService {
         orgUnit.getName(),
         orgUnit.getShorthand(),
         orgUnit.getKind(),
-        balance);
+        balance,
+        canRequest);
   }
 }

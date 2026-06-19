@@ -707,7 +707,7 @@ class ArchitectureTest {
             // (OwnerScopeService.hasRoleInOrgUnit), so the service must wire both.
             "MaterialClaimService",
             // #364: the blueprint availability overview filters the aggregate to the caller's
-            // oversight org units via OwnerScopeService.currentBlueprintOversightScope().
+            // oversight org units via OwnerScopeService.currentOversightScope().
             "PersonalBlueprintOverviewService");
 
     String authHelper = "de.greluc.krt.profit.basetool.backend.service.AuthHelperService";

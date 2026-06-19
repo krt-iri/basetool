@@ -86,7 +86,8 @@ class OrgUnitBankPageControllerMvcTest {
             "IRIDIUM",
             "IRI",
             "SQUADRON",
-            new BigDecimal("1850000"));
+            new BigDecimal("1850000"),
+            true);
     BankBookingRequestDto request =
         new BankBookingRequestDto(
             UUID.randomUUID(),

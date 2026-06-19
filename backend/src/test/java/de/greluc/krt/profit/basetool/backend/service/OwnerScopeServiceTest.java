@@ -166,6 +166,27 @@ class OwnerScopeServiceTest {
     return m;
   }
 
+  /**
+   * Returns a Bereich membership row (no leadership flags set) for the given user + Bereich; the
+   * caller flips {@code isBereichsleiter}/-koordinator/-operator to make it an oversight seat (epic
+   * #692 Phase 6).
+   */
+  private static OrgUnitMembership bereichMembershipRow(UUID userId, UUID bereichId) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, bereichId));
+    m.setKind(OrgUnitKind.BEREICH);
+    return m;
+  }
+
+  /** Returns an OL membership row with {@code is_ol_member} set for the given user + OL. */
+  private static OrgUnitMembership olMembershipRow(UUID userId, UUID olId) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, olId));
+    m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
+    m.setOlMember(true);
+    return m;
+  }
+
   @Nested
   class CurrentSquadronIdTests {
 
@@ -1679,17 +1700,57 @@ class OwnerScopeServiceTest {
 
       assertFalse(service.canAccessBlueprintOverview());
     }
+
+    @Test
+    void bereichLeader_canAccess() {
+      // Epic #692 Phase 6: a Bereichsleitung seat is an oversight seat — it unlocks the overview.
+      OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
+      bereichSeat.setBereichsleiter(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(bereichSeat));
+
+      assertTrue(service.canAccessBlueprintOverview());
+    }
+
+    @Test
+    void olMember_canAccess() {
+      OrgUnitMembership olSeat = olMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(olSeat));
+
+      assertTrue(service.canAccessBlueprintOverview());
+    }
+
+    @Test
+    void flaglessBereichSeat_isDenied() {
+      // A chart-only (flag-less) Bereich seat — an SK-Leiter's organisational membership
+      // (REQ-ORG-017, owner Q1) — is NOT an oversight seat and must not unlock the overview.
+      OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(flaglessBereich));
+
+      assertFalse(service.canAccessBlueprintOverview());
+    }
   }
 
   @Nested
-  class CurrentBlueprintOversightScopeTests {
+  class CurrentOversightScopeTests {
 
     @Test
     void adminWithoutPin_allScope() {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      ScopePredicate scope = service.currentBlueprintOversightScope();
+      ScopePredicate scope = service.currentOversightScope();
 
       assertTrue(scope.adminAllScope());
       assertNull(scope.activeOrgUnitId());
@@ -1702,7 +1763,7 @@ class OwnerScopeServiceTest {
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
-      ScopePredicate scope = service.currentBlueprintOversightScope();
+      ScopePredicate scope = service.currentOversightScope();
 
       assertFalse(scope.adminAllScope());
       assertEquals(SQUADRON_B_ID, scope.activeOrgUnitId());
@@ -1721,7 +1782,7 @@ class OwnerScopeServiceTest {
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      ScopePredicate scope = service.currentBlueprintOversightScope();
+      ScopePredicate scope = service.currentOversightScope();
 
       assertFalse(scope.adminAllScope());
       assertNull(scope.activeOrgUnitId());
@@ -1740,7 +1801,7 @@ class OwnerScopeServiceTest {
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      ScopePredicate scope = service.currentBlueprintOversightScope();
+      ScopePredicate scope = service.currentOversightScope();
 
       // Their Staffel is NOT in scope (they are not an officer there); only the led SK is.
       assertEquals(Set.of(skId), scope.memberOrgUnitIds());
@@ -1761,7 +1822,7 @@ class OwnerScopeServiceTest {
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      ScopePredicate scope = service.currentBlueprintOversightScope();
+      ScopePredicate scope = service.currentOversightScope();
 
       assertEquals(Set.of(SQUADRON_A_ID, skId), scope.memberOrgUnitIds());
     }
@@ -1779,7 +1840,7 @@ class OwnerScopeServiceTest {
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_A_ID.toString());
 
-      ScopePredicate scope = service.currentBlueprintOversightScope();
+      ScopePredicate scope = service.currentOversightScope();
 
       assertEquals(SQUADRON_A_ID, scope.activeOrgUnitId());
       assertTrue(scope.memberOrgUnitIds().isEmpty());
@@ -1798,7 +1859,7 @@ class OwnerScopeServiceTest {
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
-      ScopePredicate scope = service.currentBlueprintOversightScope();
+      ScopePredicate scope = service.currentOversightScope();
 
       assertNull(scope.activeOrgUnitId());
       assertEquals(Set.of(SQUADRON_A_ID), scope.memberOrgUnitIds());
@@ -1813,10 +1874,139 @@ class OwnerScopeServiceTest {
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      ScopePredicate scope = service.currentBlueprintOversightScope();
+      ScopePredicate scope = service.currentOversightScope();
 
       assertFalse(scope.adminAllScope());
       assertNull(scope.activeOrgUnitId());
+      assertTrue(scope.memberOrgUnitIds().isEmpty());
+    }
+
+    @Test
+    void bereichLeader_viewScopeCascadesToBereichAndChildren() {
+      // Epic #692 Phase 6: the view (F1) scope drills down — a Bereichsleitung oversees its Bereich
+      // (its AREA account) AND every child Staffel/SK (their ORG_UNIT accounts), via the cascade.
+      UUID bereichId = UUID.randomUUID();
+      UUID childStaffelId = UUID.randomUUID();
+      OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
+      bereichSeat.setBereichsleiter(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(bereichSeat));
+      when(orgUnitCascadeService.cascadedOfficerReach(any()))
+          .thenReturn(Set.of(bereichId, childStaffelId));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentOversightScope();
+
+      assertFalse(scope.adminAllScope());
+      assertEquals(Set.of(bereichId, childStaffelId), scope.memberOrgUnitIds());
+    }
+  }
+
+  /**
+   * Epic #692 Phase 6 (REQ-BANK-022, owner decision Q4): the own-level (write) oversight scope is
+   * deliberately NOT cascaded — it names only the caller's own-level leadership seats, so a
+   * Bereichsleitung/OL may raise a bank booking request against their own AREA/CARTEL account but
+   * not against the subordinate accounts they may merely view (those reach them through the
+   * cascading {@link OwnerScopeService#currentOversightScope()} instead).
+   */
+  @Nested
+  class CurrentOwnLevelOversightScopeTests {
+
+    @Test
+    void adminWithoutPin_allScope() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentOwnLevelOversightScope();
+
+      assertTrue(scope.adminAllScope());
+    }
+
+    @Test
+    void officer_ownLevelIsTheirStaffel() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      // The officer's own Staffel is sourced from readPersistentSquadronFromUser (kind=SQUADRON).
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentOwnLevelOversightScope();
+
+      assertEquals(Set.of(SQUADRON_A_ID), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void skLead_ownLevelIsLedSk() {
+      UUID skId = UUID.randomUUID();
+      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
+      lead.setLead(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentOwnLevelOversightScope();
+
+      assertEquals(Set.of(skId), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void bereichLeader_ownLevelIsBereichOnly_notChildrenAndNeverCascades() {
+      UUID bereichId = UUID.randomUUID();
+      OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
+      bereichSeat.setBereichsleiter(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(bereichSeat));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentOwnLevelOversightScope();
+
+      // Only the Bereich (its AREA account) — NOT the child Staffel/SK accounts.
+      assertEquals(Set.of(bereichId), scope.memberOrgUnitIds());
+      // The own-level scope must never apply the descendant cascade.
+      verify(orgUnitCascadeService, never()).cascadedOfficerReach(any());
+    }
+
+    @Test
+    void olMember_ownLevelIsOlSeatOnly() {
+      UUID olId = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(olMembershipRow(MEMBER_USER_ID, olId)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentOwnLevelOversightScope();
+
+      assertEquals(Set.of(olId), scope.memberOrgUnitIds());
+    }
+
+    @Test
+    void plainMemberOrFlaglessBereichSeat_emptyOwnLevel() {
+      OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), flaglessBereich));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentOwnLevelOversightScope();
+
       assertTrue(scope.memberOrgUnitIds().isEmpty());
     }
   }

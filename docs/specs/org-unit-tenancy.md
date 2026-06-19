@@ -321,7 +321,7 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 > `currentMemberOrgUnitIds()`, so it flows into `currentScopePredicate()` (all org-scoped aggregate
 > lists + per-row `canSee*`/`canEdit*` gates: mission, hangar, inventory, refinery, operation,
 > job-order) and the Job-Order profit gate `canViewJobOrders()`. The JWT-authority cascade ships in
-> the same phase. **Deferred to Phase 6 (#699):** `currentBlueprintOversightScope()` is **not** yet
+> the same phase. **Deferred to Phase 6 (#699):** `currentOversightScope()` is **not** yet
 > cascaded — it is shared by the bank seam (`OrgUnitBankAccessService`), where Q4 requires the
 > balance **view** to cascade down but deposit/withdrawal **requests** to stay own-level only
 > (REQ-BANK-027). Widening that one method atomically with the bank's read/write split belongs to the

@@ -42,8 +42,13 @@ import org.jetbrains.annotations.Nullable;
  * @param orgUnitName the owning org unit's long-form name
  * @param orgUnitShorthand the owning org unit's 3–5 letter shorthand, or {@code null} for a legacy
  *     row without one
- * @param orgUnitKind the owning org unit's kind (SQUADRON / SPECIAL_COMMAND), for styling
+ * @param orgUnitKind the owning org unit's kind (SQUADRON / SPECIAL_COMMAND / BEREICH /
+ *     ORGANISATIONSLEITUNG), for styling
  * @param balance the account's current balance in whole aUEC (compute-on-read, ADR-0010)
+ * @param canRequest {@code true} iff this is the caller's <em>own-level</em> account, so the F2
+ *     booking-request affordance applies (epic #692 Phase 6, owner decision Q4). {@code false} for
+ *     a subordinate account reached through the cascading view — those are view-only, and the
+ *     backend rejects a request against them.
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
@@ -54,4 +59,5 @@ public record OrgUnitBankBalanceDto(
     String orgUnitName,
     @Nullable String orgUnitShorthand,
     OrgUnitKind orgUnitKind,
-    BigDecimal balance) {}
+    BigDecimal balance,
+    boolean canRequest) {}

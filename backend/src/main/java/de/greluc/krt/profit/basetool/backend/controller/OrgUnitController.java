@@ -89,4 +89,30 @@ public class OrgUnitController {
   public List<OrgUnitMembershipOptionDto> listActiveOrgUnits() {
     return orgUnitMembershipService.listAllActiveOptions();
   }
+
+  /**
+   * Lists every active org unit of <em>all four</em> kinds (Staffel + Spezialkommando + Bereich +
+   * Organisationsleitung) as picker options (epic #692 Phase 6, REQ-ORG-019). Drives the
+   * bank-management account-create form, which links an {@code AREA} account to its Bereich and the
+   * {@code CARTEL} account to the Organisationsleitung. {@code isAuthenticated}: unlike the public
+   * {@link #listActiveOrgUnits()} (whose Staffel/SK-only list backs the anonymous Job-Order form),
+   * this surfaces the Bereich/OL tiers and is gated to authenticated callers — the consumer is the
+   * BANK_MANAGEMENT create form; the payload carries no PII.
+   *
+   * @return active org-unit options across all four kinds, grouped by tier.
+   */
+  @GetMapping("/active-all-kinds")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  @Operation(
+      summary = "List every active org unit of all kinds (incl. Bereich + OL)",
+      description =
+          "Returns active Staffeln, Spezialkommandos, Bereiche and the Organisationsleitung as"
+              + " picker options. Drives the bank-management create form that links an AREA account"
+              + " to its Bereich and the CARTEL account to the OL. Authenticated; carries no PII.")
+  @ApiResponses(
+      value = {@ApiResponse(responseCode = "200", description = "Active org-unit options")})
+  public List<OrgUnitMembershipOptionDto> listActiveOrgUnitsAllKinds() {
+    return orgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds();
+  }
 }

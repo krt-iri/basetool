@@ -35,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
@@ -107,6 +109,25 @@ class BankAccountServiceTest {
   }
 
   @Test
+  void createAccount_orgUnit_rejectsBereichOrOlKind() {
+    // Epic #692 Phase 6 (REQ-ORG-019): an ORG_UNIT account must reference a Staffel/SK — a Bereich
+    // belongs to an AREA account and the OL to the CARTEL account. Without this guard the ORG_UNIT
+    // account would consume the Bereich/OL's one-account slot (symmetric with the AREA/CARTEL
+    // guards).
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            bankAccountService.createAccount(
+                new CreateBankAccountRequest("X", BankAccountType.ORG_UNIT, bereichId, null)));
+    verify(accountRepository, never()).save(any());
+  }
+
+  @Test
   void createAccount_secondAccountForSameOrgUnitIsRejected() {
     // Given
     UUID orgUnitId = UUID.randomUUID();
@@ -137,20 +158,99 @@ class BankAccountServiceTest {
   }
 
   @Test
-  void createAccount_area_requiresAreaNameAndForbidsOrgUnit() {
-    // When / Then: missing area name
+  void createAccount_area_requiresBereichFkAndForbidsAreaNameAndNonBereich() {
+    // Epic #692 (REQ-ORG-019): an AREA account is owned by its Bereich via the org_unit FK.
+    // Missing org unit → 400.
     assertThrows(
         BadRequestException.class,
         () ->
             bankAccountService.createAccount(
                 new CreateBankAccountRequest("Bereich Profit", BankAccountType.AREA, null, null)));
-    // And: org unit on an AREA account
+    // A free-form area name is no longer accepted on creation → 400 (checked before the FK lookup).
     assertThrows(
         BadRequestException.class,
         () ->
             bankAccountService.createAccount(
                 new CreateBankAccountRequest(
                     "Bereich Profit", BankAccountType.AREA, UUID.randomUUID(), "Profit")));
+    // The referenced org unit must be a Bereich, not a Staffel/SK → 400.
+    UUID staffelId = UUID.randomUUID();
+    Squadron staffel = new Squadron();
+    staffel.setId(staffelId);
+    when(orgUnitRepository.findById(staffelId)).thenReturn(Optional.of(staffel));
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            bankAccountService.createAccount(
+                new CreateBankAccountRequest(
+                    "Bereich Profit", BankAccountType.AREA, staffelId, null)));
+    verify(accountRepository, never()).save(any());
+  }
+
+  @Test
+  void createAccount_area_linksBereichAndRejectsDuplicate() {
+    // Given a Bereich that owns no account yet
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+    when(accountRepository.existsByOrgUnitId(bereichId)).thenReturn(false);
+    when(accountRepository.nextAccountNoValue()).thenReturn(9L);
+    when(accountRepository.save(any(BankAccount.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    // When
+    bankAccountService.createAccount(
+        new CreateBankAccountRequest("Bereich Profit", BankAccountType.AREA, bereichId, null));
+
+    // Then the account is linked to the Bereich via the org_unit FK (not the area name)
+    ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
+    verify(accountRepository).save(saved.capture());
+    assertEquals(bereichId, saved.getValue().getOrgUnit().getId());
+    assertEquals(null, saved.getValue().getAreaName());
+
+    // And a second account for the same Bereich is rejected (one account per org unit)
+    when(accountRepository.existsByOrgUnitId(bereichId)).thenReturn(true);
+    assertThrows(
+        DuplicateEntityException.class,
+        () ->
+            bankAccountService.createAccount(
+                new CreateBankAccountRequest(
+                    "Bereich Profit 2", BankAccountType.AREA, bereichId, null)));
+  }
+
+  @Test
+  void createAccount_cartel_linksOrganisationsleitungAndRejectsNonOl() {
+    // The singleton CARTEL account maps to the Organisationsleitung via the org_unit FK.
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    when(accountRepository.existsByType(BankAccountType.CARTEL)).thenReturn(false);
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+    when(accountRepository.existsByOrgUnitId(olId)).thenReturn(false);
+    when(accountRepository.nextAccountNoValue()).thenReturn(1L);
+    when(accountRepository.save(any(BankAccount.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    bankAccountService.createAccount(
+        new CreateBankAccountRequest("DAS KARTELL", BankAccountType.CARTEL, olId, null));
+
+    ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
+    verify(accountRepository).save(saved.capture());
+    assertEquals(olId, saved.getValue().getOrgUnit().getId());
+
+    // A non-OL org unit on the CARTEL account is rejected.
+    UUID staffelId = UUID.randomUUID();
+    Squadron staffel = new Squadron();
+    staffel.setId(staffelId);
+    when(accountRepository.existsByType(BankAccountType.CARTEL)).thenReturn(false);
+    when(orgUnitRepository.findById(staffelId)).thenReturn(Optional.of(staffel));
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            bankAccountService.createAccount(
+                new CreateBankAccountRequest(
+                    "DAS KARTELL", BankAccountType.CARTEL, staffelId, null)));
   }
 
   @Test

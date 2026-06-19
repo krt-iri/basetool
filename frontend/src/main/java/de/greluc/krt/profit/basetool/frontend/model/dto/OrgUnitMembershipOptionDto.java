@@ -31,9 +31,12 @@ import java.util.UUID;
  * @param orgUnitId Identifier of the org unit (used as the {@code <option value="...">}).
  * @param orgUnitName Visible name (used as the option label).
  * @param orgUnitShorthand Abbreviated badge text; may be {@code null}.
- * @param kind Discriminator string ({@code SQUADRON} or {@code SPECIAL_COMMAND}) — kept as a plain
- *     string so the frontend does not need a parallel enum that drifts out of sync with the
- *     backend.
+ * @param kind Discriminator string ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH} /
+ *     {@code ORGANISATIONSLEITUNG}) — kept as a plain string so the frontend does not need a
+ *     parallel enum that drifts out of sync with the backend. The {@code
+ *     /api/v1/org-units/active-all-kinds} payload (the bank account-create picker, epic #692 Phase
+ *     6) carries all four kinds; the {@code /users/{id}/memberships} owner-picker only ever sees
+ *     {@code SQUADRON} / {@code SPECIAL_COMMAND}.
  * @param isProfitEligible Whether the org unit may process Job Orders (be the responsible unit).
  *     {@code true} for the entries the Job Order create form keeps in its responsible picker; the
  *     requesting picker offers every entry regardless. {@code null} on the {@code

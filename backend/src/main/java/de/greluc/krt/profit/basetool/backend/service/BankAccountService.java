@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
@@ -201,19 +202,67 @@ public class BankAccountService {
             orgUnitRepository
                 .findById(request.orgUnitId())
                 .orElseThrow(() -> new NotFoundException("Org unit not found"));
+        // Epic #692 Phase 6 (REQ-ORG-019): since Bereich/OL are first-class org_unit rows now, an
+        // ORG_UNIT account must reference a Staffel/SK — a Bereich is an AREA account and the OL
+        // the
+        // CARTEL account. Symmetric with the BEREICH/ORGANISATIONSLEITUNG kind guards below;
+        // without
+        // it an ORG_UNIT account on a Bereich/OL would consume that unit's one-account slot.
+        if (orgUnit.getKind() != OrgUnitKind.SQUADRON
+            && orgUnit.getKind() != OrgUnitKind.SPECIAL_COMMAND) {
+          throw new BadRequestException(
+              "An ORG_UNIT account must reference a Staffel or Spezialkommando");
+        }
         if (accountRepository.existsByOrgUnitId(orgUnit.getId())) {
           throw new DuplicateEntityException("The org unit already owns a bank account");
         }
         account.setOrgUnit(orgUnit);
       }
       case AREA -> {
-        if (request.areaName() == null || request.areaName().isBlank()) {
-          throw new BadRequestException("An AREA account requires an area name");
+        // Epic #692 (REQ-ORG-019, V168): an AREA account is owned by its Bereich via the org_unit
+        // FK, not the legacy free-form area name. The Bereich is a first-class org unit now.
+        if (request.orgUnitId() == null) {
+          throw new BadRequestException("An AREA account requires its Bereich org unit");
         }
-        requireNoOrgUnit(request);
-        account.setAreaName(request.areaName().trim());
+        requireNoAreaName(request);
+        OrgUnit bereich =
+            orgUnitRepository
+                .findById(request.orgUnitId())
+                .orElseThrow(() -> new NotFoundException("Org unit not found"));
+        if (bereich.getKind() != OrgUnitKind.BEREICH) {
+          throw new BadRequestException("An AREA account must reference a Bereich org unit");
+        }
+        if (accountRepository.existsByOrgUnitId(bereich.getId())) {
+          throw new DuplicateEntityException("The Bereich already owns a bank account");
+        }
+        account.setOrgUnit(bereich);
       }
-      case CARTEL, CARTEL_BANK -> {
+      case CARTEL -> {
+        // Epic #692: the singleton CARTEL account is mapped to the Organisationsleitung via the
+        // org_unit FK so an OL member's oversight scope reaches it. The link is optional (a CARTEL
+        // may predate the OL); when supplied it must be the OL and uniqueness is enforced.
+        requireNoAreaName(request);
+        if (accountRepository.existsByType(request.type())) {
+          throw new DuplicateEntityException(
+              "The " + request.type() + " account already exists (singleton)");
+        }
+        if (request.orgUnitId() != null) {
+          OrgUnit ol =
+              orgUnitRepository
+                  .findById(request.orgUnitId())
+                  .orElseThrow(() -> new NotFoundException("Org unit not found"));
+          if (ol.getKind() != OrgUnitKind.ORGANISATIONSLEITUNG) {
+            throw new BadRequestException(
+                "The CARTEL account must reference the Organisationsleitung");
+          }
+          if (accountRepository.existsByOrgUnitId(ol.getId())) {
+            throw new DuplicateEntityException(
+                "The Organisationsleitung already owns a bank account");
+          }
+          account.setOrgUnit(ol);
+        }
+      }
+      case CARTEL_BANK -> {
         requireNoOrgUnit(request);
         requireNoAreaName(request);
         if (accountRepository.existsByType(request.type())) {
@@ -412,24 +461,30 @@ public class BankAccountService {
   }
 
   /**
-   * Rejects an org-unit reference on non-{@code ORG_UNIT} types.
+   * Rejects an org-unit reference on the types that carry none: {@code CARTEL_BANK} and {@code
+   * SPECIAL}. {@code ORG_UNIT} (Staffel/SK), {@code AREA} (Bereich) and {@code CARTEL} (OL) all
+   * carry the org_unit FK and validate it in their own switch branch (epic #692, REQ-ORG-019).
    *
    * @param request the creation payload
    */
   private static void requireNoOrgUnit(@NotNull CreateBankAccountRequest request) {
     if (request.orgUnitId() != null) {
-      throw new BadRequestException("Only an ORG_UNIT account may carry an org unit reference");
+      throw new BadRequestException(
+          "A " + request.type() + " account must not carry an org unit reference");
     }
   }
 
   /**
-   * Rejects an area name on non-{@code AREA} types.
+   * Rejects a free-form area name. Since epic #692 (REQ-ORG-019) an AREA account is owned by its
+   * Bereich via the org_unit FK, so no type accepts an area name on creation — the legacy {@code
+   * areaName} form survives only for rows created before the FK and is never produced here.
    *
    * @param request the creation payload
    */
   private static void requireNoAreaName(@NotNull CreateBankAccountRequest request) {
     if (request.areaName() != null && !request.areaName().isBlank()) {
-      throw new BadRequestException("Only an AREA account may carry an area name");
+      throw new BadRequestException(
+          "A " + request.type() + " account must not carry a free-form area name");
     }
   }
 }
