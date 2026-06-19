@@ -363,15 +363,19 @@ here:
 
 **Acceptance**
 
-- [ ] An OL/Bereich principal fails `isAdmin()` and is rejected by every `hasRole('ADMIN')` gate.
-- [ ] A Bereichsleitung is denied another Bereich's data (lists and detail gates).
-- [ ] A new scoped controller/service is caught by the ArchUnit scope/whitelist rules (a deliberately
+- [x] An OL/Bereich principal fails `isAdmin()` and is rejected by every `hasRole('ADMIN')` gate.
+- [x] A Bereichsleitung is denied another Bereich's data (lists and detail gates).
+- [x] A new scoped controller/service is caught by the ArchUnit scope/whitelist rules (a deliberately
   ungated one fails the build).
 
-**Enforced by (planned):** `OwnerScopeServiceTest`, `ArchitectureTest` (whitelist + no-admin rules),
-visibility-matrix e2e · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:**
-
-# 692, #696, #700.
+**Enforced by:** `OwnerScopeServiceTest` (`CascadingScopeTests`: `cascade_neverSetsAdminAllScope`,
+strict-silo foreign-unit denial, OL concrete-union) and `OrgUnitCascadeServiceTest`;
+`ArchitectureTest` — `cascadeServiceMustNotConsultTheSecurityContext` (the cascade can never branch on
+admin status, so it can never grant admin), the `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
+whitelist (incl. the new `OrgUnitBankAccessService`) and `staffelScopedWriteEndpointsMustGateOnOwnerScopeService`
+(a new ungated scoped endpoint fails the build); and the `OrgHierarchyVisibilityMatrixE2eTest` cross-Bereich
+matrix on the ephemeral stack (Phase 7, `e2e`-label-gated) · **ADR:**
+[ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:** #692, #696, #700.
 
 ## Out of scope
 
