@@ -3059,6 +3059,50 @@ input[type='radio']:focus {
     margin-top: var(--space-8);
 }
 
+/* Collapsible wrapper for the blueprint-availability panel. Keeps .bp-coverage's
+   quiet gray heading register (no orange HUD restyle of .hud-details) and only
+   adds a fold affordance: the section's <h3> rides inside the <summary>, with a
+   +/- marker pinned to the right edge mirroring the .hud-details convention.
+   Renders open by default (the template sets the `open` attribute). */
+.bp-coverage__details {
+    margin: 0;
+}
+
+.bp-coverage__summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    cursor: pointer;
+    list-style: none;
+    padding-bottom: var(--space-2);
+}
+
+.bp-coverage__summary::-webkit-details-marker {
+    display: none;
+}
+
+.bp-coverage__summary > h3 {
+    margin: 0;
+}
+
+.bp-coverage__summary::after {
+    content: '+';
+    margin-left: auto;
+    color: var(--color-primary);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-h3);
+    line-height: 1;
+}
+
+.bp-coverage__details[open] > .bp-coverage__summary::after {
+    content: '\2212'; /* minus sign */
+}
+
+.bp-coverage__summary:focus-visible {
+    outline: var(--border-accent);
+    outline-offset: var(--space-1);
+}
+
 .bp-coverage h3,
 .bp-coverage h4 {
     color: var(--color-gray-1);

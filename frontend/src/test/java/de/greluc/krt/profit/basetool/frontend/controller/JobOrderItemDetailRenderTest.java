@@ -672,6 +672,10 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("discreet not-a-member hint shown for the global-sharer owner (REQ-INV-018)")
         .contains("kein Einheitsmitglied");
+    assertThat(html)
+        .as("coverage panel is rendered inside a collapsible details, expanded by default")
+        .contains("data-testid=\"blueprint-owners-details\"")
+        .contains("bp-coverage__summary");
   }
 
   @Test
