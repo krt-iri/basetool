@@ -138,9 +138,14 @@ enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), ap
 > **Amended by epic #692 (REQ-ORG-015):** membership in a Bereich's Bereichsleitung or the OL grants
 > **officer-equivalent reach** over the subordinate units, **never admin rights** — every carve-out in
 > this requirement stays `hasRole('ADMIN')`, and an OL/Bereich principal must never satisfy `isAdmin()`.
-> Bereichsleitung inherits the OFFICER promotion-maintenance carve-out for the **Staffeln** in its
-> Bereich (via the normal officer path, not a widened promotion scope); Bereich/OL never own promotion
-> data and SKs stay permanently excluded.
+> **Promotion does NOT cascade (Phase 3 / #696):** the cascade mints the flat `ROLE_LOGISTICIAN` /
+> `ROLE_MISSION_MANAGER` (mirroring the SK-lead precedent), **not** `ROLE_OFFICER`, and a non-admin
+> Bereichsleitung/OL member holds no Staffel membership (REQ-ORG-017), so `currentSquadronId()` is empty
+> → `hasPromotionReadAccess()` is `false` and the OFFICER-gated promotion-topic write paths reject them.
+> Promotion therefore stays **squadron-OFFICER-only** (consistent with "promotion stays Squadron-only");
+> Bereich/OL never own promotion data and SKs stay permanently excluded. This fail-closed boundary is
+> deliberate — widening promotion maintenance to Bereichsleitung is out of scope and would need an
+> explicit owner decision.
 
 ### REQ-ORG-006 — ArchUnit guards for new staffel-scoped aggregates
 
@@ -307,9 +312,22 @@ Leadership reach cascades, mirroring `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANA
 (`is_bereichsleiter` / `is_bereichskoordinator` / `is_bereichsoperator`, REQ-ORG-017) gets
 officer-equivalent reach over **all Staffeln + SKs of its Bereich** (and its Bereich's own data); the
 **OL** (`is_ol_member`) over **everything**. This reach is computed in **exactly one** helper
-`OwnerScopeService.expandWithDescendants(...)`, consumed by `currentMemberOrgUnitIds()` **and**
-`currentBlueprintOversightScope()` (ADR-0026); `ScopePredicate.permits()` and the `IN :memberOrgUnitIds`
-JPQL cascade automatically once fed the expanded set, so lists and per-row gates widen together.
+`OrgUnitCascadeService.expandWithDescendants(...)` (with `cascadedOfficerReach(...)` for the
+leadership-only subset), consumed by `OwnerScopeService.currentMemberOrgUnitIds()`;
+`ScopePredicate.permits()` and the `IN :memberOrgUnitIds` JPQL cascade automatically once fed the
+expanded set, so lists and per-row gates widen together (ADR-0026).
+
+> **Implemented (epic #692, Phase 3 / #696):** the cascade is wired into
+> `currentMemberOrgUnitIds()`, so it flows into `currentScopePredicate()` (all org-scoped aggregate
+> lists + per-row `canSee*`/`canEdit*` gates: mission, hangar, inventory, refinery, operation,
+> job-order) and the Job-Order profit gate `canViewJobOrders()`. The JWT-authority cascade ships in
+> the same phase. **Deferred to Phase 6 (#699):** `currentBlueprintOversightScope()` is **not** yet
+> cascaded — it is shared by the bank seam (`OrgUnitBankAccessService`), where Q4 requires the
+> balance **view** to cascade down but deposit/withdrawal **requests** to stay own-level only
+> (REQ-BANK-027). Widening that one method atomically with the bank's read/write split belongs to the
+> bank phase, so the blueprint-availability overview and the bank balance-view inherit the cascade
+> there rather than here. Until then a Bereichsleitung/OL sees descendant **aggregates** but not the
+> descendant **blueprint-availability overview** — strictly fail-closed (less reach, never more).
 
 Hard invariants:
 
@@ -320,11 +338,16 @@ Hard invariants:
   crosses Bereiche. No peer-Bereich visibility.
 - An **SK-lead is not expanded** — they keep SK-only reach; their Bereichsleitung membership is
   organisational only (REQ-ORG-017).
-- The JWT converter mints, per leadership membership, the flat `ROLE_LOGISTICIAN`/`ROLE_MISSION_MANAGER`
-  (so `hasRole(...)` menu gates work) **and** a contextual `OrgUnitContextualAuthority(role, descendant)`
-  per descendant (so existing `@PreAuthorize("@ownerScopeService.hasRoleInOrgUnit(#id, '…')")` resolves).
+- The JWT converter (`CustomJwtGrantedAuthoritiesConverter`) mints, for a leadership membership, the
+  flat `ROLE_LOGISTICIAN`/`ROLE_MISSION_MANAGER` (so `hasRole(...)` menu gates work) **and** a contextual
+  `OrgUnitContextualAuthority(role, x)` for every `x` in `cascadedOfficerReach(...)` — the Bereich itself
+  plus its descendants, or every org unit for the OL — so existing
+  `@PreAuthorize("@ownerScopeService.hasRoleInOrgUnit(#id, '…')")` gates (e.g. the SK material-claim
+  gate) resolve for the units a leader reaches.
 - The cascade **composes with** the personal-aggregate owner-bypass (REQ-ORG-011) and the opt-in global
-  blueprint union ([ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md)); neither is weakened.
+  blueprint union ([ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md)); neither is weakened —
+  both short-circuit ahead of or alongside the `memberOrgUnitIds` membership check, which the cascade
+  only ever enlarges.
 
 **Acceptance**
 
@@ -336,8 +359,11 @@ Hard invariants:
 - [ ] The REQ-ORG-011 owner-bypass and the ADR-0024 global-sharing union still hold for a leadership
   principal.
 
-**Enforced by (planned):** `OwnerScopeServiceTest`, `CustomJwtGrantedAuthoritiesConverterTest`,
-visibility-matrix e2e · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · also pins
+**Enforced by:** `OrgUnitCascadeServiceTest` (cascade math + strict silo + no-flag short-circuit +
+SK-lead no-cascade + per-request memoisation), `OwnerScopeServiceTest` (cascade routed into the
+scope predicate; `adminAllScope` never set),
+`CustomJwtGrantedAuthoritiesConverterTest` (flat + cascaded contextual authorities); visibility-matrix
+e2e *(planned, Phase 7)* · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · also pins
 [REQ-SEC-015](security-and-access.md) · **Issues:** #692, #696.
 
 ### REQ-ORG-016 — Bereich/OL as direct owners of org-unit-scoped aggregates

@@ -102,6 +102,8 @@ class OwnerScopeServiceTest {
   private de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository
       specialCommandRepository;
 
+  @Mock private OrgUnitCascadeService orgUnitCascadeService;
+
   @Mock private HttpServletRequest request;
 
   @InjectMocks private OwnerScopeService service;
@@ -127,6 +129,25 @@ class OwnerScopeServiceTest {
     memberUserInA = new User();
     memberUserInA.setId(MEMBER_USER_ID);
     // Post-R9 D3 (V101): the home Staffel is sourced from org_unit_membership only.
+
+    // Epic #692 / REQ-ORG-015: the cascade expansion is delegated to OrgUnitCascadeService (tested
+    // independently in OrgUnitCascadeServiceTest). The default stub here mirrors the no-leadership
+    // case — expansion collapses to the direct membership ids — so every pre-#692 scenario behaves
+    // byte-for-byte as before. The dedicated cascade scenarios below override it with an expanded
+    // set to verify OwnerScopeService routes the cascade output into the scope predicate.
+    lenient()
+        .when(
+            orgUnitCascadeService.expandWithDescendants(
+                org.mockito.ArgumentMatchers.anyCollection()))
+        .thenAnswer(
+            invocation -> {
+              java.util.Collection<OrgUnitMembership> rows = invocation.getArgument(0);
+              java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
+              for (OrgUnitMembership row : rows) {
+                ids.add(row.getId().getOrgUnitId());
+              }
+              return ids;
+            });
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -1852,5 +1873,93 @@ class OwnerScopeServiceTest {
         .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
         .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
     lenient().when(orgUnitRepository.countProfitEligibleByIdIn(any())).thenReturn(0L);
+  }
+
+  /**
+   * Epic #692 / REQ-ORG-015: verifies that {@link OwnerScopeService} routes the cascade expansion
+   * (delegated to {@link OrgUnitCascadeService}) into the scope predicate, so a Bereichsleitung /
+   * OL member's per-row {@code canSee*}/{@code canEdit*} gates cover their subordinate units —
+   * while never setting {@code adminAllScope} and never granting reach outside the cascaded set
+   * (strict silo). The expansion math itself is covered by {@link OrgUnitCascadeServiceTest}; here
+   * we stub the cascade output and assert OwnerScopeService consumes it correctly.
+   */
+  @Nested
+  class CascadingScopeTests {
+
+    private static final UUID BEREICH_A_ID = UUID.randomUUID();
+    private static final UUID DESCENDANT_STAFFEL_ID = UUID.randomUUID();
+    private static final UUID FOREIGN_STAFFEL_ID = UUID.randomUUID();
+
+    private OrgUnitMembership bereichLeadMembership() {
+      OrgUnitMembership m = new OrgUnitMembership();
+      m.setId(new OrgUnitMembershipId(MEMBER_USER_ID, BEREICH_A_ID));
+      m.setKind(OrgUnitKind.BEREICH);
+      m.setBereichsleiter(true);
+      return m;
+    }
+
+    private void stubBereichLeaderWithCascade(Set<UUID> expandedReach) {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(bereichLeadMembership()));
+      when(orgUnitCascadeService.expandWithDescendants(any())).thenReturn(expandedReach);
+    }
+
+    @Test
+    void bereichsleiter_canSeeAndEditDescendantUnit() {
+      stubBereichLeaderWithCascade(Set.of(BEREICH_A_ID, DESCENDANT_STAFFEL_ID));
+
+      assertTrue(service.canSeeSquadron(DESCENDANT_STAFFEL_ID));
+      assertTrue(service.canEditSquadron(DESCENDANT_STAFFEL_ID));
+      assertTrue(service.canSeeOrgUnit(BEREICH_A_ID));
+    }
+
+    @Test
+    void strictSilo_bereichsleiterCannotSeeUnitOutsideTheirCascade() {
+      stubBereichLeaderWithCascade(Set.of(BEREICH_A_ID, DESCENDANT_STAFFEL_ID));
+
+      assertFalse(service.canSeeSquadron(FOREIGN_STAFFEL_ID));
+      assertFalse(service.canEditSquadron(FOREIGN_STAFFEL_ID));
+    }
+
+    @Test
+    void cascade_neverSetsAdminAllScope() {
+      stubBereichLeaderWithCascade(Set.of(BEREICH_A_ID, DESCENDANT_STAFFEL_ID));
+
+      ScopePredicate predicate = service.currentScopePredicate();
+
+      // HARD INVARIANT (REQ-ORG-015): OL/Bereich leadership is a concrete membership union, never
+      // admin-all — otherwise the SK-lifecycle / promotion / ownerless-row admin carve-outs leak.
+      assertFalse(predicate.adminAllScope());
+      assertNull(predicate.activeOrgUnitId());
+      assertTrue(predicate.memberOrgUnitIds().contains(DESCENDANT_STAFFEL_ID));
+      assertFalse(predicate.memberOrgUnitIds().contains(FOREIGN_STAFFEL_ID));
+    }
+
+    @Test
+    void olMember_seesEveryUnitInTheConcreteUnion_butStillNotAdminAllScope() {
+      // OL expansion materialises every org-unit id (including a "foreign" Staffel) as a concrete
+      // set — reach is total, but adminAllScope stays false.
+      stubBereichLeaderWithCascade(Set.of(BEREICH_A_ID, DESCENDANT_STAFFEL_ID, FOREIGN_STAFFEL_ID));
+
+      assertTrue(service.canSeeSquadron(FOREIGN_STAFFEL_ID));
+      assertFalse(service.currentScopePredicate().adminAllScope());
+    }
+
+    @Test
+    void leaderPinnedToReachableDescendant_narrowsScopeToThatUnit() {
+      stubBereichLeaderWithCascade(Set.of(BEREICH_A_ID, DESCENDANT_STAFFEL_ID));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(DESCENDANT_STAFFEL_ID.toString());
+
+      ScopePredicate predicate = service.currentScopePredicate();
+
+      assertEquals(DESCENDANT_STAFFEL_ID, predicate.activeOrgUnitId());
+      assertFalse(predicate.adminAllScope());
+      assertTrue(service.canSeeSquadron(DESCENDANT_STAFFEL_ID));
+      // The Bereich itself is no longer in scope while pinned to one descendant.
+      assertFalse(service.canSeeSquadron(BEREICH_A_ID));
+    }
   }
 }

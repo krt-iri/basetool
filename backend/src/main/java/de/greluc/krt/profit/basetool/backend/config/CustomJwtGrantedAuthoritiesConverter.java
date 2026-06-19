@@ -22,10 +22,12 @@ package de.greluc.krt.profit.basetool.backend.config;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.NonNull;
@@ -76,6 +78,7 @@ public class CustomJwtGrantedAuthoritiesConverter
 
   private final UserService userService;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+  private final OrgUnitCascadeService orgUnitCascadeService;
 
   @Override
   public Collection<GrantedAuthority> convert(@NonNull Jwt jwt) {
@@ -150,6 +153,15 @@ public class CustomJwtGrantedAuthoritiesConverter
    *       per-OrgUnit scoping at the {@code @PreAuthorize} surface without a service-layer
    *       round-trip. Matches the plan §6.1 design: "Spring Security authentication carries a
    *       Set&lt;ContextualAuthority&gt;".
+   *   <li><b>Cascaded contextual (epic #692, REQ-ORG-015)</b> — additional {@link
+   *       OrgUnitContextualAuthority} entries for the org units a Bereichsleitung / OL leadership
+   *       membership reaches <em>downward</em> (a Bereich's Staffeln + SKs; for OL, every org
+   *       unit), resolved by {@link
+   *       OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}. This makes a
+   *       Bereichsleitung / OL member act with officer-equivalent {@code LOGISTICIAN} / {@code
+   *       MISSION_MANAGER} authority in their subordinate units — never admin. A caller with no
+   *       leadership flag contributes nothing here, so the authority set is unchanged from the
+   *       pre-#692 behaviour.
    * </ol>
    *
    * <p>Both lists emit on every authentication so existing flat-role gates and new contextual
@@ -184,9 +196,18 @@ public class CustomJwtGrantedAuthoritiesConverter
     // SK — the lead role sits above both within its org unit, mirroring how admin outranks every
     // role and an Officer is logistician + mission manager of their own squadron (#344). is_lead
     // only exists on SK memberships (DB CHECK), so this never widens a Staffel membership.
-    boolean anyLogistician = memberships.stream().anyMatch(m -> m.isLogistician() || m.isLead());
+    //
+    // Epic #692 / REQ-ORG-015 extends the same "leadership ⊇ logistician + mission manager"
+    // principle one level up: a Bereichsleitung membership (is_bereichsleiter /
+    // is_bereichskoordinator / is_bereichsoperator) and an OL membership (is_ol_member) confer
+    // officer-equivalent reach — never admin — so they promote the caller to the flat
+    // ROLE_LOGISTICIAN / ROLE_MISSION_MANAGER just like an SK lead does. The flat role is the
+    // back-compat surface for role-only @PreAuthorize gates; the cascade's org-unit scoping is
+    // applied separately (contextual authorities below + OwnerScopeService's scope predicate).
+    boolean anyLogistician =
+        memberships.stream().anyMatch(m -> m.isLogistician() || confersFlatOfficerRole(m));
     boolean anyMissionManager =
-        memberships.stream().anyMatch(m -> m.isMissionManager() || m.isLead());
+        memberships.stream().anyMatch(m -> m.isMissionManager() || confersFlatOfficerRole(m));
 
     if (anyLogistician) {
       authorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
@@ -211,5 +232,49 @@ public class CustomJwtGrantedAuthoritiesConverter
             new OrgUnitContextualAuthority("MISSION_MANAGER", m.getId().getOrgUnitId()));
       }
     }
+
+    // Epic #692 / REQ-ORG-015 — cascade the contextual authorities down the hierarchy. A
+    // Bereichsleitung member acts as LOGISTICIAN + MISSION_MANAGER in every Staffel/SK below their
+    // Bereich (and in the Bereich itself); an OL member in every org unit. The reachable id set is
+    // resolved by the shared OrgUnitCascadeService so the scope resolver and this converter agree
+    // on exactly which units a leader reaches. Plain Staffel/SK memberships contribute nothing here
+    // (handled by the per-row loop above), so for a caller with no Bereich/OL leadership flag this
+    // set is empty and the authority list is unchanged from the pre-#692 behaviour.
+    for (UUID cascadedOrgUnitId : orgUnitCascadeService.cascadedOfficerReach(memberships)) {
+      authorities.add(new OrgUnitContextualAuthority("LOGISTICIAN", cascadedOrgUnitId));
+      authorities.add(new OrgUnitContextualAuthority("MISSION_MANAGER", cascadedOrgUnitId));
+    }
+  }
+
+  /**
+   * {@code true} iff holding {@code m} promotes the caller to the flat, officer-equivalent {@code
+   * ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} (epic #692, REQ-ORG-015). A membership
+   * qualifies when it ranks at or above logistician + mission manager on its own unit: an SK-Lead
+   * ({@code is_lead}, which is logistician + mission manager of its SK, #344), a Bereichsleitung
+   * ({@code is_bereichsleiter} / {@code is_bereichskoordinator} / {@code is_bereichsoperator}), or
+   * the OL ({@code is_ol_member}). The flat role is the back-compat surface for role-only
+   * {@code @PreAuthorize} gates.
+   *
+   * <p>This is deliberately <b>not</b> the cascade-reach predicate. Which org units a leader
+   * reaches downward — and thus which contextual authorities are minted — is computed separately by
+   * {@link OrgUnitCascadeService#cascadedOfficerReach(Collection)}, which, unlike this method,
+   * <em>excludes</em> {@code is_lead}: an SK-Lead keeps SK-only reach (REQ-ORG-017, owner decision
+   * Q1) and receives their SK's contextual authority from the per-row loop above, not from the
+   * cascade.
+   *
+   * <p>A per-membership Logistician / MissionManager flag is handled by the explicit {@code
+   * m.isLogistician()} / {@code m.isMissionManager()} terms at the call sites (a plain logistician
+   * confers only the logistician flat role, not mission manager), and a flag-less Bereich/OL seat
+   * confers nothing — so both return {@code false} here.
+   *
+   * @param m the membership row to classify; never {@code null}.
+   * @return {@code true} iff {@code m} is an SK-Lead, Bereichsleitung, or OL leadership membership.
+   */
+  private static boolean confersFlatOfficerRole(@NonNull OrgUnitMembership m) {
+    return m.isLead()
+        || m.isBereichsleiter()
+        || m.isBereichskoordinator()
+        || m.isBereichsoperator()
+        || m.isOlMember();
   }
 }

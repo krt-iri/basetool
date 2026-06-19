@@ -82,4 +82,34 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    */
   @Query("SELECT o FROM OrgUnit o WHERE o.parent.id = :parentOrgUnitId")
   List<OrgUnit> findByParentOrgUnitId(@Param("parentOrgUnitId") UUID parentOrgUnitId);
+
+  /**
+   * Id-only projection of {@link #findByParentOrgUnitId(UUID)}: the ids of the direct children of
+   * {@code parentOrgUnitId} (the Staffeln + SKs of a Bereich). Used by the cascading-scope resolver
+   * ({@link de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService}, REQ-ORG-015) to
+   * expand a Bereichsleitung member's reach to their subordinate units without hydrating the full
+   * {@link OrgUnit} rows. The fixed three-level hierarchy (OL &gt; Bereich &gt; Staffel/SK) means a
+   * Bereich's children are exactly the leaf units, so one call yields the whole subtree below a
+   * Bereich.
+   *
+   * @param parentOrgUnitId the parent org unit whose direct child ids to load; never {@code null}.
+   * @return the direct child org-unit ids in arbitrary order; never {@code null}, possibly empty.
+   */
+  @Query("SELECT o.id FROM OrgUnit o WHERE o.parent.id = :parentOrgUnitId")
+  List<UUID> findChildOrgUnitIds(@Param("parentOrgUnitId") UUID parentOrgUnitId);
+
+  /**
+   * Returns the id of every org unit across all kinds (Squadron, SK, Bereich, OL) via single-table
+   * inheritance. Backs the Organisationsleitung branch of the cascading-scope resolver ({@link
+   * de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService}, REQ-ORG-015): an OL
+   * member's reach is the concrete union of <em>every</em> org-unit id — deliberately materialised
+   * rather than collapsed into an admin-all marker, so OL/Bereich leadership never inherits the
+   * admin carve-outs (the HARD INVARIANT of REQ-ORG-015). Including units with a {@code null}
+   * parent (the additive-soak window before the hierarchy is wired up) is intentional: OL reach is
+   * "everything", not "everything reachable through a parent edge".
+   *
+   * @return every org-unit id in arbitrary order; never {@code null}, possibly empty.
+   */
+  @Query("SELECT o.id FROM OrgUnit o")
+  List<UUID> findAllOrgUnitIds();
 }
