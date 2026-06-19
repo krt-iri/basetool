@@ -58,7 +58,11 @@ class OrgChartPageControllerTest {
 
   private static OrgChartDto emptyChart() {
     return new OrgChartDto(
-        new AreaLeadershipDto(null, List.of(), List.of(), List.of()), List.of(), List.of());
+        List.of(),
+        List.of(),
+        new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+        List.of(),
+        List.of());
   }
 
   private static Authentication auth(String role) {

@@ -112,4 +112,26 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    */
   @Query("SELECT o.id FROM OrgUnit o")
   List<UUID> findAllOrgUnitIds();
+
+  /**
+   * Loads every active {@link de.greluc.krt.profit.basetool.backend.model.Bereich} (epic #692,
+   * REQ-ORG-018). Backs the multi-Bereich org chart's tier list: each Bereich renders as its own
+   * leadership sub-tree, coloured by its {@link
+   * de.greluc.krt.profit.basetool.backend.model.Department Department}, with its child Staffeln/SKs
+   * grouped underneath. Returns the {@code BEREICH} discriminator only via the typed JPQL {@code
+   * FROM Bereich}.
+   *
+   * @return the active Bereiche in arbitrary order; never {@code null}, possibly empty.
+   */
+  @Query("SELECT o FROM Bereich o WHERE o.active = true")
+  List<OrgUnit> findActiveBereiche();
+
+  /**
+   * Loads the active {@link de.greluc.krt.profit.basetool.backend.model.Organisationsleitung} (epic
+   * #692, REQ-ORG-018) — normally a singleton. Backs the OL root tier of the org chart.
+   *
+   * @return the active OL row(s) in arbitrary order; never {@code null}, normally one or zero.
+   */
+  @Query("SELECT o FROM Organisationsleitung o WHERE o.active = true")
+  List<OrgUnit> findActiveOrganisationsleitung();
 }

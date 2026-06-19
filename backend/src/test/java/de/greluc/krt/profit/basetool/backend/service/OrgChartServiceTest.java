@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapperImpl;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
@@ -187,6 +189,43 @@ class OrgChartServiceTest {
     assertEquals(4, squadronDto.commands().size());
     assertFalse(squadronDto.canAddCommand());
     assertFalse(squadronDto.canAddEnsign());
+  }
+
+  @Test
+  void getOrgChart_groupsUnitsUnderBereichTierAndExposesOl() {
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = bereich(bereichId, "Profit", "PRF");
+    bereich.setDepartment(Department.PROFIT);
+    Squadron grouped = squadron(UUID.randomUUID(), "Alpha", "ALF");
+    grouped.setParent(bereich);
+    Squadron ungrouped = squadron(UUID.randomUUID(), "Orphan", "ORP"); // parent == null
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = organisationsleitung(olId, "Organisationsleitung", "OL");
+
+    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(grouped, ungrouped));
+    when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of(bereich));
+    when(orgUnitRepository.findActiveOrganisationsleitung()).thenReturn(List.of(ol));
+    when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
+        .thenReturn(List.of());
+    OrgChartPosition bereichsleiter = pos(OrgChartPositionType.BEREICHSLEITER, bereich, null);
+    OrgChartPosition olMember = pos(OrgChartPositionType.OL_MEMBER, ol, null);
+    when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
+        .thenReturn(List.of(bereichsleiter, olMember));
+
+    OrgChartDto chart = service().getOrgChart();
+
+    // OL members surface at the top.
+    assertEquals(1, chart.organisationsleitung().size());
+    // One Bereich tier carrying its department, its Bereichsleiter and its grouped Staffel.
+    assertEquals(1, chart.bereiche().size());
+    BereichChartDto b = chart.bereiche().getFirst();
+    assertEquals(Department.PROFIT, b.department());
+    assertNotNull(b.leadership().lead());
+    assertEquals(1, b.squadrons().size());
+    assertEquals("Alpha", b.squadrons().getFirst().name());
+    // The parentless Staffel stays in the ungrouped/legacy tier, NOT under the Bereich.
+    assertEquals(1, chart.squadrons().size());
+    assertEquals("Orphan", chart.squadrons().getFirst().name());
   }
 
   // ----------------------------------------------------------------- create guards --

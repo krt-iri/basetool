@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AreaLeadershipDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartNodeDto;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionReposito
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -123,36 +125,141 @@ public class OrgChartService {
    */
   public OrgChartDto getOrgChart() {
     List<OrgUnit> units = orgUnitRepository.findActiveProfitEligible();
-    List<OrgUnit> squadrons =
-        units.stream()
-            .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
-            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
-            .toList();
-    List<OrgUnit> specialCommands =
-        units.stream()
-            .filter(u -> u.getKind() == OrgUnitKind.SPECIAL_COMMAND)
-            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
-            .toList();
+    List<OrgUnit> bereiche = orgUnitRepository.findActiveBereiche();
+    List<OrgUnit> ols = orgUnitRepository.findActiveOrganisationsleitung();
+    OrgUnit ol = ols.isEmpty() ? null : ols.getFirst();
+    Set<UUID> bereichIds = bereiche.stream().map(OrgUnit::getId).collect(Collectors.toSet());
 
-    List<OrgChartPosition> areaPositions =
+    final List<OrgChartPosition> areaPositions =
         positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc();
 
-    Set<UUID> unitIds = units.stream().map(OrgUnit::getId).collect(Collectors.toSet());
+    // Positions for every org-unit-bound tier: profit-eligible Staffeln/SKs + Bereiche + the OL.
+    Set<UUID> chartedUnitIds = new HashSet<>();
+    units.forEach(u -> chartedUnitIds.add(u.getId()));
+    chartedUnitIds.addAll(bereichIds);
+    if (ol != null) {
+      chartedUnitIds.add(ol.getId());
+    }
     List<OrgChartPosition> unitPositions =
-        unitIds.isEmpty()
+        chartedUnitIds.isEmpty()
             ? List.of()
-            : positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(unitIds);
+            : positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(
+                chartedUnitIds);
     Map<UUID, List<OrgChartPosition>> positionsByUnit =
         unitPositions.stream().collect(Collectors.groupingBy(p -> p.getOrgUnit().getId()));
 
-    return new OrgChartDto(
-        buildAreaLeadership(areaPositions),
-        squadrons.stream()
+    // OL members at the very top (empty when no OL exists).
+    List<OrgChartNodeDto> olMembers =
+        ol == null
+            ? List.of()
+            : nodesOfType(
+                positionsByUnit.getOrDefault(ol.getId(), List.of()),
+                OrgChartPositionType.OL_MEMBER);
+
+    // One tier per Bereich: its Bereichsleitung sub-tree + the Staffeln/SKs wired under it.
+    List<BereichChartDto> bereichDtos =
+        bereiche.stream()
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+            .map(b -> buildBereich(b, units, positionsByUnit))
+            .toList();
+
+    // Ungrouped/legacy tier: profit-eligible Staffeln/SKs NOT wired under a (charted) Bereich.
+    // Until
+    // an admin creates Bereiche and assigns parents this holds every unit, so the chart degrades to
+    // the pre-#692 single-tree view.
+    List<SquadronChartDto> ungroupedSquadrons =
+        units.stream()
+            .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
+            .filter(u -> !hasChartedBereichParent(u, bereichIds))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
             .map(s -> buildSquadron(s, positionsByUnit.getOrDefault(s.getId(), List.of())))
-            .toList(),
-        specialCommands.stream()
+            .toList();
+    List<SpecialCommandChartDto> ungroupedSpecialCommands =
+        units.stream()
+            .filter(u -> u.getKind() == OrgUnitKind.SPECIAL_COMMAND)
+            .filter(u -> !hasChartedBereichParent(u, bereichIds))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
             .map(sk -> buildSpecialCommand(sk, positionsByUnit.getOrDefault(sk.getId(), List.of())))
-            .toList());
+            .toList();
+
+    return new OrgChartDto(
+        olMembers,
+        bereichDtos,
+        buildAreaLeadership(areaPositions),
+        ungroupedSquadrons,
+        ungroupedSpecialCommands);
+  }
+
+  /**
+   * {@code true} iff {@code unit}'s parent is one of the charted Bereiche — i.e. the unit renders
+   * under that Bereich's tier rather than in the ungrouped tier. A {@code null} parent (or a parent
+   * that is not an active Bereich) means the unit stays ungrouped, preserving the pre-#692 view.
+   *
+   * @param unit the Staffel/SK to classify; never {@code null}.
+   * @param bereichIds the ids of the active Bereiche.
+   * @return {@code true} iff the unit is grouped under a Bereich.
+   */
+  private static boolean hasChartedBereichParent(OrgUnit unit, Set<UUID> bereichIds) {
+    return unit.getParent() != null && bereichIds.contains(unit.getParent().getId());
+  }
+
+  /**
+   * Assembles one Bereich tier (epic #692, REQ-ORG-018): its Bereichsleitung sub-tree plus the
+   * Staffeln/SKs whose parent is this Bereich, carrying the Bereich's Bereichsfarbe.
+   *
+   * @param bereich the Bereich org unit.
+   * @param units all active profit-eligible Staffeln/SKs (filtered here to this Bereich's
+   *     children).
+   * @param positionsByUnit positions grouped by org-unit id.
+   * @return the assembled Bereich tier; never {@code null}.
+   */
+  private BereichChartDto buildBereich(
+      OrgUnit bereich, List<OrgUnit> units, Map<UUID, List<OrgChartPosition>> positionsByUnit) {
+    List<SquadronChartDto> squadrons =
+        units.stream()
+            .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
+            .filter(u -> u.getParent() != null && bereich.getId().equals(u.getParent().getId()))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+            .map(s -> buildSquadron(s, positionsByUnit.getOrDefault(s.getId(), List.of())))
+            .toList();
+    List<SpecialCommandChartDto> specialCommands =
+        units.stream()
+            .filter(u -> u.getKind() == OrgUnitKind.SPECIAL_COMMAND)
+            .filter(u -> u.getParent() != null && bereich.getId().equals(u.getParent().getId()))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+            .map(sk -> buildSpecialCommand(sk, positionsByUnit.getOrDefault(sk.getId(), List.of())))
+            .toList();
+    return new BereichChartDto(
+        bereich.getId(),
+        bereich.getName(),
+        bereich.getShorthand(),
+        bereich.getDepartment(),
+        buildBereichLeadership(positionsByUnit.getOrDefault(bereich.getId(), List.of())),
+        squadrons,
+        specialCommands);
+  }
+
+  /**
+   * Builds a Bereich's Bereichsleitung as an {@link AreaLeadershipDto} (reused for layout
+   * symmetry): the Bereichsleiter as {@code lead}, the Bereichskoordinatoren as {@code
+   * coordinators}, the Bereichsoperatoren as {@code operators}; {@code commanders} is always empty
+   * (a Bereich has no commander rank).
+   *
+   * @param positions the Bereich's positions.
+   * @return the Bereichsleitung DTO; never {@code null}.
+   */
+  private AreaLeadershipDto buildBereichLeadership(List<OrgChartPosition> positions) {
+    OrgChartNodeDto lead =
+        positions.stream()
+            .filter(p -> p.getPositionType() == OrgChartPositionType.BEREICHSLEITER)
+            .findFirst()
+            .map(mapper::toNode)
+            .orElse(null);
+    return new AreaLeadershipDto(
+        lead,
+        List.of(),
+        nodesOfType(positions, OrgChartPositionType.BEREICHSKOORDINATOR),
+        nodesOfType(positions, OrgChartPositionType.BEREICHSOPERATOR));
   }
 
   /**

@@ -48012,6 +48012,40 @@
           }
         }
       },
+      "BereichChartDto" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "department" : {
+            "type" : "string",
+            "enum" : [ "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE" ]
+          },
+          "leadership" : {
+            "$ref" : "#/components/schemas/AreaLeadershipDto"
+          },
+          "squadrons" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SquadronChartDto"
+            }
+          },
+          "specialCommands" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SpecialCommandChartDto"
+            }
+          }
+        }
+      },
       "CommandChartDto" : {
         "type" : "object",
         "properties" : {
@@ -48051,6 +48085,18 @@
       "OrgChartDto" : {
         "type" : "object",
         "properties" : {
+          "organisationsleitung" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          },
+          "bereiche" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BereichChartDto"
+            }
+          },
           "areaLeadership" : {
             "$ref" : "#/components/schemas/AreaLeadershipDto"
           },

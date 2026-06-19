@@ -56,7 +56,11 @@ class OrgChartControllerTest {
   void getOrgChart_delegatesToService() {
     OrgChartDto chart =
         new OrgChartDto(
-            new AreaLeadershipDto(null, List.of(), List.of(), List.of()), List.of(), List.of());
+            List.of(),
+            List.of(),
+            new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+            List.of(),
+            List.of());
     when(orgChartService.getOrgChart()).thenReturn(chart);
 
     assertSame(chart, controller.getOrgChart());

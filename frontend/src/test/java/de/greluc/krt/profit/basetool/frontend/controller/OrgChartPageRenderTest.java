@@ -86,6 +86,8 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
+                List.of(),
+                List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(),
                 List.of()));
@@ -116,6 +118,8 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
+                List.of(),
+                List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
@@ -170,6 +174,8 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
+                List.of(),
+                List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
@@ -214,6 +220,8 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
+                List.of(),
+                List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
