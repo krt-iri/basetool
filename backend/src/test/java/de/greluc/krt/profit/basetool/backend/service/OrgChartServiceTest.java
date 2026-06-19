@@ -33,12 +33,16 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapperImpl;
+import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
@@ -185,6 +189,44 @@ class OrgChartServiceTest {
     assertEquals(4, squadronDto.commands().size());
     assertFalse(squadronDto.canAddCommand());
     assertFalse(squadronDto.canAddEnsign());
+  }
+
+  @Test
+  void getOrgChart_groupsUnitsUnderBereichTierAndExposesOl() {
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = bereich(bereichId, "Profit", "PRF");
+    bereich.setDepartment(Department.PROFIT);
+    Squadron grouped = squadron(UUID.randomUUID(), "Alpha", "ALF");
+    grouped.setParent(bereich);
+    Squadron ungrouped = squadron(UUID.randomUUID(), "Orphan", "ORP"); // parent == null
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = organisationsleitung(olId, "Organisationsleitung", "OL");
+
+    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(grouped, ungrouped));
+    when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of(bereich));
+    when(orgUnitRepository.findActiveOrganisationsleitung()).thenReturn(List.of(ol));
+    when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
+        .thenReturn(List.of());
+    OrgChartPosition bereichsleiter = pos(OrgChartPositionType.BEREICHSLEITER, bereich, null);
+    OrgChartPosition olMember = pos(OrgChartPositionType.OL_MEMBER, ol, null);
+    when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
+        .thenReturn(List.of(bereichsleiter, olMember));
+
+    OrgChartDto chart = service().getOrgChart();
+
+    // OL members surface at the top, carried by the OL tier (id + name + members).
+    assertEquals(olId, chart.organisationsleitung().orgUnitId());
+    assertEquals(1, chart.organisationsleitung().members().size());
+    // One Bereich tier carrying its department, its Bereichsleiter and its grouped Staffel.
+    assertEquals(1, chart.bereiche().size());
+    BereichChartDto b = chart.bereiche().getFirst();
+    assertEquals(Department.PROFIT, b.department());
+    assertNotNull(b.leadership().lead());
+    assertEquals(1, b.squadrons().size());
+    assertEquals("Alpha", b.squadrons().getFirst().name());
+    // The parentless Staffel stays in the ungrouped/legacy tier, NOT under the Bereich.
+    assertEquals(1, chart.squadrons().size());
+    assertEquals("Orphan", chart.squadrons().getFirst().name());
   }
 
   // ----------------------------------------------------------------- create guards --
@@ -621,6 +663,155 @@ class OrgChartServiceTest {
                         OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null, null)));
   }
 
+  // -------------------------------------------- Bereich / OL scopes (REQ-ORG-018) --
+
+  @Test
+  void createPosition_bereichsleiter_persists() {
+    UUID userId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "blead")));
+    when(orgUnitRepository.findById(bereichId))
+        .thenReturn(Optional.of(bereich(bereichId, "Profit", "PRF")));
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            bereichId, OrgChartPositionType.BEREICHSLEITER))
+        .thenReturn(0L);
+    when(positionRepository.existsByOrgUnitIdAndUserId(bereichId, userId)).thenReturn(false);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto =
+        service()
+            .createPosition(
+                new OrgChartPositionCreateRequest(
+                    OrgChartPositionType.BEREICHSLEITER, bereichId, userId, null, null, null));
+
+    assertEquals(OrgChartPositionType.BEREICHSLEITER, dto.positionType());
+    assertEquals(bereichId, dto.orgUnitId());
+  }
+
+  @Test
+  void createPosition_secondBereichsleiterSameBereich_isRejected() {
+    UUID userId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "blead2")));
+    when(orgUnitRepository.findById(bereichId))
+        .thenReturn(Optional.of(bereich(bereichId, "Profit", "PRF")));
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            bereichId, OrgChartPositionType.BEREICHSLEITER))
+        .thenReturn(1L);
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.BEREICHSLEITER,
+                            bereichId,
+                            userId,
+                            null,
+                            null,
+                            null)));
+
+    assertTrue(ex.getMessage().contains("duplicate_lead"), ex.getMessage());
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void createPosition_bereichRankOnSquadron_isScopeMismatch() {
+    UUID userId = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "x")));
+    when(orgUnitRepository.findById(squadronId))
+        .thenReturn(Optional.of(squadron(squadronId, "IRIDIUM", "IRI")));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.BEREICHSLEITER,
+                            squadronId,
+                            userId,
+                            null,
+                            null,
+                            null)));
+
+    assertTrue(ex.getMessage().contains("scope_mismatch"), ex.getMessage());
+  }
+
+  @Test
+  void createPosition_bereichDoesNotRequireProfitEligible() {
+    // A Bereich is never profit-eligible; the org-chart create must NOT reject it for that
+    // (unlike a Staffel/SK). Only its active flag is checked.
+    UUID userId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    Bereich notProfit = bereich(bereichId, "Sub-Radar", "SUB"); // isProfitEligible() == false
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "k")));
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(notProfit));
+    when(positionRepository.existsByOrgUnitIdAndUserId(bereichId, userId)).thenReturn(false);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto =
+        service()
+            .createPosition(
+                new OrgChartPositionCreateRequest(
+                    OrgChartPositionType.BEREICHSKOORDINATOR, bereichId, userId, null, null, null));
+
+    assertEquals(OrgChartPositionType.BEREICHSKOORDINATOR, dto.positionType());
+  }
+
+  @Test
+  void createPosition_inactiveBereich_throwsUnitInactive() {
+    // An inactive Bereich is rejected, but with the precise "inactive" error rather than the
+    // (irrelevant) "not profit-eligible" one a Bereich would never satisfy anyway.
+    UUID userId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    Bereich inactive = bereich(bereichId, "Sub-Radar", "SUB");
+    inactive.setActive(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "k")));
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(inactive));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.BEREICHSKOORDINATOR,
+                            bereichId,
+                            userId,
+                            null,
+                            null,
+                            null)));
+
+    assertTrue(ex.getMessage().contains("unit_inactive"), ex.getMessage());
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void createPosition_olMember_persists() {
+    UUID userId = UUID.randomUUID();
+    UUID olId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "olm")));
+    when(orgUnitRepository.findById(olId))
+        .thenReturn(Optional.of(organisationsleitung(olId, "Organisationsleitung", "OL")));
+    when(positionRepository.existsByOrgUnitIdAndUserId(olId, userId)).thenReturn(false);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto =
+        service()
+            .createPosition(
+                new OrgChartPositionCreateRequest(
+                    OrgChartPositionType.OL_MEMBER, olId, userId, null, null, null));
+
+    assertEquals(OrgChartPositionType.OL_MEMBER, dto.positionType());
+    assertEquals(olId, dto.orgUnitId());
+  }
+
   // ----------------------------------------------------------------- update / delete --
 
   @Test
@@ -857,6 +1048,24 @@ class OrgChartServiceTest {
     sk.setActive(true);
     sk.setProfitEligible(true);
     return sk;
+  }
+
+  private static Bereich bereich(UUID id, String name, String shorthand) {
+    Bereich b = new Bereich();
+    b.setId(id);
+    b.setName(name);
+    b.setShorthand(shorthand);
+    b.setActive(true);
+    return b;
+  }
+
+  private static Organisationsleitung organisationsleitung(UUID id, String name, String shorthand) {
+    Organisationsleitung o = new Organisationsleitung();
+    o.setId(id);
+    o.setName(name);
+    o.setShorthand(shorthand);
+    o.setActive(true);
+    return o;
   }
 
   private static OrgChartPosition pos(

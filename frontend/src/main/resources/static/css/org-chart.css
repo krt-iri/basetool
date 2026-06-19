@@ -268,6 +268,83 @@ main.oc-page .oc-toolbar {
     color: var(--color-dept-profit);
 }
 
+/* --- multi-Bereich tiers (epic #692, REQ-ORG-018) ---------------------------
+   The chart stacks several independent ARIA trees: the Organisationsleitung on
+   top, one tier per Bereich (tinted by its Bereichsfarbe), then the
+   legacy/ungrouped tier. Each tier is a caption + an .oc-tree; subsequent tiers
+   get extra top spacing so the captions clearly separate the trees. */
+.oc-tree + .oc-caption {
+    margin-top: 2.75rem;
+}
+
+/* The Organisationsleitung apex box: a neutral white top edge so it reads as
+   sitting above every (department-coloured) Bereich rather than belonging to one. */
+.oc-unit-box--ol {
+    border-top-color: var(--color-white);
+}
+
+.oc-unit-box--ol .sh {
+    color: var(--color-white);
+}
+
+/* Per-Bereich Bereichsfarbe. The template maps the department enum name to one of
+   these classes (oc-dept--<name>), which only sets the --oc-dept custom property
+   the tier rules below consume. Used as decorative ACCENTS on borders + a caption
+   swatch only (never on text), so every department hue stays well clear of the
+   WCAG 4.5:1 text-contrast floor on the dark canvas (REQ-ORG-018). */
+.oc-dept--profit {
+    --oc-dept: var(--color-dept-profit);
+}
+
+.oc-dept--sub-radar {
+    --oc-dept: var(--color-dept-sub-radar);
+}
+
+.oc-dept--raumueberlegenheit {
+    --oc-dept: var(--color-dept-raumueberlegenheit);
+}
+
+.oc-dept--forschung {
+    --oc-dept: var(--color-dept-forschung);
+}
+
+.oc-dept--marinekorps {
+    --oc-dept: var(--color-dept-marinekorps);
+}
+
+.oc-dept--search-rescue {
+    --oc-dept: var(--color-dept-search-rescue);
+}
+
+/* Caption swatch: a small square in the Bereichsfarbe next to the Bereich name.
+   Decorative (aria-hidden in the template) and rendered only when the Bereich has
+   a department assigned. */
+.oc-dept-swatch {
+    display: inline-block;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin-right: 0.55rem;
+    background: var(--oc-dept, var(--color-primary));
+    border: 1px solid var(--color-gray-3);
+}
+
+/* Within a Bereich tier the nodes carry the Bereichsfarbe: the Bereichsleiter is
+   framed in it (replacing the orange hero bloom), the Stab + unit-leader nodes get a
+   left accent rule, and the Staffel/SK boxes take the dept colour on their top edge.
+   All text stays white/orange — only borders are tinted. */
+.oc-bereich-tier .oc-node--hero {
+    border-color: var(--oc-dept, var(--color-primary));
+    box-shadow: none;
+}
+
+.oc-bereich-tier .oc-node:not(.oc-node--hero) {
+    border-left: 3px solid var(--oc-dept, var(--color-gray-3));
+}
+
+.oc-bereich-tier .oc-unit-box {
+    border-top-color: var(--oc-dept, var(--color-primary));
+}
+
 /* Kommando(gruppe) header: names the command, sits above its Kommandoleiter. */
 .oc-command-head {
     gap: 0.15rem;

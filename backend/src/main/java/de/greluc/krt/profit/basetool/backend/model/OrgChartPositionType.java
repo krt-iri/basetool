@@ -68,7 +68,27 @@ public enum OrgChartPositionType {
   ENSIGN(OrgChartScope.SQUADRON),
 
   /** Commander acting as SK-Leiter — leads a Spezialkommando. One or two per SK. */
-  SK_COMMANDER(OrgChartScope.SPECIAL_COMMAND);
+  SK_COMMANDER(OrgChartScope.SPECIAL_COMMAND),
+
+  /**
+   * Bereichsleiter — the single head of a Bereich (epic #692, REQ-ORG-018). At most one per Bereich
+   * (the cardinality is scoped to the Bereich's {@code org_unit_id}, unlike the legacy singleton
+   * {@link #AREA_LEAD}).
+   */
+  BEREICHSLEITER(OrgChartScope.BEREICH),
+
+  /** Bereichskoordinator — a Bereich's coordinator. Any number per Bereich. */
+  BEREICHSKOORDINATOR(OrgChartScope.BEREICH),
+
+  /** Bereichsoperator — a Bereich's operator. Any number per Bereich. */
+  BEREICHSOPERATOR(OrgChartScope.BEREICH),
+
+  /**
+   * A member of the Organisationsleitung (epic #692, REQ-ORG-018). Any number — the OL is a body of
+   * several people, mirroring the single {@code is_ol_member} membership flag (no separate OL head
+   * rank).
+   */
+  OL_MEMBER(OrgChartScope.OL);
 
   private final OrgChartScope scope;
 

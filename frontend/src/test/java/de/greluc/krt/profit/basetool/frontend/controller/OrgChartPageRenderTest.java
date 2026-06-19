@@ -28,7 +28,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.AreaLeadershipDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BereichChartDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CommandChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OlChartDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartNodeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronChartDto;
@@ -86,6 +88,8 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
+                null,
+                List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(),
                 List.of()));
@@ -116,6 +120,8 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
+                null,
+                List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
@@ -170,6 +176,8 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
+                null,
+                List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
@@ -214,6 +222,8 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
+                null,
+                List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(
                     new SquadronChartDto(
@@ -249,5 +259,99 @@ class OrgChartPageRenderTest {
     assertThat(html)
         .as("fragment is chrome-free — no page header brand")
         .doesNotContain("class=\"brand\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void olTier_admin_rendersRootMembersAndAddAffordance() throws Exception {
+    // Given: an Organisationsleitung tier with one member (epic #692 / REQ-ORG-018). The OL renders
+    // as its own ARIA tree — the OL root box (level 1) with its OL_MEMBER nodes (level 2) — plus
+    // the
+    // admin add-OL-member affordance, which needs the OL's org-unit id carried by OlChartDto.
+    UUID olId = UUID.randomUUID();
+    OrgChartNodeDto member =
+        new OrgChartNodeDto(UUID.randomUUID(), "OL_MEMBER", UUID.randomUUID(), "Chief", 0, 0L);
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new OlChartDto(olId, "Organisationsleitung", "OL", List.of(member)),
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("OL root box rendered").contains("oc-unit-box--ol");
+    assertThat(html).as("OL member rendered via ocNode").contains("Chief");
+    assertThat(html).as("OL root is a level-1 treeitem").contains("aria-level=\"1\"");
+    assertThat(html)
+        .as("admin add-OL-member affordance")
+        .contains("data-position-type=\"OL_MEMBER\"");
+    assertThat(html)
+        .as("legacy area tier hidden when an OL exists")
+        .doesNotContain("data-trigger=\"oc-add-staff\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void bereichTier_admin_rendersDepartmentTintLeadershipAndUnits() throws Exception {
+    // Given: one Bereich tier carrying the PROFIT Bereichsfarbe, a Bereichsleiter (hero) and one
+    // Staffel (epic #692 / REQ-ORG-018). The tier renders as its own ARIA tree, tinted via the
+    // oc-dept--profit class, with the Staffel fanning out through the shared ocUnitFan fragment.
+    // The
+    // legacy area tier must stay hidden once a Bereich is populated.
+    OrgChartNodeDto lead =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Area Boss", 0, 0L);
+    SquadronChartDto sq =
+        new SquadronChartDto(
+            UUID.randomUUID(), "IRIDIUM", "IRI", null, List.of(), List.of(), true, true);
+    BereichChartDto bereich =
+        new BereichChartDto(
+            UUID.randomUUID(),
+            "Profit-Bereich",
+            "PRF",
+            "PROFIT",
+            new AreaLeadershipDto(lead, List.of(), List.of(), List.of()),
+            List.of(sq),
+            List.of());
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                null,
+                List.of(bereich),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("Bereich tier rendered").contains("oc-bereich-tier");
+    assertThat(html).as("Bereich department tint class").contains("oc-dept--profit");
+    assertThat(html).as("Bereich caption swatch rendered").contains("oc-dept-swatch");
+    assertThat(html).as("Bereich caption shows its name").contains("Profit-Bereich");
+    assertThat(html).as("Bereichsleiter renders as a hero node").contains("oc-node--hero");
+    assertThat(html).as("Bereichsleiter holder rendered").contains("Area Boss");
+    assertThat(html).as("Bereich's Staffel rendered via ocUnitFan").contains("IRIDIUM");
+    assertThat(html)
+        .as("legacy area tier hidden when a Bereich is populated")
+        .doesNotContain("data-trigger=\"oc-add-staff\"");
   }
 }

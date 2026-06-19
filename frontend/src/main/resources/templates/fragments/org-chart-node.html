@@ -14,7 +14,7 @@
   tabindex="-1".
 -->
 <div th:fragment="ocNode(node, level)" class="oc-node" th:if="${node != null}"
-     th:classappend="${node.positionType() == 'AREA_LEAD' ? 'oc-node--hero' : ''}"
+     th:classappend="${(node.positionType() == 'AREA_LEAD' or node.positionType() == 'BEREICHSLEITER') ? 'oc-node--hero' : ''}"
      th:with="rk=${'orgChart.rank.' + node.positionType()}"
      role="treeitem" tabindex="-1" th:aria-level="${level}"
      th:aria-label="#{${rk}} + ', ' + ${node.userName()}">
@@ -41,5 +41,196 @@
         </button>
     </div>
 </div>
+
+<!--
+  Tier 2 unit fan: the Staffeln + Spezialkommandos that fan out under a leadership spine
+  (Bereichsleiter for a Bereich tier, the legacy Area Lead for the ungrouped tier). Factored out of
+  org-chart.html so every tier — each Bereich and the legacy area — renders its child units through
+  identical markup (and identical ARIA levels: unit box = 2, Staffel-/SK-Leiter = 3, Kommando head /
+  direct Ensign = 4, Kommandoleiter = 5, Stv./Ensign-in-Kommando = 6). The owning tier supplies its
+  own already-filtered `squadrons` / `specialCommands` lists, so this fragment is scope-agnostic.
+-->
+<ul th:fragment="ocUnitFan(squadrons, specialCommands)" class="oc-fan oc-fan--units" role="group"
+    th:if="${!#lists.isEmpty(squadrons) or !#lists.isEmpty(specialCommands)}">
+
+    <!-- Staffeln -->
+    <li th:each="sq : ${squadrons}">
+        <div class="oc-col">
+            <div class="oc-unit-box" role="treeitem" tabindex="-1" aria-level="2"
+                 th:aria-label="#{orgChart.a11y.squadron(${sq.name()})}">
+                <span class="sh" th:text="${sq.shorthand()}">IRI</span>
+                <span class="nm" th:text="${sq.name()}">IRIDIUM</span>
+            </div>
+            <div class="oc-v"></div>
+
+            <!-- Staffelleiter or vacant -->
+            <th:block th:if="${sq.lead() != null}">
+                <th:block th:replace="~{fragments/org-chart-node :: ocNode(${sq.lead()}, 3)}"></th:block>
+            </th:block>
+            <div th:if="${sq.lead() == null}" class="oc-node oc-node--vacant"
+                 role="treeitem" tabindex="-1" aria-level="3"
+                 th:aria-label="#{orgChart.rank.SQUADRON_LEAD} + ', ' + #{orgChart.vacant}">
+                <span class="oc-node-rank" th:text="#{orgChart.rank.SQUADRON_LEAD}">Staffelleiter</span>
+                <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
+            </div>
+            <button th:if="${sq.lead() == null}" type="button" class="oc-add"
+                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                    data-position-type="SQUADRON_LEAD" th:data-org-unit-id="${sq.orgUnitId()}"
+                    th:data-rank-label="#{orgChart.rank.SQUADRON_LEAD}"
+                    th:text="#{orgChart.add.squadronLead}">Staffelleiter zuweisen</button>
+
+            <!-- Kommandos + direct Ensigns fan out under the Staffelleiter -->
+            <ul class="oc-fan" role="group"
+                th:if="${!#lists.isEmpty(sq.commands()) or !#lists.isEmpty(sq.directEnsigns())}">
+
+                <!-- Kommando(gruppe): named header, its Kommandoleiter (may be vacant),
+                     then the Stv. + Ensigns chained underneath -->
+                <li th:each="cmd : ${sq.commands()}">
+                    <div class="oc-col">
+                        <div class="oc-node oc-command-head" role="treeitem" tabindex="-1"
+                             aria-level="4"
+                             th:aria-label="#{orgChart.command.tag} + ', ' + ${cmd.name() != null ? cmd.name() : #messages.msg('orgChart.command.unnamed')}">
+                            <span class="oc-node-rank" th:text="#{orgChart.command.tag}">Kommandogruppe</span>
+                            <span class="oc-command-name" th:if="${cmd.name() != null}"
+                                  th:text="${cmd.name()}">Alpha</span>
+                            <span class="oc-command-name oc-command-name--unnamed"
+                                  th:if="${cmd.name() == null}"
+                                  th:text="#{orgChart.command.unnamed}">Ohne Namen</span>
+                            <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+                                <button type="button" class="oc-icon-btn" data-trigger="oc-rename"
+                                        th:data-position-id="${cmd.positionId()}"
+                                        th:data-version="${cmd.version()}"
+                                        th:data-name="${cmd.name()}"
+                                        th:title="#{orgChart.command.rename}"
+                                        th:aria-label="#{orgChart.command.rename}">
+                                    <svg class="krt-icon" aria-hidden="true">
+                                        <use href="#krt-icon-edit"></use>
+                                    </svg>
+                                </button>
+                                <button type="button" class="oc-icon-btn oc-icon-btn--danger"
+                                        data-trigger="oc-remove"
+                                        th:data-position-id="${cmd.positionId()}"
+                                        data-position-type="COMMAND_LEAD"
+                                        th:title="#{orgChart.remove}" th:aria-label="#{orgChart.remove}">
+                                    <svg class="krt-icon" aria-hidden="true">
+                                        <use href="#krt-icon-trash"></use>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="oc-v"></div>
+
+                        <th:block th:if="${cmd.leaderUserId() != null}">
+                            <div class="oc-node" role="treeitem" tabindex="-1" aria-level="5"
+                                 th:aria-label="#{orgChart.rank.COMMAND_LEAD} + ', ' + ${cmd.leaderUserName()}">
+                                <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
+                                <span class="oc-node-name" th:text="${cmd.leaderUserName()}">Name</span>
+                                <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+                                    <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
+                                            th:data-position-id="${cmd.positionId()}"
+                                            th:data-version="${cmd.version()}"
+                                            th:data-user-id="${cmd.leaderUserId()}"
+                                            th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
+                                            th:title="#{orgChart.reassign}" th:aria-label="#{orgChart.reassign}">
+                                        <svg class="krt-icon" aria-hidden="true">
+                                            <use href="#krt-icon-edit"></use>
+                                        </svg>
+                                    </button>
+                                    <button type="button" class="oc-icon-btn oc-icon-btn--danger"
+                                            data-trigger="oc-vacate"
+                                            th:data-position-id="${cmd.positionId()}"
+                                            th:data-version="${cmd.version()}"
+                                            th:title="#{orgChart.vacateLead}" th:aria-label="#{orgChart.vacateLead}">
+                                        <svg class="krt-icon" aria-hidden="true">
+                                            <use href="#krt-icon-trash"></use>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </th:block>
+                        <div th:if="${cmd.leaderUserId() == null}" class="oc-node oc-node--vacant"
+                             role="treeitem" tabindex="-1" aria-level="5"
+                             th:aria-label="#{orgChart.rank.COMMAND_LEAD} + ', ' + #{orgChart.vacant}">
+                            <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
+                            <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
+                        </div>
+                        <button th:if="${cmd.leaderUserId() == null}" type="button" class="oc-add"
+                                sec:authorize="hasRole('ADMIN')" data-trigger="oc-reassign"
+                                th:data-position-id="${cmd.positionId()}"
+                                th:data-version="${cmd.version()}" data-user-id=""
+                                th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
+                                th:text="#{orgChart.add.assignLead}">Kommandoleiter zuweisen</button>
+
+                        <!-- Stv. then Ensigns: chained under the Kommandoleiter -->
+                        <th:block th:if="${cmd.deputy() != null}">
+                            <div class="oc-v"></div>
+                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${cmd.deputy()}, 6)}"></th:block>
+                        </th:block>
+                        <th:block th:each="e : ${cmd.ensigns()}">
+                            <div class="oc-v"></div>
+                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e}, 6)}"></th:block>
+                        </th:block>
+
+                        <button th:if="${cmd.deputy() == null}" type="button" class="oc-add"
+                                sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                                data-position-type="DEPUTY_COMMAND_LEAD"
+                                th:data-org-unit-id="${sq.orgUnitId()}"
+                                th:data-parent-id="${cmd.positionId()}"
+                                th:data-rank-label="#{orgChart.rank.DEPUTY_COMMAND_LEAD}"
+                                th:text="#{orgChart.add.deputy}">Stv. zuweisen</button>
+                        <button th:if="${sq.canAddEnsign()}" type="button" class="oc-add"
+                                sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                                data-position-type="ENSIGN" th:data-org-unit-id="${sq.orgUnitId()}"
+                                th:data-parent-id="${cmd.positionId()}"
+                                th:data-rank-label="#{orgChart.rank.ENSIGN}"
+                                th:text="#{orgChart.add.ensign}">Ensign hinzufügen</button>
+                    </div>
+                </li>
+
+                <!-- Ensigns reporting straight to the Staffelleiter -->
+                <li th:each="e : ${sq.directEnsigns()}">
+                    <div class="oc-col">
+                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e}, 4)}"></th:block>
+                    </div>
+                </li>
+            </ul>
+
+            <button th:if="${sq.canAddCommand()}" type="button" class="oc-add"
+                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                    data-position-type="COMMAND_LEAD" data-needs-name="true"
+                    data-user-optional="true" th:data-org-unit-id="${sq.orgUnitId()}"
+                    th:data-rank-label="#{orgChart.command.tag}"
+                    th:text="#{orgChart.add.command}">Kommandogruppe hinzufügen</button>
+            <button th:if="${sq.canAddEnsign()}" type="button" class="oc-add"
+                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                    data-position-type="ENSIGN" th:data-org-unit-id="${sq.orgUnitId()}"
+                    th:data-rank-label="#{orgChart.rank.ENSIGN}"
+                    th:text="#{orgChart.add.ensignDirect}">Ensign (direkt) hinzufügen</button>
+        </div>
+    </li>
+
+    <!-- Spezialkommandos: 1-2 SK-Leiter side by side under the unit box -->
+    <li th:each="sk : ${specialCommands}">
+        <div class="oc-col">
+            <div class="oc-unit-box oc-unit-box--sk" role="treeitem" tabindex="-1" aria-level="2"
+                 th:aria-label="#{orgChart.a11y.sk(${sk.name()})}">
+                <span class="sh" th:text="${sk.shorthand()}">BRV</span>
+                <span class="nm" th:text="${sk.name()}">Bravo</span>
+            </div>
+            <ul class="oc-fan" role="group" th:if="${!#lists.isEmpty(sk.commanders())}">
+                <li th:each="c : ${sk.commanders()}">
+                    <div class="oc-col">
+                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${c}, 3)}"></th:block>
+                    </div>
+                </li>
+            </ul>
+            <button th:if="${sk.canAddCommander()}" type="button" class="oc-add"
+                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add" data-position-type="SK_COMMANDER"
+                    th:data-org-unit-id="${sk.orgUnitId()}"
+                    th:data-rank-label="#{orgChart.rank.SK_COMMANDER}"
+                    th:text="#{orgChart.add.skCommander}">SK-Leiter hinzufügen</button>
+        </div>
+    </li>
+</ul>
 </body>
 </html>

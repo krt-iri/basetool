@@ -85,16 +85,19 @@ through the inline editor's confirm dialog) · **Code:** `OrgChartService#delete
 ### REQ-ORG-013 — The org chart is keyboard-operable and screen-reader-navigable
 
 The chart conveys its hierarchy to assistive technology and is fully operable without a
-mouse. It is exposed as an ARIA **tree**: the container is `role="tree"` (labelled by the
-page title), each child row is `role="group"`, and every box — person node, unit box,
-command head, vacant seat — is a `role="treeitem"` carrying an `aria-level` that matches its
-depth in the reporting chain (1 = Bereichsleiter, 2 = Stab member / Staffel- or SK-unit box,
+mouse. It is exposed as ARIA **tree**s — since epic #692 (REQ-ORG-018) the chart stacks one
+tree per tier (the Organisationsleitung, each Bereich, and the legacy/ungrouped tier), each
+its own `role="tree"` (labelled by its tier caption), each child row `role="group"`, and
+every box — person node, unit box, command head, vacant seat — a `role="treeitem"` carrying
+an `aria-level` that matches its depth in that tier's reporting chain (within a Bereich /
+legacy tier: 1 = Bereichsleiter / Area Lead, 2 = Stab member / Staffel- or SK-unit box,
 3 = Staffel-/SK-Leiter, 4 = Kommandogruppe header / direct Ensign, 5 = Kommandoleiter,
-6 = Stv. Kommandoleiter / Ensign within a Kommando) and an `aria-label` of "rank, name" (or
-"rank, nicht besetzt"). Parents are `aria-expanded` (the tree never collapses).
+6 = Stv. Kommandoleiter / Ensign within a Kommando; within the OL tree: 1 = OL root box,
+2 = OL member) and an `aria-label` of "rank, name" (or "rank, nicht besetzt"). Parents are
+`aria-expanded` (the tree never collapses).
 
-Keyboard model: a roving tabindex keeps exactly one treeitem tabbable; ↑/↓ move between
-siblings, ←/→ between levels, Home/End to the ends. Keyboard focus is a sharp outline,
+Keyboard model: a roving tabindex keeps exactly one treeitem tabbable per tree; ↑/↓ move
+between siblings, ←/→ between levels, Home/End to the ends. Keyboard focus is a sharp outline,
 deliberately distinct from the Bereichsleiter's bloom. The inline editor's dialog traps
 focus (Tab/Shift+Tab cycle within it), closes on Esc, returns focus to the control that
 opened it, and renders the page chrome `inert` + `aria-hidden` while open. A successful edit
@@ -106,7 +109,8 @@ preserves the chart's horizontal scroll and the page's vertical scroll across th
 
 - [ ] `GET /org-chart` renders `role="tree"`, `role="group"` and `role="treeitem"` with an
   `aria-level` per node, plus an `aria-pressed` edit toggle and the edit-mode hint.
-- [ ] Exactly one treeitem is tabbable; the arrow keys + Home/End move focus through the tree.
+- [ ] Exactly one treeitem per tier-tree is tabbable; the arrow keys + Home/End move focus
+  within each tree.
 - [ ] The dialog closes on Esc and returns focus to its trigger; the background is inert while
   it is open.
 - [ ] A save keeps the scroll position (no jump to the top-left).
@@ -134,15 +138,26 @@ tree (REQ-ORG-013) intact.
 
 **Acceptance**
 
-- [ ] `GET /org-chart` renders an OL root, then one area-leadership sub-tree per Bereich, then that
+- [x] `GET /org-chart` renders an OL root, then one area-leadership sub-tree per Bereich, then that
   Bereich's Staffeln + SKs; the partial unique indexes scope "one Bereichsleiter" etc. **per Bereich**.
-- [ ] Holding a chart position still grants no permission (a chart-only user is denied scoped data).
-- [ ] Each Bereich's nodes carry its Bereichsfarbe; contrast and the ARIA tree roles/levels are preserved.
+- [x] Holding a chart position still grants no permission (a chart-only user is denied scoped data).
+- [x] Each Bereich's nodes carry its Bereichsfarbe; contrast and the ARIA tree roles/levels are preserved.
 
-**Enforced by (planned):** `OrgChartPageRenderTest` (multi-Bereich + OL tree, per-Bereich colours, ARIA),
-`OrgChartServiceTest` (per-Bereich cardinality), a migration for the widened scope/indexes · **Issues:**
+The OL tier is carried by its own `OlChartDto` (id + name + members) so the inline editor can stamp a
+new `OL_MEMBER` against the OL's org-unit id even while the tier is empty. The Bereichsfarbe is applied
+as **border/swatch accents only** (the `oc-dept--<name>` class maps the `Department` enum name to a
+`--color-dept-*` token); node text stays white/orange so every department hue clears the 4.5:1 text floor.
+Each tier is its own ARIA tree (REQ-ORG-013). The legacy/ungrouped Area-Lead tier is hidden once it holds
+no content and a hierarchy exists, so an empty Area-Lead spine never lingers below a populated chart.
 
-# 692, #698.
+**Enforced by:** `OrgChartPageRenderTest` (`olTier_admin_*`, `bereichTier_admin_*` — OL + per-Bereich
+trees, the `oc-dept--profit` tint, the Bereichsleiter hero, the hidden legacy tier),
+`OrgChartServiceTest#getOrgChart_groupsUnitsUnderBereichTierAndExposesOl` and the per-Bereich
+`createPosition`/`validateCardinality` tests, migrations `V166` (`org_unit.department`) + `V167`
+(widened `chk_org_chart_scope` + per-Bereich `BEREICHSLEITER` unique index) · **Code:**
+`OrgChartService#getOrgChart`/`buildBereich`, `OlChartDto`, `BereichChartDto`, `org-chart.html`
+(OL + Bereich tiers + multi-tree keyboard nav), `fragments/org-chart-node.html` (`ocUnitFan`),
+`org-chart.css` (`oc-dept--*`, `oc-bereich-tier`) · **Issues:** #692, #698.
 
 ## Out of scope
 

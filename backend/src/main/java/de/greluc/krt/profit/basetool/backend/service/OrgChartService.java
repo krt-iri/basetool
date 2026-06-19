@@ -29,7 +29,9 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AreaLeadershipDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OlChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartNodeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
@@ -41,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionReposito
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -98,6 +101,7 @@ public class OrgChartService {
 
   private static final String ERR_SCOPE_MISMATCH = "problem.org_chart.scope_mismatch";
   private static final String ERR_UNIT_NOT_PROFIT = "problem.org_chart.unit_not_profit_eligible";
+  private static final String ERR_UNIT_INACTIVE = "problem.org_chart.unit_inactive";
   private static final String ERR_INVALID_PARENT = "problem.org_chart.invalid_parent";
   private static final String ERR_COMMAND_LIMIT = "problem.org_chart.command_limit";
   private static final String ERR_ENSIGN_LIMIT = "problem.org_chart.ensign_limit";
@@ -123,36 +127,145 @@ public class OrgChartService {
    */
   public OrgChartDto getOrgChart() {
     List<OrgUnit> units = orgUnitRepository.findActiveProfitEligible();
-    List<OrgUnit> squadrons =
-        units.stream()
-            .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
-            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
-            .toList();
-    List<OrgUnit> specialCommands =
-        units.stream()
-            .filter(u -> u.getKind() == OrgUnitKind.SPECIAL_COMMAND)
-            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
-            .toList();
+    List<OrgUnit> bereiche = orgUnitRepository.findActiveBereiche();
+    List<OrgUnit> ols = orgUnitRepository.findActiveOrganisationsleitung();
+    OrgUnit ol = ols.isEmpty() ? null : ols.getFirst();
+    Set<UUID> bereichIds = bereiche.stream().map(OrgUnit::getId).collect(Collectors.toSet());
 
-    List<OrgChartPosition> areaPositions =
+    final List<OrgChartPosition> areaPositions =
         positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc();
 
-    Set<UUID> unitIds = units.stream().map(OrgUnit::getId).collect(Collectors.toSet());
+    // Positions for every org-unit-bound tier: profit-eligible Staffeln/SKs + Bereiche + the OL.
+    Set<UUID> chartedUnitIds = new HashSet<>();
+    units.forEach(u -> chartedUnitIds.add(u.getId()));
+    chartedUnitIds.addAll(bereichIds);
+    if (ol != null) {
+      chartedUnitIds.add(ol.getId());
+    }
     List<OrgChartPosition> unitPositions =
-        unitIds.isEmpty()
+        chartedUnitIds.isEmpty()
             ? List.of()
-            : positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(unitIds);
+            : positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(
+                chartedUnitIds);
     Map<UUID, List<OrgChartPosition>> positionsByUnit =
         unitPositions.stream().collect(Collectors.groupingBy(p -> p.getOrgUnit().getId()));
 
-    return new OrgChartDto(
-        buildAreaLeadership(areaPositions),
-        squadrons.stream()
+    // OL tier at the very top (null when no OL exists, so the chart omits the tier).
+    OlChartDto olTier =
+        ol == null
+            ? null
+            : new OlChartDto(
+                ol.getId(),
+                ol.getName(),
+                ol.getShorthand(),
+                nodesOfType(
+                    positionsByUnit.getOrDefault(ol.getId(), List.of()),
+                    OrgChartPositionType.OL_MEMBER));
+
+    // One tier per Bereich: its Bereichsleitung sub-tree + the Staffeln/SKs wired under it.
+    List<BereichChartDto> bereichDtos =
+        bereiche.stream()
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+            .map(b -> buildBereich(b, units, positionsByUnit))
+            .toList();
+
+    // Ungrouped/legacy tier: profit-eligible Staffeln/SKs NOT wired under a (charted) Bereich.
+    // Until
+    // an admin creates Bereiche and assigns parents this holds every unit, so the chart degrades to
+    // the pre-#692 single-tree view.
+    List<SquadronChartDto> ungroupedSquadrons =
+        units.stream()
+            .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
+            .filter(u -> !hasChartedBereichParent(u, bereichIds))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
             .map(s -> buildSquadron(s, positionsByUnit.getOrDefault(s.getId(), List.of())))
-            .toList(),
-        specialCommands.stream()
+            .toList();
+    List<SpecialCommandChartDto> ungroupedSpecialCommands =
+        units.stream()
+            .filter(u -> u.getKind() == OrgUnitKind.SPECIAL_COMMAND)
+            .filter(u -> !hasChartedBereichParent(u, bereichIds))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
             .map(sk -> buildSpecialCommand(sk, positionsByUnit.getOrDefault(sk.getId(), List.of())))
-            .toList());
+            .toList();
+
+    return new OrgChartDto(
+        olTier,
+        bereichDtos,
+        buildAreaLeadership(areaPositions),
+        ungroupedSquadrons,
+        ungroupedSpecialCommands);
+  }
+
+  /**
+   * {@code true} iff {@code unit}'s parent is one of the charted Bereiche — i.e. the unit renders
+   * under that Bereich's tier rather than in the ungrouped tier. A {@code null} parent (or a parent
+   * that is not an active Bereich) means the unit stays ungrouped, preserving the pre-#692 view.
+   *
+   * @param unit the Staffel/SK to classify; never {@code null}.
+   * @param bereichIds the ids of the active Bereiche.
+   * @return {@code true} iff the unit is grouped under a Bereich.
+   */
+  private static boolean hasChartedBereichParent(OrgUnit unit, Set<UUID> bereichIds) {
+    return unit.getParent() != null && bereichIds.contains(unit.getParent().getId());
+  }
+
+  /**
+   * Assembles one Bereich tier (epic #692, REQ-ORG-018): its Bereichsleitung sub-tree plus the
+   * Staffeln/SKs whose parent is this Bereich, carrying the Bereich's Bereichsfarbe.
+   *
+   * @param bereich the Bereich org unit.
+   * @param units all active profit-eligible Staffeln/SKs (filtered here to this Bereich's
+   *     children).
+   * @param positionsByUnit positions grouped by org-unit id.
+   * @return the assembled Bereich tier; never {@code null}.
+   */
+  private BereichChartDto buildBereich(
+      OrgUnit bereich, List<OrgUnit> units, Map<UUID, List<OrgChartPosition>> positionsByUnit) {
+    List<SquadronChartDto> squadrons =
+        units.stream()
+            .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
+            .filter(u -> u.getParent() != null && bereich.getId().equals(u.getParent().getId()))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+            .map(s -> buildSquadron(s, positionsByUnit.getOrDefault(s.getId(), List.of())))
+            .toList();
+    List<SpecialCommandChartDto> specialCommands =
+        units.stream()
+            .filter(u -> u.getKind() == OrgUnitKind.SPECIAL_COMMAND)
+            .filter(u -> u.getParent() != null && bereich.getId().equals(u.getParent().getId()))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+            .map(sk -> buildSpecialCommand(sk, positionsByUnit.getOrDefault(sk.getId(), List.of())))
+            .toList();
+    return new BereichChartDto(
+        bereich.getId(),
+        bereich.getName(),
+        bereich.getShorthand(),
+        bereich.getDepartment(),
+        buildBereichLeadership(positionsByUnit.getOrDefault(bereich.getId(), List.of())),
+        squadrons,
+        specialCommands);
+  }
+
+  /**
+   * Builds a Bereich's Bereichsleitung as an {@link AreaLeadershipDto} (reused for layout
+   * symmetry): the Bereichsleiter as {@code lead}, the Bereichskoordinatoren as {@code
+   * coordinators}, the Bereichsoperatoren as {@code operators}; {@code commanders} is always empty
+   * (a Bereich has no commander rank).
+   *
+   * @param positions the Bereich's positions.
+   * @return the Bereichsleitung DTO; never {@code null}.
+   */
+  private AreaLeadershipDto buildBereichLeadership(List<OrgChartPosition> positions) {
+    OrgChartNodeDto lead =
+        positions.stream()
+            .filter(p -> p.getPositionType() == OrgChartPositionType.BEREICHSLEITER)
+            .findFirst()
+            .map(mapper::toNode)
+            .orElse(null);
+    return new AreaLeadershipDto(
+        lead,
+        List.of(),
+        nodesOfType(positions, OrgChartPositionType.BEREICHSKOORDINATOR),
+        nodesOfType(positions, OrgChartPositionType.BEREICHSOPERATOR));
   }
 
   /**
@@ -431,12 +544,27 @@ public class OrgChartService {
             .findById(orgUnitId)
             .orElseThrow(() -> new NotFoundException("OrgUnit not found: " + orgUnitId));
     OrgUnitKind expectedKind =
-        scope == OrgChartScope.SQUADRON ? OrgUnitKind.SQUADRON : OrgUnitKind.SPECIAL_COMMAND;
+        switch (scope) {
+          case SQUADRON -> OrgUnitKind.SQUADRON;
+          case SPECIAL_COMMAND -> OrgUnitKind.SPECIAL_COMMAND;
+          case BEREICH -> OrgUnitKind.BEREICH;
+          case OL -> OrgUnitKind.ORGANISATIONSLEITUNG;
+          case AREA -> throw new IllegalStateException("AREA scope handled above");
+        };
     if (unit.getKind() != expectedKind) {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
-    if (!unit.isActive() || !unit.isProfitEligible()) {
-      throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
+    // Profit-eligibility is required only for the Job-Order-processing tiers (Staffel/SK) — those
+    // are the org chart's historical "Profit-Bereich" units. A Bereich/OL (epic #692, REQ-ORG-018)
+    // is never profit-eligible and must not be rejected for it; only its active flag is checked,
+    // and an inactive Bereich/OL gets the precise "inactive" error rather than the (irrelevant)
+    // "not profit-eligible" one.
+    if (scope == OrgChartScope.SQUADRON || scope == OrgChartScope.SPECIAL_COMMAND) {
+      if (!unit.isActive() || !unit.isProfitEligible()) {
+        throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
+      }
+    } else if (!unit.isActive()) {
+      throw new BadRequestException(ERR_UNIT_INACTIVE);
     }
     return unit;
   }
@@ -514,8 +642,18 @@ public class OrgChartService {
           throw new BadRequestException(ERR_COMMANDER_LIMIT);
         }
       }
+      case BEREICHSLEITER -> {
+        // Epic #692, REQ-ORG-018: at most one Bereichsleiter PER Bereich (scoped to org_unit_id),
+        // unlike the legacy AREA_LEAD which is a global singleton.
+        if (positionRepository.countByOrgUnitIdAndPositionType(
+                orgUnit.getId(), OrgChartPositionType.BEREICHSLEITER)
+            > 0) {
+          throw new BadRequestException(ERR_DUPLICATE_LEAD);
+        }
+      }
       // DEPUTY_COMMAND_LEAD's "at most one per Kommando" is enforced during parent resolution;
-      // AREA_COORDINATOR / AREA_OPERATOR / AREA_COMMANDER are unbounded.
+      // AREA_COORDINATOR / AREA_OPERATOR / AREA_COMMANDER, BEREICHSKOORDINATOR / BEREICHSOPERATOR
+      // and OL_MEMBER are unbounded.
       default -> {
         // no cardinality limit
       }

@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -68,10 +69,12 @@ class OrgHierarchyServiceTest {
     when(bereichRepository.existsByNameIgnoreCase("Profit")).thenReturn(false);
     when(bereichRepository.save(any(Bereich.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    Bereich result = service.createBereich("Profit", "PRF", "the profit area", null);
+    Bereich result =
+        service.createBereich("Profit", "PRF", "the profit area", null, Department.PROFIT);
 
     assertEquals("Profit", result.getName());
     assertNull(result.getParent());
+    assertEquals(Department.PROFIT, result.getDepartment());
   }
 
   @Test
@@ -79,7 +82,8 @@ class OrgHierarchyServiceTest {
     when(bereichRepository.existsByNameIgnoreCase("Profit")).thenReturn(true);
 
     assertThrows(
-        DuplicateEntityException.class, () -> service.createBereich("Profit", "PRF", null, null));
+        DuplicateEntityException.class,
+        () -> service.createBereich("Profit", "PRF", null, null, null));
     verify(bereichRepository, never()).save(any());
   }
 
@@ -92,7 +96,8 @@ class OrgHierarchyServiceTest {
     when(orgUnitRepository.findById(parentId)).thenReturn(Optional.of(notAnOl));
 
     assertThrows(
-        BadRequestException.class, () -> service.createBereich("Profit", "PRF", null, parentId));
+        BadRequestException.class,
+        () -> service.createBereich("Profit", "PRF", null, parentId, null));
     verify(bereichRepository, never()).save(any());
   }
 
@@ -105,7 +110,7 @@ class OrgHierarchyServiceTest {
     when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
     when(bereichRepository.save(any(Bereich.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    Bereich result = service.createBereich("Profit", "PRF", null, olId);
+    Bereich result = service.createBereich("Profit", "PRF", null, olId, null);
 
     assertSame(ol, result.getParent());
   }

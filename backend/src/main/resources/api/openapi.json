@@ -28036,6 +28036,104 @@
         }
       }
     },
+    "/api/v1/users/me/pickable-org-units" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "getMyPickableOrgUnits",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/OrgUnitMembershipOptionDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/lookup" : {
       "get" : {
         "tags" : [ "user-controller" ],
@@ -42513,7 +42611,7 @@
           },
           "positionType" : {
             "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
           },
           "orgUnitId" : {
             "type" : "string",
@@ -45206,6 +45304,10 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "department" : {
+            "type" : "string",
+            "enum" : [ "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE" ]
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -45258,7 +45360,7 @@
         "properties" : {
           "positionType" : {
             "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
           },
           "orgUnitId" : {
             "type" : "string",
@@ -47910,6 +48012,40 @@
           }
         }
       },
+      "BereichChartDto" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "department" : {
+            "type" : "string",
+            "enum" : [ "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE" ]
+          },
+          "leadership" : {
+            "$ref" : "#/components/schemas/AreaLeadershipDto"
+          },
+          "squadrons" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SquadronChartDto"
+            }
+          },
+          "specialCommands" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SpecialCommandChartDto"
+            }
+          }
+        }
+      },
       "CommandChartDto" : {
         "type" : "object",
         "properties" : {
@@ -47946,9 +48082,39 @@
           }
         }
       },
+      "OlChartDto" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "members" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgChartNodeDto"
+            }
+          }
+        }
+      },
       "OrgChartDto" : {
         "type" : "object",
         "properties" : {
+          "organisationsleitung" : {
+            "$ref" : "#/components/schemas/OlChartDto"
+          },
+          "bereiche" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BereichChartDto"
+            }
+          },
           "areaLeadership" : {
             "$ref" : "#/components/schemas/AreaLeadershipDto"
           },
@@ -47975,7 +48141,7 @@
           },
           "positionType" : {
             "type" : "string",
-            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER" ]
+            "enum" : [ "AREA_LEAD", "AREA_COORDINATOR", "AREA_OPERATOR", "AREA_COMMANDER", "SQUADRON_LEAD", "COMMAND_LEAD", "DEPUTY_COMMAND_LEAD", "ENSIGN", "SK_COMMANDER", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER" ]
           },
           "userId" : {
             "type" : "string",
