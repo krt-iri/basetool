@@ -1475,7 +1475,10 @@ class OwnerScopeServiceTest {
         assertThrows(
             BadRequestException.class,
             () -> service.resolveOrgUnitForPickerOutput(user, foreignId));
-    assertTrue(ex.getMessage().toLowerCase().contains("not a membership"), ex.getMessage());
+    // A foreign pick the caller cannot edit is still rejected (epic #692 Phase 4 only widens the
+    // accepted set to the caller's editable scope; this caller has none). The message now names
+    // both rejection reasons (not a membership, not in editable scope).
+    assertTrue(ex.getMessage().toLowerCase().contains("membership"), ex.getMessage());
   }
 
   @Test
@@ -1960,6 +1963,111 @@ class OwnerScopeServiceTest {
       assertTrue(service.canSeeSquadron(DESCENDANT_STAFFEL_ID));
       // The Bereich itself is no longer in scope while pinned to one descendant.
       assertFalse(service.canSeeSquadron(BEREICH_A_ID));
+    }
+  }
+
+  /**
+   * Epic #692 / REQ-ORG-016 (Phase 4): the picker resolvers may stamp a {@code BEREICH} / {@code
+   * ORGANISATIONSLEITUNG} as the owning org unit, and a leadership caller may stamp a subordinate
+   * unit they oversee (create-on-behalf). Ordinary-member stamping is unchanged (covered by the
+   * existing {@code resolveOrgUnitForPickerOutput*} tests above).
+   */
+  @Nested
+  class BereichOlOwnershipStampingTests {
+
+    private static final UUID BEREICH_ID = UUID.randomUUID();
+    private static final UUID DESCENDANT_STAFFEL_ID = UUID.randomUUID();
+
+    private de.greluc.krt.profit.basetool.backend.model.Bereich newBereich() {
+      de.greluc.krt.profit.basetool.backend.model.Bereich b =
+          new de.greluc.krt.profit.basetool.backend.model.Bereich();
+      b.setId(BEREICH_ID);
+      b.setShorthand("PRF");
+      return b;
+    }
+
+    private OrgUnitMembership bereichLeadMembership(UUID userId) {
+      OrgUnitMembership m = new OrgUnitMembership();
+      m.setId(new OrgUnitMembershipId(userId, BEREICH_ID));
+      m.setKind(OrgUnitKind.BEREICH);
+      m.setBereichsleiter(true);
+      return m;
+    }
+
+    @Test
+    void leaderStampsOwnBereich_resolvesToBereichOrgUnit() {
+      User leader = new User();
+      leader.setId(UUID.randomUUID());
+      de.greluc.krt.profit.basetool.backend.model.Bereich bereich = newBereich();
+      when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
+          .thenReturn(List.of(bereichLeadMembership(leader.getId())));
+      // Bereich is neither a Squadron nor an SK; it resolves via the polymorphic repository.
+      when(squadronRepository.findById(BEREICH_ID)).thenReturn(Optional.empty());
+      when(specialCommandRepository.findById(BEREICH_ID)).thenReturn(Optional.empty());
+      when(orgUnitRepository.findById(BEREICH_ID)).thenReturn(Optional.of(bereich));
+
+      // Auto-stamp (null pick) onto the leader's single direct membership = their own Bereich.
+      assertSame(bereich, service.resolveOrgUnitForPickerOutput(leader, null));
+      // Explicit pick of the same Bereich resolves identically.
+      assertSame(bereich, service.resolveOrgUnitForPickerOutput(leader, BEREICH_ID));
+    }
+
+    @Test
+    void leaderCreatesOnBehalfOfDescendant_passesViaCanEditOrgUnit() {
+      User leader = new User();
+      leader.setId(UUID.randomUUID());
+      Squadron descendant = new Squadron();
+      descendant.setId(DESCENDANT_STAFFEL_ID);
+      descendant.setShorthand("DSC");
+
+      when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
+          .thenReturn(List.of(bereichLeadMembership(leader.getId())));
+      // canEditOrgUnit(descendant) → currentScopePredicate → cascade reach includes the descendant.
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(leader.getId()));
+      when(orgUnitCascadeService.expandWithDescendants(any()))
+          .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID));
+      when(squadronRepository.findById(DESCENDANT_STAFFEL_ID)).thenReturn(Optional.of(descendant));
+
+      // The descendant is NOT a direct membership, but the leader oversees it → stamp succeeds.
+      assertSame(descendant, service.resolveOrgUnitForPickerOutput(leader, DESCENDANT_STAFFEL_ID));
+    }
+
+    @Test
+    void leaderCannotStampUnitOutsideTheirCascade_throws() {
+      User leader = new User();
+      leader.setId(UUID.randomUUID());
+      UUID foreignStaffelId = UUID.randomUUID();
+
+      when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
+          .thenReturn(List.of(bereichLeadMembership(leader.getId())));
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(leader.getId()));
+      // Cascade reaches only the Bereich + its own descendant, NOT the foreign Staffel.
+      when(orgUnitCascadeService.expandWithDescendants(any()))
+          .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID));
+
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () -> service.resolveOrgUnitForPickerOutput(leader, foreignStaffelId));
+      assertTrue(ex.getMessage().toLowerCase().contains("editable scope"), ex.getMessage());
+    }
+
+    @Test
+    void subordinateCannotSeeOrEditBereichOwnedScope_strictSilo() {
+      // Defense-in-depth read-gate lock (REQ-ORG-016 strict silo: the level above is invisible to a
+      // subordinate). A plain Staffel member under the Bereich carries no leadership flag, so the
+      // cascade is the identity (default stub) — their scope is their own Staffel only, never the
+      // parent Bereich. A BEREICH-owned aggregate (owningOrgUnit.id == BEREICH_ID) is therefore
+      // never in scope for them, in either the read or the write gate.
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, DESCENDANT_STAFFEL_ID)));
+
+      assertFalse(service.canSeeSquadron(BEREICH_ID));
+      assertFalse(service.canEditSquadron(BEREICH_ID));
     }
   }
 }

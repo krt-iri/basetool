@@ -5,6 +5,7 @@
 ### Added
 
 - **Bereichsleitung und Organisationsleitung sehen und bearbeiten jetzt die Daten ihrer untergeordneten Einheiten.** Wer Bereichsleiter, -koordinator oder -operator eines Bereichs ist, erhält offiziersgleichen Zugriff auf alle Staffeln und Spezialkommandos dieses Bereichs (Einsätze, Hangar, Lager, Raffinerie, Operationen, Aufträge); die Organisationsleitung auf alle Einheiten. Der Zugriff ist streng auf den eigenen Bereich begrenzt (nur die OL übergreift Bereiche) und verleiht ausdrücklich keine Administratorrechte.
+- **Bereiche und die Organisationsleitung können jetzt eigene Daten besitzen, und die Leitung kann stellvertretend für eine untergeordnete Einheit anlegen.** Beim Anlegen eines Eintrags (Lager, Hangar, Raffinerie, Einsatz, Operation) lässt sich als besitzende Einheit der eigene Bereich bzw. die OL oder eine untergeordnete Staffel/ein Spezialkommando wählen, die man verantwortet. Die Voreinstellung und das Verhalten für normale Mitglieder bleiben unverändert.
 
 ### Changed
 

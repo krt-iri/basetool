@@ -645,17 +645,26 @@ public class OwnerScopeService {
   /**
    * Applies the §5.5.1 picker-output matrix for a user known to have at least one membership, then
    * resolves the chosen id to its concrete {@link OrgUnit} subtype (Staffel via {@link
-   * SquadronRepository}, Spezialkommando via {@link SpecialCommandRepository}). Shared tail of
-   * {@link #resolveOrgUnitForPickerOutput(User, UUID)} and {@link
+   * SquadronRepository}, Spezialkommando via {@link SpecialCommandRepository}, and — epic #692
+   * Phase 4 / REQ-ORG-016 — a {@code BEREICH} / {@code ORGANISATIONSLEITUNG} owner via the
+   * polymorphic {@link OrgUnitRepository}). Shared tail of {@link
+   * #resolveOrgUnitForPickerOutput(User, UUID)} and {@link
    * #resolveOrgUnitForPickerOutputNullable(User, UUID)} — the empty-membership branch differs
    * between the two callers and is handled by each before delegating here.
    *
-   * @param memberOrgUnitIds the caller's non-empty membership set.
+   * <p>The auto-stamp ({@code owningOrgUnitId == null}) and {@code >1 → force a choice} rules stay
+   * keyed on the target user's DIRECT memberships, so a leader's default owner is their own
+   * Bereich/OL and ordinary-member stamping is unchanged. An explicit pick is accepted when it is a
+   * DIRECT membership <em>or</em> an org unit the current caller may edit ({@link
+   * #canEditOrgUnit(UUID)}) — the cascade-aware create-on-behalf widening.
+   *
+   * @param memberOrgUnitIds the target user's non-empty DIRECT membership set.
    * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} for the auto-stamp
    *     path.
    * @return the resolved {@link OrgUnit}; never {@code null}.
-   * @throws BadRequestException on a foreign choice, a &gt;1-membership {@code null} choice, or a
-   *     resolved id that no longer exists in either repository.
+   * @throws BadRequestException on a pick that is neither a direct membership nor within the
+   *     caller's editable scope, a &gt;1-membership {@code null} choice, or a resolved id that no
+   *     longer exists / is not an ownable kind.
    */
   @NotNull
   private OrgUnit resolveStampedOrgUnit(@NotNull Set<UUID> memberOrgUnitIds, UUID owningOrgUnitId) {
@@ -668,23 +677,41 @@ public class OwnerScopeService {
             "User belongs to multiple org units; owningOrgUnitId is required");
       }
     } else {
-      if (!memberOrgUnitIds.contains(owningOrgUnitId)) {
+      // Epic #692 Phase 4 (REQ-ORG-016): a picker choice is valid when it is one of the target
+      // user's DIRECT memberships (the historical contract, and the only path a refinery-store
+      // receiver's pick travels) OR an org unit the CURRENT caller may edit ({@link
+      // #canEditOrgUnit(UUID)}, cascade-aware since Phase 3). The latter is the create-on-behalf
+      // widening: a Bereichsleitung/OL leader may stamp a subordinate Staffel/SK (or its own
+      // Bereich/OL) they oversee. For an ordinary member canEditOrgUnit is true exactly for their
+      // own membership units, so this adds nothing and stamping stays byte-identical.
+      if (!memberOrgUnitIds.contains(owningOrgUnitId) && !canEditOrgUnit(owningOrgUnitId)) {
         throw new BadRequestException(
-            "Selected owner org unit is not a membership of the target user");
+            "Selected owner org unit is neither a membership of the target user nor within the"
+                + " caller's editable scope");
       }
       stampedOrgUnitId = owningOrgUnitId;
     }
 
     // Resolve to the concrete subtype. Staffel-side: SquadronRepository (discriminator filter
-    // matches). SK-side: SpecialCommandRepository. Picker output was validated against the
-    // membership set above so a missing row here is a hard contract violation, surfaced as 400.
+    // matches). SK-side: SpecialCommandRepository. Epic #692 Phase 4 (REQ-ORG-016): a Bereich or
+    // Organisationsleitung may own an aggregate directly, so a non-Squadron/non-SK id falls through
+    // to the polymorphic OrgUnitRepository and is accepted iff it resolves to a BEREICH / OL row.
+    // The picker output was validated above, so any other miss is a hard contract violation (400).
     Optional<Squadron> sq = squadronRepository.findById(stampedOrgUnitId);
     if (sq.isPresent()) {
       return sq.get();
     }
-    return specialCommandRepository
+    OrgUnit specialCommand =
+        specialCommandRepository.findById(stampedOrgUnitId).map(s -> (OrgUnit) s).orElse(null);
+    if (specialCommand != null) {
+      return specialCommand;
+    }
+    return orgUnitRepository
         .findById(stampedOrgUnitId)
-        .map(s -> (OrgUnit) s)
+        .filter(
+            ou ->
+                ou.getKind() == OrgUnitKind.BEREICH
+                    || ou.getKind() == OrgUnitKind.ORGANISATIONSLEITUNG)
         .orElseThrow(
             () ->
                 new BadRequestException(
