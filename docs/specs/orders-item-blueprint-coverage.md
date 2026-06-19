@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-14.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-19.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Item-order blueprint coverage
@@ -50,7 +50,11 @@ e-mail).
 
 Display: each coverage row shows the **ordered** item name (the variant the line requested, if any)
 and, for every non-magazine row, a "counts variants" hint; each owner row shows the **actual** owned
-variant blueprint names (so a lead sees which variant each member holds).
+variant blueprint names (so a lead sees which variant each member holds). The whole panel
+(owners list + per-item coverage table) is rendered **collapsible** — its heading is the toggle, with
+a `+`/`−` affordance — and starts **expanded**, so a lead can fold the (potentially long) availability
+panel away without leaving the order page. Collapsing it is purely cosmetic and does not change the
+data exposed.
 
 **Acceptance**
 
@@ -64,8 +68,11 @@ variant blueprint names (so a lead sees which variant each member holds).
 - [ ] A user who opted into global sharing (`REQ-INV-018`) and owns a required family is counted
   and listed as an owner even when they are not a member of the responsible org unit.
 - [ ] A material order returns an empty coverage view.
+- [ ] The coverage panel renders inside a collapsible container that starts expanded; toggling it
+  open/closed changes only visibility, never the data shown.
 
-**Enforced by:** `JobOrderItemBlueprintOwnersServiceTest`, `BlueprintVariantFamilyResolverTest` ·
+**Enforced by:** `JobOrderItemBlueprintOwnersServiceTest`, `BlueprintVariantFamilyResolverTest`,
+`JobOrderItemDetailRenderTest` ·
 **Code:** `JobOrderItemBlueprintOwnersService`, `BlueprintVariantFamilyResolver`,
 `JobOrderController.getItemBlueprintOwners` · **Issues:** —
 

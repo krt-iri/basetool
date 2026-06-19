@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Blueprint-Verfügbarkeit in den Auftragsdetails lässt sich jetzt über ihre Überschrift ein- und ausklappen** (standardmäßig ausgeklappt), sodass die teils lange Liste bei Bedarf weggeklappt werden kann. Außerdem gibt es mehr Abstand vor dem Abschnitt „Item-Übergaben".
+
 ## [v0.5.12](https://github.com/krt-profit/basetool/releases/tag/v0.5.12) - 2026-06-19
 
 ### Added
