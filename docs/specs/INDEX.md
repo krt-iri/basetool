@@ -107,6 +107,19 @@ void skOrderIsVisibleAcrossSquadrons() { ... }
 A plain-text search for `REQ-ORDERS-012` then finds the requirement, every test that
 proves it, and every issue/PR that touched it.
 
+> **Known collision (REQ-ORG-010 / REQ-ORG-011), to reconcile.** The ORG area is split across two
+> specs that each numbered into the 010+ range: `org-unit-tenancy.md` uses `REQ-ORG-001..011` (010 =
+> active-context surfacing; 011 = personal-aggregate owner retains see/edit, #701) **and**
+> `org-chart.md` uses `REQ-ORG-010..013` (010 = descriptive chart; 011 = Kommandoleiter). So
+> `REQ-ORG-010` and `REQ-ORG-011` each denote **two different** requirements. Per the "numbers are never
+>
+>> reused" rule this is a defect; renumbering shipped, test-referenced REQs needs owner sign-off (epic
+>
+> # 692, Phase 0 / #693) and is deliberately **not** done unilaterally here. To avoid compounding it, new
+>
+> ORG requirements skip the contested range: epic #692 allocated `REQ-ORG-014..018`, so the **next free
+> ORG id is `REQ-ORG-019`**.
+
 ### 3. Acceptance criteria are the testable contract
 
 Write acceptance criteria as checkable statements (Given/When/Then maps onto the project's

@@ -1,0 +1,66 @@
+# ADR-0026 — Cascading org-unit scope without admin rights, computed in one descent helper
+
+- **Status:** Accepted — implementation pending (epic #692)
+- **Date:** 2026-06-19
+- **Deciders:** @greluc, Claude
+- **Related:** spec REQ-ORG-015 · REQ-SEC-015 · ADR-0025 · REQ-ORG-011 (#701) · ADR-0024 (#702) · issue #692 · #696
+
+## Context
+
+Authorisation cascades today: `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`, with an officer reaching
+their one Staffel and an SK-lead their SK via `OwnerScopeService.currentBlueprintOversightScope()`, and
+an admin reaching everything via the `adminAllScope=true` branch. The restructure (ADR-0025) needs the
+**Bereichsleitung** (Bereichsleiter/-koordinator/-operator) to reach **all Staffeln + SKs of their
+Bereich**, and the **OL** to reach **everything** — but with **no admin rights**: `isAdmin()` unlocks
+ADMIN-only carve-outs (SK lifecycle, system settings, stammdaten, the promotion-topic guards). The scope
+seam computes `memberOrgUnitIds` as a flat read of `org_unit_membership`. Two recently-merged PRs add
+branches the cascade must not break: #701 (`REQ-ORG-011`) runs an `isCurrentUserOwner(owner)` bypass
+*before* the scope check on personal aggregates; #702 (`ADR-0024`) adds a consented global-blueprint
+union into the oversight/coverage path.
+
+## Decision
+
+We will compute the cascade in **exactly one** private helper,
+`OwnerScopeService.expandWithDescendants(...)`, consumed by **both** `currentMemberOrgUnitIds()` and
+`currentBlueprintOversightScope()`. For a `BEREICH`-leadership membership it unions in all
+`SQUADRON`+`SPECIAL_COMMAND` descendants of that Bereich; for an `is_ol_member` membership it unions in
+everything (all Bereiche + their descendants + the OL's own id). The result is a **concrete
+`memberOrgUnitIds` union** — the cascade **must never** route through the `adminAllScope=true` branch,
+and an OL/Bereich principal **must never satisfy `isAdmin()`**. `ScopePredicate.permits()` and the
+`IN :memberOrgUnitIds` JPQL are kind-agnostic, so feeding them the expanded set cascades lists **and**
+per-row gates together with no per-query edits.
+
+Further:
+
+- **Strict silo:** a Bereichsleitung's expanded union contains only its own Bereich's descendants; only
+  the OL crosses Bereiche. Cross-Bereich access is impossible by construction.
+- **SK-lead is not expanded:** an SK-lead keeps SK-only reach (Q1); their Bereichsleitung membership is
+  organisational only.
+- **Authorities:** the JWT converter mints, for each Bereich/OL leadership membership, the flat
+  `ROLE_LOGISTICIAN`/`ROLE_MISSION_MANAGER` (so `hasRole(...)` menu gates work) **and** a contextual
+  `OrgUnitContextualAuthority(role, descendantId)` per descendant (so existing
+  `@PreAuthorize("@ownerScopeService.hasRoleInOrgUnit(#id, '…')")` resolves without SpEL rewrites).
+- **Stamping stays DIRECT:** `collectMemberOrgUnitIds()` (create-time auto-stamp) is *not* expanded;
+  create-on-behalf is handled separately (ADR-0027).
+- **Composition:** the cascade only widens the *scope* branch; the #701 `isCurrentUserOwner` bypass stays
+  ahead of it, and the #702 global-blueprint union in the overview/coverage services is preserved.
+
+## Consequences
+
+- Lists and detail gates can never diverge — they read the same expanded set through one helper.
+- Bereich/OL get officer-equivalent reach while every `hasRole('ADMIN')` carve-out stays locked.
+- Cost: an OL union is potentially *all* units — benchmark the `IN :memberOrgUnitIds` list queries on a
+  prod-like snapshot; if it bites, swap to a closure-table JOIN / materialised path (the helper is the
+  single place to change). Per-descendant contextual-authority fan-out is the chosen trade-off over a
+  parent-walk at gate time (which would add a DB read per gate and break the pure value-equality match).
+
+## Alternatives considered
+
+- **Model OL via `adminAllScope=true`** — rejected: it would make OL satisfy `isAdmin()` and silently
+  unlock every ADMIN-only carve-out — the exact privilege escalation the restructure forbids.
+- **Inline the descent into each repository query / per-row gate** — rejected: scatters the security-
+  critical logic, and risks list-vs-detail divergence; the one-helper rule makes the cascade auditable.
+- **Contextual authority at the Bereich id + parent-walk at evaluation time** — rejected for v1: adds a
+  DB read per `hasRoleInOrgUnit` call and breaks its current pure value-equality match; pre-expanded
+  authorities keep the gate cheap.
+
