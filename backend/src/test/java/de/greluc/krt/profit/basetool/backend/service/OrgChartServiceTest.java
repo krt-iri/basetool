@@ -214,8 +214,9 @@ class OrgChartServiceTest {
 
     OrgChartDto chart = service().getOrgChart();
 
-    // OL members surface at the top.
-    assertEquals(1, chart.organisationsleitung().size());
+    // OL members surface at the top, carried by the OL tier (id + name + members).
+    assertEquals(olId, chart.organisationsleitung().orgUnitId());
+    assertEquals(1, chart.organisationsleitung().members().size());
     // One Bereich tier carrying its department, its Bereichsleiter and its grouped Staffel.
     assertEquals(1, chart.bereiche().size());
     BereichChartDto b = chart.bereiche().getFirst();

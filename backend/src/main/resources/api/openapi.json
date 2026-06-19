@@ -48082,14 +48082,32 @@
           }
         }
       },
-      "OrgChartDto" : {
+      "OlChartDto" : {
         "type" : "object",
         "properties" : {
-          "organisationsleitung" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "members" : {
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/OrgChartNodeDto"
             }
+          }
+        }
+      },
+      "OrgChartDto" : {
+        "type" : "object",
+        "properties" : {
+          "organisationsleitung" : {
+            "$ref" : "#/components/schemas/OlChartDto"
           },
           "bereiche" : {
             "type" : "array",

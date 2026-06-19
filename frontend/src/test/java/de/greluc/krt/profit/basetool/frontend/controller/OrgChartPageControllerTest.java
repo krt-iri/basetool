@@ -58,7 +58,7 @@ class OrgChartPageControllerTest {
 
   private static OrgChartDto emptyChart() {
     return new OrgChartDto(
-        List.of(),
+        null,
         List.of(),
         new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
         List.of(),

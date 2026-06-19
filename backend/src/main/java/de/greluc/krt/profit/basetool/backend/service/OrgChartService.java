@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AreaLeadershipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OlChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartNodeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
@@ -148,13 +149,17 @@ public class OrgChartService {
     Map<UUID, List<OrgChartPosition>> positionsByUnit =
         unitPositions.stream().collect(Collectors.groupingBy(p -> p.getOrgUnit().getId()));
 
-    // OL members at the very top (empty when no OL exists).
-    List<OrgChartNodeDto> olMembers =
+    // OL tier at the very top (null when no OL exists, so the chart omits the tier).
+    OlChartDto olTier =
         ol == null
-            ? List.of()
-            : nodesOfType(
-                positionsByUnit.getOrDefault(ol.getId(), List.of()),
-                OrgChartPositionType.OL_MEMBER);
+            ? null
+            : new OlChartDto(
+                ol.getId(),
+                ol.getName(),
+                ol.getShorthand(),
+                nodesOfType(
+                    positionsByUnit.getOrDefault(ol.getId(), List.of()),
+                    OrgChartPositionType.OL_MEMBER));
 
     // One tier per Bereich: its Bereichsleitung sub-tree + the Staffeln/SKs wired under it.
     List<BereichChartDto> bereichDtos =
@@ -183,7 +188,7 @@ public class OrgChartService {
             .toList();
 
     return new OrgChartDto(
-        olMembers,
+        olTier,
         bereichDtos,
         buildAreaLeadership(areaPositions),
         ungroupedSquadrons,

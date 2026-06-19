@@ -56,7 +56,7 @@ class OrgChartControllerTest {
   void getOrgChart_delegatesToService() {
     OrgChartDto chart =
         new OrgChartDto(
-            List.of(),
+            null,
             List.of(),
             new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
             List.of(),
