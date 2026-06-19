@@ -95,6 +95,11 @@ values exactly:
 
 - [ ] Department tags/badges use the official token names with the exact hex values.
 
+> **Amended by epic #692 (REQ-ORG-018):** these frozen Bereichsfarben are also applied to **org-chart
+> nodes**, tinting each Bereich's sub-tree with its colour. This applies the existing tokens (no new
+> hues); node text must keep ≥ 4.5:1 contrast (use the accessible `--color-*-text` tints where the hue
+> would become small text).
+
 ### REQ-UI-006 — Semantic status colours
 
 Status hues reuse Bereichsfarben values by appearance: danger `#A3000A`, success

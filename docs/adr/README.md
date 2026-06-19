@@ -62,4 +62,8 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0022](0022-bank-booking-request-notifications-account-grant-selector.md) | Bank booking-request notifications via an `ACCOUNT_GRANT` selector kind                 | Accepted                          |
 | [0023](0023-manufacturer-uex-company-alias-merge.md)                      | Merge UEX duplicate companies onto one manufacturer via a company-id alias table        | Accepted                          |
 | [0024](0024-opt-in-global-blueprint-sharing.md)                           | Opt-in global blueprint sharing overrides org-unit scoping (read-only)                  | Accepted                          |
+| [0025](0025-org-hierarchy-data-model.md)                                  | Org hierarchy: Bereich + Organisationsleitung as `org_unit` kinds with a parent FK      | Accepted — implementation pending |
+| [0026](0026-cascading-scope-without-admin.md)                             | Cascading org-unit scope without admin rights, computed in one descent helper           | Accepted — implementation pending |
+| [0027](0027-bereich-ol-aggregate-ownership.md)                            | Bereich and Organisationsleitung as direct owners of org-unit-scoped aggregates         | Accepted — implementation pending |
+| [0028](0028-bank-bereich-ol-access-seam.md)                               | Bereich/OL bank access (AREA/CARTEL) via the `OrgUnitBankAccessService` seam            | Accepted — implementation pending |
 

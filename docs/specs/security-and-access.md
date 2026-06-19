@@ -59,6 +59,13 @@ does so by delegating its management branch to `canManageMission` rather than sh
 bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
 REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 
+> **Amended by epic #692 (REQ-SEC-015 / REQ-ORG-015):** Bereich/OL leadership memberships
+> (`is_bereichsleiter`/`koordinator`/`operator`, `is_ol_member`) also mint the flat
+> `LOGISTICIAN`/`MISSION_MANAGER` authorities **and** contextual `…@orgUnitId` authorities — but one per
+> **descendant** Staffel/SK of the leader's scope (Bereich → its children; OL → all), so existing
+> per-OrgUnit `@PreAuthorize` SpEL resolves for area leaders without change. This reach is concrete and
+> scoped; it grants **no** admin rights.
+
 ### REQ-SEC-006 — Multi-user data isolation
 
 Every read/write filters by JWT `sub` unless the caller has an elevated role (`ADMIN`,
@@ -334,6 +341,37 @@ network). Dev/test are exempt (Keycloak stays HTTP; the admin URL is plain HTTP 
 **Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService`, `application-prod.yml`
 (`spring.ssl.bundle.jks.keycloak-trust`), `docker-compose.yml` (`keycloak` command, backend
 `KEYCLOAK_ADMIN_URL`) · **Runbook:** [`deployment.md` &rarr; Keycloak behind NPM over HTTPS](../deployment.md#keycloak-behind-npm-over-https)
+
+### REQ-SEC-015 — Bereich/OL leadership grants officer-equivalent reach, never admin rights
+
+The org hierarchy (REQ-ORG-014) introduces Bereich and OL leadership whose access **cascades** down to
+subordinate units (REQ-ORG-015). This is a security-load-bearing carve-out, so the invariant is pinned
+here:
+
+- A Bereich/OL leadership principal gets **officer-equivalent reach** over its scope as a **concrete
+  `memberOrgUnitIds` union** (and matching contextual authorities) — it MUST **never** route through the
+  `adminAllScope=true` branch and MUST **never satisfy `isAdmin()`**. Every `hasRole('ADMIN')` gate
+  (admin area, SK lifecycle, system settings, stammdaten, promotion-topic guards, bank admin/audit) stays
+  closed to it.
+- **Strict silo:** a Bereichsleitung sees/edits only its own Bereich's descendants; only the OL crosses
+  Bereiche. No peer-Bereich access, even read-only.
+- **ArchUnit-whitelist obligation:** the name-keyed rules `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`,
+  `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` and `orgUnitAwareBankSeamIsContainedToOneClass`
+  silently skip classes not in their set; **every** new scoped controller/service added by the
+  restructure MUST be added to the relevant whitelist in the same PR (or covered by an
+  annotation/package-based rule), so no new write endpoint ships ungated.
+
+**Acceptance**
+
+- [ ] An OL/Bereich principal fails `isAdmin()` and is rejected by every `hasRole('ADMIN')` gate.
+- [ ] A Bereichsleitung is denied another Bereich's data (lists and detail gates).
+- [ ] A new scoped controller/service is caught by the ArchUnit scope/whitelist rules (a deliberately
+  ungated one fails the build).
+
+**Enforced by (planned):** `OwnerScopeServiceTest`, `ArchitectureTest` (whitelist + no-admin rules),
+visibility-matrix e2e · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:**
+
+# 692, #696, #700.
 
 ## Out of scope
 

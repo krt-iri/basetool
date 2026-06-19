@@ -13,6 +13,13 @@ the `OrgChartPosition` row (Flyway `V136`, extended by `V138`); the read/write r
 [`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartService.java)
 and [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/OrgChartController.java).
 
+> **Widened by epic #692 (REQ-ORG-018):** the chart was originally a single "Profit-Bereich" tree
+> (`OrgChartScope.AREA` as a singleton). With the real hierarchy (REQ-ORG-014: OL > Bereich > Staffel/SK)
+> it becomes **multi-Bereich with an Organisationsleitung at the top**. It stays **purely descriptive**
+> (REQ-ORG-010): a position grants no permission — authorization lives in the role model and
+> `org_unit_membership` flags. The authoritative hierarchy and the descriptive chart are kept
+> consistent by the admin who maintains both.
+
 ## Requirements
 
 ### REQ-ORG-010 — The org chart is descriptive and ADMIN-edited
@@ -113,6 +120,29 @@ and the horizontal-scroll restoration across a successful edit (`@Tag("e2e")`, s
 ephemeral stack and is gated on the `e2e` PR label — see `.github/workflows/e2e.yml`).
 **Code:** `org-chart.html` (inline tree-nav + dialog JS), `org-chart.css`,
 `fragments/org-chart-node.html` · **Issues:** —
+
+### REQ-ORG-018 — Multi-Bereich chart with an Organisationsleitung level, coloured by Bereich
+
+With the real hierarchy (REQ-ORG-014) the chart renders **OL → each Bereich (Bereichsleiter +
+Bereichskoordinatoren + Bereichsoperatoren) → its Staffeln + SKs**, not a single Profit-Bereich.
+`OrgChartScope.AREA` stops being a singleton: each Bereich has its own area-leadership sub-tree, and a
+new top level holds the OL. The chart stays **descriptive and ADMIN-edited** (REQ-ORG-010) — it confers
+no permission. Each Bereich's nodes are tinted with its frozen Bereichsfarbe
+(`--color-dept-*`: Profit `#239E33`, Sub-Radar `#A3000A`, Raumüberlegenheit `#37BBC0`, Forschung
+`#355DDC`, Marinekorps `#7A5E96`, Search & Rescue `#FFD23F`), keeping text contrast ≥ 4.5:1 and the ARIA
+tree (REQ-ORG-013) intact.
+
+**Acceptance**
+
+- [ ] `GET /org-chart` renders an OL root, then one area-leadership sub-tree per Bereich, then that
+  Bereich's Staffeln + SKs; the partial unique indexes scope "one Bereichsleiter" etc. **per Bereich**.
+- [ ] Holding a chart position still grants no permission (a chart-only user is denied scoped data).
+- [ ] Each Bereich's nodes carry its Bereichsfarbe; contrast and the ARIA tree roles/levels are preserved.
+
+**Enforced by (planned):** `OrgChartPageRenderTest` (multi-Bereich + OL tree, per-Bereich colours, ARIA),
+`OrgChartServiceTest` (per-Bereich cardinality), a migration for the widened scope/indexes · **Issues:**
+
+# 692, #698.
 
 ## Out of scope
 

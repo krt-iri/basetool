@@ -59,6 +59,11 @@ by partial unique indexes, not by application convention alone.
 
 **Enforced by:** `BankAccountServiceTest`, `BankControllerSecurityTest`, `DatabaseIndexMigrationTest` (V150 partial uniques), `BankManagePageControllerOrgUnitPickerMvcTest` (create-account org-unit picker renders names + ids, not `null`) · **Code:** `model/BankAccount`, `service/BankAccountService`, `db/migration/V150`, `controller/BankManagePageController` · **Issues:** #556
 
+> **Amended by epic #692 (REQ-BANK-027):** Bereiche are now first-class `org_unit` kinds (REQ-ORG-014),
+> so the `AREA` row's owner reference becomes a link to a `BEREICH` `org_unit` (one `AREA` account per
+> Bereich) instead of a free-form area name, and `CARTEL` is linked to the `ORGANISATIONSLEITUNG`. This
+> lets the `OrgUnitBankAccessService` seam resolve `AREA`/`CARTEL` accounts by Bereich/OL membership.
+
 ### REQ-BANK-002 — Dynamic account lifecycle, no hard delete
 
 **All** account types — org-unit, area, cartel, cartel-bank and special — are created at
@@ -223,6 +228,11 @@ the grant table.
 > which is the **only** class permitted to bridge `OwnerScopeService` and the bank
 > (pinned by `ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`). The officer/lead
 > surface lives outside the bank URL/role space (`/api/v1/org-units/bank/**`).
+>
+> **Amendment (epic #692, REQ-BANK-027):** the same seam — still the only org-unit bridge — extends this
+> narrow capability **up the hierarchy**: a Bereichsleitung over its `AREA` account, the OL over the
+> `CARTEL` account, plus **view-only** drill-down into subordinate accounts. `BankSecurityService` and
+> the ledger stay 100% org-unit-blind; both ArchUnit pins remain in force.
 
 **Acceptance**
 
@@ -666,6 +676,39 @@ admin-editable at runtime.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:** `event/BankBookingRequest{Created,Confirmed,Rejected}Event`, `service/RecipientResolutionService#resolveAccountGrantHolders`, `model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT}`, `db/migration/V160`, `db/migration/V161` · **Issues:** #666, #673
 
+### REQ-BANK-027 — Bereich/OL bank access via the OrgUnitBankAccessService seam (cascading view, own-level requests)
+
+The org hierarchy (REQ-ORG-014) extends the epic-#666 officer/lead bank function (REQ-BANK-021/022) up
+the new levels, **without** weakening the bank's org-unit-blindness (REQ-BANK-008, ADR-0011): all new
+logic stays in the single non-`Bank*` seam `OrgUnitBankAccessService` (ADR-0020/0028); the ledger,
+`BankSecurityService` and the grant model are untouched, and both ArchUnit pins
+(`bankClassesMustNotConsultOrgUnitScope`, `orgUnitAwareBankSeamIsContainedToOneClass`) stay green.
+
+- **Account identity:** `AREA` accounts are linked to a Bereich and `CARTEL` to the OL (replacing /
+  constraining the free-form `areaName`, REQ-BANK-001).
+- **View cascades down:** `listOverseenBalances()` returns the caller's own-level account **and** all
+  subordinate accounts in their oversight scope (Bereichsleitung → its `AREA` account + every child
+  Staffel/SK `ORG_UNIT` account; OL → `CARTEL` + every `AREA` + every `ORG_UNIT`). Strict silo holds —
+  no foreign-Bereich account is listed.
+- **Requests are own-level only (asymmetric, by owner decision):** `createBookingRequest()` is permitted
+  only on the caller's **own-level** account (officer → squadron `ORG_UNIT`; Bereich → `AREA`; OL →
+  `CARTEL`). Subordinate accounts reached by drill-down are **view-only**. The confirm-before-post flow,
+  overdraft/holder checks and `ACCOUNT_GRANT` notifications are unchanged; bank staff still confirm.
+- The officer flow from REQ-BANK-021/022 is preserved exactly (no regression).
+
+**Acceptance**
+
+- [ ] A Bereichsleitung sees its `AREA` balance + all child `ORG_UNIT` balances; the OL sees `CARTEL` +
+  all `AREA` + all `ORG_UNIT`; no foreign-Bereich balance leaks.
+- [ ] A Bereichsleitung can file a request on its `AREA` account and the OL on `CARTEL`; a request on a
+  **subordinate** account is rejected (view-only).
+- [ ] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay green;
+  the existing officer flow and ledger tests are unchanged.
+
+**Enforced by (planned):** a bank role-matrix test (officer / SK-lead / Bereich / OL / admin × bank
+roles/grants), `ArchitectureTest` · **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md) ·
+**Issues:** #692, #699.
+
 ## Out of scope
 
 - **Accounts for individual players** — an explicit owner decision: players appear only
@@ -682,8 +725,10 @@ admin-editable at runtime.
   requests do not expire automatically (they are confirmed, rejected or cancelled).
 - **English PDF variants** — v1 statements/exports render German labels (from the
   message bundles, so a locale switch stays cheap later).
-- **A "Bereich" (area) entity** — area accounts carry a free-form name; the org chart
-  stays purely descriptive (REQ-ORG-010).
+- ~~**A "Bereich" (area) entity** — area accounts carry a free-form name; the org chart
+  stays purely descriptive (REQ-ORG-010).~~ **Superseded by epic #692:** Bereich and OL are now
+  first-class `org_unit` kinds (REQ-ORG-014); `AREA` accounts link to a Bereich and `CARTEL` to the OL
+  (REQ-BANK-027). The org chart stays descriptive, but is widened to multi-Bereich + OL (org-chart spec).
 
 ## Open questions
 

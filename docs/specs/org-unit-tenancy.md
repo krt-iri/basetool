@@ -20,6 +20,10 @@ staffel-scoped aggregate carries both the legacy `owning_squadron_id` and the ne
 Repository queries read the new column; the legacy column drops in the destructive cleanup
 release.
 
+> **Amended by epic #692 (REQ-ORG-014):** `org_unit.kind` gains `BEREICH` and `ORGANISATIONSLEITUNG`, and
+> a nullable self-referential `parent_org_unit_id` introduces the fixed three-level hierarchy
+> OL → Bereich → Staffel/SK.
+
 ### REQ-ORG-002 — Scope is enforced in the service layer
 
 Use [`OwnerScopeService.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
@@ -71,6 +75,12 @@ non-admins see the union of their memberships unless they pin one.
   cross-OrgUnit inside the order UI but NEVER leak into a foreign Lager-View
   (`findGlobalByFilters` is gated, `findByJobOrderIdOrdered` is not).
 
+> **Amended by epic #692 (REQ-ORG-016):** `owning_org_unit_id` (and `responsible_org_unit_id`) may now
+> reference a `BEREICH` or `ORGANISATIONSLEITUNG` org_unit. Such rows participate in **these same** scope
+> kinds and escape rules unchanged — the only new behaviour is that the descendant cascade (REQ-ORG-015)
+> lets a higher level see/edit its subordinate units' rows; a subordinate never sees the level above
+> (strict silo).
+
 ### REQ-ORG-004 — Create-time OrgUnit stamping
 
 Stamp the OrgUnit via the central picker resolvers on `OwnerScopeService` — never read
@@ -99,6 +109,11 @@ Job Order uses its own resolvers: `responsible_org_unit_id` must be profit-eligi
 from system setting `job_order.intake_special_command_id` for guest creations);
 `requesting_org_unit_id` accepts any OrgUnit and is freely editable.
 
+> **Amended by epic #692 (REQ-ORG-016):** stamping **validation** widens to `(direct memberships ∪
+> oversight descendants)` so a Bereichsleitung/OL can create on behalf of a subordinate Staffel/SK and
+> own their own Bereich/OL data; the **auto-stamp** default and the `>1 → force a choice` rule stay keyed
+> on **DIRECT** membership, so ordinary-member stamping is unchanged.
+
 ### REQ-ORG-005 — Admin area & promotion carve-outs
 
 Admin area is admin-only (post-Phase-4 lockdown), with carve-outs: Stammdaten,
@@ -119,6 +134,13 @@ short-circuits promotion services when OFF. **SKs can never participate in promo
 enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), app
 (`SpecialCommand` entity), and type layer (ArchUnit
 `promotionTopicOwningSquadronMustStayTypedSquadronNotOrgUnit`).
+
+> **Amended by epic #692 (REQ-ORG-015):** membership in a Bereich's Bereichsleitung or the OL grants
+> **officer-equivalent reach** over the subordinate units, **never admin rights** — every carve-out in
+> this requirement stays `hasRole('ADMIN')`, and an OL/Bereich principal must never satisfy `isAdmin()`.
+> Bereichsleitung inherits the OFFICER promotion-maintenance carve-out for the **Staffeln** in its
+> Bereich (via the normal officer path, not a widened promotion scope); Bereich/OL never own promotion
+> data and SKs stay permanently excluded.
 
 ### REQ-ORG-006 — ArchUnit guards for new staffel-scoped aggregates
 
@@ -188,6 +210,12 @@ creator column and no `is_internal` flag:
 Only `Mission` and `Operation` gain this carve-out; `JobOrder` stays NOT NULL (org-owned by
 construction, no creator-owner fallback and no ownerless-leadership use case).
 
+> **Amended by epic #692 (REQ-ORG-016):** this ownerless (`owning_org_unit_id = NULL`) path is
+> **preserved unchanged** — it remains the "org-wide, visible to members-or-above" semantic. It is
+> distinct from Bereich/OL *ownership*: a `NULL` owner is org-wide, whereas a `BEREICH`/`ORGANISATIONSLEITUNG`
+> owner scopes the row to that level's leadership (strict silo). No existing `NULL`-owner row is
+> backfilled to a concrete owner.
+
 ### REQ-ORG-010 — Active-context surfacing in the UI
 
 The active OrgUnit context is surfaced to the user **only** by appending it to the application
@@ -245,3 +273,133 @@ shared pools. A **non-owner** stays bound by the strict `owning_org_unit_id` sco
 `InventoryTenancyE2eTest` (`ownerRetainsEditAfterLeavingOwningOrgUnit`) · **Code:**
 `OwnerScopeService#canSeeInventoryItem` / `#canEditInventoryItem` / `#canSeeShip` / `#canEditShip` /
 `#canSeeRefineryOrder` / `#canEditRefineryOrder`.
+
+### REQ-ORG-014 — Three-tier org hierarchy (Organisationsleitung > Bereich > Staffel/SK)
+
+The org unit world gains two levels **above** Staffel and SK, modelled on the existing single-table
+`org_unit` (ADR-0025): two new `OrgUnitKind` values `BEREICH` (area/division, e.g. Profit, Sub-Radar,
+Raumüberlegenheit) and `ORGANISATIONSLEITUNG` (OL), plus a nullable self-referential
+`parent_org_unit_id`. The hierarchy is **fixed three levels**: OL → Bereich → (Staffel | SK). A CHECK
+constraint pins the parent kind by the child kind (Staffel/SK parent is a `BEREICH`; Bereich parent is
+the `ORGANISATIONSLEITUNG`; OL has no parent), which also forbids cycles at fixed depth.
+`Bereich`/`Organisationsleitung` are JPA subclasses with promotion permanently disabled (like
+`SpecialCommand`); `chk_org_unit_promotion_only_squadron` widens to keep promotion FALSE for both new
+kinds. Roll-out is **additive** (mirror the V97–V100 soak): `parent_org_unit_id` is NULL until an admin
+assigns Bereiche, and the descent helper (REQ-ORG-015) treats a NULL parent as "no ancestor expansion",
+so the system is byte-identical to today's flat behaviour while the hierarchy is being populated.
+
+**Acceptance**
+
+- [ ] `OrgUnitKind` has `BEREICH` and `ORGANISATIONSLEITUNG`; `chk_org_unit_kind` and the discriminator
+  accept them; `ddl-auto=validate` passes.
+- [ ] `parent_org_unit_id` is nullable with the kind-pairing CHECK; no row can parent a kind other than
+  the one its level allows; the OL row has a NULL parent.
+- [ ] With every `parent_org_unit_id` NULL and no leadership flags set, `OwnerScopeService` scope output
+  is byte-identical to pre-change (snapshot test).
+
+**Enforced by (planned):** `OwnerScopeServiceTest` (degrade-to-flat snapshot), a migration test on a
+prod-like snapshot, `ArchitectureTest` · **ADR:** [ADR-0025](../adr/0025-org-hierarchy-data-model.md) ·
+**Issues:** #692, #694.
+
+### REQ-ORG-015 — Cascading oversight without admin rights, via one descent helper
+
+Leadership reach cascades, mirroring `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`: a **Bereichsleitung**
+(`is_bereichsleiter` / `is_bereichskoordinator` / `is_bereichsoperator`, REQ-ORG-017) gets
+officer-equivalent reach over **all Staffeln + SKs of its Bereich** (and its Bereich's own data); the
+**OL** (`is_ol_member`) over **everything**. This reach is computed in **exactly one** helper
+`OwnerScopeService.expandWithDescendants(...)`, consumed by `currentMemberOrgUnitIds()` **and**
+`currentBlueprintOversightScope()` (ADR-0026); `ScopePredicate.permits()` and the `IN :memberOrgUnitIds`
+JPQL cascade automatically once fed the expanded set, so lists and per-row gates widen together.
+
+Hard invariants:
+
+- The reach is a **concrete `memberOrgUnitIds` union — never** the `adminAllScope=true` branch. An
+  OL/Bereich principal **must never satisfy `isAdmin()`**, so all `hasRole('ADMIN')` carve-outs (SK
+  lifecycle, system settings, stammdaten, the promotion-topic guards in REQ-ORG-005) stay ADMIN-only.
+- **Strict silo:** a Bereichsleitung's union contains only its own Bereich's descendants; only the OL
+  crosses Bereiche. No peer-Bereich visibility.
+- An **SK-lead is not expanded** — they keep SK-only reach; their Bereichsleitung membership is
+  organisational only (REQ-ORG-017).
+- The JWT converter mints, per leadership membership, the flat `ROLE_LOGISTICIAN`/`ROLE_MISSION_MANAGER`
+  (so `hasRole(...)` menu gates work) **and** a contextual `OrgUnitContextualAuthority(role, descendant)`
+  per descendant (so existing `@PreAuthorize("@ownerScopeService.hasRoleInOrgUnit(#id, '…')")` resolves).
+- The cascade **composes with** the personal-aggregate owner-bypass (REQ-ORG-011) and the opt-in global
+  blueprint union ([ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md)); neither is weakened.
+
+**Acceptance**
+
+- [ ] For a Bereichsleitung and the OL, list-query scope equals `permits()` for every descendant **and**
+  denies every non-descendant / foreign pin (foreign-pin-collapses-to-union preserved).
+- [ ] A Bereichsleitung is denied another Bereich's data in both lists and detail gates (strict silo).
+- [ ] An OL/Bereich principal fails `isAdmin()` and every `hasRole('ADMIN')` carve-out.
+- [ ] An SK-lead's reach is SK-only (no Bereich expansion).
+- [ ] The REQ-ORG-011 owner-bypass and the ADR-0024 global-sharing union still hold for a leadership
+  principal.
+
+**Enforced by (planned):** `OwnerScopeServiceTest`, `CustomJwtGrantedAuthoritiesConverterTest`,
+visibility-matrix e2e · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · also pins
+[REQ-SEC-015](security-and-access.md) · **Issues:** #692, #696.
+
+### REQ-ORG-016 — Bereich/OL as direct owners of org-unit-scoped aggregates
+
+A Bereich and the OL **own their own data** — `owning_org_unit_id` may reference a `BEREICH` or
+`ORGANISATIONSLEITUNG` org_unit — in addition to overseeing subordinate units (ADR-0027). Leadership may
+also **create on behalf of** a subordinate Staffel/SK. The create-time stamping matrix (REQ-ORG-004) is
+extended:
+
+- **Validation** of a picker choice widens to `(direct memberships ∪ oversight descendants)`: a
+  Bereichsleitung may stamp its own Bereich or any descendant; the OL anything.
+- **Auto-stamp stays on a single DIRECT membership** (a leader's default owner = their own Bereich/OL;
+  `>1` direct forces an explicit pick; a foreign / out-of-oversight pick is a 400) — ordinary members'
+  stamping is unchanged.
+- **Create-on-behalf is authorised by `canEditOrgUnit(target)`** (cascades per REQ-ORG-015), not by
+  admin-ness; every create/update path accepting a target owning-org-unit (incl.
+  `JobOrderService.resolveResponsibleOrgUnit`) gains this gate.
+- Visibility reuses the existing scope + public/internal escape rules unchanged; strict silo holds. The
+  ownerless `NULL` leadership path (REQ-ORG-009) is **preserved unchanged** (no backfill). Promotion
+  stays Squadron-only. The REQ-ORG-011 owner-bypass stays ahead of the scope check.
+
+**Acceptance**
+
+- [ ] A Bereich-owned and an OL-owned aggregate can be created, read and edited by that level's
+  leadership; a subordinate cannot see the level above (strict silo).
+- [ ] Create-on-behalf of a descendant succeeds; of a non-descendant fails (400/403).
+- [ ] Ordinary-member and officer stamping is byte-identical to today.
+- [ ] The ownerless `NULL` path behaves exactly as REQ-ORG-009.
+
+**Enforced by (planned):** per-aggregate stamping/visibility tests, `OwnerScopeServiceTest`,
+visibility-matrix e2e · **ADR:** [ADR-0027](../adr/0027-bereich-ol-aggregate-ownership.md) · **Issues:**
+
+# 692, #697.
+
+### REQ-ORG-017 — Membership cardinality & exclusivity rules
+
+`org_unit_membership` gains leadership flags `is_bereichsleiter` / `is_bereichskoordinator` /
+`is_bereichsoperator` (valid only on `BEREICH`-kind rows) and `is_ol_member` (only on
+`ORGANISATIONSLEITUNG`-kind rows), each pinned to its kind by a CHECK (mirroring
+`chk_org_unit_membership_lead_only_on_special_command`). The cardinality/exclusivity rules:
+
+1. A member may belong to **up to two Staffeln** (possibly from different Bereiche) and **any number of
+   SKs** — the V95 `uq_org_unit_membership_one_squadron` "≤1 squadron" guard relaxes to "≤2".
+2. An **SK-lead** (`is_lead=true`) belongs to **no Staffel** and is **always** an (organisational,
+   reach-less per REQ-ORG-015) member of the **Bereichsleitung of the Bereich its SK belongs to**.
+3. **Bereichsleitung members** (`is_bereichsleiter`/`koordinator`/`operator`) belong to **no Staffel**.
+4. **OL members** (`is_ol_member`) belong to **no Staffel**, but **may** belong to a Bereich.
+5. A user may hold leadership in **more than one** Bereich (the reach unions per REQ-ORG-015).
+
+Rules 1 and the flag-kind pairing are expressible at the DB layer (a relaxed guard + CHECKs). The
+cross-row rules (2–4: "leadership/OL/SK-lead hold no Staffel", "≤2 Staffeln") cannot be a single-row
+CHECK and are enforced by a **trigger AND a service-layer guard** (defence in depth); raw-SQL/curl paths
+must not be able to violate them. `membership.kind` and the trigger-synced flags stay
+`insertable=false, updatable=false`.
+
+**Acceptance**
+
+- [ ] A third Staffel membership is rejected; a second is accepted.
+- [ ] Making a user an SK-lead while they hold a Staffel membership is rejected; assigning an SK to a
+  Bereich (or making the user lead) auto-adds the reach-less Bereichsleitung membership.
+- [ ] A Bereichsleitung or OL flag on a user who holds a Staffel membership is rejected.
+- [ ] A leadership flag on the wrong `kind` is rejected by CHECK.
+
+**Enforced by (planned):** `OrgUnitMembershipServiceTest`, a DB-constraint/trigger test,
+`ArchitectureTest` (validation-call rule) · **Issues:** #692, #695.

@@ -543,6 +543,43 @@ restriktive Sicht wie ein Member.
   Mitgliedschafts-Vereinigung der normalen Listen). Besitzer werden nur als
   Anzeigename ausgeliefert, nie als Sub/E-Mail.
 
+### 4.1 Bereichsleitung & Organisationsleitung — kaskadierende Zuständigkeit (epic #692, geplant)
+
+> **Status:** geplant (epic #692, noch nicht ausgeliefert). Bindende Spezifikation:
+> [REQ-ORG-014..018](docs/specs/org-unit-tenancy.md), [REQ-SEC-015](docs/specs/security-and-access.md),
+> [REQ-BANK-027](docs/specs/bank.md), ADR-0025..0028.
+
+Über Staffeln und Spezialkommandos kommen zwei neue Ebenen: der **Bereich** (z. B. Profit, Sub-Radar,
+Raumüberlegenheit) und die **Organisationsleitung (OL)** ganz oben. Die Zuständigkeit **kaskadiert**
+analog zu `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
+
+- **Bereichsleitung** (`is_bereichsleiter` / `is_bereichskoordinator` / `is_bereichsoperator`) hat
+  **offiziersgleiche** Zuständigkeit über **alle Staffeln + SKs ihres Bereichs** und über die eigenen
+  Bereichsdaten.
+- **OL** (`is_ol_member`) hat dieselbe Zuständigkeit über **alles**.
+- **Keine Adminrechte:** Die Reichweite ist eine konkrete `memberOrgUnitIds`-Vereinigung, **nie** der
+  `adminAllScope`-Zweig. Ein OL-/Bereichs-Principal erfüllt **niemals** `isAdmin()`; alle
+  `hasRole('ADMIN')`-Gates (Admin-Bereich, SK-Lifecycle, System-Settings, Stammdaten,
+  Promotion-Topic-Guards, Bank-Admin/Audit) bleiben zu.
+- **Strikte Trennung:** Eine Bereichsleitung sieht/bearbeitet **nur** den eigenen Bereich; **nur** die
+  OL ist bereichsübergreifend.
+- **SK-Leiter bleibt SK-only:** Seine Bereichsleitungs-Zugehörigkeit ist rein organisatorisch (Sitz im
+  Organigramm), erweitert die Rechte **nicht** auf den Bereich.
+- **Eigene Daten + im Auftrag anlegen:** Bereich/OL besitzen eigene Aggregate (Lager, Einsätze,
+  Operationen, Aufträge, Raffinerieaufträge) und können für untergeordnete Einheiten anlegen
+  (z. B. einen Auftrag oder Raffinerieauftrag für eine Staffel ihres Bereichs); gegatet über
+  `canEditOrgUnit(target)`, nicht über Adminschaft (REQ-ORG-016).
+- **Auswahlpicker:** Bereichsleitung/OL erhalten einen admin-ähnlichen Drill-down-Picker, aber nur in
+  **ihnen untergeordnete** Einheiten (Bereichsleitung: Staffeln/SKs ihres Bereichs; OL: alles).
+- **Bank (REQ-BANK-027):** Die Ansicht kaskadiert (eigenes Ebenen-Konto **und** untergeordnete Konten),
+  Ein-/Auszahlungs**anträge** aber **nur auf dem eigenen Ebenen-Konto** (Bereich → `AREA`-Konto, OL →
+  `CARTEL`/Kartell-Konto); untergeordnete Konten sind per Picker nur einsehbar. Die Bank bleibt
+  OrgUnit-blind (Logik nur im `OrgUnitBankAccessService`-Seam).
+- **Mitgliedschaftsregeln (REQ-ORG-017):** bis zu **zwei** Staffeln (auch aus verschiedenen Bereichen)
+  und beliebig viele SKs; SK-Leiter, Bereichsleitung und OL gehören **keiner** Staffel an; SK-Leiter
+  gehören **immer** der Bereichsleitung des Bereichs ihres SK an; OL-Mitglieder dürfen einem Bereich
+  angehören.
+
 ---
 
 ## 5. Besonderheiten der Implementierung
