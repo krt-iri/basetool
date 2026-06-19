@@ -202,6 +202,21 @@ class OrgHierarchyMigrationTest {
     }
   }
 
+  /**
+   * V165 (REQ-ORG-017): the cross-row "a leader holds no Staffel" invariant is enforced by a
+   * trigger on {@code org_unit_membership} firing on both INSERT and UPDATE. The behavioural
+   * rejection paths are covered through the service layer (where user fixtures exist); here the
+   * trigger's presence is the early-warning canary.
+   */
+  @Test
+  void v165AddsLeaderExcludesSquadronTrigger() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    assertTriggerExists(
+        jdbc, "org_unit_membership", "trg_org_unit_membership_leader_excl_squadron_ins");
+    assertTriggerExists(
+        jdbc, "org_unit_membership", "trg_org_unit_membership_leader_excl_squadron_upd");
+  }
+
   private static void insertOrgUnit(
       JdbcTemplate jdbc,
       UUID id,

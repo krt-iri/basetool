@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -425,6 +426,15 @@ public class OrgUnitMembershipService {
       return;
     }
 
+    // REQ-ORG-017: a leader (SK-Leiter / Bereichsleitung / OL) belongs to no Staffel. Reject
+    // assigning a Staffel to such a user with a clean 400 before the V165 DB trigger turns it into
+    // a 500. (A user being moved between Staffeln is unaffected — they hold no leadership flag.)
+    if (userHoldsLeadershipRole(user.getId())) {
+      throw new BadRequestException(
+          "User holds a leadership role (SK-Lead/Bereichsleitung/OL) and cannot be assigned to a"
+              + " Staffel — remove the leadership role first (REQ-ORG-017)");
+    }
+
     boolean alreadyMember =
         existing.stream().anyMatch(m -> newSquadron.getId().equals(m.getId().getOrgUnitId()));
     if (alreadyMember && existing.size() == 1) {
@@ -480,6 +490,13 @@ public class OrgUnitMembershipService {
       @NotNull MembershipLeadToggleRequest request) {
     OrgUnitMembership m = loadMembership(specialCommandId, userId);
     assertVersionMatches(m, request.version());
+    // REQ-ORG-017: an SK-Leiter holds no Staffel membership. Reject promoting a user who still
+    // belongs to a Staffel with a clean 400 before the V165 DB trigger turns it into a 500.
+    if (request.isLead() && userHoldsStaffelMembership(userId)) {
+      throw new BadRequestException(
+          "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel membership"
+              + " first (REQ-ORG-017)");
+    }
     m.setLead(request.isLead());
     return membershipRepository.save(m);
   }
@@ -561,5 +578,36 @@ public class OrgUnitMembershipService {
     if (m.getVersion() != null && !m.getVersion().equals(version)) {
       throw new ObjectOptimisticLockingFailureException(OrgUnitMembership.class, null);
     }
+  }
+
+  /**
+   * {@code true} iff the user holds at least one Staffel ({@code SQUADRON}) membership. Backs the
+   * REQ-ORG-017 guard that an SK-Leiter must belong to no Staffel.
+   *
+   * @param userId the user to check; never {@code null}.
+   * @return {@code true} when the user has a Staffel membership row.
+   */
+  private boolean userHoldsStaffelMembership(@NotNull UUID userId) {
+    return !membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON).isEmpty();
+  }
+
+  /**
+   * {@code true} iff the user holds any leadership flag on any membership — SK-Leiter ({@code
+   * is_lead}), Bereichsleitung ({@code is_bereichsleiter} / {@code is_bereichskoordinator} / {@code
+   * is_bereichsoperator}) or OL ({@code is_ol_member}). Backs the REQ-ORG-017 guard that such a
+   * leader is never assigned to a Staffel.
+   *
+   * @param userId the user to check; never {@code null}.
+   * @return {@code true} when any of the user's membership rows carries a leadership flag.
+   */
+  private boolean userHoldsLeadershipRole(@NotNull UUID userId) {
+    return membershipRepository.findAllByIdUserId(userId).stream()
+        .anyMatch(
+            m ->
+                m.isLead()
+                    || m.isBereichsleiter()
+                    || m.isBereichskoordinator()
+                    || m.isBereichsoperator()
+                    || m.isOlMember());
   }
 }

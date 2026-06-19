@@ -30,6 +30,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -343,6 +344,43 @@ class OrgUnitMembershipServiceTest {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> membershipService.toggleLead(scId, userId, request));
+  }
+
+  @Test
+  void toggleLead_userHoldsStaffel_throwsBadRequest() {
+    // REQ-ORG-017: an SK-Leiter holds no Staffel — promoting a user who still belongs to a Staffel
+    // is rejected with a clean 400 (the V165 trigger is the DB backstop).
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setVersion(0L);
+    m.setLead(false);
+    MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(new OrgUnitMembership()));
+
+    assertThrows(
+        BadRequestException.class, () -> membershipService.toggleLead(scId, userId, request));
+    verify(membershipRepository, never()).save(any());
+  }
+
+  // --- syncStaffelMembership guard ------------------------------------------
+
+  @Test
+  void syncStaffelMembership_userHoldsLeadershipRole_throwsBadRequest() {
+    // REQ-ORG-017: a leader (SK-Lead/Bereichsleitung/OL) is never assigned to a Staffel.
+    Squadron target = new Squadron();
+    target.setId(UUID.randomUUID());
+    OrgUnitMembership leadRow = new OrgUnitMembership();
+    leadRow.setLead(true);
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(leadRow));
+
+    assertThrows(
+        BadRequestException.class, () -> membershipService.syncStaffelMembership(user, target));
+    verify(membershipRepository, never()).save(any());
   }
 
   // --- listOptionsForUser ---------------------------------------------------
