@@ -33,16 +33,20 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -71,6 +75,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private SpecialCommandRepository specialCommandRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private InventoryOrgUnitReconciler inventoryReconciler;
 
   @InjectMocks private OrgUnitMembershipService membershipService;
@@ -380,6 +385,93 @@ class OrgUnitMembershipServiceTest {
 
     assertThrows(
         BadRequestException.class, () -> membershipService.syncStaffelMembership(user, target));
+    verify(membershipRepository, never()).save(any());
+  }
+
+  // --- Bereich / OL leadership membership -----------------------------------
+
+  @Test
+  void addBereichLeader_setsExactlyOneRoleFlag() {
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
+        .thenReturn(Optional.empty());
+    when(membershipRepository.save(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership m =
+        membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
+
+    assertTrue(m.isBereichskoordinator());
+    assertFalse(m.isBereichsleiter());
+    assertFalse(m.isBereichsoperator());
+  }
+
+  @Test
+  void addBereichLeader_userHoldsStaffel_throwsBadRequest() {
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(new OrgUnitMembership()));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.LEITER));
+    verify(membershipRepository, never()).save(any());
+  }
+
+  @Test
+  void addBereichLeader_notABereich_throwsBadRequest() {
+    UUID notBereichId = UUID.randomUUID();
+    Squadron squadron = new Squadron();
+    squadron.setId(notBereichId);
+    when(orgUnitRepository.findById(notBereichId)).thenReturn(Optional.of(squadron));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.addBereichLeader(notBereichId, userId, BereichLeadershipRole.LEITER));
+    verify(membershipRepository, never()).save(any());
+  }
+
+  @Test
+  void addOlMember_setsOlFlag() {
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+    when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(false);
+    when(membershipRepository.save(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership m = membershipService.addOlMember(olId, userId);
+
+    assertTrue(m.isOlMember());
+  }
+
+  @Test
+  void addOlMember_duplicate_throws() {
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+    when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(true);
+
+    assertThrows(DuplicateEntityException.class, () -> membershipService.addOlMember(olId, userId));
     verify(membershipRepository, never()).save(any());
   }
 

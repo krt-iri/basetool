@@ -22,11 +22,15 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
+import de.greluc.krt.profit.basetool.backend.model.dto.AddBereichLeaderRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.AddOlMemberRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgHierarchyService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -35,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -62,6 +67,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrgHierarchyController {
 
   private final OrgHierarchyService orgHierarchyService;
+  private final OrgUnitMembershipService orgUnitMembershipService;
 
   /**
    * Lists Bereiche for the admin overview.
@@ -157,6 +163,100 @@ public class OrgHierarchyController {
   }
 
   /**
+   * Grants a user a Bereichsleitung role (Leiter / Koordinator / Operator) on the Bereich. The user
+   * must hold no Staffel; an existing membership (e.g. an SK-Leiter seat) has the role flag set.
+   *
+   * @param id the Bereich id.
+   * @param request the user and the role to grant.
+   * @return the member's resulting role flags + version.
+   */
+  @PostMapping("/bereiche/{id}/members")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Add a Bereichsleitung member",
+      description = "Grants a Leiter/Koordinator/Operator role on the Bereich. ADMIN-only.")
+  public BereichMemberResponse addBereichLeader(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid AddBereichLeaderRequest request) {
+    return toBereichMember(
+        orgUnitMembershipService.addBereichLeader(id, request.userId(), request.role()));
+  }
+
+  /**
+   * Removes a user's Bereichsleitung membership from the Bereich.
+   *
+   * @param id the Bereich id.
+   * @param userId the user to remove.
+   */
+  @DeleteMapping("/bereiche/{id}/members/{userId}")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Remove a Bereichsleitung member",
+      description = "Removes the user's Bereichsleitung membership. ADMIN-only.")
+  public void removeBereichLeader(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+    orgUnitMembershipService.removeBereichLeader(id, userId);
+  }
+
+  /**
+   * Adds a user to the Organisationsleitung. The user must hold no Staffel.
+   *
+   * @param id the Organisationsleitung id.
+   * @param request the user to add.
+   * @return the member's resulting OL-flag + version.
+   */
+  @PostMapping("/organisationsleitung/{id}/members")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Add an Organisationsleitung member",
+      description = "Adds a user to the Organisationsleitung (is_ol_member). ADMIN-only.")
+  public OlMemberResponse addOlMember(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid AddOlMemberRequest request) {
+    return toOlMember(orgUnitMembershipService.addOlMember(id, request.userId()));
+  }
+
+  /**
+   * Removes a user from the Organisationsleitung.
+   *
+   * @param id the Organisationsleitung id.
+   * @param userId the user to remove.
+   */
+  @DeleteMapping("/organisationsleitung/{id}/members/{userId}")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Remove an Organisationsleitung member",
+      description = "Removes the user's Organisationsleitung membership. ADMIN-only.")
+  public void removeOlMember(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+    orgUnitMembershipService.removeOlMember(id, userId);
+  }
+
+  /**
+   * Maps a Bereichsleitung membership row to its wire response.
+   *
+   * @param m the membership; never {@code null}.
+   * @return the response DTO.
+   */
+  private BereichMemberResponse toBereichMember(@NotNull OrgUnitMembership m) {
+    return new BereichMemberResponse(
+        m.getId().getOrgUnitId(),
+        m.getId().getUserId(),
+        m.isBereichsleiter(),
+        m.isBereichskoordinator(),
+        m.isBereichsoperator(),
+        m.getVersion());
+  }
+
+  /**
+   * Maps an Organisationsleitung membership row to its wire response.
+   *
+   * @param m the membership; never {@code null}.
+   * @return the response DTO.
+   */
+  private OlMemberResponse toOlMember(@NotNull OrgUnitMembership m) {
+    return new OlMemberResponse(
+        m.getId().getOrgUnitId(), m.getId().getUserId(), m.isOlMember(), m.getVersion());
+  }
+
+  /**
    * Maps a {@link Bereich} entity to its wire DTO. Reads the (lazy) parent id within the
    * controller's transaction; {@code getId()} on the proxy needs no DB hit.
    *
@@ -196,4 +296,34 @@ public class OrgHierarchyController {
    */
   public record OrgUnitParentResponse(
       UUID orgUnitId, OrgUnitKind kind, UUID parentOrgUnitId, Long version) {}
+
+  /**
+   * Response for the add-Bereichsleitung-member endpoint: the member's resulting role flags and the
+   * membership's optimistic-lock version.
+   *
+   * @param bereichId the Bereich id.
+   * @param userId the member's user id.
+   * @param isBereichsleiter whether the member is the Bereichsleiter.
+   * @param isBereichskoordinator whether the member is a Bereichskoordinator.
+   * @param isBereichsoperator whether the member is a Bereichsoperator.
+   * @param version the membership's optimistic-lock version.
+   */
+  public record BereichMemberResponse(
+      UUID bereichId,
+      UUID userId,
+      boolean isBereichsleiter,
+      boolean isBereichskoordinator,
+      boolean isBereichsoperator,
+      Long version) {}
+
+  /**
+   * Response for the add-Organisationsleitung-member endpoint.
+   *
+   * @param organisationsleitungId the OL id.
+   * @param userId the member's user id.
+   * @param isOlMember whether the member carries the OL flag (always {@code true} on a fresh add).
+   * @param version the membership's optimistic-lock version.
+   */
+  public record OlMemberResponse(
+      UUID organisationsleitungId, UUID userId, boolean isOlMember, Long version) {}
 }
