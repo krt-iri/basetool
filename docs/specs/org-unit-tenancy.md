@@ -295,16 +295,19 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
 
 **Acceptance**
 
-- [ ] `OrgUnitKind` has `BEREICH` and `ORGANISATIONSLEITUNG`; `chk_org_unit_kind` and the discriminator
+- [x] `OrgUnitKind` has `BEREICH` and `ORGANISATIONSLEITUNG`; `chk_org_unit_kind` and the discriminator
   accept them; `ddl-auto=validate` passes.
-- [ ] `parent_org_unit_id` is nullable with the kind-pairing CHECK; no row can parent a kind other than
+- [x] `parent_org_unit_id` is nullable with the kind-pairing CHECK; no row can parent a kind other than
   the one its level allows; the OL row has a NULL parent.
-- [ ] With every `parent_org_unit_id` NULL and no leadership flags set, `OwnerScopeService` scope output
+- [x] With every `parent_org_unit_id` NULL and no leadership flags set, `OwnerScopeService` scope output
   is byte-identical to pre-change (snapshot test).
 
-**Enforced by (planned):** `OwnerScopeServiceTest` (degrade-to-flat snapshot), a migration test on a
-prod-like snapshot, `ArchitectureTest` · **ADR:** [ADR-0025](../adr/0025-org-hierarchy-data-model.md) ·
-**Issues:** #692, #694.
+**Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
+its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
+`OwnerScopeServiceTest` — the cascade is delegated to `OrgUnitCascadeService` with a no-leadership default
+stub so every pre-#692 scenario stays byte-identical (the degrade-to-flat proof), pinned structurally by
+`ArchitectureTest#cascadeServiceMustNotConsultTheSecurityContext` · **ADR:**
+[ADR-0025](../adr/0025-org-hierarchy-data-model.md) · **Issues:** #692, #694.
 
 ### REQ-ORG-015 — Cascading oversight without admin rights, via one descent helper
 
@@ -451,11 +454,13 @@ must not be able to violate them. `membership.kind` and the trigger-synced flags
 
 **Acceptance**
 
-- [ ] A third Staffel membership is rejected; a second is accepted.
-- [ ] Making a user an SK-lead while they hold a Staffel membership is rejected; assigning an SK to a
+- [x] A third Staffel membership is rejected; a second is accepted.
+- [x] Making a user an SK-lead while they hold a Staffel membership is rejected; assigning an SK to a
   Bereich (or making the user lead) auto-adds the reach-less Bereichsleitung membership.
-- [ ] A Bereichsleitung or OL flag on a user who holds a Staffel membership is rejected.
-- [ ] A leadership flag on the wrong `kind` is rejected by CHECK.
+- [x] A Bereichsleitung or OL flag on a user who holds a Staffel membership is rejected.
+- [x] A leadership flag on the wrong `kind` is rejected by CHECK.
 
-**Enforced by (planned):** `OrgUnitMembershipServiceTest`, a DB-constraint/trigger test,
-`ArchitectureTest` (validation-call rule) · **Issues:** #692, #695.
+**Enforced by:** `OrgUnitMembershipServiceTest` (the service-layer guards) and `OrgHierarchyMigrationTest`
+(the ≤2-Staffel counting triggers on INSERT+UPDATE, the leader-excludes-Staffel trigger, and the
+`chk_org_unit_membership_bereich_flags_only_on_bereich` / `chk_org_unit_membership_ol_flag_only_on_ol`
+CHECKs — DB-side defence in depth) · **Issues:** #692, #695.

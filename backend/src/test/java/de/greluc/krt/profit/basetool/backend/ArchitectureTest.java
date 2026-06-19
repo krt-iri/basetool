@@ -708,7 +708,14 @@ class ArchitectureTest {
             "MaterialClaimService",
             // #364: the blueprint availability overview filters the aggregate to the caller's
             // oversight org units via OwnerScopeService.currentOversightScope().
-            "PersonalBlueprintOverviewService");
+            "PersonalBlueprintOverviewService",
+            // Epic #692 Phase 6 (REQ-BANK-027): the org-unit-aware bank seam scopes the F1
+            // balance view + F2 booking requests through OwnerScopeService
+            // (currentOversightScope / currentOwnLevelOversightScope). Whitelisted so a
+            // maintainer who drops that dependency — silently un-scoping the bank seam — fails
+            // the build. It is also the sole sanctioned OwnerScope↔bank bridge, pinned by
+            // orgUnitAwareBankSeamIsContainedToOneClass.
+            "OrgUnitBankAccessService");
 
     String authHelper = "de.greluc.krt.profit.basetool.backend.service.AuthHelperService";
     String ownerScope = "de.greluc.krt.profit.basetool.backend.service.OwnerScopeService";
@@ -1634,6 +1641,36 @@ class ArchitectureTest {
         .because(
             "bank gates are independent of org-unit membership in both directions"
                 + " (REQ-BANK-008); only bank roles and bank_account_grant rows decide")
+        .check(CLASSES);
+  }
+
+  /**
+   * Epic #692 / REQ-ORG-015 (the HARD INVARIANT) + REQ-SEC cascading-scope security: the
+   * cascading-scope expansion ({@code OrgUnitCascadeService}) must be a pure function of the
+   * caller's memberships plus the persisted hierarchy — it must NEVER consult the security context
+   * (admin status). If it could read {@code AuthHelperService.isAdmin()} it could branch on admin
+   * and route an OL/Bereich principal through an admin-all grant; pinning the absence of that
+   * dependency keeps the cascade strictly officer-equivalent and leaves the {@code
+   * adminAllScope=true} branch reachable only from the genuine admin path in {@code
+   * OwnerScopeService}. This is the durable, structural guarantee behind "an OL/Bereich principal
+   * can never satisfy {@code isAdmin()}" — the cascade literally cannot know whether the caller is
+   * an admin, so its output (a concrete org-unit-id union) can never be an admin marker. The
+   * runtime value invariant (the cascade path always builds {@code adminAllScope=false}) is pinned
+   * by {@code OwnerScopeServiceTest} ({@code cascade_neverSetsAdminAllScope}).
+   */
+  @Test
+  void cascadeServiceMustNotConsultTheSecurityContext() {
+    noClasses()
+        .that()
+        .haveSimpleName("OrgUnitCascadeService")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName("de.greluc.krt.profit.basetool.backend.service.AuthHelperService")
+        .because(
+            "the cascading-scope expansion must be a pure function of memberships + hierarchy and"
+                + " must never branch on admin status, so it can never route an OL/Bereich"
+                + " principal through adminAllScope / isAdmin (epic #692, REQ-ORG-015 hard"
+                + " invariant)")
         .check(CLASSES);
   }
 

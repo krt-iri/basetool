@@ -543,11 +543,13 @@ restriktive Sicht wie ein Member.
   Mitgliedschafts-Vereinigung der normalen Listen). Besitzer werden nur als
   Anzeigename ausgeliefert, nie als Sub/E-Mail.
 
-### 4.1 Bereichsleitung & Organisationsleitung — kaskadierende Zuständigkeit (epic #692, geplant)
+### 4.1 Bereichsleitung & Organisationsleitung — kaskadierende Zuständigkeit (epic #692)
 
-> **Status:** geplant (epic #692, noch nicht ausgeliefert). Bindende Spezifikation:
-> [REQ-ORG-014..018](docs/specs/org-unit-tenancy.md), [REQ-SEC-015](docs/specs/security-and-access.md),
-> [REQ-BANK-027](docs/specs/bank.md), ADR-0025..0028.
+> **Status:** umgesetzt — epic #692, Phasen 3–6 ausgeliefert (Kaskade #708, Bereich/OL-Besitz #709,
+> Picker + Organigramm #710, Bank-Zugriff #711); Phase 7 (#700) ist das Security-/Regressions-Gate
+> (kumulative Security-Review ohne Befund, ArchUnit-Härtung, Spec-Abgleich, Sichtbarkeits-Matrix-e2e).
+> Bindende Spezifikation: [REQ-ORG-014..019](docs/specs/org-unit-tenancy.md),
+> [REQ-SEC-015](docs/specs/security-and-access.md), [REQ-BANK-027](docs/specs/bank.md), ADR-0025..0028.
 
 Über Staffeln und Spezialkommandos kommen zwei neue Ebenen: der **Bereich** (z. B. Profit, Sub-Radar,
 Raumüberlegenheit) und die **Organisationsleitung (OL)** ganz oben. Die Zuständigkeit **kaskadiert**

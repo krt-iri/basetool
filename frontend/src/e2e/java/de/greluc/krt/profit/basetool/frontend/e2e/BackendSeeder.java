@@ -1372,6 +1372,49 @@ public final class BackendSeeder {
   }
 
   /**
+   * Creates a {@code BEREICH} OrgUnit (area) via {@code POST /api/v1/org-hierarchy/bereiche}
+   * (admin-only) and returns its id (epic #692, REQ-ORG-014). Backs the Phase 7 org-hierarchy
+   * visibility-matrix e2e. Name/shorthand are unique across all OrgUnits; department/parent are
+   * omitted (the matrix wires leadership + ownership separately).
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param name the Bereich name (unique across all OrgUnits)
+   * @param shorthand the Bereich shorthand (unique across all OrgUnits)
+   * @return the created Bereich's id
+   */
+  public String createBereich(
+      String adminUser, String adminPassword, String name, String shorthand) {
+    return seedEntity(
+        adminUser,
+        adminPassword,
+        "/api/v1/org-hierarchy/bereiche",
+        "{\"name\":\"" + name + "\",\"shorthand\":\"" + shorthand + "\"}");
+  }
+
+  /**
+   * Grants a user a Bereichsleitung role on a Bereich via {@code POST
+   * /api/v1/org-hierarchy/bereiche/{id}/members} (admin-only, epic #692 REQ-ORG-017). The user must
+   * hold no Staffel membership (the leader-excludes-Staffel invariant). Backs the Phase 7
+   * visibility-matrix e2e.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param bereichId the Bereich id
+   * @param userId the user to grant the role to
+   * @param role the Bereichsleitung role name: {@code LEITER}, {@code KOORDINATOR} or {@code
+   *     OPERATOR}
+   */
+  public void addBereichLeader(
+      String adminUser, String adminPassword, String bereichId, String userId, String role) {
+    postBody(
+        adminUser,
+        adminPassword,
+        "/api/v1/org-hierarchy/bereiche/" + bereichId + "/members",
+        "{\"userId\":\"" + userId + "\",\"role\":\"" + role + "\"}");
+  }
+
+  /**
    * Opts a squadron into (or out of) Job-Order processing by setting its {@code is_profit_eligible}
    * flag via {@code PATCH /api/v1/squadrons/{id}/profit-eligible} (admin-only, body {@code
    * {"eligible": …}}). Only profit-eligible org units may be a job order's responsible (processing)

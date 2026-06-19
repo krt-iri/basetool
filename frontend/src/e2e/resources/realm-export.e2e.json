@@ -164,6 +164,16 @@
       "realmRoles": ["Squadron Member"]
     },
     {
+      "username": "test-bereich",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-bereich@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-bereich-pw", "temporary": false }
+      ],
+      "realmRoles": ["Squadron Member"]
+    },
+    {
       "username": "test-bank-employee",
       "enabled": true,
       "emailVerified": true,
