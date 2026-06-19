@@ -116,6 +116,12 @@ class InventoryTenancyE2eTest {
   // The B-owned item the edit-gate test targets (kept separate so its mutation isolates).
   private static String editItemId;
 
+  // REQ-ORG-011 owner-escape fixture: an item owned by test-member but stamped to an SK the member
+  // no longer belongs to (they joined the SK, recorded the item, then left — Staffel A stays, so
+  // the
+  // reconciler keeps the stamp). Kept on its own material so no other probe touches it.
+  private static String ownerMoveItemId;
+
   // Shared storage location for all seeded rows and the create-stamping probes.
   private static String locId;
 
@@ -181,6 +187,22 @@ class InventoryTenancyE2eTest {
     editItemId =
         seeder.createInventoryItemOwnedBy(
             BOTH_USER, BOTH_PASSWORD, matEditId, locId, SEED_QUALITY, 100, squadronBId);
+
+    // --- REQ-ORG-011 owner-escape fixture ----------------------------------------------------
+    // test-member (Staffel A) briefly joins a fresh SK Y, records an item stamped to SK Y, then
+    // leaves SK Y. Because Staffel A remains, the reconciler keeps the SK stamp (REQ-INV-004), so
+    // test-member ends up owning an SK-Y-stamped item without being an SK Y member — the "owner
+    // switched / left the owning org unit while the entry stays booked to it" case.
+    String skYId =
+        seeder.createSpecialCommand(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy SK Y", "ETSY");
+    String matMoveId =
+        seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy Mat Move");
+    String memberId = seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD);
+    seeder.addSpecialCommandMember(ADMIN_USER, ADMIN_PASSWORD, skYId, memberId);
+    ownerMoveItemId =
+        seeder.createInventoryItemOwnedBy(
+            MEMBER_USER, MEMBER_PASSWORD, matMoveId, locId, SEED_QUALITY, 100, skYId);
+    seeder.removeSpecialCommandMember(ADMIN_USER, ADMIN_PASSWORD, skYId, memberId);
   }
 
   /** Releases the browser and the Playwright driver process. */
@@ -361,6 +383,30 @@ class InventoryTenancyE2eTest {
         403,
         seeder.attemptBookOutStatus(BOTH_USER, BOTH_PASSWORD, editItemId, 1, 0),
         "a member of the owning unit must pass the org-scope edit gate");
+  }
+
+  /**
+   * REQ-ORG-011 owner escape: the per-user owner of an inventory item may still book it out after
+   * leaving the item's owning org unit while the row stays stamped to it. {@code test-member} owns
+   * {@code ownerMoveItemId} (stamped to the SK they left), so they pass the edit gate; non-owners
+   * outside that SK stay rejected (403).
+   */
+  @Test
+  void ownerRetainsEditAfterLeavingOwningOrgUnit() {
+    // Non-owners outside the item's owning SK are still blocked — the escape is per-owner.
+    assertEquals(
+        403,
+        seeder.attemptBookOutStatus(BOTH_USER, BOTH_PASSWORD, ownerMoveItemId, 1, 0),
+        "a non-owner outside the owning SK must not book out the item");
+    assertEquals(
+        403,
+        seeder.attemptBookOutStatus(NONE_USER, NONE_PASSWORD, ownerMoveItemId, 1, 0),
+        "a membershipless non-owner must not book out the item");
+    // The owner — no longer a member of the item's owning SK — still passes the edit gate.
+    assertNotEquals(
+        403,
+        seeder.attemptBookOutStatus(MEMBER_USER, MEMBER_PASSWORD, ownerMoveItemId, 1, 0),
+        "the owner retains edit access after leaving the item's owning org unit");
   }
 
   /**

@@ -260,7 +260,12 @@ Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
 | Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                     |   ❌    |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
 | Auftrag **löschen** (`hasRole('ADMIN')`)                                                                                    |   ❌    |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
 
-¹ Nur über das eigene Lager / die Owner-Scope-Prüfung — nicht generell.
+¹ Nur über das eigene Objekt / die Owner-Scope-Prüfung — nicht generell. Der **Eigentümer** eines
+persönlichen Aggregats (Lagereintrag `inventory_item.user`, Schiff `ship.owner`, Raffinerie-Auftrag
+`refinery_order.owner`) darf sein Objekt **immer** ansehen und bearbeiten, unabhängig vom
+`owning_org_unit_id`-Stempel — auch nach einem OrgUnit-Wechsel oder ohne jede Mitgliedschaft, solange
+das Objekt noch auf eine OrgUnit gebucht ist (REQ-ORG-011). Ein **Nicht**-Eigentümer bleibt an den
+strikten OrgUnit-Scope gebunden.
 ² Admin frei; Staffel-Logistiker/-Officer nur **Eskalation** des eigenen
 Staffel-Auftrags an ein SK.
 ³ **Nur Mitglieder einer profit-berechtigten Orgeinheit** (`is_profit_eligible`
@@ -507,7 +512,12 @@ restriktive Sicht wie ein Member.
   `canSee*`/`canEdit*`. Persönliche Zeilen ganz ohne Orgeinheit
   (`owning_org_unit_id = NULL`, V132 — z. B. das Schiff eines Nutzers ohne
   Staffel/SK) sind **owner-only**: sichtbar/editierbar nur für den Besitzer
-  selbst und Admins (`canAccessOwnerlessPersonalRow`).
+  selbst und Admins (`canAccessOwnerlessPersonalRow`). **Eigentümer-Escape
+  (REQ-ORG-011):** Der per-User-Besitzer (`ship.owner` / `inventory_item.user` /
+  `refinery_order.owner`) darf seine Zeile **immer** sehen/bearbeiten, unabhängig
+  vom `owning_org_unit_id`-Stempel — `isCurrentUserOwner` greift vor der
+  Scope-Prüfung in allen sechs `canSee*/canEdit*`-Gates. Ein Nicht-Eigentümer
+  bleibt strikt gescopt; die geteilten Listen-Views bleiben unverändert.
 - **Cross-Staffel mit Public-Escape**: `Mission` — für andere OrgUnits sichtbar
   genau dann, wenn `is_internal = false`; editierbar nur durch die besitzende
   OrgUnit + Admins. Ownerless Bereichsleitungs-Missionen (V144) folgen
