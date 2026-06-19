@@ -168,6 +168,9 @@ public class InventoryItemController {
    * Calling user's inventory grouped by material with totals/average-quality — drives the "personal
    * inventory" page's outer rows.
    *
+   * @param personalOnly when {@code true}, narrows the result to the caller's private stock ({@code
+   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter; defaults to {@code
+   *     false} (both shared and personal stacks)
    * @return grouped DTOs
    */
   @GetMapping("/my-inventory/grouped")
@@ -178,9 +181,15 @@ public class InventoryItemController {
           @RequestParam(required = false) List<UUID> materialIds,
           @RequestParam(required = false) Integer minQuality,
           @RequestParam(required = false) List<UUID> jobOrderIds,
-          @RequestParam(required = false) List<UUID> missionIds) {
+          @RequestParam(required = false) List<UUID> missionIds,
+          @RequestParam(required = false, defaultValue = "false") boolean personalOnly) {
     return inventoryItemService.getMyAggregatedInventory(
-        userService.getUserIdFromJwt(jwt), materialIds, minQuality, jobOrderIds, missionIds);
+        userService.getUserIdFromJwt(jwt),
+        materialIds,
+        minQuality,
+        jobOrderIds,
+        missionIds,
+        personalOnly);
   }
 
   /**

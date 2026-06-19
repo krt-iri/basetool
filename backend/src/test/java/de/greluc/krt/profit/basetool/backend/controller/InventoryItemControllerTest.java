@@ -165,17 +165,33 @@ class InventoryItemControllerTest {
     GroupedInventoryDto group = new GroupedInventoryDto(null, 25.0, 750.0, 800, List.of());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(inventoryItemService.getMyAggregatedInventory(
-            ownerId, List.of(materialId), 700, List.of(jobOrderId), List.of(missionId)))
+            ownerId, List.of(materialId), 700, List.of(jobOrderId), List.of(missionId), false))
         .thenReturn(List.of(group));
 
     List<GroupedInventoryDto> result =
         controller.getMyGroupedInventory(
-            jwt, List.of(materialId), 700, List.of(jobOrderId), List.of(missionId));
+            jwt, List.of(materialId), 700, List.of(jobOrderId), List.of(missionId), false);
 
     assertThat(result).containsExactly(group);
     verify(inventoryItemService)
         .getMyAggregatedInventory(
-            ownerId, List.of(materialId), 700, List.of(jobOrderId), List.of(missionId));
+            ownerId, List.of(materialId), 700, List.of(jobOrderId), List.of(missionId), false);
+  }
+
+  @Test
+  void getMyGroupedInventory_personalOnly_forwardsFlagToService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    GroupedInventoryDto group = new GroupedInventoryDto(null, 5.0, 600.0, 600, List.of());
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryItemService.getMyAggregatedInventory(ownerId, null, null, null, null, true))
+        .thenReturn(List.of(group));
+
+    List<GroupedInventoryDto> result =
+        controller.getMyGroupedInventory(jwt, null, null, null, null, true);
+
+    assertThat(result).containsExactly(group);
+    verify(inventoryItemService).getMyAggregatedInventory(ownerId, null, null, null, null, true);
   }
 
   // ── GET /all (admin/logistician wide read) ───────────────────────────

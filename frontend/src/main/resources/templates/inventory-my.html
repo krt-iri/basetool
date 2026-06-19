@@ -201,6 +201,11 @@
                             </div>
                         </div>
                     </div>
+                    <label class="flex-gap-sm cursor-pointer" style="align-items: center;">
+                        <input type="checkbox" id="personalOnly" name="personalOnly" value="true" class="item-checkbox"
+                               th:checked="${selectedPersonalOnly}" data-trigger="inv-my-filter">
+                        <span class="form-label-xs" th:text="#{inventory.filter.personalOnly}">Nur pers\u00f6nliche Eintr\u00e4ge</span>
+                    </label>
                     <button type="button" class="btn btn-ghost" data-trigger="inv-my-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
                 </form>
             </div>
@@ -798,6 +803,8 @@
         var activeMissions = collectMyChecked('missionCheck');
         var minQualitySelect = document.getElementById('minQuality');
         var minQuality = minQualitySelect ? minQualitySelect.value : '';
+        var personalOnlyEl = document.getElementById('personalOnly');
+        var personalOnly = personalOnlyEl ? personalOnlyEl.checked : false;
 
         var container = document.getElementById('myInventoryTableContainer');
         if (!container) return;
@@ -810,12 +817,14 @@
         if (minQuality) url.searchParams.append('minQuality', minQuality);
         activeJobOrders.forEach(j => url.searchParams.append('jobOrderIds', j));
         activeMissions.forEach(m => url.searchParams.append('missionIds', m));
+        if (personalOnly) url.searchParams.append('personalOnly', 'true');
 
         var visibleUrl = new URL(window.location.origin + '/inventory/my');
         activeMaterials.forEach(m => visibleUrl.searchParams.append('materialIds', m));
         if (minQuality) visibleUrl.searchParams.append('minQuality', minQuality);
         activeJobOrders.forEach(j => visibleUrl.searchParams.append('jobOrderIds', j));
         activeMissions.forEach(m => visibleUrl.searchParams.append('missionIds', m));
+        if (personalOnly) visibleUrl.searchParams.append('personalOnly', 'true');
         try { window.history.replaceState({}, '', visibleUrl.toString()); } catch (e) { /* ignore */ }
 
         fetch(url, { method: 'GET', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -839,6 +848,8 @@
         });
         var minQualitySelect = document.getElementById('minQuality');
         if (minQualitySelect) minQualitySelect.value = '';
+        var personalOnlyEl = document.getElementById('personalOnly');
+        if (personalOnlyEl) personalOnlyEl.checked = false;
         if (document.getElementById('materialHeader')) updateSelectState('matAll', 'matCheck', 'materialHeader');
         if (document.getElementById('jobOrderHeader')) updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
         if (document.getElementById('missionHeader')) updateSelectState('missionAll', 'missionCheck', 'missionHeader');

@@ -194,9 +194,9 @@ public class InventoryItemService {
   }
 
   /**
-   * Full-filter user-scoped aggregation. Loads the user's items via the parameterized repository
-   * query and groups them in memory — the {@code GroupedInventoryDto} shape is what the {@code
-   * /grouped} frontend endpoint returns directly.
+   * Filter-only convenience overload of {@link #getMyAggregatedInventory(UUID, List, Integer, List,
+   * List, boolean)} that returns both the caller's shared and personal stacks (no personal-only
+   * narrowing).
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -213,6 +213,34 @@ public class InventoryItemService {
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds) {
+    return getMyAggregatedInventory(
+        userId, materialIds, minQuality, jobOrderIds, missionIds, false);
+  }
+
+  /**
+   * Full-filter user-scoped aggregation. Loads the user's items via the parameterized repository
+   * query and groups them in memory — the {@code GroupedInventoryDto} shape is what the {@code
+   * /grouped} frontend endpoint returns directly.
+   *
+   * @param userId owner id
+   * @param materialIds optional material filter
+   * @param minQuality optional min-quality filter
+   * @param jobOrderIds optional job order filter
+   * @param missionIds optional mission filter
+   * @param personalOnly when {@code true}, narrows the result to the caller's private stock ({@code
+   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter; when {@code false},
+   *     both shared and personal stacks are returned
+   * @return aggregated items
+   * @throws NotFoundException when the user id is unknown
+   */
+  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
+      getMyAggregatedInventory(
+          UUID userId,
+          List<UUID> materialIds,
+          Integer minQuality,
+          List<UUID> jobOrderIds,
+          List<UUID> missionIds,
+          boolean personalOnly) {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
@@ -227,7 +255,8 @@ public class InventoryItemService {
             hasJobOrders,
             hasJobOrders ? jobOrderIds : null,
             hasMissions,
-            hasMissions ? missionIds : null);
+            hasMissions ? missionIds : null,
+            personalOnly);
 
     return buildGroupedFromStacks(stacks);
   }

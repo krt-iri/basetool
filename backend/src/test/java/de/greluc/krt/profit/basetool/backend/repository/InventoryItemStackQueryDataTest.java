@@ -159,7 +159,7 @@ class InventoryItemStackQueryDataTest {
 
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null);
+            user.getId(), false, null, null, false, null, false, null, false);
 
     assertThat(stacks)
         .as(
@@ -168,5 +168,63 @@ class InventoryItemStackQueryDataTest {
         .hasSize(1);
     assertThat(stacks.get(0).material().getId()).isEqualTo(material.getId());
     assertThat(stacks.get(0).totalAmount()).isEqualTo(42.0);
+  }
+
+  /**
+   * With {@code personalOnly = true} the owner's grouped "my inventory" view must return only the
+   * caller's private stock ({@code personal = true}); a shared (non-personal) contribution at the
+   * same location/material is excluded. The same query with {@code personalOnly = false} keeps both
+   * stacks — the "Mein Lager" personal-entries-only filter.
+   */
+  @Test
+  void findUserStacks_personalOnly_returnsOnlyPersonalStock() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(user);
+
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
+
+    Material material = new Material();
+    material.setName("Quantanium-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    InventoryItem personal = new InventoryItem();
+    personal.setUser(user);
+    personal.setLocation(location);
+    personal.setMaterial(material);
+    personal.setQuality(500);
+    personal.setAmount(10.0);
+    personal.setPersonal(true);
+    inventoryItemRepository.save(personal);
+
+    InventoryItem shared = new InventoryItem();
+    shared.setUser(user);
+    shared.setLocation(location);
+    shared.setMaterial(material);
+    shared.setQuality(600);
+    shared.setAmount(25.0);
+    shared.setPersonal(false);
+    inventoryItemRepository.save(shared);
+    entityManager.flush();
+
+    List<InventoryStackAggregate> personalOnly =
+        inventoryItemRepository.findUserStacks(
+            user.getId(), false, null, null, false, null, false, null, true);
+    assertThat(personalOnly)
+        .as("personalOnly=true must return only the caller's personal stock")
+        .hasSize(1);
+    assertThat(personalOnly.get(0).personal()).isTrue();
+    assertThat(personalOnly.get(0).totalAmount()).isEqualTo(10.0);
+
+    List<InventoryStackAggregate> all =
+        inventoryItemRepository.findUserStacks(
+            user.getId(), false, null, null, false, null, false, null, false);
+    assertThat(all)
+        .as("personalOnly=false must return both the personal and the shared stack")
+        .hasSize(2);
   }
 }
