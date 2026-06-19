@@ -63,6 +63,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -227,12 +228,36 @@ public class MissionService {
    * allowInternal=true} (for authenticated callers) includes internal missions; guests see only
    * public missions.
    *
+   * <p>Org-unit scoping (REQ-MISSION-008): when the caller has an effective org-unit scope — a
+   * plain member's own unit(s), or the cascade-expanded reach of a Bereich/OL leader (REQ-ORG-015)
+   * — the banner is restricted to missions owned by those org units; foreign missions, including
+   * other units' public ones, are excluded so the banner answers "what is <em>my</em> unit heading
+   * towards". When the caller has <em>no</em> org-unit scope — an admin in "all squadrons" mode, an
+   * anonymous guest, or an authenticated user who belongs to no org unit — the banner falls back to
+   * the unchanged organisation-wide next mission. The scope vector is the same {@link
+   * OwnerScopeService#currentScopePredicate()} the scoped mission lists use.
+   *
    * @param allowInternal whether internal missions should be included
    * @return the next mission, or empty when none upcoming
    */
   public Optional<Mission> getNextMission(boolean allowInternal) {
-    Optional<Mission> next = findNextMissionHead(Instant.now(), allowInternal);
-    // The limit-1 lookup above is intentionally not graphed — a collection fetch combined with the
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    Instant now = Instant.now();
+    Optional<Mission> next;
+    if (scope.adminAllScope()
+        || (scope.activeOrgUnitId() == null && scope.memberOrgUnitIds().isEmpty())) {
+      // No org-unit scope: admin all-scope, anonymous guest, or an authenticated user with no
+      // membership. Unchanged behaviour — the soonest PLANNED/ACTIVE mission across the whole
+      // organisation (internal ones only for members). REQ-MISSION-008.
+      next = findNextMissionHead(now, allowInternal);
+    } else {
+      // The caller has an org-unit scope: restrict the banner to missions owned by those org units.
+      // A Bereich/OL leader's scope already carries the cascaded descendants (REQ-ORG-015 via
+      // OwnerScopeService.currentMemberOrgUnitIds); a plain member sees only their own units.
+      next = findNextScopedMissionHead(now, allowInternal, scope);
+    }
+    // The limit-1 lookups above are intentionally not graphed — a collection fetch combined with
+    // the
     // limit forces Hibernate into in-memory pagination (HHH90003004). Re-fetch the single hit by id
     // through the graphed findById so participants / assignedUnits are eagerly loaded for the
     // mapper
@@ -241,7 +266,7 @@ public class MissionService {
   }
 
   /**
-   * Resolves the ungraphed limit-1 head of the next-mission lookup, filtered to {@link
+   * Resolves the ungraphed limit-1 head of the unscoped next-mission lookup, filtered to {@link
    * #NEXT_MISSION_STATUSES}. Split out from {@link #getNextMission(boolean)} only so the long
    * derived-query method names sit at a shallow enough indentation to stay within the line-length
    * limit; it carries no behaviour of its own beyond the {@code allowInternal} branch.
@@ -259,6 +284,34 @@ public class MissionService {
     return missionRepository
         .findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
             now, NEXT_MISSION_STATUSES);
+  }
+
+  /**
+   * Resolves the ungraphed limit-1 head of the org-unit-scoped next-mission lookup
+   * (REQ-MISSION-008) for a caller that has an effective scope. Delegates to {@link
+   * MissionRepository#findNextScopedMission} with a {@code PageRequest.of(0, 1)} so only the
+   * soonest matching mission is fetched, then returns its head. The scope's {@code activeOrgUnitId}
+   * (when pinned) or {@code memberOrgUnitIds} (the cascade-expanded membership union) selects the
+   * eligible owning org units; {@code allowInternal} mirrors the unscoped variant's
+   * internal-visibility gate.
+   *
+   * @param now exclusive lower bound on {@code plannedStartTime}
+   * @param allowInternal whether internal missions should be included
+   * @param scope the caller's effective org-unit scope (never admin-all / never empty here)
+   * @return the next-mission head (id-only matters; caller re-fetches through the graphed findById)
+   */
+  private Optional<Mission> findNextScopedMissionHead(
+      Instant now, boolean allowInternal, ScopePredicate scope) {
+    return missionRepository
+        .findNextScopedMission(
+            now,
+            NEXT_MISSION_STATUSES,
+            allowInternal,
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            PageRequest.of(0, 1))
+        .stream()
+        .findFirst();
   }
 
   /**

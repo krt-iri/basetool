@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -83,6 +84,7 @@ class MissionServiceTest {
   @InjectMocks private MissionService missionService;
 
   // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions
+  // covers REQ-MISSION-008 — admin all-scope falls back to the organisation-wide next mission
   @Test
   void getNextMission_allowInternal_refetchesByIdThroughGraph() {
     // The limit-1 lookup is intentionally not graphed (a collection fetch + limit forces in-memory
@@ -93,6 +95,9 @@ class MissionServiceTest {
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
+    // Admin all-scope → no org-unit narrowing → the unscoped, all-status finder.
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
             any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.of(head));
@@ -107,6 +112,7 @@ class MissionServiceTest {
     verify(missionRepository).findById(id);
   }
 
+  // covers REQ-MISSION-008 — an anonymous/membershipless caller keeps the unscoped public fallback
   @Test
   void getNextMission_guest_usesInternalFalseVariantThenRefetches() {
     UUID id = UUID.randomUUID();
@@ -114,6 +120,9 @@ class MissionServiceTest {
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
+    // No admin-all, no pin, no membership → unscoped fallback path; allowInternal=false → public.
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository
             .findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
                 any(), eq(List.of("PLANNED", "ACTIVE"))))
@@ -131,9 +140,79 @@ class MissionServiceTest {
 
   @Test
   void getNextMission_noUpcomingMission_returnsEmptyWithoutRefetch() {
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
             any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.empty());
+
+    Optional<Mission> result = missionService.getNextMission(true);
+
+    assertEquals(Optional.empty(), result);
+    verify(missionRepository, never()).findById(any());
+  }
+
+  // covers REQ-MISSION-008 — a member's banner is scoped to their own org units' next mission
+  @Test
+  void getNextMission_scopedMember_usesScopedQueryThenRefetches() {
+    UUID orgA = UUID.randomUUID();
+    UUID id = UUID.randomUUID();
+    Mission head = new Mission();
+    head.setId(id);
+    Mission detail = new Mission();
+    detail.setId(id);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
+    when(missionRepository.findNextScopedMission(
+            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), isNull(), eq(Set.of(orgA)), any()))
+        .thenReturn(List.of(head));
+    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
+
+    Optional<Mission> result = missionService.getNextMission(true);
+
+    assertSame(detail, result.orElseThrow(), "scoped lookup must re-fetch the hit by id");
+    verify(missionRepository)
+        .findNextScopedMission(
+            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), isNull(), eq(Set.of(orgA)), any());
+    verify(missionRepository).findById(id);
+    // The unscoped finders must NOT run for a scoped caller.
+    verify(missionRepository, never())
+        .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(any(), any());
+  }
+
+  // covers REQ-MISSION-008 — a pinned active org unit narrows the scoped lookup to that unit
+  @Test
+  void getNextMission_scopedPinned_passesActiveOrgUnitId() {
+    UUID pin = UUID.randomUUID();
+    UUID id = UUID.randomUUID();
+    Mission head = new Mission();
+    head.setId(id);
+    Mission detail = new Mission();
+    detail.setId(id);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, pin, Set.of()));
+    when(missionRepository.findNextScopedMission(
+            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), eq(pin), eq(Set.of()), any()))
+        .thenReturn(List.of(head));
+    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
+
+    Optional<Mission> result = missionService.getNextMission(true);
+
+    assertSame(detail, result.orElseThrow());
+    verify(missionRepository)
+        .findNextScopedMission(
+            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), eq(pin), eq(Set.of()), any());
+  }
+
+  // covers REQ-MISSION-008 — a scoped caller with no upcoming own-unit mission gets nothing
+  @Test
+  void getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch() {
+    UUID orgA = UUID.randomUUID();
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
+    when(missionRepository.findNextScopedMission(
+            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), isNull(), eq(Set.of(orgA)), any()))
+        .thenReturn(List.of());
 
     Optional<Mission> result = missionService.getNextMission(true);
 
