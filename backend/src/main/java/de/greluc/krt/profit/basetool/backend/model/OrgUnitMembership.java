@@ -152,6 +152,45 @@ public class OrgUnitMembership {
   private boolean isLead = false;
 
   /**
+   * {@code true} when this membership makes the user the <em>Bereichsleiter</em> (area lead) of the
+   * referenced Bereich (epic #692, REQ-ORG-017). Valid only on a {@code kind = 'BEREICH'}
+   * membership (V164 CHECK {@code chk_org_unit_membership_bereich_flags_only_on_bereich}). Together
+   * with {@link #isBereichskoordinator} / {@link #isBereichsoperator} it confers
+   * officer-equivalent, cascading reach over every Staffel/SK of that Bereich (REQ-ORG-015) — never
+   * admin rights. Always {@code false} for non-Bereich memberships.
+   */
+  @Column(name = "is_bereichsleiter", nullable = false)
+  private boolean isBereichsleiter = false;
+
+  /**
+   * {@code true} when this membership makes the user a <em>Bereichskoordinator</em> of the
+   * referenced Bereich (epic #692, REQ-ORG-017). Same Bereich-only CHECK and same cascading,
+   * officer-equivalent reach over the Bereich's Staffeln/SKs as {@link #isBereichsleiter}. Always
+   * {@code false} for non-Bereich memberships.
+   */
+  @Column(name = "is_bereichskoordinator", nullable = false)
+  private boolean isBereichskoordinator = false;
+
+  /**
+   * {@code true} when this membership makes the user a <em>Bereichsoperator</em> of the referenced
+   * Bereich (epic #692, REQ-ORG-017). Same Bereich-only CHECK and same cascading,
+   * officer-equivalent reach over the Bereich's Staffeln/SKs as {@link #isBereichsleiter}. Always
+   * {@code false} for non-Bereich memberships.
+   */
+  @Column(name = "is_bereichsoperator", nullable = false)
+  private boolean isBereichsoperator = false;
+
+  /**
+   * {@code true} when this membership makes the user a member of the <em>Organisationsleitung</em>
+   * (epic #692, REQ-ORG-017). Valid only on a {@code kind = 'ORGANISATIONSLEITUNG'} membership
+   * (V164 CHECK {@code chk_org_unit_membership_ol_flag_only_on_ol}). Confers officer-equivalent,
+   * cascading reach over <em>every</em> org unit (REQ-ORG-015) — never admin rights. Always {@code
+   * false} for non-OL memberships.
+   */
+  @Column(name = "is_ol_member", nullable = false)
+  private boolean isOlMember = false;
+
+  /**
    * Timestamp when the membership was granted. Backfilled by V95 from {@link User#getJoinDate()}
    * for pre-existing Staffel memberships; defaults to {@code now()} for new memberships at the DB
    * layer (the V95 column carries {@code DEFAULT NOW()}). Stored as {@link Instant} (UTC) per the

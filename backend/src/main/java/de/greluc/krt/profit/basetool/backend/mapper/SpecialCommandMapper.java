@@ -57,7 +57,8 @@ public interface SpecialCommandMapper {
    * profitEligible} is ignored because, like the squadron flag, it is mutated only through the
    * dedicated {@code PATCH /api/v1/special-commands/{id}/profit-eligible} toggle, never as a
    * side-effect of a create/update, so an accidental edit cannot change which SKs may process
-   * orders.
+   * orders. The {@code parent} hierarchy link (epic #692) is ignored too — an SK's Bereich is
+   * assigned through the org-hierarchy admin, never an SK create/update.
    *
    * @param dto the inbound DTO; never {@code null}.
    * @return a transient {@link SpecialCommand} instance ready to be saved.
@@ -66,5 +67,6 @@ public interface SpecialCommandMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "promotionEnabled", ignore = true)
   @Mapping(target = "profitEligible", ignore = true)
+  @Mapping(target = "parent", ignore = true)
   SpecialCommand toEntity(SpecialCommandDto dto);
 }
