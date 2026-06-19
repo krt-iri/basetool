@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
@@ -92,6 +93,8 @@ public class OrgHierarchyService {
    * @param description free-form text; nullable.
    * @param parentOrgUnitId the owning OL's id, or {@code null} to leave the Bereich unparented for
    *     now; when non-null it must reference an {@code ORGANISATIONSLEITUNG}.
+   * @param department the Kartell department / Bereichsfarbe (epic #692, REQ-ORG-018), or {@code
+   *     null} to leave the Bereich untinted in the org chart for now.
    * @return the persisted Bereich.
    * @throws DuplicateEntityException if a Bereich with that name already exists.
    * @throws BadRequestException if {@code parentOrgUnitId} is not an Organisationsleitung.
@@ -102,7 +105,8 @@ public class OrgHierarchyService {
       @NotNull String name,
       @NotNull String shorthand,
       @Nullable String description,
-      @Nullable UUID parentOrgUnitId) {
+      @Nullable UUID parentOrgUnitId,
+      @Nullable Department department) {
     if (bereichRepository.existsByNameIgnoreCase(name)) {
       throw new DuplicateEntityException("A Bereich with the name '" + name + "' already exists.");
     }
@@ -110,6 +114,7 @@ public class OrgHierarchyService {
     bereich.setName(name);
     bereich.setShorthand(shorthand);
     bereich.setDescription(description);
+    bereich.setDepartment(department);
     if (parentOrgUnitId != null) {
       bereich.setParent(requireKind(parentOrgUnitId, OrgUnitKind.ORGANISATIONSLEITUNG));
     }

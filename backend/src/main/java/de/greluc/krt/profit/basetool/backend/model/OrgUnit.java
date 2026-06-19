@@ -23,6 +23,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorColumn;
 import jakarta.persistence.DiscriminatorType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -146,6 +148,19 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
    */
   @Column(name = "is_profit_eligible", nullable = false)
   private boolean isProfitEligible = false;
+
+  /**
+   * The Kartell department (and its frozen Bereichsfarbe) this org unit belongs to (epic #692,
+   * REQ-ORG-018). Meaningful only for a {@link Bereich} — it drives the per-Bereich colour tint of
+   * the multi-Bereich org chart and is {@code null} for every other kind (Squadron / SK /
+   * Organisationsleitung) and for a Bereich an admin has not yet assigned a department to. Nullable
+   * so the column is purely additive (V166) and the chart degrades to an untinted tree until a
+   * department is set. Stored as a string ({@link EnumType#STRING}) so the value reads the same
+   * across Flyway, JPA and the wire DTOs.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "department", length = 32)
+  private Department department;
 
   /**
    * Parent org unit in the Kartell hierarchy (epic #692, REQ-ORG-014, ADR-0025): the {@link

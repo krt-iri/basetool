@@ -97,7 +97,11 @@ public class OrgHierarchyController {
   public BereichDto createBereich(@RequestBody @Valid BereichDto dto) {
     return toDto(
         orgHierarchyService.createBereich(
-            dto.name(), dto.shorthand(), dto.description(), dto.parentOrgUnitId()));
+            dto.name(),
+            dto.shorthand(),
+            dto.description(),
+            dto.parentOrgUnitId(),
+            dto.department()));
   }
 
   /**
@@ -271,6 +275,7 @@ public class OrgHierarchyController {
         b.getDescription(),
         b.isActive(),
         b.getParent() == null ? null : b.getParent().getId(),
+        b.getDepartment(),
         b.getVersion());
   }
 
