@@ -383,6 +383,12 @@ visibility-matrix e2e · **ADR:** [ADR-0027](../adr/0027-bereich-ol-aggregate-ow
    SKs** — the V95 `uq_org_unit_membership_one_squadron` "≤1 squadron" guard relaxes to "≤2".
 2. An **SK-lead** (`is_lead=true`) belongs to **no Staffel** and is **always** an (organisational,
    reach-less per REQ-ORG-015) member of the **Bereichsleitung of the Bereich its SK belongs to**.
+   This Bereichsleitung membership is **derived, not stored**: it is computed from `is_lead` + the
+   SK's `parent_org_unit_id` wherever it is needed (e.g. the org chart), so there is no separate
+   membership row to keep in sync and no stale seat on demotion or SK re-parenting. (An admin may
+   still grant such a user an *explicit, flagged* Bereichsleitung role via
+   `POST /api/v1/org-hierarchy/bereiche/{id}/members` — that is an additive, reach-bearing grant,
+   independent of the derived organisational seat.)
 3. **Bereichsleitung members** (`is_bereichsleiter`/`koordinator`/`operator`) belong to **no Staffel**.
 4. **OL members** (`is_ol_member`) belong to **no Staffel**, but **may** belong to a Bereich.
 5. A user may hold leadership in **more than one** Bereich (the reach unions per REQ-ORG-015).

@@ -19,18 +19,22 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -75,6 +79,7 @@ public class OrgUnitMembershipService {
   private final UserRepository userRepository;
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
+  private final OrgUnitRepository orgUnitRepository;
   private final InventoryOrgUnitReconciler inventoryReconciler;
 
   /**
@@ -269,6 +274,137 @@ public class OrgUnitMembershipService {
   }
 
   /**
+   * Grants a user an explicit, reach-bearing Bereichsleitung role on the given Bereich (epic #692,
+   * REQ-ORG-017) — distinct from the SK-Leiter's derived (computed, not stored) Bereichsleitung
+   * seat, which has no membership row. If the user already has a membership row on this Bereich
+   * (from a prior explicit grant), its role flag is updated in place; otherwise a fresh membership
+   * is created. Exactly one of the three Bereich role flags ends up set. The user must hold no
+   * Staffel membership — the service guard returns a clean 400 before the V165 trigger would 500.
+   * Unlike a Staffel/SK join this does <em>not</em> adopt the user's ownerless inventory (a Bereich
+   * is not a personal-inventory home).
+   *
+   * @param bereichId the Bereich to add the leader to; must be a {@code BEREICH} org unit.
+   * @param userId the user to grant the role to; never {@code null}.
+   * @param role the Bereichsleitung role to set; never {@code null}.
+   * @return the persisted membership row.
+   * @throws NotFoundException if the Bereich or the user does not exist.
+   * @throws BadRequestException if {@code bereichId} is not a Bereich, or the user belongs to a
+   *     Staffel.
+   */
+  @Transactional
+  public OrgUnitMembership addBereichLeader(
+      @NotNull UUID bereichId, @NotNull UUID userId, @NotNull BereichLeadershipRole role) {
+    OrgUnit bereich =
+        orgUnitRepository
+            .findById(bereichId)
+            .orElseThrow(() -> new NotFoundException("Bereich not found"));
+    if (bereich.getKind() != OrgUnitKind.BEREICH) {
+      throw new BadRequestException("Org unit " + bereichId + " is not a Bereich");
+    }
+    final User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    if (userHoldsStaffelMembership(userId)) {
+      throw new BadRequestException(
+          "User belongs to a Staffel and cannot be a Bereichsleitung member — remove the Staffel"
+              + " membership first (REQ-ORG-017)");
+    }
+    OrgUnitMembership m =
+        membershipRepository.findById(new OrgUnitMembershipId(userId, bereichId)).orElse(null);
+    if (m == null) {
+      m = new OrgUnitMembership();
+      m.setId(new OrgUnitMembershipId(userId, bereichId));
+      m.setUser(user);
+      // kind is trigger-managed (insertable=false); mirror it so the in-memory row is consistent.
+      m.setKind(OrgUnitKind.BEREICH);
+      m.setJoinedAt(Instant.now());
+    }
+    m.setBereichsleiter(role == BereichLeadershipRole.LEITER);
+    m.setBereichskoordinator(role == BereichLeadershipRole.KOORDINATOR);
+    m.setBereichsoperator(role == BereichLeadershipRole.OPERATOR);
+    // saveAndFlush (not save): on the upsert-onto-existing-row branch this is an UPDATE, so without
+    // an explicit flush the @Version increment would land after the controller maps the response
+    // and the caller would get a stale version. Flushing also surfaces the V165 trigger as a clean
+    // in-transaction failure rather than at commit.
+    return membershipRepository.saveAndFlush(m);
+  }
+
+  /**
+   * Removes a Bereichsleitung member by deleting their membership row on the Bereich.
+   *
+   * @param bereichId the Bereich; never {@code null}.
+   * @param userId the user to remove; never {@code null}.
+   * @throws NotFoundException if the user is not a member of the Bereich.
+   */
+  @Transactional
+  public void removeBereichLeader(@NotNull UUID bereichId, @NotNull UUID userId) {
+    OrgUnitMembershipId id = new OrgUnitMembershipId(userId, bereichId);
+    if (!membershipRepository.existsById(id)) {
+      throw new NotFoundException("Bereichsleitung membership not found");
+    }
+    membershipRepository.deleteById(id);
+  }
+
+  /**
+   * Adds a user to the Organisationsleitung (epic #692, REQ-ORG-017), setting the {@code
+   * is_ol_member} flag. The user must hold no Staffel membership (service guard + V165 trigger). A
+   * duplicate add is rejected with 409.
+   *
+   * @param organisationsleitungId the OL org unit; must be of kind {@code ORGANISATIONSLEITUNG}.
+   * @param userId the user to add; never {@code null}.
+   * @return the persisted membership row.
+   * @throws NotFoundException if the OL or the user does not exist.
+   * @throws BadRequestException if the id is not the OL, or the user belongs to a Staffel.
+   * @throws DuplicateEntityException if the user is already an OL member.
+   */
+  @Transactional
+  public OrgUnitMembership addOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
+    OrgUnit ol =
+        orgUnitRepository
+            .findById(organisationsleitungId)
+            .orElseThrow(() -> new NotFoundException("Organisationsleitung not found"));
+    if (ol.getKind() != OrgUnitKind.ORGANISATIONSLEITUNG) {
+      throw new BadRequestException(
+          "Org unit " + organisationsleitungId + " is not the Organisationsleitung");
+    }
+    final User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    if (userHoldsStaffelMembership(userId)) {
+      throw new BadRequestException(
+          "User belongs to a Staffel and cannot be an Organisationsleitung member — remove the"
+              + " Staffel membership first (REQ-ORG-017)");
+    }
+    if (membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, organisationsleitungId)) {
+      throw new DuplicateEntityException("User is already an Organisationsleitung member");
+    }
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, organisationsleitungId));
+    m.setUser(user);
+    m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
+    m.setJoinedAt(Instant.now());
+    m.setOlMember(true);
+    // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
+    // in-transaction failure and keeps the flushed @Version in the response under the
+    // class-@Transactional controller.
+    return membershipRepository.saveAndFlush(m);
+  }
+
+  /**
+   * Removes a user from the Organisationsleitung by deleting their OL membership row.
+   *
+   * @param organisationsleitungId the OL org unit; never {@code null}.
+   * @param userId the user to remove; never {@code null}.
+   * @throws NotFoundException if the user is not an OL member.
+   */
+  @Transactional
+  public void removeOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
+    OrgUnitMembershipId id = new OrgUnitMembershipId(userId, organisationsleitungId);
+    if (!membershipRepository.existsById(id)) {
+      throw new NotFoundException("Organisationsleitung membership not found");
+    }
+    membershipRepository.deleteById(id);
+  }
+
+  /**
    * Flips the per-membership Logistician / Mission Manager flags on the membership row. Either flag
    * may be {@code null} in the request — that means "leave the current value alone". The inbound
    * {@code version} is checked against the row's {@code @Version} to surface concurrent admin edits
@@ -425,6 +561,15 @@ public class OrgUnitMembershipService {
       return;
     }
 
+    // REQ-ORG-017: a leader (SK-Leiter / Bereichsleitung / OL) belongs to no Staffel. Reject
+    // assigning a Staffel to such a user with a clean 400 before the V165 DB trigger turns it into
+    // a 500. (A user being moved between Staffeln is unaffected — they hold no leadership flag.)
+    if (userHoldsLeadershipRole(user.getId())) {
+      throw new BadRequestException(
+          "User holds a leadership role (SK-Lead/Bereichsleitung/OL) and cannot be assigned to a"
+              + " Staffel — remove the leadership role first (REQ-ORG-017)");
+    }
+
     boolean alreadyMember =
         existing.stream().anyMatch(m -> newSquadron.getId().equals(m.getId().getOrgUnitId()));
     if (alreadyMember && existing.size() == 1) {
@@ -480,6 +625,13 @@ public class OrgUnitMembershipService {
       @NotNull MembershipLeadToggleRequest request) {
     OrgUnitMembership m = loadMembership(specialCommandId, userId);
     assertVersionMatches(m, request.version());
+    // REQ-ORG-017: an SK-Leiter holds no Staffel membership. Reject promoting a user who still
+    // belongs to a Staffel with a clean 400 before the V165 DB trigger turns it into a 500.
+    if (request.isLead() && userHoldsStaffelMembership(userId)) {
+      throw new BadRequestException(
+          "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel membership"
+              + " first (REQ-ORG-017)");
+    }
     m.setLead(request.isLead());
     return membershipRepository.save(m);
   }
@@ -561,5 +713,36 @@ public class OrgUnitMembershipService {
     if (m.getVersion() != null && !m.getVersion().equals(version)) {
       throw new ObjectOptimisticLockingFailureException(OrgUnitMembership.class, null);
     }
+  }
+
+  /**
+   * {@code true} iff the user holds at least one Staffel ({@code SQUADRON}) membership. Backs the
+   * REQ-ORG-017 guard that an SK-Leiter must belong to no Staffel.
+   *
+   * @param userId the user to check; never {@code null}.
+   * @return {@code true} when the user has a Staffel membership row.
+   */
+  private boolean userHoldsStaffelMembership(@NotNull UUID userId) {
+    return !membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON).isEmpty();
+  }
+
+  /**
+   * {@code true} iff the user holds any leadership flag on any membership — SK-Leiter ({@code
+   * is_lead}), Bereichsleitung ({@code is_bereichsleiter} / {@code is_bereichskoordinator} / {@code
+   * is_bereichsoperator}) or OL ({@code is_ol_member}). Backs the REQ-ORG-017 guard that such a
+   * leader is never assigned to a Staffel.
+   *
+   * @param userId the user to check; never {@code null}.
+   * @return {@code true} when any of the user's membership rows carries a leadership flag.
+   */
+  private boolean userHoldsLeadershipRole(@NotNull UUID userId) {
+    return membershipRepository.findAllByIdUserId(userId).stream()
+        .anyMatch(
+            m ->
+                m.isLead()
+                    || m.isBereichsleiter()
+                    || m.isBereichskoordinator()
+                    || m.isBereichsoperator()
+                    || m.isOlMember());
   }
 }
