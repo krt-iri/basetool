@@ -455,7 +455,16 @@
           <ul class="bp-owner-list">
             <li class="bp-owner" th:each="owner : ${itemBlueprintOwners.owners}">
               <div class="bp-owner__head">
-                <span class="bp-owner__name" th:text="${owner.ownerName}">Name</span>
+                <span class="bp-owner__ident">
+                  <span class="bp-owner__name" th:text="${owner.ownerName}">Name</span>
+                  <span
+                    th:unless="${owner.orgUnitMember}"
+                    class="bp-owner__external"
+                    th:text="#{orders.detail.blueprintOwners.notMember}"
+                    th:title="#{orders.detail.blueprintOwners.notMember.hint}"
+                    >kein Einheitsmitglied</span
+                  >
+                </span>
                 <span class="bp-owner__count" th:text="#{orders.detail.blueprintOwners.ownedCount(${owner.ownedProductNames.size()})}">3 Blaupausen</span>
               </div>
               <ul class="bp-owner__tags">

@@ -28,5 +28,9 @@ import java.util.List;
  *
  * @param ownerName the member's effective display name
  * @param ownedProductNames the required products this member owns the blueprint for
+ * @param orgUnitMember {@code true} when this owner is a member of the order's responsible org
+ *     unit; {@code false} when they appear only via global blueprint sharing (REQ-INV-018), which
+ *     the template marks with a discreet "not a unit member" hint
  */
-public record JobOrderBlueprintOwnerDto(String ownerName, List<String> ownedProductNames) {}
+public record JobOrderBlueprintOwnerDto(
+    String ownerName, List<String> ownedProductNames, boolean orgUnitMember) {}

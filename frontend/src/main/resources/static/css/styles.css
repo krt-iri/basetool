@@ -3105,8 +3105,24 @@ input[type='radio']:focus {
     gap: var(--space-4);
 }
 
+.bp-owner__ident {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+}
+
 .bp-owner__name {
     font-weight: var(--fw-bold);
+}
+
+/* Discreet "not a member of the responsible unit" hint — shown next to an owner who
+   appears only because they opted into global blueprint sharing (REQ-INV-018). Muted and
+   small so it reads as a footnote, never competing with the member's name. */
+.bp-owner__external {
+    color: var(--color-gray-2);
+    font-size: var(--fs-xs);
+    font-style: italic;
 }
 
 .bp-owner__count {

@@ -61,4 +61,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0021](0021-bank-off-ledger-booking-requests.md)                          | Confirm-before-post booking requests as a mutable, off-ledger aggregate                 | Accepted                          |
 | [0022](0022-bank-booking-request-notifications-account-grant-selector.md) | Bank booking-request notifications via an `ACCOUNT_GRANT` selector kind                 | Accepted                          |
 | [0023](0023-manufacturer-uex-company-alias-merge.md)                      | Merge UEX duplicate companies onto one manufacturer via a company-id alias table        | Accepted                          |
+| [0024](0024-opt-in-global-blueprint-sharing.md)                           | Opt-in global blueprint sharing overrides org-unit scoping (read-only)                  | Accepted                          |
 

@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-16.
-> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md)
+> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
 
@@ -146,3 +146,56 @@ duplicate add MUST return 409. Adding MUST immediately grant the new default to 
 [`AdminDefaultBlueprintController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminDefaultBlueprintController.java),
 [`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DefaultBlueprintBootstrap.java),
 [`V157__create_default_blueprint.sql`](../../backend/src/main/resources/db/migration/V157__create_default_blueprint.sql).
+
+### REQ-INV-018 — Opt-in global blueprint sharing
+
+By default a user's owned `personal_blueprint` rows count toward the leadership
+blueprint-availability overview (REQ-INV-012) and the item-order blueprint-coverage view
+(REQ-ORDERS-015) **only for the org units the user is a member of**. A user MAY opt in, via a
+toggle on their profile page, to share their blueprints **globally**: while
+`app_user.share_blueprints_globally` is `true`, the user is counted in **both** views for
+**every** org unit, even when org-unit membership would otherwise exclude them — so a Staffel
+member's blueprint can satisfy an SK order's coverage across org-unit boundaries.
+
+This is a deliberate, user-controlled carve-out to the org-unit scoping ([ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md));
+it preserves the surrounding guarantees:
+
+- **Opt-in only**, default off (`NOT NULL DEFAULT FALSE`); nothing changes for users who do not
+  enable it.
+- It widens **whose** blueprints are counted, never **who may open** the views — the
+  viewer-access gates (`OwnerScopeService.canAccessBlueprintOverview`,
+  `canSeeJobOrderBlueprintOwners`) are unchanged, so a non-member still cannot open either view.
+- **Read-only** exposure by **display name only** (`User.getEffectiveName()`, never the `sub` or
+  e-mail); it grants no edit rights on the owner's blueprints.
+- In both views, an owner shown **only** via this opt-in (not a member of the relevant org unit) is
+  marked with a **discreet "not a unit member" hint**, so leadership can tell a cross-unit volunteer
+  apart from their own members at a glance. In the admin "all org units" overview scope — where no
+  single unit applies — no owner is marked.
+
+The flag is self-service: the user reads / sets it through `GET` / `PUT
+/api/v1/users/me/blueprint-sharing` (JWT-scoped, optimistic-locked), saved in place on the
+profile page (REQ-FE-001) next to the payout preference. The two aggregations union the opted-in
+users' `owner_sub`s into their org-unit member set before counting; an owner who is both a member
+and a global sharer is counted once.
+
+**Acceptance criteria:**
+
+- [ ] Given a user enables the toggle and owns a required blueprint, when the coverage view of an
+  order whose responsible org unit they are **not** a member of is built, then they are counted
+  and appear as an owner row.
+- [ ] Given the same user, then they appear in the availability overview of a leadership viewer
+  who oversees an org unit the user does not belong to.
+- [ ] Given the user disables the toggle, then they are removed from both views again.
+- [ ] The opt-in never lets a viewer open a view they could not already open (the access gates
+  are unchanged), and the owner is exposed by display name only.
+- [ ] An owner shown only via global sharing is rendered with a discreet "not a unit member"
+  marker in both the availability drill-down and the order-coverage view; a genuine member of the
+  relevant unit is not marked.
+- [ ] Given a user who never opts in, then they are counted only in their own org units
+  (unchanged behaviour).
+
+**Code links:** [`UserService#updateUserShareBlueprintsGlobally`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserService.java),
+[`UserController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/UserController.java) (`/me/blueprint-sharing`),
+[`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintOverviewService.java),
+[`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderItemBlueprintOwnersService.java),
+[`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).

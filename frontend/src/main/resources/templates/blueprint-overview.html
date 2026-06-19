@@ -72,6 +72,14 @@
                 background-color: rgba(231, 126, 35, 0.08);
                 border: 1px solid rgba(231, 126, 35, 0.25);
             }
+            /* Discreet marker for an owner shown only via global blueprint sharing
+               (REQ-INV-018) — not a member of the caller's oversight org unit. */
+            .bp-owners-list .bp-owner-external {
+                margin-left: 0.4rem;
+                color: var(--color-gray-2);
+                font-size: 0.78rem;
+                font-style: italic;
+            }
             .bp-owner-count {
                 font-weight: 700;
             }
@@ -180,7 +188,9 @@
         i18n: {
             loading: /*[[#{blueprintOverview.owners.loading}]]*/ 'Loading owners...',
             empty: /*[[#{blueprintOverview.owners.empty}]]*/ 'No owners.',
-            error: /*[[#{blueprintOverview.owners.error}]]*/ 'Could not load owners.'
+            error: /*[[#{blueprintOverview.owners.error}]]*/ 'Could not load owners.',
+            notMember: /*[[#{blueprintOverview.owners.notMember}]]*/ 'not a unit member',
+            notMemberHint: /*[[#{blueprintOverview.owners.notMember.hint}]]*/ 'Visible via global blueprint sharing.'
         }
     };
     /*]]*/

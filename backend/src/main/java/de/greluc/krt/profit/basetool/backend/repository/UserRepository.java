@@ -93,6 +93,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       @org.springframework.data.repository.query.Param("roleCode") String roleCode);
 
   /**
+   * Returns the ids of every user who has opted into sharing their blueprints globally ({@link
+   * User#isShareBlueprintsGlobally()}). The blueprint-availability aggregations union these ids
+   * into their org-unit member set so an opted-in user is counted regardless of org-unit membership
+   * (REQ-INV-018). The id equals the stored {@code PersonalBlueprint.owner_sub} once rendered as
+   * text, so callers convert via {@link UUID#toString()}.
+   *
+   * @return the user ids of global blueprint sharers; never {@code null}, possibly empty
+   */
+  @Query("SELECT u.id FROM User u WHERE u.shareBlueprintsGlobally = true")
+  Set<UUID> findIdsBySharingBlueprintsGlobally();
+
+  /**
    * Returns the ids ({@code sub}s) of users who both hold the global role {@code roleCode} and are
    * members of the given org unit. Backs the notification rule engine's {@code ORG_RELATIVE_ROLE}
    * resolution of "officers of the responsible squadron" (role {@code OFFICER} intersected with

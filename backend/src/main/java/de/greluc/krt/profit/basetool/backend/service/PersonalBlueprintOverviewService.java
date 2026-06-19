@@ -168,11 +168,21 @@ public class PersonalBlueprintOverviewService {
       return List.of();
     }
     ScopePredicate scope = ownerScopeService.currentBlueprintOversightScope();
+    boolean adminAll = scope.adminAllScope();
     List<PersonalBlueprint> owned;
-    if (scope.adminAllScope()) {
+    Set<String> memberSubs;
+    if (adminAll) {
+      // Admin "all org units" has no single unit to be a member of, so no owner is flagged
+      // external (every owner is in scope by definition).
+      memberSubs = Set.of();
       owned = personalBlueprintRepository.findAllByProductKeyIn(productKeys);
     } else {
-      Set<String> ownerSubs = oversightMemberSubs(scope);
+      // Union the global sharers (REQ-INV-018) into the oversight member set so an opted-in owner
+      // shows in the drill-down, keeping the owner names consistent with the bumped count. The
+      // oversight members are kept separate so each owner can be flagged member vs global sharer.
+      memberSubs = oversightMemberSubs(scope);
+      Set<String> ownerSubs = new LinkedHashSet<>(memberSubs);
+      ownerSubs.addAll(globalSharerSubs());
       if (ownerSubs.isEmpty()) {
         return List.of();
       }
@@ -189,7 +199,11 @@ public class PersonalBlueprintOverviewService {
       return List.of();
     }
     return userRepository.findAllById(ownerIds).stream()
-        .map(user -> new BlueprintOverviewOwnerDto(user.getEffectiveName()))
+        .map(
+            user ->
+                new BlueprintOverviewOwnerDto(
+                    user.getEffectiveName(),
+                    adminAll || memberSubs.contains(user.getId().toString())))
         .sorted(
             Comparator.comparing(
                 BlueprintOverviewOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))
@@ -211,9 +225,31 @@ public class PersonalBlueprintOverviewService {
   private Set<String> inScopeOwnerSubs() {
     ScopePredicate scope = ownerScopeService.currentBlueprintOversightScope();
     if (scope.adminAllScope()) {
+      // Admin all-scope already spans every owner, so the global-share opt-in adds nothing here.
       return personalBlueprintRepository.findAllDistinctOwnerSubs();
     }
-    return oversightMemberSubs(scope);
+    // Union the global sharers (REQ-INV-018) into the oversight member set so an opted-in user is
+    // counted even when no oversight org unit contains them — including the sharer-only case where
+    // the caller's oversight membership set is otherwise empty.
+    Set<String> subs = new LinkedHashSet<>(oversightMemberSubs(scope));
+    subs.addAll(globalSharerSubs());
+    return subs;
+  }
+
+  /**
+   * Resolves the {@code owner_sub}s of every user who opted into global blueprint sharing
+   * (REQ-INV-018). These are unioned into the oversight member set so an opted-in user's blueprints
+   * surface in the availability overview for every leadership viewer, regardless of org-unit
+   * membership. The id stored on {@link PersonalBlueprint#getOwnerSub()} equals {@code User.id} as
+   * text, so the ids are rendered via {@link UUID#toString()}.
+   *
+   * @return the global sharers' {@code owner_sub}s; never {@code null}, possibly empty
+   */
+  @NotNull
+  private Set<String> globalSharerSubs() {
+    return userRepository.findIdsBySharingBlueprintsGlobally().stream()
+        .map(UUID::toString)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**

@@ -505,6 +505,44 @@ public class UserService {
   }
 
   /**
+   * Sets the calling user's opt-in flag for global blueprint sharing. When {@code true}, the user's
+   * owned blueprints are counted in the leadership blueprint-availability overview and the
+   * item-order blueprint-coverage view for <em>every</em> org unit, not only the ones they belong
+   * to (REQ-INV-018). Mirrors {@link #updateUserDefaultPayoutPreference}'s optimistic-lock
+   * contract: a stale {@code version} surfaces as a 409. The flag is set unconditionally; the
+   * widening is read-only and the viewer-access gates are unchanged.
+   *
+   * @param id the calling user's id, resolved from the JWT (never from the URL); never {@code
+   *     null}.
+   * @param shareBlueprintsGlobally the new opt-in value.
+   * @param version the optimistic-lock version the caller last read; {@code null} bypasses the
+   *     check, matching {@link #updateUserDefaultPayoutPreference}.
+   * @return the persisted user with the updated flag and bumped version.
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
+   *     unknown.
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale.
+   */
+  @Transactional
+  public User updateUserShareBlueprintsGlobally(
+      @NotNull UUID id, boolean shareBlueprintsGlobally, @Nullable Long version) {
+    User user =
+        userRepository
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
+                        "User not found"));
+    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
+      throw new ObjectOptimisticLockingFailureException(User.class, id);
+    }
+    user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
+    // saveAndFlush so the bumped @Version reaches the response — the profile blueprint-sharing
+    // toggle writes the returned version back in place via syncAllVersions (no reload), so a stale
+    // save version 409s the next consecutive change.
+    return userRepository.saveAndFlush(user);
+  }
+
+  /**
    * Records that the user has read the given announcement (clears the unread badge on the home
    * page).
    *

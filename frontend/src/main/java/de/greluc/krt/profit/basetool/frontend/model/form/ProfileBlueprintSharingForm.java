@@ -17,16 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.model.dto;
+package de.greluc.krt.profit.basetool.frontend.model.form;
 
 /**
- * Frontend mirror of the backend {@code BlueprintOverviewOwnerDto} (#364): one owner of a blueprint
- * in the availability drill-down, carrying the display name only (never the sub or e-mail).
+ * Form-binding object for the profile-level "share my blueprints globally" toggle (REQ-INV-018).
  *
- * @param ownerName the member's effective display name
- * @param orgUnitMember {@code true} when this owner is a member of the caller's oversight org
- *     unit(s) (always {@code true} for an admin "all org units" scope); {@code false} when they
- *     appear only via global blueprint sharing (REQ-INV-018), which the drill-down marks with a
- *     discreet hint
+ * @param shareBlueprintsGlobally whether the user opts into having their owned blueprints counted
+ *     in the leadership availability overview and the item-order blueprint-coverage view across
+ *     every org unit; the no-JS form posts {@code false} when the checkbox is unticked.
+ * @param version the optimistic-lock version of the user row, echoed back so a concurrent edit
+ *     surfaces as a 409 rather than a silent overwrite.
  */
-public record BlueprintOverviewOwnerDto(String ownerName, boolean orgUnitMember) {}
+public record ProfileBlueprintSharingForm(boolean shareBlueprintsGlobally, Long version) {}

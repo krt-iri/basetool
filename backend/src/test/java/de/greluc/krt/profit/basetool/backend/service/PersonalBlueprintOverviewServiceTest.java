@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -33,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintOverviewOwnerDto
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +42,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -307,8 +310,72 @@ class PersonalBlueprintOverviewServiceTest {
     assertEquals(
         List.of("Alpha", "Bravo"),
         owners.stream().map(BlueprintOverviewOwnerDto::ownerName).toList());
+    // Admin "all org units" has no single unit, so no owner is flagged external (no hint).
+    assertTrue(owners.stream().allMatch(BlueprintOverviewOwnerDto::orgUnitMember));
     verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
     verify(personalBlueprintRepository, never()).findAllDistinctOwnerSubs();
     verify(personalBlueprintRepository, never()).findAllByProductKeyInAndOwnerSubIn(any(), any());
+  }
+
+  // covers REQ-INV-018 — a user who opted into global sharing is counted in the availability
+  // overview even when they are not a member of any of the caller's oversight org units; the
+  // service unions their sub into the owner-set passed to the blueprint lookup.
+  @Test
+  @SuppressWarnings("unchecked")
+  void list_globalSharerOutsideOversight_isUnionedIntoOwnerSet() {
+    when(ownerScopeService.currentBlueprintOversightScope())
+        .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
+    when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
+        .thenReturn(Set.of(USER_1));
+    // USER_2 is not a member of ORG_A but opted into global sharing — they must still be counted.
+    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
+    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
+    when(personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs.capture()))
+        .thenReturn(List.of(bp("aurora", "Aurora MR", USER_1), bp("aurora", "Aurora MR", USER_2)));
+
+    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
+
+    assertEquals(1, page.getTotalElements());
+    assertEquals(2L, page.getContent().get(0).ownerCount());
+    assertTrue(ownerSubs.getValue().contains(USER_1.toString()));
+    assertTrue(ownerSubs.getValue().contains(USER_2.toString()));
+  }
+
+  // covers REQ-INV-018 — the owner drill-down includes a global sharer who is not an oversight
+  // member, so the listed owners stay consistent with the bumped availability count.
+  @Test
+  @SuppressWarnings("unchecked")
+  void owners_globalSharerOutsideOversight_appearsInDrillDown() {
+    when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
+    when(ownerScopeService.currentBlueprintOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
+    when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
+        .thenReturn(Set.of(USER_1));
+    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
+    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
+    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(any(), ownerSubs.capture()))
+        .thenReturn(
+            List.of(bp("aurora mr", "Aurora MR", USER_1), bp("aurora mr", "Aurora MR", USER_2)));
+    when(userRepository.findAllById(any()))
+        .thenReturn(List.of(user(USER_1, "Bravo"), user(USER_2, "Alpha")));
+
+    List<BlueprintOverviewOwnerDto> owners = service.listOwnersForProduct("aurora mr");
+
+    assertEquals(
+        List.of("Alpha", "Bravo"),
+        owners.stream().map(BlueprintOverviewOwnerDto::ownerName).toList());
+    assertTrue(ownerSubs.getValue().contains(USER_2.toString()));
+    // The global sharer (USER_2 → "Alpha") is flagged not-a-member; the oversight member
+    // (USER_1 → "Bravo") is flagged a member, so the UI marks only the former.
+    BlueprintOverviewOwnerDto alpha = ownerByName(owners, "Alpha");
+    BlueprintOverviewOwnerDto bravo = ownerByName(owners, "Bravo");
+    assertFalse(alpha.orgUnitMember(), "the global sharer is not an oversight member");
+    assertTrue(bravo.orgUnitMember(), "the oversight member is flagged a member");
+  }
+
+  /** Finds the owner row with the given display name, failing the test when absent. */
+  private static BlueprintOverviewOwnerDto ownerByName(
+      List<BlueprintOverviewOwnerDto> owners, String name) {
+    return owners.stream().filter(o -> o.ownerName().equals(name)).findFirst().orElseThrow();
   }
 }

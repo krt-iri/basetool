@@ -34,5 +34,9 @@ import java.util.List;
  * @param ownedProductNames the display names of the order's required products this member owns the
  *     blueprint for, sorted case-insensitively; never {@code null} and never empty (members owning
  *     none of the required blueprints are omitted from the view entirely)
+ * @param orgUnitMember {@code true} when this owner is a member of the order's responsible org
+ *     unit; {@code false} when they appear only because they opted into global blueprint sharing
+ *     (REQ-INV-018), so the UI can mark them with a discreet "not a unit member" hint
  */
-public record JobOrderBlueprintOwnerDto(String ownerName, List<String> ownedProductNames) {}
+public record JobOrderBlueprintOwnerDto(
+    String ownerName, List<String> ownedProductNames, boolean orgUnitMember) {}

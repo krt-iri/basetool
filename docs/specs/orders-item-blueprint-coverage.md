@@ -30,6 +30,13 @@ any cosmetic variant of it**, and which concrete blueprint each member holds. Th
 additionally surfaces a **per-item coverage** summary (each distinct required item with the count of
 members who own a matching blueprint, flagging items **no member** owns as a coverage gap).
 
+In addition to the responsible org unit's members, users who opted into **global blueprint sharing**
+(`REQ-INV-018`) are counted in the coverage and listed as owners even when they are **not** members
+of the responsible org unit; such an owner is marked with a **discreet "not a unit member" hint** so
+the processing unit can tell a cross-unit volunteer from its own members. This widens only *whose*
+blueprints are counted; it does not change *who* may open the coverage view (`REQ-ORDERS-016` is
+unaffected), and owners are still exposed by display name only.
+
 Matching is by the **variant family key** (`REQ-INV-015`), not the raw `product_key`: a required
 line's `blueprint.outputName` and each member's `PersonalBlueprint.productName` are reduced to a
 family key by `BlueprintVariantFamilyResolver`, so a base item and its cosmetic variants
@@ -54,6 +61,8 @@ variant blueprint names (so a lead sees which variant each member holds).
   its weapon, and a member's magazine is not surfaced; a required magazine matches only itself.
 - [ ] A required item no member can build shows owner count `0` (a gap) in the coverage summary.
 - [ ] A member owning none of the required families does not appear in the owners list.
+- [ ] A user who opted into global sharing (`REQ-INV-018`) and owns a required family is counted
+  and listed as an owner even when they are not a member of the responsible org unit.
 - [ ] A material order returns an empty coverage view.
 
 **Enforced by:** `JobOrderItemBlueprintOwnersServiceTest`, `BlueprintVariantFamilyResolverTest` ·
@@ -71,7 +80,8 @@ is restricted to members of that SK. The gate is
 scope predicate against the order's responsible org unit (so a non-admin matches only org
 units in their own membership set, with no SK-public escape). A non-member who can otherwise
 open a public SK order's detail page receives HTTP 403 from the endpoint, and the frontend
-simply omits the section.
+simply omits the section. The global blueprint-sharing opt-in (`REQ-INV-018`) does **not** widen
+this gate — it changes only which owners are counted *inside* the view, never who may open it.
 
 **Acceptance**
 

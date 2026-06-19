@@ -120,17 +120,24 @@ public class JobOrderItemBlueprintOwnersService {
       return new JobOrderItemBlueprintOwnersDto(List.of(), List.of());
     }
 
-    // Owner subs of the responsible org unit's members. A null responsible (legacy pre-backfill
-    // row) yields no members, so every required product shows zero coverage.
+    // Owner subs of the responsible org unit's members, unioned with the users who opted into
+    // global blueprint sharing (REQ-INV-018) so an opted-in owner is counted toward this order's
+    // coverage even when they are not a member of the responsible org unit. A null responsible
+    // (legacy pre-backfill row) contributes no members; the endpoint gate already rejects such
+    // orders, but global sharers would still be considered here.
     OrgUnit responsible = order.getResponsibleOrgUnit();
-    Set<String> ownerSubs =
-        responsible == null
-            ? Set.of()
-            : orgUnitMembershipRepository
-                .findDistinctUserIdsByOrgUnitIdIn(Set.of(responsible.getId()))
-                .stream()
-                .map(UUID::toString)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+    Set<String> memberSubs = new LinkedHashSet<>();
+    if (responsible != null) {
+      orgUnitMembershipRepository
+          .findDistinctUserIdsByOrgUnitIdIn(Set.of(responsible.getId()))
+          .stream()
+          .map(UUID::toString)
+          .forEach(memberSubs::add);
+    }
+    Set<String> ownerSubs = new LinkedHashSet<>(memberSubs);
+    userRepository.findIdsBySharingBlueprintsGlobally().stream()
+        .map(UUID::toString)
+        .forEach(ownerSubs::add);
 
     // Load the members' owned blueprints and keep the ones whose variant family is required. The
     // family key is a Java-computed reduction of the product name (no SQL form), so the match runs
@@ -171,7 +178,7 @@ public class JobOrderItemBlueprintOwnersService {
                     .thenComparing(JobOrderRequiredBlueprintDto::productKey))
             .toList();
 
-    List<JobOrderBlueprintOwnerDto> owners = buildOwners(ownedNamesByOwnerId);
+    List<JobOrderBlueprintOwnerDto> owners = buildOwners(ownedNamesByOwnerId, memberSubs);
     return new JobOrderItemBlueprintOwnersDto(requiredBlueprints, owners);
   }
 
@@ -183,11 +190,14 @@ public class JobOrderItemBlueprintOwnersService {
    *
    * @param ownedNamesByOwnerId owner id → the owned blueprint display names that matched a required
    *     family
+   * @param memberSubs the {@code owner_sub}s of the responsible org unit's members, used to flag
+   *     each owner as a unit member ({@code true}) or a global sharer who is not a member ({@code
+   *     false}, REQ-INV-018) so the UI can mark the latter
    * @return the owning-member rows, sorted case-insensitively by name; never {@code null}
    */
   @NotNull
   private List<JobOrderBlueprintOwnerDto> buildOwners(
-      @NotNull Map<UUID, Set<String>> ownedNamesByOwnerId) {
+      @NotNull Map<UUID, Set<String>> ownedNamesByOwnerId, @NotNull Set<String> memberSubs) {
     if (ownedNamesByOwnerId.isEmpty()) {
       return List.of();
     }
@@ -200,7 +210,8 @@ public class JobOrderItemBlueprintOwnersService {
             e ->
                 new JobOrderBlueprintOwnerDto(
                     nameById.get(e.getKey()),
-                    e.getValue().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList()))
+                    e.getValue().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList(),
+                    memberSubs.contains(e.getKey().toString())))
         .sorted(
             Comparator.comparing(
                 JobOrderBlueprintOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))

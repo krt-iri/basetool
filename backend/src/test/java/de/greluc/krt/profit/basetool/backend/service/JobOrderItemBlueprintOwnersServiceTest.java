@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -50,6 +51,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -334,11 +336,76 @@ class JobOrderItemBlueprintOwnersServiceTest {
     verify(personalBlueprintRepository, never()).findAllByOwnerSubIn(any());
   }
 
+  // covers REQ-INV-018 — a user who opted into global sharing is counted in the order's coverage
+  // and listed as an owner even when they are NOT a member of the responsible org unit; the service
+  // unions their sub into the owner-set passed to the blueprint lookup.
+  @Test
+  @SuppressWarnings("unchecked")
+  void globalSharerOutsideResponsibleOrgUnit_isCountedAndListed() {
+    JobOrder order = order(item("Aurora MR", "Aurora MR Ship"));
+    when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
+    when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
+        .thenReturn(Set.of(ALICE));
+    // CARLA is not a member of the responsible org unit but opted into global sharing.
+    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(CARLA));
+    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
+    when(personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs.capture()))
+        .thenReturn(List.of(owned(ALICE, "Aurora MR"), owned(CARLA, "Aurora MR")));
+    when(userRepository.findAllById(any()))
+        .thenReturn(List.of(user(ALICE, "Alice"), user(CARLA, "Carla")));
+
+    JobOrderItemBlueprintOwnersDto result = service.getBlueprintOwners(ORDER_ID);
+
+    assertTrue(ownerSubs.getValue().contains(ALICE.toString()));
+    assertTrue(ownerSubs.getValue().contains(CARLA.toString()));
+    assertEquals(2, result.requiredBlueprints().get(0).ownerCount());
+    assertEquals(
+        List.of("Alice", "Carla"),
+        result.owners().stream().map(JobOrderBlueprintOwnerDto::ownerName).toList());
+    // ALICE is a member of the responsible org unit; CARLA appears only via global sharing, so she
+    // is flagged not-a-member for the discreet UI hint.
+    JobOrderBlueprintOwnerDto alice = ownerByName(result, "Alice");
+    JobOrderBlueprintOwnerDto carla = ownerByName(result, "Carla");
+    assertTrue(alice.orgUnitMember(), "the responsible-unit member is flagged a member");
+    assertFalse(carla.orgUnitMember(), "the global sharer is flagged not-a-member");
+  }
+
+  // covers REQ-INV-018 — a user who is neither a member of the responsible org unit nor a global
+  // sharer is never counted: the global-sharer union is empty, so the owner-set is members-only.
+  @Test
+  @SuppressWarnings("unchecked")
+  void nonMemberNonSharer_isNotCounted() {
+    JobOrder order = order(item("Aurora MR", "Aurora MR Ship"));
+    when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
+    when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
+        .thenReturn(Set.of(ALICE));
+    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of());
+    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
+    when(personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs.capture()))
+        .thenReturn(List.of(owned(ALICE, "Aurora MR")));
+    when(userRepository.findAllById(any())).thenReturn(List.of(user(ALICE, "Alice")));
+
+    JobOrderItemBlueprintOwnersDto result = service.getBlueprintOwners(ORDER_ID);
+
+    assertEquals(Set.of(ALICE.toString()), Set.copyOf(ownerSubs.getValue()));
+    assertEquals(1, result.owners().size());
+    assertEquals("Alice", result.owners().get(0).ownerName());
+  }
+
   /** Finds the coverage row with the given family key, failing the test when it is absent. */
   private static JobOrderRequiredBlueprintDto coverageFor(
       JobOrderItemBlueprintOwnersDto result, String familyKey) {
     return result.requiredBlueprints().stream()
         .filter(rb -> rb.productKey().equals(familyKey))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  /** Finds the owner row with the given display name, failing the test when it is absent. */
+  private static JobOrderBlueprintOwnerDto ownerByName(
+      JobOrderItemBlueprintOwnersDto result, String name) {
+    return result.owners().stream()
+        .filter(o -> o.ownerName().equals(name))
         .findFirst()
         .orElseThrow();
   }

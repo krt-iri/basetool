@@ -42,9 +42,11 @@ users outside the requested family.
 - [ ] For the admin "all org units" scope, the owners lookup queries by that **family product-key
   set alone** (`findAllByProductKeyIn`); it must not enumerate all distinct owner subs first nor pass
   them back as an `IN` restriction.
-- [ ] Non-admin scopes keep the owner-restricted lookup (family product keys + in-scope member subs,
-  `findAllByProductKeyInAndOwnerSubIn`), resolved server-side — the client cannot widen the scope, and
-  the multi-user data-isolation rule is unaffected.
+- [ ] Non-admin scopes keep the owner-restricted lookup (family product keys + in-scope member subs
+  — **unioned with the subs of users who opted into global blueprint sharing, REQ-INV-018** —
+  `findAllByProductKeyInAndOwnerSubIn`), resolved server-side: the client cannot widen the scope,
+  the multi-user data-isolation rule is unaffected, and the opt-in widens only *whose* blueprints
+  are counted, never *who may open* the overview.
 
 **Enforced by:** `PersonalBlueprintOverviewServiceTest`, `BlueprintVariantFamilyCatalogTest` ·
 **Code:** `PersonalBlueprintOverviewService`, `BlueprintVariantFamilyCatalog`,
