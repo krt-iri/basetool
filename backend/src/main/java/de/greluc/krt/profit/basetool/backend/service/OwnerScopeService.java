@@ -153,6 +153,7 @@ public class OwnerScopeService {
   private final ShipRepository shipRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitRepository orgUnitRepository;
+  private final OrgUnitCascadeService orgUnitCascadeService;
   private final HttpServletRequest request;
 
   /**
@@ -246,22 +247,35 @@ public class OwnerScopeService {
 
   /**
    * Helper for {@link #currentScopePredicate()}: resolves every OrgUnit id the current non-admin
-   * caller is a member of. Used by the union-of-memberships branch of the scope predicate. Returns
-   * the empty set for anonymous callers and (technically) for admins, although the latter never
-   * reaches this method through {@link #currentScopePredicate()}.
+   * caller has effective reach over — their direct memberships <em>plus</em> the cascading
+   * leadership expansion (epic #692, REQ-ORG-015). Used by the union-of-memberships branch of the
+   * scope predicate. Returns the empty set for anonymous callers and (technically) for admins,
+   * although the latter never reaches this method through {@link #currentScopePredicate()}.
+   *
+   * <p>Cascade (delegated to {@link
+   * OrgUnitCascadeService#expandWithDescendants(java.util.Collection)} so the converter and this
+   * resolver share one definition): a Bereichsleitung membership ({@code is_bereichsleiter}/{@code
+   * is_bereichskoordinator}/{@code is_bereichsoperator}) widens reach to the Bereich's Staffeln +
+   * SKs; an OL membership ({@code is_ol_member}) widens reach to <em>every</em> org unit; a plain
+   * Staffel/SK membership (or a flag-less Bereich/OL seat) widens nothing. The expansion is always
+   * a concrete id set — never {@code adminAllScope}, never an {@code isAdmin()} grant — so
+   * OL/Bereich leadership stays officer-equivalent and never inherits the admin carve-outs (the
+   * HARD INVARIANT of REQ-ORG-015). For a caller with no leadership flag the result is exactly
+   * their direct membership ids, i.e. byte-for-byte the pre-#692 behaviour.
    *
    * <p>The result is memoised on the {@link HttpServletRequest} for the duration of the request.
    * Since the Job-Order profit gate ({@link #canViewJobOrders()}) landed, the resolver is consulted
    * more than once per request — the list path reads it via both {@code canViewJobOrders()} and
    * {@link #currentScopePredicate()}, and the detail/edit paths read it via {@code
    * canViewJobOrders()} — so the single cached {@code Set<UUID>} collapses what would otherwise be
-   * two or three identical {@code findAllByIdUserId} queries into one.
+   * repeated {@code findAllByIdUserId} + hierarchy reads into one.
    *
-   * <p>Post-D3: every membership row (Staffel + SK) flows through {@code
+   * <p>Post-D3: every membership row (Staffel + SK + Bereich + OL) flows through {@code
    * OrgUnitMembershipRepository.findAllByIdUserId} — the legacy {@code User.squadron} column was
    * dropped in R9 Step 5 / V101.
    *
-   * @return the union of OrgUnit ids the caller belongs to, never {@code null}.
+   * @return the union of OrgUnit ids the caller is a member of or has cascading leadership reach
+   *     over, never {@code null}.
    */
   @NotNull
   public java.util.Set<UUID> currentMemberOrgUnitIds() {
@@ -276,10 +290,9 @@ public class OwnerScopeService {
     if (userIdOpt.isEmpty()) {
       ids = java.util.Set.of();
     } else {
-      ids = new java.util.LinkedHashSet<>();
-      for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userIdOpt.get())) {
-        ids.add(m.getId().getOrgUnitId());
-      }
+      ids =
+          orgUnitCascadeService.expandWithDescendants(
+              orgUnitMembershipRepository.findAllByIdUserId(userIdOpt.get()));
     }
     request.setAttribute(CACHE_KEY_MEMBER_ORG_UNIT_IDS, ids);
     return ids;

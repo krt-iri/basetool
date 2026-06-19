@@ -1,0 +1,149 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.config;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+/**
+ * Mockito unit tests for {@link CustomJwtGrantedAuthoritiesConverter}, focused on the epic #692 /
+ * REQ-ORG-015 cascade: a Bereichsleitung / OL leadership membership must mint officer-equivalent
+ * flat roles ({@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER}) plus contextual authorities
+ * for every org unit the leadership reaches downward, and a plain member must be unaffected.
+ */
+@ExtendWith(MockitoExtension.class)
+class CustomJwtGrantedAuthoritiesConverterTest {
+
+  @Mock private UserService userService;
+  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
+  @Mock private OrgUnitCascadeService orgUnitCascadeService;
+  @Mock private Jwt jwt;
+
+  @InjectMocks private CustomJwtGrantedAuthoritiesConverter converter;
+
+  private static final UUID USER_ID = UUID.randomUUID();
+  private static final UUID BEREICH_ID = UUID.randomUUID();
+  private static final UUID DESCENDANT_STAFFEL_ID = UUID.randomUUID();
+  private static final UUID DESCENDANT_SK_ID = UUID.randomUUID();
+
+  private User userWithNoRoles() {
+    User user = new User();
+    user.setId(USER_ID);
+    return user;
+  }
+
+  private static OrgUnitMembership membership(UUID orgUnitId, OrgUnitKind kind) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(USER_ID, orgUnitId));
+    m.setKind(kind);
+    return m;
+  }
+
+  @Test
+  void plainStaffelMember_getsNoLeadershipRolesAndNoCascade() {
+    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    OrgUnitMembership plain = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(plain));
+    when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    assertFalse(
+        authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", DESCENDANT_STAFFEL_ID)));
+  }
+
+  @Test
+  void bereichsleiter_getsFlatRolesAndCascadedContextualAuthorities() {
+    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
+    lead.setBereichsleiter(true);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
+    when(orgUnitCascadeService.cascadedOfficerReach(any()))
+        .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID, DESCENDANT_SK_ID));
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    // Officer-equivalent flat roles (back-compat for role-only @PreAuthorize gates).
+    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    // Contextual authorities for every cascaded unit, both roles.
+    for (UUID reached : List.of(BEREICH_ID, DESCENDANT_STAFFEL_ID, DESCENDANT_SK_ID)) {
+      assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", reached)));
+      assertTrue(authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", reached)));
+    }
+  }
+
+  @Test
+  void olMember_getsFlatRolesAndContextualAuthoritiesForEveryReachedUnit() {
+    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    UUID olId = UUID.randomUUID();
+    OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
+    ol.setOlMember(true);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(ol));
+    // The cascade service resolves OL reach to the concrete union of every org unit.
+    when(orgUnitCascadeService.cascadedOfficerReach(any()))
+        .thenReturn(Set.of(olId, BEREICH_ID, DESCENDANT_STAFFEL_ID));
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    assertTrue(
+        authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", DESCENDANT_STAFFEL_ID)));
+  }
+
+  @Test
+  void memberlessUser_getsNoMembershipDerivedAuthorities() {
+    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    // No memberships → the converter short-circuits before consulting the cascade.
+    lenient().when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+  }
+}

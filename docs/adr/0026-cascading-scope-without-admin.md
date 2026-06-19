@@ -1,6 +1,7 @@
 # ADR-0026 — Cascading org-unit scope without admin rights, computed in one descent helper
 
-- **Status:** Accepted — implementation pending (epic #692)
+- **Status:** Accepted — implemented in Phase 3 (#696) for the aggregate scope + authorities; the
+  `currentBlueprintOversightScope()` half is deferred to Phase 6 (#699). See *Implementation note*.
 - **Date:** 2026-06-19
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-ORG-015 · REQ-SEC-015 · ADR-0025 · REQ-ORG-011 (#701) · ADR-0024 (#702) · issue #692 · #696
@@ -44,6 +45,25 @@ Further:
   create-on-behalf is handled separately (ADR-0027).
 - **Composition:** the cascade only widens the *scope* branch; the #701 `isCurrentUserOwner` bypass stays
   ahead of it, and the #702 global-blueprint union in the overview/coverage services is preserved.
+
+## Implementation note (Phase 3, #696)
+
+The decision holds; two refinements landed during implementation:
+
+- **The helper lives in a dedicated `OrgUnitCascadeService`**, not as a private method on
+  `OwnerScopeService`. It exposes `expandWithDescendants(memberships)` (full reach = direct ids ∪
+  cascade) for the scope path and `cascadedOfficerReach(memberships)` (leadership-only reach) for the
+  authority path, so `OwnerScopeService` and `CustomJwtGrantedAuthoritiesConverter` share one
+  independently-tested definition. Routing the cascade through an injected collaborator (rather than a
+  body change) also let every pre-#692 `OwnerScopeServiceTest` scenario stay green with a single
+  identity-default stub — concrete evidence of the zero-regression property.
+- **`currentBlueprintOversightScope()` is NOT cascaded yet.** That method is shared by the bank seam
+  (`OrgUnitBankAccessService`), where Q4 (REQ-BANK-027) requires the balance **view** to cascade but
+  deposit/withdrawal **requests** to stay own-level. Widening it atomically with that read/write split
+  belongs to the bank phase (#699), so Phase 3 wires the cascade into `currentMemberOrgUnitIds()` only
+  (aggregate lists + per-row gates + the Job-Order profit gate) plus the authority minting. A
+  Bereichsleitung/OL therefore reaches descendant **aggregates** but not yet the descendant
+  **blueprint-availability overview** — strictly fail-closed.
 
 ## Consequences
 

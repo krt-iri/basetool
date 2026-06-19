@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bereichsleitung und Organisationsleitung sehen und bearbeiten jetzt die Daten ihrer untergeordneten Einheiten.** Wer Bereichsleiter, -koordinator oder -operator eines Bereichs ist, erhält offiziersgleichen Zugriff auf alle Staffeln und Spezialkommandos dieses Bereichs (Einsätze, Hangar, Lager, Raffinerie, Operationen, Aufträge); die Organisationsleitung auf alle Einheiten. Der Zugriff ist streng auf den eigenen Bereich begrenzt (nur die OL übergreift Bereiche) und verleiht ausdrücklich keine Administratorrechte.
+
 ### Changed
 
 - **Die Blueprint-Verfügbarkeit in den Auftragsdetails lässt sich jetzt über ihre Überschrift ein- und ausklappen** (standardmäßig ausgeklappt), sodass die teils lange Liste bei Bedarf weggeklappt werden kann. Außerdem gibt es mehr Abstand vor dem Abschnitt „Item-Übergaben".
