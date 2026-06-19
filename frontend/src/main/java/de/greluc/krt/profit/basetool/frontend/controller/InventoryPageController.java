@@ -212,6 +212,8 @@ public class InventoryPageController {
    * @param minQuality optional minimum-quality filter
    * @param jobOrderIds optional job-order id filter (multi)
    * @param missionIds optional mission id filter (multi)
+   * @param personalOnly when true, show only the caller's personal entries ({@code personal =
+   *     true})
    * @param fragment when true, return the {@code inventoryTableFragment} fragment
    * @param model Thymeleaf model populated with grouped items, filter source catalogs and the
    *     auth-derived UX flags
@@ -223,6 +225,7 @@ public class InventoryPageController {
       @RequestParam(required = false) Integer minQuality,
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
+      @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     if (!model.containsAttribute("inventoryForm")) {
@@ -257,6 +260,9 @@ public class InventoryPageController {
           uriBuilder.queryParam("missionIds", id.toString());
         }
       }
+      if (personalOnly) {
+        uriBuilder.queryParam("personalOnly", true);
+      }
       String url = uriBuilder.build().toUriString();
       List<GroupedInventoryDto> res =
           backendApiClient.get(url, new ParameterizedTypeReference<>() {});
@@ -280,6 +286,7 @@ public class InventoryPageController {
     model.addAttribute("selectedMinQuality", minQuality);
     model.addAttribute("selectedJobOrderIds", jobOrderIds);
     model.addAttribute("selectedMissionIds", missionIds);
+    model.addAttribute("selectedPersonalOnly", personalOnly);
     model.addAttribute("authUserId", currentAuthName());
     model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
 
@@ -826,7 +833,7 @@ public class InventoryPageController {
       if (fromAdminListing) {
         return viewAllInventory(null, null, null, null, false, model);
       }
-      return viewMyInventory(null, null, null, null, false, model);
+      return viewMyInventory(null, null, null, null, false, false, model);
     }
 
     try {

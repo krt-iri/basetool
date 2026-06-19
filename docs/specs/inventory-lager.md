@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-08.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-19.
 > **Owner area:** INV · **Related ADRs:** ADR-0003
 
 # Inventory Lager — append-only entries & group-on-read
@@ -153,6 +153,36 @@ beneath the Auftrag/Einsatz controls.
 `fragments/inventory-stack-entries.html`, `static/css/styles.css` (`.tree-row--leaf`, `.btn-icon`),
 `inventory-my.html` / `inventory-admin.html` (note-button DOM sync), `V143__add_inventory_item_stack_key_index.sql` ·
 **Issues:** #466
+
+### REQ-INV-006 — "Mein Lager" personal-entries-only filter
+
+The personal Lager view (`/inventory/my`) offers a **personal-entries-only** filter alongside the
+existing material / min-quality / job-order / mission filters. When enabled (query param
+`personalOnly=true`), the grouped result is narrowed to the caller's private stock (`personal =
+true` rows); when the param is absent or `false`, both the caller's shared contributions and their
+personal stock are returned — the unchanged default. The narrowing is applied **in SQL** by the
+same group-on-read query (`findUserStacks`), so the material-group aggregates (summed amount,
+amount-weighted mean quality, max quality, entry count) always reflect exactly the visible stacks
+rather than a client-side subset. The flag is URL-driven (a filtered view is shareable), composes
+with the other filters and the `fragment=true` in-place swap, and is reflected back into the page
+URL. It is a scope-**narrowing** concern only: it never widens visibility, and it exists solely on
+the owner-scoped `/my` view — there is no equivalent on the squadron-wide `/all` view.
+
+**Acceptance**
+
+- [ ] With `personalOnly=true`, only the caller's `personal = true` stacks appear; the caller's
+  shared (non-personal) contributions are excluded.
+- [ ] With `personalOnly` absent or `false`, both shared and personal stacks appear (unchanged
+  behaviour).
+- [ ] The material-group aggregates reflect only the visible stacks under the active filter.
+- [ ] The flag composes with the material / min-quality / job-order / mission filters and is
+  reflected in the page URL.
+
+**Enforced by:** `InventoryItemServiceTest`, `InventoryItemStackQueryDataTest`,
+`InventoryItemControllerTest`, `InventoryPageControllerTest`, `InventoryPageControllerMvcTest` ·
+**Code:** `InventoryItemRepository#findUserStacks`,
+`InventoryItemService#getMyAggregatedInventory`, `InventoryItemController#getMyGroupedInventory`,
+`InventoryPageController#viewMyInventory`, `inventory-my.html` · **Issues:** #466
 
 ## Out of scope
 

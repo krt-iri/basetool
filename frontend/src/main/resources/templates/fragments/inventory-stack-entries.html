@@ -37,7 +37,6 @@
                        th:data-id="${entry.id}"
                        th:data-material-id="${entry.material.id}"
                        data-trigger="inv-my-update-bulk-state">
-                <span class="tree-leaf-tag" th:text="#{inventory.tree.entry}">Eintrag</span>
                 <div class="tree-fieldset">
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
@@ -157,7 +156,6 @@
     <th:block th:each="entry : ${entries}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
             <div class="tree-leaf-main">
-                <span class="tree-leaf-tag" th:text="#{inventory.tree.entry}">Eintrag</span>
                 <div class="tree-fieldset">
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
