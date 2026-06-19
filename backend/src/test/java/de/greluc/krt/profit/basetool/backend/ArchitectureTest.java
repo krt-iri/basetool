@@ -709,13 +709,12 @@ class ArchitectureTest {
             // #364: the blueprint availability overview filters the aggregate to the caller's
             // oversight org units via OwnerScopeService.currentOversightScope().
             "PersonalBlueprintOverviewService",
-            // Epic #692 Phase 6 (REQ-BANK-027): the org-unit-aware bank seam scopes the F1 balance
-            // view + F2 booking requests through OwnerScopeService (currentOversightScope /
-            // currentOwnLevelOversightScope). Whitelisted so a future maintainer who drops that
-            // dependency — silently un-scoping the bank seam — fails the build. (It is also the
-            // sole
-            // sanctioned OwnerScope↔bank bridge, pinned by
-            // orgUnitAwareBankSeamIsContainedToOneClass.)
+            // Epic #692 Phase 6 (REQ-BANK-027): the org-unit-aware bank seam scopes the F1
+            // balance view + F2 booking requests through OwnerScopeService
+            // (currentOversightScope / currentOwnLevelOversightScope). Whitelisted so a
+            // maintainer who drops that dependency — silently un-scoping the bank seam — fails
+            // the build. It is also the sole sanctioned OwnerScope↔bank bridge, pinned by
+            // orgUnitAwareBankSeamIsContainedToOneClass.
             "OrgUnitBankAccessService");
 
     String authHelper = "de.greluc.krt.profit.basetool.backend.service.AuthHelperService";
