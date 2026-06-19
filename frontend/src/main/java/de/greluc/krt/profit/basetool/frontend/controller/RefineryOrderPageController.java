@@ -1198,11 +1198,39 @@ public class RefineryOrderPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(
       RefineryOrderForm form, OidcUser principal) {
-    UUID targetUserId = form != null ? form.getOwnerId() : null;
-    if (targetUserId == null) {
-      targetUserId = getCurrentUserId(principal);
+    UUID explicitOwnerId = form != null ? form.getOwnerId() : null;
+    if (explicitOwnerId == null) {
+      // Self-entry → the caller's pickable org units: direct memberships plus their cascading
+      // leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs), epic #692 Phase 5.
+      // Unchanged for an ordinary member. Resolved server-side for the caller.
+      if (principal == null) {
+        return List.of();
+      }
+      return fetchMyPickableOrgUnits();
     }
-    return fetchUserOrgUnitOptions(targetUserId);
+    // A logistician explicitly picking another owner → that user's DIRECT memberships (their own
+    // stock); the create-on-behalf cascade applies to the caller, not to a third-party owner.
+    return fetchUserOrgUnitOptions(explicitOwnerId);
+  }
+
+  /**
+   * Fetches the calling user's pickable owning-org-unit options (direct memberships ∪ cascading
+   * leadership reach) from {@code /api/v1/users/me/pickable-org-units} (epic #692 Phase 5). Wraps
+   * failures in an empty list so a transient backend hiccup leaves the picker empty rather than
+   * breaking the form.
+   *
+   * @return the caller's pickable options, sorted by the backend; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchMyPickableOrgUnits() {
+    try {
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get(
+              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
+      return options != null ? options : List.of();
+    } catch (Exception e) {
+      log.warn("Failed to fetch pickable org units for refinery-order owner-picker", e);
+      return List.of();
+    }
   }
 
   /**

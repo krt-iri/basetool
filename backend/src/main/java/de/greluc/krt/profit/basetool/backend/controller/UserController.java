@@ -237,6 +237,29 @@ public class UserController {
   }
 
   /**
+   * Returns the calling user's <em>pickable</em> owning-org-unit options for the create/stamp forms
+   * (epic #692 Phase 5, REQ-ORG-016 / REQ-ORG-018): the caller's direct memberships plus their
+   * cascading leadership reach (a Bereichsleitung/OL leader's subordinate Staffeln/SKs and their
+   * own Bereich/OL). This is the drill-down counterpart of {@code GET /{id}/memberships}, which
+   * stays strictly the user's direct memberships and is shared by the admin member views and the
+   * refinery-store/transfer receiver picker. Resolved for the <em>current caller only</em> (never
+   * an arbitrary id) so it cannot enumerate another user's reach.
+   *
+   * <p>For an ordinary member the result equals their direct memberships, so the owner picker is
+   * unchanged for non-leaders.
+   *
+   * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}.
+   * @return the caller's pickable org-unit options across all reachable kinds; never {@code null}.
+   */
+  @GetMapping("/me/pickable-org-units")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public List<OrgUnitMembershipOptionDto> getMyPickableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
+    return orgUnitMembershipService.listPickerOptionsWithDescendants(
+        userService.getUserIdFromJwt(jwt));
+  }
+
+  /**
    * Updates the calling user's own description + displayName. The JWT identifies the row — no
    * impersonation possible.
    *

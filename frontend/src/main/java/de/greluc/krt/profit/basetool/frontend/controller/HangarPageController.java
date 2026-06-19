@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronShipOverviewDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.ShipForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -279,16 +278,16 @@ public class HangarPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
     try {
-      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
-      if (me == null || me.id() == null) {
-        return List.of();
-      }
+      // Epic #692 Phase 5: the owner picker offers the caller's pickable org units — their direct
+      // memberships plus their cascading leadership reach (a Bereichsleitung/OL leader's own
+      // Bereich/OL + the subordinate Staffeln/SKs they oversee). For an ordinary member this equals
+      // their direct memberships, so the picker is unchanged. Resolved server-side for the caller.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/" + me.id() + "/memberships", new ParameterizedTypeReference<>() {});
+              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
       return options != null ? options : List.of();
     } catch (Exception e) {
-      log.warn("Failed to fetch memberships for hangar add-ship owner-picker", e);
+      log.warn("Failed to fetch pickable org units for hangar add-ship owner-picker", e);
       return List.of();
     }
   }

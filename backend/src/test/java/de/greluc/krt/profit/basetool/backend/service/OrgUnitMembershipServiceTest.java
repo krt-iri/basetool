@@ -76,6 +76,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private SpecialCommandRepository specialCommandRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
+  @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private InventoryOrgUnitReconciler inventoryReconciler;
 
   @InjectMocks private OrgUnitMembershipService membershipService;
@@ -572,6 +573,49 @@ class OrgUnitMembershipServiceTest {
     assertTrue(
         options.isEmpty(),
         "membership row pointing at a deleted Squadron must not crash the picker");
+  }
+
+  // --- listPickerOptionsWithDescendants (epic #692 Phase 5 drill-down) -------
+
+  @Test
+  void listPickerOptionsWithDescendants_bereichLeader_includesBereichAndDescendantsTopDown() {
+    UUID bereichId = UUID.randomUUID();
+    UUID staffelId = UUID.randomUUID();
+    OrgUnitMembership bereichRow = new OrgUnitMembership();
+    bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
+    bereichRow.setKind(OrgUnitKind.BEREICH);
+    bereichRow.setBereichsleiter(true);
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(bereichRow));
+    when(orgUnitCascadeService.expandWithDescendants(any()))
+        .thenReturn(new java.util.LinkedHashSet<>(List.of(bereichId, staffelId)));
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    bereich.setName("Profit");
+    bereich.setShorthand("PRF");
+    Squadron staffel = new Squadron();
+    staffel.setId(staffelId);
+    staffel.setName("Alpha");
+    staffel.setShorthand("ALF");
+    // Return unordered to prove the service applies the top-down hierarchy sort itself.
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(staffel, bereich));
+
+    List<OrgUnitMembershipOptionDto> options =
+        membershipService.listPickerOptionsWithDescendants(userId);
+
+    assertEquals(2, options.size());
+    // Top-down hierarchy order: Bereich (1) before Staffel (2).
+    assertEquals(OrgUnitKind.BEREICH, options.get(0).kind());
+    assertEquals(bereichId, options.get(0).orgUnitId());
+    assertEquals(OrgUnitKind.SQUADRON, options.get(1).kind());
+    assertEquals(staffelId, options.get(1).orgUnitId());
+  }
+
+  @Test
+  void listPickerOptionsWithDescendants_noMemberships_returnsEmptyWithoutCascade() {
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+
+    assertTrue(membershipService.listPickerOptionsWithDescendants(userId).isEmpty());
+    verify(orgUnitCascadeService, never()).expandWithDescendants(any());
   }
 
   // --- listAllActiveOptions (R5.d.c Job Order picker) -----------------------

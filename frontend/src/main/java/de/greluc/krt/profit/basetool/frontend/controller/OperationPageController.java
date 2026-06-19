@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutStatusUpd
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -175,16 +174,15 @@ public class OperationPageController {
       return List.of();
     }
     try {
-      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
-      if (me == null || me.id() == null) {
-        return List.of();
-      }
+      // Epic #692 Phase 5: drill-down owner picker — the caller's direct memberships plus their
+      // cascading leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs). Unchanged
+      // for an ordinary member.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/" + me.id() + "/memberships", new ParameterizedTypeReference<>() {});
+              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
       return options != null ? options : List.of();
     } catch (Exception e) {
-      log.warn("Failed to fetch memberships for operation-create owner-picker", e);
+      log.warn("Failed to fetch pickable org units for operation-create owner-picker", e);
       return List.of();
     }
   }

@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -80,6 +81,7 @@ public class OrgUnitMembershipService {
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
   private final OrgUnitRepository orgUnitRepository;
+  private final OrgUnitCascadeService orgUnitCascadeService;
   private final InventoryOrgUnitReconciler inventoryReconciler;
 
   /**
@@ -185,6 +187,65 @@ public class OrgUnitMembershipService {
                 o -> o.orgUnitName() == null ? "" : o.orgUnitName(),
                 String.CASE_INSENSITIVE_ORDER));
     return options;
+  }
+
+  /**
+   * Picker options for the <em>owning-org-unit</em> drill-down (epic #692 Phase 5, REQ-ORG-016 /
+   * REQ-ORG-018): the caller's direct memberships <em>plus</em> the cascading leadership reach
+   * (delegated to {@link OrgUnitCascadeService#expandWithDescendants(java.util.Collection)}).
+   * Unlike {@link #listOptionsForUser(UUID)} — which stays strictly the user's DIRECT memberships
+   * and is shared by the admin member views, the refinery-store/transfer receiver picker and the
+   * active-context union — this widens the set so a Bereichsleitung/OL leader can pick their own
+   * Bereich/OL <em>or</em> a subordinate Staffel/SK they oversee when stamping a new aggregate.
+   *
+   * <p>For a caller with no leadership flag the expansion collapses to their direct memberships, so
+   * the picker is byte-identical to {@link #listOptionsForUser(UUID)} for an ordinary member. The
+   * returned set may legitimately contain {@code BEREICH} / {@code ORGANISATIONSLEITUNG} options (a
+   * leader owning their own level's data) — the picker fragment groups them by kind. Options are
+   * sorted top-down by hierarchy kind (OL → Bereich → Staffel → SK) then by name.
+   *
+   * @param userId the caller whose reachable org units to enumerate; never {@code null}.
+   * @return picker-friendly DTOs across all reachable kinds; never {@code null}, possibly empty
+   *     when the caller has no membership at all.
+   */
+  public List<OrgUnitMembershipOptionDto> listPickerOptionsWithDescendants(@NotNull UUID userId) {
+    List<OrgUnitMembership> rows = membershipRepository.findAllByIdUserId(userId);
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    Set<UUID> reach = orgUnitCascadeService.expandWithDescendants(rows);
+    List<OrgUnitMembershipOptionDto> options = new ArrayList<>(reach.size());
+    for (OrgUnit orgUnit : orgUnitRepository.findAllById(reach)) {
+      options.add(
+          new OrgUnitMembershipOptionDto(
+              orgUnit.getId(),
+              orgUnit.getName(),
+              orgUnit.getShorthand(),
+              orgUnit.getKind(),
+              orgUnit.isProfitEligible()));
+    }
+    options.sort(
+        Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(o -> pickerKindOrder(o.kind()))
+            .thenComparing(
+                o -> o.orgUnitName() == null ? "" : o.orgUnitName(),
+                String.CASE_INSENSITIVE_ORDER));
+    return options;
+  }
+
+  /**
+   * Stable top-down ordering of org-unit kinds for the owning-org-unit picker (OL → Bereich →
+   * Staffel → SK), so the picker fragment renders its {@code optgroup}s in hierarchy order.
+   *
+   * @param kind the option's org-unit kind; never {@code null}.
+   * @return the sort rank (0 = top of the hierarchy).
+   */
+  private static int pickerKindOrder(@NotNull OrgUnitKind kind) {
+    return switch (kind) {
+      case ORGANISATIONSLEITUNG -> 0;
+      case BEREICH -> 1;
+      case SQUADRON -> 2;
+      case SPECIAL_COMMAND -> 3;
+    };
   }
 
   /**

@@ -1337,8 +1337,8 @@ public class MissionPageController {
    * owner's. Falls back to an empty list when the lookup fails (the fragment collapses to a hidden
    * state for an empty option list).
    *
-   * @param principal authenticated OIDC user; the membership lookup uses {@code /api/v1/users/me}
-   *     to resolve the caller's id without forcing the JWT subject through a UUID parse.
+   * @param principal authenticated OIDC user; the picker is resolved server-side for the caller via
+   *     {@code /api/v1/users/me/pickable-org-units}.
    * @return picker options or empty list; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions(OidcUser principal) {
@@ -1346,16 +1346,15 @@ public class MissionPageController {
       return List.of();
     }
     try {
-      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
-      if (me == null || me.id() == null) {
-        return List.of();
-      }
+      // Epic #692 Phase 5: drill-down owner picker — the caller's direct memberships plus their
+      // cascading leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs). Unchanged
+      // for an ordinary member.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/" + me.id() + "/memberships", new ParameterizedTypeReference<>() {});
+              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
       return options != null ? options : List.of();
     } catch (Exception e) {
-      log.warn("Failed to fetch memberships for mission-create owner-picker", e);
+      log.warn("Failed to fetch pickable org units for mission-create owner-picker", e);
       return List.of();
     }
   }

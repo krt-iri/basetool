@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import jakarta.validation.Valid;
@@ -579,30 +578,30 @@ public class InventoryPageController {
    * @return picker options or empty list; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(InventoryForm form) {
-    UUID targetUserId = null;
     if (form != null && Boolean.TRUE.equals(form.getIsGlobal()) && form.getUserId() != null) {
-      targetUserId = form.getUserId();
-    } else {
+      // Admin creating a global entry for ANOTHER user → that user's DIRECT memberships (their own
+      // stock). The create-on-behalf cascade is the caller's reach, not a third-party owner's.
       try {
-        UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
-        if (me != null && me.id() != null) {
-          targetUserId = me.id();
-        }
+        List<OrgUnitMembershipOptionDto> options =
+            backendApiClient.get(
+                "/api/v1/users/" + form.getUserId() + "/memberships",
+                new ParameterizedTypeReference<>() {});
+        return options != null ? options : List.of();
       } catch (Exception e) {
-        log.warn("Failed to fetch current user for owner-picker", e);
+        log.warn("Failed to fetch memberships for owner-picker", e);
+        return List.of();
       }
     }
-    if (targetUserId == null) {
-      return List.of();
-    }
+    // Self-entry → the caller's pickable org units: direct memberships plus their cascading
+    // leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs), epic #692 Phase 5.
+    // Unchanged for an ordinary member. Resolved server-side for the caller.
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/" + targetUserId + "/memberships",
-              new ParameterizedTypeReference<>() {});
+              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
       return options != null ? options : List.of();
     } catch (Exception e) {
-      log.warn("Failed to fetch memberships for owner-picker", e);
+      log.warn("Failed to fetch pickable org units for owner-picker", e);
       return List.of();
     }
   }
