@@ -50,20 +50,25 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression test for the "profit-eligible Spezialkommando never appears in the Job-Order
- * responsible picker" bug. Both owner-pickers are now fed by the single {@code permitAll} {@code
- * GET /api/v1/org-units/active} catalog (each option carries its {@code isProfitEligible} flag), so
- * a profit-eligible SK reaches the responsible picker for authenticated callers <em>and</em>
- * anonymous guests alike. The previous design fetched the authenticated-only SK catalog ({@code
- * /api/v1/special-commands}) separately, which 401s for a guest and dropped every SK. This test
- * pins that an eligible SK reaches the rendered picker, that the catalog is fetched through the
- * public client, and that the deprecated SK-catalog call is no longer made for the picker.
+ * Owner-picker sourcing for the Job-Order create form, for an <em>authenticated</em> caller. Since
+ * epic #692 the requesting (Auftraggeber) picker offers all four kinds — including Bereiche and the
+ * Organisationsleitung — sourced from the authenticated {@code GET
+ * /api/v1/org-units/active-all-kinds} catalog, so a Bereichsleitung/OL member can place an order on
+ * behalf of their tier. The responsible picker is the {@code isProfitEligible} subset, which keeps
+ * a profit-eligible SK and excludes the (never-profit) Bereich/OL — they can be the customer but
+ * never the processor. This test pins that an eligible SK still reaches the responsible picker,
+ * that a Bereich + OL reach the requesting picker (they are non-profit, so a rendered Bereich/OL
+ * name can only have come from the requesting picker), that the all-kinds catalog is the source,
+ * and that the deprecated SK-catalog call is gone. The anonymous-guest path (which keeps the
+ * Staffel/SK-only {@code /active} catalog) is covered by {@link
+ * JobOrderPageControllerCreateFormAnonymousMvcTest}.
  */
 @SpringBootTest
 @SuppressWarnings("unchecked")
 class JobOrderPageControllerResponsiblePickerMvcTest {
 
   private static final String ACTIVE_URI = "/api/v1/org-units/active";
+  private static final String ALL_KINDS_URI = "/api/v1/org-units/active-all-kinds";
   private static final String SK_CATALOG_URI = "/api/v1/special-commands?size=1000&sort=name,asc";
 
   @Autowired private WebApplicationContext context;
@@ -82,30 +87,44 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
 
   @Test
   @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
-  void viewCreateForm_eligibleSpecialCommand_appearsInResponsiblePicker() throws Exception {
+  void viewCreateForm_authenticated_requestingOffersBereichAndOl_responsibleStaysProfitStaffelSk()
+      throws Exception {
     OrgUnitMembershipOptionDto profitStaffel =
         new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Test Staffel", "TS", "SQUADRON", true);
     OrgUnitMembershipOptionDto profitSk =
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Profit Spezialkommando", "PSK", "SPECIAL_COMMAND", true);
+    OrgUnitMembershipOptionDto bereich =
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "Bereich Profit XYZ", "P", "BEREICH", false);
+    OrgUnitMembershipOptionDto ol =
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "Kartellleitung XYZ", "OL", "ORGANISATIONSLEITUNG", false);
 
     // Reference catalogs (materials / orderable items / squadrons) go through the cached client;
     // empty keeps them from blocking the render.
     when(backendApiClient.getCached(
             anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
         .thenReturn(Collections.emptyList());
-    when(backendApiClient.get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), eq(true)))
-        .thenReturn(List.of(profitStaffel, profitSk));
+    // Authenticated requesting picker sources the all-kinds catalog via the authenticated client.
+    when(backendApiClient.get(eq(ALL_KINDS_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(profitStaffel, profitSk, bereich, ol));
 
     mockMvc
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
         .andExpect(view().name("orders-create"))
-        .andExpect(content().string(Matchers.containsString("Profit Spezialkommando")));
+        // The profit SK still reaches the responsible picker.
+        .andExpect(content().string(Matchers.containsString("Profit Spezialkommando")))
+        // The Bereich + OL are non-profit, so a rendered Bereich/OL option name can only have come
+        // from the requesting picker (the responsible picker filters non-profit out).
+        .andExpect(content().string(Matchers.containsString("Bereich Profit XYZ")))
+        .andExpect(content().string(Matchers.containsString("Kartellleitung XYZ")));
 
-    // The catalog must come from the permitAll active endpoint via the public client — the previous
-    // design fetched the authenticated SK catalog, which 401s and drops every SK for a guest.
-    verify(backendApiClient).get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), eq(true));
+    // Authenticated callers source the all-kinds catalog — never the Staffel/SK-only /active.
+    verify(backendApiClient).get(eq(ALL_KINDS_URI), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never())
+        .get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), anyBoolean());
     verify(backendApiClient, never())
         .getCached(eq(SK_CATALOG_URI), any(ParameterizedTypeReference.class), anyBoolean());
   }

@@ -1277,9 +1277,11 @@ public class JobOrderService {
   }
 
   /**
-   * Resolves the requesting (customer) org unit from the picker output. Any squadron or
-   * Spezialkommando is accepted — there is no profit-eligibility restriction on who may place an
-   * order. Mandatory: the create/update DTOs always carry it.
+   * Resolves the requesting (customer / Auftraggeber) org unit from the picker output. Any org unit
+   * is accepted — Staffel, Spezialkommando, Bereich or Organisationsleitung (epic #692): there is
+   * no profit-eligibility or kind restriction on who may be named the customer (unlike the
+   * responsible unit, which must be a profit-eligible Staffel/SK). Mandatory: the create/update
+   * DTOs always carry it.
    *
    * @param requestingOrgUnitId picker output from the DTO.
    * @return the resolved requesting org unit; never {@code null}.
