@@ -16,6 +16,10 @@
 - **Die Blueprint-Verfügbarkeit in den Auftragsdetails lässt sich jetzt über ihre Überschrift ein- und ausklappen** (standardmäßig ausgeklappt), sodass die teils lange Liste bei Bedarf weggeklappt werden kann. Außerdem gibt es mehr Abstand vor dem Abschnitt „Item-Übergaben".
 - **In den Lagereinträgen entfällt die überflüssige Beschriftung „Eintrag" vor dem Auftrags-Dropdown**, sodass die Auftrags- und Einsatzauswahl direkt und aufgeräumter erscheint.
 
+### Fixed
+
+- **Das Deploy-Skript rollt jetzt auch den `ingest`-Gateway aus.** Bisher löste, pinnte und zog `scripts/deploy.sh` nur die Backend- und Frontend-Images; das `ingest`-Image lief zwar mit, wurde aber nie auf seinen Digest festgenagelt (ein `:stable`-Wechsel in GHCR konnte es unbemerkt verschieben) und ein neu promotetes `ingest`-Image löste allein keinen Deploy aus. Jetzt werden alle drei Images (Backend, Frontend, Ingest) gemeinsam aufgelöst, gepinnt, vorab gezogen und gegen den Idempotenz-Marker geprüft.
+
 ## [v0.5.12](https://github.com/krt-profit/basetool/releases/tag/v0.5.12) - 2026-06-19
 
 ### Added
