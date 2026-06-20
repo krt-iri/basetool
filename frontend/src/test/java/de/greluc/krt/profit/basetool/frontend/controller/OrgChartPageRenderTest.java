@@ -351,7 +351,69 @@ class OrgChartPageRenderTest {
     assertThat(html).as("Bereichsleiter holder rendered").contains("Area Boss");
     assertThat(html).as("Bereich's Staffel rendered via ocUnitFan").contains("IRIDIUM");
     assertThat(html)
+        .as("Bereich carries a collapse toggle")
+        .contains("data-trigger=\"oc-collapse\"");
+    assertThat(html).as("Bereich body is collapsible").contains("oc-bereich-body");
+    assertThat(html)
         .as("legacy area tier hidden when a Bereich is populated")
         .doesNotContain("data-trigger=\"oc-add-staff\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void olWithBereiche_admin_rendersConnectorFanSideBySide() throws Exception {
+    // Given: an OL plus two Bereiche. The Bereiche must fan out side by side beneath the OL via the
+    // oc-fan--bereiche connector (epic #692) — each its own collapsible Bereich subtree.
+    UUID olId = UUID.randomUUID();
+    OrgChartNodeDto leadA =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Boss A", 0, 0L);
+    OrgChartNodeDto leadB =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Boss B", 0, 0L);
+    BereichChartDto bereichA =
+        new BereichChartDto(
+            UUID.randomUUID(),
+            "Profit-Bereich",
+            "PRF",
+            "PROFIT",
+            new AreaLeadershipDto(leadA, List.of(), List.of(), List.of()),
+            List.of(),
+            List.of());
+    BereichChartDto bereichB =
+        new BereichChartDto(
+            UUID.randomUUID(),
+            "Sub-Radar-Bereich",
+            "SUB",
+            "SUB_RADAR",
+            new AreaLeadershipDto(leadB, List.of(), List.of(), List.of()),
+            List.of(),
+            List.of());
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new OlChartDto(olId, "Organisationsleitung", "OL", List.of()),
+                List.of(bereichA, bereichB),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("OL apex rendered").contains("oc-unit-box--ol");
+    assertThat(html).as("OL → Bereiche connector fan rendered").contains("oc-fan--bereiche");
+    assertThat(html).as("first Bereich rendered side by side").contains("Profit-Bereich");
+    assertThat(html).as("second Bereich rendered side by side").contains("Sub-Radar-Bereich");
+    assertThat(html)
+        .as("each Bereich carries a collapse toggle")
+        .contains("data-trigger=\"oc-collapse\"");
   }
 }

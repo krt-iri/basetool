@@ -43,6 +43,78 @@
 </div>
 
 <!--
+  One Bereich subtree (epic #692): its caption, then its own ARIA tree — the Bereichsleiter (the
+  level-1 hero) with a collapse toggle, and a collapsible body holding the Stab (Koordinatoren /
+  Operatoren, level 2) and the Bereich's Staffeln/SKs via the shared ocUnitFan. Factored out of
+  org-chart.html so the Bereiche can be laid out side by side (each <li> of the OL's connector fan,
+  or a flat row when there is no OL) without duplicating this markup. Each Bereich stays its OWN
+  role="tree" with unchanged ARIA levels, so the per-tree roving-tabindex nav is unaffected; the
+  collapse toggle hides the body and the nav skips the now-hidden treeitems.
+-->
+<th:block th:fragment="ocBereich(b)">
+    <div class="oc-caption">
+        <span class="oc-dept-swatch" aria-hidden="true" th:if="${b.department() != null}"
+              th:classappend="${'oc-dept--' + b.department().toLowerCase().replace('_', '-')}"></span>
+        <span class="oc-caption-title" th:text="${b.name()}">Bereich</span>
+    </div>
+    <div class="oc-tree oc-bereich-tier" role="tree"
+         th:classappend="${b.department() != null ? 'oc-dept--' + b.department().toLowerCase().replace('_', '-') : ''}"
+         th:aria-label="#{orgChart.a11y.bereich(${b.name()})}">
+        <div class="oc-col">
+            <!-- Bereichsleiter (hero) or vacant, wrapped so the collapse toggle anchors to the box -->
+            <div class="oc-leader-wrap">
+                <th:block th:if="${b.leadership().lead() != null}">
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${b.leadership().lead()}, 1)}"></th:block>
+                </th:block>
+                <div th:if="${b.leadership().lead() == null}" class="oc-node oc-node--vacant"
+                     role="treeitem" tabindex="-1" aria-level="1"
+                     th:aria-label="#{orgChart.rank.BEREICHSLEITER} + ', ' + #{orgChart.vacant}">
+                    <span class="oc-node-rank" th:text="#{orgChart.rank.BEREICHSLEITER}">Bereichsleiter</span>
+                    <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
+                </div>
+                <!-- Collapse toggle: available to everyone, anchored to the Bereichsleiter box.
+                     aria-expanded reflects the state; the chevron glyph is drawn in CSS. -->
+                <button type="button" class="oc-collapse" data-trigger="oc-collapse"
+                        aria-expanded="true" th:aria-controls="'oc-bbody-' + ${b.orgUnitId()}"
+                        th:aria-label="#{orgChart.bereich.toggle(${b.name()})}">
+                    <span class="oc-collapse-icon" aria-hidden="true"></span>
+                </button>
+            </div>
+            <button th:if="${b.leadership().lead() == null}" type="button" class="oc-add"
+                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                    data-position-type="BEREICHSLEITER" th:data-org-unit-id="${b.orgUnitId()}"
+                    th:data-rank-label="#{orgChart.rank.BEREICHSLEITER}"
+                    th:text="#{orgChart.add.bereichLead}">Bereichsleiter zuweisen</button>
+
+            <!-- Collapsible body: the Stab + the Bereich's Staffeln/SKs -->
+            <div class="oc-bereich-body" th:id="'oc-bbody-' + ${b.orgUnitId()}">
+                <th:block th:each="n : ${b.leadership().coordinators()}">
+                    <div class="oc-v"></div>
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
+                </th:block>
+                <th:block th:each="n : ${b.leadership().operators()}">
+                    <div class="oc-v"></div>
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
+                </th:block>
+                <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                        data-trigger="oc-add" data-position-type="BEREICHSKOORDINATOR"
+                        th:data-org-unit-id="${b.orgUnitId()}"
+                        th:data-rank-label="#{orgChart.rank.BEREICHSKOORDINATOR}"
+                        th:text="#{orgChart.add.bereichCoordinator}">Bereichskoordinator hinzufügen</button>
+                <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                        data-trigger="oc-add" data-position-type="BEREICHSOPERATOR"
+                        th:data-org-unit-id="${b.orgUnitId()}"
+                        th:data-rank-label="#{orgChart.rank.BEREICHSOPERATOR}"
+                        th:text="#{orgChart.add.bereichOperator}">Bereichsoperator hinzufügen</button>
+
+                <!-- Tier 2: this Bereich's Staffeln + Spezialkommandos -->
+                <th:block th:replace="~{fragments/org-chart-node :: ocUnitFan(${b.squadrons()}, ${b.specialCommands()})}"></th:block>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!--
   Tier 2 unit fan: the Staffeln + Spezialkommandos that fan out under a leadership spine
   (Bereichsleiter for a Bereich tier, the legacy Area Lead for the ungrouped tier). Factored out of
   org-chart.html so every tier — each Bereich and the legacy area — renders its child units through
