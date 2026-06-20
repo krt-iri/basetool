@@ -11,8 +11,9 @@ Production deployment runs as a closed loop between three actors:
 │  .github/workflows/          │  push │  ghcr.io/krt-profit/          │
 │    release-images.yml ───────┼──────►│    basetool-backend:1.4.2  │
 │      build  + push           │       │    basetool-frontend:1.4.2 │
-│      scan   (Trivy SARIF)    │       │      ... :latest, :edge,   │
-│      sign   (cosign keyless) │       │      :sha-abc1234, :stable │
+│      scan   (Trivy SARIF)    │       │    basetool-ingest:1.4.2   │
+│      sign   (cosign keyless) │       │      ... :latest, :edge,   │
+│                              │       │      :sha-abc1234, :stable │
 │                              │       │                            │
 │  .github/workflows/          │       │                            │
 │    promote.yml      ─────────┼──────►│    (re-tags an existing    │
@@ -278,6 +279,7 @@ as:
 ```
 ghcr.io/krt-profit/basetool-backend:1.4.3   (also :1.4, :1, :latest)
 ghcr.io/krt-profit/basetool-frontend:1.4.3
+ghcr.io/krt-profit/basetool-ingest:1.4.3
 ```
 
 At this point **nothing is deployed yet**. `:stable` still points at the
@@ -301,8 +303,9 @@ Within at most 5 minutes (timer interval + RandomizedDelaySec):
 1. `iri-deploy.service` fires.
 2. `deploy.sh` resolves `:stable` → digest, compares with
 `/var/lib/iri/last-deployed.digests`.
-3. If different: writes `current-digest-pin.yml` with the new digest pair,
-runs `docker compose pull && docker compose up -d --wait`.
+3. If different: writes `current-digest-pin.yml` with the new digest set
+(backend + frontend + ingest), runs `docker compose pull && docker compose
+up -d --wait`.
 4. On all-healthy: updates `last-deployed.digests`, logs success.
 5. On any-unhealthy within 180 s: restores `previous-digest-pin.yml`,
 re-ups, logs failure, exits non-zero (journald and OnFailure= hooks
@@ -324,8 +327,8 @@ if you do not want to wait for the next tick.
 
 ## Maintenance page
 
-While `deploy.sh` cycles `backend` and `frontend` out and the new images are
-booting, the upstream behind `nginx-proxy-manager` (NPM) momentarily returns
+While `deploy.sh` cycles `backend`, `frontend` and `ingest` out and the new
+images are booting, the upstream behind `nginx-proxy-manager` (NPM) momentarily returns
 `502 Bad Gateway`. NPM intercepts those failures and serves a branded
 maintenance page in their place, so a user hitting the site mid-deploy sees a
 deliberate "we'll be right back" screen instead of nginx's default error page.
@@ -646,8 +649,8 @@ A few decisions worth keeping in mind when you touch any of the pieces:
   drive code execution on the production host. The PAT on the server can
   only *read* images that were already published.
 - **Digest pin between resolution and apply.** `deploy.sh` resolves
-  `:stable` to a concrete digest, writes that digest into a compose
-  override, and applies *that*. A `:stable` flip in GHCR mid-deploy cannot
+  `:stable` to concrete digests (backend + frontend + ingest), writes them
+  into a compose override, and applies *that*. A `:stable` flip in GHCR mid-deploy cannot
   partially apply a half-promoted release; it would only be picked up by
   the next timer tick.
 - **Health gate + auto-rollback.** `docker compose up --wait
