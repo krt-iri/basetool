@@ -8,14 +8,14 @@ plugins {
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
-  id("com.github.spotbugs-base") version "6.5.6"
-  id("info.solidsoft.pitest") version "1.19.0"
+  alias(libs.plugins.spotbugs.base)
+  alias(libs.plugins.pitest)
   id("com.diffplug.spotless")
   // Node toolchain for the web-asset linters (ESLint / Stylelint / HTMLHint). The
   // plugin downloads its own Node + npm under `.gradle/nodejs` (download = true
   // below), so neither the developer machine nor the CI runner needs a
   // pre-installed Node — consistent with the "only the Gradle wrapper" rule.
-  id("com.github.node-gradle.node") version "7.1.0"
+  alias(libs.plugins.node.gradle)
 }
 
 description = "frontend"
@@ -137,7 +137,7 @@ dependencies {
   // FindSecBugs: security-focused SpotBugs detector plugin (taint analysis for
   // SQLi / path traversal / SSRF / weak crypto / XXE on our OWN code). Loaded
   // into spotbugsMain via `pluginJarFiles` below; complements CodeQL (CI-only).
-  spotbugsPlugins("com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0")
+  spotbugsPlugins(libs.findsecbugs.plugin)
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
@@ -311,8 +311,8 @@ tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
 // launch with a DriverException. That path uses apt + passwordless sudo, so it is gated to CI
 // Linux;
 // local runs on any OS just download the browser binaries (a Linux dev installs deps manually).
-val playwrightInstall by
-  tasks.registering(JavaExec::class) {
+val playwrightInstall =
+  tasks.register<JavaExec>("playwrightInstall") {
     group = "verification"
     description =
       "Installs the Playwright browsers (Chromium, Firefox, WebKit) for e2eTest/smokeTest."
@@ -382,7 +382,7 @@ tasks.register<Test>("smokeTest") {
 // tool configs (eslint.config.mjs / .stylelintrc.json).
 // ---------------------------------------------------------------------------
 node {
-  version.set("24.16.0")
+  version.set(libs.versions.node.get())
   download.set(true)
 }
 
