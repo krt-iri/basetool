@@ -51,8 +51,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  *
  * <p><b>Lifecycle.</b> Register once via a {@code @RegisterExtension static} field. The stack is
  * brought up exactly once on the first {@link #beforeAll} and stopped exactly once when the whole
- * JUnit test plan finishes, via a {@link ExtensionContext.Store.CloseableResource} stored in the
- * root context.
+ * JUnit test plan finishes, via an {@link AutoCloseable} stored in the root context.
  *
  * <p>All credentials baked in here are throwaway values that must match {@code
  * realm-export.e2e.json} (the {@code backend-service} client secret) and the generated keystore
@@ -227,9 +226,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
       context
           .getRoot()
           .getStore(ExtensionContext.Namespace.GLOBAL)
-          .put(
-              "e2e-docker-stack",
-              (ExtensionContext.Store.CloseableResource) () -> composeDown(root));
+          .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
     }
   }
 

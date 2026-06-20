@@ -5,6 +5,13 @@
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "springDependencyManagement" }
 cyclonedx-bom = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
+# Build-tooling plugins, consolidated here from the per-module build scripts so the single source of
+# truth lives in this catalog and `./gradlew refreshVersions` surfaces updates for them too.
+spotbugs-base = { id = "com.github.spotbugs-base", version.ref = "spotbugs" }
+pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
+node-gradle = { id = "com.github.node-gradle.node", version.ref = "nodeGradle" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owaspDependencycheck" }
 
 [versions]
 
@@ -12,7 +19,7 @@ springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.2.4"
 testcontainers = "2.0.5"
-flyway = "12.8.1"
+flyway = "12.9.0"
 mapstruct = "1.6.3"
 ##     ⬆ = "1.7.0.Beta1"
 # Stay on 1.6.x stable; only 1.7.0.Beta1 is available upstream as of 2026-06.
@@ -28,7 +35,22 @@ axeCorePlaywright = "4.11.3"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
 openpdf = "3.0.5"
-commonmark = "0.28.0"
+commonmark = "0.29.0"
+# Build-tooling versions, consolidated from the module build scripts (see the [plugins] note above).
+# google-java-format, checkstyle and the Pitest JUnit5 plugin are wired by version string rather than
+# as plugins; the matching version-tracking [libraries] entries below let refreshVersions check them.
+# `node` pins the Node.js runtime downloaded by the node-gradle plugin and is not a Maven artifact, so
+# refreshVersions cannot track it — bump it by hand against the active Node LTS line.
+spotbugs = "6.5.8"
+pitest = "1.19.0"
+pitestJunit5 = "1.2.3"
+nodeGradle = "7.1.0"
+spotless = "8.7.0"
+owaspDependencycheck = "12.2.2"
+findsecbugs = "1.14.0"
+checkstyle = "13.6.0"
+googleJavaFormat = "1.35.0"
+node = "24.17.0"
 
 [libraries]
 
@@ -53,3 +75,13 @@ jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "j
 lombok-mapstruct-binding = { module = "org.projectlombok:lombok-mapstruct-binding", version.ref = "lombokMapstructBinding" }
 openpdf-core = { module = "com.github.librepdf:openpdf", version.ref = "openpdf" }
 commonmark-core = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
+# FindSecBugs detector plugin, loaded into the manually-registered spotbugsMain task via the
+# `spotbugsPlugins` configuration in each module build script.
+findsecbugs-plugin = { module = "com.h3xstream.findsecbugs:findsecbugs-plugin", version.ref = "findsecbugs" }
+# Version-tracking aliases only (NOT declared as dependencies anywhere): the Checkstyle CLI,
+# google-java-format and the Pitest JUnit5 plugin are configured by version string in the build
+# scripts. Mapping their coordinates here lets `./gradlew refreshVersions` annotate available updates
+# for them alongside everything else; the generated `libs.*` accessors are intentionally unused.
+checkstyle = { module = "com.puppycrawl.tools:checkstyle", version.ref = "checkstyle" }
+google-java-format = { module = "com.google.googlejavaformat:google-java-format", version.ref = "googleJavaFormat" }
+pitest-junit5-plugin = { module = "org.pitest:pitest-junit5-plugin", version.ref = "pitestJunit5" }

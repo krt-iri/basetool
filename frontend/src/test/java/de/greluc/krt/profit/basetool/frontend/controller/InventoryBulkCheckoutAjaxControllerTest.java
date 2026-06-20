@@ -114,7 +114,7 @@ class InventoryBulkCheckoutAjaxControllerTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"itemIds\":[]}"))
-        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().isUnprocessableContent())
         .andExpect(jsonPath("$.code").value("VALIDATION"));
 
     verify(backendApiClient, never()).post(anyString(), any(), eq(Void.class));

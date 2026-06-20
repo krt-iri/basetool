@@ -547,7 +547,7 @@ class GlobalExceptionHandlerTest {
 
     assertInstanceOf(ResponseEntity.class, result);
     ResponseEntity<?> response = (ResponseEntity<?>) result;
-    assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, response.getStatusCode());
+    assertEquals(HttpStatus.CONTENT_TOO_LARGE, response.getStatusCode());
     @SuppressWarnings("unchecked")
     Map<String, Object> body = (Map<String, Object>) response.getBody();
     assertNotNull(body);

@@ -7,8 +7,8 @@ plugins {
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
-  id("com.github.spotbugs-base") version "6.5.6"
-  id("info.solidsoft.pitest") version "1.19.0"
+  alias(libs.plugins.spotbugs.base)
+  alias(libs.plugins.pitest)
   id("com.diffplug.spotless")
 }
 
@@ -64,7 +64,7 @@ dependencies {
 
   // FindSecBugs: security-focused SpotBugs detectors (taint analysis for SSRF /
   // path traversal / weak crypto on our own code). Wired into spotbugsMain below.
-  spotbugsPlugins("com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0")
+  spotbugsPlugins(libs.findsecbugs.plugin)
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")

@@ -113,7 +113,7 @@ class AdminSettingsPageControllerMvcTest {
                         + "\"ageRedDays\":\"30\",\"ageRedVersion\":0,"
                         + "\"refineryRoundingMode\":\"UP\",\"refineryRoundingVersion\":0,"
                         + "\"transferFeePercent\":\"0.5\",\"transferFeeVersion\":0}"))
-        .andExpect(status().isUnprocessableEntity());
+        .andExpect(status().isUnprocessableContent());
   }
 
   // covers #582 — header routing: the same URL WITHOUT the header still hits the classic form
