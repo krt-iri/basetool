@@ -19,8 +19,17 @@
 
 package de.greluc.krt.profit.basetool.keycloak.spi;
 
+import jakarta.ws.rs.core.Response;
+import java.util.Map;
+import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
+import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.Authenticator;
+import org.keycloak.authentication.authenticators.broker.AbstractIdpAuthenticator;
+import org.keycloak.authentication.authenticators.broker.util.SerializedBrokeredIdentityContext;
+import org.keycloak.broker.oidc.AbstractOAuth2IdentityProvider;
+import org.keycloak.broker.provider.BrokeredIdentityContext;
+import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
@@ -28,29 +37,112 @@ import org.keycloak.models.UserModel;
 /**
  * First-broker-login authenticator that gates Discord federation on das-kartell guild membership.
  *
- * <p><strong>T1.0 scaffold — this is a deliberate no-op that allows every login.</strong> The real,
- * fail-closed gate (admit only when the federated Discord user is in the configured guild
- * <em>and</em> holds the configured KRT-Mitglied role, by numeric role id) lands in T1.2 (#723),
- * where {@link #authenticate(AuthenticationFlowContext)} will call {@code
- * /users/@me/guilds/{guild}/ member} with the brokered user token and {@code context.failure(...)}
- * on any miss or ambiguity.
+ * <p>It admits the login only when the brokered Discord user is in the configured guild and holds
+ * the configured KRT-Mitglied role, delegating the decision to {@link DiscordMembershipChecker}
+ * (which fails closed). It reads the guild id, role id and API base URL from this authenticator's
+ * per-flow config, and the user's Discord access token from the brokered identity stored on the
+ * authentication session. On any denial it renders a localized error page and ends the flow with
+ * {@link AuthenticationFlowError#ACCESS_DENIED}, so no Keycloak session is issued (REQ-SEC-016).
  *
- * <p>Even while this stub allows federation, a brand-new user is granted no access: the backend
- * lands them in {@code PENDING} until an admin approves (T1.3). Keeping the stub no-op here lets
- * the login button (T1.1) and the {@code discord_user_id} auto-link be exercised before the gate
- * exists.
+ * <p>It never logs the token, the membership payload, or any Discord id — only the coarse decision.
  */
 public class DiscordGuildRoleGateAuthenticator implements Authenticator {
 
+  /**
+   * Login-theme message key used for the denial page. Add a localized entry to the krt-theme login
+   * messages; an absent key renders as the key itself (still a hard denial).
+   */
+  static final String ERROR_MESSAGE_KEY = "discordMembershipDenied";
+
+  private static final String DEFAULT_API_BASE_URL = "https://discord.com/api/v10";
+  private static final Logger LOG = Logger.getLogger(DiscordGuildRoleGateAuthenticator.class);
+
+  private final DiscordMembershipChecker checker;
+
+  /**
+   * Creates the authenticator.
+   *
+   * @param checker the fail-closed membership decision logic
+   */
+  public DiscordGuildRoleGateAuthenticator(DiscordMembershipChecker checker) {
+    this.checker = checker;
+  }
+
   @Override
   public void authenticate(AuthenticationFlowContext context) {
-    // T1.0: no-op allow. Real fail-closed guild + KRT-Mitglied check arrives in T1.2 (#723).
-    context.success();
+    Map<String, String> config = config(context);
+    String guildId =
+        trimToNull(config.get(DiscordGuildRoleGateAuthenticatorFactory.CONFIG_GUILD_ID));
+    String roleId =
+        trimToNull(
+            config.get(DiscordGuildRoleGateAuthenticatorFactory.CONFIG_KRT_MITGLIED_ROLE_ID));
+    String apiBaseUrl =
+        orDefault(
+            config.get(DiscordGuildRoleGateAuthenticatorFactory.CONFIG_API_BASE_URL),
+            DEFAULT_API_BASE_URL);
+
+    if (guildId == null || roleId == null) {
+      LOG.error(
+          "Discord guild/role gate is misconfigured (missing guildId/roleId); failing closed.");
+      deny(context);
+      return;
+    }
+
+    String accessToken = federatedAccessToken(context);
+    if (accessToken == null) {
+      LOG.warn("No federated Discord access token on the auth session; failing closed.");
+      deny(context);
+      return;
+    }
+
+    DiscordMembershipChecker.Result result =
+        checker.check(apiBaseUrl, guildId, roleId, accessToken);
+    if (result == DiscordMembershipChecker.Result.ALLOWED) {
+      context.success();
+    } else {
+      // Coarse reason only — never the token, payload or any Discord id.
+      LOG.infof("Discord membership gate denied login (reason=%s).", result);
+      deny(context);
+    }
+  }
+
+  private void deny(AuthenticationFlowContext context) {
+    Response challenge =
+        context.form().setError(ERROR_MESSAGE_KEY).createErrorPage(Response.Status.FORBIDDEN);
+    context.failure(AuthenticationFlowError.ACCESS_DENIED, challenge);
+  }
+
+  private Map<String, String> config(AuthenticationFlowContext context) {
+    AuthenticatorConfigModel model = context.getAuthenticatorConfig();
+    return (model != null && model.getConfig() != null) ? model.getConfig() : Map.of();
+  }
+
+  private String federatedAccessToken(AuthenticationFlowContext context) {
+    SerializedBrokeredIdentityContext serialized =
+        SerializedBrokeredIdentityContext.readFromAuthenticationSession(
+            context.getAuthenticationSession(), AbstractIdpAuthenticator.BROKERED_CONTEXT_NOTE);
+    if (serialized == null) {
+      return null;
+    }
+    BrokeredIdentityContext broker =
+        serialized.deserialize(context.getSession(), context.getAuthenticationSession());
+    Object token =
+        broker.getContextData().get(AbstractOAuth2IdentityProvider.FEDERATED_ACCESS_TOKEN);
+    return token == null ? null : token.toString();
+  }
+
+  private static String trimToNull(String value) {
+    return (value == null || value.isBlank()) ? null : value.trim();
+  }
+
+  private static String orDefault(String value, String fallback) {
+    String trimmed = trimToNull(value);
+    return trimmed == null ? fallback : trimmed;
   }
 
   @Override
   public void action(AuthenticationFlowContext context) {
-    context.success();
+    // Non-interactive: authenticate() terminates with success/failure, so this is never reached.
   }
 
   @Override

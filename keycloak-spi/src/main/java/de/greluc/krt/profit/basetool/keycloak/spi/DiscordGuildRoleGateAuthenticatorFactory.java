@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.keycloak.spi;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.List;
 import org.keycloak.Config;
 import org.keycloak.authentication.Authenticator;
@@ -52,9 +54,18 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   public static final String CONFIG_API_BASE_URL = "apiBaseUrl";
 
   private static final String DEFAULT_API_BASE_URL = "https://discord.com/api/v10";
+  private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(10);
 
+  // One shared, stateless authenticator + checker (per-login config arrives via the flow context).
+  // A bounded 429 retry budget honours Discord rate limits without blocking the login indefinitely.
+  private static final DiscordMembershipChecker CHECKER =
+      new DiscordMembershipChecker(
+          HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).build(),
+          HTTP_TIMEOUT,
+          2,
+          Duration.ofSeconds(2));
   private static final DiscordGuildRoleGateAuthenticator INSTANCE =
-      new DiscordGuildRoleGateAuthenticator();
+      new DiscordGuildRoleGateAuthenticator(CHECKER);
 
   private static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
     AuthenticationExecutionModel.Requirement.REQUIRED,

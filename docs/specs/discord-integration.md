@@ -50,15 +50,15 @@ from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never 
 
 **Acceptance**
 
-- [ ] In-guild **and** holds `KRT-Mitglied` (HTTP 200, `roles[]` ∋ role id) ⇒ login allowed.
-- [ ] In-guild but missing the role ⇒ denied.
-- [ ] Not in guild (clean 404) ⇒ denied.
-- [ ] 5xx / timeout / malformed body / 429-after-retries ⇒ denied (**fail closed**).
-- [ ] Role is matched by numeric id; renaming the Discord role does not change the outcome.
-- [ ] No token, payload or Discord id appears in any log line.
-- [ ] Credential (non-Discord) login is unaffected by the gate.
+- [x] In-guild **and** holds `KRT-Mitglied` (HTTP 200, `roles[]` ∋ role id) ⇒ login allowed.
+- [x] In-guild but missing the role ⇒ denied.
+- [x] Not in guild (clean 404) ⇒ denied.
+- [x] 5xx / timeout / malformed body / 429-after-retries ⇒ denied (**fail closed**).
+- [x] Role is matched by numeric id; renaming the Discord role does not change the outcome.
+- [ ] No token, payload or Discord id appears in any log line. _(by design — only the coarse decision is logged; proven by the T1.4 PII grep.)_
+- [ ] Credential (non-Discord) login is unaffected by the gate. _(T1.4 e2e.)_
 
-**Enforced by:** _(planned T1.2: `keycloak-spi` SPI tests; T1.4: `DiscordLoginGate*E2eTest`)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)` · **Issues:** #723, #725
+**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker` · **Issues:** #723, #725
 
 ### REQ-SEC-017 — PENDING approval withholds all authorities _(planned — T1.3)_
 
