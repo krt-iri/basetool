@@ -1569,7 +1569,7 @@ public class MissionPageController {
         }
         fieldErrors.putIfAbsent(fe.getField(), message);
       }
-      return org.springframework.http.ResponseEntity.unprocessableEntity().body(fieldErrors);
+      return org.springframework.http.ResponseEntity.unprocessableContent().body(fieldErrors);
     }
     try {
       applyMissionUpdate(id, form);
