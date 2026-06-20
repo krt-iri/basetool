@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Im Organigramm erscheinen jetzt alle Staffeln und Spezialkommandos unter ihrem Bereich, nicht nur die Profit-Einheiten.** Bisher wurden unter einem Bereich nur Einheiten angezeigt, die als „auftragsbearbeitend" (profit-berechtigt) markiert waren; einem Bereich zugeordnete Staffeln anderer Bereiche (etwa Forschung oder Marinekorps) blieben unsichtbar. Ob eine Einheit im Organigramm erscheint, richtet sich jetzt nur noch danach, ob sie aktiv ist — die Einstellung „Auftragsbearbeitung" steuert weiterhin ausschließlich die Auftragsabwicklung, nicht die Anzeige im Organigramm.
+
 ## [v0.6.3](https://github.com/krt-profit/basetool/releases/tag/v0.6.3) - 2026-06-20
 
 ### Fixed
