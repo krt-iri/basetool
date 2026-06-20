@@ -30,9 +30,13 @@ import java.util.UUID;
  * @param id the position id (server-stamped on create).
  * @param positionType the functional rank held.
  * @param orgUnitId owning Staffel/SK id, or {@code null} for an area-leadership position.
- * @param userId id of the user holding the position, or {@code null} for a still-leaderless
- *     Kommando ({@code COMMAND_LEAD}).
- * @param userName the user's effective display name, or {@code null} for a leaderless Kommando.
+ * @param userId id of the user holding the position, or {@code null} for a free-text holder or a
+ *     still-leaderless Kommando ({@code COMMAND_LEAD}).
+ * @param userName the user's effective display name, or {@code null} for a free-text holder or a
+ *     leaderless Kommando.
+ * @param displayName the free-text holder name for a member without a Basetool account, or {@code
+ *     null} when the holder is an account or the seat is vacant; mutually exclusive with {@code
+ *     userId}.
  * @param name the Kommando's display name, or {@code null} (set only on a {@code COMMAND_LEAD}
  *     row).
  * @param parentId id of the parent position (deputy → Kommandoleiter, Ensign → its parent), or
@@ -46,6 +50,7 @@ public record OrgChartPositionDto(
     UUID orgUnitId,
     UUID userId,
     String userName,
+    String displayName,
     String name,
     UUID parentId,
     int sortIndex,

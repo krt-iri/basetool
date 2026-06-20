@@ -31,8 +31,9 @@ import java.util.UUID;
  * de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType#COMMAND_LEAD}); {@link
  * #positionId} / {@link #version} are that row's handle so the inline editor can rename it, remove
  * it (cascading its Stv. + Ensigns), or assign / reassign its Kommandoleiter. The leader lives on
- * that same row, so it is projected inline as {@link #leaderUserId} / {@link #leaderUserName}
- * rather than as a separate node — both {@code null} while the Kommandoleiter seat is vacant.
+ * that same row, so it is projected inline as {@link #leaderUserId} / {@link #leaderUserName} (an
+ * account) or {@link #leaderDisplayName} (a free-text name for a member without an account) rather
+ * than as a separate node — all {@code null} while the Kommandoleiter seat is vacant.
  *
  * @param positionId id of the underlying Kommando row; the handle for rename / remove / assign-lead
  *     / add-child actions.
@@ -40,8 +41,13 @@ import java.util.UUID;
  *     fallback label).
  * @param version optimistic-lock version of the Kommando row, echoed back on rename / assign-lead.
  * @param sortIndex stable display order among the Staffel's Kommandos.
- * @param leaderUserId id of the Kommandoleiter, or {@code null} when the seat is vacant.
- * @param leaderUserName the Kommandoleiter's effective display name, or {@code null} when vacant.
+ * @param leaderUserId id of the Kommandoleiter account, or {@code null} for a free-text leader or a
+ *     vacant seat.
+ * @param leaderUserName the Kommandoleiter account's effective display name, or {@code null} for a
+ *     free-text leader or a vacant seat.
+ * @param leaderDisplayName the free-text Kommandoleiter name for a member without a Basetool
+ *     account, or {@code null} when the leader is an account or the seat is vacant; mutually
+ *     exclusive with {@code leaderUserId}.
  * @param deputy the Stv. Kommandoleiter node, or {@code null} when no deputy is assigned.
  * @param ensigns the Ensigns reporting into this Kommando, ordered for display; never {@code null},
  *     possibly empty.
@@ -53,5 +59,6 @@ public record CommandChartDto(
     int sortIndex,
     UUID leaderUserId,
     String leaderUserName,
+    String leaderDisplayName,
     OrgChartNodeDto deputy,
     List<OrgChartNodeDto> ensigns) {}

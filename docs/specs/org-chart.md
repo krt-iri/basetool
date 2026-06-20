@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-09.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-20.
 > **Owner area:** ORG · **Related ADRs:** none
 
 # Profit-Bereich org chart (Funktionsränge)
@@ -9,7 +9,7 @@ The org chart (`/org-chart`, "Organigramm") is a purely **descriptive** view of 
 functional rank across the Bereichsleitung, the Staffeln and the Spezialkommandos. It grants no
 permission — authorization stays with the role model and the `org_unit_membership` flags — so it is
 deliberately not org-unit-scoped. An admin edits it inline; everyone else reads it. The aggregate is
-the `OrgChartPosition` row (Flyway `V136`, extended by `V138`); the read/write rules live in
+the `OrgChartPosition` row (Flyway `V136`, extended by `V138` and `V171`); the read/write rules live in
 [`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartService.java)
 and [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/OrgChartController.java).
 
@@ -44,9 +44,10 @@ optional group name and an optional holder (the Kommandoleiter). The seat may be
 Kommando is created, and — crucially — **vacated without deleting the Kommando**. When the
 Kommandoleiter post becomes vacant, the Kommandogruppe keeps existing: its name, its Stv.
 Kommandoleiter and its Ensigns are untouched, and a new Kommandoleiter can later be assigned.
-`COMMAND_LEAD` is the *only* rank allowed a `null` holder (the `chk_org_chart_user` CHECK in `V138`
-keeps every other rank's holder mandatory); vacating is therefore rejected as a 400 for any other
-rank — removing such a person-centric position is REQ-ORG-012 instead.
+`COMMAND_LEAD` is the *only* rank allowed **no holder at all** — neither an account nor a free-text
+name (REQ-ORG-020); the `chk_org_chart_user` CHECK in `V138`/`V171` keeps every other rank filled by
+one of the two. Vacating is therefore rejected as a 400 for any other rank — removing such a
+person-centric position is REQ-ORG-012 instead.
 
 **Acceptance**
 
@@ -170,6 +171,50 @@ trees, the `oc-dept--profit` tint, the Bereichsleiter hero, the hidden legacy ti
 (OL → Bereich connector fan + multi-tree keyboard nav + per-Bereich collapse), `fragments/org-chart-node.html`
 (`ocBereich`, `ocUnitFan`), `org-chart.css` (`oc-dept--*`, `oc-bereich-tier`, `oc-fan--bereiche`,
 `oc-collapse`) · **Issues:** #692, #698.
+
+### REQ-ORG-020 — A position may be held by an account or a free-text member name
+
+Every person-position may be filled by **either** a Basetool account **or** a free-text name for a
+Kartell member who has no account yet — the two are **mutually exclusive** (the `chk_org_chart_holder`
+CHECK in `V171` forbids both; `chk_org_chart_user` keeps every non-`COMMAND_LEAD` rank filled by one
+of the two). The chart stays **descriptive** (REQ-ORG-010): a free-text holder, like a leaderless
+Kommando, grants **no** permission — the authority cascade runs solely off `org_unit_membership`,
+never off the chart, so a `user_id`-null row is invisible to authorization.
+
+Once the member gets an account, an admin reassigns the position to that account: the backend sets
+`user_id` and clears `display_name` **in the same transaction** on the same row, so the swap is
+**regression-free** — no new row, the position keeps its place in the tree (parent, sortIndex,
+positionId) and bumps its `@Version` exactly once. The inverse (account → free-text) is symmetric.
+Vacating a `COMMAND_LEAD` clears both the account and any free-text leader name. `display_name` is
+distinct from the Kommandogruppen-`name` and carries no uniqueness (typed names may repeat — it is a
+descriptive label).
+
+**Acceptance**
+
+- [x] Creating a non-`COMMAND_LEAD` position with neither an account nor a free-text name is a 400
+  (`problem.org_chart.user_required`); supplying both an account and a free-text name — on **create
+  or update** — is a 400 (`problem.org_chart.holder_ambiguous`).
+- [x] A free-text position renders its typed name with a "no account" marker (not the vacant
+  placeholder) and grants no scoped data — both as a regular node and as an inline Kommandoleiter.
+- [x] Reassigning a free-text position to an account clears the typed name in the same write, keeps
+  the row's place in the tree, and bumps the version exactly once (no 409).
+- [x] Vacating a `COMMAND_LEAD` clears a free-text leader name as well as an account holder.
+
+**Enforced by:** `OrgChartServiceTest` (`createPosition_freeTextHolder_persistsDisplayNameAndNullUser`,
+`createPosition_bothAccountAndFreeText_isRejected`,
+`updatePosition_replaceFreeTextWithAccount_clearsDisplayName`,
+`updatePosition_setFreeTextName_clearsAccount`,
+`updatePosition_clearFreeTextLeavesNonCommandWithNoHolder_isRejected`,
+`updatePosition_bothAccountAndFreeText_isRejected`,
+`getOrgChart_freeTextCommandLeader_carriesLeaderDisplayName`,
+`vacateCommandLeader_clearsFreeTextLeaderName`), `OrgChartPageRenderTest`
+(`freeTextHolder_admin_rendersTypedNameAndNoAccountMarker_notVacant`,
+`freeTextCommandLeader_admin_rendersTypedNameAndNoAccountMarker_notVacant`), migration `V171`
+(`display_name` + `chk_org_chart_holder` + widened `chk_org_chart_user`) · **Code:**
+`OrgChartService#createPosition`/`#updatePosition`/`#vacateCommandLeader`,
+`OrgChartPosition#displayName`, `org-chart.html` (holder-mode modal),
+`fragments/org-chart-node.html` (`ocNode` free-text branch + inline Kommandoleiter branch) ·
+**Issues:** —
 
 ## Out of scope
 

@@ -10,6 +10,8 @@
 
 - **Aufträge können jetzt einen Bereich oder die Organisationsleitung als Auftraggeber haben.** Angemeldete Nutzer können beim Anlegen oder Bearbeiten eines Auftrags neben Staffeln und Spezialkommandos auch einen Bereich oder die Organisationsleitung als Auftraggeber auswählen. Die bearbeitende (verantwortliche) Einheit bleibt wie bisher eine profit-berechtigte Staffel oder ein Spezialkommando, und das öffentliche, anonyme Auftragsformular bietet als Auftraggeber weiterhin nur Staffeln und Spezialkommandos. (Einsätze lassen sich bereits seit v0.6.0 einem Bereich oder der Organisationsleitung zuordnen.)
 
+- **Im Organigramm lassen sich jetzt auch freie Namen eintragen.** Administratoren können eine Position mit dem Namen eines Kartell-Mitglieds besetzen, das noch keinen Basetool-Account hat (Auswahl „Name eintragen" im Besetzen-Dialog); der Name erscheint mit der Markierung „Kein Account". Sobald das Mitglied einen Account hat, wird die Position einfach auf diesen Account umgestellt — der freie Name wird dabei ohne Datenverlust ersetzt. Eine so besetzte Position verleiht weiterhin keinerlei Rechte.
+
 ### Changed
 
 - **Das Organigramm stellt die Bereiche jetzt nebeneinander statt untereinander dar und verbindet sie mit Linien zur Organisationsleitung.** Die Bereiche fächern unter der Organisationsleitung auf — mit denselben Verbindungslinien wie von einem Bereich zu seinen Staffeln und Spezialkommandos. Jeder Bereich lässt sich außerdem unterhalb seines Bereichsleiters ein- und ausklappen, sodass das Organigramm bei vielen Einheiten übersichtlich bleibt.
