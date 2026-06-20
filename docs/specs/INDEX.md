@@ -117,9 +117,10 @@ proves it, and every issue/PR that touched it.
 >
 > # 692, Phase 0 / #693) and is deliberately **not** done unilaterally here. To avoid compounding it, new
 >
-> ORG requirements skip the contested range: epic #692 allocated `REQ-ORG-014..018`, and Phase 6 then
-> used `REQ-ORG-019` (the bank AREA/CARTEL→Bereich/OL linkage), so the **next free ORG id is
-> `REQ-ORG-020`**. Phase 7 reconciliation confirms this two-namespace split (tenancy vs org-chart) as
+> ORG requirements skip the contested range: epic #692 allocated `REQ-ORG-014..018`, Phase 6 used
+> `REQ-ORG-019` (the bank AREA/CARTEL→Bereich/OL linkage), and `REQ-ORG-020` is the org-chart
+> free-text holder name, so the **next free ORG id is `REQ-ORG-021`**. Phase 7 reconciliation confirms
+> this two-namespace split (tenancy vs org-chart) as
 > the **accepted working resolution**; a physical renumber of the shipped, test-referenced
 > `REQ-ORG-010/011` pair remains an owner-approved cleanup and is **not** a release-gate blocker.
 

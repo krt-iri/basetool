@@ -57,14 +57,23 @@ import lombok.ToString;
  * <p><b>Kommando(gruppe).</b> A {@link OrgChartPositionType#COMMAND_LEAD} row models the Kommando
  * itself, not merely the person leading it: it carries an optional group {@link #name} and an
  * optional holder ({@link #user} may be {@code null} while the Kommandoleiter seat is still
- * vacant). This is the one rank allowed to have a null user — it lets an admin create and name a
- * Kommando, attach a Stv. Kommandoleiter and Ensigns to it, and only later assign the
- * Kommandoleiter. The {@code chk_org_chart_user} / {@code chk_org_chart_name} CHECK constraints
- * (migration {@code V138}) confine both the nullable holder and the {@code name} to this rank;
- * every other rank keeps its mandatory holder and a {@code null} name.
+ * vacant). This is the one rank allowed to have neither a {@link #user} nor a {@link #displayName}
+ * — it lets an admin create and name a Kommando, attach a Stv. Kommandoleiter and Ensigns to it,
+ * and only later assign the Kommandoleiter. The {@code chk_org_chart_name} CHECK (migration {@code
+ * V138}) confines the Kommandogruppen-{@code name} to this rank; every other rank keeps a {@code
+ * null} name.
+ *
+ * <p><b>Holder: account or free-text name.</b> A position is held by <em>exactly one</em> of a
+ * {@link #user} (a Basetool account) or a free-text {@link #displayName} (a Kartell member without
+ * an account yet) — never both, enforced by the {@code chk_org_chart_holder} CHECK (migration
+ * {@code V171}). The {@code chk_org_chart_user} CHECK keeps every non-{@code COMMAND_LEAD} rank
+ * filled by one of the two. Reassigning a free-text position to an account simply sets {@link
+ * #user} and clears {@link #displayName} in the same transaction, so the swap is regression-free
+ * (same row, same place in the tree).
  *
  * <p><b>Descriptive only.</b> Nothing here feeds authorization — the chart records who holds which
  * functional rank; permissions stay with the role model and the {@code org_unit_membership} flags.
+ * A free-text holder therefore grants nothing, exactly like a leaderless Kommando.
  */
 @Entity
 @Table(name = "org_chart_position")
@@ -112,6 +121,19 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   @JoinColumn(name = "user_id")
   @ToString.Exclude
   private User user;
+
+  /**
+   * Free-text holder name for a Kartell member who has no Basetool account yet, e.g. {@code "Max
+   * Mustermann"}. Mutually exclusive with {@link #user}: the {@code chk_org_chart_holder} CHECK
+   * (migration {@code V171}) forbids both being set at once, and {@code chk_org_chart_user}
+   * requires one of the two on every rank except a leaderless {@link
+   * OrgChartPositionType#COMMAND_LEAD}. {@code null} whenever the holder is an account (or a
+   * Kommando is still leaderless). Once the member gets an account, reassigning the position to
+   * that account clears this field in the same transaction, leaving the row in place. Distinct from
+   * {@link #name}, the Kommandogruppen-Name. Capped at 120 characters by the column definition.
+   */
+  @Column(name = "display_name", length = 120)
+  private String displayName;
 
   /**
    * The Kommando's display name (Kommandogruppen-Name), e.g. {@code "Alpha"}. Only ever set on a
