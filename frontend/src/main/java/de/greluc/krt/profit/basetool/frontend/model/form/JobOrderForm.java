@@ -59,7 +59,7 @@ public class JobOrderForm {
   @Data
   public static class JobOrderMaterialForm {
     private UUID materialId;
-    private Integer minQuality = 700;
+    private Integer minQuality = 650;
     private Double amount;
   }
 }

@@ -42795,10 +42795,10 @@
           "minQuality" : {
             "type" : "integer",
             "format" : "int32",
-            "description" : "Minimale Qualität: 700 (vorgegeben) oder null für \"Keine\" (keine Mindestqualität).",
-            "example" : 700,
-            "maximum" : 700,
-            "minimum" : 700
+            "description" : "Minimale Qualität: 650 (vorgegeben) oder null für \"Keine\" (keine Mindestqualität).",
+            "example" : 650,
+            "maximum" : 650,
+            "minimum" : 650
           },
           "amount" : {
             "type" : "number",

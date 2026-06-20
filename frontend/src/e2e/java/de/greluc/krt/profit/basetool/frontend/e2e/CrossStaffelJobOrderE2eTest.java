@@ -105,7 +105,7 @@ class CrossStaffelJobOrderE2eTest {
               IRIDIUM_ID,
               "E2E CrossStaffel Order",
               materialId,
-              700,
+              650,
               80);
       // B's supply: created as test-member (homed in B) so the resolver stamps the owner as B.
       bInventoryItemId =

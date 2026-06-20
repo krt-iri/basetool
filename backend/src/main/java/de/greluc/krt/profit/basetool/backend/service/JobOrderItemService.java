@@ -90,7 +90,7 @@ public class JobOrderItemService {
    * Refining-grade quality threshold: an ingredient {@code minQuality} at or above this maps to
    * {@link QualityRequirement#GOOD}.
    */
-  private static final int GOOD_QUALITY_THRESHOLD = 700;
+  private static final int GOOD_QUALITY_THRESHOLD = 650;
 
   /**
    * Scale factor for rounding SCU quantities to three decimals (the {@code 0.001} input step used

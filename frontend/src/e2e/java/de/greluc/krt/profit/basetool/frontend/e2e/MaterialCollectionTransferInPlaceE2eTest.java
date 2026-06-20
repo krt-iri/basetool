@@ -65,7 +65,7 @@ class MaterialCollectionTransferInPlaceE2eTest {
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
 
-  /** Quality stamped on the seeded item; clears the job order's {@code minQuality} of 700. */
+  /** Quality stamped on the seeded item; clears the job order's {@code minQuality} of 650. */
   private static final int SEED_QUALITY = 750;
 
   private static Playwright playwright;
@@ -109,7 +109,7 @@ class MaterialCollectionTransferInPlaceE2eTest {
         seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Collection Transfer Mat");
     jobOrderId =
         seeder.createJobOrder(
-            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Collection Transfer Order", materialId, 700, 100);
+            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Collection Transfer Order", materialId, 650, 100);
     sourceItemId =
         seeder.createInventoryItemForJobOrder(
             USERNAME, PASSWORD, materialId, sourceLocationId, jobOrderId, SEED_QUALITY, 100);

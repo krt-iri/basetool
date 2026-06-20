@@ -102,7 +102,7 @@ class RolePermissionsE2eTest {
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Role Material");
       jobOrderId =
           seeder.createJobOrder(
-              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Role Order", materialId, 700, 100.0);
+              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Role Order", materialId, 650, 100.0);
     }
   }
 

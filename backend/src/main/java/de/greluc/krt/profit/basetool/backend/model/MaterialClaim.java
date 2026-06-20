@@ -83,7 +83,7 @@ public class MaterialClaim extends AbstractEntity<UUID> {
   private Material material;
 
   /**
-   * The quality bucket this claim falls into — {@code GOOD} (700+) or {@code NONE} (no floor) —
+   * The quality bucket this claim falls into — {@code GOOD} (650+) or {@code NONE} (no floor) —
    * matching the {@code aggregateMaterials()} bucket scheme so a material required in both
    * qualities is claimed separately per quality.
    */

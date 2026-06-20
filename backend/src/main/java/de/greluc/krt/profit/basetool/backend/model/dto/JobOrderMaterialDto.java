@@ -27,7 +27,7 @@ import java.util.UUID;
  *
  * @param id material-line primary key
  * @param material the required material (with {@code quantityType} for unit-aware display)
- * @param minQuality the minimum acceptable quality (700) or {@code null} for "Keine"
+ * @param minQuality the minimum acceptable quality (650) or {@code null} for "Keine"
  * @param amount the required amount in the material's own unit
  * @param currentStock the summed linked-inventory stock for this line
  * @param claims the per-squadron claims on this material's bucket; populated only for public SK

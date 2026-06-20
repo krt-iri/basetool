@@ -111,7 +111,7 @@ class JobOrderHandoverE2eTest {
 
       jobOrderId =
           seeder.createJobOrder(
-              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Handover Order", materialId, 700, 100.0);
+              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Handover Order", materialId, 650, 100.0);
       inventoryItemId =
           seeder.createInventoryItemForJobOrder(
               USERNAME, PASSWORD, materialId, locationId, jobOrderId, 750, 100.0);
@@ -119,7 +119,7 @@ class JobOrderHandoverE2eTest {
       // Single-entry book-out: order requests 200 so a 40-unit handover never completes it.
       singleEntryOrderId =
           seeder.createJobOrder(
-              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Handover Single", materialId, 700, 200.0);
+              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Handover Single", materialId, 650, 200.0);
       singleEntryItemId =
           seeder.createInventoryItemForJobOrder(
               USERNAME, PASSWORD, materialId, locationId, singleEntryOrderId, 750, 100.0);
@@ -127,7 +127,7 @@ class JobOrderHandoverE2eTest {
       // Multi-entry book-out: two linked items (100 + 60) on an order requesting 200.
       multiEntryOrderId =
           seeder.createJobOrder(
-              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Handover Multi", materialId, 700, 200.0);
+              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Handover Multi", materialId, 650, 200.0);
       multiEntryItemAId =
           seeder.createInventoryItemForJobOrder(
               USERNAME, PASSWORD, materialId, locationId, multiEntryOrderId, 750, 100.0);

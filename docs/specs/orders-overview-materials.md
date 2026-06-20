@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-14.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-20.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Order-overview Materialien column
@@ -35,7 +35,7 @@ count. A `MATERIAL` order's column is unchanged.
 
 The progress per row is `currentStock / totalQuantity`, clamped to 100 %, where
 `currentStock` is the total of inventory **linked to that order** for the material at or above
-the aggregated bucket's quality floor (`GOOD` → 700, `NONE` → no floor) — the same per-bucket
+the aggregated bucket's quality floor (`GOOD` → 650, `NONE` → no floor) — the same per-bucket
 sum the `MATERIAL` requirement rows use (`InventoryItemRepository`
 `sumAmountByMaterialAndJobOrderAndMinQuality`). `currentStock` is carried on
 `AggregatedMaterialDto` and populated by the backend for every item order it returns (list and

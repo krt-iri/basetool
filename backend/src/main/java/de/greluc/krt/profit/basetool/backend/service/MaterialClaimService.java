@@ -333,7 +333,7 @@ public class MaterialClaimService {
    * Computes the required amount per material bucket for either order kind: an {@code ITEM} order
    * sums each {@link JobOrderItemMaterial#getRequiredQuantity()} per {@code (material, quality)}; a
    * {@code MATERIAL} order sums each {@link JobOrderMaterial#getAmount()} with the bucket derived
-   * from {@code minQuality} ({@code GOOD} when a 700-floor is set, {@code NONE} otherwise).
+   * from {@code minQuality} ({@code GOOD} when a 650-floor is set, {@code NONE} otherwise).
    *
    * @param order the order.
    * @return required amount keyed by bucket, insertion-ordered for stable rendering.
