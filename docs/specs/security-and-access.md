@@ -254,6 +254,26 @@ longer protects the persisted desktop-extractor refresh token — the runbook al
 reversible, ingest-independent operator lever (`INGEST_KEYCLOAK_SETUP.md`). See ADR-0019
 (2026-06-18 amendment #4).
 
+**2026-06-20 — a second, rotation-independent root cause: the `scope` request param leaking into
+the grant.** Production still showed "Fehler beim Laden" after rotation was turned off, but the
+Keycloak event was a different one: `REFRESH_TOKEN_ERROR error="invalid_request" reason="Invalid
+scopes: all"` (and `"Invalid scopes: mine"`), surfacing in the frontend as
+`ClientAuthorizationException [invalid_scope]` out of `RefreshTokenOAuth2AuthorizedClientProvider`.
+The values `all` / `mine` are the job-orders **"Staffel" filter** (`orders-index.html`, radio
+buttons `name="scope"` `value="mine|all"` — "Eigene Staffel" / "Alle Staffeln"), not OAuth scopes.
+The cause is a Spring footgun: `DefaultOAuth2AuthorizedClientManager`'s default
+`contextAttributesMapper` copies a request parameter literally named `scope` into
+`OAuth2AuthorizationContext.REQUEST_SCOPE_ATTRIBUTE_NAME`, which the refresh provider then sends to
+Keycloak as the requested scope of the **refresh-token grant**. So any token refresh that coincides
+with a request carrying `?scope=all|mine` is rejected with `invalid_scope`, and the SSO session is
+bounced into re-authentication — intermittently, because only a refresh that lands on such a request
+is poisoned (a no-`scope` background poll refreshes cleanly, which is why a reload "after a bit"
+recovers). The frontend never requests scopes dynamically (they are fixed on the `keycloak` client
+registration), so the manager's `contextAttributesMapper` is overridden to return an empty map
+(`WebClientConfig.NO_REQUEST_DERIVED_ATTRIBUTES`), severing the request-parameter → OAuth-scope path
+entirely. This is orthogonal to the rotation/reuse-detection mitigation above and to single-flight;
+it MUST hold regardless of either.
+
 **Acceptance**
 
 - [ ] A `client_authorization_required` on an HTML navigation redirects (302) to the Keycloak login
@@ -270,11 +290,16 @@ reversible, ingest-independent operator lever (`INGEST_KEYCLOAK_SETUP.md`). See 
 - [ ] `ClientAuthorizationException` is not retried and does not open the backend circuit breaker.
 - [ ] The `iri` realm has `Revoke Refresh Token = Off` (`"revokeRefreshToken": false`), so a replayed
   or duplicate online refresh token does not trip reuse detection and does not revoke the SSO session.
+- [ ] An application request parameter named `scope` (e.g. the job-orders Staffel filter's
+  `scope=all|mine`) never reaches Keycloak as the refresh-token grant scope: the
+  `DefaultOAuth2AuthorizedClientManager` `contextAttributesMapper` returns an empty map, so a token
+  refresh coinciding with such a request is not rejected with `invalid_scope`.
 
-**Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `NotificationPageControllerStreamTest`,
-`GlobalExceptionHandlerTest`, `BackendApiClientResilienceTest` · **Code:**
-`SingleFlightAuthorizedClientManager`, `ReauthenticationRequiredException`, `BackendApiClient`,
-`GlobalExceptionHandler`, `NotificationPageController`, `krt-fetch.js` · **Issues:** ingest-rollout
+**Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `OAuth2ScopeRequestParamLeakTest`,
+`NotificationPageControllerStreamTest`, `GlobalExceptionHandlerTest`,
+`BackendApiClientResilienceTest` · **Code:** `SingleFlightAuthorizedClientManager`, `WebClientConfig`,
+`ReauthenticationRequiredException`, `BackendApiClient`, `GlobalExceptionHandler`,
+`NotificationPageController`, `krt-fetch.js` · **Issues:** ingest-rollout
 regression · **ADR:** ADR-0019
 
 ### REQ-SEC-013 — Frontend role checks read the Authentication token, not the OidcUser principal
