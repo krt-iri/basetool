@@ -111,7 +111,7 @@ class InventoryInputAjaxControllerTest {
                 .param("personal", "true")
                 .param("jobOrderId", UUID.randomUUID().toString())
                 .param("source", "my"))
-        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().isUnprocessableContent())
         .andExpect(jsonPath("$.code").value("INVENTORY_PERSONAL_ASSIGNMENT"));
 
     verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));

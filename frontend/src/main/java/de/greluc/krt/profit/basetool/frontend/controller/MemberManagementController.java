@@ -353,7 +353,7 @@ public class MemberManagementController {
       for (FieldError fieldError : bindingResult.getFieldErrors()) {
         errors.putIfAbsent(fieldError.getField(), resolveFieldMessage(fieldError, locale));
       }
-      return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+      return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
           .contentType(MediaType.APPLICATION_JSON)
           .body(errors);
     }

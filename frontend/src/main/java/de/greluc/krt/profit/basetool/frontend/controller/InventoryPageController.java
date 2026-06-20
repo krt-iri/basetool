@@ -759,7 +759,7 @@ public class InventoryPageController {
     java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("status", 422);
     body.put("code", code);
-    return org.springframework.http.ResponseEntity.unprocessableEntity()
+    return org.springframework.http.ResponseEntity.unprocessableContent()
         .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
         .body(body);
   }

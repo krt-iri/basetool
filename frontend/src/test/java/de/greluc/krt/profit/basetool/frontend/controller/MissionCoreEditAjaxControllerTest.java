@@ -181,7 +181,7 @@ class MissionCoreEditAjaxControllerTest {
                 .with(csrf())
                 .param("name", "")
                 .param("status", ""))
-        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().isUnprocessableContent())
         // The map carries the RESOLVED localized message (not the raw {validation.*} key), matching
         // exactly what th:errors renders for the request locale.
         .andExpect(jsonPath("$.name").exists())

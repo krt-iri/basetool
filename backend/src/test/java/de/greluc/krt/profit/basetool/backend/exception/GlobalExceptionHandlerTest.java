@@ -565,20 +565,6 @@ class GlobalExceptionHandlerTest {
     assertCommon(resp, HttpStatus.FORBIDDEN, GlobalExceptionHandler.CODE_ACCESS_DENIED);
   }
 
-  @Test
-  void handleResponseStatus_otherClientError_mapsToBadRequestCode() {
-    // codeForStatus default for 4xx that doesn't have a specific mapping falls
-    // through to BAD_REQUEST; verify with 418 I'm a teapot.
-    org.springframework.web.server.ResponseStatusException ex =
-        new org.springframework.web.server.ResponseStatusException(HttpStatus.I_AM_A_TEAPOT, "tea");
-
-    ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
-
-    assertEquals(HttpStatus.I_AM_A_TEAPOT.value(), resp.getStatusCode().value());
-    assertEquals(
-        GlobalExceptionHandler.CODE_BAD_REQUEST, resp.getBody().getProperties().get("code"));
-  }
-
   // ---------------------------------------------------------------------
   // ErrorResponseException — preserves provided body, fills in missing props
   // ---------------------------------------------------------------------

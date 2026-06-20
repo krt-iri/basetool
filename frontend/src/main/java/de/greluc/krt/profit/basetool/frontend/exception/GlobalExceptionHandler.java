@@ -288,7 +288,7 @@ public class GlobalExceptionHandler {
    * @return a {@code 413} JSON body for XHR callers, or the {@code error/error} view name otherwise
    */
   @ExceptionHandler(MaxUploadSizeExceededException.class)
-  @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+  @ResponseStatus(HttpStatus.CONTENT_TOO_LARGE)
   public Object handleMaxUploadSizeExceeded(
       @NotNull HttpServletRequest request, @NotNull Model model) {
     Locale locale = LocaleContextHolder.getLocale();
@@ -307,16 +307,16 @@ public class GlobalExceptionHandler {
     if (wantsJson(request)) {
       Map<String, Object> body = new LinkedHashMap<>();
       body.put("code", "UPLOAD_TOO_LARGE");
-      body.put("status", HttpStatus.PAYLOAD_TOO_LARGE.value());
+      body.put("status", HttpStatus.CONTENT_TOO_LARGE.value());
       body.put("title", title);
       body.put("message", message);
-      return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+      return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
           .contentType(MediaType.APPLICATION_JSON)
           .body(body);
     }
     model.addAttribute("error", title);
     model.addAttribute("message", message);
-    model.addAttribute("status", String.valueOf(HttpStatus.PAYLOAD_TOO_LARGE.value()));
+    model.addAttribute("status", String.valueOf(HttpStatus.CONTENT_TOO_LARGE.value()));
     return "error/error";
   }
 
@@ -409,7 +409,7 @@ public class GlobalExceptionHandler {
       case UNAUTHORIZED -> "error.401.title";
       case FORBIDDEN -> "error.403.title";
       case NOT_FOUND -> "error.404.title";
-      case PAYLOAD_TOO_LARGE -> "error.413.title";
+      case CONTENT_TOO_LARGE -> "error.413.title";
       case CONFLICT -> "error.409.title";
       case LOCKED -> "error.423.title";
       case SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT -> "error.503.title";
