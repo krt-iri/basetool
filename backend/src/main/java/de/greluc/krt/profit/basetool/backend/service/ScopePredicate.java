@@ -35,7 +35,7 @@ import org.jetbrains.annotations.Nullable;
  *       specific selection via the switcher.
  *   <li><b>Admin or non-admin pinned to a specific OrgUnit</b> ({@link #activeOrgUnitId()} non-
  *       null): the caller sees data owned by that single OrgUnit. The admin-pinned case relies on
- *       the {@code X-Active-Squadron-Id} request header; the non-admin pinned case (R5.e) relies on
+ *       the {@code X-Active-Org-Unit-Id} request header; the non-admin pinned case (R5.e) relies on
  *       the same header propagated by the frontend switcher widened to non-admins.
  *   <li><b>Non-admin without pinning</b> ({@link #memberOrgUnitIds()} non-empty, {@link
  *       #activeOrgUnitId()} null, {@link #adminAllScope()} = {@code false}): the caller sees the

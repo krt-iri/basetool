@@ -43,7 +43,7 @@ import org.springframework.context.annotation.Configuration;
  *       comes first. The previous 2 min global TTL kept paying the underlying DB-hit cost 15× per
  *       hour for data that almost never changes.
  *   <li><b>Squadrons (10 min)</b> — slower than master data because admins toggle the active
- *       squadron mid-session via the {@code X-Active-Squadron-Id} header, but the squadron entity
+ *       squadron mid-session via the {@code X-Active-Org-Unit-Id} header, but the squadron entity
  *       itself rarely changes. {@code SquadronService} already evicts on writes.
  *   <li><b>Roles (2 min)</b> — kept short. A Keycloak role change should propagate quickly so a
  *       freshly-elevated officer does not stare at a 30 min cached "you don't have permission"

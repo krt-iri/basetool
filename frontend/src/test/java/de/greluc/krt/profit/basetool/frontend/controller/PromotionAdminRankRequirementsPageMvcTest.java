@@ -109,7 +109,7 @@ class PromotionAdminRankRequirementsPageMvcTest {
             null,
             null);
 
-    // SquadronContextAdvice fan-out: squadrons list + non-admin /me/active-squadron lookup.
+    // SquadronContextAdvice fan-out: squadrons list + non-admin /me/active-org-unit lookup.
     when(backendApiClient.get(contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
         .thenReturn(
             new PageResponse<>(
@@ -120,9 +120,9 @@ class PromotionAdminRankRequirementsPageMvcTest {
                 1,
                 List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/me/active-squadron"),
-            eq(SquadronContextAdvice.ActiveSquadronResponse.class)))
-        .thenReturn(new SquadronContextAdvice.ActiveSquadronResponse(squadronId));
+            eq("/api/v1/me/active-org-unit"),
+            eq(SquadronContextAdvice.ActiveOrgUnitResponse.class)))
+        .thenReturn(new SquadronContextAdvice.ActiveOrgUnitResponse(squadronId));
 
     when(backendApiClient.get(
             contains("/api/v1/promotion/rank-requirements"), any(ParameterizedTypeReference.class)))

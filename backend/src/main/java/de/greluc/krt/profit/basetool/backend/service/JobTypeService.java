@@ -25,8 +25,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionCrewRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -54,8 +52,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobTypeService {
 
   private final JobTypeRepository jobTypeRepository;
-  private final MissionCrewRepository missionCrewRepository;
-  private final MissionParticipantRepository missionParticipantRepository;
 
   /**
    * Returns the unpaged active job-type list for a dropdown, optionally filtered by archetype.

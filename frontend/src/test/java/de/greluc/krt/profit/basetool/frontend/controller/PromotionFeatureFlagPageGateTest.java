@@ -82,9 +82,9 @@ class PromotionFeatureFlagPageGateTest {
     when(backendApiClient.get(contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/me/active-squadron"),
-            eq(SquadronContextAdvice.ActiveSquadronResponse.class)))
-        .thenReturn(new SquadronContextAdvice.ActiveSquadronResponse(squadronId));
+            eq("/api/v1/me/active-org-unit"),
+            eq(SquadronContextAdvice.ActiveOrgUnitResponse.class)))
+        .thenReturn(new SquadronContextAdvice.ActiveOrgUnitResponse(squadronId));
   }
 
   @Test
@@ -151,13 +151,13 @@ class PromotionFeatureFlagPageGateTest {
   @Test
   @WithMockUser(roles = "SQUADRON_MEMBER")
   void squadronlessNonAdmin_overviewIsForbidden() throws Exception {
-    // A non-admin whose home squadron does not resolve (active-squadron endpoint returns null) has
+    // A non-admin whose home squadron does not resolve (active-org-unit endpoint returns null) has
     // no promotion system of their own: the menu is hidden and direct page access is blocked, so a
     // squadron-less caller never sees the cross-staffel union.
     when(backendApiClient.get(
-            eq("/api/v1/me/active-squadron"),
-            eq(SquadronContextAdvice.ActiveSquadronResponse.class)))
-        .thenReturn(new SquadronContextAdvice.ActiveSquadronResponse(null));
+            eq("/api/v1/me/active-org-unit"),
+            eq(SquadronContextAdvice.ActiveOrgUnitResponse.class)))
+        .thenReturn(new SquadronContextAdvice.ActiveOrgUnitResponse(null));
     mockMvc.perform(get("/promotion/overview")).andExpect(status().isForbidden());
   }
 

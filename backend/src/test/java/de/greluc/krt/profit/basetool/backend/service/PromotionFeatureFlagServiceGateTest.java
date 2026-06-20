@@ -303,8 +303,7 @@ class PromotionFeatureFlagServiceGateTest {
   @DisplayName("SquadronService.setPromotionEnabled flips only the flag and persists")
   void squadronToggle_flipsOnlyFlag() {
     SquadronRepository repository = mock(SquadronRepository.class);
-    MissionParticipantRepository participantRepository = mock(MissionParticipantRepository.class);
-    SquadronService service = new SquadronService(repository, participantRepository);
+    SquadronService service = new SquadronService(repository);
     UUID id = UUID.randomUUID();
     Squadron entity = squadron(id, true);
     entity.setName("Original");
@@ -323,8 +322,7 @@ class PromotionFeatureFlagServiceGateTest {
   @DisplayName("SquadronService.setPromotionEnabled raises 404 for unknown squadron id")
   void squadronToggle_rejectsUnknownId() {
     SquadronRepository repository = mock(SquadronRepository.class);
-    MissionParticipantRepository participantRepository = mock(MissionParticipantRepository.class);
-    SquadronService service = new SquadronService(repository, participantRepository);
+    SquadronService service = new SquadronService(repository);
     UUID id = UUID.randomUUID();
     when(repository.findById(id)).thenReturn(Optional.empty());
 
@@ -335,8 +333,7 @@ class PromotionFeatureFlagServiceGateTest {
   @DisplayName("SquadronService.setPromotionEnabled propagates optimistic-lock failures")
   void squadronToggle_propagatesOptimisticLockFailure() {
     SquadronRepository repository = mock(SquadronRepository.class);
-    MissionParticipantRepository participantRepository = mock(MissionParticipantRepository.class);
-    SquadronService service = new SquadronService(repository, participantRepository);
+    SquadronService service = new SquadronService(repository);
     UUID id = UUID.randomUUID();
     Squadron entity = squadron(id, true);
     when(repository.findById(id)).thenReturn(Optional.of(entity));

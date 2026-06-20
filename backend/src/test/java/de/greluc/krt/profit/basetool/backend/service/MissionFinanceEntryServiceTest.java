@@ -77,8 +77,6 @@ class MissionFinanceEntryServiceTest {
 
   // Constructor-injected but not exercised in these tests; declared so
   // @InjectMocks satisfies the constructor signature without an NPE.
-  @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
-  @Mock private UserService userService;
 
   @InjectMocks private MissionFinanceEntryService service;
 
