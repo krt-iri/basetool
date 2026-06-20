@@ -2,11 +2,11 @@
 # =============================================================================
 # Profit Basetool — Server-side deploy script
 #
-# Pulls the production backend + frontend images from GHCR (the version tag
-# defaults to `:stable`, which is moved atomically by the `promote.yml`
+# Pulls the production backend + frontend + ingest images from GHCR (the version
+# tag defaults to `:stable`, which is moved atomically by the `promote.yml`
 # GitHub Actions workflow), resolves them to immutable digests, applies them
 # via docker-compose with `--wait`, and rolls back to the previous digest
-# pair if the health-check fails within IRI_HEALTH_TIMEOUT seconds.
+# set if the health-check fails within IRI_HEALTH_TIMEOUT seconds.
 #
 # Invoked periodically by the `iri-deploy.timer` systemd unit, or manually:
 #   sudo -u deploy /var/iri/code/scripts/deploy.sh                  # apply :stable
@@ -16,8 +16,8 @@
 #
 # State files (rewritten on every deploy):
 #   /var/lib/iri/current-digest-pin.yml    compose override pinning the live
-#                                          backend/frontend image digests; used
-#                                          on every subsequent `up` so a tag
+#                                          backend/frontend/ingest image digests;
+#                                          used on every subsequent `up` so a tag
 #                                          flip in GHCR does NOT silently move
 #                                          the running stack underneath us.
 #   /var/lib/iri/previous-digest-pin.yml   the prior pin, restored on rollback.
@@ -192,6 +192,7 @@ fi
 # --- Resolve target digests -------------------------------------------------
 BACKEND_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-backend"
 FRONTEND_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-frontend"
+INGEST_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-ingest"
 
 resolve_digest() {
   # buildx imagetools resolves a tag to its manifest digest without pulling
@@ -206,11 +207,16 @@ BACKEND_DIGEST="$(resolve_digest "${BACKEND_IMAGE}:${TARGET_TAG}")" \
   || fail "cannot resolve ${BACKEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
 FRONTEND_DIGEST="$(resolve_digest "${FRONTEND_IMAGE}:${TARGET_TAG}")" \
   || fail "cannot resolve ${FRONTEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
+INGEST_DIGEST="$(resolve_digest "${INGEST_IMAGE}:${TARGET_TAG}")" \
+  || fail "cannot resolve ${INGEST_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
 
 log "target backend  ${BACKEND_DIGEST}"
 log "target frontend ${FRONTEND_DIGEST}"
+log "target ingest   ${INGEST_DIGEST}"
 
-EXPECTED_MARKER="${BACKEND_DIGEST}|${FRONTEND_DIGEST}"
+# Single whitespace-free token (digests carry no spaces), so the failed.digests
+# `read -r REC_MARKER REC_COUNT REC_EPOCH` parsing below stays a single field.
+EXPECTED_MARKER="${BACKEND_DIGEST}|${FRONTEND_DIGEST}|${INGEST_DIGEST}"
 
 # --- Idempotence check ------------------------------------------------------
 if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
@@ -271,25 +277,28 @@ services:
     image: ${BACKEND_IMAGE}@${BACKEND_DIGEST}
   frontend:
     image: ${FRONTEND_IMAGE}@${FRONTEND_DIGEST}
+  ingest:
+    image: ${INGEST_IMAGE}@${INGEST_DIGEST}
 EOF
 
 # --- Apply ------------------------------------------------------------------
 cd "${COMPOSE_DIR}"
 
-# Only pre-pull the images this deploy actually moves (backend + frontend from
-# GHCR). The third-party infra images (keycloak/postgres/redis/npm) are pinned
-# by digest and change only on a deliberate compose edit; pulling them here
-# would make every deploy hostage to a transient outage of a third-party
-# registry (e.g. a quay.io 502/504 on the Keycloak manifest aborting the whole
-# `pull` under `set -e`, before `up` ever runs). The `up -d` below still pulls
-# any infra image that is genuinely missing locally, so a real digest bump is
-# rolled forward — an already-present pinned image is simply reused offline.
+# Only pre-pull the images this deploy actually moves (backend + frontend +
+# ingest from GHCR). The third-party infra images (keycloak/postgres/redis/npm)
+# are pinned by digest and change only on a deliberate compose edit; pulling
+# them here would make every deploy hostage to a transient outage of a
+# third-party registry (e.g. a quay.io 502/504 on the Keycloak manifest aborting
+# the whole `pull` under `set -e`, before `up` ever runs). The `up -d` below
+# still pulls any infra image that is genuinely missing locally, so a real
+# digest bump is rolled forward — an already-present pinned image is simply
+# reused offline.
 log "pulling images"
 docker compose \
   -f docker-compose.yml \
   -f "${PIN_FILE_CURRENT}" \
   --profile "${PROFILE}" \
-  pull --quiet backend frontend
+  pull --quiet backend frontend ingest
 
 log "applying (timeout ${HEALTH_TIMEOUT}s)"
 if docker compose \
@@ -347,7 +356,7 @@ if docker compose \
         --wait-timeout "${HEALTH_TIMEOUT}"; then
   log "rolled back to previous digest pin successfully"
 else
-  log "rollback ALSO failed — both digests broken or environment problem"
+  log "rollback ALSO failed — one or more target digests broken or environment problem"
 fi
 
 # Either way, this run failed → non-zero exit so the systemd unit reports
