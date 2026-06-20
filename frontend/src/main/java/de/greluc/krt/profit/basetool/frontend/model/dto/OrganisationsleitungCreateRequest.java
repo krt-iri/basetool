@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
-import java.util.UUID;
-import org.jetbrains.annotations.Nullable;
-
 /**
- * Frontend mirror of {@code UserController.UpdateUserSquadronRequest}. Carries the squadron id the
- * admin selected (or {@code null} when the admin cleared the assignment) plus the optimistic-lock
- * version of the user row the admin last fetched.
+ * Create payload for the Organisationsleitung, posted by the admin org-structure page and relayed
+ * to the backend {@code POST /api/v1/org-hierarchy/organisationsleitung} (epic #692, REQ-ORG-014).
+ * The OL is a singleton — a second create is rejected by the backend with 409. Its JSON shape is a
+ * subset of the backend {@code OrganisationsleitungDto} (server-stamped id/active/version omitted).
+ *
+ * @param name the OL's display name; required, unique across all org units.
+ * @param shorthand the OL's short tag; required.
+ * @param description free-form text; nullable.
  */
-public record UserSquadronUpdateDto(@Nullable UUID squadronId, Long version) {}
+public record OrganisationsleitungCreateRequest(
+    String name, String shorthand, String description) {}

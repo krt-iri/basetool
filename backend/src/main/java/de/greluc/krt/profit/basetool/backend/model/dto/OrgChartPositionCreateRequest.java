@@ -34,16 +34,19 @@ import java.util.UUID;
  * @param positionType the functional rank to assign; required.
  * @param orgUnitId the owning Staffel/SK; must be {@code null} for area-leadership ranks and
  *     present for Staffel/SK ranks (the service enforces the match).
- * @param userId the user to place in the position. Required for every rank except {@code
- *     COMMAND_LEAD}, where it is optional — omitting it creates a still-leaderless Kommando whose
- *     Kommandoleiter is assigned later. The service rejects a missing {@code userId} for all other
- *     ranks.
+ * @param userId the account to place in the position. Mutually exclusive with {@code displayName}:
+ *     supply one of the two for every rank except {@code COMMAND_LEAD}, where both may be omitted
+ *     to create a still-leaderless Kommando. The service rejects supplying both, and rejects
+ *     supplying neither for any rank other than {@code COMMAND_LEAD}.
  * @param parentId the parent position for a deputy (its Kommandoleiter) or an Ensign (the
  *     Staffelleiter or a Kommandoleiter); {@code null} for every root rank.
  * @param name the Kommando's display name; only honoured for {@code COMMAND_LEAD} (rejected for any
  *     other rank). {@code null} or blank creates an unnamed Kommando.
  * @param sortIndex optional display order within the sibling group; defaults to {@code 0} when
  *     omitted.
+ * @param displayName a free-text holder name for a Kartell member who has no Basetool account yet;
+ *     mutually exclusive with {@code userId} (see above). {@code null} or blank means "use {@code
+ *     userId} instead". Placed last so it stays optional on every existing call shape.
  */
 public record OrgChartPositionCreateRequest(
     @NotNull OrgChartPositionType positionType,
@@ -51,4 +54,5 @@ public record OrgChartPositionCreateRequest(
     UUID userId,
     UUID parentId,
     @Size(max = 120) String name,
-    Integer sortIndex) {}
+    Integer sortIndex,
+    @Size(max = 120) String displayName) {}

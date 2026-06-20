@@ -298,22 +298,4 @@ public class ShipDataPageController {
         .contentType(MediaType.APPLICATION_PROBLEM_JSON)
         .body(body);
   }
-
-  private String parseString(Object o) {
-    return o == null ? null : o.toString();
-  }
-
-  private UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof UUID u) {
-      return u;
-    }
-    try {
-      return UUID.fromString(o.toString());
-    } catch (Exception e) {
-      return null;
-    }
-  }
 }

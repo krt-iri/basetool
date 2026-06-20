@@ -6,6 +6,34 @@
 
 - **Anmeldung mit Discord (Track 1).** Mitglieder können sich jetzt zusätzlich mit Discord anmelden — aber nur, wer im das-kartell Discord ist und dort die Rolle „KRT-Mitglied“ trägt (direkt bei der Anmeldung geprüft, fail-closed). Neu über Discord angemeldete Nutzer landen zunächst in einem Wartezustand ohne Zugriff und müssen von einem Administrator freigegeben werden (Admin-Übersicht unter „Discord-Registrierungen“, Admins werden benachrichtigt); Rollen und Einheiten werden danach wie gewohnt von Hand vergeben. Die bestehende Anmeldung per Benutzername/Passwort bleibt unverändert. Wird erst nach der serverseitigen Einrichtung (Discord-App + Keycloak) wirksam.
 
+## [v0.6.3](https://github.com/krt-profit/basetool/releases/tag/v0.6.3) - 2026-06-20
+
+### Fixed
+
+- **Der Staffel-Filter in der Auftragsübersicht löst keine sporadischen Abmeldungen mehr aus.** Beim Umschalten zwischen „Eigene Staffel" und „Alle Staffeln" konnte die Sitzungserneuerung fehlschlagen, sodass die Aufträge kurzzeitig nicht luden und erst ein erneutes Laden half. Ursache war, dass der Filterwert fälschlich als Berechtigungsumfang an Keycloak gesendet wurde; das ist nun unterbunden.
+
+## [v0.6.2](https://github.com/krt-profit/basetool/releases/tag/v0.6.2) - 2026-06-20
+
+### Added
+
+- **Aufträge können jetzt einen Bereich oder die Organisationsleitung als Auftraggeber haben.** Angemeldete Nutzer können beim Anlegen oder Bearbeiten eines Auftrags neben Staffeln und Spezialkommandos auch einen Bereich oder die Organisationsleitung als Auftraggeber auswählen. Die bearbeitende (verantwortliche) Einheit bleibt wie bisher eine profit-berechtigte Staffel oder ein Spezialkommando, und das öffentliche, anonyme Auftragsformular bietet als Auftraggeber weiterhin nur Staffeln und Spezialkommandos. (Einsätze lassen sich bereits seit v0.6.0 einem Bereich oder der Organisationsleitung zuordnen.)
+
+- **Im Organigramm lassen sich jetzt auch freie Namen eintragen.** Administratoren können eine Position mit dem Namen eines Kartell-Mitglieds besetzen, das noch keinen Basetool-Account hat (Auswahl „Name eintragen" im Besetzen-Dialog); der Name erscheint mit der Markierung „Kein Account". Sobald das Mitglied einen Account hat, wird die Position einfach auf diesen Account umgestellt — der freie Name wird dabei ohne Datenverlust ersetzt. Eine so besetzte Position verleiht weiterhin keinerlei Rechte.
+
+### Changed
+
+- **Das Organigramm stellt die Bereiche jetzt nebeneinander statt untereinander dar und verbindet sie mit Linien zur Organisationsleitung.** Die Bereiche fächern unter der Organisationsleitung auf — mit denselben Verbindungslinien wie von einem Bereich zu seinen Staffeln und Spezialkommandos. Jeder Bereich lässt sich außerdem unterhalb seines Bereichsleiters ein- und ausklappen, sodass das Organigramm bei vielen Einheiten übersichtlich bleibt.
+
+### Fixed
+
+- **Raffinerie-Aufträge mit vielen Erz-Zeilen lassen sich wieder speichern.** Das Anlege-Formular wird per AJAX als Multipart gesendet (ein Teil pro Formularfeld); Tomcat 11 begrenzte die Teilanzahl neuerdings auf 10, sodass große — etwa aus vielen Screenshots importierte — Aufträge beim Speichern mit einem Serverfehler abbrachen. Das Limit ist wieder großzügig gesetzt, und ein Überschreiten erscheint nun als verständliche Meldung statt als „500".
+
+## [v0.6.1](https://github.com/krt-profit/basetool/releases/tag/v0.6.1) - 2026-06-20
+
+### Added
+
+- **Administratoren können die Organisationsstruktur jetzt direkt in der App pflegen.** Unter Administration → Organisationsstruktur lassen sich Bereiche und die Organisationsleitung anlegen und Staffeln/Spezialkommandos einem Bereich bzw. Bereiche der Organisationsleitung zuordnen — bisher war das nur über die API möglich. Die Besetzung der Leitungspositionen bleibt im Organigramm.
+
 ### Changed
 
 - **Die Mindestqualität in Aufträgen ist von 700 auf 650 gesenkt.** In Material- und Item-Aufträgen steht als Mindestqualität nur noch „650" oder „Keine" zur Auswahl (Voreinstellung 650), und Lagerbestände ab Qualität 650 zählen jetzt als „Gut" für Deckung und Sammelfortschritt. Bestehende Aufträge mit dem alten Wert 700 werden per Datenbank-Migration automatisch auf 650 umgestellt.

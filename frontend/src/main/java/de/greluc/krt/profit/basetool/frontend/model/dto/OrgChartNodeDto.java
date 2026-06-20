@@ -30,8 +30,13 @@ import java.util.UUID;
  * @param positionId id of the underlying position row; the handle every edit / remove action
  *     targets.
  * @param positionType the functional-rank enum name (e.g. {@code SQUADRON_LEAD}).
- * @param userId id of the user holding the position; preselects the reassign picker.
- * @param userName the holder's effective display name.
+ * @param userId id of the user holding the position, or {@code null} when the holder is a free-text
+ *     name (or the seat is vacant); preselects the reassign picker when present.
+ * @param userName the holding account's effective display name, or {@code null} for a free-text
+ *     holder or a vacant seat.
+ * @param displayName the free-text holder name for a member without a Basetool account, or {@code
+ *     null} when the holder is an account or the seat is vacant; mutually exclusive with {@code
+ *     userId}.
  * @param sortIndex stable display order within the sibling group.
  * @param version optimistic-lock version, echoed back on reassign.
  */
@@ -40,5 +45,6 @@ public record OrgChartNodeDto(
     String positionType,
     UUID userId,
     String userName,
+    String displayName,
     int sortIndex,
     Long version) {}

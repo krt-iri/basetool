@@ -1,5 +1,5 @@
 -- =====================================================================
--- V172 - app_user approval state + audit (epic #720, Track 1, REQ-SEC-017)
+-- V173 - app_user approval state + audit (epic #720, Track 1, REQ-SEC-017)
 -- =====================================================================
 -- Why: a brand-new Discord registration must land in a holding state with no
 -- access until an admin approves it (REQ-SEC-017). approval_status carries that

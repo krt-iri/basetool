@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Servlet filter that mirrors the admin's active-squadron selection from the frontend's Spring
+ * Servlet filter that mirrors the caller's active OrgUnit selection from the frontend's Spring
  * Session into {@link ActiveSquadronContext} on every request and clears it on the way out.
  *
  * <p>The {@code ActiveSquadronRelayFilter} on the WebClient pipeline cannot read the session
@@ -82,17 +82,7 @@ public class ActiveSquadronContextFilter extends OncePerRequestFilter implements
     if (session == null) {
       return null;
     }
-    // R5.e: read the new ACTIVE_ORG_UNIT_SESSION_KEY first; fall back to the legacy
-    // ACTIVE_SQUADRON_SESSION_KEY so admin sessions stored under the old key during deploy
-    // continue to honour the pin until the user's next switcher interaction (which rewrites
-    // the new key). The legacy fallback comes out once the destructive cleanup release lands.
-    UUID fromNew =
-        ActiveSquadronContext.coerce(
-            session.getAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY));
-    if (fromNew != null) {
-      return fromNew;
-    }
     return ActiveSquadronContext.coerce(
-        session.getAttribute(MeFrontendController.ACTIVE_SQUADRON_SESSION_KEY));
+        session.getAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY));
   }
 }

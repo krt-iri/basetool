@@ -1,5 +1,5 @@
 -- =====================================================================
--- V171 - app_user: Discord identity link (epic #720, Track 1, REQ-DATA-006)
+-- V172 - app_user: Discord identity link (epic #720, Track 1, REQ-DATA-006)
 -- =====================================================================
 -- Why: a Discord login federated through Keycloak must be linkable to the local
 -- app_user row so the membership gate (T1.2) and the approval flow (T1.3) can

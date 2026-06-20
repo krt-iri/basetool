@@ -70,6 +70,7 @@ import org.springframework.web.context.WebApplicationContext;
 class JobOrderPageControllerCreateFormAnonymousMvcTest {
 
   private static final String ACTIVE_URI = "/api/v1/org-units/active";
+  private static final String ALL_KINDS_URI = "/api/v1/org-units/active-all-kinds";
   private static final String INTAKE_SETTING_URI =
       "/api/v1/settings/job_order.intake_special_command_id";
 
@@ -152,5 +153,8 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
 
     verify(backendApiClient).get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), eq(true));
     verify(backendApiClient).get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true));
+    // A guest keeps the Staffel/SK-only catalog — the Bereich/OL tiers (authenticated, epic #692)
+    // are never offered to an anonymous caller.
+    verify(backendApiClient, never()).get(eq(ALL_KINDS_URI), any(ParameterizedTypeReference.class));
   }
 }

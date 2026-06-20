@@ -759,7 +759,7 @@ public class InventoryPageController {
     java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("status", 422);
     body.put("code", code);
-    return org.springframework.http.ResponseEntity.unprocessableEntity()
+    return org.springframework.http.ResponseEntity.unprocessableContent()
         .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
         .body(body);
   }
@@ -1161,37 +1161,5 @@ public class InventoryPageController {
       }
     }
     return false;
-  }
-
-  private String parseString(Object o) {
-    return o == null ? null : o.toString();
-  }
-
-  private Integer parseInteger(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Integer i) {
-      return i;
-    }
-    if (o instanceof Number n) {
-      return n.intValue();
-    }
-    try {
-      return Integer.parseInt(o.toString());
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  private UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(o.toString());
-    } catch (Exception e) {
-      return null;
-    }
   }
 }

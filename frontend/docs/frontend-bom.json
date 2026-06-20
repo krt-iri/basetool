@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:00744e5a-7c6e-4860-a41c-f0f3bf255564",
+  "serialNumber" : "urn:uuid:6741da55-f031-409e-9f7f-01d2a445b0d4",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-06-20T05:14:18Z",
+    "timestamp" : "2026-06-20T13:52:21Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/27861194894"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/27873134713"
         },
         {
           "type" : "vcs",
@@ -7944,43 +7944,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.commonmark/commonmark@0.28.0?type=jar",
+      "bom-ref" : "pkg:maven/org.commonmark/commonmark@0.29.0?type=jar",
       "group" : "org.commonmark",
       "name" : "commonmark",
-      "version" : "0.28.0",
+      "version" : "0.29.0",
       "description" : "Core of commonmark-java (a library for parsing Markdown to an AST, modifying the AST and rendering it to HTML or Markdown)",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "1242f7899d4f37a41126f45113e27c95"
+          "content" : "3f014f0a09c6e0796774bab669e48e5a"
         },
         {
           "alg" : "SHA-1",
-          "content" : "9fa5c6ea2a17aedfec543c693be35573307750dd"
+          "content" : "afd6755ebe69fc302f8cfbbd4a6bc056ac73ba94"
         },
         {
           "alg" : "SHA-256",
-          "content" : "f8b28e00f97c568329ee1b2496cfec5c3ef8664b565ea09cf8988894183b956d"
+          "content" : "4c9b0fa481e36d7176f38e572c134656424cf9601bc190855d0f89478df901c6"
         },
         {
           "alg" : "SHA-512",
-          "content" : "cd4ee2b918de001ab4ff09c3ee9d3b0d38c3566116a6755080a0cb5f0a16a9557ccc9530a1f20e8c71b43b4b37cce8667dcc8d12cb389fcde11193456e65ef77"
+          "content" : "a241c385fa3eeacbf235110f686485b4c4d5d6936e8656435410d8ff6fa5411c6bd0f520431bc77f8e72341ae92d33c9155541e236f530282fa63c4b51be32b3"
         },
         {
           "alg" : "SHA-384",
-          "content" : "21d34ff51409a97f41f45172e2c399671241df8d2eaca05064e0639d3e3b796a31c5ab98ba854539383e149a4c6dad31"
+          "content" : "994ea477d478786b7df2e95473d25bf084fc6ffb7ecc06e1074079091f42389c29ad93d4b971033ac4db7f0dc42f0f90"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "1f02b2c588749a06368219eb749499a9088d16caa3865d8d64573ff36346899352750ceac648e24c44a43fa85dcbe183"
+          "content" : "0df5960db565f37e73ff6fa634717172676ea1ade268591bb400b43791912047e3bbbcd7999a7d4f0e22e55b5a29cc84"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "8cfeec2b2b5ce49fc21e3cb7bf0f2e1db3766f90ed1eb6044e3c25d35e2135c9"
+          "content" : "17b365efba8caab565b6a212a7132becf2242ce8b43853a6b8afc252960a4757"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "5be241384747221d92c907a0f10768a08eb2c10028ac659c9ae8346dcc7687c7b25ad0db16631e1d65f214e9b46db738ad105cc4b4ddd7737770a71083537433"
+          "content" : "8ef304dc7fb30fe90df260c55687c929a76d65a35703260abe22fb403ff524bea9e94e296192e6966ac25ed196a0d24ec9d9f7e2b94c743c6548ddbd9c8785ab"
         }
       ],
       "licenses" : [
@@ -7991,7 +7991,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.commonmark/commonmark@0.28.0?type=jar",
+      "purl" : "pkg:maven/org.commonmark/commonmark@0.29.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -18307,7 +18307,7 @@
         "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
         "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.commonmark/commonmark@0.28.0?type=jar",
+        "pkg:maven/org.commonmark/commonmark@0.29.0?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
         "pkg:maven/org.jetbrains/annotations@26.1.0?type=jar",
@@ -18958,7 +18958,7 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.commonmark/commonmark@0.28.0?type=jar",
+      "ref" : "pkg:maven/org.commonmark/commonmark@0.29.0?type=jar",
       "dependsOn" : [ ]
     },
     {

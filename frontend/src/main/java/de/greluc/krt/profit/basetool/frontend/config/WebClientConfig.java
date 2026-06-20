@@ -41,7 +41,9 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.security.KeyStore;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +54,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProvider;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
@@ -79,6 +82,27 @@ public class WebClientConfig {
    * ~576 MB heap, even with the 10-minute matrix cache holding one such response).
    */
   private static final int MAX_IN_MEMORY_BYTES = 64 * 1024 * 1024;
+
+  /**
+   * Context-attributes mapper for the {@link DefaultOAuth2AuthorizedClientManager} that yields an
+   * empty map, deliberately replacing Spring's request-parameter-derived default.
+   *
+   * <p>Spring's {@code DEFAULT_CONTEXT_ATTRIBUTES_MAPPER} copies an HTTP request parameter
+   * literally named {@code scope} into {@code
+   * OAuth2AuthorizationContext.REQUEST_SCOPE_ATTRIBUTE_NAME}, and the {@code
+   * RefreshTokenOAuth2AuthorizedClientProvider} then forwards those values to Keycloak as the
+   * requested scope of the refresh-token grant. The job-orders page's "Staffel" filter submits
+   * {@code scope=all|mine} (the same own-vs-all squadron concept the refinery list exposes), so
+   * whenever a token refresh happens to coincide with such a request Keycloak rejects the grant
+   * with {@code invalid_scope ("Invalid scopes: all"/"Invalid scopes: mine")}; the whole SSO
+   * session is then bounced into re-authentication and the user sees "Fehler beim Laden". This is a
+   * refresh failure mode independent of refresh-token rotation/reuse detection (REQ-SEC-012), which
+   * is why disabling rotation did not stop it. The frontend never requests scopes dynamically —
+   * they are fixed on the {@code keycloak} client registration — so severing the request-parameter
+   * &rarr; OAuth-scope path entirely is both correct and the complete fix.
+   */
+  static final Function<OAuth2AuthorizeRequest, Map<String, Object>> NO_REQUEST_DERIVED_ATTRIBUTES =
+      authorizeRequest -> Map.of();
 
   private final AppBackendProperties backendProperties;
   private final AppHttpProperties httpProperties;
@@ -282,6 +306,9 @@ public class WebClientConfig {
         new DefaultOAuth2AuthorizedClientManager(
             clientRegistrationRepository, authorizedClientRepository);
     delegate.setAuthorizedClientProvider(authorizedClientProvider);
+    // Stop the servlet request's parameters (notably the "Staffel" filter's scope=all|mine) from
+    // leaking into the refresh-token grant as the OAuth2 requested scope (REQ-SEC-012).
+    delegate.setContextAttributesMapper(NO_REQUEST_DERIVED_ATTRIBUTES);
 
     return new SingleFlightAuthorizedClientManager(delegate);
   }

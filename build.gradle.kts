@@ -3,18 +3,19 @@ plugins {
   // `base` gives the root project the `check` lifecycle task that Spotless's
   // `isEnforceCheck` hooks `spotlessCheck` into (see the root Spotless block).
   id("base")
-  id("org.owasp.dependencycheck") version "12.2.2"
+  alias(libs.plugins.owasp.dependencycheck)
   // Pulled in with `apply false` so the PitestPluginExtension type is on the
   // root build script's classpath for the `subprojects { plugins.withId(...) }`
   // configuration block below. Each subproject still applies the plugin itself.
-  id("info.solidsoft.pitest") version "1.19.0" apply false
+  // Version comes from the `gradle/libs.versions.toml` catalog (single source of truth).
+  alias(libs.plugins.pitest) apply false
   // Applied at the root (NOT `apply false`) so the root project gets its own
   // Spotless instance for the repo-wide non-Java formats configured below. The
   // type stays on the classpath for the strongly-typed `subprojects {}` block,
   // which configures the per-module Java formatting. Applying via the plugins DSL
   // (rather than an imperative `apply(...)` in the script body) keeps task
   // registration in the right phase under `--configure-on-demand`.
-  id("com.diffplug.spotless") version "8.7.0"
+  alias(libs.plugins.spotless)
 }
 
 allprojects {
@@ -267,7 +268,7 @@ subprojects {
   //   make the gate strict.
   plugins.withId("info.solidsoft.pitest") {
     extensions.configure<info.solidsoft.gradle.pitest.PitestPluginExtension>("pitest") {
-      junit5PluginVersion.set("1.2.3")
+      junit5PluginVersion.set(libs.versions.pitestJunit5.get())
       targetClasses.set(listOf("de.greluc.krt.profit.basetool.${project.name}.service.*"))
       targetTests.set(listOf("de.greluc.krt.profit.basetool.${project.name}.service.*Test"))
       threads.set(4)
@@ -308,7 +309,7 @@ subprojects {
   // BDD-style assertions) that Google's style flags as noise.
   plugins.withId("checkstyle") {
     extensions.configure<CheckstyleExtension>("checkstyle") {
-      toolVersion = "13.6.0"
+      toolVersion = libs.versions.checkstyle.get()
       configFile = rootProject.file("config/checkstyle/google_checks.xml")
       isIgnoreFailures = false
       maxWarnings = 0
@@ -339,8 +340,8 @@ subprojects {
         // reflection lookup explodes with `NoSuchMethodError`. CI runs JDK 25 Temurin
         // (see `.github/workflows/ci.yml`), so without an explicit pin the spotless
         // task fails 767 files with `google-java-format(java.lang.NoSuchMethodError)`.
-        // 1.35.0 targets the new JDK 25 javac signature.
-        googleJavaFormat("1.35.0").reflowLongStrings()
+        // The catalog pins a JDK-25-compatible google-java-format (>= 1.35.0).
+        googleJavaFormat(libs.versions.googleJavaFormat.get()).reflowLongStrings()
         removeUnusedImports()
         // GPLv3 file header, enforced on every Java source (main + test + e2e).
         // The project is GPL-3.0-only (LICENSE.md is the GPLv3 text); the SPDX

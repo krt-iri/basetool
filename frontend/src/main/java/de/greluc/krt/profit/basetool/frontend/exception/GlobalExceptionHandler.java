@@ -40,6 +40,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -270,6 +271,56 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * Maps a multipart upload that breaches Tomcat's part-count, part-size or total-size limit onto a
+   * clean {@code 413 Payload Too Large} instead of letting it fall through to the generic 500
+   * handler. The frontend's in-place AJAX writes (epic #571) submit their forms as {@code
+   * multipart/form-data} via {@code FormData}, so every form field is a separate multipart part; a
+   * large editor (a refinery order with many goods rows, a job order with many items) can exceed
+   * Tomcat 11's lowered {@code maxPartCount} default of 10. The connector cap is raised in {@code
+   * application.yml}; this handler is the graceful backstop for any residual breach (REQ-FE-009).
+   *
+   * <p>Spring raises {@link MaxUploadSizeExceededException} during {@code DispatcherServlet}'s
+   * multipart resolution — before a handler method is selected — so only a global {@code
+   * &#64;ControllerAdvice} (not a controller-local {@code &#64;ExceptionHandler}) can intercept it.
+   *
+   * @param request the current request, used to decide JSON-vs-HTML and for the diagnostic log line
+   * @param model the model populated for the HTML error page
+   * @return a {@code 413} JSON body for XHR callers, or the {@code error/error} view name otherwise
+   */
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  @ResponseStatus(HttpStatus.CONTENT_TOO_LARGE)
+  public Object handleMaxUploadSizeExceeded(
+      @NotNull HttpServletRequest request, @NotNull Model model) {
+    Locale locale = LocaleContextHolder.getLocale();
+    String title = resolve("error.413.title", locale, "Upload Too Large");
+    String message =
+        resolve(
+            "error.uploadTooLarge",
+            locale,
+            "The upload exceeded the allowed size or number of parts.");
+    // WARN, not ERROR: malformed/oversized client input is not a server fault. Never log the body —
+    // it may carry PII.
+    log.warn(
+        "Upload rejected for {} {}: multipart part-count or size limit exceeded",
+        request.getMethod(),
+        request.getRequestURI());
+    if (wantsJson(request)) {
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("code", "UPLOAD_TOO_LARGE");
+      body.put("status", HttpStatus.CONTENT_TOO_LARGE.value());
+      body.put("title", title);
+      body.put("message", message);
+      return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+          .contentType(MediaType.APPLICATION_JSON)
+          .body(body);
+    }
+    model.addAttribute("error", title);
+    model.addAttribute("message", message);
+    model.addAttribute("status", String.valueOf(HttpStatus.CONTENT_TOO_LARGE.value()));
+    return "error/error";
+  }
+
+  /**
    * Catch-all fallback. Renders a 500 error page; unwraps a {@link BackendServiceException} cause
    * to propagate the backend's status code (e.g. 503 / 504) rather than masking it as 500.
    */
@@ -358,6 +409,7 @@ public class GlobalExceptionHandler {
       case UNAUTHORIZED -> "error.401.title";
       case FORBIDDEN -> "error.403.title";
       case NOT_FOUND -> "error.404.title";
+      case CONTENT_TOO_LARGE -> "error.413.title";
       case CONFLICT -> "error.409.title";
       case LOCKED -> "error.423.title";
       case SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT -> "error.503.title";

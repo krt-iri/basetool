@@ -108,6 +108,7 @@
                         <span class="sidebar-subheading" th:text="#{nav.admin.group.members}">Benutzer &amp; Inhalte</span>
                         <a th:href="@{/members}" th:text="#{nav.members}">Mitgliederverwaltung</a>
                         <a th:href="@{/admin/special-commands}" th:text="#{nav.admin.specialcommands}">Spezialkommandos</a>
+                        <a th:href="@{/admin/org-structure}" data-testid="nav-admin-org-structure" th:text="#{nav.admin.orgStructure}">Organisationsstruktur</a>
                         <a th:href="@{/admin/announcement}" th:text="#{info.title}">Informationen</a>
                         <span class="sidebar-subheading" th:text="#{nav.admin.group.masterdata}">Stammdaten</span>
                         <a th:href="@{/admin/mission-data}" th:text="#{nav.mission_data}">Missionsdaten</a>
@@ -162,8 +163,7 @@
             <!-- R5.e — active-OrgUnit switcher. Visible to any authenticated user with >1 option
                  in the dropdown: admins see the Squadron + SpecialCommand catalogue, non-admins
                  see only the OrgUnits they are a member of (Staffel + every SK membership). The
-                 form posts to the new /me/active-org-unit endpoint; the legacy /me/active-squadron
-                 path stays as a one-release alias for cached browser tabs. The Spring Session-
+                 form posts to the /me/active-org-unit endpoint. The Spring Session-
                  backed store (Redis in dev/prod) carries the active selection across page loads;
                  leaving the select on the blank "All OrgUnits" option DELETEs the selection.
                  Non-admin pins are independently re-validated on the backend against the caller's

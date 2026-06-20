@@ -63,7 +63,7 @@ class CorrelationIdFilterTest {
 
   {
     // Default behaviour: anonymous traffic returns "none" through the filter's defensive
-    // fallback. Tests that assert squadronId behaviour can stub these mocks per-case.
+    // fallback. Tests that assert orgUnit-context behaviour can stub these mocks per-case.
     when(authHelperService.isAuthenticated()).thenReturn(false);
     when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
   }

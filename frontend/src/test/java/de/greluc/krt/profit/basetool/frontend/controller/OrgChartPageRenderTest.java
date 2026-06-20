@@ -168,11 +168,12 @@ class OrgChartPageRenderTest {
     // ocNode. A broken expression in any of those new paths fails here instead of as a runtime 500.
     OrgChartNodeDto deputy =
         new OrgChartNodeDto(
-            UUID.randomUUID(), "DEPUTY_COMMAND_LEAD", UUID.randomUUID(), "Deputy", 0, 0L);
+            UUID.randomUUID(), "DEPUTY_COMMAND_LEAD", UUID.randomUUID(), "Deputy", null, 0, 0L);
     OrgChartNodeDto ensign =
-        new OrgChartNodeDto(UUID.randomUUID(), "ENSIGN", UUID.randomUUID(), "Ensign", 0, 0L);
+        new OrgChartNodeDto(UUID.randomUUID(), "ENSIGN", UUID.randomUUID(), "Ensign", null, 0, 0L);
     CommandChartDto command =
-        new CommandChartDto(UUID.randomUUID(), "Alpha", 0L, 0, null, null, deputy, List.of(ensign));
+        new CommandChartDto(
+            UUID.randomUUID(), "Alpha", 0L, 0, null, null, null, deputy, List.of(ensign));
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
@@ -270,7 +271,8 @@ class OrgChartPageRenderTest {
     // admin add-OL-member affordance, which needs the OL's org-unit id carried by OlChartDto.
     UUID olId = UUID.randomUUID();
     OrgChartNodeDto member =
-        new OrgChartNodeDto(UUID.randomUUID(), "OL_MEMBER", UUID.randomUUID(), "Chief", 0, 0L);
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "OL_MEMBER", UUID.randomUUID(), "Chief", null, 0, 0L);
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
@@ -303,6 +305,96 @@ class OrgChartPageRenderTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void freeTextHolder_admin_rendersTypedNameAndNoAccountMarker_notVacant() throws Exception {
+    // Given: an OL member named on the chart who has no Basetool account yet (REQ-ORG-020) — userId
+    // null but a free-text displayName. The node must render the typed name through ocNode with the
+    // free-text marker class (not the dashed vacant placeholder), and the reassign control must
+    // carry the typed name so an admin can later swap it for an account without losing it.
+    UUID olId = UUID.randomUUID();
+    OrgChartNodeDto freeTextMember =
+        new OrgChartNodeDto(UUID.randomUUID(), "OL_MEMBER", null, null, "Max Mustermann", 0, 0L);
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new OlChartDto(olId, "Organisationsleitung", "OL", List.of(freeTextMember)),
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("the free-text holder's typed name renders").contains("Max Mustermann");
+    assertThat(html)
+        .as("free-text node carries the no-account marker class, not the vacant style")
+        .contains("oc-node--freetext");
+    assertThat(html).as("the no-account badge element renders").contains("oc-node-flag");
+    assertThat(html)
+        .as("the reassign control carries the typed name for the account swap")
+        .contains("data-display-name=\"Max Mustermann\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void freeTextCommandLeader_admin_rendersTypedNameAndNoAccountMarker_notVacant() throws Exception {
+    // Given: a Kommando whose Kommandoleiter is a Kartell member with no Basetool account yet
+    // (REQ-ORG-020) — leaderUserId null but a free-text leaderDisplayName. Exercises the inline
+    // command-leader branch (cmd.leaderDisplayName != null), distinct from the ocNode path above:
+    // the leader node renders the typed name with the no-account marker (not the dashed vacant
+    // placeholder), and its reassign control carries the typed name for a later account swap.
+    CommandChartDto command =
+        new CommandChartDto(
+            UUID.randomUUID(), "Alpha", 0L, 0, null, null, "Max Mustermann", null, List.of());
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                null,
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(
+                    new SquadronChartDto(
+                        UUID.randomUUID(),
+                        "IRIDIUM",
+                        "IRI",
+                        null,
+                        List.of(command),
+                        List.of(),
+                        true,
+                        true)),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the free-text Kommandoleiter's typed name renders")
+        .contains("Max Mustermann");
+    assertThat(html)
+        .as("free-text leader node carries the no-account marker class")
+        .contains("oc-node--freetext");
+    assertThat(html).as("the no-account badge element renders").contains("oc-node-flag");
+    assertThat(html)
+        .as("the leader reassign control carries the typed name for the account swap")
+        .contains("data-display-name=\"Max Mustermann\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void bereichTier_admin_rendersDepartmentTintLeadershipAndUnits() throws Exception {
     // Given: one Bereich tier carrying the PROFIT Bereichsfarbe, a Bereichsleiter (hero) and one
     // Staffel (epic #692 / REQ-ORG-018). The tier renders as its own ARIA tree, tinted via the
@@ -311,7 +403,7 @@ class OrgChartPageRenderTest {
     // legacy area tier must stay hidden once a Bereich is populated.
     OrgChartNodeDto lead =
         new OrgChartNodeDto(
-            UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Area Boss", 0, 0L);
+            UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Area Boss", null, 0, 0L);
     SquadronChartDto sq =
         new SquadronChartDto(
             UUID.randomUUID(), "IRIDIUM", "IRI", null, List.of(), List.of(), true, true);
@@ -351,7 +443,69 @@ class OrgChartPageRenderTest {
     assertThat(html).as("Bereichsleiter holder rendered").contains("Area Boss");
     assertThat(html).as("Bereich's Staffel rendered via ocUnitFan").contains("IRIDIUM");
     assertThat(html)
+        .as("Bereich carries a collapse toggle")
+        .contains("data-trigger=\"oc-collapse\"");
+    assertThat(html).as("Bereich body is collapsible").contains("oc-bereich-body");
+    assertThat(html)
         .as("legacy area tier hidden when a Bereich is populated")
         .doesNotContain("data-trigger=\"oc-add-staff\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void olWithBereiche_admin_rendersConnectorFanSideBySide() throws Exception {
+    // Given: an OL plus two Bereiche. The Bereiche must fan out side by side beneath the OL via the
+    // oc-fan--bereiche connector (epic #692) — each its own collapsible Bereich subtree.
+    UUID olId = UUID.randomUUID();
+    OrgChartNodeDto leadA =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Boss A", null, 0, 0L);
+    OrgChartNodeDto leadB =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Boss B", null, 0, 0L);
+    BereichChartDto bereichA =
+        new BereichChartDto(
+            UUID.randomUUID(),
+            "Profit-Bereich",
+            "PRF",
+            "PROFIT",
+            new AreaLeadershipDto(leadA, List.of(), List.of(), List.of()),
+            List.of(),
+            List.of());
+    BereichChartDto bereichB =
+        new BereichChartDto(
+            UUID.randomUUID(),
+            "Sub-Radar-Bereich",
+            "SUB",
+            "SUB_RADAR",
+            new AreaLeadershipDto(leadB, List.of(), List.of(), List.of()),
+            List.of(),
+            List.of());
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new OlChartDto(olId, "Organisationsleitung", "OL", List.of()),
+                List.of(bereichA, bereichB),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("OL apex rendered").contains("oc-unit-box--ol");
+    assertThat(html).as("OL → Bereiche connector fan rendered").contains("oc-fan--bereiche");
+    assertThat(html).as("first Bereich rendered side by side").contains("Profit-Bereich");
+    assertThat(html).as("second Bereich rendered side by side").contains("Sub-Radar-Bereich");
+    assertThat(html)
+        .as("each Bereich carries a collapse toggle")
+        .contains("data-trigger=\"oc-collapse\"");
   }
 }

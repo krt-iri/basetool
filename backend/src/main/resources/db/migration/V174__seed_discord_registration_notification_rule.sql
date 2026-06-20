@@ -1,5 +1,5 @@
 -- =====================================================================
--- V173 - notification rule: new Discord registration pending (epic #720, REQ-NOTIF-012)
+-- V174 - notification rule: new Discord registration pending (epic #720, REQ-NOTIF-012)
 -- =====================================================================
 -- Why: when a new Discord user lands PENDING, every admin must be notified so they
 -- can review and approve (REQ-NOTIF-012). Reuses the data-driven rule engine

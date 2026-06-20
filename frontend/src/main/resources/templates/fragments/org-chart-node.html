@@ -14,17 +14,23 @@
   tabindex="-1".
 -->
 <div th:fragment="ocNode(node, level)" class="oc-node" th:if="${node != null}"
-     th:classappend="${(node.positionType() == 'AREA_LEAD' or node.positionType() == 'BEREICHSLEITER') ? 'oc-node--hero' : ''}"
-     th:with="rk=${'orgChart.rank.' + node.positionType()}"
+     th:with="rk=${'orgChart.rank.' + node.positionType()},
+              freeText=${node.userId() == null and node.displayName() != null},
+              nm=${node.userName() != null ? node.userName() : node.displayName()},
+              noAcc=#{orgChart.noAccount}"
+     th:classappend="|${(node.positionType() == 'AREA_LEAD' or node.positionType() == 'BEREICHSLEITER') ? 'oc-node--hero' : ''} ${freeText ? 'oc-node--freetext' : ''}|"
      role="treeitem" tabindex="-1" th:aria-level="${level}"
-     th:aria-label="#{${rk}} + ', ' + ${node.userName()}">
+     th:aria-label="#{${rk}} + ', ' + ${nm} + (${freeText} ? ' (' + ${noAcc} + ')' : '')">
     <span class="oc-node-rank" th:text="#{${rk}}">Rank</span>
-    <span class="oc-node-name" th:text="${node.userName()}">Name</span>
+    <span class="oc-node-name" th:text="${nm}">Name</span>
+    <span class="oc-node-flag" th:if="${freeText}" th:text="${noAcc}"
+          th:title="#{orgChart.noAccount.hint}">Kein Account</span>
     <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
         <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                 th:data-position-id="${node.positionId()}"
                 th:data-version="${node.version()}"
                 th:data-user-id="${node.userId()}"
+                th:data-display-name="${node.displayName()}"
                 th:data-rank-label="#{${rk}}"
                 th:title="#{orgChart.reassign}" th:aria-label="#{orgChart.reassign}">
             <svg class="krt-icon" aria-hidden="true">
@@ -41,6 +47,78 @@
         </button>
     </div>
 </div>
+
+<!--
+  One Bereich subtree (epic #692): its caption, then its own ARIA tree — the Bereichsleiter (the
+  level-1 hero) with a collapse toggle, and a collapsible body holding the Stab (Koordinatoren /
+  Operatoren, level 2) and the Bereich's Staffeln/SKs via the shared ocUnitFan. Factored out of
+  org-chart.html so the Bereiche can be laid out side by side (each <li> of the OL's connector fan,
+  or a flat row when there is no OL) without duplicating this markup. Each Bereich stays its OWN
+  role="tree" with unchanged ARIA levels, so the per-tree roving-tabindex nav is unaffected; the
+  collapse toggle hides the body and the nav skips the now-hidden treeitems.
+-->
+<th:block th:fragment="ocBereich(b)">
+    <div class="oc-caption">
+        <span class="oc-dept-swatch" aria-hidden="true" th:if="${b.department() != null}"
+              th:classappend="${'oc-dept--' + b.department().toLowerCase().replace('_', '-')}"></span>
+        <span class="oc-caption-title" th:text="${b.name()}">Bereich</span>
+    </div>
+    <div class="oc-tree oc-bereich-tier" role="tree"
+         th:classappend="${b.department() != null ? 'oc-dept--' + b.department().toLowerCase().replace('_', '-') : ''}"
+         th:aria-label="#{orgChart.a11y.bereich(${b.name()})}">
+        <div class="oc-col">
+            <!-- Bereichsleiter (hero) or vacant, wrapped so the collapse toggle anchors to the box -->
+            <div class="oc-leader-wrap">
+                <th:block th:if="${b.leadership().lead() != null}">
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${b.leadership().lead()}, 1)}"></th:block>
+                </th:block>
+                <div th:if="${b.leadership().lead() == null}" class="oc-node oc-node--vacant"
+                     role="treeitem" tabindex="-1" aria-level="1"
+                     th:aria-label="#{orgChart.rank.BEREICHSLEITER} + ', ' + #{orgChart.vacant}">
+                    <span class="oc-node-rank" th:text="#{orgChart.rank.BEREICHSLEITER}">Bereichsleiter</span>
+                    <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
+                </div>
+                <!-- Collapse toggle: available to everyone, anchored to the Bereichsleiter box.
+                     aria-expanded reflects the state; the chevron glyph is drawn in CSS. -->
+                <button type="button" class="oc-collapse" data-trigger="oc-collapse"
+                        aria-expanded="true" th:aria-controls="'oc-bbody-' + ${b.orgUnitId()}"
+                        th:aria-label="#{orgChart.bereich.toggle(${b.name()})}">
+                    <span class="oc-collapse-icon" aria-hidden="true"></span>
+                </button>
+            </div>
+            <button th:if="${b.leadership().lead() == null}" type="button" class="oc-add"
+                    sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
+                    data-position-type="BEREICHSLEITER" th:data-org-unit-id="${b.orgUnitId()}"
+                    th:data-rank-label="#{orgChart.rank.BEREICHSLEITER}"
+                    th:text="#{orgChart.add.bereichLead}">Bereichsleiter zuweisen</button>
+
+            <!-- Collapsible body: the Stab + the Bereich's Staffeln/SKs -->
+            <div class="oc-bereich-body" th:id="'oc-bbody-' + ${b.orgUnitId()}">
+                <th:block th:each="n : ${b.leadership().coordinators()}">
+                    <div class="oc-v"></div>
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
+                </th:block>
+                <th:block th:each="n : ${b.leadership().operators()}">
+                    <div class="oc-v"></div>
+                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
+                </th:block>
+                <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                        data-trigger="oc-add" data-position-type="BEREICHSKOORDINATOR"
+                        th:data-org-unit-id="${b.orgUnitId()}"
+                        th:data-rank-label="#{orgChart.rank.BEREICHSKOORDINATOR}"
+                        th:text="#{orgChart.add.bereichCoordinator}">Bereichskoordinator hinzufügen</button>
+                <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                        data-trigger="oc-add" data-position-type="BEREICHSOPERATOR"
+                        th:data-org-unit-id="${b.orgUnitId()}"
+                        th:data-rank-label="#{orgChart.rank.BEREICHSOPERATOR}"
+                        th:text="#{orgChart.add.bereichOperator}">Bereichsoperator hinzufügen</button>
+
+                <!-- Tier 2: this Bereich's Staffeln + Spezialkommandos -->
+                <th:block th:replace="~{fragments/org-chart-node :: ocUnitFan(${b.squadrons()}, ${b.specialCommands()})}"></th:block>
+            </div>
+        </div>
+    </div>
+</th:block>
 
 <!--
   Tier 2 unit fan: the Staffeln + Spezialkommandos that fan out under a leadership spine
@@ -120,16 +198,23 @@
                         </div>
                         <div class="oc-v"></div>
 
-                        <th:block th:if="${cmd.leaderUserId() != null}">
+                        <th:block th:if="${cmd.leaderUserId() != null or cmd.leaderDisplayName() != null}"
+                                  th:with="cmdFreeText=${cmd.leaderUserId() == null},
+                                           cmdNm=${cmd.leaderUserName() != null ? cmd.leaderUserName() : cmd.leaderDisplayName()},
+                                           cmdNoAcc=#{orgChart.noAccount}">
                             <div class="oc-node" role="treeitem" tabindex="-1" aria-level="5"
-                                 th:aria-label="#{orgChart.rank.COMMAND_LEAD} + ', ' + ${cmd.leaderUserName()}">
+                                 th:classappend="${cmdFreeText ? 'oc-node--freetext' : ''}"
+                                 th:aria-label="#{orgChart.rank.COMMAND_LEAD} + ', ' + ${cmdNm} + (${cmdFreeText} ? ' (' + ${cmdNoAcc} + ')' : '')">
                                 <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
-                                <span class="oc-node-name" th:text="${cmd.leaderUserName()}">Name</span>
+                                <span class="oc-node-name" th:text="${cmdNm}">Name</span>
+                                <span class="oc-node-flag" th:if="${cmdFreeText}" th:text="${cmdNoAcc}"
+                                      th:title="#{orgChart.noAccount.hint}">Kein Account</span>
                                 <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
                                     <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                                             th:data-position-id="${cmd.positionId()}"
                                             th:data-version="${cmd.version()}"
                                             th:data-user-id="${cmd.leaderUserId()}"
+                                            th:data-display-name="${cmd.leaderDisplayName()}"
                                             th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
                                             th:title="#{orgChart.reassign}" th:aria-label="#{orgChart.reassign}">
                                         <svg class="krt-icon" aria-hidden="true">
@@ -148,13 +233,15 @@
                                 </div>
                             </div>
                         </th:block>
-                        <div th:if="${cmd.leaderUserId() == null}" class="oc-node oc-node--vacant"
+                        <div th:if="${cmd.leaderUserId() == null and cmd.leaderDisplayName() == null}"
+                             class="oc-node oc-node--vacant"
                              role="treeitem" tabindex="-1" aria-level="5"
                              th:aria-label="#{orgChart.rank.COMMAND_LEAD} + ', ' + #{orgChart.vacant}">
                             <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
                             <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
                         </div>
-                        <button th:if="${cmd.leaderUserId() == null}" type="button" class="oc-add"
+                        <button th:if="${cmd.leaderUserId() == null and cmd.leaderDisplayName() == null}"
+                                type="button" class="oc-add"
                                 sec:authorize="hasRole('ADMIN')" data-trigger="oc-reassign"
                                 th:data-position-id="${cmd.positionId()}"
                                 th:data-version="${cmd.version()}" data-user-id=""

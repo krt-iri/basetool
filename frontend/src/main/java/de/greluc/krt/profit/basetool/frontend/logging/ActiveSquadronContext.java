@@ -23,8 +23,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Thread-local holder for the admin's currently selected squadron, so that the WebClient exchange
- * filter ({@code ActiveSquadronRelayFilter}) can attach the {@code X-Active-Squadron-Id} header
+ * Thread-local holder for the caller's currently selected OrgUnit, so that the WebClient exchange
+ * filter ({@code ActiveSquadronRelayFilter}) can attach the {@code X-Active-Org-Unit-Id} header
  * without re-reading the {@code HttpSession} from a Netty reactor thread that does not have the
  * Tomcat request bound to its {@code RequestContextHolder}.
  *

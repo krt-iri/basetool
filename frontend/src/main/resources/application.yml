@@ -13,6 +13,17 @@ server:
       min-spare: 10
     accept-count: 200
     max-connections: 10000
+    # Tomcat 11.0.8+ lowered the `maxPartCount` connector default from 1000 to 10 as a multipart
+    # DoS hardening. That bites us hard: the frontend's in-place AJAX writes (epic #571) submit
+    # their forms as `multipart/form-data` via `FormData`, so EVERY form field is its own part —
+    # not just file uploads. A refinery order or a job order with several line items already has
+    # well over 10 fields, so on Tomcat 11 the save 500s with `FileCountLimitExceededException`
+    # (whose "attachment" text is a hardcoded Tomcat label, not a real field name). We restore the
+    # pre-11.0.8 default of 1000: generous enough for the largest legitimate editor (a refinery
+    # order with ~30 goods is ~165 parts) while still bounding a malicious flood. The request-size
+    # caps below remain the real volume guard; `GlobalExceptionHandler` turns any residual breach
+    # into a clean 413 instead of a 500 (REQ-FE-009).
+    max-part-count: 1000
   max-http-request-header-size: 65536
   http2:
     enabled: true

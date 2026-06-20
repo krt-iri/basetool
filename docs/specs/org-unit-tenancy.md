@@ -158,16 +158,18 @@ prevents new `@JoinColumn(name = "squadron_id")` (only `User.squadron` +
 
 ### REQ-ORG-007 — Audit MDC field
 
-`CorrelationIdFilter` emits MDC `orgUnitId` on every request (legacy `squadronId` in
-parallel for one release). Logback patterns must include `%X{orgUnitId}`. See
-[`observability.md`](observability.md).
+`CorrelationIdFilter` emits MDC `orgUnitId` on every request. Logback patterns must include
+`%X{orgUnitId}`. See [`observability.md`](observability.md). (The pre-R5.e legacy `squadronId`
+MDC alias was removed in the rename-soak cleanup release.)
 
 ### REQ-ORG-008 — Active-context relay
 
-The frontend sends `X-Active-Org-Unit-Id` (canonical) + legacy `X-Active-Squadron-Id` on
-every outbound call; the backend reads the new name first. Session attribute (Redis-backed)
-is `iridium.activeOrgUnitId` with legacy `iridium.activeSquadronId` mirrored for one release.
-Both aliases drop in the cleanup release.
+The frontend sends `X-Active-Org-Unit-Id` on every outbound call; the backend reads it to scope
+staffel-scoped queries (an admin pin directly, a non-admin pin only when it matches a membership).
+The selection lives in the Redis-backed Spring Session under `iridium.activeOrgUnitId`, set via
+`POST /me/active-org-unit` and read back via `GET /api/v1/me/active-org-unit`. (The pre-R5.e
+`X-Active-Squadron-Id` header, the `iridium.activeSquadronId` session key, and the
+`/active-squadron` endpoints were removed in the rename-soak cleanup release.)
 
 ### REQ-ORG-009 — Ownerless leadership ("Bereichsleitung") missions & operations
 
@@ -301,12 +303,19 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
   the one its level allows; the OL row has a NULL parent.
 - [x] With every `parent_org_unit_id` NULL and no leadership flags set, `OwnerScopeService` scope output
   is byte-identical to pre-change (snapshot test).
+- [x] An ADMIN-only management UI (`/admin/org-structure`) creates Bereiche and the Organisationsleitung
+  and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-hierarchy`
+  API, reading the whole structure — each unit's current parent and optimistic-lock version — from a
+  single `GET /api/v1/org-hierarchy/org-units`. Leadership seating stays on the org chart (REQ-ORG-018).
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
 its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
 `OwnerScopeServiceTest` — the cascade is delegated to `OrgUnitCascadeService` with a no-leadership default
 stub so every pre-#692 scenario stays byte-identical (the degrade-to-flat proof), pinned structurally by
-`ArchitectureTest#cascadeServiceMustNotConsultTheSecurityContext` · **ADR:**
+`ArchitectureTest#cascadeServiceMustNotConsultTheSecurityContext`; the admin management UI by
+`AdminOrgStructurePageControllerMvcTest` (ADMIN gate + AJAX create/set-parent relay) and the
+`org-units` listing by `OrgHierarchyControllerSecurityTest` +
+`OrgHierarchyServiceTest#listAllOrgUnits_delegatesToRepository` · **ADR:**
 [ADR-0025](../adr/0025-org-hierarchy-data-model.md) · **Issues:** #692, #694.
 
 ### REQ-ORG-015 — Cascading oversight without admin rights, via one descent helper
@@ -417,12 +426,21 @@ extended:
 - [ ] Self-service stamping (caller = target user) is byte-identical to today for ordinary members and
   officers; the only widening is the caller ≠ target create-on-behalf paths (book-out/transfer, store).
 - [ ] The ownerless `NULL` path behaves exactly as REQ-ORG-009.
+- [x] The create-form pickers surface the Bereich/OL tiers in the UI: the Mission/Operation/Refinery/
+  Inventory **owning** picker (cascade-scoped via `/api/v1/users/me/pickable-org-units`, Phase 5) and
+  the Job Order **requesting** (Auftraggeber) picker (every active unit via
+  `/api/v1/org-units/active-all-kinds` for an authenticated caller; the anonymous public order form
+  keeps the Staffel/SK-only `/api/v1/org-units/active` catalog). The Job Order **responsible** picker
+  stays profit-eligible Staffel/SK only — Bereiche/OL are never profit-eligible, so they can be the
+  customer but never the processor.
 
 **Enforced by:** `OwnerScopeServiceTest` (the `BereichOlOwnershipStampingTests` nest — Bereich **and OL**
 resolved as owners, create-on-behalf of a descendant **Staffel and SK** via `canEditOrgUnit`, the
 caller ≠ target divergence keyed on the caller's scope, foreign-to-both pick still 400, strict-silo
 read/edit lock); existing picker-resolver + per-aggregate stamping/visibility tests stay green
-(self-service stamping unchanged); visibility-matrix e2e *(planned, Phase 7)* · **ADR:**
+(self-service stamping unchanged); the Job Order requesting-picker surfacing by
+`JobOrderPageControllerMvcTest` (authenticated picker offers Bereich/OL, guest does not, responsible
+excludes them); visibility-matrix e2e (`OrgHierarchyVisibilityMatrixE2eTest`, Phase 7) · **ADR:**
 [ADR-0027](../adr/0027-bereich-ol-aggregate-ownership.md) · **Issues:** #692, #697.
 
 ### REQ-ORG-017 — Membership cardinality & exclusivity rules

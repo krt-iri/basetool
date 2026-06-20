@@ -32671,6 +32671,106 @@
         }
       }
     },
+    "/api/v1/org-hierarchy/org-units" : {
+      "get" : {
+        "tags" : [ "org-hierarchy-controller" ],
+        "summary" : "List all org units",
+        "description" : "Admin-only flat list of every active org unit (all four kinds) with its current parent and optimistic-lock version, for the hierarchy-management surface.",
+        "operationId" : "listOrgUnits",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/OrgUnitNodeDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/org-chart" : {
       "get" : {
         "tags" : [ "org-chart-controller" ],
@@ -35604,102 +35704,6 @@
             }
           }
         }
-      }
-    },
-    "/api/v1/me/active-squadron" : {
-      "get" : {
-        "tags" : [ "me-controller" ],
-        "operationId" : "getActiveSquadron",
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "headers" : {
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            },
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ActiveSquadronResponse"
-                }
-              }
-            }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        },
-        "deprecated" : true
       }
     },
     "/api/v1/me/active-org-unit" : {
@@ -43091,6 +43095,11 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "displayName" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
           }
         },
         "required" : [ "version" ]
@@ -43115,6 +43124,9 @@
             "format" : "uuid"
           },
           "userName" : {
+            "type" : "string"
+          },
+          "displayName" : {
             "type" : "string"
           },
           "name" : {
@@ -45875,6 +45887,11 @@
           "sortIndex" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "displayName" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
           }
         },
         "required" : [ "positionType" ]
@@ -48534,6 +48551,37 @@
           }
         }
       },
+      "OrgUnitNodeDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
+          },
+          "parentOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "department" : {
+            "type" : "string",
+            "enum" : [ "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "AreaLeadershipDto" : {
         "type" : "object",
         "properties" : {
@@ -48619,6 +48667,9 @@
           "leaderUserName" : {
             "type" : "string"
           },
+          "leaderDisplayName" : {
+            "type" : "string"
+          },
           "deputy" : {
             "$ref" : "#/components/schemas/OrgChartNodeDto"
           },
@@ -48696,6 +48747,9 @@
             "format" : "uuid"
           },
           "userName" : {
+            "type" : "string"
+          },
+          "displayName" : {
             "type" : "string"
           },
           "sortIndex" : {
@@ -49330,15 +49384,6 @@
           },
           "canViewJobOrders" : {
             "type" : "boolean"
-          }
-        }
-      },
-      "ActiveSquadronResponse" : {
-        "type" : "object",
-        "properties" : {
-          "squadronId" : {
-            "type" : "string",
-            "format" : "uuid"
           }
         }
       },

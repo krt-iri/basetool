@@ -29,14 +29,14 @@ all credential-only users coexist.
 
 **Acceptance**
 
-- [ ] `app_user.discord_user_id` exists: nullable, `VARCHAR(32)`, with a unique constraint (V171).
+- [ ] `app_user.discord_user_id` exists: nullable, `VARCHAR(32)`, with a unique constraint (V172).
 - [ ] The JPA `User` entity maps it (`@Column(name = "discord_user_id", unique = true)`), and
   `ddl-auto: validate` boots clean against the migration.
 - [ ] Two distinct users cannot hold the same non-null Discord id (DB unique).
 - [](T1.3) On login of a federated Discord identity, the backend persists the `discord_user_id`
   claim onto the user row; a credential login leaves it untouched.
 
-**Enforced by:** `BackendApplicationTests` (schema validate) · _(planned T1.3: link-persistence test)_ · **Code:** `User`, `V171__add_discord_user_id_to_app_user.sql`, _(T1.3) `UserService.syncUser`_ · **Issues:** #721, #724
+**Enforced by:** `BackendApplicationTests` (schema validate) · _(planned T1.3: link-persistence test)_ · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, _(T1.3) `UserService.syncUser`_ · **Issues:** #721, #724
 
 ### REQ-SEC-016 — Fail-closed guild + KRT-Mitglied membership gate
 
@@ -76,7 +76,7 @@ automated mapping.
 - [ ] First admin (Keycloak `ADMIN` realm role) is `ACTIVE` on first login. _(syncUser carve-out; T1.4 e2e.)_
 - [x] Approve ⇒ `ACTIVE` + audit row; reject ⇒ `REJECTED` + reason in the audit.
 - [x] Concurrent approve ⇒ 409 (optimistic `@Version`).
-- [ ] Legacy rows backfilled `ACTIVE` (V172). _(schema-validated on boot; T1.4 e2e.)_
+- [ ] Legacy rows backfilled `ACTIVE` (V173). _(schema-validated on boot; T1.4 e2e.)_
 
 **Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService`, `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route) · **Issues:** #724
 
@@ -89,11 +89,11 @@ or PII in the payload), via the existing data-driven notification rule engine (a
 **Acceptance**
 
 - [x] A new PENDING registration publishes a `DISCORD_REGISTRATION_PENDING` after-commit event whose
-  default rule (V173) resolves to every admin via a `ROLE` selector.
+  default rule (V174) resolves to every admin via a `ROLE` selector.
 - [x] No Discord id / token / e-mail rides the event (it carries only the user id + username).
 - [ ] Exactly one notification per admin, end to end. _(notification engine; T1.4 e2e.)_
 
-**Enforced by:** `DiscordRegistrationPendingEvent` (no PII by construction) + `V173` seed; the rule-engine fan-out is covered by the epic-#622 tests · **Code:** `UserService.syncUser`, `DiscordRegistrationPendingEvent`, `V173` · **Issues:** #724
+**Enforced by:** `DiscordRegistrationPendingEvent` (no PII by construction) + `V174` seed; the rule-engine fan-out is covered by the epic-#622 tests · **Code:** `UserService.syncUser`, `DiscordRegistrationPendingEvent`, `V174` · **Issues:** #724
 
 ## Out of scope
 
