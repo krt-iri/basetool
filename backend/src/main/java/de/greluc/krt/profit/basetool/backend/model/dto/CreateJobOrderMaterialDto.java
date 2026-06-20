@@ -39,13 +39,13 @@ import java.util.UUID;
 public record CreateJobOrderMaterialDto(
     @NotNull UUID materialId,
     @org.jetbrains.annotations.Nullable
-        @Min(700)
-        @Max(700)
+        @Min(650)
+        @Max(650)
         @Schema(
             description =
-                "Minimale Qualität: 700 (vorgegeben) oder null für \"Keine\" (keine"
+                "Minimale Qualität: 650 (vorgegeben) oder null für \"Keine\" (keine"
                     + " Mindestqualität).",
-            example = "700")
+            example = "650")
         Integer minQuality,
     // @Max caps the per-material amount at 100 000 units so an anonymous caller cannot push a
     // 1e308 value through the public create-order endpoint (audit finding H-2: ledger pollution

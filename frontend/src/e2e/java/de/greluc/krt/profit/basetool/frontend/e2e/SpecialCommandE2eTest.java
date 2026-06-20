@@ -206,7 +206,7 @@ class SpecialCommandE2eTest {
                 IRIDIUM_ID,
                 "E2E SK Order",
                 materialId,
-                700,
+                650,
                 50);
     assertEquals(
         400,

@@ -31,7 +31,7 @@ import java.util.UUID;
  * @param material the required material, with its {@code quantityType} for unit-aware formatting
  * @param requiredQuantity the amount needed for the owning line (already scaled by the line's
  *     quantity)
- * @param qualityRequirement {@code GOOD} (700+) or {@code NONE} (no floor)
+ * @param qualityRequirement {@code GOOD} (650+) or {@code NONE} (no floor)
  * @param version optimistic-lock version
  */
 public record JobOrderItemMaterialDto(

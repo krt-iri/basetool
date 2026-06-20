@@ -32,7 +32,7 @@ import java.util.List;
  * @param qualityRequirement the quality bucket this row sums ({@code GOOD} or {@code NONE})
  * @param totalQuantity the summed required quantity across all item lines for this material+quality
  * @param currentStock the total stock of inventory linked to this order for this material at or
- *     above the bucket's quality floor ({@code GOOD} → 700, {@code NONE} → no floor); drives the
+ *     above the bucket's quality floor ({@code GOOD} → 650, {@code NONE} → no floor); drives the
  *     collection-progress shown in the order-overview list, mirroring the MATERIAL requirement
  *     rows. {@code 0.0} when nothing is linked; {@code null} only on the neutral rows emitted by
  *     {@code JobOrderItemService.aggregateMaterials} before {@code JobOrderService} enriches them

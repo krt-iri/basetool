@@ -76,7 +76,7 @@ class JobOrderItemServiceTest {
     Material steel = material("Steel", QuantityType.SCU);
     Material screws = material("Screws", QuantityType.PIECE);
     Blueprint blueprint = blueprint(weapon);
-    blueprint.addIngredient(resource(steel, 2.5, 700)); // default GOOD (minQuality 700)
+    blueprint.addIngredient(resource(steel, 2.5, 650)); // default GOOD (minQuality 650)
     blueprint.addIngredient(resource(screws, 4.0, null)); // default NONE
     blueprint.addIngredient(itemIngredient(gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT), 1));
     blueprint.addIngredient(unresolvedResource(9.0)); // material == null, must be skipped
@@ -214,7 +214,7 @@ class JobOrderItemServiceTest {
     stubMapper(steel);
     GameItem scope = gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT);
     Blueprint blueprint = blueprint(weapon);
-    blueprint.addIngredient(resource(steel, 2.0, 700));
+    blueprint.addIngredient(resource(steel, 2.0, 650));
     blueprint.addIngredient(itemIngredient(scope, 2));
     blueprint.addIngredient(unresolvedResource(5.0));
 

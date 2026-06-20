@@ -173,7 +173,7 @@
                         <div class="form-group flex-1 mb-0">
                             <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
                             <select th:field="*{materials[__${stat.index}__].minQuality}" th:title="#{orders.create.minQuality.hint}">
-                                <option th:value="700" th:text="700">700</option>
+                                <option th:value="650" th:text="650">650</option>
                                 <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
                             </select>
                         </div>
@@ -239,9 +239,9 @@
         <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
     </select>
 
-    <!-- Template for new min-quality options (700 / Keine), cloned by addMaterialRow() -->
+    <!-- Template for new min-quality options (650 / Keine), cloned by addMaterialRow() -->
     <select id="minquality-options-template" style="display: none;">
-        <option value="700">700</option>
+        <option value="650">650</option>
         <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
     </select>
 
@@ -437,7 +437,7 @@
         amount: /*[[#{orders.create.item.amount}]]*/ 'Anzahl',
         remove: /*[[#{orders.create.item.remove}]]*/ 'Entfernen',
         materialsTitle: /*[[#{orders.create.item.materials.title}]]*/ 'Materialien',
-        qualityGood: /*[[#{orders.create.item.quality.good}]]*/ 'Gut (700+)',
+        qualityGood: /*[[#{orders.create.item.quality.good}]]*/ 'Gut (650+)',
         qualityNone: /*[[#{orders.create.item.quality.none}]]*/ 'Keine',
         subTitle: /*[[#{orders.create.item.subassembly.title}]]*/ 'Unterbaugruppen',
         subAdopt: /*[[#{orders.create.item.subassembly.adopt}]]*/ 'Uebernehmen',

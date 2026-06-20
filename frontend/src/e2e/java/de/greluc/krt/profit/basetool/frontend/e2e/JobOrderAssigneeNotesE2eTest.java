@@ -89,7 +89,7 @@ class JobOrderAssigneeNotesE2eTest {
           seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Assignee Material");
       jobOrderId =
           seeder.createJobOrder(
-              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Assignee Order", materialId, 700, 100.0);
+              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Assignee Order", materialId, 650, 100.0);
       currentUserId = seeder.getUserId(USERNAME, PASSWORD);
     }
   }

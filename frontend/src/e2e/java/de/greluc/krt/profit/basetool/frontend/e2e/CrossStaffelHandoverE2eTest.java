@@ -94,7 +94,7 @@ class CrossStaffelHandoverE2eTest {
       String bLocationId = seeder.createLocation(ADMIN_USER, ADMIN_PASSWORD, "E2E HO X-Loc");
       jobOrderId =
           seeder.createJobOrder(
-              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E HO X-Order", materialId, 700, 80);
+              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E HO X-Order", materialId, 650, 80);
       bInventoryItemId =
           seeder.createInventoryItemForJobOrder(
               MEMBER_USER, MEMBER_PASSWORD, materialId, bLocationId, jobOrderId, 750, 60);

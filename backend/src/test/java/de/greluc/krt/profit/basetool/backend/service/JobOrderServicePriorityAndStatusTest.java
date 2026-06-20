@@ -411,7 +411,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null, null, "OP-1", null, List.of(new CreateJobOrderMaterialDto(yId, 700, 5.0)), 1L);
+              null, null, "OP-1", null, List.of(new CreateJobOrderMaterialDto(yId, 650, 5.0)), 1L);
 
       service.updateJobOrder(ORDER_ID, dto);
 
@@ -431,7 +431,7 @@ class JobOrderServicePriorityAndStatusTest {
               null,
               "OP-1",
               null,
-              List.of(new CreateJobOrderMaterialDto(missingMat, 700, 5.0)),
+              List.of(new CreateJobOrderMaterialDto(missingMat, 650, 5.0)),
               1L);
 
       assertThrows(NotFoundException.class, () -> service.updateJobOrder(ORDER_ID, dto));

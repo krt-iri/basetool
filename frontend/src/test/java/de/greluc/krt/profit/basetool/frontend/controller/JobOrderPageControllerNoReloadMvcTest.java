@@ -261,7 +261,7 @@ class JobOrderPageControllerNoReloadMvcTest {
         + UUID.randomUUID()
         + "\",\"handle\":\"h\",\"comment\":\"c\",\"version\":1,\"materials\":[{\"materialId\":\""
         + materialId
-        + "\",\"minQuality\":700,\"amount\":5.0}]}";
+        + "\",\"minQuality\":650,\"amount\":5.0}]}";
   }
 
   @Test

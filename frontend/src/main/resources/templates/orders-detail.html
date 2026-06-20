@@ -297,7 +297,7 @@
                 style="cursor: pointer;">
                 <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
                 <td>
-                    <span th:if="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-good" th:text="#{orders.detail.quality.good}">Gut (700+)</span>
+                    <span th:if="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-good" th:text="#{orders.detail.quality.good}">Gut (650+)</span>
                     <span th:unless="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-none" th:text="#{orders.detail.quality.none}">Keine</span>
                 </td>
                 <td th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
@@ -698,7 +698,7 @@
                     <div>
                         <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
                         <select th:field="*{materials[__${stat.index}__].minQuality}" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
-                            <option th:value="700" th:text="700">700</option>
+                            <option th:value="650" th:text="650">650</option>
                             <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
                         </select>
                     </div>
@@ -1290,9 +1290,9 @@
                             if (selectId) {
                                 select.setAttribute('id', selectId.replace(/\d+/, nextIndex));
                             }
-                            // minQuality is a 700/Keine select; default a fresh row to 700. The
+                            // minQuality is a 650/Keine select; default a fresh row to 650. The
                             // material select resets to the empty "please choose" option.
-                            select.value = name.includes('minQuality') ? '700' : '';
+                            select.value = name.includes('minQuality') ? '650' : '';
                         }
                     });
 

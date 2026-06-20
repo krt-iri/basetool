@@ -1033,7 +1033,7 @@ public final class BackendSeeder {
   /**
    * Creates a Job Order via {@code POST /api/v1/orders} with a single material line and returns its
    * id, so the handover flow has an order to record a handover against. The material line's {@code
-   * minQuality} must be at least 700 ({@code CreateJobOrderMaterialDto} constraint).
+   * minQuality} must be at least 650 ({@code CreateJobOrderMaterialDto} constraint).
    *
    * <p>The given org unit is named as BOTH the responsible (processing) and the requesting
    * (customer) unit — these flows model a squadron that owns and fulfils its own order. The backend
@@ -1048,7 +1048,7 @@ public final class BackendSeeder {
    *     (customer) unit of the order; must be a profit-eligible squadron (see bootstrap seeding)
    * @param handle the free-text contact handle of the order
    * @param materialId the id of the (job-order) material to request
-   * @param minQuality the minimum acceptable quality of the requested material ({@code >= 700})
+   * @param minQuality the minimum acceptable quality of the requested material ({@code >= 650})
    * @param amount the requested amount of the material
    * @return the created job order's id
    */
@@ -1223,7 +1223,7 @@ public final class BackendSeeder {
    * @param requestingOrgUnitId the requesting (customer) OrgUnit id
    * @param handle the order contact handle
    * @param materialId the requested material id
-   * @param minQuality the minimum quality ({@code >= 700})
+   * @param minQuality the minimum quality ({@code >= 650})
    * @param amount the requested amount
    * @return the HTTP status code of the create attempt
    */
@@ -1883,7 +1883,7 @@ public final class BackendSeeder {
    * @param requestingOrgUnitId the requesting (customer) OrgUnit id (mandatory)
    * @param handle the order contact handle
    * @param materialId the requested material id
-   * @param minQuality the minimum quality ({@code >= 700})
+   * @param minQuality the minimum quality ({@code >= 650})
    * @param amount the requested amount
    * @return the created order as a {@link JsonObject} (guest-redacted but org-unit-bearing)
    */

@@ -88,7 +88,7 @@ class JobOrderInventoryUnlinkInPlaceE2eTest {
       String locationId = seeder.createLocation(USERNAME, PASSWORD, "E2E Unlink Location");
       jobOrderId =
           seeder.createJobOrder(
-              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Unlink Order", materialId, 700, 200.0);
+              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Unlink Order", materialId, 650, 200.0);
       inventoryItemId =
           seeder.createInventoryItemForJobOrder(
               USERNAME, PASSWORD, materialId, locationId, jobOrderId, 750, 100.0);

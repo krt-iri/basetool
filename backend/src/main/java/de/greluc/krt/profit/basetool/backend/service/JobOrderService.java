@@ -91,11 +91,11 @@ public class JobOrderService {
   private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
 
   /**
-   * Inventory quality floor a {@code GOOD} aggregated bucket sums stock at or above (700+ =
+   * Inventory quality floor a {@code GOOD} aggregated bucket sums stock at or above (650+ =
    * refining-grade); a {@code NONE} bucket imposes no floor. Mirrors the MATERIAL requirement's
    * stored {@code minQuality} so item-order collection progress is computed the same way.
    */
-  private static final int GOOD_QUALITY_FLOOR = 700;
+  private static final int GOOD_QUALITY_FLOOR = 650;
 
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
@@ -117,7 +117,7 @@ public class JobOrderService {
   /**
    * Persists a new job order from the create DTO. The next available priority slot is taken
    * automatically (priority 1 is highest); each material's minimum quality is taken verbatim from
-   * the DTO (700 or null = Keine).
+   * the DTO (650 or null = Keine).
    *
    * @param createDto create payload
    * @return the persisted order
@@ -991,7 +991,7 @@ public class JobOrderService {
                       stock,
                       matDto.amount(),
                       matDto.minQuality());
-                  // MATERIAL bucket quality mirrors aggregateMaterials(): a 700-floor is GOOD,
+                  // MATERIAL bucket quality mirrors aggregateMaterials(): a 650-floor is GOOD,
                   // "Keine" (null minQuality) is NONE.
                   String qualityName =
                       matDto.minQuality() != null
