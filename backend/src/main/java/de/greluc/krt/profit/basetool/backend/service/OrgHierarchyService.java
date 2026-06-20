@@ -84,6 +84,17 @@ public class OrgHierarchyService {
   }
 
   /**
+   * Lists every active org unit across all four kinds (Staffel, SK, Bereich, OL) for the admin
+   * hierarchy-management surface, parent eagerly loaded so each row exposes its current parent edge
+   * and optimistic-lock version in one read.
+   *
+   * @return the active org units (parent pre-loaded) in arbitrary order; never {@code null}.
+   */
+  public List<OrgUnit> listAllOrgUnits() {
+    return orgUnitRepository.findAllActiveWithParent();
+  }
+
+  /**
    * Creates a Bereich, optionally already wired under the Organisationsleitung. The same-kind
    * case-insensitive name check surfaces a clean 409 before the global {@code org_unit.name} UNIQUE
    * constraint trips (a cross-kind collision is caught at flush time as a 409 like the SK path).

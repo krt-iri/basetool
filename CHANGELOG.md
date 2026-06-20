@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Administratoren können die Organisationsstruktur jetzt direkt in der App pflegen.** Unter Administration → Organisationsstruktur lassen sich Bereiche und die Organisationsleitung anlegen und Staffeln/Spezialkommandos einem Bereich bzw. Bereiche der Organisationsleitung zuordnen — bisher war das nur über die API möglich. Die Besetzung der Leitungspositionen bleibt im Organigramm.
+
 ## [v0.6.0](https://github.com/krt-profit/basetool/releases/tag/v0.6.0) - 2026-06-20
 
 ### Added

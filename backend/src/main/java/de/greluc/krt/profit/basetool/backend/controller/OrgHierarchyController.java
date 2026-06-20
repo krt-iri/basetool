@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddBereichLeaderRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddOlMemberRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgHierarchyService;
@@ -138,6 +139,24 @@ public class OrgHierarchyController {
     return toDto(
         orgHierarchyService.createOrganisationsleitung(
             dto.name(), dto.shorthand(), dto.description()));
+  }
+
+  /**
+   * Lists every active org unit across all four kinds for the admin hierarchy-management surface,
+   * each carrying its current parent edge (id + resolved name) and optimistic-lock version so the
+   * management table can render the structure and PATCH new parent edges from a single read.
+   *
+   * @return the org-unit node DTOs.
+   */
+  @GetMapping("/org-units")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "List all org units",
+      description =
+          "Admin-only flat list of every active org unit (all four kinds) with its current parent"
+              + " and optimistic-lock version, for the hierarchy-management surface.")
+  public List<OrgUnitNodeDto> listOrgUnits() {
+    return orgHierarchyService.listAllOrgUnits().stream().map(this::toNodeDto).toList();
   }
 
   /**
@@ -258,6 +277,26 @@ public class OrgHierarchyController {
   private OlMemberResponse toOlMember(@NotNull OrgUnitMembership m) {
     return new OlMemberResponse(
         m.getId().getOrgUnitId(), m.getId().getUserId(), m.isOlMember(), m.getVersion());
+  }
+
+  /**
+   * Maps an {@link OrgUnit} (any kind) to its flat hierarchy-node DTO for the management table. The
+   * parent edge (id + name) is read within the controller's transaction; {@code department} is read
+   * only for a {@link Bereich}, {@code null} for every other kind.
+   *
+   * @param u the entity; never {@code null}.
+   * @return the node DTO.
+   */
+  private OrgUnitNodeDto toNodeDto(@NotNull OrgUnit u) {
+    return new OrgUnitNodeDto(
+        u.getId(),
+        u.getName(),
+        u.getShorthand(),
+        u.getKind(),
+        u.getParent() == null ? null : u.getParent().getId(),
+        u.getParent() == null ? null : u.getParent().getName(),
+        u instanceof Bereich b ? b.getDepartment() : null,
+        u.getVersion());
   }
 
   /**

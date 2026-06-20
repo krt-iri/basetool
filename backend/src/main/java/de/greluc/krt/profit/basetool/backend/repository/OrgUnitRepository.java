@@ -134,4 +134,19 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    */
   @Query("SELECT o FROM Organisationsleitung o WHERE o.active = true")
   List<OrgUnit> findActiveOrganisationsleitung();
+
+  /**
+   * Loads every active org unit across all four kinds (Squadron, SK, Bereich, OL) with its parent
+   * eagerly fetched, for the admin hierarchy-management surface (epic #692, REQ-ORG-014). Backs the
+   * one read the management page needs: each row carries its current {@code parent_org_unit_id} (to
+   * show where it sits) and its optimistic-lock {@code version} (to PATCH a new parent edge), so
+   * the whole table — and the per-kind parent-option pools — comes from a single call. The {@code
+   * LEFT JOIN FETCH o.parent} avoids the per-row N+1 that mapping the parent id/name would
+   * otherwise trigger.
+   *
+   * @return the active org units (parent pre-loaded) in arbitrary order; never {@code null},
+   *     possibly empty.
+   */
+  @Query("SELECT o FROM OrgUnit o LEFT JOIN FETCH o.parent WHERE o.active = true")
+  List<OrgUnit> findAllActiveWithParent();
 }

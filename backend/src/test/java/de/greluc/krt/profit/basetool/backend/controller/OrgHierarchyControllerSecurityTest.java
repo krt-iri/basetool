@@ -91,6 +91,16 @@ class OrgHierarchyControllerSecurityTest {
   }
 
   @Test
+  void listOrgUnits_allowedForAdmin() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/org-hierarchy/org-units")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void createBereich_forbiddenForOfficer() throws Exception {
     mockMvc
         .perform(
@@ -112,6 +122,10 @@ class OrgHierarchyControllerSecurityTest {
   static Stream<Arguments> adminOnlyEndpoints() {
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
     return Stream.of(
+        arguments(
+            Named.of(
+                "listOrgUnits",
+                get("/api/v1/org-hierarchy/org-units").accept(MediaType.APPLICATION_JSON))),
         arguments(
             Named.of(
                 "listOrganisationsleitung",

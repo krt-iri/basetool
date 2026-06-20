@@ -62,6 +62,21 @@ class OrgHierarchyServiceTest {
 
   @InjectMocks private OrgHierarchyService service;
 
+  // --- listAllOrgUnits ------------------------------------------------------
+
+  @Test
+  void listAllOrgUnits_delegatesToRepository() {
+    Squadron staffel = new Squadron();
+    staffel.setId(UUID.randomUUID());
+    when(orgUnitRepository.findAllActiveWithParent()).thenReturn(List.of(staffel));
+
+    List<OrgUnit> result = service.listAllOrgUnits();
+
+    assertEquals(1, result.size());
+    assertSame(staffel, result.get(0));
+    verify(orgUnitRepository).findAllActiveWithParent();
+  }
+
   // --- createBereich --------------------------------------------------------
 
   @Test
