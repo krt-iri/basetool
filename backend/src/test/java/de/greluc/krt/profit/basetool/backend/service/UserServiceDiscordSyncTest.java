@@ -85,7 +85,6 @@ class UserServiceDiscordSyncTest {
   @Test
   void newDiscordNonAdmin_landsPending_andNotifiesAdmins() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-    when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
     when(roleRepository.findByNameIgnoreCase("Guest"))
         .thenReturn(Optional.of(role("GUEST", "Guest")));
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -100,7 +99,6 @@ class UserServiceDiscordSyncTest {
   @Test
   void newDiscordAdmin_landsActive_noNotification() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-    when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
     when(roleRepository.findByNameIgnoreCase("Admin"))
         .thenReturn(Optional.of(role("ADMIN", "Admin")));
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -109,6 +107,32 @@ class UserServiceDiscordSyncTest {
 
     assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
     verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  /**
+   * Security hardening (PR #740 review): a new Discord login MUST NOT be matched onto a
+   * pre-existing row by {@code preferred_username}. The brokered Discord username is
+   * attacker-influenced, so the legacy username fallback is suppressed for a Discord login —
+   * otherwise a verified guild member could link their Discord identity to someone else's (possibly
+   * privileged, already-ACTIVE) account and bypass the PENDING gate. The Discord identity is a
+   * brand-new PENDING registration keyed by its own subject, and {@code findByUsername} is never
+   * consulted.
+   */
+  @Test
+  void newDiscordLogin_ignoresMatchingCredentialUsername_landsPending() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+    when(roleRepository.findByNameIgnoreCase("Guest"))
+        .thenReturn(Optional.of(role("GUEST", "Guest")));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    User result = userService.syncUser(jwt(true, List.of()));
+
+    assertEquals(USER_ID, result.getId());
+    assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
+    assertEquals(DISCORD_ID, result.getDiscordUserId());
+    // The core guarantee: a Discord login is recognised only by subject, never by username.
+    verify(userRepository, never()).findByUsername(any());
+    verify(eventPublisher).publishEvent(any(DiscordRegistrationPendingEvent.class));
   }
 
   @Test

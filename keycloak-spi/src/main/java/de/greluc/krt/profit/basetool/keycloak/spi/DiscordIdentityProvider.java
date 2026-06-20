@@ -130,6 +130,7 @@ public class DiscordIdentityProvider
    * @param profile the parsed {@code /users/@me} response
    * @return the brokered identity keyed by the Discord user id (snowflake)
    */
+  @Override
   protected BrokeredIdentityContext extractIdentityFromProfile(
       EventBuilder event, JsonNode profile) {
     String id = getJsonProperty(profile, "id");

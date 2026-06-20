@@ -35,8 +35,13 @@ all credential-only users coexist.
 - [ ] Two distinct users cannot hold the same non-null Discord id (DB unique).
 - [](T1.3) On login of a federated Discord identity, the backend persists the `discord_user_id`
   claim onto the user row; a credential login leaves it untouched.
+- [x] A Discord login is recognised **only** by the Keycloak subject / `discord_user_id`, never by
+  `preferred_username`. The legacy username fallback (kept for pre-UUID credential rows) is suppressed
+  for a Discord login, so a fresh Discord identity is never silently matched onto a pre-existing row —
+  no account-link or privilege inheritance, and the PENDING gate (REQ-SEC-017) can never be bypassed
+  that way. Track 1 does no auto-linking of an existing account to a Discord identity (open decision #2).
 
-**Enforced by:** `BackendApplicationTests` (schema validate) · _(planned T1.3: link-persistence test)_ · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, _(T1.3) `UserService.syncUser`_ · **Issues:** #721, #724
+**Enforced by:** `BackendApplicationTests` (schema validate) · `UserServiceDiscordSyncTest` (subject-only recognition: a Discord login never consults `findByUsername`) · _(planned T1.3: link-persistence test)_ · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserService.syncUser` · **Issues:** #721, #724
 
 ### REQ-SEC-016 — Fail-closed guild + KRT-Mitglied membership gate
 

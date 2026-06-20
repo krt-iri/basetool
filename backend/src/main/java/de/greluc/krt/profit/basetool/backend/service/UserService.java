@@ -198,8 +198,21 @@ public class UserService {
     final UUID finalUserId = getUserIdFromJwt(jwt);
     String username = jwt.getClaimAsString("preferred_username");
 
+    // A Discord federated login is recognised ONLY by the Keycloak subject / discord_user_id link,
+    // never by username. Reading the claim up-front lets us suppress the legacy preferred_username
+    // fallback below for a Discord login (REQ-SEC-017 / REQ-DATA-006 hardening): the brokered
+    // Discord
+    // username is attacker-influenced, so matching a fresh Discord identity onto a pre-existing
+    // (possibly privileged, already-ACTIVE) row by username would both bypass the PENDING approval
+    // gate and silently link the attacker's Discord account to someone else's user. Track 1 does no
+    // auto-linking of an existing account to a Discord identity (spec open decision #2), so a
+    // Discord
+    // login that finds no row by subject is always treated as a brand-new registration.
+    final String discordUserId = jwt.getClaimAsString("discord_user_id");
+    final boolean viaDiscord = discordUserId != null && !discordUserId.isBlank();
+
     Optional<User> existingUser = userRepository.findById(finalUserId);
-    if (existingUser.isEmpty() && username != null) {
+    if (existingUser.isEmpty() && username != null && !viaDiscord) {
       existingUser = userRepository.findByUsername(username);
       if (existingUser.isPresent()) {
         // REQ-OBS-004: never log names/handles. preferred_username can be a real callsign that the
@@ -251,8 +264,7 @@ public class UserService {
     }
 
     // Persist the Discord account link (auto-link, REQ-DATA-006) from the IdP-mapped token claim.
-    String discordUserId = jwt.getClaimAsString("discord_user_id");
-    boolean viaDiscord = discordUserId != null && !discordUserId.isBlank();
+    // discordUserId / viaDiscord were resolved up-front (see the subject-only lookup above).
     if (viaDiscord && !Objects.equals(user.getDiscordUserId(), discordUserId)) {
       user.setDiscordUserId(discordUserId);
       changed = true;
