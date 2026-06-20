@@ -4,7 +4,7 @@
 > **Scope:** Discord **login** with a fail-closed Kartell-membership gate. **OAuth only — no bot.**
 > The Discord **bot** (and the automated role-sync) belong to Track 2 and are set up separately later.
 > Spec: [`docs/specs/discord-integration.md`](../specs/discord-integration.md) · decision:
-> [ADR-0029](../adr/0029-discord-federation-first-login-membership-gate.md).
+> [ADR-0030](../adr/0030-discord-federation-first-login-membership-gate.md).
 
 This is an **operator** procedure: it provisions secrets and live Keycloak config that are **never**
 committed. The redacted shape of the Keycloak side is in

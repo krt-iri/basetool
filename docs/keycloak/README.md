@@ -36,7 +36,7 @@ on for ROPC test logins). Do not cross-contaminate the two.
   authentication flows — omitted as noise.
 - **Discord IdP client id/secret** → `__SET_AT_DEPLOY__`. The `discord` identity provider and the
   `discord_user_id` attribute/protocol mappers **are** captured here (they are app-relevant, see
-  ADR-0029), but the membership gate's guild id + KRT-Mitglied role id live on the custom
+  ADR-0030), but the membership gate's guild id + KRT-Mitglied role id live on the custom
   first-broker-login flow's authenticator config — and flows stay omitted, so those are documented in
   [`DISCORD_KEYCLOAK_SETUP.md`](DISCORD_KEYCLOAK_SETUP.md) only, never here.
 

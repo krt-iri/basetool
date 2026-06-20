@@ -1,4 +1,4 @@
-# ADR-0029 — Discord federation via an owned Keycloak SPI with a fail-closed first-login membership gate
+# ADR-0030 — Discord federation via an owned Keycloak SPI with a fail-closed first-login membership gate
 
 - **Status:** Accepted — Track 1 implemented (operator Discord + Keycloak setup pending)
 - **Date:** 2026-06-20
@@ -83,7 +83,7 @@ approval gate are independent layers — the first proves *Kartell membership*, 
 - **Use a bot to check membership at login** — rejected for Track 1: the user's own
   `guilds.members.read` token proves their membership without any bot, keeping the bot (and its
   privileged intent) entirely off the login critical path. The bot is introduced only for the
-  automated role-sync in Track 2 (ADR-0030, planned).
+  automated role-sync in Track 2 (ADR-0031, planned).
 - **Map Discord roles to app roles/units at login** — deferred to Track 2: Track 1 deliberately
   keeps Basetool roles manual so login (the membership guarantee) ships first and the role-sync
   machinery is not on its critical path.

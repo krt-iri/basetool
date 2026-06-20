@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-20.
-> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0029 (federation + first-login gate); ADR-0030 (role/unit sync, planned — Track 2)
+> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0031 (role/unit sync, planned — Track 2)
 
 # Discord integration — login, membership gate & admin approval
 
@@ -14,7 +14,7 @@ the existing tooling — the automated Discord-role → app-role/unit **sync is 
 (Track 2) and is out of scope here.
 
 This is epic **#720, Track 1** (issues #721–#725). The federation and the gate are implemented in an
-owned Keycloak provider module (`keycloak-spi/`), per [ADR-0029](../adr/0029-discord-federation-first-login-membership-gate.md).
+owned Keycloak provider module (`keycloak-spi/`), per [ADR-0030](../adr/0030-discord-federation-first-login-membership-gate.md).
 
 ## Requirements
 
@@ -98,7 +98,7 @@ or PII in the payload), via the existing data-driven notification rule engine (a
 ## Out of scope
 
 - **Automated Discord-role → app-role/org-unit sync** and the Discord **bot** — Track 2 (#726–#730),
-  ADR-0030 (planned). Track 1 keeps Basetool roles manual.
+  ADR-0031 (planned). Track 1 keeps Basetool roles manual.
 - **Continuous membership enforcement.** The guild + KRT-Mitglied gate (REQ-SEC-016) runs **once**,
   at first-broker-login when the Discord identity is first linked. A member later removed from the
   guild or stripped of `KRT-Mitglied` keeps Basetool access until the Track 2 role-sync revokes it —
