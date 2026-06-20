@@ -96,6 +96,11 @@ Realm `iri` → **Clients → `basetool-frontend` → Client scopes →
 
 The backend reads this `discord_user_id` claim and persists it on `app_user` (REQ-DATA-006).
 
+> **Required for the approval gate.** The PENDING admin-approval flow (REQ-SEC-017) keys off this
+> `discord_user_id` claim to recognise a Discord federated login. If mappers 3a/3b are missing, a
+> Discord user still passes the membership gate (step 4) but is created `ACTIVE` and skips admin
+> approval — so do not skip 3a/3b.
+
 ---
 
 ## 4. Bind the fail-closed membership gate (the safety property)

@@ -1,6 +1,6 @@
 # ADR-0029 — Discord federation via an owned Keycloak SPI with a fail-closed first-login membership gate
 
-- **Status:** Accepted — implementation pending (epic #720, Track 1)
+- **Status:** Accepted — Track 1 implemented (operator Discord + Keycloak setup pending)
 - **Date:** 2026-06-20
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-SEC-016 · REQ-DATA-006 · REQ-SEC-017 · REQ-NOTIF-012 · issue #720 · #721 · #723 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
