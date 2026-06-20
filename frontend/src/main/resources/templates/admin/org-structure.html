@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.orgStructure.title} + ' - ' + ${appTitle}">Org structure - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <style th:attr="nonce=${cspNonce}">
+            .form-group label {
+                display: block;
+                margin-bottom: 0.4rem;
+                font-family: var(--font-body);
+                font-size: 0.8rem;
+            }
+            .form-group input[type='text'], .form-group select, .form-group textarea {
+                width: 100%;
+                padding: 0.5rem;
+                background-color: var(--color-gray-4);
+                border: 1px solid var(--color-gray-3);
+                color: var(--color-gray-1);
+                box-sizing: border-box;
+            }
+            .form-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 1rem;
+            }
+            .os-parent-select {
+                max-width: 16rem;
+            }
+        </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <span id="os-i18n" hidden
+          th:attr="data-saved=#{admin.orgStructure.success.saved},data-error=#{admin.orgStructure.error.action}"></span>
+
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.orgStructure.title}">Organisationsstruktur</h1>
+        <p th:text="#{admin.orgStructure.subtitle}">Bereiche und Organisationsleitung anlegen und Einheiten einordnen.</p>
+        <p class="mt-1">
+            <a th:href="@{/org-chart}" th:text="#{admin.orgStructure.toChart}">Zum Organigramm</a>
+        </p>
+    </div>
+
+    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
+        <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <!-- ===== Create the Organisationsleitung (only when none exists yet) ===== -->
+    <div class="hud-box mt-2">
+        <h2 th:text="#{admin.orgStructure.ol.create}">Organisationsleitung anlegen</h2>
+        <p th:if="${hasOl}" class="text-muted" th:text="#{admin.orgStructure.ol.exists}">Die Organisationsleitung besteht bereits.</p>
+        <form id="ol-form" th:unless="${hasOl}">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="ol-name" th:text="#{admin.orgStructure.field.name}">Name</label>
+                    <input type="text" id="ol-name" name="name" maxlength="255" required>
+                </div>
+                <div class="form-group">
+                    <label for="ol-shorthand" th:text="#{admin.orgStructure.field.shorthand}">Kürzel</label>
+                    <input type="text" id="ol-shorthand" name="shorthand" maxlength="255" required>
+                </div>
+                <div class="form-group">
+                    <label for="ol-description" th:text="#{admin.orgStructure.field.description}">Beschreibung</label>
+                    <input type="text" id="ol-description" name="description" maxlength="255">
+                </div>
+            </div>
+            <div class="mt-2">
+                <button type="submit" class="btn btn--cta" th:text="#{admin.orgStructure.ol.createButton}">Organisationsleitung anlegen</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ===== Create a Bereich ===== -->
+    <div class="hud-box mt-2">
+        <h2 th:text="#{admin.orgStructure.bereich.create}">Bereich anlegen</h2>
+        <form id="bereich-form">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="bereich-name" th:text="#{admin.orgStructure.field.name}">Name</label>
+                    <input type="text" id="bereich-name" name="name" maxlength="255" required>
+                </div>
+                <div class="form-group">
+                    <label for="bereich-shorthand" th:text="#{admin.orgStructure.field.shorthand}">Kürzel</label>
+                    <input type="text" id="bereich-shorthand" name="shorthand" maxlength="255" required>
+                </div>
+                <div class="form-group">
+                    <label for="bereich-description" th:text="#{admin.orgStructure.field.description}">Beschreibung</label>
+                    <input type="text" id="bereich-description" name="description" maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label for="bereich-department" th:text="#{admin.orgStructure.field.department}">Bereichsfarbe</label>
+                    <select id="bereich-department" name="department">
+                        <option value="" th:text="#{admin.orgStructure.department.none}">— keine —</option>
+                        <option th:each="dept : ${departments}" th:value="${dept}"
+                                th:text="#{'department.' + ${dept}}">Profit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="bereich-parent" th:text="#{admin.orgStructure.field.parentOl}">Organisationsleitung</label>
+                    <select id="bereich-parent" name="parentOrgUnitId">
+                        <option value="" th:text="#{admin.orgStructure.noParent}">— keine —</option>
+                        <option th:each="ol : ${organisationsleitungen}" th:value="${ol.id}"
+                                th:text="${ol.name}">Organisationsleitung</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-2">
+                <button type="submit" class="btn btn--cta" th:text="#{admin.orgStructure.bereich.createButton}">Bereich anlegen</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ===== The hierarchy: every unit + its parent edge ===== -->
+    <div class="hud-box mt-2">
+        <h2 th:text="#{admin.orgStructure.units.title}">Einheiten und Zuordnung</h2>
+        <p class="text-muted" th:text="#{admin.orgStructure.units.hint}">Wähle die übergeordnete Einheit; Staffeln/Spezialkommandos gehören in einen Bereich, Bereiche in die Organisationsleitung.</p>
+        <table id="org-units-table">
+            <thead>
+            <tr>
+                <th th:text="#{admin.orgStructure.column.name}">Name</th>
+                <th th:text="#{admin.orgStructure.column.kind}">Art</th>
+                <th th:text="#{admin.orgStructure.column.parent}">Übergeordnete Einheit</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="n : ${nodes}" th:attr="data-org-unit-id=${n.id},data-version=${n.version}">
+                <td>
+                    <span th:text="${n.name}">Name</span>
+                    <span class="text-muted" th:text="'(' + ${n.shorthand} + ')'">(SH)</span>
+                </td>
+                <td th:text="#{'admin.orgStructure.kind.' + ${n.kind}}">Art</td>
+                <td>
+                    <span th:if="${n.kind == 'ORGANISATIONSLEITUNG'}" class="text-muted"
+                          th:text="#{admin.orgStructure.root}">Wurzel</span>
+                    <select th:unless="${n.kind == 'ORGANISATIONSLEITUNG'}" class="os-parent-select" data-parent-select
+                            th:attr="aria-label=#{admin.orgStructure.setParent} + ' ' + ${n.name}">
+                        <option value="" th:text="#{admin.orgStructure.noParent}"
+                                th:selected="${n.parentOrgUnitId == null}">— keine —</option>
+                        <th:block th:if="${n.kind == 'BEREICH'}">
+                            <option th:each="ol : ${organisationsleitungen}" th:value="${ol.id}"
+                                    th:text="${ol.name}" th:selected="${ol.id == n.parentOrgUnitId}">Organisationsleitung</option>
+                        </th:block>
+                        <th:block th:unless="${n.kind == 'BEREICH'}">
+                            <option th:each="b : ${bereiche}" th:value="${b.id}"
+                                    th:text="${b.name}" th:selected="${b.id == n.parentOrgUnitId}">Bereich</option>
+                        </th:block>
+                    </select>
+                </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(nodes)}">
+                <td colspan="3" th:text="#{admin.orgStructure.units.empty}">Noch keine Einheiten.</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+
+<script th:src="@{/js/admin-org-structure.js}" th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

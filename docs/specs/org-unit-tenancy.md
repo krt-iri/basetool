@@ -301,12 +301,19 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
   the one its level allows; the OL row has a NULL parent.
 - [x] With every `parent_org_unit_id` NULL and no leadership flags set, `OwnerScopeService` scope output
   is byte-identical to pre-change (snapshot test).
+- [x] An ADMIN-only management UI (`/admin/org-structure`) creates Bereiche and the Organisationsleitung
+  and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-hierarchy`
+  API, reading the whole structure — each unit's current parent and optimistic-lock version — from a
+  single `GET /api/v1/org-hierarchy/org-units`. Leadership seating stays on the org chart (REQ-ORG-018).
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
 its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
 `OwnerScopeServiceTest` — the cascade is delegated to `OrgUnitCascadeService` with a no-leadership default
 stub so every pre-#692 scenario stays byte-identical (the degrade-to-flat proof), pinned structurally by
-`ArchitectureTest#cascadeServiceMustNotConsultTheSecurityContext` · **ADR:**
+`ArchitectureTest#cascadeServiceMustNotConsultTheSecurityContext`; the admin management UI by
+`AdminOrgStructurePageControllerMvcTest` (ADMIN gate + AJAX create/set-parent relay) and the
+`org-units` listing by `OrgHierarchyControllerSecurityTest` +
+`OrgHierarchyServiceTest#listAllOrgUnits_delegatesToRepository` · **ADR:**
 [ADR-0025](../adr/0025-org-hierarchy-data-model.md) · **Issues:** #692, #694.
 
 ### REQ-ORG-015 — Cascading oversight without admin rights, via one descent helper

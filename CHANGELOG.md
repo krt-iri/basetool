@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Administratoren können die Organisationsstruktur jetzt direkt in der App pflegen.** Unter Administration → Organisationsstruktur lassen sich Bereiche und die Organisationsleitung anlegen und Staffeln/Spezialkommandos einem Bereich bzw. Bereiche der Organisationsleitung zuordnen — bisher war das nur über die API möglich. Die Besetzung der Leitungspositionen bleibt im Organigramm.
+
 ### Changed
 
 - **Die Mindestqualität in Aufträgen ist von 700 auf 650 gesenkt.** In Material- und Item-Aufträgen steht als Mindestqualität nur noch „650" oder „Keine" zur Auswahl (Voreinstellung 650), und Lagerbestände ab Qualität 650 zählen jetzt als „Gut" für Deckung und Sammelfortschritt. Bestehende Aufträge mit dem alten Wert 700 werden per Datenbank-Migration automatisch auf 650 umgestellt.
