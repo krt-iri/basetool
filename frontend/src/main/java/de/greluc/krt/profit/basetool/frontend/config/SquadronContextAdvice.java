@@ -68,7 +68,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * appTitle}, {@code promotionFeatureEnabled}, and {@code currentRequestUri} — each documented on
  * its own {@code @ModelAttribute} method below.
  *
- * <p>Failures from the backend round-trip degrade gracefully: a non-resolvable active-squadron call
+ * <p>Failures from the backend round-trip degrade gracefully: a non-resolvable active-org-unit call
  * leaves the badge empty; a non-resolvable squadron list leaves the dropdown empty. We never let an
  * unrelated UI fail because the context advice could not reach the backend — the page would render
  * empty cells for the squadron columns but the rest of the layout stays intact.
@@ -90,7 +90,7 @@ public class SquadronContextAdvice {
    *   <li>Admin: read the switcher selection from the frontend's Redis-backed Spring Session (set
    *       by {@link MeFrontendController}). {@code null} means "all squadrons" mode.
    *   <li>Non-admin: the user's persistent home squadron from {@code app_user.squadron_id} on the
-   *       backend. The {@code GET /api/v1/me/active-squadron} endpoint already resolves this for
+   *       backend. The {@code GET /api/v1/me/active-org-unit} endpoint already resolves this for
    *       the current principal; we reuse it instead of duplicating the lookup on the frontend.
    * </ul>
    *
@@ -107,17 +107,9 @@ public class SquadronContextAdvice {
     }
     HttpSession session = request.getSession(false);
     if (session != null) {
-      // R5.e: prefer the new session key; fall back to the legacy one so admin sessions
-      // stored under the old name during deploy keep working. Same dual-read pattern as
-      // ActiveSquadronContextFilter.
       UUID fromSession =
           de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext.coerce(
               session.getAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY));
-      if (fromSession == null) {
-        fromSession =
-            de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext.coerce(
-                session.getAttribute(MeFrontendController.ACTIVE_SQUADRON_SESSION_KEY));
-      }
       if (fromSession != null) {
         return fromSession;
       }
@@ -127,9 +119,9 @@ public class SquadronContextAdvice {
       return null;
     }
     try {
-      ActiveSquadronResponse resp =
-          backendApiClient.get("/api/v1/me/active-squadron", ActiveSquadronResponse.class);
-      return resp != null ? resp.squadronId() : null;
+      ActiveOrgUnitResponse resp =
+          backendApiClient.get("/api/v1/me/active-org-unit", ActiveOrgUnitResponse.class);
+      return resp != null ? resp.orgUnitId() : null;
     } catch (Exception ex) {
       log.debug("Failed to resolve home squadron for non-admin caller", ex);
       return null;
@@ -137,12 +129,12 @@ public class SquadronContextAdvice {
   }
 
   /**
-   * Wire-shape mirror of the backend's {@code MeController.ActiveSquadronResponse} record. Kept
+   * Wire-shape mirror of the backend's {@code MeController.ActiveOrgUnitResponse} record. Kept
    * local to avoid a frontend dependency on the backend module just for one JSON envelope.
    *
-   * @param squadronId resolved squadron UUID, or {@code null} when none applies.
+   * @param orgUnitId resolved OrgUnit UUID, or {@code null} when none applies.
    */
-  public record ActiveSquadronResponse(UUID squadronId) {}
+  public record ActiveOrgUnitResponse(UUID orgUnitId) {}
 
   /**
    * Resolves the full {@link SquadronDto} that matches {@link #activeSquadronId()} so the template

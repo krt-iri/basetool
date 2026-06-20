@@ -27,9 +27,7 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 
 /**
  * Relays the caller's active OrgUnit selection from the frontend's Spring Session to the backend
- * via the {@code X-Active-Org-Unit-Id} request header on every outbound {@code WebClient} call. The
- * legacy {@code X-Active-Squadron-Id} header is sent in parallel for one release so backend deploys
- * lagging the frontend deploy still honour the pin (SPEZIALKOMMANDO_PLAN.md §7.2 / R5.e).
+ * via the {@code X-Active-Org-Unit-Id} request header on every outbound {@code WebClient} call.
  *
  * <p>The state lives on the frontend because backend REST calls do not relay session cookies (the
  * frontend's {@code BackendApiClient} only attaches the OAuth2 bearer token), so a backend-side
@@ -53,24 +51,14 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 public class ActiveSquadronRelayFilter {
 
   /**
-   * R5.e replacement for {@link #ACTIVE_SQUADRON_HEADER}. HTTP header name carrying the caller's
-   * active OrgUnit selection to the backend. {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService} reads this name first.
+   * HTTP header name carrying the caller's active OrgUnit selection to the backend. {@link
+   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService} reads this name to scope
+   * staffel-scoped queries for the current request.
    */
   public static final String ACTIVE_ORG_UNIT_HEADER = "X-Active-Org-Unit-Id";
 
   /**
-   * Legacy HTTP header name preserved for one release as an alias of {@link
-   * #ACTIVE_ORG_UNIT_HEADER}. Sent in parallel by the relay so a backend deploy lagging the
-   * frontend deploy still honours the pin. Removed in the destructive cleanup release.
-   *
-   * @deprecated R5.e replacement is {@link #ACTIVE_ORG_UNIT_HEADER}.
-   */
-  @Deprecated public static final String ACTIVE_SQUADRON_HEADER = "X-Active-Squadron-Id";
-
-  /**
-   * Returns the filter function that adds both the {@code X-Active-Org-Unit-Id} header (new
-   * canonical name) and the {@code X-Active-Squadron-Id} header (one-release alias) to outbound
+   * Returns the filter function that adds the {@code X-Active-Org-Unit-Id} header to outbound
    * requests when the caller has an OrgUnit selected in the frontend session. No header is added
    * for callers without an active selection — the backend then falls through to its default
    * behaviour (admin sees all OrgUnits, non-admin sees the union of memberships).
@@ -85,10 +73,7 @@ public class ActiveSquadronRelayFilter {
         return next.exchange(request);
       }
       return next.exchange(
-          ClientRequest.from(request)
-              .header(ACTIVE_ORG_UNIT_HEADER, active.toString())
-              .header(ACTIVE_SQUADRON_HEADER, active.toString())
-              .build());
+          ClientRequest.from(request).header(ACTIVE_ORG_UNIT_HEADER, active.toString()).build());
     };
   }
 }

@@ -158,16 +158,18 @@ prevents new `@JoinColumn(name = "squadron_id")` (only `User.squadron` +
 
 ### REQ-ORG-007 — Audit MDC field
 
-`CorrelationIdFilter` emits MDC `orgUnitId` on every request (legacy `squadronId` in
-parallel for one release). Logback patterns must include `%X{orgUnitId}`. See
-[`observability.md`](observability.md).
+`CorrelationIdFilter` emits MDC `orgUnitId` on every request. Logback patterns must include
+`%X{orgUnitId}`. See [`observability.md`](observability.md). (The pre-R5.e legacy `squadronId`
+MDC alias was removed in the rename-soak cleanup release.)
 
 ### REQ-ORG-008 — Active-context relay
 
-The frontend sends `X-Active-Org-Unit-Id` (canonical) + legacy `X-Active-Squadron-Id` on
-every outbound call; the backend reads the new name first. Session attribute (Redis-backed)
-is `iridium.activeOrgUnitId` with legacy `iridium.activeSquadronId` mirrored for one release.
-Both aliases drop in the cleanup release.
+The frontend sends `X-Active-Org-Unit-Id` on every outbound call; the backend reads it to scope
+staffel-scoped queries (an admin pin directly, a non-admin pin only when it matches a membership).
+The selection lives in the Redis-backed Spring Session under `iridium.activeOrgUnitId`, set via
+`POST /me/active-org-unit` and read back via `GET /api/v1/me/active-org-unit`. (The pre-R5.e
+`X-Active-Squadron-Id` header, the `iridium.activeSquadronId` session key, and the
+`/active-squadron` endpoints were removed in the rename-soak cleanup release.)
 
 ### REQ-ORG-009 — Ownerless leadership ("Bereichsleitung") missions & operations
 

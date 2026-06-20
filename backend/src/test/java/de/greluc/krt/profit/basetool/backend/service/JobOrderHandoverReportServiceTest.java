@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -52,8 +51,6 @@ import org.openpdf.text.pdf.parser.PdfTextExtractor;
 class JobOrderHandoverReportServiceTest {
 
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
-
-  @Mock private JobOrderRepository jobOrderRepository;
 
   @InjectMocks private JobOrderHandoverReportService service;
 

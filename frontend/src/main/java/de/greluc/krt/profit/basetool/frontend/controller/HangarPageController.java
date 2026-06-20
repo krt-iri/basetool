@@ -714,19 +714,4 @@ public class HangarPageController {
       return null;
     }
   }
-
-  private String parseString(Object o) {
-    return o == null ? null : o.toString();
-  }
-
-  private UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(o.toString());
-    } catch (Exception e) {
-      return null;
-    }
-  }
 }

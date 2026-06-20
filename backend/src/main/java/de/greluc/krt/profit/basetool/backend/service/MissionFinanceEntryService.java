@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryUpdate
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -68,8 +67,6 @@ public class MissionFinanceEntryService {
   private final MissionFinanceEntryRepository financeEntryRepository;
   private final MissionParticipantRepository participantRepository;
   private final MissionRepository missionRepository;
-  private final UserRepository userRepository;
-  private final UserService userService;
   private final de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository
       refineryOrderRepository;
   private final MissionMapper missionMapper;

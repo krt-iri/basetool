@@ -1162,36 +1162,4 @@ public class InventoryPageController {
     }
     return false;
   }
-
-  private String parseString(Object o) {
-    return o == null ? null : o.toString();
-  }
-
-  private Integer parseInteger(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Integer i) {
-      return i;
-    }
-    if (o instanceof Number n) {
-      return n.intValue();
-    }
-    try {
-      return Integer.parseInt(o.toString());
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  private UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(o.toString());
-    } catch (Exception e) {
-      return null;
-    }
-  }
 }

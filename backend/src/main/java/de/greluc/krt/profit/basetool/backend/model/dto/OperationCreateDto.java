@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * selections with 400 until the destructive cleanup release loosens NOT NULL on the legacy {@code
  * owning_squadron_id} column). When {@code null}, the service preserves the legacy "stamp from
  * {@code OwnerScopeService.currentSquadron()}" path that scope-resolves the active Staffel from the
- * caller's persistent home or the admin's {@code X-Active-Squadron-Id} header.
+ * caller's persistent home or the admin's {@code X-Active-Org-Unit-Id} header.
  */
 public record OperationCreateDto(
     @NotBlank String name,

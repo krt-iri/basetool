@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.TerminalMapper;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
@@ -67,7 +66,6 @@ public class MaterialController {
 
   private final MaterialService materialService;
   private final MaterialMapper materialMapper;
-  private final TerminalMapper terminalMapper;
 
   /**
    * Paged material list. {@code hasTerminals=true} returns the heavier projection with terminal

@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.List;
 import java.util.UUID;
@@ -50,7 +49,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SquadronService {
 
   private final SquadronRepository squadronRepository;
-  private final MissionParticipantRepository missionParticipantRepository;
 
   /**
    * Unpaged squadron list for dropdowns.

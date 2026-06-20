@@ -27,7 +27,6 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.StarSystemRepository;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,8 +40,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class StarSystemServiceTest {
 
   @Mock private StarSystemRepository starSystemRepository;
-
-  @Mock private LocationRepository locationRepository;
 
   @InjectMocks private StarSystemService starSystemService;
 
