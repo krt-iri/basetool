@@ -87,7 +87,8 @@ class OrgChartServiceTest {
   void getOrgChart_assemblesAreaSquadronAndSkIntoNestedTree() {
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     SpecialCommand sk = specialCommand(UUID.randomUUID(), "Alpha SK", "ASK");
-    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron, sk));
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands())
+        .thenReturn(List.of(squadron, sk));
     OrgChartPosition areaLead = pos(OrgChartPositionType.AREA_LEAD, null, null);
     OrgChartPosition areaCoordinator = pos(OrgChartPositionType.AREA_COORDINATOR, null, null);
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -133,7 +134,7 @@ class OrgChartServiceTest {
   @Test
   void getOrgChart_leaderlessNamedCommand_carriesNameAndNullLeader() {
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
-    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron));
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
 
@@ -158,7 +159,7 @@ class OrgChartServiceTest {
     // as leaderDisplayName (not leaderUserId/leaderUserName) so the template renders the typed
     // name with the no-account marker rather than the vacant placeholder.
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
-    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron));
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
 
@@ -178,8 +179,8 @@ class OrgChartServiceTest {
   }
 
   @Test
-  void getOrgChart_noProfitEligibleUnits_skipsUnitPositionQuery() {
-    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of());
+  void getOrgChart_noActiveUnits_skipsUnitPositionQuery() {
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of());
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
 
@@ -195,7 +196,7 @@ class OrgChartServiceTest {
   @Test
   void getOrgChart_fullSquadron_clearsCanAddFlags() {
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
-    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron));
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
     when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
@@ -228,7 +229,8 @@ class OrgChartServiceTest {
     UUID olId = UUID.randomUUID();
     Organisationsleitung ol = organisationsleitung(olId, "Organisationsleitung", "OL");
 
-    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(grouped, ungrouped));
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands())
+        .thenReturn(List.of(grouped, ungrouped));
     when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of(bereich));
     when(orgUnitRepository.findActiveOrganisationsleitung()).thenReturn(List.of(ol));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -253,6 +255,35 @@ class OrgChartServiceTest {
     // The parentless Staffel stays in the ungrouped/legacy tier, NOT under the Bereich.
     assertEquals(1, chart.squadrons().size());
     assertEquals("Orphan", chart.squadrons().getFirst().name());
+  }
+
+  @Test
+  void getOrgChart_includesNonProfitEligibleUnitsUnderBereich() {
+    // ADR-0029: chart visibility is independent of is_profit_eligible. A non-Profit Staffel wired
+    // under a Bereich still renders under that Bereich (previously it was filtered out entirely).
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = bereich(bereichId, "Forschung", "FOR");
+    bereich.setDepartment(Department.FORSCHUNG);
+    Squadron orion = squadron(UUID.randomUUID(), "ORION", "ORI");
+    orion.setProfitEligible(false);
+    orion.setParent(bereich);
+
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(orion));
+    when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of(bereich));
+    when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
+        .thenReturn(List.of());
+    when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
+        .thenReturn(List.of());
+
+    OrgChartDto chart = service().getOrgChart();
+
+    assertEquals(1, chart.bereiche().size());
+    BereichChartDto b = chart.bereiche().getFirst();
+    assertEquals(
+        1, b.squadrons().size(), "a non-profit-eligible Staffel renders under its Bereich");
+    assertEquals("ORION", b.squadrons().getFirst().name());
+    assertTrue(
+        chart.squadrons().isEmpty(), "it is grouped under the Bereich, not in the ungrouped tier");
   }
 
   // ----------------------------------------------------------------- create guards --
@@ -493,11 +524,35 @@ class OrgChartServiceTest {
   }
 
   @Test
-  void createPosition_nonProfitEligibleUnit_isRejected() {
+  void createPosition_nonProfitEligibleUnit_isStaffed() {
+    // Chart visibility is decoupled from is_profit_eligible (ADR-0029): a non-Profit but active
+    // Staffel may hold functional ranks, so staffing it succeeds rather than 400-ing.
     UUID userId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
-    Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
+    Squadron squadron = squadron(unitId, "ORION", "ORI");
     squadron.setProfitEligible(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "lead")));
+    when(orgUnitRepository.findById(unitId)).thenReturn(Optional.of(squadron));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto =
+        service()
+            .createPosition(
+                new OrgChartPositionCreateRequest(
+                    OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null, null, null));
+
+    assertEquals(OrgChartPositionType.SQUADRON_LEAD, dto.positionType());
+    assertEquals(unitId, dto.orgUnitId());
+    assertEquals(userId, dto.userId());
+  }
+
+  @Test
+  void createPosition_inactiveUnit_isRejected() {
+    // Active is still the gate (ADR-0029): a soft-deleted Staffel cannot be staffed.
+    UUID userId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    Squadron squadron = squadron(unitId, "ORION", "ORI");
+    squadron.setActive(false);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "lead")));
     when(orgUnitRepository.findById(unitId)).thenReturn(Optional.of(squadron));
 
@@ -516,7 +571,7 @@ class OrgChartServiceTest {
                             null,
                             null)));
 
-    assertTrue(ex.getMessage().contains("unit_not_profit_eligible"));
+    assertTrue(ex.getMessage().contains("unit_inactive"));
   }
 
   @Test

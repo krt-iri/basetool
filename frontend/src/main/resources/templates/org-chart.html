@@ -27,7 +27,7 @@
 
 <main class="oc-page">
     <div class="greeting hud-box">
-        <h1 th:text="#{orgChart.title}">Organigramm des Profit-Bereichs</h1>
+        <h1 th:text="#{orgChart.title}">Organigramm</h1>
         <p style="color: var(--color-gray-2); margin-top: 0.5rem;" th:text="#{orgChart.subtitle}">
             Übersicht der Funktionsränge in Bereichsleitung, Staffeln und Spezialkommandos.
         </p>
@@ -161,7 +161,7 @@
              th:if="${chartEmpty}"
              style="color: var(--color-gray-2);"
              th:text="#{orgChart.empty}">
-            Es sind noch keine profit-berechtigten Staffeln oder Spezialkommandos vorhanden.
+            Es sind noch keine Staffeln oder Spezialkommandos vorhanden.
         </div>
         </th:block>
     </div>

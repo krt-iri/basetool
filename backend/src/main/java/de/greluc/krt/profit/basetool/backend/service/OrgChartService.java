@@ -63,9 +63,11 @@ import org.springframework.transaction.annotation.Transactional;
  * staffelScopedServicesMustWireOwnerScopeOrAuthHelper} ArchUnit whitelist. Read access is open to
  * every authenticated user; write access is gated to ADMIN at the controller.
  *
- * <p>The unit tier is exactly the active, profit-eligible Staffeln + SKs (loaded via {@link
- * OrgUnitRepository#findActiveProfitEligible()}); every such unit is rendered even when empty so an
- * admin can fill it in.
+ * <p>The unit tier is every active Staffel + SK (loaded via {@link
+ * OrgUnitRepository#findActiveSquadronsAndSpecialCommands()}), <strong>regardless of {@code
+ * is_profit_eligible}</strong> — that flag governs Job-Order processing only, not chart visibility
+ * (ADR-0029, REQ-ORG-018), so a unit wired under any Bereich renders there, not just the
+ * Profit-side ones. Every such unit is rendered even when empty so an admin can fill it in.
  *
  * <p>All structural invariants the database cannot express in plain SQL — the per-Staffel limits
  * (≤{@value #MAX_COMMAND_LEADS} Kommandos, ≤{@value #MAX_ENSIGNS} Ensign), the per-SK limit
@@ -105,7 +107,6 @@ public class OrgChartService {
   static final int MAX_SK_COMMANDERS = 2;
 
   private static final String ERR_SCOPE_MISMATCH = "problem.org_chart.scope_mismatch";
-  private static final String ERR_UNIT_NOT_PROFIT = "problem.org_chart.unit_not_profit_eligible";
   private static final String ERR_UNIT_INACTIVE = "problem.org_chart.unit_inactive";
   private static final String ERR_INVALID_PARENT = "problem.org_chart.invalid_parent";
   private static final String ERR_COMMAND_LIMIT = "problem.org_chart.command_limit";
@@ -126,13 +127,12 @@ public class OrgChartService {
 
   /**
    * Assembles the entire chart as one nested read model: the Bereichsleitung plus a column for each
-   * active, profit-eligible Staffel and Spezialkommando, ordered by name. Open to every
-   * authenticated user.
+   * active Staffel and Spezialkommando, ordered by name. Open to every authenticated user.
    *
    * @return the assembled chart; never {@code null}. Empty scopes render as empty groups.
    */
   public OrgChartDto getOrgChart() {
-    List<OrgUnit> units = orgUnitRepository.findActiveProfitEligible();
+    List<OrgUnit> units = orgUnitRepository.findActiveSquadronsAndSpecialCommands();
     List<OrgUnit> bereiche = orgUnitRepository.findActiveBereiche();
     List<OrgUnit> ols = orgUnitRepository.findActiveOrganisationsleitung();
     OrgUnit ol = ols.isEmpty() ? null : ols.getFirst();
@@ -175,8 +175,7 @@ public class OrgChartService {
             .map(b -> buildBereich(b, units, positionsByUnit))
             .toList();
 
-    // Ungrouped/legacy tier: profit-eligible Staffeln/SKs NOT wired under a (charted) Bereich.
-    // Until
+    // Ungrouped/legacy tier: active Staffeln/SKs NOT wired under a (charted) Bereich. Until
     // an admin creates Bereiche and assigns parents this holds every unit, so the chart degrades to
     // the pre-#692 single-tree view.
     List<SquadronChartDto> ungroupedSquadrons =
@@ -220,8 +219,7 @@ public class OrgChartService {
    * Staffeln/SKs whose parent is this Bereich, carrying the Bereich's Bereichsfarbe.
    *
    * @param bereich the Bereich org unit.
-   * @param units all active profit-eligible Staffeln/SKs (filtered here to this Bereich's
-   *     children).
+   * @param units all active Staffeln/SKs (filtered here to this Bereich's children).
    * @param positionsByUnit positions grouped by org-unit id.
    * @return the assembled Bereich tier; never {@code null}.
    */
@@ -620,16 +618,12 @@ public class OrgChartService {
     if (unit.getKind() != expectedKind) {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
-    // Profit-eligibility is required only for the Job-Order-processing tiers (Staffel/SK) — those
-    // are the org chart's historical "Profit-Bereich" units. A Bereich/OL (epic #692, REQ-ORG-018)
-    // is never profit-eligible and must not be rejected for it; only its active flag is checked,
-    // and an inactive Bereich/OL gets the precise "inactive" error rather than the (irrelevant)
-    // "not profit-eligible" one.
-    if (scope == OrgChartScope.SQUADRON || scope == OrgChartScope.SPECIAL_COMMAND) {
-      if (!unit.isActive() || !unit.isProfitEligible()) {
-        throw new BadRequestException(ERR_UNIT_NOT_PROFIT);
-      }
-    } else if (!unit.isActive()) {
+    // The org chart is descriptive across the WHOLE organisation (ADR-0029, REQ-ORG-018): every
+    // active unit of any tier may be staffed, regardless of is_profit_eligible. That flag governs
+    // Job-Order processing only (a non-Profit Staffel/SK still appears on the chart and can hold
+    // functional ranks), so the sole create-time gate here is the active flag — uniform across
+    // Staffel/SK and Bereich/OL.
+    if (!unit.isActive()) {
       throw new BadRequestException(ERR_UNIT_INACTIVE);
     }
     return unit;

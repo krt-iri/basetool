@@ -6,6 +6,12 @@
 
 - **Anmeldung mit Discord (Track 1).** Mitglieder können sich jetzt zusätzlich mit Discord anmelden — aber nur, wer im das-kartell Discord ist und dort die Rolle „KRT-Mitglied“ trägt (direkt bei der Anmeldung geprüft, fail-closed). Neu über Discord angemeldete Nutzer landen zunächst in einem Wartezustand ohne Zugriff und müssen von einem Administrator freigegeben werden (Admin-Übersicht unter „Discord-Registrierungen“, Admins werden benachrichtigt); Rollen und Einheiten werden danach wie gewohnt von Hand vergeben. Die bestehende Anmeldung per Benutzername/Passwort bleibt unverändert. Wird erst nach der serverseitigen Einrichtung (Discord-App + Keycloak) wirksam.
 
+## [v0.6.4](https://github.com/krt-profit/basetool/releases/tag/v0.6.4) - 2026-06-20
+
+### Fixed
+
+- **Im Organigramm erscheinen jetzt alle Staffeln und Spezialkommandos unter ihrem Bereich, nicht nur die Profit-Einheiten.** Bisher wurden unter einem Bereich nur Einheiten angezeigt, die als „auftragsbearbeitend" (profit-berechtigt) markiert waren; einem Bereich zugeordnete Staffeln anderer Bereiche (etwa Forschung oder Marinekorps) blieben unsichtbar. Ob eine Einheit im Organigramm erscheint, richtet sich jetzt nur noch danach, ob sie aktiv ist — die Einstellung „Auftragsbearbeitung" steuert weiterhin ausschließlich die Auftragsabwicklung, nicht die Anzeige im Organigramm.
+
 ## [v0.6.3](https://github.com/krt-profit/basetool/releases/tag/v0.6.3) - 2026-06-20
 
 ### Fixed

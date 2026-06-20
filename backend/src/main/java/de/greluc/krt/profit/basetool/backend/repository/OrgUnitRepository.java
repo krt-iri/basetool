@@ -59,16 +59,20 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   long countProfitEligibleByIdIn(@Param("ids") Collection<UUID> ids);
 
   /**
-   * Loads every active, profit-eligible org unit across both kinds (Squadron + SpecialCommand) via
-   * single-table inheritance. Backs the Profit-Bereich org chart, whose unit tier is exactly the
-   * profit-eligible Staffeln + SKs; the caller splits the result by {@link OrgUnit#getKind()} into
-   * the squadron and SK columns.
+   * Loads every active leaf org unit — i.e. every {@link
+   * de.greluc.krt.profit.basetool.backend.model.Squadron Squadron} and {@link
+   * de.greluc.krt.profit.basetool.backend.model.SpecialCommand SpecialCommand} — across both kinds
+   * via single-table inheritance, <strong>regardless of {@code is_profit_eligible}</strong>. Backs
+   * the organisation-wide org chart (ADR-0029, REQ-ORG-018): the chart's unit tier is every active
+   * Staffel + SK so that a Staffel/SK an admin has wired under any Bereich renders there, not only
+   * the Profit-side ones. {@code is_profit_eligible} governs Job-Order processing only (the {@code
+   * countProfitEligibleByIdIn} path) and must not gate chart visibility. The caller splits the
+   * result by {@link OrgUnit#getKind()} into the squadron and SK columns.
    *
-   * @return the active profit-eligible org units in arbitrary order; never {@code null}, possibly
-   *     empty.
+   * @return the active Staffeln + SKs in arbitrary order; never {@code null}, possibly empty.
    */
-  @Query("SELECT o FROM OrgUnit o WHERE o.active = true AND o.isProfitEligible = true")
-  List<OrgUnit> findActiveProfitEligible();
+  @Query("SELECT o FROM OrgUnit o WHERE o.active = true AND TYPE(o) IN (Squadron, SpecialCommand)")
+  List<OrgUnit> findActiveSquadronsAndSpecialCommands();
 
   /**
    * Returns the direct children of {@code parentOrgUnitId} in the org hierarchy (epic #692,
