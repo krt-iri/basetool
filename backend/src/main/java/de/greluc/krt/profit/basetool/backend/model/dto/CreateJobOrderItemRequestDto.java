@@ -36,8 +36,8 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param responsibleOrgUnitId the profit-eligible org unit that processes the order; required for
  *     authenticated callers, ignored for guests (routed to the configured intake SK)
- * @param requestingOrgUnitId the customer org unit the order is placed for (any squadron or SK);
- *     mandatory
+ * @param requestingOrgUnitId the customer/Auftraggeber org unit the order is placed for (any kind:
+ *     Staffel/SK/Bereich/OL, epic #692); mandatory
  * @param handle optional contact handle (≤ 200 chars)
  * @param comment optional free-text note (≤ 1000 chars), HTML-escaped on display
  * @param items the ordered finished-item lines (1..50)
