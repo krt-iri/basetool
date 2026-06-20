@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{pendingApproval.title} + ' - ' + ${appTitle}">Freigabe ausstehend - Profit Basetool</title>
+    <th:block th:fragment="extraLinks"></th:block>
+</head>
+<body>
+<header>
+    <nav>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="hud-box" style="max-width: 640px; margin: 3rem auto; text-align: center;">
+        <h1 th:text="#{pendingApproval.title}">Freigabe ausstehend</h1>
+        <p th:text="#{pendingApproval.message}">Dein Account wurde erstellt und wartet auf die Freigabe durch einen Administrator.</p>
+        <p style="color: var(--color-gray-2); font-size: 0.9rem;" th:text="#{pendingApproval.help}">Sobald du freigeschaltet bist, kannst du dich erneut anmelden.</p>
+        <form th:action="@{/logout}" method="post" style="margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-outline" th:text="#{nav.logout}">Abmelden</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>
