@@ -536,6 +536,39 @@ class GlobalExceptionHandlerTest {
     assertEquals(Boolean.FALSE, model.getAttribute("unauthenticated"));
   }
 
+  // ─── handleMaxUploadSizeExceeded (REQ-FE-009) ───────────────────────────
+
+  @Test
+  void maxUploadSizeExceeded_jsonRequest_returns413WithUploadTooLargeCode() {
+    // The frontend's FormData AJAX writes serialise every form field as a multipart part; a large
+    // editor can breach Tomcat's part-count cap. The XHR caller must get a clean 413 JSON body the
+    // toast renderer can show — not the generic 500 the catch-all would otherwise produce.
+    Object result = handler.handleMaxUploadSizeExceeded(jsonRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("UPLOAD_TOO_LARGE", body.get("code"));
+    assertEquals(413, body.get("status"));
+    assertEquals("error.413.title", body.get("title"));
+    assertEquals("error.uploadTooLarge", body.get("message"));
+  }
+
+  @Test
+  void maxUploadSizeExceeded_htmlRequest_returnsErrorViewWith413() {
+    Model model = new ConcurrentModel();
+
+    Object result = handler.handleMaxUploadSizeExceeded(htmlRequest(), model);
+
+    assertEquals("error/error", result);
+    assertEquals("error.413.title", model.getAttribute("error"));
+    assertEquals("error.uploadTooLarge", model.getAttribute("message"));
+    assertEquals("413", model.getAttribute("status"));
+  }
+
   // ─── handleException (generic catch-all) ────────────────────────────────
 
   @Test
