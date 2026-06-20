@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:2460a4de-6c5a-4abe-8582-b86fe1264915",
+  "serialNumber" : "urn:uuid:bf695c6e-fe12-4b62-8ceb-f405dde3267a",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-06-20T06:36:38Z",
+    "timestamp" : "2026-06-20T13:04:17Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/27863065389"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/27871988426"
         },
         {
           "type" : "vcs",
@@ -8087,42 +8087,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-core",
-      "version" : "12.8.1",
+      "version" : "12.9.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "c1ffde20c732402ad69faf3eeda88217"
+          "content" : "0854514442cd99f83840bba3765133bb"
         },
         {
           "alg" : "SHA-1",
-          "content" : "a6f00c021c532b1bcf543104fca5c32634aa6175"
+          "content" : "c09f38ced4d2d14b493c1512fe5dffb79e030b06"
         },
         {
           "alg" : "SHA-256",
-          "content" : "76522052ed45fdad6419138d631775bfbf304b891b0b5514c48308186d4b3e67"
+          "content" : "e597cec7f68dc2950fb7e88dfae2b2aa156193209791e6b60bf619df74a123d8"
         },
         {
           "alg" : "SHA-512",
-          "content" : "6568aa9bb05644a0158f3e833941701d46e1df19c5b44a20e163485d8206243d47f69215ee71b518a58d3dd400b6201dc516cce129cb465e9b3b4cb58758edaa"
+          "content" : "7e84e7f28301f15bef08d1e4c98865f9afa8903eb70fa40489c26b8a97a0b26c3174a4e5c5a766d4cbfbbdc529e44ba4740e6a904c905a16cf95cc97efb345ef"
         },
         {
           "alg" : "SHA-384",
-          "content" : "8b765a898d802026555f5c8835f29f9f47886236e458e42e28dece593b81b18dc44851aa15ce0e026eb92fed9ad79b1d"
+          "content" : "34fd0598dbe69cbf0f694ddf620d8b6402cc43313906768349314ad8fb00c29c3e9abb8891b3214e918d4b5b5d602185"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "afc747cee021444304d051d930b481ecc5d3862c7937ac897eb74b9b13a16b04a58ebc5f6ea0b7cad257b13804e91c2c"
+          "content" : "edbe7318fa2733d7f790b94839759ecc03b18241e3f842d1e1e7e5c6014cce6ac713e07bb693bf51b7d1a7c2363b351c"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "a59e01a44f91ba78c331e527b635684cd9a78b20f15c58522c9d9d1eddbfee61"
+          "content" : "d966a15d10d8892c98b4f4086d30a2fd5861b65c52e2b5c4c3483f619b1d088a"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "2c3ecb653ac5c1c14f67f71a260d955c2ddb5865e9db634b230d3983cd59178bfae1c865f8c71ec0e29d6c06693b8329b2daf340b8d5d6d7e1c4394a33fc1c5e"
+          "content" : "637e8301ba42c84a6ff139551725cb20f16510c38d599f6b65d35165099795d8b8d8b7d18e0a5d41f87468602d42c3dc3a86adf57b61954219f05fa884be9012"
         }
       ],
       "licenses" : [
@@ -8132,7 +8132,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -8143,42 +8143,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.8.1?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.9.0?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-database-postgresql",
-      "version" : "12.8.1",
+      "version" : "12.9.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "75b79db2d884e5a3d3f0d72d8577aedc"
+          "content" : "87c14a84012ef73fea1f03182bfd56c8"
         },
         {
           "alg" : "SHA-1",
-          "content" : "ef14f0e9b900122a39d7ad1e3575bc4fb6c4459c"
+          "content" : "c4ff65cac0a05746f9ea198402aff5291256e1d1"
         },
         {
           "alg" : "SHA-256",
-          "content" : "161470cce11a997539ad6d10fdacefd05fa1ebe0c5346f6d897e8144797d6182"
+          "content" : "f9406e8fba678d717d91878d56ce4accba7bafb8d24bb3160e0ecfd26508424a"
         },
         {
           "alg" : "SHA-512",
-          "content" : "4fa8f95e6bf68c37d80fff1c90c78a697a29944ba2a6bb5a86b0b6e8c08d312a5e8144f3de3cf86d67e528cf53d946f0b027c40bd49641fbe4c5fa73de915ae8"
+          "content" : "60b70dc7786ca85a4172a0f7fb795e54922c81686abd07f227012f0bfa134cd3625c47b35505ab6bec0420ef07fa379c935fa8ceb4c06dc9d9d17689b4a0b533"
         },
         {
           "alg" : "SHA-384",
-          "content" : "0feabd623dab0602e21de24bce6d3bb33f2a919054c2800532972cb85aa7509008dea3d93fff504c8a8adec4baf8d822"
+          "content" : "52bee2b9ed80842524d0da954a0e0c1f3f39a9b28152612af12025d5db6e7e9a0d52ae54b22dc5b2613296f919deb37b"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "2af4bc8cabb85be0bb817202283fca036118a2875499c841ae5e2b6dd78f264be8acec5c5cfb208f8dd6afd3a6eee7f1"
+          "content" : "033e61906f3fb385c4790e8235f834d1b37f5c850acfbc39ea43585b994b3366fc0eb46357e6012dae834eeb2a150cfb"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "bb3fc40427801542a36b7e62761d7d6e7010c9b1ecc89e58a1232adcb73cd514"
+          "content" : "3c966d2fca1d4a36f3dc538b3274ce448133f85a5c97417eae33cf7dda98a9c7"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "555874518fa44d372f72dff087fbdecaeb2d51b56fbf305f8d834ff8e39750d25779b4ed36a998cbc45c2faf2958c749063c7fe198c8fbe306e10ab1685e3aa0"
+          "content" : "e16fa051a2489e2cc968483bd57e2e827aeee1d0c1c58462de1c8898204ab98d72b754a546ff152dbe5141a82dcfdb2e814399946dcec1bd6464d3d3274ceb66"
         }
       ],
       "licenses" : [
@@ -8188,7 +8188,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.8.1?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.9.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -19162,8 +19162,8 @@
         "pkg:maven/com.squareup.okhttp3/mockwebserver@5.4.0?type=jar",
         "pkg:maven/com.tngtech.archunit/archunit@1.4.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.8.1?type=jar",
+        "pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar",
+        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.9.0?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar",
         "pkg:maven/org.jetbrains/annotations@26.1.0?type=jar",
@@ -19746,15 +19746,15 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar",
       "dependsOn" : [
         "pkg:maven/tools.jackson.core/jackson-databind@3.1.4?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.8.1?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.9.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@12.8.1?type=jar"
+        "pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar"
       ]
     },
     {

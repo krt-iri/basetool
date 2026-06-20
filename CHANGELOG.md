@@ -2,9 +2,7 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **Raffinerie-Aufträge mit vielen Erz-Zeilen lassen sich wieder speichern.** Das Anlege-Formular wird per AJAX als Multipart gesendet (ein Teil pro Formularfeld); Tomcat 11 begrenzte die Teilanzahl neuerdings auf 10, sodass große — etwa aus vielen Screenshots importierte — Aufträge beim Speichern mit einem Serverfehler abbrachen. Das Limit ist wieder großzügig gesetzt, und ein Überschreiten erscheint nun als verständliche Meldung statt als „500".
+## [v0.6.2](https://github.com/krt-profit/basetool/releases/tag/v0.6.2) - 2026-06-20
 
 ### Added
 
@@ -15,6 +13,10 @@
 ### Changed
 
 - **Das Organigramm stellt die Bereiche jetzt nebeneinander statt untereinander dar und verbindet sie mit Linien zur Organisationsleitung.** Die Bereiche fächern unter der Organisationsleitung auf — mit denselben Verbindungslinien wie von einem Bereich zu seinen Staffeln und Spezialkommandos. Jeder Bereich lässt sich außerdem unterhalb seines Bereichsleiters ein- und ausklappen, sodass das Organigramm bei vielen Einheiten übersichtlich bleibt.
+
+### Fixed
+
+- **Raffinerie-Aufträge mit vielen Erz-Zeilen lassen sich wieder speichern.** Das Anlege-Formular wird per AJAX als Multipart gesendet (ein Teil pro Formularfeld); Tomcat 11 begrenzte die Teilanzahl neuerdings auf 10, sodass große — etwa aus vielen Screenshots importierte — Aufträge beim Speichern mit einem Serverfehler abbrachen. Das Limit ist wieder großzügig gesetzt, und ein Überschreiten erscheint nun als verständliche Meldung statt als „500".
 
 ## [v0.6.1](https://github.com/krt-profit/basetool/releases/tag/v0.6.1) - 2026-06-20
 
