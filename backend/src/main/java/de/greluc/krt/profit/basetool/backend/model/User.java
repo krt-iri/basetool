@@ -120,6 +120,40 @@ public class User extends AbstractEntity<UUID> {
   @Column(name = "discord_user_id", unique = true)
   private String discordUserId;
 
+  /**
+   * Account approval lifecycle (epic #720, Track 1, REQ-SEC-017). A brand-new Discord registration
+   * is {@link ApprovalStatus#PENDING} (no authorities granted — only {@code ROLE_PENDING_APPROVAL})
+   * until an admin approves; credential/admin-created and all pre-existing users are {@link
+   * ApprovalStatus#ACTIVE}. Defaults to {@code ACTIVE} so any non-Discord creation path is active
+   * unless {@link UserService#syncUser(org.springframework.security.oauth2.jwt.Jwt)} explicitly
+   * lands a new Discord login in {@code PENDING}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "approval_status", nullable = false)
+  private ApprovalStatus approvalStatus = ApprovalStatus.ACTIVE;
+
+  /** When the registration was approved/rejected; {@code null} while still {@code PENDING}. */
+  @Nullable
+  @Column(name = "approved_at")
+  private java.time.Instant approvedAt;
+
+  /**
+   * The admin who approved/rejected this registration; {@code null} while still {@code PENDING}.
+   */
+  @Nullable
+  @Column(name = "approved_by_id")
+  private UUID approvedById;
+
+  /**
+   * Whether the account may be granted its full authorities. {@code true} only for {@link
+   * ApprovalStatus#ACTIVE}; {@code PENDING} and {@code REJECTED} accounts receive no authorities.
+   *
+   * @return {@code true} iff the approval status is {@link ApprovalStatus#ACTIVE}
+   */
+  public boolean isApproved() {
+    return approvalStatus == ApprovalStatus.ACTIVE;
+  }
+
   public String getEffectiveName() {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;
   }
