@@ -101,6 +101,10 @@
                     <input type="text" id="bereich-shorthand" name="shorthand" maxlength="255" required>
                 </div>
                 <div class="form-group">
+                    <label for="bereich-description" th:text="#{admin.orgStructure.field.description}">Beschreibung</label>
+                    <input type="text" id="bereich-description" name="description" maxlength="255">
+                </div>
+                <div class="form-group">
                     <label for="bereich-department" th:text="#{admin.orgStructure.field.department}">Bereichsfarbe</label>
                     <select id="bereich-department" name="department">
                         <option value="" th:text="#{admin.orgStructure.department.none}">— keine —</option>

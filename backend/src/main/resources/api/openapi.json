@@ -48218,9 +48218,6 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "parentName" : {
-            "type" : "string"
-          },
           "department" : {
             "type" : "string",
             "enum" : [ "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE" ]

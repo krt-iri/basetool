@@ -87,6 +87,7 @@
                 payload: {
                     name: fieldValue('bereich-name'),
                     shorthand: fieldValue('bereich-shorthand'),
+                    description: emptyToNull(fieldValue('bereich-description')),
                     department: emptyToNull(fieldValue('bereich-department')),
                     parentOrgUnitId: emptyToNull(fieldValue('bereich-parent')),
                 },

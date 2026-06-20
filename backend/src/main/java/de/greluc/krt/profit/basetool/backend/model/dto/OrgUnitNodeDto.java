@@ -28,17 +28,16 @@ import java.util.UUID;
  * for the admin org-structure management surface (epic #692, REQ-ORG-014). Unlike the per-kind DTOs
  * ({@code SquadronDto} / {@code SpecialCommandDto} / {@code BereichDto}) — which each expose only
  * their own tier — this carries the three fields the management table needs uniformly across all
- * four kinds: the current {@code parentOrgUnitId} (where the unit sits today, plus the resolved
- * {@code parentName} for display) and the optimistic-lock {@code version} (so the UI can PATCH a
- * new parent edge without a stale-version 409). {@code department} is populated only for {@code
- * BEREICH} rows (the Bereichsfarbe, REQ-ORG-018) and {@code null} for every other kind.
+ * four kinds: the current {@code parentOrgUnitId} (where the unit sits today) and the
+ * optimistic-lock {@code version} (so the UI can PATCH a new parent edge without a stale-version
+ * 409). {@code department} is populated only for {@code BEREICH} rows (the Bereichsfarbe,
+ * REQ-ORG-018) and {@code null} for every other kind.
  *
  * @param id the org unit's id.
  * @param name the org unit's display name.
  * @param shorthand the org unit's short tag.
  * @param kind the org unit's kind (SQUADRON / SPECIAL_COMMAND / BEREICH / ORGANISATIONSLEITUNG).
  * @param parentOrgUnitId the id of the unit's current parent, or {@code null} if unparented / root.
- * @param parentName the name of the unit's current parent, or {@code null} if unparented / root.
  * @param department the Bereich's department (Bereichsfarbe), or {@code null} for non-Bereich
  *     kinds.
  * @param version the optimistic-lock version, required by the set-parent PATCH.
@@ -49,6 +48,5 @@ public record OrgUnitNodeDto(
     String shorthand,
     OrgUnitKind kind,
     UUID parentOrgUnitId,
-    String parentName,
     Department department,
     Long version) {}

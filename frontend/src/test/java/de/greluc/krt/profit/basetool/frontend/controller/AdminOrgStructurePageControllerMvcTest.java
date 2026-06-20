@@ -95,25 +95,9 @@ class AdminOrgStructurePageControllerMvcTest {
     List<OrgUnitNodeDto> nodes =
         List.of(
             new OrgUnitNodeDto(
-                olId,
-                "Organisationsleitung KRT",
-                "OL",
-                "ORGANISATIONSLEITUNG",
-                null,
-                null,
-                null,
-                0L),
-            new OrgUnitNodeDto(
-                bereichId,
-                "Bereich Profit",
-                "PRF",
-                "BEREICH",
-                olId,
-                "Organisationsleitung KRT",
-                "PROFIT",
-                0L),
-            new OrgUnitNodeDto(
-                staffelId, "Iridium", "IRI", "SQUADRON", bereichId, "Bereich Profit", null, 0L));
+                olId, "Organisationsleitung KRT", "OL", "ORGANISATIONSLEITUNG", null, null, 0L),
+            new OrgUnitNodeDto(bereichId, "Bereich Profit", "PRF", "BEREICH", olId, "PROFIT", 0L),
+            new OrgUnitNodeDto(staffelId, "Iridium", "IRI", "SQUADRON", bereichId, null, 0L));
     when(backendApiClient.get(
             eq("/api/v1/org-hierarchy/org-units"), any(ParameterizedTypeReference.class)))
         .thenReturn(nodes);

@@ -281,8 +281,8 @@ public class OrgHierarchyController {
 
   /**
    * Maps an {@link OrgUnit} (any kind) to its flat hierarchy-node DTO for the management table. The
-   * parent edge (id + name) is read within the controller's transaction; {@code department} is read
-   * only for a {@link Bereich}, {@code null} for every other kind.
+   * parent id is read within the controller's transaction; {@code department} is read only for a
+   * {@link Bereich}, {@code null} for every other kind.
    *
    * @param u the entity; never {@code null}.
    * @return the node DTO.
@@ -294,7 +294,6 @@ public class OrgHierarchyController {
         u.getShorthand(),
         u.getKind(),
         u.getParent() == null ? null : u.getParent().getId(),
-        u.getParent() == null ? null : u.getParent().getName(),
         u instanceof Bereich b ? b.getDepartment() : null,
         u.getVersion());
   }

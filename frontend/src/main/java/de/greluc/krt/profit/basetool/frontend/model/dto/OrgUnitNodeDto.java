@@ -24,10 +24,10 @@ import java.util.UUID;
 /**
  * Frontend mirror of the backend {@code OrgUnitNodeDto}: a flat hierarchy node read by the admin
  * org-structure management page (epic #692, REQ-ORG-014). Carries each org unit's current parent
- * edge ({@code parentOrgUnitId} + resolved {@code parentName} for display) and optimistic-lock
- * {@code version} so the management table can render the structure and PATCH a new parent edge from
- * a single read. {@code kind} and {@code department} are plain strings (the backend serialises its
- * enums by name); {@code department} is non-null only for {@code BEREICH} rows.
+ * edge ({@code parentOrgUnitId}) and optimistic-lock {@code version} so the management table can
+ * render the structure and PATCH a new parent edge from a single read. {@code kind} and {@code
+ * department} are plain strings (the backend serialises its enums by name); {@code department} is
+ * non-null only for {@code BEREICH} rows.
  *
  * @param id the org unit's id.
  * @param name the org unit's display name.
@@ -35,7 +35,6 @@ import java.util.UUID;
  * @param kind the org unit's kind name (SQUADRON / SPECIAL_COMMAND / BEREICH /
  *     ORGANISATIONSLEITUNG).
  * @param parentOrgUnitId the id of the current parent, or {@code null} if unparented / root.
- * @param parentName the name of the current parent, or {@code null} if unparented / root.
  * @param department the Bereich's department name (Bereichsfarbe), or {@code null} for other kinds.
  * @param version the optimistic-lock version, required by the set-parent PATCH.
  */
@@ -45,6 +44,5 @@ public record OrgUnitNodeDto(
     String shorthand,
     String kind,
     UUID parentOrgUnitId,
-    String parentName,
     String department,
     Long version) {}

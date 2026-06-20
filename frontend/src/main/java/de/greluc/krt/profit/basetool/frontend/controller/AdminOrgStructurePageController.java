@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitParentUpdateReque
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrganisationsleitungCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +75,13 @@ public class AdminOrgStructurePageController {
   /** Backend org-unit kind discriminator: the area (Bereich) tier. */
   private static final String KIND_BEREICH = "BEREICH";
 
+  /**
+   * Top-down display order of the four kinds for the management table (OL → Bereich → Staffel/SK).
+   * A kind not in this list sorts first ({@code List.indexOf} returns {@code -1}).
+   */
+  private static final List<String> KIND_DISPLAY_ORDER =
+      List.of(KIND_OL, KIND_BEREICH, "SQUADRON", "SPECIAL_COMMAND");
+
   /** Backend admin list of every active org unit with its parent edge + version. */
   private static final String BACKEND_ORG_UNITS = "/api/v1/org-hierarchy/org-units";
 
@@ -119,6 +127,7 @@ public class AdminOrgStructurePageController {
       log.debug("Failed to load org units for the structure page", e);
       model.addAttribute("error", "admin.orgStructure.error.load");
     }
+    nodes = sortForDisplay(nodes);
     model.addAttribute("nodes", nodes);
     model.addAttribute(
         "organisationsleitungen", nodes.stream().filter(n -> KIND_OL.equals(n.kind())).toList());
@@ -127,6 +136,24 @@ public class AdminOrgStructurePageController {
     model.addAttribute("hasOl", nodes.stream().anyMatch(n -> KIND_OL.equals(n.kind())));
     model.addAttribute("departments", DEPARTMENTS);
     return "admin/org-structure";
+  }
+
+  /**
+   * Orders the flat node list for stable display: top-down by tier ({@link #KIND_DISPLAY_ORDER} —
+   * OL, then Bereiche, then Staffeln/SKs) and case-insensitively by name within a tier. The backend
+   * read returns rows in arbitrary order; sorting here also gives the per-kind parent-option pools
+   * (derived by filtering this list) a stable alphabetical order.
+   *
+   * @param nodes the unsorted nodes; never {@code null}.
+   * @return a new list ordered by tier then name.
+   */
+  private static List<OrgUnitNodeDto> sortForDisplay(List<OrgUnitNodeDto> nodes) {
+    return nodes.stream()
+        .sorted(
+            Comparator.comparingInt((OrgUnitNodeDto n) -> KIND_DISPLAY_ORDER.indexOf(n.kind()))
+                .thenComparing(
+                    n -> n.name() == null ? "" : n.name(), String.CASE_INSENSITIVE_ORDER))
+        .toList();
   }
 
   /**
