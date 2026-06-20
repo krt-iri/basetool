@@ -42806,6 +42806,11 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "displayName" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
           }
         },
         "required" : [ "version" ]
@@ -42830,6 +42835,9 @@
             "format" : "uuid"
           },
           "userName" : {
+            "type" : "string"
+          },
+          "displayName" : {
             "type" : "string"
           },
           "name" : {
@@ -45590,6 +45598,11 @@
           "sortIndex" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "displayName" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
           }
         },
         "required" : [ "positionType" ]
@@ -48313,6 +48326,9 @@
           "leaderUserName" : {
             "type" : "string"
           },
+          "leaderDisplayName" : {
+            "type" : "string"
+          },
           "deputy" : {
             "$ref" : "#/components/schemas/OrgChartNodeDto"
           },
@@ -48390,6 +48406,9 @@
             "format" : "uuid"
           },
           "userName" : {
+            "type" : "string"
+          },
+          "displayName" : {
             "type" : "string"
           },
           "sortIndex" : {

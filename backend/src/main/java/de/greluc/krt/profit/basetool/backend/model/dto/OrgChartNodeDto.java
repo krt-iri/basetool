@@ -31,8 +31,13 @@ import java.util.UUID;
  * @param positionId id of the underlying {@code org_chart_position} row; the handle every edit /
  *     remove / add-child action targets.
  * @param positionType the functional rank held in this node.
- * @param userId id of the user holding the position; preselects the user in the reassign picker.
- * @param userName the user's effective display name (display name, falling back to username).
+ * @param userId id of the user holding the position, or {@code null} when the holder is a free-text
+ *     name (or the seat is vacant); preselects the user in the reassign picker when present.
+ * @param userName the holding user's effective display name (display name, falling back to
+ *     username), or {@code null} when the holder is a free-text name or the seat is vacant.
+ * @param displayName the free-text holder name for a member without a Basetool account, or {@code
+ *     null} when the holder is an account or the seat is vacant; mutually exclusive with {@code
+ *     userId}.
  * @param sortIndex stable display order within the sibling group.
  * @param version optimistic-lock version of the row, echoed back on edit to detect concurrent
  *     changes.
@@ -42,5 +47,6 @@ public record OrgChartNodeDto(
     OrgChartPositionType positionType,
     UUID userId,
     String userName,
+    String displayName,
     int sortIndex,
     Long version) {}

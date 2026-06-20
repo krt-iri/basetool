@@ -69,19 +69,24 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>All structural invariants the database cannot express in plain SQL — the per-Staffel limits
  * (≤{@value #MAX_COMMAND_LEADS} Kommandos, ≤{@value #MAX_ENSIGNS} Ensign), the per-SK limit
- * (≤{@value #MAX_SK_COMMANDERS} SK-Leiter), the parent/scope consistency rules, the "name /
- * nullable holder only on a Kommando" rule, and "a user appears at most once per scope" — are
- * enforced here and surface as 400 problem responses. The singleton rules (one Bereichsleiter, one
- * Staffelleiter per Staffel, one Stv. per Kommando, one position per user and scope) are
- * additionally backstopped by partial unique indexes in migrations {@code V136}/{@code V138}, so a
- * concurrent double-create there fails cleanly as a 409. The count caps (≤4/≤2) are service-layer
- * only: two interleaved creates could momentarily exceed a cap by one — harmless for a descriptive,
- * ADMIN-only chart where an admin simply removes the surplus.
+ * (≤{@value #MAX_SK_COMMANDERS} SK-Leiter), the parent/scope consistency rules, the "name only on a
+ * Kommando" rule, the "holder is an account OR a free-text name, never both" rule, and "a user
+ * appears at most once per scope" — are enforced here and surface as 400 problem responses. The
+ * singleton rules (one Bereichsleiter, one Staffelleiter per Staffel, one Stv. per Kommando, one
+ * position per user and scope) are additionally backstopped by partial unique indexes in migrations
+ * {@code V136}/{@code V138}, so a concurrent double-create there fails cleanly as a 409. The count
+ * caps (≤4/≤2) are service-layer only: two interleaved creates could momentarily exceed a cap by
+ * one — harmless for a descriptive, ADMIN-only chart where an admin simply removes the surplus.
  *
  * <p>A {@link OrgChartPositionType#COMMAND_LEAD} row models the Kommando(gruppe) itself, carrying
  * an optional {@code name} and an optional holder (the Kommandoleiter). This lets an admin create
  * and name a Kommando, hang a Stv. Kommandoleiter and Ensigns off it, and only later assign its
  * Kommandoleiter — so a subordinate seat is fillable while its superior is still vacant.
+ *
+ * <p>Any position's holder may be a Basetool account or — for a Kartell member who has no account
+ * yet — a free-text {@code displayName} (the two are mutually exclusive). Reassigning a free-text
+ * position to an account clears the typed name in the same transaction, so the swap is
+ * regression-free. A free-text holder grants nothing, as the chart is descriptive only.
  */
 @Service
 @RequiredArgsConstructor
@@ -110,6 +115,7 @@ public class OrgChartService {
   private static final String ERR_DUPLICATE_DEPUTY = "problem.org_chart.duplicate_deputy";
   private static final String ERR_USER_ASSIGNED = "problem.org_chart.user_already_assigned";
   private static final String ERR_USER_REQUIRED = "problem.org_chart.user_required";
+  private static final String ERR_HOLDER_AMBIGUOUS = "problem.org_chart.holder_ambiguous";
   private static final String ERR_NAME_NOT_ALLOWED = "problem.org_chart.name_not_allowed";
   private static final String ERR_VACATE_NOT_COMMAND = "problem.org_chart.vacate_not_command";
 
@@ -271,19 +277,24 @@ public class OrgChartService {
   /**
    * Creates a new position, validating scope/type consistency, parent rules, cardinality limits,
    * the name/holder rules and the one-user-per-scope rule before persisting. ADMIN-only at the
-   * controller. A {@code COMMAND_LEAD} create may omit the holder to make a still-leaderless
-   * Kommando and may carry a {@code name}; every other rank requires a holder and rejects a name.
+   * controller. The holder is either an account ({@code userId}) or a free-text {@code displayName}
+   * for a member without one — supplying both is rejected. A {@code COMMAND_LEAD} create may omit
+   * both to make a still-leaderless Kommando and may carry a Kommandogruppen-{@code name}; every
+   * other rank requires a holder (account or free-text) and rejects a {@code name}.
    *
    * @param request the assignment payload; never {@code null}.
    * @return the persisted position as a flat DTO with id + version populated.
    * @throws NotFoundException if the user, the OrgUnit, or the referenced parent does not exist.
-   * @throws BadRequestException if any scope/parent/cardinality/name/uniqueness rule is violated.
+   * @throws BadRequestException if any scope/parent/cardinality/name/uniqueness rule is violated,
+   *     if both an account and a free-text name are supplied, or if neither is supplied for a
+   *     non-{@code COMMAND_LEAD} rank.
    */
   @Transactional
   public OrgChartPositionDto createPosition(@NotNull OrgChartPositionCreateRequest request) {
     OrgChartPositionType type = request.positionType();
     OrgChartScope scope = type.scope();
-    final User user = resolveHolderForCreate(type, request.userId());
+    final String displayName = trimToNull(request.displayName());
+    final User user = resolveHolderForCreate(type, request.userId(), displayName);
 
     OrgUnit orgUnit = resolveScopeOrgUnit(scope, request.orgUnitId());
     final OrgChartPosition parent = resolveAndValidateParent(type, orgUnit, request.parentId());
@@ -297,6 +308,9 @@ public class OrgChartService {
     position.setPositionType(type);
     position.setOrgUnit(orgUnit);
     position.setUser(user);
+    // Mutually exclusive with the account: resolveHolderForCreate rejects supplying both, so
+    // displayName is null whenever an account was resolved.
+    position.setDisplayName(displayName);
     position.setName(name);
     position.setParent(parent);
     position.setSortIndex(request.sortIndex() != null ? request.sortIndex() : 0);
@@ -305,18 +319,27 @@ public class OrgChartService {
 
   /**
    * Reassigns the holder, renames a Kommando and/or reorders an existing position. The functional
-   * rank, scope and parent are immutable after creation (move = remove + re-add), so only {@code
-   * userId}, {@code name} (Kommando only) and {@code sortIndex} are honoured; a {@code null} field
-   * leaves the current value unchanged, while a blank {@code name} clears it. Assigning a holder to
-   * a still-leaderless Kommando is just a reassign through {@code userId}.
+   * rank, scope and parent are immutable after creation (move = remove + re-add), so only the
+   * holder ({@code userId} or {@code displayName}), {@code name} (Kommando only) and {@code
+   * sortIndex} are honoured; a {@code null} field leaves the current value unchanged, while a blank
+   * {@code name} clears it.
+   *
+   * <p>The holder swap is the heart of the free-text feature and runs on the already-managed entity
+   * with a single {@code save()} (no second fetch, no bulk clear), so there is no optimistic-lock
+   * second-bump: supplying a {@code userId} sets the account <em>and</em> clears any free-text
+   * {@code displayName} on the same row in the same transaction — the regression-free "the member
+   * now has an account" path. Supplying a non-blank {@code displayName} (without a {@code userId})
+   * sets the typed name and clears the account holder. Assigning a holder to a still-leaderless
+   * Kommando is just a reassign through {@code userId} or {@code displayName}.
    *
    * @param id the position id; never {@code null}.
    * @param request the edit payload carrying the current optimistic-lock version; never {@code
    *     null}.
    * @return the updated position as a flat DTO with the bumped version.
    * @throws NotFoundException if the position or the new user does not exist.
-   * @throws BadRequestException if the new holder already occupies a position in the same scope, or
-   *     a name is supplied for a non-Kommando rank.
+   * @throws BadRequestException if the new holder already occupies a position in the same scope, a
+   *     name is supplied for a non-Kommando rank, or clearing the typed name would leave a
+   *     non-Kommando rank with no holder at all.
    * @throws ObjectOptimisticLockingFailureException if the supplied version is stale.
    */
   @Transactional
@@ -336,6 +359,7 @@ public class OrgChartService {
       position.setName(trimToNull(request.name()));
     }
     if (request.userId() != null) {
+      // Account holder: assign (if changed) and clear any free-text name in the same transaction.
       User current = position.getUser();
       if (current == null || !request.userId().equals(current.getId())) {
         User newUser =
@@ -346,6 +370,20 @@ public class OrgChartService {
             position.getPositionType().scope(), position.getOrgUnit(), request.userId());
         position.setUser(newUser);
       }
+      position.setDisplayName(null);
+    } else if (request.displayName() != null) {
+      // Free-text holder: a non-blank typed name replaces the account holder; a blank value clears
+      // it, which is only allowed where a holder is optional (a COMMAND_LEAD Kommando).
+      String typed = trimToNull(request.displayName());
+      if (typed == null
+          && position.getUser() == null
+          && position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
+        throw new BadRequestException(ERR_USER_REQUIRED);
+      }
+      position.setDisplayName(typed);
+      if (typed != null) {
+        position.setUser(null);
+      }
     }
     if (request.sortIndex() != null) {
       position.setSortIndex(request.sortIndex());
@@ -354,14 +392,14 @@ public class OrgChartService {
   }
 
   /**
-   * Vacates the Kommandoleiter seat of a Kommando(gruppe): clears the holder on a {@code
-   * COMMAND_LEAD} row while leaving the row itself — its name, its Stv. Kommandoleiter and its
-   * Ensigns — intact. This is the inverse of assigning a leader through {@link #updatePosition} and
-   * the reason a Kommando outlives a departing Kommandoleiter instead of having to be deleted and
-   * rebuilt. Only a {@code COMMAND_LEAD} carries a nullable holder (the {@code chk_org_chart_user}
-   * CHECK keeps every other rank's holder mandatory), so every other rank is rejected as a 400:
-   * removing such a person-centric position is {@link #deletePosition} instead. ADMIN-only at the
-   * controller.
+   * Vacates the Kommandoleiter seat of a Kommando(gruppe): clears the holder (both an account and
+   * any free-text leader name) on a {@code COMMAND_LEAD} row while leaving the row itself — its
+   * name, its Stv. Kommandoleiter and its Ensigns — intact. This is the inverse of assigning a
+   * leader through {@link #updatePosition} and the reason a Kommando outlives a departing
+   * Kommandoleiter instead of having to be deleted and rebuilt. Only a {@code COMMAND_LEAD} may be
+   * left with no holder at all (the {@code chk_org_chart_user} CHECK keeps every other rank filled
+   * by an account or a free-text name), so every other rank is rejected as a 400: removing such a
+   * person-centric position is {@link #deletePosition} instead. ADMIN-only at the controller.
    *
    * @param id the Kommando position id; never {@code null}.
    * @param version the optimistic-lock version the client last saw; a mismatch surfaces as 409.
@@ -382,7 +420,9 @@ public class OrgChartService {
     if (position.getVersion() != null && !position.getVersion().equals(version)) {
       throw new ObjectOptimisticLockingFailureException(OrgChartPosition.class, id);
     }
+    // A vacated Kommando is fully empty: drop both an account and any free-text leader name.
     position.setUser(null);
+    position.setDisplayName(null);
     return mapper.toDto(positionRepository.save(position));
   }
 
@@ -483,6 +523,7 @@ public class OrgChartService {
         command.getSortIndex(),
         leader != null ? leader.getId() : null,
         leader != null ? leader.getEffectiveName() : null,
+        command.getDisplayName(),
         deputy,
         ensigns);
   }
@@ -509,10 +550,28 @@ public class OrgChartService {
 
   // ----------------------------------------------------------------- write guards --
 
-  private User resolveHolderForCreate(OrgChartPositionType type, UUID userId) {
+  /**
+   * Resolves the account holder for a create, enforcing the "account OR free-text name, never both"
+   * rule. Returns the {@link User} when {@code userId} is given (and {@code displayName} is not),
+   * or {@code null} when the position is held by a free-text name or is a still-leaderless
+   * Kommando.
+   *
+   * @param type the rank being created.
+   * @param userId the account id, or {@code null} for a free-text / leaderless holder.
+   * @param displayName the already-trimmed free-text holder name, or {@code null}.
+   * @return the resolved account, or {@code null} for a free-text / leaderless holder.
+   * @throws BadRequestException if both a {@code userId} and a {@code displayName} are supplied, or
+   *     if neither is supplied for a rank other than {@code COMMAND_LEAD}.
+   * @throws NotFoundException if {@code userId} does not match an existing user.
+   */
+  private User resolveHolderForCreate(OrgChartPositionType type, UUID userId, String displayName) {
+    if (userId != null && displayName != null) {
+      throw new BadRequestException(ERR_HOLDER_AMBIGUOUS);
+    }
     if (userId == null) {
-      if (type == OrgChartPositionType.COMMAND_LEAD) {
-        return null; // a Kommando may be created before its Kommandoleiter is assigned
+      // A free-text name fills the seat; a Kommando may also be created before any holder exists.
+      if (displayName != null || type == OrgChartPositionType.COMMAND_LEAD) {
+        return null;
       }
       throw new BadRequestException(ERR_USER_REQUIRED);
     }
