@@ -21,3 +21,11 @@ paths = [
   '''\.env\.example$''',
   '''frontend/src/e2e/resources/realm-export\.e2e\.json$''',
 ]
+# Obvious synthetic Discord snowflake used as a throwaway unit-test fixture (the
+# 18-digit placeholder id in UserServiceDiscordSyncTest). It is a sequential dummy,
+# never a real id — and a Discord *client id* is a public identifier, not a secret —
+# so the default discord-client-id rule's match on it is a false positive. Scoped to
+# this exact literal so any genuinely secret-shaped value still trips the scan.
+regexes = [
+  '''123456789012345678''',
+]
