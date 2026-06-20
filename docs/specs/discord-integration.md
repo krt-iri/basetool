@@ -65,25 +65,44 @@ from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never 
 
 **Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker` · **Issues:** #723, #725
 
-### REQ-SEC-017 — PENDING approval withholds all authorities
+### REQ-SEC-017 — PENDING approval withholds all authorities (fail-safe default)
 
-A brand-new Discord login lands `PENDING` and is granted **no** authorities until an admin approves:
-the entire authority assembly (realm roles + permissions + org-unit membership + cascade) is
-short-circuited to a single `ROLE_PENDING_APPROVAL`, and `ROLE_GUEST` is **not** carried. Approval
-moves the user to `ACTIVE`; rejection keeps them denied. Keycloak `ADMIN`-realm-role holders are
-auto-`ACTIVE` (bootstrap safety). After approval, roles/units are assigned manually (Track 1) — no
-automated mapping.
+**Every** brand-new **non-admin** registration lands `PENDING` and is granted **no** authorities
+until an admin approves — independent of whether the login arrived via Discord or credentials. The
+PENDING decision is deliberately **decoupled from Discord detection**: it must not depend on the
+optional `discord_user_id` claim/mapper, otherwise a misconfigured Keycloak (attribute/protocol
+mapper absent) would let a federated login inherit the `ACTIVE` default and silently skip approval.
+For a PENDING (or `REJECTED`) account the entire authority assembly (realm roles + permissions +
+org-unit membership + cascade) is short-circuited to a single `ROLE_PENDING_APPROVAL`, and
+`ROLE_GUEST` is **not** carried. Approval moves the user to `ACTIVE`; rejection keeps them denied.
+Keycloak `ADMIN`-realm-role holders are auto-`ACTIVE` (bootstrap safety — the first admin can never be
+locked out). Both creation paths apply the rule — the interactive login (`syncUser(Jwt)`) and the
+scheduled Keycloak reconciliation (`syncUser(KeycloakUserDto)`) — so the scheduler can never
+pre-create an `ACTIVE` row that a later login would inherit. Admins are **notified** only for genuine
+Discord self-registrations (REQ-NOTIF-012); a credential account is created by an admin in Keycloak
+who already sees it in the pending queue, so it raises no extra notification. After approval,
+roles/units are assigned manually (Track 1) — no automated mapping.
+
+> **Trade-off (owner-approved 2026-06-20).** Making the default fail-safe means a brand-new
+> **credential** account (created directly in Keycloak) now also requires a one-time Basetool
+> approval, and the scheduled sync materialises not-yet-seen Keycloak users as `PENDING` rather than
+> `ACTIVE`. This is the accepted cost of closing the mapper-misconfiguration bypass; pre-existing rows
+> stay `ACTIVE` (V173 backfill), so only accounts created after this change are affected.
 
 **Acceptance**
 
 - [x] PENDING/REJECTED ⇒ only `ROLE_PENDING_APPROVAL`, even if the JWT carries realm roles; membership
   is never consulted and `ROLE_GUEST` is not carried.
+- [x] Every brand-new non-admin registration ⇒ `PENDING`, whether via Discord **or** credentials, and
+  regardless of whether the `discord_user_id` claim is present (mapper-independent fail-safe).
+- [x] The scheduled sync (`syncUser(KeycloakUserDto)`) creates a brand-new non-admin user `PENDING`
+  too; it never changes an existing user's approval state.
 - [ ] First admin (Keycloak `ADMIN` realm role) is `ACTIVE` on first login. _(syncUser carve-out; T1.4 e2e.)_
 - [x] Approve ⇒ `ACTIVE` + audit row; reject ⇒ `REJECTED` + reason in the audit.
 - [x] Concurrent approve ⇒ 409 (optimistic `@Version`).
 - [ ] Legacy rows backfilled `ACTIVE` (V173). _(schema-validated on boot; T1.4 e2e.)_
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService`, `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route) · **Issues:** #724
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService`, `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route) · **Issues:** #724
 
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 

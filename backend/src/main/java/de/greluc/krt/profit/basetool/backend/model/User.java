@@ -122,12 +122,16 @@ public class User extends AbstractEntity<UUID> {
   private String discordUserId;
 
   /**
-   * Account approval lifecycle (epic #720, Track 1, REQ-SEC-017). A brand-new Discord registration
-   * is {@link ApprovalStatus#PENDING} (no authorities granted — only {@code ROLE_PENDING_APPROVAL})
-   * until an admin approves; credential/admin-created and all pre-existing users are {@link
-   * ApprovalStatus#ACTIVE}. Defaults to {@code ACTIVE} so any non-Discord creation path is active
-   * unless {@link UserService#syncUser(org.springframework.security.oauth2.jwt.Jwt)} explicitly
-   * lands a new Discord login in {@code PENDING}.
+   * Account approval lifecycle (epic #720, Track 1, REQ-SEC-017 — fail-safe default). A brand-new
+   * non-admin registration is {@link ApprovalStatus#PENDING} (no authorities granted — only {@code
+   * ROLE_PENDING_APPROVAL}) until an admin approves, whether it arrived via Discord or credentials;
+   * Keycloak {@code ADMIN}-realm-role holders and all pre-existing (V173-backfilled) rows are
+   * {@link ApprovalStatus#ACTIVE}. The field-level default stays {@code ACTIVE} so the
+   * admin-bootstrap path and direct test/seed construction yield an active member, but both
+   * creation paths in {@link UserService} ({@code syncUser(Jwt)} and {@code
+   * syncUser(KeycloakUserDto)}) explicitly set {@code PENDING} for every new non-admin — so the
+   * PENDING decision never depends on detecting the Discord {@code discord_user_id} claim (a
+   * missing claim mapper can no longer let a federated login skip approval).
    */
   @Enumerated(EnumType.STRING)
   @Column(name = "approval_status", nullable = false)

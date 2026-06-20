@@ -270,15 +270,23 @@ public class UserService {
       changed = true;
     }
 
-    // Approval lifecycle (epic #720, Track 1 / REQ-SEC-017). A brand-new Discord federated login by
-    // a non-admin lands PENDING; credential/admin-created users and admins stay ACTIVE (the entity
-    // default). The Keycloak ADMIN-realm-role carve-out also promotes any existing PENDING admin to
-    // ACTIVE so the first admin can never be locked out (bootstrap safety).
+    // Approval lifecycle (epic #720, Track 1 / REQ-SEC-017 — fail-safe default). EVERY brand-new
+    // non-admin registration lands PENDING and receives no authorities until an admin approves,
+    // regardless of whether the login arrived via Discord or credentials. This is deliberately
+    // decoupled from Discord detection: the PENDING decision must NOT depend on the optional
+    // discord_user_id claim/mapper, otherwise a misconfigured Keycloak (attribute/protocol mapper
+    // absent) would let a federated login inherit the ACTIVE entity-default and silently skip
+    // approval. Keycloak ADMIN-realm-role holders are auto-ACTIVE (bootstrap safety — the first
+    // admin
+    // can never be locked out), and the carve-out below also promotes an existing PENDING admin to
+    // ACTIVE. Admins are notified only for genuine Discord self-registrations (REQ-NOTIF-012); a
+    // credential account is created by an admin in Keycloak, who already sees it in the pending
+    // queue, so it raises no extra notification.
     boolean isAdmin = localRoles.stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()));
     boolean newPendingRegistration = false;
-    if (created && viaDiscord && !isAdmin) {
+    if (created && !isAdmin) {
       user.setApprovalStatus(ApprovalStatus.PENDING);
-      newPendingRegistration = true;
+      newPendingRegistration = viaDiscord;
       changed = true;
     } else if (!created && isAdmin && user.getApprovalStatus() != ApprovalStatus.ACTIVE) {
       user.setApprovalStatus(ApprovalStatus.ACTIVE);
@@ -354,6 +362,20 @@ public class UserService {
     Set<Role> localRoles = mapRoles(dto.roles());
     if (!user.getRoles().equals(localRoles)) {
       user.setRoles(localRoles);
+      changed = true;
+    }
+
+    // Fail-safe approval default (REQ-SEC-017), mirroring syncUser(Jwt). A brand-new non-admin user
+    // first discovered by the scheduled reconciliation lands PENDING, so the scheduler can never
+    // pre-create an ACTIVE row that a later interactive login would inherit (created == false) and
+    // thereby skip the approval gate. Admins stay ACTIVE (entity default, bootstrap safety). Only
+    // brand-new rows are touched — an existing user's approval state is never changed here. No
+    // notification is raised: this is batch reconciliation, a genuine Discord self-registration is
+    // announced by the interactive login path (REQ-NOTIF-012), and the new rows still surface in
+    // the
+    // admin pending queue.
+    if (created && localRoles.stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()))) {
+      user.setApprovalStatus(ApprovalStatus.PENDING);
       changed = true;
     }
 

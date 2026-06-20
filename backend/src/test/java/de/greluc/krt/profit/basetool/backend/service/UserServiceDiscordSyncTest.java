@@ -136,7 +136,14 @@ class UserServiceDiscordSyncTest {
   }
 
   @Test
-  void newCredentialUser_landsActive_noLink_noNotification() {
+  void newCredentialUser_landsPending_noLink_noNotification() {
+    // Fail-safe default (REQ-SEC-017): a brand-new non-admin credential login now also lands
+    // PENDING
+    // (no longer ACTIVE), independent of any Discord claim — this is what closes the
+    // mapper-misconfig
+    // gap. It carries no Discord link, and raises no admin notification (only genuine Discord
+    // self-registrations notify; an admin-created credential account is already known via the
+    // queue).
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
     when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
     when(roleRepository.findByNameIgnoreCase("Guest"))
@@ -145,8 +152,25 @@ class UserServiceDiscordSyncTest {
 
     User result = userService.syncUser(jwt(false, List.of()));
 
-    assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
+    assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
     assertNull(result.getDiscordUserId());
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  @Test
+  void newCredentialAdmin_landsActive_noNotification() {
+    // ADMIN bootstrap carve-out: a brand-new Keycloak ADMIN-realm-role holder is ACTIVE even
+    // without
+    // Discord, so the first admin can never be locked out by the fail-safe default.
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+    when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
+    when(roleRepository.findByNameIgnoreCase("Admin"))
+        .thenReturn(Optional.of(role("ADMIN", "Admin")));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    User result = userService.syncUser(jwt(false, List.of("Admin")));
+
+    assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
     verify(eventPublisher, never()).publishEvent(any());
   }
 
