@@ -22,6 +22,11 @@ java {
 // in lockstep with the Keycloak image's JDK if a future Keycloak upgrades it.
 tasks.withType<JavaCompile>().configureEach { options.release.set(21) }
 
+// Byte Buddy (Mockito's backend) does not yet officially support the repo's JDK 25 toolchain; the
+// flag lets it proceed (the same compatibility knob Byte Buddy itself recommends). The backend/
+// frontend modules avoid this via Spring Boot's newer managed Mockito.
+tasks.withType<Test>().configureEach { systemProperty("net.bytebuddy.experimental", "true") }
+
 repositories { mavenCentral() }
 
 dependencies {
@@ -38,6 +43,10 @@ dependencies {
   // instantiate the factories/providers directly), mirroring the compileOnly set.
   testImplementation(platform(libs.junit.bom))
   testImplementation(libs.junit.jupiter)
+  // Mockito to unit-test the authenticator orchestration against a mocked Keycloak flow context.
+  // Pinned directly — this module has no Spring Boot dependency-management to supply a version.
+  testImplementation("org.mockito:mockito-core:5.14.2")
+  testImplementation("org.mockito:mockito-junit-jupiter:5.14.2")
   testImplementation(libs.keycloak.server.spi)
   testImplementation(libs.keycloak.server.spi.private)
   testImplementation(libs.keycloak.services)

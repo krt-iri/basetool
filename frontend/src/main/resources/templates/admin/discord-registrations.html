@@ -59,7 +59,7 @@
                     <tr th:each="reg : ${registrations}" th:id="'reg-row-' + ${reg.id}"
                         th:attr="data-id=${reg.id},data-version=${reg.version}">
                         <td th:text="${reg.username}">Nutzer</td>
-                        <td class="reg-when" th:text="${reg.registeredAt}">2026-06-20T00:00:00Z</td>
+                        <td class="reg-when" th:text="${#temporals.format(reg.registeredAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
                         <td>
                             <div class="reg-actions">
                                 <button type="button" class="btn btn--cta" data-action="approve"

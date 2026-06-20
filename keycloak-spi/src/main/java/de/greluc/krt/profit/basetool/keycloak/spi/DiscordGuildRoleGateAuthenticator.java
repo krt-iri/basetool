@@ -117,7 +117,14 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
     return (model != null && model.getConfig() != null) ? model.getConfig() : Map.of();
   }
 
-  private String federatedAccessToken(AuthenticationFlowContext context) {
+  /**
+   * Extracts the user's brokered Discord access token from the first-broker-login session. Package-
+   * visible (not private) purely so a unit test can override it without a live Keycloak session.
+   *
+   * @param context the authentication flow context
+   * @return the brokered Discord access token, or {@code null} when none is present
+   */
+  String federatedAccessToken(AuthenticationFlowContext context) {
     SerializedBrokeredIdentityContext serialized =
         SerializedBrokeredIdentityContext.readFromAuthenticationSession(
             context.getAuthenticationSession(), AbstractIdpAuthenticator.BROKERED_CONTEXT_NOTE);

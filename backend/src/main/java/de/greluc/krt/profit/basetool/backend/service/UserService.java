@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
@@ -1073,6 +1074,14 @@ public class UserService {
                         "User not found"));
     if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
       throw new ObjectOptimisticLockingFailureException(User.class, userId);
+    }
+    // State-transition guard (PR review #3): only a still-PENDING registration may be approved or
+    // rejected. Acting on an already-ACTIVE member would silently strip their authorities and trap
+    // them on the waiting page; an already-REJECTED row is a stale double-action. Either is a 409.
+    if (user.getApprovalStatus() != ApprovalStatus.PENDING) {
+      throw new BusinessConflictException(
+          "Only a pending registration can be decided; current status is "
+              + user.getApprovalStatus());
     }
     user.setApprovalStatus(newStatus);
     user.setApprovedAt(Instant.now());

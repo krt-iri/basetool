@@ -31,6 +31,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
@@ -135,7 +136,7 @@ public class User extends AbstractEntity<UUID> {
   /** When the registration was approved/rejected; {@code null} while still {@code PENDING}. */
   @Nullable
   @Column(name = "approved_at")
-  private java.time.Instant approvedAt;
+  private Instant approvedAt;
 
   /**
    * The admin who approved/rejected this registration; {@code null} while still {@code PENDING}.

@@ -36,8 +36,9 @@ import org.keycloak.provider.ProviderConfigProperty;
  * <p>Registered via {@code META-INF/services/org.keycloak.authentication.AuthenticatorFactory} so
  * the gate can be added as a {@code REQUIRED} execution to a custom <em>First Broker Login</em>
  * flow and bound to the Discord IdP. The config properties (guild id, KRT-Mitglied role id, API
- * base URL) are declared here so they are editable in the admin console; the T1.0 authenticator
- * stub does not read them yet — T1.2 (#723) consumes them in the real gate.
+ * base URL) are declared here so they are editable in the admin console; {@link
+ * DiscordGuildRoleGateAuthenticator} reads them at authentication time to enforce the membership
+ * gate.
  */
 public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFactory {
 

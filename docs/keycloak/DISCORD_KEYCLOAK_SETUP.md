@@ -133,6 +133,11 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 - Keycloak/SPI logs contain **no** Discord ids, tokens or profile payloads.
 - Username/password login is unchanged.
 
+> **Enforced once, at first link.** The guild + KRT-Mitglied check runs in the first-broker-login
+> flow — i.e. only when the Discord account is first linked, not on every login. A member later
+> kicked from the guild or stripped of KRT-Mitglied keeps access until the Track 2 role-sync lands;
+> until then, revoke access by disabling/removing the user in Keycloak.
+
 ---
 
 ## 6. Secrets & rotation

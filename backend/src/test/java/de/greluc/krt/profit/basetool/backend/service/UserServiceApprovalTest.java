@@ -27,6 +27,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -107,5 +108,20 @@ class UserServiceApprovalTest {
 
     verify(userApprovalEventRepository, never()).save(any());
     assertEquals(ApprovalStatus.PENDING, user.getApprovalStatus());
+  }
+
+  @Test
+  void decide_onNonPendingUser_throwsConflict_andWritesNoAudit() {
+    // PR review #3: an already-ACTIVE member must not be reject-able into a lockout.
+    User active = pendingUser(2L);
+    active.setApprovalStatus(ApprovalStatus.ACTIVE);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(active));
+
+    assertThrows(
+        BusinessConflictException.class,
+        () -> userService.rejectUser(USER_ID, "oops", 2L, ADMIN_ID));
+
+    verify(userApprovalEventRepository, never()).save(any());
+    assertEquals(ApprovalStatus.ACTIVE, active.getApprovalStatus());
   }
 }

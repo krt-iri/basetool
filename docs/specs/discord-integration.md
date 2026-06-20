@@ -99,6 +99,10 @@ or PII in the payload), via the existing data-driven notification rule engine (a
 
 - **Automated Discord-role → app-role/org-unit sync** and the Discord **bot** — Track 2 (#726–#730),
   ADR-0030 (planned). Track 1 keeps Basetool roles manual.
+- **Continuous membership enforcement.** The guild + KRT-Mitglied gate (REQ-SEC-016) runs **once**,
+  at first-broker-login when the Discord identity is first linked. A member later removed from the
+  guild or stripped of `KRT-Mitglied` keeps Basetool access until the Track 2 role-sync revokes it —
+  Track 1 does no periodic re-check.
 - **Discord OAuth application + Keycloak realm provisioning** (client id/secret, IdP, mappers, the
   custom first-broker-login flow, the gate config) — operator steps in
   [`DISCORD_KEYCLOAK_SETUP.md`](../keycloak/DISCORD_KEYCLOAK_SETUP.md); never committed secrets.
