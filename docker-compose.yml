@@ -150,6 +150,13 @@ x-keycloak: &keycloak-template
   volumes:
     - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
     - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+    # Custom Keycloak provider JARs (the Discord federation + first-login membership
+    # gate SPI, epic #720). The deploy step stages keycloak-spi-*.jar here, 0644 so the
+    # uid-1000 Keycloak image can read it (same lesson as the keystore). An empty or
+    # missing host dir is harmless — Keycloak simply finds no extra providers. The
+    # `start` command re-runs the provider build on every boot, so a staged JAR is
+    # picked up after a restart. See docs/keycloak/DISCORD_KEYCLOAK_SETUP.md.
+    - /var/iri/code/keycloak/providers:/opt/keycloak/providers
     - /var/iri/keycloak/log:/var/log/keycloak
 
 x-backend: &backend-template
@@ -404,6 +411,9 @@ services:
     volumes:
       - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
       - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+      # Custom Keycloak provider JARs — see the x-keycloak template note. Re-listed
+      # here because a service-level `volumes:` replaces the merged template value.
+      - /var/iri/code/keycloak/providers:/opt/keycloak/providers
       - /var/iri/keycloak/log:/var/log/keycloak
       - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     depends_on:

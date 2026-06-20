@@ -108,6 +108,18 @@ public class User extends AbstractEntity<UUID> {
   @Column(name = "share_blueprints_globally", nullable = false)
   private boolean shareBlueprintsGlobally = false;
 
+  /**
+   * The user's linked Discord account id (a numeric snowflake, stored as text). Written by the
+   * Keycloak Discord identity-provider mapper into the {@code discord_user_id} token claim and
+   * persisted here on login, so a returning Discord user is recognised. {@code null} for users who
+   * only ever signed in with credentials; at most one {@link User} per Discord id (DB-unique). This
+   * column merely records the federation link — the guild + KRT-Mitglied membership gate itself
+   * lives in the Keycloak SPI, never here. Epic #720, Track 1 / REQ-DATA-006.
+   */
+  @Nullable
+  @Column(name = "discord_user_id", unique = true)
+  private String discordUserId;
+
   public String getEffectiveName() {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;
   }

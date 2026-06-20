@@ -1,0 +1,50 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.keycloak.spi;
+
+import org.keycloak.broker.oidc.mappers.AbstractJsonUserAttributeMapper;
+
+/**
+ * JSON attribute-importer mapper for the Discord identity provider.
+ *
+ * <p>Reuses Keycloak's {@link AbstractJsonUserAttributeMapper} machinery so an admin can map a path
+ * in the stored Discord {@code /users/@me} JSON (notably {@code id}) into a Keycloak user attribute
+ * — configured to target {@code discord_user_id}, which a {@code basetool-frontend} protocol mapper
+ * then carries into the token as the {@code discord_user_id} claim. That is the Discord-account
+ * auto-link (epic #720 / REQ-DATA-006). Registered via {@code
+ * META-INF/services/org.keycloak.broker.provider.IdentityProviderMapper}.
+ */
+public class DiscordUserAttributeMapper extends AbstractJsonUserAttributeMapper {
+
+  /** Stable mapper id shown in the admin console. */
+  public static final String PROVIDER_ID = "discord-user-attribute-mapper";
+
+  private static final String[] COMPATIBLE_PROVIDERS = {DiscordIdentityProviderFactory.PROVIDER_ID};
+
+  @Override
+  public String[] getCompatibleProviders() {
+    return COMPATIBLE_PROVIDERS;
+  }
+
+  @Override
+  public String getId() {
+    return PROVIDER_ID;
+  }
+}

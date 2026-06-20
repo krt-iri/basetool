@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Grundgerüst für die Discord-Anmeldung steht (Track 1, für Nutzer noch ohne sichtbare Wirkung).** Ein neues Keycloak-Provider-Modul bindet Discord als Anmeldeanbieter an und verknüpft das Discord-Konto mit dem Basetool-Konto. Die eigentliche Mitgliedschaftsprüfung (nur Mitglieder des Kartell-Discords mit der Rolle „KRT-Mitglied“ kommen hinein) und die Admin-Freigabe neuer Discord-Nutzer folgen in den nächsten Schritten; die Anmeldung per Benutzername/Passwort bleibt unverändert.
+
 ### Changed
 
 - **Die Mindestqualität in Aufträgen ist von 700 auf 650 gesenkt.** In Material- und Item-Aufträgen steht als Mindestqualität nur noch „650" oder „Keine" zur Auswahl (Voreinstellung 650), und Lagerbestände ab Qualität 650 zählen jetzt als „Gut" für Deckung und Sammelfortschritt. Bestehende Aufträge mit dem alten Wert 700 werden per Datenbank-Migration automatisch auf 650 umgestellt.
