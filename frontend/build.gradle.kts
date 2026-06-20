@@ -337,13 +337,13 @@ val playwrightSuiteConfig: Test.() -> Unit = {
   testClassesDirs = sourceSets["e2e"].output.classesDirs
   classpath = sourceSets["e2e"].runtimeClasspath
   dependsOn(playwrightInstall)
-  // These flows run against a full stack that E2eStackExtension builds at RUNTIME from the entire
-  // app (main code, Thymeleaf templates, Flyway migrations, the backend image) — none of which is a
-  // tracked Gradle input here (only the `e2e` source set + classpath are). So a pure main-code PR
-  // leaves these inputs unchanged and the Test task would resolve UP-TO-DATE / FROM-CACHE, reporting
-  // a green WITHOUT ever booting the stack or running a browser (observed on PRs #733/#734). Force a
-  // real run every time these opt-in, label-gated suites are invoked — correctness beats the cache
-  // for a Docker-stack integration test whose true inputs cannot be hashed.
+  // These flows run against a full stack that E2eStackExtension builds at RUNTIME from the
+  // entire app (main code, Thymeleaf templates, Flyway migrations, the backend image) — none of
+  // which is a tracked Gradle input here (only the `e2e` source set + classpath are). So a PR
+  // that touches only main code leaves those inputs unchanged and the Test task resolves
+  // UP-TO-DATE / FROM-CACHE, reporting green WITHOUT ever booting the stack or running a browser
+  // (seen on #733/#734). Force a real run whenever these opt-in, label-gated suites are invoked —
+  // correctness beats caching for a stack-integration test whose true inputs cannot be hashed.
   outputs.upToDateWhen { false }
   outputs.cacheIf { false }
   // Chromium is provisioned by playwrightInstall; stop Playwright.create() from auto-downloading
