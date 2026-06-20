@@ -220,3 +220,28 @@ the change is realm-wide.
 This is an operator-applied Keycloak setting (the owner runs prod Keycloak directly); this PR carries
 the matching spec/runbook/reference updates so code-as-docs and the live config stay in step.
 
+## Amendment — 2026-06-20 (amendment #5): a second, rotation-independent cause — the `scope` request param leaked into the grant
+
+Even with rotation off (amendment #4), production still showed `Fehler beim Laden` — but the Keycloak
+event was a *different* one: `REFRESH_TOKEN_ERROR error="invalid_request" reason="Invalid scopes: all"`
+(also `"Invalid scopes: mine"`), surfacing as `ClientAuthorizationException [invalid_scope]` from
+`RefreshTokenOAuth2AuthorizedClientProvider`. `all` / `mine` are not OAuth scopes — they are the
+job-orders **"Staffel" filter** (`orders-index.html`, radio `name="scope"` `value="mine|all"`,
+"Eigene Staffel" / "Alle Staffeln"). The bug is a Spring footgun independent of rotation/reuse and of
+single-flight: `DefaultOAuth2AuthorizedClientManager`'s default `contextAttributesMapper` copies an
+HTTP request parameter literally named `scope` into
+`OAuth2AuthorizationContext.REQUEST_SCOPE_ATTRIBUTE_NAME`, and the refresh provider then forwards it to
+Keycloak as the requested scope of the **refresh-token grant**. So any token refresh that coincides
+with a request carrying `?scope=all|mine` is rejected `invalid_scope` and the SSO session is bounced
+into re-authentication. It is intermittent because only a refresh landing on such a request is
+poisoned — a `scope`-free background poll (`/notifications/unread-count`) refreshes cleanly, which is
+why a reload "after a bit" recovers. This is precisely why the four prior rotation-/reuse-focused
+iterations never closed it.
+
+**Fix.** The frontend never requests scopes dynamically — the `keycloak` client registration's scopes
+are fixed — so the `DefaultOAuth2AuthorizedClientManager`'s `contextAttributesMapper` is overridden to
+return an empty map (`WebClientConfig.NO_REQUEST_DERIVED_ATTRIBUTES`), severing the request-parameter →
+OAuth-scope path entirely. This is a code change (unlike amendment #4's operator toggle) and is
+orthogonal to every mitigation above; it holds regardless of the rotation setting. Guarded by
+`OAuth2ScopeRequestParamLeakTest` (baseline proves the default mapper leaks; fix proves the override
+drops `scope=all` and `scope=mine`).

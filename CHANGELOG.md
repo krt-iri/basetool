@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Der Staffel-Filter in der Auftragsübersicht löst keine sporadischen Abmeldungen mehr aus.** Beim Umschalten zwischen „Eigene Staffel" und „Alle Staffeln" konnte die Sitzungserneuerung fehlschlagen, sodass die Aufträge kurzzeitig nicht luden und erst ein erneutes Laden half. Ursache war, dass der Filterwert fälschlich als Berechtigungsumfang an Keycloak gesendet wurde; das ist nun unterbunden.
+
 - **Raffinerie-Aufträge mit vielen Erz-Zeilen lassen sich wieder speichern.** Das Anlege-Formular wird per AJAX als Multipart gesendet (ein Teil pro Formularfeld); Tomcat 11 begrenzte die Teilanzahl neuerdings auf 10, sodass große — etwa aus vielen Screenshots importierte — Aufträge beim Speichern mit einem Serverfehler abbrachen. Das Limit ist wieder großzügig gesetzt, und ein Überschreiten erscheint nun als verständliche Meldung statt als „500".
 
 ### Added
