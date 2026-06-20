@@ -1,7 +1,7 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-20.
-> **Owner area:** ORG · **Related ADRs:** none
+> **Owner area:** ORG · **Related ADRs:** ADR-0029
 
-# Profit-Bereich org chart (Funktionsränge)
+# Organisation org chart (Funktionsränge)
 
 ## Context & goal
 
@@ -137,7 +137,10 @@ ephemeral stack and is gated on the `e2e` PR label — see `.github/workflows/e2
 ### REQ-ORG-018 — Multi-Bereich chart with an Organisationsleitung level, coloured by Bereich
 
 With the real hierarchy (REQ-ORG-014) the chart renders **OL → each Bereich (Bereichsleiter +
-Bereichskoordinatoren + Bereichsoperatoren) → its Staffeln + SKs**, not a single Profit-Bereich.
+Bereichskoordinatoren + Bereichsoperatoren) → its Staffeln + SKs**, not a single Profit-Bereich. The unit tier is **every active Staffel/SK regardless of
+`is_profit_eligible`** (ADR-0029): that flag gates Job-Order processing only, never chart visibility,
+so a unit wired under any Bereich (Forschung, Marinekorps, not just Profit) renders there and can hold
+functional ranks.
 `OrgChartScope.AREA` stops being a singleton: each Bereich has its own area-leadership sub-tree, and a
 new top level holds the OL. The chart stays **descriptive and ADMIN-edited** (REQ-ORG-010) — it confers
 no permission. Each Bereich's nodes are tinted with its frozen Bereichsfarbe
@@ -151,6 +154,8 @@ tree (REQ-ORG-013) intact.
   Bereich's Staffeln + SKs; the partial unique indexes scope "one Bereichsleiter" etc. **per Bereich**.
 - [x] Holding a chart position still grants no permission (a chart-only user is denied scoped data).
 - [x] Each Bereich's nodes carry its Bereichsfarbe; contrast and the ARIA tree roles/levels are preserved.
+- [x] A non-profit-eligible but active Staffel/SK renders under its Bereich and can be staffed in the
+  chart; `is_profit_eligible` gates Job-Order processing only, never chart visibility (ADR-0029).
 
 The OL tier is carried by its own `OlChartDto` (id + name + members) so the inline editor can stamp a
 new `OL_MEMBER` against the OL's org-unit id even while the tier is empty. The Bereichsfarbe is applied
@@ -164,10 +169,12 @@ populated chart.
 
 **Enforced by:** `OrgChartPageRenderTest` (`olTier_admin_*`, `bereichTier_admin_*` — OL + per-Bereich
 trees, the `oc-dept--profit` tint, the Bereichsleiter hero, the hidden legacy tier),
-`OrgChartServiceTest#getOrgChart_groupsUnitsUnderBereichTierAndExposesOl` and the per-Bereich
+`OrgChartServiceTest#getOrgChart_groupsUnitsUnderBereichTierAndExposesOl`,
+`OrgChartServiceTest#getOrgChart_includesNonProfitEligibleUnitsUnderBereich` and the per-Bereich
 `createPosition`/`validateCardinality` tests, migrations `V166` (`org_unit.department`) + `V167`
 (widened `chk_org_chart_scope` + per-Bereich `BEREICHSLEITER` unique index) · **Code:**
-`OrgChartService#getOrgChart`/`buildBereich`, `OlChartDto`, `BereichChartDto`, `org-chart.html`
+`OrgChartService#getOrgChart`/`buildBereich`, `OrgUnitRepository#findActiveSquadronsAndSpecialCommands`,
+`OlChartDto`, `BereichChartDto`, `org-chart.html`
 (OL → Bereich connector fan + multi-tree keyboard nav + per-Bereich collapse), `fragments/org-chart-node.html`
 (`ocBereich`, `ocUnitFan`), `org-chart.css` (`oc-dept--*`, `oc-bereich-tier`, `oc-fan--bereiche`,
 `oc-collapse`) · **Issues:** #692, #698.

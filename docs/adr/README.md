@@ -66,4 +66,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0026](0026-cascading-scope-without-admin.md)                             | Cascading org-unit scope without admin rights, computed in one descent helper           | Accepted — implementation pending |
 | [0027](0027-bereich-ol-aggregate-ownership.md)                            | Bereich and Organisationsleitung as direct owners of org-unit-scoped aggregates         | Accepted — implementation pending |
 | [0028](0028-bank-bereich-ol-access-seam.md)                               | Bereich/OL bank access (AREA/CARTEL) via the `OrgUnitBankAccessService` seam            | Accepted — implementation pending |
+| [0029](0029-org-chart-visibility-decoupled-from-profit-eligibility.md)    | Org chart visibility decoupled from `is_profit_eligible` (org-wide chart)               | Accepted                          |
 
