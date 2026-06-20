@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Raffinerie-Aufträge mit vielen Erz-Zeilen lassen sich wieder speichern.** Das Anlege-Formular wird per AJAX als Multipart gesendet (ein Teil pro Formularfeld); Tomcat 11 begrenzte die Teilanzahl neuerdings auf 10, sodass große — etwa aus vielen Screenshots importierte — Aufträge beim Speichern mit einem Serverfehler abbrachen. Das Limit ist wieder großzügig gesetzt, und ein Überschreiten erscheint nun als verständliche Meldung statt als „500".
+
 ## [v0.6.1](https://github.com/krt-profit/basetool/releases/tag/v0.6.1) - 2026-06-20
 
 ### Added

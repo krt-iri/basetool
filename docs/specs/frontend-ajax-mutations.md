@@ -451,6 +451,39 @@ reliably suppress bfcache across Chromium / Firefox / WebKit.
 **Enforced by:** `BfcacheRefreshE2eTest` (a synthetic `pageshow{persisted:true}` drives a reload that
 discards a live-document marker) · **Code:** `common-handlers.js` · **ADR:** ADR-0013
 
+### REQ-FE-009 — Multipart part-count headroom for `FormData` submits
+
+Every in-place AJAX write submits its form as `multipart/form-data` via `FormData` (REQ-FE-002), so
+**each form field is its own multipart part** — not only file uploads. Tomcat 11.0.8 lowered the
+connector's `maxPartCount` default from 1000 to 10 as a DoS hardening, far below the field count of
+the app's larger editors: a refinery order carries ~13 order-level fields plus ~5 per goods row, and
+a job order grows with its line items, so a realistic save exceeds 10 parts and fails during
+multipart parsing. It surfaces as `MaxUploadSizeExceededException` caused by Tomcat's
+`FileCountLimitExceededException` — whose `"attachment"` text is a hardcoded Tomcat constant
+(`FileUploadBase.ATTACHMENT`), **not** a form field name, so it must not be read as evidence of an
+attachment upload.
+
+The frontend therefore sets `server.tomcat.max-part-count: 1000` — the pre-11.0.8 default the
+`FormData` writes were built against, generous for the largest legitimate editor (a refinery order
+with ~30 goods is ~165 parts) yet still bounded against a flood; the
+`spring.servlet.multipart.max-request-size` cap stays the real volume guard. A part-count or size
+breach that still occurs must degrade to a clean, localized **413** — a JSON `{code:
+UPLOAD_TOO_LARGE}` body for XHR callers and the `error/error` page otherwise — never the generic
+500. Because Spring raises the exception during `DispatcherServlet` multipart resolution (before
+handler selection), only the global `GlobalExceptionHandler` `@ControllerAdvice` can intercept it; a
+controller-local `@ExceptionHandler` is bypassed.
+
+**Acceptance**
+
+- [ ] A refinery order (or any large `FormData` editor) with more than 10 form fields saves
+  successfully — it is not rejected by the connector's part-count limit.
+- [ ] A multipart submission that exceeds the configured part-count or size limit returns a
+  localized 413 (JSON `UPLOAD_TOO_LARGE` for XHR, the error page otherwise), not a 500.
+
+**Enforced by:** `GlobalExceptionHandlerTest` (the JSON + HTML branches of
+`handleMaxUploadSizeExceeded`) · **Config:** `frontend application.yml`
+`server.tomcat.max-part-count` · **Code:** `GlobalExceptionHandler.handleMaxUploadSizeExceeded`
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
