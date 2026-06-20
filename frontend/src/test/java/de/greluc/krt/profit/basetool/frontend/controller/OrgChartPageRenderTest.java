@@ -344,6 +344,57 @@ class OrgChartPageRenderTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void freeTextCommandLeader_admin_rendersTypedNameAndNoAccountMarker_notVacant() throws Exception {
+    // Given: a Kommando whose Kommandoleiter is a Kartell member with no Basetool account yet
+    // (REQ-ORG-020) — leaderUserId null but a free-text leaderDisplayName. Exercises the inline
+    // command-leader branch (cmd.leaderDisplayName != null), distinct from the ocNode path above:
+    // the leader node renders the typed name with the no-account marker (not the dashed vacant
+    // placeholder), and its reassign control carries the typed name for a later account swap.
+    CommandChartDto command =
+        new CommandChartDto(
+            UUID.randomUUID(), "Alpha", 0L, 0, null, null, "Max Mustermann", null, List.of());
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                null,
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(
+                    new SquadronChartDto(
+                        UUID.randomUUID(),
+                        "IRIDIUM",
+                        "IRI",
+                        null,
+                        List.of(command),
+                        List.of(),
+                        true,
+                        true)),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the free-text Kommandoleiter's typed name renders")
+        .contains("Max Mustermann");
+    assertThat(html)
+        .as("free-text leader node carries the no-account marker class")
+        .contains("oc-node--freetext");
+    assertThat(html).as("the no-account badge element renders").contains("oc-node-flag");
+    assertThat(html)
+        .as("the leader reassign control carries the typed name for the account swap")
+        .contains("data-display-name=\"Max Mustermann\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void bereichTier_admin_rendersDepartmentTintLeadershipAndUnits() throws Exception {
     // Given: one Bereich tier carrying the PROFIT Bereichsfarbe, a Bereichsleiter (hero) and one
     // Staffel (epic #692 / REQ-ORG-018). The tier renders as its own ARIA tree, tinted via the

@@ -152,6 +152,32 @@ class OrgChartServiceTest {
   }
 
   @Test
+  void getOrgChart_freeTextCommandLeader_carriesLeaderDisplayName() {
+    // A Kommandoleiter named on the chart with no Basetool account yet (REQ-ORG-020): the
+    // COMMAND_LEAD row carries a free-text display_name and no user. buildCommand must surface it
+    // as leaderDisplayName (not leaderUserId/leaderUserName) so the template renders the typed
+    // name with the no-account marker rather than the vacant placeholder.
+    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of(squadron));
+    when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
+        .thenReturn(List.of());
+
+    OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
+    command.setName("Alpha");
+    command.setDisplayName("Max Mustermann");
+    when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
+        .thenReturn(List.of(command));
+
+    CommandChartDto dto = service().getOrgChart().squadrons().getFirst().commands().getFirst();
+
+    assertEquals("Alpha", dto.name());
+    assertNull(dto.leaderUserId(), "a free-text leader has no account id");
+    assertNull(dto.leaderUserName(), "a free-text leader has no account name");
+    assertEquals(
+        "Max Mustermann", dto.leaderDisplayName(), "the typed Kommandoleiter name is surfaced");
+  }
+
+  @Test
   void getOrgChart_noProfitEligibleUnits_skipsUnitPositionQuery() {
     when(orgUnitRepository.findActiveProfitEligible()).thenReturn(List.of());
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -1157,6 +1183,32 @@ class OrgChartServiceTest {
     assertNull(dto.userId());
     assertNull(dto.displayName(), "vacate clears a free-text leader name too");
     assertEquals("Alpha", dto.name(), "the Kommando name survives a vacate");
+  }
+
+  @Test
+  void updatePosition_bothAccountAndFreeText_isRejected() {
+    // Mirror of createPosition_bothAccountAndFreeText_isRejected on the update path: an account
+    // and a free-text name are mutually exclusive, so a single edit may not set both at once. It
+    // fails fast, before resolving the user or saving.
+    UUID id = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
+    position.setDisplayName("Max");
+    position.setId(id);
+    position.setVersion(0L);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(position));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .updatePosition(
+                        id, new OrgChartPositionUpdateRequest(userId, null, null, 0L, "Max")));
+
+    assertTrue(ex.getMessage().contains("holder_ambiguous"));
+    verify(positionRepository, never()).save(any());
+    verify(userRepository, never()).findById(any());
   }
 
   @Test

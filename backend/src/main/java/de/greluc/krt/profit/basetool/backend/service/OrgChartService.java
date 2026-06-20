@@ -329,8 +329,9 @@ public class OrgChartService {
    * second-bump: supplying a {@code userId} sets the account <em>and</em> clears any free-text
    * {@code displayName} on the same row in the same transaction — the regression-free "the member
    * now has an account" path. Supplying a non-blank {@code displayName} (without a {@code userId})
-   * sets the typed name and clears the account holder. Assigning a holder to a still-leaderless
-   * Kommando is just a reassign through {@code userId} or {@code displayName}.
+   * sets the typed name and clears the account holder; supplying <em>both</em> in one call is
+   * rejected as ambiguous, mirroring create. Assigning a holder to a still-leaderless Kommando is
+   * just a reassign through {@code userId} or {@code displayName}.
    *
    * @param id the position id; never {@code null}.
    * @param request the edit payload carrying the current optimistic-lock version; never {@code
@@ -338,8 +339,8 @@ public class OrgChartService {
    * @return the updated position as a flat DTO with the bumped version.
    * @throws NotFoundException if the position or the new user does not exist.
    * @throws BadRequestException if the new holder already occupies a position in the same scope, a
-   *     name is supplied for a non-Kommando rank, or clearing the typed name would leave a
-   *     non-Kommando rank with no holder at all.
+   *     name is supplied for a non-Kommando rank, both an account and a free-text name are supplied
+   *     at once, or clearing the typed name would leave a non-Kommando rank with no holder at all.
    * @throws ObjectOptimisticLockingFailureException if the supplied version is stale.
    */
   @Transactional
@@ -351,6 +352,12 @@ public class OrgChartService {
             .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
     if (position.getVersion() != null && !position.getVersion().equals(request.version())) {
       throw new ObjectOptimisticLockingFailureException(OrgChartPosition.class, id);
+    }
+    // Symmetric with createPosition: a position is held by an account OR a free-text name, never
+    // both, so a single update may not set both at once. A bare userId still clears any existing
+    // free-text name below (the regression-free swap); only supplying both together is ambiguous.
+    if (request.userId() != null && trimToNull(request.displayName()) != null) {
+      throw new BadRequestException(ERR_HOLDER_AMBIGUOUS);
     }
     if (request.name() != null) {
       if (position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {

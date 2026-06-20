@@ -41,9 +41,12 @@ import java.util.UUID;
  * @param version current optimistic-lock version held by the client; required so concurrent edits
  *     surface as a 409.
  * @param displayName a free-text holder name to set (replacing an account holder), {@code null} to
- *     keep the current holder, or blank to clear the typed name. Ignored when {@code userId} is
- *     also supplied (the account wins). Clearing the only holder of a non-{@code COMMAND_LEAD} rank
- *     is rejected. Placed last so it stays optional on every existing call shape.
+ *     keep the current holder, or blank to clear the typed name. Supplying both a {@code userId}
+ *     and a non-blank {@code displayName} in one call is rejected (a position is held by an account
+ *     or a free-text name, never both) — to swap a free-text holder for an account, send the {@code
+ *     userId} alone and the typed name is cleared automatically. Clearing the only holder of a
+ *     non-{@code COMMAND_LEAD} rank is rejected. Placed last so it stays optional on every existing
+ *     call shape.
  */
 public record OrgChartPositionUpdateRequest(
     UUID userId,

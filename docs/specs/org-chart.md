@@ -192,9 +192,10 @@ descriptive label).
 **Acceptance**
 
 - [x] Creating a non-`COMMAND_LEAD` position with neither an account nor a free-text name is a 400
-  (`problem.org_chart.user_required`); supplying both is a 400 (`problem.org_chart.holder_ambiguous`).
+  (`problem.org_chart.user_required`); supplying both an account and a free-text name — on **create
+  or update** — is a 400 (`problem.org_chart.holder_ambiguous`).
 - [x] A free-text position renders its typed name with a "no account" marker (not the vacant
-  placeholder) and grants no scoped data.
+  placeholder) and grants no scoped data — both as a regular node and as an inline Kommandoleiter.
 - [x] Reassigning a free-text position to an account clears the typed name in the same write, keeps
   the row's place in the tree, and bumps the version exactly once (no 409).
 - [x] Vacating a `COMMAND_LEAD` clears a free-text leader name as well as an account holder.
@@ -204,12 +205,16 @@ descriptive label).
 `updatePosition_replaceFreeTextWithAccount_clearsDisplayName`,
 `updatePosition_setFreeTextName_clearsAccount`,
 `updatePosition_clearFreeTextLeavesNonCommandWithNoHolder_isRejected`,
+`updatePosition_bothAccountAndFreeText_isRejected`,
+`getOrgChart_freeTextCommandLeader_carriesLeaderDisplayName`,
 `vacateCommandLeader_clearsFreeTextLeaderName`), `OrgChartPageRenderTest`
-(`freeTextHolder_admin_rendersTypedNameAndNoAccountMarker_notVacant`), migration `V171`
+(`freeTextHolder_admin_rendersTypedNameAndNoAccountMarker_notVacant`,
+`freeTextCommandLeader_admin_rendersTypedNameAndNoAccountMarker_notVacant`), migration `V171`
 (`display_name` + `chk_org_chart_holder` + widened `chk_org_chart_user`) · **Code:**
 `OrgChartService#createPosition`/`#updatePosition`/`#vacateCommandLeader`,
 `OrgChartPosition#displayName`, `org-chart.html` (holder-mode modal),
-`fragments/org-chart-node.html` (`ocNode` free-text branch) · **Issues:** —
+`fragments/org-chart-node.html` (`ocNode` free-text branch + inline Kommandoleiter branch) ·
+**Issues:** —
 
 ## Out of scope
 
