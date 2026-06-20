@@ -345,6 +345,127 @@ main.oc-page .oc-toolbar {
     border-top-color: var(--oc-dept, var(--color-primary));
 }
 
+/* --- Bereiche side by side under the OL (epic #692) --------------------------
+   The Bereiche fan out beneath the OL with the SAME connector lines a Bereich draws to its
+   Staffeln/SKs — .oc-fan--bereiche reuses the .oc-fan primitive, but top-aligns the columns (a whole
+   Bereich subtree is far taller than one unit box) and uses the wider unit gap. min-width:100%
+   centres the connector bus under the OL apex box, which is centred in its own full-width tree above,
+   so the OL→bus drop lands on the OL box. */
+.oc-fan--bereiche {
+    min-width: 100%;
+    justify-content: safe center;
+    align-items: flex-start;
+}
+
+.oc-fan--bereiche > li {
+    padding-left: calc(var(--oc-unit-gap) / 2);
+    padding-right: calc(var(--oc-unit-gap) / 2);
+}
+
+/* No-OL fallback: the Bereiche still stand side by side, just without a connector head (there is no
+   OL apex to fan from yet). */
+.oc-bereich-row {
+    display: flex;
+    justify-content: safe center;
+    align-items: flex-start;
+    gap: var(--oc-unit-gap);
+    min-width: 100%;
+}
+
+/* A Bereich's caption now sits above its own Bereichsleiter (per column) rather than as a full-width
+   tier heading, so it needs only a small gap to its box. */
+.oc-fan--bereiche .oc-caption,
+.oc-bereich-row .oc-caption {
+    margin-bottom: 0.6rem;
+}
+
+/* The legacy/ungrouped tier follows the Bereich fan (a <ul>) or row (a <div>), neither of which the
+   .oc-tree + .oc-caption rule matches, so give its caption the same tier separation. */
+.oc-fan--bereiche + .oc-caption,
+.oc-bereich-row + .oc-caption {
+    margin-top: 2.75rem;
+}
+
+/* --- per-Bereich collapse toggle -------------------------------------------- */
+/* The Bereichsleiter box is wrapped so the collapse toggle can pin to its corner; the wrap is the
+   box width and centred in the column, regardless of how wide the unit fan below makes the column. */
+.oc-leader-wrap {
+    position: relative;
+    width: var(--oc-box-w);
+}
+
+/* Square toggle in the Bereichsleiter's top-right corner. Available to everyone (not edit-mode), so
+   anyone can fold a Bereich down to just its Bereichsleiter. The chevron is CSS-drawn and rotates
+   with aria-expanded — no icon dependency, CSP-safe. */
+.oc-collapse {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    background: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    cursor: pointer;
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.oc-collapse:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* Keep the chevron box visually compact (1.6rem) but stretch the clickable region to the 44px
+   design-system minimum (var(--touch-target), "min hit area for every interactive control") via a
+   transparent, centred overlay — the standard "small glyph, fat-finger target" pattern. The toggle
+   sits in the card's top-right corner with empty space above/right, so the overlay grows mostly
+   outward and never swallows clicks meant for the flow-positioned .oc-actions controls. */
+.oc-collapse::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    transform: translate(-50%, -50%);
+}
+
+.oc-collapse-icon {
+    display: block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid currentcolor;
+    border-bottom: 2px solid currentcolor;
+    /* expanded → chevron points down (body shown below) */
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform 0.2s ease;
+}
+
+.oc-collapse[aria-expanded='false'] .oc-collapse-icon {
+    /* collapsed → chevron points right */
+    transform: translateX(-1px) rotate(-45deg);
+}
+
+/* The collapsible part of a Bereich: the Stab spine + the unit fan. Continues the centred column;
+   hidden (display:none) when the Bereich is collapsed, which also drops its treeitems out of the
+   keyboard-nav order (see treeItems() in org-chart.html). */
+.oc-bereich-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.oc-bereich-body[hidden] {
+    display: none;
+}
+
 /* Kommando(gruppe) header: names the command, sits above its Kommandoleiter. */
 .oc-command-head {
     gap: 0.15rem;

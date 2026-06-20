@@ -10,6 +10,10 @@
 
 - **Aufträge können jetzt einen Bereich oder die Organisationsleitung als Auftraggeber haben.** Angemeldete Nutzer können beim Anlegen oder Bearbeiten eines Auftrags neben Staffeln und Spezialkommandos auch einen Bereich oder die Organisationsleitung als Auftraggeber auswählen. Die bearbeitende (verantwortliche) Einheit bleibt wie bisher eine profit-berechtigte Staffel oder ein Spezialkommando, und das öffentliche, anonyme Auftragsformular bietet als Auftraggeber weiterhin nur Staffeln und Spezialkommandos. (Einsätze lassen sich bereits seit v0.6.0 einem Bereich oder der Organisationsleitung zuordnen.)
 
+### Changed
+
+- **Das Organigramm stellt die Bereiche jetzt nebeneinander statt untereinander dar und verbindet sie mit Linien zur Organisationsleitung.** Die Bereiche fächern unter der Organisationsleitung auf — mit denselben Verbindungslinien wie von einem Bereich zu seinen Staffeln und Spezialkommandos. Jeder Bereich lässt sich außerdem unterhalb seines Bereichsleiters ein- und ausklappen, sodass das Organigramm bei vielen Einheiten übersichtlich bleibt.
+
 ## [v0.6.1](https://github.com/krt-profit/basetool/releases/tag/v0.6.1) - 2026-06-20
 
 ### Added

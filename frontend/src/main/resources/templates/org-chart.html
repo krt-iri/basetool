@@ -73,13 +73,13 @@
                         <span class="sh" th:text="${ol.shorthand()}">OL</span>
                         <span class="nm" th:text="${ol.name()}">Organisationsleitung</span>
                     </div>
-                    <ul class="oc-fan" role="group" th:if="${!#lists.isEmpty(ol.members())}">
-                        <li th:each="m : ${ol.members()}">
-                            <div class="oc-col">
-                                <th:block th:replace="~{fragments/org-chart-node :: ocNode(${m}, 2)}"></th:block>
-                            </div>
-                        </li>
-                    </ul>
+                    <!-- OL Stab (members) as a vertical spine under the OL box, so the connector
+                         fan to the Bereiche below reads as one clean drop (mirrors a Bereich's
+                         Koordinatoren/Operatoren spine above its unit fan). -->
+                    <th:block th:each="m : ${ol.members()}">
+                        <div class="oc-v"></div>
+                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${m}, 2)}"></th:block>
+                    </th:block>
                     <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
                             data-trigger="oc-add" data-position-type="OL_MEMBER"
                             th:data-org-unit-id="${ol.orgUnitId()}"
@@ -87,61 +87,24 @@
                             th:text="#{orgChart.add.olMember}">OL-Mitglied hinzufügen</button>
                 </div>
             </div>
+            <!-- ===== OL → Bereiche connector: the Bereiche fan out side by side beneath the OL,
+                 each its own ARIA tree, drawn with the same .oc-fan lines as a Bereich → its
+                 Staffeln/SKs. Each <li> is one Bereich subtree (caption + collapsible tree). ===== -->
+            <ul class="oc-fan oc-fan--bereiche" role="presentation"
+                th:if="${!#lists.isEmpty(orgChart.bereiche())}">
+                <li th:each="b : ${orgChart.bereiche()}">
+                    <th:block th:replace="~{fragments/org-chart-node :: ocBereich(${b})}"></th:block>
+                </li>
+            </ul>
         </th:block>
 
-        <!-- ===== One tier per Bereich — each its own ARIA tree, tinted by its Bereichsfarbe (the
-             oc-dept--* class maps the department enum name to a --color-dept-* token). The
-             Bereichsleiter is the level-1 hero, the Stab (Koordinatoren/Operatoren) level 2, and the
-             Bereich's Staffeln/SKs fan out through the shared ocUnitFan fragment (levels 2-6). ===== -->
-        <th:block th:each="b : ${orgChart.bereiche()}">
-            <div class="oc-caption">
-                <span class="oc-dept-swatch" aria-hidden="true" th:if="${b.department() != null}"
-                      th:classappend="${'oc-dept--' + b.department().toLowerCase().replace('_', '-')}"></span>
-                <span class="oc-caption-title" th:text="${b.name()}">Bereich</span>
-            </div>
-            <div class="oc-tree oc-bereich-tier" role="tree"
-                 th:classappend="${b.department() != null ? 'oc-dept--' + b.department().toLowerCase().replace('_', '-') : ''}"
-                 th:aria-label="#{orgChart.a11y.bereich(${b.name()})}">
-                <div class="oc-col">
-                    <!-- Bereichsleiter (hero) or vacant -->
-                    <th:block th:if="${b.leadership().lead() != null}">
-                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${b.leadership().lead()}, 1)}"></th:block>
-                    </th:block>
-                    <div th:if="${b.leadership().lead() == null}" class="oc-node oc-node--vacant"
-                         role="treeitem" tabindex="-1" aria-level="1"
-                         th:aria-label="#{orgChart.rank.BEREICHSLEITER} + ', ' + #{orgChart.vacant}">
-                        <span class="oc-node-rank" th:text="#{orgChart.rank.BEREICHSLEITER}">Bereichsleiter</span>
-                        <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
-                    </div>
-                    <button th:if="${b.leadership().lead() == null}" type="button" class="oc-add"
-                            sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
-                            data-position-type="BEREICHSLEITER" th:data-org-unit-id="${b.orgUnitId()}"
-                            th:data-rank-label="#{orgChart.rank.BEREICHSLEITER}"
-                            th:text="#{orgChart.add.bereichLead}">Bereichsleiter zuweisen</button>
-
-                    <!-- Stab: Bereichskoordinatoren then Bereichsoperatoren under the Bereichsleiter -->
-                    <th:block th:each="n : ${b.leadership().coordinators()}">
-                        <div class="oc-v"></div>
-                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
-                    </th:block>
-                    <th:block th:each="n : ${b.leadership().operators()}">
-                        <div class="oc-v"></div>
-                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
-                    </th:block>
-                    <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
-                            data-trigger="oc-add" data-position-type="BEREICHSKOORDINATOR"
-                            th:data-org-unit-id="${b.orgUnitId()}"
-                            th:data-rank-label="#{orgChart.rank.BEREICHSKOORDINATOR}"
-                            th:text="#{orgChart.add.bereichCoordinator}">Bereichskoordinator hinzufügen</button>
-                    <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
-                            data-trigger="oc-add" data-position-type="BEREICHSOPERATOR"
-                            th:data-org-unit-id="${b.orgUnitId()}"
-                            th:data-rank-label="#{orgChart.rank.BEREICHSOPERATOR}"
-                            th:text="#{orgChart.add.bereichOperator}">Bereichsoperator hinzufügen</button>
-
-                    <!-- Tier 2: this Bereich's Staffeln + Spezialkommandos -->
-                    <th:block th:replace="~{fragments/org-chart-node :: ocUnitFan(${b.squadrons()}, ${b.specialCommands()})}"></th:block>
-                </div>
+        <!-- ===== No OL yet: render the Bereiche side by side without a connector head (the OL apex
+             that would parent them does not exist), each still its own collapsible ARIA tree. ===== -->
+        <th:block th:if="${ol == null and !#lists.isEmpty(orgChart.bereiche())}">
+            <div class="oc-bereich-row">
+                <th:block th:each="b : ${orgChart.bereiche()}">
+                    <th:block th:replace="~{fragments/org-chart-node :: ocBereich(${b})}"></th:block>
+                </th:block>
             </div>
         </th:block>
 
@@ -630,6 +593,37 @@
                 });
             });
 
+            // Collapse / expand one Bereich (everyone, not just admins). Hides the Bereich's body
+            // (Stab + Staffeln/SKs) below its Bereichsleiter, flips aria-expanded on the toggle and
+            // on the Bereichsleiter treeitem, and — when collapsing — moves the tree's single
+            // tabbable item to the always-visible Bereichsleiter so the roving tabindex never points
+            // at a now-hidden node. No server call; purely a local view toggle.
+            window.krtEvents.on('click', 'oc-collapse', function (btn) {
+                const bodyId = btn.getAttribute('aria-controls');
+                const body = bodyId ? document.getElementById(bodyId) : null;
+                if (!body) {
+                    return;
+                }
+                const expand = btn.getAttribute('aria-expanded') === 'false';
+                btn.setAttribute('aria-expanded', expand ? 'true' : 'false');
+                body.hidden = !expand;
+                const wrap = btn.closest('.oc-leader-wrap');
+                const leader = wrap ? wrap.querySelector('[role="treeitem"]') : null;
+                if (leader) {
+                    leader.setAttribute('aria-expanded', expand ? 'true' : 'false');
+                    if (!expand) {
+                        const tree = btn.closest('.oc-tree');
+                        if (tree) {
+                            Array.prototype.forEach.call(
+                                tree.querySelectorAll('[role="treeitem"]'),
+                                function (n) {
+                                    n.setAttribute('tabindex', n === leader ? '0' : '-1');
+                                });
+                        }
+                    }
+                }
+            });
+
             window.krtEvents.on('click', 'oc-modal-cancel', closeModal);
             window.krtEvents.on('click', 'oc-modal-submit', submitModal);
         }
@@ -685,9 +679,15 @@
             if (!tree) {
                 return;
             }
+            // Visible treeitems only: a Bereich collapsed via its oc-collapse toggle hides its body
+            // (display:none), so those treeitems have a null offsetParent and drop out of the
+            // flattened nav order + roving tabindex — arrow keys skip a collapsed Bereich's subtree.
             const treeItems = function () {
-                return Array.prototype.slice.call(
-                    tree.querySelectorAll('[role="treeitem"]'));
+                return Array.prototype.slice
+                    .call(tree.querySelectorAll('[role="treeitem"]'))
+                    .filter(function (el) {
+                        return el.offsetParent !== null;
+                    });
             };
             const levelOf = function (el) {
                 return parseInt(el.getAttribute('aria-level'), 10) || 1;
@@ -695,8 +695,8 @@
 
             // Initial roving state: the first item is tabbable, the rest are reachable
             // only via the arrow keys. A treeitem whose next item in document order is
-            // one level deeper has children, so it is marked aria-expanded (the tree is
-            // always-expanded — there is no collapse affordance).
+            // one level deeper has children, so it is marked aria-expanded (collapsible Bereiche
+            // start expanded; the oc-collapse handler flips aria-expanded + hides the body).
             const initial = treeItems();
             initial.forEach(function (el, i) {
                 el.setAttribute('tabindex', i === 0 ? '0' : '-1');

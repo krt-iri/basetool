@@ -85,16 +85,20 @@ through the inline editor's confirm dialog) · **Code:** `OrgChartService#delete
 ### REQ-ORG-013 — The org chart is keyboard-operable and screen-reader-navigable
 
 The chart conveys its hierarchy to assistive technology and is fully operable without a
-mouse. It is exposed as ARIA **tree**s — since epic #692 (REQ-ORG-018) the chart stacks one
-tree per tier (the Organisationsleitung, each Bereich, and the legacy/ungrouped tier), each
-its own `role="tree"` (labelled by its tier caption), each child row `role="group"`, and
+mouse. It is exposed as ARIA **tree**s — since epic #692 (REQ-ORG-018) the chart renders one
+tree per tier: the Organisationsleitung on top, the Bereich tier-trees **side by side** beneath it
+(joined to the OL by the same connector lines a Bereich draws to its Staffeln/SKs), then the
+legacy/ungrouped tier — each its own `role="tree"` (labelled by its tier caption), each child row
+`role="group"`, and
 every box — person node, unit box, command head, vacant seat — a `role="treeitem"` carrying
 an `aria-level` that matches its depth in that tier's reporting chain (within a Bereich /
 legacy tier: 1 = Bereichsleiter / Area Lead, 2 = Stab member / Staffel- or SK-unit box,
 3 = Staffel-/SK-Leiter, 4 = Kommandogruppe header / direct Ensign, 5 = Kommandoleiter,
 6 = Stv. Kommandoleiter / Ensign within a Kommando; within the OL tree: 1 = OL root box,
 2 = OL member) and an `aria-label` of "rank, name" (or "rank, nicht besetzt"). Parents are
-`aria-expanded` (the tree never collapses).
+`aria-expanded`; each Bereich additionally carries a collapse toggle that folds it to just its
+Bereichsleiter (flipping the toggle's + the Bereichsleiter's `aria-expanded` and hiding the Bereich
+body), and the keyboard nav skips the now-hidden treeitems.
 
 Keyboard model: a roving tabindex keeps exactly one treeitem tabbable per tree; ↑/↓ move
 between siblings, ←/→ between levels, Home/End to the ends. Keyboard focus is a sharp outline,
@@ -115,6 +119,9 @@ preserves the chart's horizontal scroll and the page's vertical scroll across th
   it is open.
 - [ ] A save keeps the scroll position (no jump to the top-left).
 - [ ] Keyboard focus on a node is a visible outline, not only the hero bloom.
+- [x] The Bereich tier-trees render side by side beneath the OL with OL→Bereich connector lines, and
+  each Bereich carries a collapse toggle (`aria-expanded`) that folds it to its Bereichsleiter; a
+  collapsed Bereich's hidden nodes drop out of the roving-tabindex order.
 
 **Enforced by:** `OrgChartPageRenderTest` (asserts the rendered tree roles, the `aria-level`s,
 the `aria-pressed` toggle and the edit-mode hint) and the Playwright e2e spec
@@ -122,8 +129,9 @@ the `aria-pressed` toggle and the edit-mode hint) and the Playwright e2e spec
 roving tabindex + arrow-key / Home/End navigation, the modal focus-trap / Esc / focus-return,
 and the horizontal-scroll restoration across a successful edit (`@Tag("e2e")`, so it runs on the
 ephemeral stack and is gated on the `e2e` PR label — see `.github/workflows/e2e.yml`).
-**Code:** `org-chart.html` (inline tree-nav + dialog JS), `org-chart.css`,
-`fragments/org-chart-node.html` · **Issues:** —
+**Code:** `org-chart.html` (inline tree-nav + per-Bereich collapse + dialog JS), `org-chart.css`
+(`.oc-fan--bereiche`, `.oc-leader-wrap`, `.oc-collapse`, `.oc-bereich-body`),
+`fragments/org-chart-node.html` (`ocBereich`) · **Issues:** —
 
 ### REQ-ORG-018 — Multi-Bereich chart with an Organisationsleitung level, coloured by Bereich
 
@@ -147,8 +155,11 @@ The OL tier is carried by its own `OlChartDto` (id + name + members) so the inli
 new `OL_MEMBER` against the OL's org-unit id even while the tier is empty. The Bereichsfarbe is applied
 as **border/swatch accents only** (the `oc-dept--<name>` class maps the `Department` enum name to a
 `--color-dept-*` token); node text stays white/orange so every department hue clears the 4.5:1 text floor.
-Each tier is its own ARIA tree (REQ-ORG-013). The legacy/ungrouped Area-Lead tier is hidden once it holds
-no content and a hierarchy exists, so an empty Area-Lead spine never lingers below a populated chart.
+Each tier is its own ARIA tree (REQ-ORG-013). The Bereich tier-trees fan out **side by side** beneath the
+OL — drawn with the same `.oc-fan` connector lines a Bereich uses for its Staffeln/SKs — and each is
+individually **collapsible** to just its Bereichsleiter. The legacy/ungrouped Area-Lead tier is hidden
+once it holds no content and a hierarchy exists, so an empty Area-Lead spine never lingers below a
+populated chart.
 
 **Enforced by:** `OrgChartPageRenderTest` (`olTier_admin_*`, `bereichTier_admin_*` — OL + per-Bereich
 trees, the `oc-dept--profit` tint, the Bereichsleiter hero, the hidden legacy tier),
@@ -156,8 +167,9 @@ trees, the `oc-dept--profit` tint, the Bereichsleiter hero, the hidden legacy ti
 `createPosition`/`validateCardinality` tests, migrations `V166` (`org_unit.department`) + `V167`
 (widened `chk_org_chart_scope` + per-Bereich `BEREICHSLEITER` unique index) · **Code:**
 `OrgChartService#getOrgChart`/`buildBereich`, `OlChartDto`, `BereichChartDto`, `org-chart.html`
-(OL + Bereich tiers + multi-tree keyboard nav), `fragments/org-chart-node.html` (`ocUnitFan`),
-`org-chart.css` (`oc-dept--*`, `oc-bereich-tier`) · **Issues:** #692, #698.
+(OL → Bereich connector fan + multi-tree keyboard nav + per-Bereich collapse), `fragments/org-chart-node.html`
+(`ocBereich`, `ocUnitFan`), `org-chart.css` (`oc-dept--*`, `oc-bereich-tier`, `oc-fan--bereiche`,
+`oc-collapse`) · **Issues:** #692, #698.
 
 ## Out of scope
 
