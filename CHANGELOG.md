@@ -6,6 +6,10 @@
 
 - **Raffinerie-Aufträge mit vielen Erz-Zeilen lassen sich wieder speichern.** Das Anlege-Formular wird per AJAX als Multipart gesendet (ein Teil pro Formularfeld); Tomcat 11 begrenzte die Teilanzahl neuerdings auf 10, sodass große — etwa aus vielen Screenshots importierte — Aufträge beim Speichern mit einem Serverfehler abbrachen. Das Limit ist wieder großzügig gesetzt, und ein Überschreiten erscheint nun als verständliche Meldung statt als „500".
 
+### Added
+
+- **Aufträge können jetzt einen Bereich oder die Organisationsleitung als Auftraggeber haben.** Angemeldete Nutzer können beim Anlegen oder Bearbeiten eines Auftrags neben Staffeln und Spezialkommandos auch einen Bereich oder die Organisationsleitung als Auftraggeber auswählen. Die bearbeitende (verantwortliche) Einheit bleibt wie bisher eine profit-berechtigte Staffel oder ein Spezialkommando, und das öffentliche, anonyme Auftragsformular bietet als Auftraggeber weiterhin nur Staffeln und Spezialkommandos. (Einsätze lassen sich bereits seit v0.6.0 einem Bereich oder der Organisationsleitung zuordnen.)
+
 ## [v0.6.1](https://github.com/krt-profit/basetool/releases/tag/v0.6.1) - 2026-06-20
 
 ### Added

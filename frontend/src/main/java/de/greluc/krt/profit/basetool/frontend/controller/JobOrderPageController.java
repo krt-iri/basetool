@@ -2092,19 +2092,66 @@ public class JobOrderPageController {
   }
 
   /**
+   * Resolves the requesting (Auftraggeber) picker options. An authenticated caller gets every
+   * active org unit of all four kinds — including Bereiche and the Organisationsleitung (epic #692)
+   * — so a Bereichsleitung/OL member can place an order on behalf of their tier; this reads the
+   * authenticated {@code /active-all-kinds} catalog. The anonymous public request form keeps the
+   * Staffel/SK-only {@code permitAll} catalog: a guest is external and does not place orders for an
+   * internal Bereich/OL, and the all-kinds endpoint is authenticated-only. The responsible picker
+   * is the profit-eligible subset of whatever this returns, and Bereiche/OL are never
+   * profit-eligible, so they can only ever be the customer, never the processor. Falls back to the
+   * public Staffel/SK catalog on any backend hiccup so the form stays renderable.
+   *
+   * @return requesting-picker options; never {@code null}.
+   */
+  private List<OrgUnitMembershipOptionDto> fetchRequestingOrgUnitOptions() {
+    if (!isAuthenticatedCaller()) {
+      return fetchActiveOrgUnitOptions();
+    }
+    try {
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get(
+              "/api/v1/org-units/active-all-kinds", new ParameterizedTypeReference<>() {});
+      return options != null ? options : fetchActiveOrgUnitOptions();
+    } catch (Exception e) {
+      log.warn(
+          "Failed to fetch all-kind org units for the Job Order requesting picker; falling back to"
+              + " the Staffel/SK catalog",
+          e);
+      return fetchActiveOrgUnitOptions();
+    }
+  }
+
+  /**
+   * Whether the current request carries an authenticated (non-anonymous) principal. Mirrors the
+   * {@code SecurityContextHolder} read used by {@link #isLogistician}; used to decide whether the
+   * requesting picker may offer the Bereich/OL tiers.
+   *
+   * @return {@code true} for an authenticated caller, {@code false} for an anonymous guest.
+   */
+  private boolean isAuthenticatedCaller() {
+    org.springframework.security.core.Authentication auth =
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .getAuthentication();
+    return auth != null
+        && auth.isAuthenticated()
+        && !(auth
+            instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
+  }
+
+  /**
    * Populates the create/edit form model with the two owner-picker option lists, both derived from
-   * a single {@link #fetchActiveOrgUnitOptions} fetch: {@code requestingOptions} (any active
-   * squadron or SK may be the customer) is the full list, and {@code responsibleOptions} (only
-   * profit-eligible squadrons + SKs may process orders) is the {@code isProfitEligible} subset.
-   * Each carries a boolean flag telling the template whether to render the SK optgroup. Sourcing
-   * both from the one {@code permitAll} endpoint is what lets the anonymous create form show profit
-   * SKs in the responsible picker — the previous split fetch needed an authenticated SK-catalog
-   * call that dropped every SK for a guest.
+   * a single {@link #fetchRequestingOrgUnitOptions} fetch: {@code requestingOptions} (the customer)
+   * is the full list — every active Staffel/SK for a guest, plus the Bereich/OL tiers for an
+   * authenticated caller (epic #692) — and {@code responsibleOptions} (only profit-eligible
+   * squadrons + SKs may process orders) is the {@code isProfitEligible} subset, which excludes
+   * Bereiche/OL because they are never profit-eligible. Each carries a boolean flag telling the
+   * template whether to render the SK optgroup.
    *
    * @param model the Thymeleaf model to populate.
    */
   private void addOwnerPickerOptions(Model model) {
-    List<OrgUnitMembershipOptionDto> requestingOptions = fetchActiveOrgUnitOptions();
+    List<OrgUnitMembershipOptionDto> requestingOptions = fetchRequestingOrgUnitOptions();
     List<OrgUnitMembershipOptionDto> responsibleOptions =
         requestingOptions.stream()
             .filter(o -> Boolean.TRUE.equals(o.isProfitEligible()))

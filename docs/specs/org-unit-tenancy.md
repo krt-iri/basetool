@@ -424,12 +424,21 @@ extended:
 - [ ] Self-service stamping (caller = target user) is byte-identical to today for ordinary members and
   officers; the only widening is the caller ≠ target create-on-behalf paths (book-out/transfer, store).
 - [ ] The ownerless `NULL` path behaves exactly as REQ-ORG-009.
+- [x] The create-form pickers surface the Bereich/OL tiers in the UI: the Mission/Operation/Refinery/
+  Inventory **owning** picker (cascade-scoped via `/api/v1/users/me/pickable-org-units`, Phase 5) and
+  the Job Order **requesting** (Auftraggeber) picker (every active unit via
+  `/api/v1/org-units/active-all-kinds` for an authenticated caller; the anonymous public order form
+  keeps the Staffel/SK-only `/api/v1/org-units/active` catalog). The Job Order **responsible** picker
+  stays profit-eligible Staffel/SK only — Bereiche/OL are never profit-eligible, so they can be the
+  customer but never the processor.
 
 **Enforced by:** `OwnerScopeServiceTest` (the `BereichOlOwnershipStampingTests` nest — Bereich **and OL**
 resolved as owners, create-on-behalf of a descendant **Staffel and SK** via `canEditOrgUnit`, the
 caller ≠ target divergence keyed on the caller's scope, foreign-to-both pick still 400, strict-silo
 read/edit lock); existing picker-resolver + per-aggregate stamping/visibility tests stay green
-(self-service stamping unchanged); visibility-matrix e2e *(planned, Phase 7)* · **ADR:**
+(self-service stamping unchanged); the Job Order requesting-picker surfacing by
+`JobOrderPageControllerMvcTest` (authenticated picker offers Bereich/OL, guest does not, responsible
+excludes them); visibility-matrix e2e (`OrgHierarchyVisibilityMatrixE2eTest`, Phase 7) · **ADR:**
 [ADR-0027](../adr/0027-bereich-ol-aggregate-ownership.md) · **Issues:** #692, #697.
 
 ### REQ-ORG-017 — Membership cardinality & exclusivity rules
