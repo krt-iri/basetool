@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.6.3](https://github.com/krt-profit/basetool/releases/tag/v0.6.3) - 2026-06-20
+
 ### Fixed
 
 - **Der Staffel-Filter in der Auftragsübersicht löst keine sporadischen Abmeldungen mehr aus.** Beim Umschalten zwischen „Eigene Staffel" und „Alle Staffeln" konnte die Sitzungserneuerung fehlschlagen, sodass die Aufträge kurzzeitig nicht luden und erst ein erneutes Laden half. Ursache war, dass der Filterwert fälschlich als Berechtigungsumfang an Keycloak gesendet wurde; das ist nun unterbunden.
