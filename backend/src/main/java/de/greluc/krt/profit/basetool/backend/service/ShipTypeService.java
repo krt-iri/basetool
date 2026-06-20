@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
-import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +43,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ShipTypeService {
 
   private final ShipTypeRepository shipTypeRepository;
-  private final ManufacturerRepository manufacturerRepository;
-  private final ShipRepository shipRepository;
 
   /**
    * Returns cached page result.
@@ -95,19 +91,5 @@ public class ShipTypeService {
     ShipType shipType = getShipType(id);
     shipType.setHidden(hidden);
     return shipTypeRepository.save(shipType);
-  }
-
-  private void resolveManufacturer(ShipType shipType) {
-    if (shipType.getManufacturer() != null && shipType.getManufacturer().getId() != null) {
-      shipType.setManufacturer(
-          manufacturerRepository
-              .findById(shipType.getManufacturer().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "Manufacturer not found")));
-    } else {
-      shipType.setManufacturer(null);
-    }
   }
 }

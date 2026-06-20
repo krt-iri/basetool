@@ -10,12 +10,8 @@
       - %X{correlationId:-} renders the per-request correlation id set by CorrelationIdFilter.
       - %X{userId:-anonymous} renders the JWT `sub` of the authenticated user (or "anonymous").
       - %X{orgUnitId:-} renders the active OrgUnit context (audit finding L-5 / CLAUDE.md
-        MULTI_SQUADRON_PLAN section 7 + SPEZIALKOMMANDO_PLAN.md R14). Empty for anonymous callers
-        and admins in "all OrgUnits" mode; the bracket stays so the column position is stable
-        for log parsing. R5.e renamed the MDC key from `squadronId` to `orgUnitId`; CorrelationIdFilter
-        writes BOTH keys with the same value for one release so dashboards keyed on the legacy
-        name keep working until the next deploy. The console / file patterns here use the new
-        name; the JSON appender below includes both for the same transition window.
+        section 7 logging requirement). Empty for anonymous callers and admins in "all OrgUnits"
+        mode; the bracket stays so the column position is stable for log parsing.
       These three fields are the audit-trail backbone for multi-tenant incident triage.
     -->
     <property name="LOG_PATTERN_CONSOLE" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{correlationId:-}]){magenta} %clr([%X{userId:-anonymous}]){blue} %clr([%X{orgUnitId:-}]){cyan} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
@@ -110,14 +106,9 @@
             <encoder class="de.greluc.krt.profit.basetool.backend.logging.PiiMaskingLogstashEncoder">
                 <includeMdcKeyName>correlationId</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
-                <!-- L-5: orgUnitId / squadronId on the structured JSON appender so log shippers
-                     can index either name as a first-class field. R5.e: both are emitted with
-                     the same value for one release so existing log-pipeline rules keyed on
-                     `squadronId` keep working while downstream dashboards migrate to the new
-                     `orgUnitId` name. The legacy `squadronId` entry comes out together with the
-                     legacy X-Active-Squadron-Id header alias after one release of soak. -->
+                <!-- L-5: orgUnitId on the structured JSON appender so log shippers can index the
+                     active OrgUnit context as a first-class field. -->
                 <includeMdcKeyName>orgUnitId</includeMdcKeyName>
-                <includeMdcKeyName>squadronId</includeMdcKeyName>
                 <customFields>{"app":"basetool-backend"}</customFields>
             </encoder>
         </appender>

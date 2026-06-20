@@ -72,7 +72,7 @@ import org.springframework.transaction.annotation.Transactional;
  *       (Once R2.d switches the membership-driven scope resolution on, this falls back to the
  *       user's Staffel membership in {@code org_unit_membership} — for now the legacy column is
  *       still authoritative.)
- *   <li>For an admin, the {@link #ACTIVE_SQUADRON_HEADER} request header relayed by the frontend's
+ *   <li>For an admin, the {@link #ACTIVE_ORG_UNIT_HEADER} request header relayed by the frontend's
  *       WebClient. {@code null} / missing means "all squadrons" — admins are not constrained when
  *       no active selection exists.
  * </ul>
@@ -91,28 +91,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class OwnerScopeService {
 
   /**
-   * Name of the HTTP request header through which the frontend relays the admin's active squadron
-   * selection. A {@code null}/missing value means "no active selection" (admin sees all squadrons);
-   * a non-blank UUID restricts the admin to that org unit's data for the duration of this request.
-   * Source of truth lives on the frontend (Redis-backed Spring Session via the {@code
-   * MeFrontendController}); the backend treats the header as untrusted-but-bounded input — only
-   * honoured for principals that already carry {@code ROLE_ADMIN}.
-   *
-   * <p>Header name is preserved verbatim from the {@code SquadronScopeService} era — R2.d / R3 may
-   * rename it to {@code X-Active-Org-Unit-Id} once the frontend's relay filter and the admin's
-   * existing cached browser tabs have been migrated. Keeping the legacy name in R2.c avoids
-   * breaking any admin session that is open when the deploy lands.
-   */
-  public static final String ACTIVE_SQUADRON_HEADER = "X-Active-Squadron-Id";
-
-  /**
-   * Plan §7.2 / R5.e replacement for {@link #ACTIVE_SQUADRON_HEADER}. The frontend's relay filter
-   * sends this name on every backend call once R5.e is deployed; the legacy {@link
-   * #ACTIVE_SQUADRON_HEADER} name remains accepted as an alias for one release so admin browser
-   * tabs that were open during deploy keep working. {@link #readActiveSquadronFromHeader()} reads
-   * the new name first, falls back to the legacy one if missing — once the soak window closes and
-   * the legacy header has not been seen in prod logs for a release cycle, the fallback branch and
-   * the legacy constant come out.
+   * Name of the HTTP request header through which the frontend relays the caller's active OrgUnit
+   * selection. A {@code null}/missing value means "no active selection" (admin sees all OrgUnits);
+   * a non-blank UUID restricts the request to that OrgUnit's data for its duration. Source of truth
+   * lives on the frontend (Redis-backed Spring Session via {@code MeFrontendController}); the
+   * backend treats the header as untrusted-but-bounded input — an admin pin is honoured directly, a
+   * non-admin pin only when it matches one of the caller's memberships (re-validated in {@link
+   * #currentScopePredicate()}). Read by {@link #readActiveSquadronFromHeader()}.
    */
   public static final String ACTIVE_ORG_UNIT_HEADER = "X-Active-Org-Unit-Id";
 
@@ -158,7 +143,7 @@ public class OwnerScopeService {
 
   /**
    * Returns the org-unit context that filters the current request. For admins this reads the {@code
-   * X-Active-Squadron-Id} request header (the frontend's switcher pushed there via the relay
+   * X-Active-Org-Unit-Id} request header (the frontend's switcher pushed there via the relay
    * filter); for everyone else this loads the user's persistent home squadron. Empty result means
    * "no filter" for admins ("all squadrons") and "no access" for non-admins (typically
    * unauthenticated / anonymous).
@@ -210,7 +195,7 @@ public class OwnerScopeService {
    *   <li>Non-admin (with or without future R5.e pinning) → {@code memberOrgUnitIds = union of
    *       User.squadron + SK memberships}, {@code adminAllScope=false}, {@code activeOrgUnitId=
    *       null}. The R5.e pinning will switch this branch to populate {@code activeOrgUnitId} from
-   *       the same X-Active-Squadron-Id header that admins use today.
+   *       the same X-Active-Org-Unit-Id header that admins use today.
    *   <li>Anonymous → all empty / false / null. The repository predicate falls through to "no rows
    *       except cross-staffel public escape".
    * </ul>
@@ -1537,15 +1522,7 @@ public class OwnerScopeService {
 
   @NotNull
   private Optional<UUID> readActiveSquadronFromHeader() {
-    // R5.e: read the plan-aligned X-Active-Org-Unit-Id first; fall back to the legacy
-    // X-Active-Squadron-Id alias so admin browser tabs cached against the old name during deploy
-    // keep working for one release. Once the legacy header stops appearing in prod logs, the
-    // fallback comes out together with the constant.
-    Optional<UUID> fromNew = parseHeaderUuid(request.getHeader(ACTIVE_ORG_UNIT_HEADER));
-    if (fromNew.isPresent()) {
-      return fromNew;
-    }
-    return parseHeaderUuid(request.getHeader(ACTIVE_SQUADRON_HEADER));
+    return parseHeaderUuid(request.getHeader(ACTIVE_ORG_UNIT_HEADER));
   }
 
   /**

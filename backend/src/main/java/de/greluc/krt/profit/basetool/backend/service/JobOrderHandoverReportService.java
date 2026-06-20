@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -59,7 +58,6 @@ public class JobOrderHandoverReportService {
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
 
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
-  private final JobOrderRepository jobOrderRepository;
 
   /**
    * Generates a handover report PDF for a persisted handover.

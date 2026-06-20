@@ -74,7 +74,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * lived under {@code SquadronScopeServiceTest} before the R2.c rename — the implementation moved
  * from {@code SquadronScopeService} to {@code OwnerScopeService} but every behavioural invariant
  * stayed the same. Covers the org-unit-context resolution paths (admin via {@code
- * X-Active-Squadron-Id} request header, non-admin via persistent user record), the aggregate-
+ * X-Active-Org-Unit-Id} request header, non-admin via persistent user record), the aggregate-
  * specific access checks for the five staffel-scoped roots, and the Mission cross-staffel-
  * visibility escape clause ({@code is_internal = false}).
  *

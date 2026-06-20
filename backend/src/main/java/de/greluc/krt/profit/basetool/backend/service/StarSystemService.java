@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.StarSystemRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +47,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class StarSystemService {
 
   private final StarSystemRepository starSystemRepository;
-  private final LocationRepository locationRepository;
 
   /**
    * Returns cached page of star systems.

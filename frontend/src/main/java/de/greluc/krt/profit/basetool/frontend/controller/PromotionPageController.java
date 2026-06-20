@@ -56,7 +56,7 @@ public class PromotionPageController {
   /**
    * Throws {@link AccessDeniedException} when the per-squadron promotion-feature flag is off for
    * the current caller, so every {@code @GetMapping} below short-circuits with HTTP 403 instead of
-   * rendering the page. The advisor-supplied flag (admin override + active-squadron lookup) is
+   * rendering the page. The advisor-supplied flag (admin override + active-org-unit lookup) is
    * passed in as a {@link ModelAttribute} parameter so the controller does not duplicate the
    * resolution logic that {@code SquadronContextAdvice.promotionFeatureEnabled} already runs once
    * per request.

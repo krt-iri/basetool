@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -47,7 +46,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ManufacturerService {
 
   private final ManufacturerRepository manufacturerRepository;
-  private final ShipTypeRepository shipTypeRepository;
 
   /**
    * Returns a paged manufacturer list. {@code includeHidden=true} bypasses the {@code hidden=false}
