@@ -60,7 +60,7 @@ from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never 
 
 **Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker` · **Issues:** #723, #725
 
-### REQ-SEC-017 — PENDING approval withholds all authorities _(planned — T1.3)_
+### REQ-SEC-017 — PENDING approval withholds all authorities
 
 A brand-new Discord login lands `PENDING` and is granted **no** authorities until an admin approves:
 the entire authority assembly (realm roles + permissions + org-unit membership + cascade) is
@@ -69,28 +69,31 @@ moves the user to `ACTIVE`; rejection keeps them denied. Keycloak `ADMIN`-realm-
 auto-`ACTIVE` (bootstrap safety). After approval, roles/units are assigned manually (Track 1) — no
 automated mapping.
 
-**Acceptance** _(filled in T1.3)_
+**Acceptance**
 
-- [ ] PENDING ⇒ only `ROLE_PENDING_APPROVAL`, even if the JWT carries realm roles; no GUEST-readable
-  endpoint leaks org data.
-- [ ] First admin (Keycloak `ADMIN` realm role) is `ACTIVE` on first login.
-- [ ] Approve ⇒ `ACTIVE` + audit row; reject ⇒ denied + reason; legacy rows backfilled `ACTIVE`.
-- [ ] Concurrent approve ⇒ 409 (optimistic `@Version`).
+- [x] PENDING/REJECTED ⇒ only `ROLE_PENDING_APPROVAL`, even if the JWT carries realm roles; membership
+  is never consulted and `ROLE_GUEST` is not carried.
+- [ ] First admin (Keycloak `ADMIN` realm role) is `ACTIVE` on first login. _(syncUser carve-out; T1.4 e2e.)_
+- [x] Approve ⇒ `ACTIVE` + audit row; reject ⇒ `REJECTED` + reason in the audit.
+- [x] Concurrent approve ⇒ 409 (optimistic `@Version`).
+- [ ] Legacy rows backfilled `ACTIVE` (V172). _(schema-validated on boot; T1.4 e2e.)_
 
-**Enforced by:** _(planned T1.3 tests)_ · **Code:** _(T1.3) `CustomJwtGrantedAuthoritiesConverter`, `UserService`, registrations controller_ · **Issues:** #724
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService`, `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route) · **Issues:** #724
 
-### REQ-NOTIF-012 — Admins notified on new PENDING registration _(planned — T1.3)_
+### REQ-NOTIF-012 — Admins notified on new PENDING registration
 
 When a new Discord user enters `PENDING`, every admin receives one in-app notification (no Discord id
 or PII in the payload), via the existing data-driven notification rule engine (a `ROLE` selector with
 `roleCode = 'ADMIN'`, mirroring V160/V161).
 
-**Acceptance** _(filled in T1.3)_
+**Acceptance**
 
-- [ ] One notification per admin on a new PENDING registration; the actor is not self-notified.
-- [ ] No Discord id / token / e-mail in the notification or logs.
+- [x] A new PENDING registration publishes a `DISCORD_REGISTRATION_PENDING` after-commit event whose
+  default rule (V173) resolves to every admin via a `ROLE` selector.
+- [x] No Discord id / token / e-mail rides the event (it carries only the user id + username).
+- [ ] Exactly one notification per admin, end to end. _(notification engine; T1.4 e2e.)_
 
-**Enforced by:** _(planned T1.3 tests)_ · **Code:** _(T1.3) `DiscordRegistrationPendingEvent`, `V173` seed_ · **Issues:** #724
+**Enforced by:** `DiscordRegistrationPendingEvent` (no PII by construction) + `V173` seed; the rule-engine fan-out is covered by the epic-#622 tests · **Code:** `UserService.syncUser`, `DiscordRegistrationPendingEvent`, `V173` · **Issues:** #724
 
 ## Out of scope
 

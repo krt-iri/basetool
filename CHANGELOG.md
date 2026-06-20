@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Grundgerüst für die Discord-Anmeldung steht (Track 1, für Nutzer noch ohne sichtbare Wirkung).** Ein neues Keycloak-Provider-Modul bindet Discord als Anmeldeanbieter an und verknüpft das Discord-Konto mit dem Basetool-Konto. Die eigentliche Mitgliedschaftsprüfung (nur Mitglieder des Kartell-Discords mit der Rolle „KRT-Mitglied“ kommen hinein) und die Admin-Freigabe neuer Discord-Nutzer folgen in den nächsten Schritten; die Anmeldung per Benutzername/Passwort bleibt unverändert.
+- **Anmeldung mit Discord (Track 1).** Mitglieder können sich jetzt zusätzlich mit Discord anmelden — aber nur, wer im das-kartell Discord ist und dort die Rolle „KRT-Mitglied“ trägt (direkt bei der Anmeldung geprüft, fail-closed). Neu über Discord angemeldete Nutzer landen zunächst in einem Wartezustand ohne Zugriff und müssen von einem Administrator freigegeben werden (Admin-Übersicht unter „Discord-Registrierungen“, Admins werden benachrichtigt); Rollen und Einheiten werden danach wie gewohnt von Hand vergeben. Die bestehende Anmeldung per Benutzername/Passwort bleibt unverändert. Wird erst nach der serverseitigen Einrichtung (Discord-App + Keycloak) wirksam.
 
 ### Changed
 
