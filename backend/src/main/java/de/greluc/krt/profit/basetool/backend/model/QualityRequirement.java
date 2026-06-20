@@ -28,7 +28,7 @@ package de.greluc.krt.profit.basetool.backend.model;
  */
 public enum QualityRequirement {
 
-  /** Requires refining-grade quality (700+); only inventory at or above that tier satisfies it. */
+  /** Requires refining-grade quality (650+); only inventory at or above that tier satisfies it. */
   GOOD,
 
   /** No quality floor ("Keine"); inventory of any quality satisfies the requirement. */

@@ -281,7 +281,7 @@ class MaterialClaimIntegrationTest {
             null,
             "orph",
             null,
-            List.of(new CreateJobOrderMaterialDto(s.matA(), 700, 10.0)),
+            List.of(new CreateJobOrderMaterialDto(s.matA(), 650, 10.0)),
             null);
     jobOrderService.updateJobOrder(s.orderId(), update);
 

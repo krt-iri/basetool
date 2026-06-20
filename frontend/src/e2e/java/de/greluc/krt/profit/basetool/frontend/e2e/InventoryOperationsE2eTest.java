@@ -84,7 +84,7 @@ class InventoryOperationsE2eTest {
   /** Tolerance for SCU-amount equality assertions (the backend rounds to three decimals). */
   private static final double AMOUNT_DELTA = 0.001;
 
-  /** Quality stamped on every seeded row; clears the job order's {@code minQuality} of 700. */
+  /** Quality stamped on every seeded row; clears the job order's {@code minQuality} of 650. */
   private static final int SEED_QUALITY = 750;
 
   private static Playwright playwright;
@@ -172,7 +172,7 @@ class InventoryOperationsE2eTest {
             USERNAME, PASSWORD, assignOrderMatId, opsHubLocId, SEED_QUALITY, 100);
     assignOrderId =
         seeder.createJobOrder(
-            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Assign Order", assignOrderMatId, 700, 100);
+            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Assign Order", assignOrderMatId, 650, 100);
 
     assignMissionMatId =
         seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Assign Mission Mat");

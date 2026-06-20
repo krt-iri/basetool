@@ -77,7 +77,7 @@ public class JobOrderItemMaterial extends AbstractEntity<UUID> {
   @Column(name = "required_quantity", nullable = false)
   private Double requiredQuantity;
 
-  /** Whether this material is needed in Gut (700+) or Keine quality for this order. */
+  /** Whether this material is needed in Gut (650+) or Keine quality for this order. */
   @Enumerated(EnumType.STRING)
   @Column(name = "quality_requirement", nullable = false, length = 8)
   private QualityRequirement qualityRequirement;

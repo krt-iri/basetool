@@ -233,7 +233,7 @@ class AnonymousJobOrderE2eTest {
     JsonObject created =
         new BackendSeeder()
             .anonymousCreateMaterialOrder(
-                nonProfitSkId, nonProfitSkId, handle, materialId, 700, 10);
+                nonProfitSkId, nonProfitSkId, handle, materialId, 650, 10);
     assertEquals(
         intakeProfitSkId,
         orgUnitId(created, "responsibleOrgUnit"),
@@ -251,7 +251,7 @@ class AnonymousJobOrderE2eTest {
     String handle = "E2E Anon Api Omitted " + UUID.randomUUID();
     JsonObject created =
         new BackendSeeder()
-            .anonymousCreateMaterialOrder(null, IRIDIUM_ID, handle, materialId, 700, 10);
+            .anonymousCreateMaterialOrder(null, IRIDIUM_ID, handle, materialId, 650, 10);
     assertEquals(
         intakeProfitSkId,
         orgUnitId(created, "responsibleOrgUnit"),

@@ -91,7 +91,7 @@ class JobOrderEditE2eTest {
       String materialId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Edit Material");
       jobOrderId =
           seeder.createJobOrder(
-              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Edit Order", materialId, 700, 100.0);
+              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Edit Order", materialId, 650, 100.0);
     }
   }
 

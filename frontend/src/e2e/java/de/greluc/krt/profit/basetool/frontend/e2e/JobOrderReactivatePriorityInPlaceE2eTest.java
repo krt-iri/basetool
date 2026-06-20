@@ -84,7 +84,7 @@ class JobOrderReactivatePriorityInPlaceE2eTest {
           seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Reactivate Material");
       jobOrderId =
           seeder.createJobOrder(
-              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Reactivate Order", materialId, 700, 100.0);
+              USERNAME, PASSWORD, IRIDIUM_ID, "E2E Reactivate Order", materialId, 650, 100.0);
     }
   }
 
