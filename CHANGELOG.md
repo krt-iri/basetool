@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **In den Auftragsdetails hat die Überschrift „Aggregierte Materialien" wieder den gewohnten Abstand zur Tabelle darüber.** Durch den AJAX-Swap-Container wurde der Titel als erstes Element behandelt und sein oberer Abstand entfernt, sodass er direkt an der Item-Tabelle klebte.
+
 - **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster war PatternFlys Standard-Login-Bild (per Keycloak-Common-Theme auf `body` gesetzt); unsere Wabenregel hat jetzt Vorrang. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
 
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
