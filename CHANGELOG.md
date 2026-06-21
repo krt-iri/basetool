@@ -6,6 +6,10 @@
 
 - **Änderungen anderer Nutzer an einem Einsatz erscheinen jetzt live, ohne die Seite neu zu laden.** Tritt jemand bei, wird die Crew umgestellt, ein Finanzeintrag erfasst oder eine Kern-/Termin-/Status-/Einsatzleiter-/Funk-Änderung gemacht, aktualisiert sich die Ansicht auf allen anderen geöffneten Einsatz-Seiten automatisch über die bestehende Präsenz-Verbindung. Bearbeitet man selbst gerade etwas (Dialog offen), wird die Aktualisierung über einen „Aktualisierungen verfügbar“-Hinweis aufgeschoben statt aufgedrängt; über die Verbindung gehen nur Abschnitts-Kennungen, die Daten holt jede Ansicht weiterhin über ihre eigene berechtigungsgeprüfte Anfrage.
 
+### Changed
+
+- **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
+
 ### Fixed
 
 - **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster war PatternFlys Standard-Login-Bild (per Keycloak-Common-Theme auf `body` gesetzt); unsere Wabenregel hat jetzt Vorrang. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
