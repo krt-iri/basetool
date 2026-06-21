@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.4](https://github.com/krt-profit/basetool/releases/tag/v0.7.4) - 2026-06-21
+
 ### Added
 
 - **Änderungen anderer Nutzer an einem Einsatz erscheinen jetzt live, ohne die Seite neu zu laden.** Tritt jemand bei, wird die Crew umgestellt, ein Finanzeintrag erfasst oder eine Kern-/Termin-/Status-/Einsatzleiter-/Funk-Änderung gemacht, aktualisiert sich die Ansicht auf allen anderen geöffneten Einsatz-Seiten automatisch über die bestehende Präsenz-Verbindung. Bearbeitet man selbst gerade etwas (Dialog offen), wird die Aktualisierung über einen „Aktualisierungen verfügbar“-Hinweis aufgeschoben statt aufgedrängt; über die Verbindung gehen nur Abschnitts-Kennungen, die Daten holt jede Ansicht weiterhin über ihre eigene berechtigungsgeprüfte Anfrage.
