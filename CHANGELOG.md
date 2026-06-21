@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Jede angemeldete Seite lädt den Staffel-Katalog nicht mehr bei jedem Aufruf neu.** Die Seitenleisten-/Kontext-Logik holt die (sich selten ändernde) Staffel-Liste jetzt aus dem 10-Minuten-Cache statt bei jedem Rendern frisch vom Backend; für Admins entfällt dadurch auch ein doppelter Abruf derselben Liste pro Seitenaufbau. Spürbar weniger Backend-Last pro Navigation, keine Verhaltensänderung.
+
 - **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
 
 ### Fixed

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.core.ParameterizedTypeReference;
 
 /**
  * Unit tests for {@link SquadronContextAdvice}. Two groups: (1) the per-principal capability gates
@@ -120,6 +122,42 @@ class SquadronContextAdviceTest {
   void derivedFlags_nullCapabilities_areFalse() {
     assertFalse(advice().canSeeBlueprintOverview(null));
     assertFalse(advice().canViewJobOrders(null));
+  }
+
+  @Test
+  void availableSquadrons_routesSquadronCatalogueThroughCache() {
+    // REQ-DATA-003: the squadron catalogue is a slow-changing global list fetched on every
+    // authenticated render; it must go through the 10-min STATIC_DATA_CACHE (getCached), not a
+    // per-render plain GET. getCached is unstubbed (returns null → advice degrades to empty); the
+    // assertion is about the routing, not the payload.
+    when(authHelper.isAuthenticated()).thenReturn(true);
+
+    advice().availableSquadrons();
+
+    verify(backendApiClient)
+        .getCached(
+            eq("/api/v1/squadrons?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/squadrons?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  void adminSwitcher_reusesCachedSquadronCatalogue_noDoubleFetch() {
+    // The admin switcher catalogue and availableSquadrons() both hit the SAME cached squadron URI,
+    // so the admin render no longer double-fetches the squadron list (the report's confirmed
+    // redundancy). Special-commands stays a plain GET (admin-only, intentionally uncached).
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(authHelper.isAdmin()).thenReturn(true);
+
+    advice().availableOrgUnits();
+
+    verify(backendApiClient)
+        .getCached(
+            eq("/api/v1/squadrons?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/squadrons?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class));
   }
 
   @Test
