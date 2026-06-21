@@ -50,6 +50,7 @@
 
 - **Fremde Gast-Anmeldungen an öffentlichen Einsätzen lassen sich nicht mehr von Unbeteiligten ändern oder löschen.** Bisher konnte jede Person mit der (öffentlich sichtbaren) Teilnehmer-ID eine fremde Gast-Anmeldung bearbeiten, abmelden oder deren Auszahlungswunsch umstellen. Eine Gast-Anmeldung ist jetzt an ein einmalig vergebenes, geheimes Bearbeitungs-Token gebunden: nur wer es besitzt (der ursprüngliche Gast) oder eine Einsatzleitungs-Rolle hat, darf die Zeile noch ändern. Wer Cookies bzw. Seitendaten löscht, verliert die Selbstbearbeitung — dann übernimmt die Einsatzleitung.
 - **Offiziere können Finanzeinträge fremder Staffeln nicht mehr bearbeiten oder löschen.** Das Bearbeiten/Löschen eines Missions-Finanzeintrags prüft für Offiziere jetzt zusätzlich die Staffel-Zugehörigkeit der Mission (wie bei allen anderen Schreibvorgängen an Missionen); nur Administratoren behalten den staffelübergreifenden Zugriff.
+- **Offiziere können keine Bewertungen mehr für Mitglieder fremder Staffeln anlegen, ändern oder löschen.** Die Mitglieder-Bewertung prüft jetzt zusätzlich, dass das bewertete Mitglied zur Staffel des Offiziers gehört (bisher wurde nur die Staffel der Bewertungs-Kategorie geprüft); Administratoren bewerten weiterhin staffelübergreifend.
 
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
 

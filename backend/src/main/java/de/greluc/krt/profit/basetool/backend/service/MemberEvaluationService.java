@@ -45,10 +45,13 @@ import org.springframework.transaction.annotation.Transactional;
  * Domain service for {@link MemberEvaluation}.
  *
  * <p>Data isolation: read operations for personal views are filtered by {@code userId} (JWT sub).
- * Write operations (assign/update level) are restricted to ADMIN and OFFICER callers, with an
- * additional squadron-scope guard: an Officer of squadron X may only manage evaluations whose
- * category belongs to a topic owned by squadron X. Admins span every squadron unless they have
- * focused the sidebar switcher.
+ * Write operations (assign/update level) are restricted to ADMIN and OFFICER callers, with two
+ * squadron-scope guards that BOTH must pass for a non-admin: an Officer of squadron X may only
+ * manage evaluations whose category belongs to a topic owned by squadron X ({@link
+ * #assertCallerMayEditCategory}) AND whose evaluated member belongs to squadron X ({@link
+ * #assertCallerMayEvaluateUser} — the target-member scope check added by the gap-fill security
+ * audit; without it an officer could write a foreign-squadron member's evaluation row). Admins span
+ * every squadron unless they have focused the sidebar switcher.
  */
 @Service
 @RequiredArgsConstructor
@@ -64,6 +67,8 @@ public class MemberEvaluationService {
   private final PromotionCategoryRepository categoryRepository;
   private final MemberEvaluationMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final AuthHelperService authHelperService;
 
   /**
    * Returns all evaluations for the given user (JWT-sub filtered – data isolation), additionally
@@ -120,6 +125,7 @@ public class MemberEvaluationService {
             .orElseThrow(
                 () -> new EntityNotFoundException("PromotionCategory not found: " + categoryId));
     assertCallerMayEditCategory(category);
+    assertCallerMayEvaluateUser(userId);
 
     MemberEvaluation entity =
         repository
@@ -150,6 +156,7 @@ public class MemberEvaluationService {
             .findById(id)
             .orElseThrow(() -> new EntityNotFoundException("MemberEvaluation not found: " + id));
     assertCallerMayEditCategory(entity.getCategory());
+    assertCallerMayEvaluateUser(entity.getUserId());
     repository.delete(entity);
     log.info("Deleted MemberEvaluation id={}", id);
   }
@@ -163,6 +170,38 @@ public class MemberEvaluationService {
     if (!ownerScopeService.canEditSquadron(category.getTopic().getOwningSquadron().getId())) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow editing evaluations of this scope");
+    }
+  }
+
+  /**
+   * Security audit (gap-fill): asserts the caller may evaluate the <em>member being evaluated</em>,
+   * not just the category. {@link #assertCallerMayEditCategory} validates only the category's
+   * owning squadron, so without this an OFFICER of squadron X could create/overwrite/delete an
+   * evaluation row for a member of squadron Y as long as the category belongs to X (a cross-tenant
+   * write of member-evaluation data). Admins span every squadron and short-circuit; otherwise the
+   * target member's home Staffel must be within the caller's editable scope ({@link
+   * OwnerScopeService#canEditSquadron(UUID)}), mirroring the officer-scope rule the rest of the
+   * promotion area enforces. Fails closed when the user id is malformed or the member has no
+   * Staffel the caller can edit.
+   *
+   * @param userId the Keycloak sub (== app_user id) of the member being evaluated; never {@code
+   *     null}.
+   */
+  private void assertCallerMayEvaluateUser(@NotNull String userId) {
+    if (authHelperService.isAdmin()) {
+      return;
+    }
+    UUID targetUserId;
+    try {
+      targetUserId = UUID.fromString(userId);
+    } catch (IllegalArgumentException e) {
+      throw new AccessDeniedException("Evaluated member id is not a valid identifier");
+    }
+    UUID staffelId =
+        orgUnitMembershipService.findStaffelMembershipOrgUnitId(targetUserId).orElse(null);
+    if (staffelId == null || !ownerScopeService.canEditSquadron(staffelId)) {
+      throw new AccessDeniedException(
+          "Caller's squadron context does not allow evaluating this member");
     }
   }
 }

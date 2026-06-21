@@ -481,6 +481,30 @@ participant who is still a registered participant) is unchanged.
 (`canEditFinanceEntry_OfficerForeignOrgUnit_ShouldReturnFalse`, `…_OfficerInScope_*`, `…_Admin_*`,
 `…_OwnerStillParticipant_*`). **Security audit:** finding H1.
 
+### REQ-SEC-020 — Member-evaluation writes are scoped to the evaluated member's squadron
+
+MemberEvaluation create/update/delete (`PUT`/`DELETE /api/v1/promotion/evaluations/...`) gates on
+`MemberEvaluationService` with `@PreAuthorize("hasAnyRole('ADMIN','OFFICER')")`. A non-admin write
+must satisfy TWO squadron-scope checks, not one: the evaluation's **category** must belong to a
+squadron the caller may edit (`assertCallerMayEditCategory`) AND the **evaluated member** must belong
+to a Staffel the caller may edit (`assertCallerMayEvaluateUser` →
+`OwnerScopeService.canEditSquadron(member's home Staffel)`). Without the member check an officer of
+squadron X could create/overwrite/delete an evaluation row for a member of squadron Y by pairing the
+victim's id with a category owned by X (a cross-tenant write of member-evaluation data). ADMIN spans
+every squadron and short-circuits; the check fails closed on a malformed member id or a member with
+no Staffel the caller can edit.
+
+**Acceptance**
+
+- [x] An officer is denied (`AccessDeniedException`) upserting/deleting an evaluation for a member
+  outside their editable Staffel scope, even with an in-scope category.
+- [x] An officer may evaluate a member of a Staffel within their scope; an admin may evaluate anyone.
+
+**Enforced by:** `MemberEvaluationServiceTest`
+(`upsert_shouldDenyOfficer_evaluatingForeignSquadronMember`,
+`upsert_shouldAllowOfficer_evaluatingOwnSquadronMember`). **Security audit:** gap-fill finding
+(member-evaluation cross-tenant write).
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
