@@ -321,7 +321,8 @@ public class JobOrderPageController {
         // results on the request thread. Each fetch helper swallows its own failure and returns an
         // empty list, so join() never throws and the page degrades exactly as the serial version
         // did.
-        CompletableFuture<List<UserDto>> usersFuture = parallelPageLoader.loadAsync(this::fetchUsers);
+        CompletableFuture<List<UserDto>> usersFuture =
+            parallelPageLoader.loadAsync(this::fetchUsers);
         CompletableFuture<List<MaterialDto>> materialsFuture =
             parallelPageLoader.loadAsync(this::fetchMaterials);
         CompletableFuture<List<SquadronDto>> squadronsFuture =
@@ -2197,11 +2198,11 @@ public class JobOrderPageController {
 
   /**
    * Populates the two owner-picker model attributes from an already-fetched requesting-org-unit
-   * option list. Split out from {@link #addOwnerPickerOptions(Model)} so the order-detail render can
-   * fetch the list on a {@link ParallelPageLoader} worker thread alongside the other logistician
-   * lookups and then apply the cheap in-memory derivation on the request thread; {@link
-   * #addOwnerPickerOptions(Model)} remains the serial fetch-and-apply entry point for the create/edit
-   * forms.
+   * option list. Split out from {@link #addOwnerPickerOptions(Model)} so the order-detail render
+   * can fetch the list on a {@link ParallelPageLoader} worker thread alongside the other
+   * logistician lookups and then apply the cheap in-memory derivation on the request thread; {@link
+   * #addOwnerPickerOptions(Model)} remains the serial fetch-and-apply entry point for the
+   * create/edit forms.
    *
    * @param model the Thymeleaf model to populate.
    * @param requestingOptions the requesting-org-unit options to expose, and to derive the

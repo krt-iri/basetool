@@ -20,7 +20,10 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -42,6 +45,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderRequiredBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
@@ -54,6 +58,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
@@ -704,5 +709,48 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("coverage section omitted when the members-only endpoint is forbidden")
         .doesNotContain("data-testid=\"blueprint-owners-section\"");
+  }
+
+  // No-double-fetch guard for the parallelized logistician fan-out (#768). The order-detail render
+  // splits addOwnerPickerOptions into a fetch step + an apply step so the requesting-org-unit list
+  // can be loaded on a ParallelPageLoader worker thread alongside users/materials/squadrons. Pin
+  // that each of the four independent lookups still fires exactly once: a regression that left the
+  // old serial addOwnerPickerOptions(model) in place on top of the parallel fetch would double the
+  // owner-picker round-trip and trip times(1) here.
+  @Test
+  @SuppressWarnings("unchecked")
+  void detailRender_logistician_fetchesEachFanOutLookupExactlyOnce() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    // The authenticated requesting picker sources the all-kinds catalog; return one option so the
+    // fetch path runs end to end (the apply step derives the responsible subset from it) and the
+    // picker never falls back to the /active catalog.
+    when(backendApiClient.get(
+            eq("/api/v1/org-units/active-all-kinds"), any(ParameterizedTypeReference.class)))
+        .thenReturn(
+            List.of(
+                new OrgUnitMembershipOptionDto(
+                    UUID.randomUUID(), "Profit Spezialkommando", "PSK", "SPECIAL_COMMAND", true)));
+
+    mockMvc
+        .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+        .andExpect(status().isOk());
+
+    // Each of the four independent logistician lookups fires exactly once — the parallel fan-out
+    // does not duplicate any round-trip.
+    verify(backendApiClient, times(1))
+        .get(eq("/api/v1/org-units/active-all-kinds"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, times(1))
+        .get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, times(1))
+        .getCached(
+            eq("/api/v1/materials/job-order"), any(ParameterizedTypeReference.class), eq(true));
+    verify(backendApiClient, times(1))
+        .getCached(
+            eq("/api/v1/squadrons?size=1000&sort=name,asc"),
+            any(ParameterizedTypeReference.class),
+            eq(true));
   }
 }
