@@ -42140,6 +42140,9 @@
           "joinDate" : {
             "type" : "string",
             "format" : "date"
+          },
+          "discordLinked" : {
+            "type" : "boolean"
           }
         }
       },

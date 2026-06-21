@@ -71,7 +71,8 @@ public final class EntityMappers {
         u.isInKeycloak(),
         null,
         u.getVersion(),
-        u.getJoinDate());
+        u.getJoinDate(),
+        u.getDiscordUserId() != null && !u.getDiscordUserId().isBlank());
   }
 
   /** Flattens a {@link JobType} entity into its DTO, surfacing the {@code parent.id} as a UUID. */

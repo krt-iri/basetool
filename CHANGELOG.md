@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Die Mitgliederverwaltung zeigt jetzt, ob ein Konto mit Discord verknüpft ist.** Eine neue Spalte zwischen „Missions-Manager" und „Status" zeigt bei verknüpften Konten das Discord-Symbol, sonst einen gedämpften Strich. Nur für Admins sichtbar, und es wird ausschließlich der Verknüpfungs-Status angezeigt — nie die Discord-ID.
+
 ## [v0.7.5](https://github.com/krt-profit/basetool/releases/tag/v0.7.5) - 2026-06-21
 
 ## [v0.7.4](https://github.com/krt-profit/basetool/releases/tag/v0.7.4) - 2026-06-21

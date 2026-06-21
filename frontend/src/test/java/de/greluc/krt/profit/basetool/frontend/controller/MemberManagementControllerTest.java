@@ -602,7 +602,8 @@ class MemberManagementControllerTest {
         true,
         null,
         1L,
-        null);
+        null,
+        false);
   }
 
   private static PageResponse<UserDto> newPage(List<UserDto> content) {

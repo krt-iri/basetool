@@ -52,6 +52,7 @@
                     <th th:text="#{profile.rank}">Rang</th>
                     <th th:text="#{members.is_logistician}">Logistiker</th>
                     <th th:text="#{members.is_mission_manager}">Missions-Manager</th>
+                    <th th:text="#{members.discord}">Discord</th>
                     <th th:text="#{members.status}">Status</th>
                     <th th:text="#{general.action}">Aktion</th>
                 </tr>
@@ -93,6 +94,14 @@
                                th:data-user-id="${user.id}"
                                data-trigger="members-toggle-mission-manager"
                                th:disabled="${#authentication.principal.subject == user.id.toString()}">
+                    </td>
+                    <td>
+                        <span th:if="${user.discordLinked}" role="img"
+                              th:title="#{members.discord.linked}" th:aria-label="#{members.discord.linked}">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-discord"/></svg>
+                        </span>
+                        <span th:unless="${user.discordLinked}" class="text-muted"
+                              th:title="#{members.discord.not_linked}" th:aria-label="#{members.discord.not_linked}">&mdash;</span>
                     </td>
                     <td>
                         <span th:if="${user.inKeycloak}" style="color: var(--color-success); font-size: 0.8rem;" th:text="#{members.in_keycloak}">In Keycloak</span>
