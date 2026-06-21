@@ -93,6 +93,12 @@ roles/units are assigned manually (Track 1) — no automated mapping.
 > approval, and the scheduled sync materialises not-yet-seen Keycloak users as `PENDING` rather than
 > `ACTIVE`. This is the accepted cost of closing the mapper-misconfiguration bypass; pre-existing rows
 > stay `ACTIVE` (V173 backfill), so only accounts created after this change are affected.
+>
+> The behaviour is gated by `app.registration.require-approval` (default **`true`** = prod). It is set
+> to `false` **only** in the Playwright e2e stack (`APP_REGISTRATION_REQUIRE_APPROVAL=false` in
+> `docker-compose.e2e.yml`), where `BackendSeeder` provisions fixture users on the fly and an
+> interactive approval step would deadlock seeding on an ephemeral DB (no V173 backfill). The approval
+> lifecycle itself stays covered by backend unit tests, not e2e.
 
 **Acceptance**
 
