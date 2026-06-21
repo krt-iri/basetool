@@ -1293,6 +1293,19 @@ class OwnerScopeServiceTest {
 
       verify(orgUnitMembershipRepository, times(1)).findAllByIdUserId(MEMBER_USER_ID);
     }
+
+    @Test
+    void canViewJobOrders_calledTwice_runsProfitEligibilityCountOnce() {
+      // The profit-eligibility verdict is request-constant, yet on the order-lookup path
+      // canViewJobOrders() is consulted once per row via canSeeJobOrder. The request-scoped memo
+      // collapses the repeated countProfitEligibleByIdIn aggregate to a single query per request.
+      stubMemberInSquadronA();
+
+      assertTrue(service.canViewJobOrders());
+      assertTrue(service.canViewJobOrders());
+
+      verify(orgUnitRepository, times(1)).countProfitEligibleByIdIn(any());
+    }
   }
 
   // --- resolveSquadronForPickerOutput (R5.d picker shared helper, hardened in R6.b
