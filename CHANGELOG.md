@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Discord-Login zeigt den Zustimmungs-Bildschirm nicht mehr bei jeder Anmeldung.** Nach der ersten Autorisierung überspringt Discord die Zustimmung (`prompt=none`); nur die allererste Anmeldung zeigt sie noch. Wird mit dem neu bereitgestellten Keycloak-Provider-JAR wirksam.
+
 ## [v0.7.1](https://github.com/krt-profit/basetool/releases/tag/v0.7.1) - 2026-06-21
 
 ## [v0.7.0](https://github.com/krt-profit/basetool/releases/tag/v0.7.0) - 2026-06-21
