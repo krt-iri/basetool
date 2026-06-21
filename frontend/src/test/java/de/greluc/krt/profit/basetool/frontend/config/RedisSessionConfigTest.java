@@ -29,9 +29,12 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.FlushMode;
+import org.springframework.session.Session;
 import org.springframework.session.config.SessionRepositoryCustomizer;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
+import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
@@ -119,6 +122,25 @@ class RedisSessionConfigTest {
     RedisIndexedSessionRepository repository = applyCustomizer("IMMEDIATE");
     verify(repository).setDefaultMaxInactiveInterval(Duration.ofHours(240));
     verify(repository).setRedisKeyNamespace("basetool:session");
+  }
+
+  /**
+   * Security audit gap-fill: the concurrent-session cap ({@code maximumSessions}) must be backed by
+   * the Redis session store, because with {@code @EnableRedisIndexedHttpSession} the default
+   * in-memory registry never sees the (Spring-Session-owned) sessions. The config exposes a {@link
+   * SpringSessionBackedSessionRegistry} built from the Redis {@link
+   * FindByIndexNameSessionRepository}.
+   */
+  @Test
+  void sessionRegistryIsBackedByTheRedisSessionRepository() {
+    RedisSessionConfig config = new RedisSessionConfig();
+    @SuppressWarnings("unchecked")
+    FindByIndexNameSessionRepository<Session> repository =
+        mock(FindByIndexNameSessionRepository.class);
+
+    SpringSessionBackedSessionRegistry<Session> registry = config.sessionRegistry(repository);
+
+    assertThat(registry).isNotNull();
   }
 
   /**

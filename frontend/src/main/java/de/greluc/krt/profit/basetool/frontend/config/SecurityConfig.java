@@ -209,7 +209,10 @@ public class SecurityConfig {
       HttpSecurity http,
       ClientRegistrationRepository clientRegistrationRepository,
       @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri:}")
-          String keycloakIssuerUri)
+          String keycloakIssuerUri,
+      org.springframework.beans.factory.ObjectProvider<
+              org.springframework.security.core.session.SessionRegistry>
+          sessionRegistryProvider)
       throws Exception {
     SmartOidcLogoutSuccessHandler oidcLogoutSuccessHandler =
         new SmartOidcLogoutSuccessHandler(clientRegistrationRepository, "{baseUrl}");
@@ -376,31 +379,49 @@ public class SecurityConfig {
                                     .equals(request.getContextPath() + "/logout"))
                     .logoutSuccessHandler(oidcLogoutSuccessHandler))
         .exceptionHandling(ex -> ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint))
-        // M-14: explicit session-management policy.
+        // M-14 (+ security audit gap-fill): explicit session-management policy.
         //   * sessionFixation(changeSessionId) is Spring Security's default since 4.x; pinning it
         //     here makes the contract explicit so a future regression that switches to {@code
         //     none} or {@code migrateSession} is visible in code review.
         //   * maximumSessions(2) caps a single user to two concurrent sessions (e.g. desktop +
-        //     phone); a stolen cookie used in parallel will eventually push the legitimate
-        //     session out. maxSessionsPreventsLogin(false) keeps the UX as "most recent login
-        //     wins" rather than "new login refused" — combined with the cookie SameSite=Strict
-        //     this is the right trade-off for a member-facing app.
+        //     phone); a stolen cookie used in parallel eventually pushes the legitimate session
+        //     out. maxSessionsPreventsLogin(false) keeps the UX as "most recent login wins" rather
+        //     than "new login refused" — combined with the cookie SameSite=Strict this is the right
+        //     trade-off for a member-facing app.
+        //   * Sessions are Redis-indexed (@EnableRedisIndexedHttpSession), so the default in-memory
+        //     SessionRegistryImpl (fed by HttpSessionEventPublisher) NEVER sees them — the cap was
+        // a
+        //     silent no-op. The Redis-backed SpringSessionBackedSessionRegistry (RedisSessionConfig
+        //     #sessionRegistry) is wired in below so the cap is actually enforced and survives a
+        //     restart. The bean is absent in the `test` profile (RedisSessionConfig is
+        //     @Profile("!test")); there maximumSessions falls back to the default registry, which
+        // is
+        //     harmless because the suite never exercises concurrent-session eviction.
         .sessionManagement(
-            sm ->
-                sm.sessionFixation(
-                        org.springframework.security.config.annotation.web.configurers
-                                .SessionManagementConfigurer.SessionFixationConfigurer
-                            ::changeSessionId)
-                    .maximumSessions(2)
-                    .maxSessionsPreventsLogin(false));
+            sm -> {
+              var concurrency =
+                  sm.sessionFixation(
+                          org.springframework.security.config.annotation.web.configurers
+                                  .SessionManagementConfigurer.SessionFixationConfigurer
+                              ::changeSessionId)
+                      .maximumSessions(2)
+                      .maxSessionsPreventsLogin(false);
+              sessionRegistryProvider.ifAvailable(concurrency::sessionRegistry);
+            });
     return http.build();
   }
 
   /**
-   * Publishes Spring's session-lifecycle events so {@link
-   * org.springframework.security.core.session.SessionRegistry} (used by {@code
-   * sessionManagement().maximumSessions(...)}) can track session creation / destruction. Without
-   * this bean the concurrent-session control silently no-ops. Audit finding M-14.
+   * Bridges servlet-container session-lifecycle events to Spring's default in-memory {@link
+   * org.springframework.security.core.session.SessionRegistry}. This only matters in profiles
+   * WITHOUT Redis-indexed sessions (e.g. {@code test}): there {@code maximumSessions(...)} falls
+   * back to {@code SessionRegistryImpl}, which this publisher feeds.
+   *
+   * <p>In prod/dev the sessions are Redis-indexed and the cap is backed by the {@code
+   * SpringSessionBackedSessionRegistry} instead (see {@code RedisSessionConfig#sessionRegistry} and
+   * the {@code sessionManagement} wiring above) — that registry reads the Redis principal-name
+   * index directly and does not depend on this publisher. Kept because it is harmless and keeps the
+   * non-Redis fallback functional. Audit finding M-14 (corrected by the gap-fill audit).
    *
    * @return the publisher bean
    */
