@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
@@ -68,6 +69,40 @@ class JobOrderItemServiceTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private MaterialMapper materialMapper;
   @InjectMocks private JobOrderItemService service;
+
+  @Test
+  void requiredMaterialIdsCollectsMaterialLinesForMaterialOrderAndDerivedForItemOrder() {
+    // REQ-ORDERS-018: the kind-agnostic required-material set. MATERIAL order -> its material
+    // lines;
+    // ITEM order -> the snapshotted per-item materials. Each kind's other collection is empty.
+    Material steel = new Material();
+    steel.setId(UUID.randomUUID());
+    Material gold = new Material();
+    gold.setId(UUID.randomUUID());
+
+    JobOrder materialOrder = new JobOrder();
+    materialOrder.addMaterial(JobOrderMaterial.builder().material(steel).amount(5.0).build());
+    materialOrder.addMaterial(JobOrderMaterial.builder().material(gold).amount(1.0).build());
+
+    assertThat(service.requiredMaterialIds(materialOrder))
+        .containsExactlyInAnyOrder(steel.getId(), gold.getId());
+
+    Material iron = new Material();
+    iron.setId(UUID.randomUUID());
+    JobOrderItemMaterial req =
+        JobOrderItemMaterial.builder()
+            .material(iron)
+            .requiredQuantity(2.0)
+            .qualityRequirement(QualityRequirement.GOOD)
+            .build();
+    JobOrderItem item = new JobOrderItem();
+    item.addMaterial(req);
+    JobOrder itemOrder = new JobOrder();
+    itemOrder.setType(JobOrderType.ITEM);
+    itemOrder.addItem(item);
+
+    assertThat(service.requiredMaterialIds(itemOrder)).containsExactly(iron.getId());
+  }
 
   @Test
   void buildItemLineDerivesResourceMaterialsScalingByAmountWithQualityDefaultAndOverride() {
