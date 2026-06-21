@@ -70,7 +70,11 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * JobOrderItemService.requiredMaterialIds}) without an N+1 per ITEM order. A row explosion across
    * the {@code materials} and {@code items.materials} collection paths does not occur in practice:
    * the two order kinds are mutually exclusive, so for any given order exactly one of the two
-   * collections is non-empty.
+   * collections is non-empty. The {@code handovers} branch fetched here is MATERIAL-only (an ITEM
+   * order's deliveries live on the separate {@code itemHandovers} collection, which is deliberately
+   * NOT fetched), so it too stays empty for an ITEM order. <strong>Do not add {@code itemHandovers}
+   * (or any second ITEM-side collection) to this graph:</strong> combined with {@code
+   * items.materials} it would be a genuine cartesian product on ITEM orders.
    */
   @EntityGraph(
       attributePaths = {

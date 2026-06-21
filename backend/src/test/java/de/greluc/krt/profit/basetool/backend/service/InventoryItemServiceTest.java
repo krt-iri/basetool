@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -147,8 +148,7 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrder.getId())).thenReturn(Optional.of(jobOrder));
-    when(jobOrderItemService.requiredMaterialIds(jobOrder))
-        .thenReturn(java.util.Set.of(material.getId()));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(material.getId()));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item)).thenReturn(mapped);
 
@@ -530,13 +530,12 @@ class InventoryItemServiceTest {
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
     // The order requires a DIFFERENT material than the one being linked.
-    when(jobOrderItemService.requiredMaterialIds(jobOrder))
-        .thenReturn(java.util.Set.of(UUID.randomUUID()));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
 
     assertThrows(
         BadRequestException.class,
         () -> inventoryItemService.createInventoryItem(dto, userId, false));
-    verify(inventoryItemRepository, org.mockito.Mockito.never()).save(any(InventoryItem.class));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
   @Test
@@ -564,8 +563,7 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderItemService.requiredMaterialIds(jobOrder))
-        .thenReturn(java.util.Set.of(materialId));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(materialId));
     InventoryItem saved = new InventoryItem();
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(saved);
     when(inventoryItemMapper.toDto(saved)).thenReturn(null);
@@ -610,14 +608,12 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderItemService.requiredMaterialIds(jobOrder))
-        .thenReturn(java.util.Set.of(UUID.randomUUID()));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
 
     assertThrows(
         BadRequestException.class,
         () -> inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false));
-    verify(inventoryItemRepository, org.mockito.Mockito.never())
-        .saveAndFlush(any(InventoryItem.class));
+    verify(inventoryItemRepository, never()).saveAndFlush(any(InventoryItem.class));
   }
 
   @Test
@@ -905,8 +901,7 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(newJobOrderId)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderItemService.requiredMaterialIds(jobOrder))
-        .thenReturn(java.util.Set.of(material.getId()));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(material.getId()));
     when(missionRepository.findById(newMissionId)).thenReturn(Optional.of(mission));
     when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class))).thenReturn(existingItem);
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);

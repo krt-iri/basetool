@@ -114,6 +114,13 @@ detail view.
 
 ## Out of scope
 
+- **Quality-floor gating on the link (REQ-ORDERS-018).** The gate and the orphaned-link check key
+  on **material membership only**, not on the order's minimum quality. An inventory item below a
+  required material's quality floor may still be linked — it simply contributes `0` to that bucket's
+  stock and is **not** flagged as orphaned, because its material *is* required. This is intentional:
+  the material view still shows the row, so the link is never invisible; the per-material picker
+  (`getInventoryItemsForJobOrderMaterial`) continues to filter candidates by quality as a separate
+  concern.
 - The item-order **detail** page's aggregated panel — it keeps its material+quality rows and
   claim columns; this change only adds the stock the overview consumes and does not alter the
   detail rendering.
