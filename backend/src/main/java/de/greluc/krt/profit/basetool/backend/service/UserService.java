@@ -988,12 +988,18 @@ public class UserService {
 
   /**
    * Deletes a user account along with all owned data (ships, inventory, refinery orders, mission
-   * memberships). Used by admins to remove ex-members. The cascade is explicit (per-table delete
-   * calls) so the order matches the FK constraints; auto-cascading would surface confusing FK
-   * errors when the table order changes.
+   * memberships) and its Discord-approval audit trail (epic #720 / V173). Used by admins to remove
+   * ex-members; only a user no longer present in Keycloak may be deleted. The cascade is explicit
+   * (per-table delete / reassign calls) so the order matches the FK constraints; auto-cascading
+   * would surface confusing FK errors when the table order changes. References whose FK declares
+   * {@code ON DELETE SET NULL} / {@code CASCADE} (bank tables, org-unit membership, org-chart, …)
+   * are left to the database; the no-{@code ON DELETE} references — the owner columns (reassigned
+   * to an admin) and the V173 approval audit (cleaned up here) — must be resolved explicitly first.
    *
    * @param userId user to delete
    * @throws NoSuchElementException when the user id is unknown
+   * @throws IllegalStateException when the user is still present in Keycloak, or when no other
+   *     admin exists to receive the reassigned owner references
    */
   @Transactional
   public void deleteUser(UUID userId) {
@@ -1032,6 +1038,19 @@ public class UserService {
     missionRepository.removeManager(userId);
     jobOrderRepository.removeAssignee(userId);
     missionParticipantRepository.unlinkUser(userId);
+
+    // Discord-approval audit cleanup (epic #720 / REQ-SEC-017, V173). These three references into
+    // app_user declare no ON DELETE clause (Postgres NO ACTION), so without explicit cleanup a
+    // decided-on or deciding account cannot be hard-deleted. This is the reported regression: an
+    // approved, since-removed Discord registration could not be deleted because of FK
+    // user_approval_event_user_id_fkey (409). The subject's own audit rows are deleted (user_id is
+    // NOT NULL, so they cannot be orphaned); rows the deleted account decided keep the audit but
+    // lose their now-gone decider link; and the denormalised app_user.approved_by_id back-pointer
+    // on other users is nulled. The approval audit of OTHER users survives. Must run before the
+    // app_user delete below so the FK is satisfied at flush.
+    userApprovalEventRepository.deleteByUserId(userId);
+    userApprovalEventRepository.clearDecidedBy(userId);
+    userRepository.clearApprovedBy(userId);
 
     // Delete the user
     userRepository.delete(user);

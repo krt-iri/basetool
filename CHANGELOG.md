@@ -34,6 +34,8 @@
 
 ### Fixed
 
+- **Ein bereits in Keycloak gelöschter Nutzer ließ sich nicht mehr aus dem Basetool löschen, wenn zuvor über seine Registrierung eine Discord-Freigabe entschieden wurde.** Die Löschung scheiterte an der Freigabe-Historie (V173), deren Fremdschlüssel beim Entfernen bisher nicht aufgelöst wurden (Datenbank-Constraint-Verletzung → 409). Beim endgültigen Löschen eines Nutzers werden seine eigenen Freigabe-Audit-Einträge jetzt mitentfernt und die Verweise auf ihn als entscheidender Admin aufgelöst; die Freigabe-Historie anderer Nutzer bleibt unberührt.
+
 - **Der Keycloak-Nutzerabgleich liest jetzt alle Nutzer seitenweise, statt nur die erste Seite.** Bei mehr als ~100 Nutzern lieferte Keycloak nur die erste Seite; der Abgleich markierte daraufhin alle übrigen Nutzer fälschlich als „nicht mehr in Keycloak" (stiller Soft-Delete echter Mitglieder). Der Abgleich blättert nun über `first`/`max` durch die komplette Liste (neue Einstellung `app.keycloak.sync.page-size`, Default 100). Betrifft nur Installationen mit mehr als einer vollen Keycloak-Seite an Nutzern.
 
 - **Abschnittsüberschriften, die in einem AJAX-Swap-Container stecken, haben wieder ihren gewohnten Abstand zum Inhalt darüber.** Der Container machte die Überschrift zum ersten Element und entfernte so ihren oberen Abstand, sodass sie direkt am vorherigen Block klebte. Betrifft in den Auftragsdetails „Aggregierte Materialien" und „Übergaben" sowie „Notiz" in der Detailansicht persönlicher Blueprints.

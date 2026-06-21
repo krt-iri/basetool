@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -26,8 +29,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
+import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +63,12 @@ class UserManagementTest {
   private MockMvc mockMvc;
 
   @Autowired private UserRepository userRepository;
+
+  @Autowired private UserService userService;
+
+  @Autowired private UserApprovalEventRepository userApprovalEventRepository;
+
+  @Autowired private RoleRepository roleRepository;
 
   @MockitoBean private JwtDecoder jwtDecoder;
 
@@ -114,5 +130,47 @@ class UserManagementTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.rank").value(5))
         .andExpect(jsonPath("$.description").value("Promoted"));
+  }
+
+  @Test
+  void deleteUser_withDiscordApprovalAudit_succeedsAndClearsAudit() {
+    // Regression (epic #720 / V173): an approved, since-removed Discord registration could not be
+    // hard-deleted — the user_approval_event FK carries no ON DELETE clause, so removing the
+    // app_user row failed with a DataIntegrityViolation (user_approval_event_user_id_fkey -> 409).
+    // The delete must now clear the approval audit first, so it succeeds end-to-end.
+
+    // An admin must exist as the reassignment target for the deleted user's owned data.
+    Role adminRole =
+        roleRepository
+            .findByNameIgnoreCase("ADMIN")
+            .orElseThrow(() -> new IllegalStateException("ADMIN role not seeded"));
+    User admin = new User();
+    admin.setId(UUID.randomUUID());
+    admin.setUsername("reassign-admin");
+    admin.setInKeycloak(true);
+    admin.setRoles(Set.of(adminRole));
+    userRepository.save(admin);
+
+    // The to-be-deleted account: removed from Keycloak, with an approval-audit row referencing it.
+    User target = new User();
+    UUID targetId = UUID.randomUUID();
+    target.setId(targetId);
+    target.setUsername("ex-discord-member");
+    target.setInKeycloak(false);
+    userRepository.save(target);
+
+    userApprovalEventRepository.save(
+        new UserApprovalEvent(targetId, ApprovalDecision.APPROVED, null, admin.getId()));
+    userRepository.flush();
+
+    userService.deleteUser(targetId);
+    // Before the fix the scheduled app_user delete threw on flush; it must now succeed.
+    assertDoesNotThrow(userRepository::flush);
+
+    assertTrue(userRepository.findById(targetId).isEmpty(), "the deleted user must be gone");
+    assertFalse(
+        userApprovalEventRepository.findAll().stream()
+            .anyMatch(e -> targetId.equals(e.getUserId())),
+        "the deleted user's approval-audit rows must be cleared");
   }
 }
