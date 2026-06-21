@@ -73,7 +73,7 @@ class JobOrderPageCookieTest {
   @WithMockUser
   void viewOrders_WithoutCookie_ShouldUseDefaultAndSetNoNewCookie() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
             any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
@@ -84,7 +84,7 @@ class JobOrderPageCookieTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
             any(org.springframework.core.ParameterizedTypeReference.class));
   }
 
@@ -92,7 +92,7 @@ class JobOrderPageCookieTest {
   @WithMockUser
   void viewOrders_WithValidCookie_ShouldUseCookie() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=COMPLETED"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"),
             any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
@@ -102,7 +102,7 @@ class JobOrderPageCookieTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=COMPLETED"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"),
             any(org.springframework.core.ParameterizedTypeReference.class));
   }
 
@@ -110,7 +110,7 @@ class JobOrderPageCookieTest {
   @WithMockUser
   void viewOrders_WithInvalidOldCookie_ShouldFallbackToDefault() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
             any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
@@ -120,7 +120,7 @@ class JobOrderPageCookieTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
             any(org.springframework.core.ParameterizedTypeReference.class));
   }
 
@@ -128,7 +128,7 @@ class JobOrderPageCookieTest {
   @WithMockUser
   void viewOrders_WithNewCookieFormat_ShouldUseCookie() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
             any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
@@ -138,7 +138,7 @@ class JobOrderPageCookieTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
             any(org.springframework.core.ParameterizedTypeReference.class));
   }
 
@@ -146,7 +146,7 @@ class JobOrderPageCookieTest {
   @WithMockUser
   void viewOrders_WithQueryParam_ShouldSetNewCookie() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=COMPLETED"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"),
             any(org.springframework.core.ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
@@ -157,7 +157,7 @@ class JobOrderPageCookieTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=COMPLETED"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"),
             any(org.springframework.core.ParameterizedTypeReference.class));
   }
 }

@@ -32,6 +32,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,6 +49,7 @@ class UserServiceDeleteTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MaterialClaimRepository materialClaimRepository;
+  @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private RoleRepository roleRepository;
   // Required so the AuthHelperService constructor parameter of UserService is
   // satisfied. shouldThrowExceptionIfNoAdminFound exercises the deleteUser
@@ -98,6 +100,9 @@ class UserServiceDeleteTest {
     verify(jobOrderRepository).removeAssignee(userId);
     verify(missionParticipantRepository).unlinkUser(userId);
     verify(materialClaimRepository).unlinkClaimedByUser(userId);
+    verify(userApprovalEventRepository).deleteByUserId(userId);
+    verify(userApprovalEventRepository).clearDecidedBy(userId);
+    verify(userRepository).clearApprovedBy(userId);
     verify(userRepository).delete(user);
   }
 
@@ -120,6 +125,24 @@ class UserServiceDeleteTest {
     inOrder.verify(missionRepository).updateOwner(user, admin);
     inOrder.verify(missionOwnershipRepository).updateOwner(user, admin);
     inOrder.verify(materialClaimRepository).unlinkClaimedByUser(userId);
+    inOrder.verify(userRepository).delete(user);
+  }
+
+  @Test
+  void shouldClearDiscordApprovalAuditBeforeDeletingUser() {
+    // Regression (epic #720 / V173): the approval-audit FKs carry no ON DELETE clause, so the audit
+    // must be cleared before the app_user row is removed, or the delete 409s on
+    // user_approval_event_user_id_fkey — the reported "approved Discord registration can no longer
+    // be deleted" failure.
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    userService.deleteUser(userId);
+
+    InOrder inOrder = inOrder(userApprovalEventRepository, userRepository);
+    inOrder.verify(userApprovalEventRepository).deleteByUserId(userId);
+    inOrder.verify(userApprovalEventRepository).clearDecidedBy(userId);
+    inOrder.verify(userRepository).clearApprovedBy(userId);
     inOrder.verify(userRepository).delete(user);
   }
 

@@ -191,6 +191,10 @@
             </tbody>
         </table>
         </div>
+        <div class="pagination-controls" th:if="${ordersPage != null}">
+            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+            <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl})}"></nav>
+        </div>
         </th:block>
         </div>
     </div>
