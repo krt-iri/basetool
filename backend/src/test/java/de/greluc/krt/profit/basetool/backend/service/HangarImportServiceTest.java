@@ -45,6 +45,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -1897,6 +1898,17 @@ class HangarImportServiceTest {
     type.setUexSlug(uexSlug);
     type.setScwikiSlug(scwikiSlug);
     return type;
+  }
+
+  @Test
+  void importShips_fileExceedingSizeCap_rejectedBeforeParsing() {
+    // Security audit gap-fill: an oversized upload is rejected by file.getSize() BEFORE readTree
+    // materialises the JSON into an in-memory tree (the user lookup and parsing are never reached).
+    MultipartFile file = mock(MultipartFile.class);
+    when(file.getSize()).thenReturn(9L * 1024 * 1024); // > 8 MB cap
+
+    assertThrows(
+        BadRequestException.class, () -> hangarImportService.importShips(UUID.randomUUID(), file));
   }
 
   private static MockMultipartFile multipartFile(String json) {

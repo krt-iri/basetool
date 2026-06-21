@@ -95,6 +95,14 @@ public class BlueprintImportService {
   /** External catalogue every import row and learned alias belongs to. */
   private static final BlueprintExternalAliasSource SOURCE = BlueprintExternalAliasSource.SCMDB;
 
+  /**
+   * Application-level cap on a blueprint-export upload, enforced before the body is materialised
+   * into a Jackson tree (security audit gap-fill). A real blueprint export is well under 1 MB; 8 MB
+   * leaves generous headroom while keeping this member-reachable import off the 64 MB global
+   * multipart cap (sized for the admin-only P4K catalogue).
+   */
+  private static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
+
   private final ObjectMapper objectMapper;
   private final BlueprintProductService blueprintProductService;
   private final BlueprintNameNormalizer normalizer;
@@ -399,6 +407,14 @@ public class BlueprintImportService {
   private List<ParsedEntry> parse(@NotNull MultipartFile file) {
     if (file.isEmpty()) {
       throw new BadRequestException("The uploaded file is empty.");
+    }
+    // Reject an oversized upload BEFORE readTree builds the in-memory tree (security audit
+    // gap-fill). getSize() reflects the buffered multipart length, so this never reads the body.
+    if (file.getSize() > MAX_IMPORT_BYTES) {
+      throw new BadRequestException(
+          "The uploaded blueprint file is too large (limit "
+              + (MAX_IMPORT_BYTES / (1024 * 1024))
+              + " MB).");
     }
     JsonNode root;
     try {

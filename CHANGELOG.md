@@ -52,6 +52,7 @@
 - **Offiziere können Finanzeinträge fremder Staffeln nicht mehr bearbeiten oder löschen.** Das Bearbeiten/Löschen eines Missions-Finanzeintrags prüft für Offiziere jetzt zusätzlich die Staffel-Zugehörigkeit der Mission (wie bei allen anderen Schreibvorgängen an Missionen); nur Administratoren behalten den staffelübergreifenden Zugriff.
 - **Offiziere können keine Bewertungen mehr für Mitglieder fremder Staffeln anlegen, ändern oder löschen.** Die Mitglieder-Bewertung prüft jetzt zusätzlich, dass das bewertete Mitglied zur Staffel des Offiziers gehört (bisher wurde nur die Staffel der Bewertungs-Kategorie geprüft); Administratoren bewerten weiterhin staffelübergreifend.
 - **Profilbeschreibung und Anzeigename sind jetzt längenbegrenzt (10.000 bzw. 255 Zeichen).** Überlange Eingaben werden serverseitig mit einer klaren Fehlermeldung abgewiesen, statt unbegrenzt in der Datenbank gespeichert zu werden.
+- **Datei-Importe (Schiffe/Fleetview und Baupläne) sind jetzt auf 8 MB begrenzt.** Übergroße Uploads werden sofort mit einer klaren Fehlermeldung abgewiesen, bevor die Datei vollständig in den Arbeitsspeicher geladen wird (Schutz vor Speicher-Erschöpfung); reale Exporte liegen weit darunter.
 
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
 

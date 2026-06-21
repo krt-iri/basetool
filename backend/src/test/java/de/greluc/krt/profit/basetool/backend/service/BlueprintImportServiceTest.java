@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -87,6 +88,16 @@ class BlueprintImportServiceTest {
 
   private static MultipartFile upload(String json) {
     return new MockMultipartFile("file", "scmdb.json", "application/json", json.getBytes());
+  }
+
+  @Test
+  void previewImport_fileExceedingSizeCap_rejectedBeforeParsing() {
+    // Security audit gap-fill: an oversized upload is rejected by file.getSize() BEFORE readTree
+    // materialises the JSON into an in-memory tree.
+    MultipartFile file = mock(MultipartFile.class);
+    when(file.getSize()).thenReturn(9L * 1024 * 1024); // > 8 MB cap
+
+    assertThrows(BadRequestException.class, () -> service.previewImport(SUB, file));
   }
 
   // ---------------------------------------------------------------- preview --
