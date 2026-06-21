@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- **Der Keycloak-Nutzerabgleich liest jetzt alle Nutzer seitenweise, statt nur die erste Seite.** Bei mehr als ~100 Nutzern lieferte Keycloak nur die erste Seite; der Abgleich markierte daraufhin alle übrigen Nutzer fälschlich als „nicht mehr in Keycloak" (stiller Soft-Delete echter Mitglieder). Der Abgleich blättert nun über `first`/`max` durch die komplette Liste (neue Einstellung `app.keycloak.sync.page-size`, Default 100). Betrifft nur Installationen mit mehr als einer vollen Keycloak-Seite an Nutzern.
+
 - **Abschnittsüberschriften, die in einem AJAX-Swap-Container stecken, haben wieder ihren gewohnten Abstand zum Inhalt darüber.** Der Container machte die Überschrift zum ersten Element und entfernte so ihren oberen Abstand, sodass sie direkt am vorherigen Block klebte. Betrifft in den Auftragsdetails „Aggregierte Materialien" und „Übergaben" sowie „Notiz" in der Detailansicht persönlicher Blueprints.
 
 - **Lagerbestand lässt sich nicht mehr einem Auftrag zuordnen, dessen Materialliste das Material gar nicht enthält.** Solche Zuordnungen tauchten in der aggregierten Materialliste des Auftrags nie auf, banden den Bestand aber trotzdem. Das „Auftrag"-Dropdown im Lager bietet jetzt nur noch Aufträge an, die das Material wirklich benötigen, und bereits bestehende Fehlzuordnungen werden in der Auftragsansicht als Warnhinweis aufgelistet, damit man sie auflösen kann.
