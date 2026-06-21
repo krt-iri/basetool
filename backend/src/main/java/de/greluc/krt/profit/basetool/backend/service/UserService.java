@@ -19,9 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -30,7 +35,9 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -44,6 +51,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -90,6 +98,8 @@ public class UserService {
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
+  private final UserApprovalEventRepository userApprovalEventRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -188,8 +198,21 @@ public class UserService {
     final UUID finalUserId = getUserIdFromJwt(jwt);
     String username = jwt.getClaimAsString("preferred_username");
 
+    // A Discord federated login is recognised ONLY by the Keycloak subject / discord_user_id link,
+    // never by username. Reading the claim up-front lets us suppress the legacy preferred_username
+    // fallback below for a Discord login (REQ-SEC-017 / REQ-DATA-006 hardening): the brokered
+    // Discord
+    // username is attacker-influenced, so matching a fresh Discord identity onto a pre-existing
+    // (possibly privileged, already-ACTIVE) row by username would both bypass the PENDING approval
+    // gate and silently link the attacker's Discord account to someone else's user. Track 1 does no
+    // auto-linking of an existing account to a Discord identity (spec open decision #2), so a
+    // Discord
+    // login that finds no row by subject is always treated as a brand-new registration.
+    final String discordUserId = jwt.getClaimAsString("discord_user_id");
+    final boolean viaDiscord = discordUserId != null && !discordUserId.isBlank();
+
     Optional<User> existingUser = userRepository.findById(finalUserId);
-    if (existingUser.isEmpty() && username != null) {
+    if (existingUser.isEmpty() && username != null && !viaDiscord) {
       existingUser = userRepository.findByUsername(username);
       if (existingUser.isPresent()) {
         // REQ-OBS-004: never log names/handles. preferred_username can be a real callsign that the
@@ -240,6 +263,37 @@ public class UserService {
       changed = true;
     }
 
+    // Persist the Discord account link (auto-link, REQ-DATA-006) from the IdP-mapped token claim.
+    // discordUserId / viaDiscord were resolved up-front (see the subject-only lookup above).
+    if (viaDiscord && !Objects.equals(user.getDiscordUserId(), discordUserId)) {
+      user.setDiscordUserId(discordUserId);
+      changed = true;
+    }
+
+    // Approval lifecycle (epic #720, Track 1 / REQ-SEC-017 — fail-safe default). EVERY brand-new
+    // non-admin registration lands PENDING and receives no authorities until an admin approves,
+    // regardless of whether the login arrived via Discord or credentials. This is deliberately
+    // decoupled from Discord detection: the PENDING decision must NOT depend on the optional
+    // discord_user_id claim/mapper, otherwise a misconfigured Keycloak (attribute/protocol mapper
+    // absent) would let a federated login inherit the ACTIVE entity-default and silently skip
+    // approval. Keycloak ADMIN-realm-role holders are auto-ACTIVE (bootstrap safety — the first
+    // admin
+    // can never be locked out), and the carve-out below also promotes an existing PENDING admin to
+    // ACTIVE. Admins are notified only for genuine Discord self-registrations (REQ-NOTIF-012); a
+    // credential account is created by an admin in Keycloak, who already sees it in the pending
+    // queue, so it raises no extra notification.
+    boolean isAdmin = localRoles.stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()));
+    boolean newPendingRegistration = false;
+    if (created && !isAdmin) {
+      user.setApprovalStatus(ApprovalStatus.PENDING);
+      newPendingRegistration = viaDiscord;
+      changed = true;
+    } else if (!created && isAdmin && user.getApprovalStatus() != ApprovalStatus.ACTIVE) {
+      user.setApprovalStatus(ApprovalStatus.ACTIVE);
+      user.setApprovedAt(Instant.now());
+      changed = true;
+    }
+
     if (changed || user.isNew()) {
       User saved = userRepository.save(user);
       if (created) {
@@ -249,6 +303,12 @@ public class UserService {
         // the user's @Version nor collides with the converter's retry. The id is the Keycloak sub,
         // set before the first save.
         defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
+      }
+      if (newPendingRegistration) {
+        // After-commit listener notifies every admin of the pending registration (REQ-NOTIF-012);
+        // the event carries no Discord id.
+        eventPublisher.publishEvent(
+            new DiscordRegistrationPendingEvent(saved.getId(), saved.getUsername()));
       }
       return saved;
     }
@@ -302,6 +362,20 @@ public class UserService {
     Set<Role> localRoles = mapRoles(dto.roles());
     if (!user.getRoles().equals(localRoles)) {
       user.setRoles(localRoles);
+      changed = true;
+    }
+
+    // Fail-safe approval default (REQ-SEC-017), mirroring syncUser(Jwt). A brand-new non-admin user
+    // first discovered by the scheduled reconciliation lands PENDING, so the scheduler can never
+    // pre-create an ACTIVE row that a later interactive login would inherit (created == false) and
+    // thereby skip the approval gate. Admins stay ACTIVE (entity default, bootstrap safety). Only
+    // brand-new rows are touched — an existing user's approval state is never changed here. No
+    // notification is raised: this is batch reconciliation, a genuine Discord self-registration is
+    // announced by the interactive login path (REQ-NOTIF-012), and the new rows still surface in
+    // the
+    // admin pending queue.
+    if (created && localRoles.stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()))) {
+      user.setApprovalStatus(ApprovalStatus.PENDING);
       changed = true;
     }
 
@@ -947,5 +1021,105 @@ public class UserService {
     // Delete the user
     userRepository.delete(user);
     log.info("User {} deleted and references reassigned to admin {}", userId, admin.getId());
+  }
+
+  /**
+   * Returns the registrations awaiting an admin decision (status {@link ApprovalStatus#PENDING}),
+   * oldest first. Admin-only at the controller boundary; not squadron-scoped because a pending user
+   * has no org unit yet.
+   *
+   * @return the pending registrations, oldest registration first
+   */
+  @NotNull
+  public List<User> findPendingRegistrations() {
+    return userRepository.findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus.PENDING);
+  }
+
+  /**
+   * Approves a pending registration: moves it to {@link ApprovalStatus#ACTIVE}, stamps the
+   * approving admin + time, and writes an audit row. The user's Basetool roles/units stay manually
+   * managed (Track 1) — approval grants no roles by itself. Optimistic-locking via {@code version}.
+   *
+   * @param userId the registration to approve
+   * @param version the optimistic-lock version echoed back from the admin queue; {@code null}
+   *     bypasses the check
+   * @param adminId the approving admin's id (for the audit row)
+   * @return the now-active user
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
+   *     unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  @NotNull
+  public User approveUser(@NotNull UUID userId, @Nullable Long version, @NotNull UUID adminId) {
+    User user = decide(userId, version, ApprovalStatus.ACTIVE, adminId);
+    userApprovalEventRepository.save(
+        new UserApprovalEvent(userId, ApprovalDecision.APPROVED, null, adminId));
+    return user;
+  }
+
+  /**
+   * Rejects a pending registration: moves it to {@link ApprovalStatus#REJECTED} (the user keeps no
+   * authorities and is routed to the waiting page), stamps the deciding admin + time, and writes an
+   * audit row carrying the optional reason. Optimistic-locking via {@code version}.
+   *
+   * @param userId the registration to reject
+   * @param reason optional free-text reason recorded in the audit; may be {@code null}
+   * @param version the optimistic-lock version echoed back from the admin queue; {@code null}
+   *     bypasses the check
+   * @param adminId the deciding admin's id (for the audit row)
+   * @return the now-rejected user
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
+   *     unknown
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  @NotNull
+  public User rejectUser(
+      @NotNull UUID userId,
+      @Nullable String reason,
+      @Nullable Long version,
+      @NotNull UUID adminId) {
+    User user = decide(userId, version, ApprovalStatus.REJECTED, adminId);
+    userApprovalEventRepository.save(
+        new UserApprovalEvent(userId, ApprovalDecision.REJECTED, reason, adminId));
+    return user;
+  }
+
+  /**
+   * Shared approve/reject body: loads the user, checks the optimistic-lock version, stamps the new
+   * status + deciding admin + time, and persists (saveAndFlush so the bumped {@code @Version}
+   * reaches the response for the no-reload admin queue).
+   *
+   * @param userId the registration to decide
+   * @param version the optimistic-lock version; {@code null} bypasses the check
+   * @param newStatus the target status ({@link ApprovalStatus#ACTIVE} or {@link
+   *     ApprovalStatus#REJECTED})
+   * @param adminId the deciding admin's id
+   * @return the persisted user
+   */
+  private User decide(UUID userId, @Nullable Long version, ApprovalStatus newStatus, UUID adminId) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(
+                () ->
+                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
+                        "User not found"));
+    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
+      throw new ObjectOptimisticLockingFailureException(User.class, userId);
+    }
+    // State-transition guard (PR review #3): only a still-PENDING registration may be approved or
+    // rejected. Acting on an already-ACTIVE member would silently strip their authorities and trap
+    // them on the waiting page; an already-REJECTED row is a stale double-action. Either is a 409.
+    if (user.getApprovalStatus() != ApprovalStatus.PENDING) {
+      throw new BusinessConflictException(
+          "Only a pending registration can be decided; current status is "
+              + user.getApprovalStatus());
+    }
+    user.setApprovalStatus(newStatus);
+    user.setApprovedAt(Instant.now());
+    user.setApprovedById(adminId);
+    return userRepository.saveAndFlush(user);
   }
 }

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -351,6 +353,38 @@ class UserServiceSyncTest {
           new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of()));
 
       verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void createsNewNonAdminUser_landsPending() {
+      // Fail-safe default (REQ-SEC-017): a brand-new non-admin user first discovered by the
+      // scheduled
+      // sync lands PENDING, so the scheduler can never pre-create an ACTIVE row that a later login
+      // would inherit (created == false) and use to skip the approval gate.
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(roleRepository.findByNameIgnoreCase("Guest"))
+          .thenReturn(Optional.of(role(99L, "Guest")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userService.syncUser(
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of()));
+
+      verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.PENDING));
+    }
+
+    @Test
+    void createsNewAdminUser_landsActive() {
+      // ADMIN bootstrap carve-out applies to the scheduled sync too: a brand-new ADMIN stays
+      // ACTIVE.
+      Role adminRole = role(1L, "ADMIN");
+      adminRole.setCode("ADMIN");
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(roleRepository.findByNameIgnoreCase("ADMIN")).thenReturn(Optional.of(adminRole));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userService.syncUser(new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN")));
+
+      verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.ACTIVE));
     }
 
     @Test

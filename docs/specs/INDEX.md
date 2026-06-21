@@ -53,6 +53,8 @@ re-reads.
 | Frontend confidential OAuth2 client         | [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) + [runbook](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)          | Decision + runbook | Accepted — implementation pending                                                  | AUTH               |
 | Frontend AJAX mutations (krtFetch)          | [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md)                                                                      | Living             | Current — Phase 0 (#572)                                                           | FE/UI              |
 | Notifications & alerting                    | [`notifications.md`](notifications.md)                                                                                          | Living             | Current — Phases 1–3,5,6,8 (epic #622)                                             | NOTIF              |
+| Discord integration — login, gate, approval | [`discord-integration.md`](discord-integration.md)                                                                              | Living             | Current — Track 1 implemented (operator Discord + Keycloak setup pending; #720)    | AUTH/SEC           |
+| Discord login — Keycloak setup runbook      | [`DISCORD_KEYCLOAK_SETUP.md`](../keycloak/DISCORD_KEYCLOAK_SETUP.md)                                                            | Runbook            | Open — operator deployment step (#721)                                             | AUTH/SEC           |
 
 Architecture *decisions* (the "why we chose X over Y") live next door in
 [`docs/adr/`](../adr/README.md), not here. A spec says what must hold; an ADR records the

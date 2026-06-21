@@ -136,6 +136,15 @@ in **zwei Stufen** bereinigt:
 > Guest passiert `isAuthenticated()`-Gates (sieht also z. B. sein eigenes — leeres —
 > Inventar), scheitert aber an jedem `hasRole(...)`/`hasAuthority(...)`-Check; ein anonymer
 > Aufrufer erreicht nur die `permitAll`-Liste.
+>
+> **Discord-Registrierung `PENDING`/`REJECTED` ≈ noch weniger als Guest.** Eine neue
+> Discord-Anmeldung landet ohne Freigabe in `PENDING` (REQ-SEC-017): die gesamte
+> Authority-Zusammenstellung wird auf die einzige Authority `ROLE_PENDING_APPROVAL` kurzgeschlossen
+> — keine Realm-Rollen, keine Permissions, keine OrgUnit-Rollen, **und kein `ROLE_GUEST`**.
+> Solche Nutzer werden im Frontend auf eine „Freigabe ausstehend“-Seite geleitet, bis
+> ein Admin sie unter `/admin/discord-registrations` freigibt (danach `ACTIVE`) oder ablehnt
+> (`REJECTED`, bleibt ohne Zugriff). Rollen/Einheiten werden nach der Freigabe **manuell** vergeben
+> (Track 1).
 
 ---
 

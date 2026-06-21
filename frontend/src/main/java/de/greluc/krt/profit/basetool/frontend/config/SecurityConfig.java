@@ -462,6 +462,13 @@ public class SecurityConfig {
         if ("none".equals(prompt)) {
           additionalParameters.put("prompt", "none");
         }
+        // Additive "Mit Discord anmelden" path: an `idp=discord` query param (set by the
+        // login link) is forwarded to Keycloak as kc_idp_hint so it jumps straight to the
+        // Discord identity provider. Only the known alias is honoured — never an arbitrary
+        // request value — so the param cannot be used to redirect to an unintended IdP.
+        if ("discord".equals(request.getParameter("idp"))) {
+          additionalParameters.put("kc_idp_hint", "discord");
+        }
         return OAuth2AuthorizationRequest.from(req)
             .additionalParameters(additionalParameters)
             .build();

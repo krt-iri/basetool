@@ -55,5 +55,12 @@ public enum NotificationType {
    * A bank employee rejected the requester's booking request (epic #666 F2, REQ-BANK-026). The
    * seeded default rule notifies the requesting officer/lead (the reason is rendered in the text).
    */
-  BANK_BOOKING_REQUEST_REJECTED
+  BANK_BOOKING_REQUEST_REJECTED,
+
+  /**
+   * A new Discord user registered and is awaiting admin approval (epic #720, Track 1). The seeded
+   * default rule notifies every admin; the frontend renders it under {@code
+   * notifications.type.DISCORD_REGISTRATION_PENDING} with the {@code username} render parameter.
+   */
+  DISCORD_REGISTRATION_PENDING
 }

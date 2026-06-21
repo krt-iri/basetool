@@ -123,6 +123,19 @@
             "access.token.claim": "true",
             "introspection.token.claim": "true"
           }
+        },
+        {
+          "name": "discord_user_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "discord_user_id",
+            "claim.name": "discord_user_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
         }
       ],
       "defaultClientScopes": [
@@ -217,6 +230,23 @@
           }
         }
       ]
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "discord",
+      "displayName": "Discord",
+      "providerId": "discord",
+      "enabled": true,
+      "trustEmail": false,
+      "storeToken": true,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "First broker login - discord",
+      "config": {
+        "clientId": "__SET_AT_DEPLOY__",
+        "clientSecret": "__SET_AT_DEPLOY__",
+        "defaultScope": "identify email guilds.members.read"
+      }
     }
   ],
   "browserSecurityHeaders": {

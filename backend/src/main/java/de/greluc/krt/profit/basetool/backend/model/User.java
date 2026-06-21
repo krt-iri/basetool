@@ -31,6 +31,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
@@ -107,6 +108,56 @@ public class User extends AbstractEntity<UUID> {
    */
   @Column(name = "share_blueprints_globally", nullable = false)
   private boolean shareBlueprintsGlobally = false;
+
+  /**
+   * The user's linked Discord account id (a numeric snowflake, stored as text). Written by the
+   * Keycloak Discord identity-provider mapper into the {@code discord_user_id} token claim and
+   * persisted here on login, so a returning Discord user is recognised. {@code null} for users who
+   * only ever signed in with credentials; at most one {@link User} per Discord id (DB-unique). This
+   * column merely records the federation link — the guild + KRT-Mitglied membership gate itself
+   * lives in the Keycloak SPI, never here. Epic #720, Track 1 / REQ-DATA-006.
+   */
+  @Nullable
+  @Column(name = "discord_user_id", unique = true)
+  private String discordUserId;
+
+  /**
+   * Account approval lifecycle (epic #720, Track 1, REQ-SEC-017 — fail-safe default). A brand-new
+   * non-admin registration is {@link ApprovalStatus#PENDING} (no authorities granted — only {@code
+   * ROLE_PENDING_APPROVAL}) until an admin approves, whether it arrived via Discord or credentials;
+   * Keycloak {@code ADMIN}-realm-role holders and all pre-existing (V173-backfilled) rows are
+   * {@link ApprovalStatus#ACTIVE}. The field-level default stays {@code ACTIVE} so the
+   * admin-bootstrap path and direct test/seed construction yield an active member, but both
+   * creation paths in {@link UserService} ({@code syncUser(Jwt)} and {@code
+   * syncUser(KeycloakUserDto)}) explicitly set {@code PENDING} for every new non-admin — so the
+   * PENDING decision never depends on detecting the Discord {@code discord_user_id} claim (a
+   * missing claim mapper can no longer let a federated login skip approval).
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "approval_status", nullable = false)
+  private ApprovalStatus approvalStatus = ApprovalStatus.ACTIVE;
+
+  /** When the registration was approved/rejected; {@code null} while still {@code PENDING}. */
+  @Nullable
+  @Column(name = "approved_at")
+  private Instant approvedAt;
+
+  /**
+   * The admin who approved/rejected this registration; {@code null} while still {@code PENDING}.
+   */
+  @Nullable
+  @Column(name = "approved_by_id")
+  private UUID approvedById;
+
+  /**
+   * Whether the account may be granted its full authorities. {@code true} only for {@link
+   * ApprovalStatus#ACTIVE}; {@code PENDING} and {@code REJECTED} accounts receive no authorities.
+   *
+   * @return {@code true} iff the approval status is {@link ApprovalStatus#ACTIVE}
+   */
+  public boolean isApproved() {
+    return approvalStatus == ApprovalStatus.ACTIVE;
+  }
 
   public String getEffectiveName() {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;

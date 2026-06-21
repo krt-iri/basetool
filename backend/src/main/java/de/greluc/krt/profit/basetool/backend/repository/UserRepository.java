@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.util.List;
@@ -44,6 +45,16 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
+
+  /**
+   * Returns the registrations awaiting approval (status {@link ApprovalStatus#PENDING}), oldest
+   * first, for the admin approval queue (epic #720, Track 1). Not squadron-scoped — a pending user
+   * has no org unit yet.
+   *
+   * @param approvalStatus the status to filter on (always {@code PENDING} at the call site)
+   * @return matching users, oldest registration first
+   */
+  List<User> findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus approvalStatus);
 
   /**
    * Returns slim {@link UserReferenceDto}s for every user (id, username, displayName, effective

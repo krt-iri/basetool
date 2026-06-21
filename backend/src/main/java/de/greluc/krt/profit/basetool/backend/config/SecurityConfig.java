@@ -472,6 +472,16 @@ public class SecurityConfig {
                     .authenticated())
         .oauth2ResourceServer(
             oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
+        // REQ-SEC-017 (PR review #1): a PENDING/REJECTED registration is authenticated but carries
+        // only ROLE_PENDING_APPROVAL; this filter 403s it on every /api/** endpoint (except the
+        // registration-status read) so the "no access until approved" guarantee holds at the
+        // backend
+        // boundary, not just via the frontend redirect. Placed after the bearer-token filter so the
+        // authorities are already assembled.
+        .addFilterAfter(
+            new PendingApprovalAccessFilter(),
+            org.springframework.security.oauth2.server.resource.web.authentication
+                .BearerTokenAuthenticationFilter.class)
         // L-11: backend is a pure JWT-bearer resource server — no HTTP session needed for any
         // endpoint. Pinning STATELESS makes the contract explicit: a future bug that introduces
         // {@code @SessionAttributes} or {@code request.getSession(true)} on a permitAll POST is

@@ -87,6 +87,16 @@ public class CustomJwtGrantedAuthoritiesConverter
       try {
         User user = userService.syncUser(jwt);
 
+        // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
+        // authorities. The ENTIRE assembly below — realm roles, permissions, membership-derived
+        // flat roles, contextual + cascaded authorities — is short-circuited to a single
+        // ROLE_PENDING_APPROVAL. ROLE_GUEST is deliberately NOT carried: a pending user is routed
+        // to
+        // the "waiting for approval" surface, not given the guest read surface.
+        if (!user.isApproved()) {
+          return List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"));
+        }
+
         Collection<GrantedAuthority> authorities =
             user.getRoles().stream()
                 .flatMap(

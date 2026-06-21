@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -132,6 +135,37 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
     assertTrue(
         authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", DESCENDANT_STAFFEL_ID)));
+  }
+
+  @Test
+  void pendingRegistration_getsOnlyPendingApprovalAndNeverConsultsMembership() {
+    // REQ-SEC-017: a PENDING registration is granted NO authorities except ROLE_PENDING_APPROVAL —
+    // the entire assembly is short-circuited, so membership/cascade are never consulted and
+    // ROLE_GUEST is not carried.
+    User pending = userWithNoRoles();
+    pending.setApprovalStatus(ApprovalStatus.PENDING);
+    when(userService.syncUser(jwt)).thenReturn(pending);
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertEquals(
+        List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL")), List.copyOf(authorities));
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_GUEST")));
+    verifyNoInteractions(orgUnitMembershipRepository, orgUnitCascadeService);
+  }
+
+  @Test
+  void rejectedRegistration_getsOnlyPendingApprovalAuthority() {
+    // A REJECTED account is treated like PENDING — no authorities, routed to the waiting page.
+    User rejected = userWithNoRoles();
+    rejected.setApprovalStatus(ApprovalStatus.REJECTED);
+    when(userService.syncUser(jwt)).thenReturn(rejected);
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertEquals(
+        List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL")), List.copyOf(authorities));
+    verifyNoInteractions(orgUnitMembershipRepository, orgUnitCascadeService);
   }
 
   @Test

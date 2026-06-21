@@ -34,6 +34,11 @@ on for ROPC test logins). Do not cross-contaminate the two.
 - **Realm signing keys / `components`** — not present in the masked export and never to be added.
 - **`id` UUIDs**, Keycloak built-in clients (`account`, `broker`, `realm-management`, …) and the
   authentication flows — omitted as noise.
+- **Discord IdP client id/secret** → `__SET_AT_DEPLOY__`. The `discord` identity provider and the
+  `discord_user_id` attribute/protocol mappers **are** captured here (they are app-relevant, see
+  ADR-0030), but the membership gate's guild id + KRT-Mitglied role id live on the custom
+  first-broker-login flow's authenticator config — and flows stay omitted, so those are documented in
+  [`DISCORD_KEYCLOAK_SETUP.md`](DISCORD_KEYCLOAK_SETUP.md) only, never here.
 
 This file is **reference documentation**, not a credential store. Treat it as read-mostly: when the
 prod realm config changes in a way that matters to the app (token settings, a new client/scope, a

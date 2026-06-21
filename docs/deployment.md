@@ -564,6 +564,37 @@ emergency fallback only, revert `KEYCLOAK_ADMIN_URL` to `http://keycloak:18080` 
 
 ---
 
+## Keycloak custom providers — Discord login SPI (epic #720)
+
+Discord login (Track 1) ships as a Keycloak provider JAR built from the `keycloak-spi` module
+(`DiscordIdentityProvider` + the fail-closed first-login membership gate). Keycloak loads it from
+`/opt/keycloak/providers`, bind-mounted from the host at `/var/iri/code/keycloak/providers`.
+
+```bash
+# 1. Build the provider JAR (on a build host with the JDK 25 toolchain).
+./gradlew :keycloak-spi:build      # -> keycloak-spi/build/libs/keycloak-spi-<version>.jar
+
+# 2. Stage it on the Keycloak host, world-readable (0644) so the uid-1000 Keycloak image can read it
+#    — the same lesson as the shared keystore.p12; 0640 makes Keycloak ignore (or fail to read) it.
+sudo install -D -m 0644 keycloak-spi-*.jar /var/iri/code/keycloak/providers/keycloak-spi.jar
+
+# 3. Restart Keycloak so the `start` command re-runs the provider build and discovers the JAR.
+sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
+    up -d --no-deps keycloak
+
+# 4. Verify the provider registered (no SPI load error in the log; "Discord" selectable as a Social IdP).
+sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
+    logs --since 2m keycloak | grep -iE "error|exception|providers" | head
+```
+
+The JAR is compiled to **Java-21 bytecode** to match the Keycloak runtime JVM; a mismatch surfaces as
+`UnsupportedClassVersionError` at provider load. The Discord OAuth application, the realm identity
+provider, the `discord_user_id` mappers and the membership-gate flow config are one-time operator
+steps in [`docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md). An empty or
+missing providers dir is harmless (Keycloak simply finds no extra providers).
+
+---
+
 ## Manual deploy / rollback
 
 ### Pin to a specific version (forward or backward)

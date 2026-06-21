@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.discordRegistrations.title} + ' - ' + ${appTitle}">Discord-Registrierungen - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style th:attr="nonce=${cspNonce}">
+        .reg-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .reg-when { color: var(--color-gray-2); font-size: 0.85rem; }
+        .modal {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
+            align-items: center; justify-content: center; padding: 1rem;
+        }
+        #reject-reason {
+            width: 100%; min-height: 80px; padding: 0.5rem; box-sizing: border-box;
+            background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1); font-family: var(--font-body);
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.discordRegistrations.title}">Discord-Registrierungen</h1>
+        <p th:text="#{admin.discordRegistrations.subtitle}">Neue Discord-Anmeldungen freigeben oder ablehnen.</p>
+    </div>
+
+    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
+        <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div class="table-responsive">
+            <table id="registrationsTable">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.discordRegistrations.col.user}">Nutzer</th>
+                        <th th:text="#{admin.discordRegistrations.col.registeredAt}">Registriert</th>
+                        <th th:text="#{admin.discordRegistrations.col.actions}">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody id="registrationsBody">
+                    <tr th:each="reg : ${registrations}" th:id="'reg-row-' + ${reg.id}"
+                        th:attr="data-id=${reg.id},data-version=${reg.version}">
+                        <td th:text="${reg.username}">Nutzer</td>
+                        <td class="reg-when" th:text="${#temporals.format(reg.registeredAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
+                        <td>
+                            <div class="reg-actions">
+                                <button type="button" class="btn btn--cta" data-action="approve"
+                                        th:text="#{admin.discordRegistrations.approve}">Freigeben</button>
+                                <button type="button" class="btn btn-outline-danger" data-action="reject"
+                                        th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="registrationsEmpty" th:if="${#lists.isEmpty(registrations)}">
+                        <td colspan="3" th:text="#{admin.discordRegistrations.empty}">Keine offenen Registrierungen.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Reject reason modal (no native dialogs, REQ-UI) -->
+    <div id="reject-modal" class="modal" style="display:none; z-index: 3100;">
+        <div class="modal-content hud-box" style="max-width: 520px;">
+            <h2 class="mt-0" th:text="#{admin.discordRegistrations.reject.modal.title}">Registrierung ablehnen</h2>
+            <label for="reject-reason" th:text="#{admin.discordRegistrations.reject.modal.reasonLabel}">Begründung (optional)</label>
+            <textarea id="reject-reason" maxlength="1000"></textarea>
+            <div class="flex-center-gap" style="margin-top: 1rem;">
+                <button type="button" class="btn btn-ghost" id="reject-cancel" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-danger" id="reject-confirm" th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!window.krtFetch) {
+            return;
+        }
+        const MSG = {
+            approved: /*[[#{admin.discordRegistrations.approved}]]*/ 'Registrierung freigegeben.',
+            rejected: /*[[#{admin.discordRegistrations.rejected}]]*/ 'Registrierung abgelehnt.',
+            approveError: /*[[#{error.admin.discordRegistrations.approve}]]*/ 'Freigabe fehlgeschlagen.',
+            rejectError: /*[[#{error.admin.discordRegistrations.reject}]]*/ 'Ablehnung fehlgeschlagen.',
+            empty: /*[[#{admin.discordRegistrations.empty}]]*/ 'Keine offenen Registrierungen.'
+        };
+        const body = document.getElementById('registrationsBody');
+        const modal = document.getElementById('reject-modal');
+        const reasonInput = document.getElementById('reject-reason');
+        let rejectTarget = null;
+
+        function removeRow(row) {
+            row.remove();
+            if (!body.querySelector('tr[data-id]')) {
+                const empty = document.createElement('tr');
+                empty.id = 'registrationsEmpty';
+                const cell = document.createElement('td');
+                cell.colSpan = 3;
+                cell.textContent = MSG.empty;
+                empty.appendChild(cell);
+                body.appendChild(empty);
+            }
+        }
+
+        function approve(row) {
+            const id = row.getAttribute('data-id');
+            const version = row.getAttribute('data-version');
+            window.krtFetch.write({
+                method: 'POST',
+                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/approve',
+                payload: { version: version == null ? null : Number(version) },
+                toast: false,
+                errorMessage: MSG.approveError,
+                onSuccess: function () {
+                    if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(MSG.approved);
+                    }
+                    removeRow(row);
+                }
+            });
+        }
+
+        function openReject(row) {
+            rejectTarget = row;
+            if (reasonInput) {
+                reasonInput.value = '';
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeReject() {
+            modal.style.display = 'none';
+            rejectTarget = null;
+        }
+
+        body.addEventListener('click', function (event) {
+            const btn = event.target.closest('button[data-action]');
+            if (!btn) {
+                return;
+            }
+            const row = btn.closest('tr[data-id]');
+            if (!row) {
+                return;
+            }
+            if (btn.getAttribute('data-action') === 'approve') {
+                approve(row);
+            } else {
+                openReject(row);
+            }
+        });
+
+        const cancelBtn = document.getElementById('reject-cancel');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', closeReject);
+        }
+        const confirmBtn = document.getElementById('reject-confirm');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', function () {
+                if (!rejectTarget) {
+                    return;
+                }
+                const row = rejectTarget;
+                const id = row.getAttribute('data-id');
+                const version = row.getAttribute('data-version');
+                const reason = reasonInput ? reasonInput.value.trim() : '';
+                window.krtFetch.write({
+                    method: 'POST',
+                    url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/reject',
+                    payload: { reason: reason === '' ? null : reason, version: version == null ? null : Number(version) },
+                    toast: false,
+                    errorMessage: MSG.rejectError,
+                    onSuccess: function () {
+                        if (window.showFrontendSuccessToast) {
+                            window.showFrontendSuccessToast(MSG.rejected);
+                        }
+                        closeReject();
+                        removeRow(row);
+                    }
+                });
+            });
+        }
+
+        window.addEventListener('click', function (event) {
+            if (event.target === modal) {
+                closeReject();
+            }
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && modal.style.display === 'flex') {
+                closeReject();
+            }
+        });
+    });
+</script>
+</body>
+</html>

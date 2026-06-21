@@ -50,5 +50,11 @@ public enum NotificationEventType {
    * A bank employee rejected a booking request (epic #666 F2, REQ-BANK-026). The default rule
    * notifies the requesting officer/lead.
    */
-  BANK_BOOKING_REQUEST_REJECTED
+  BANK_BOOKING_REQUEST_REJECTED,
+
+  /**
+   * A new Discord user registered and is awaiting admin approval (epic #720, Track 1,
+   * REQ-NOTIF-012). The default rule notifies every admin.
+   */
+  DISCORD_REGISTRATION_PENDING
 }

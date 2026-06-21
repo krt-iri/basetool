@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.RegistrationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import jakarta.servlet.FilterChain;
@@ -53,6 +54,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   private final SecurityContextRepository securityContextRepository =
       new HttpSessionSecurityContextRepository();
   private static final String SYNC_COMPLETE_FLAG = "BACKEND_ROLES_SYNCED";
+  private static final String APPROVAL_STATE_FLAG = "BACKEND_APPROVAL_STATE";
 
   /**
    * Returns a stable, non-reversible 8-hex-char digest of the OIDC principal name suitable for log
@@ -80,20 +82,87 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
     if (auth != null && auth.isAuthenticated() && auth instanceof OAuth2AuthenticationToken token) {
       HttpSession session = request.getSession(false);
-      if (session != null && session.getAttribute(SYNC_COMPLETE_FLAG) == null) {
-        log.debug(
-            "Session exists, starting role sync for user: {}", maskPrincipal(token.getName()));
-        // Only mark the session synced when the backend role read genuinely succeeded. A
-        // Resilience4j fallback (null) or a thrown error must NOT set the flag — otherwise a single
-        // backend hiccup on the first request of a session would permanently leave the OidcUser
-        // principal without its ROLE_* authorities until the user re-logs in (REQ-SEC-013).
-        if (syncRoles(token, request, response)) {
-          session.setAttribute(SYNC_COMPLETE_FLAG, true);
+      if (session != null) {
+        // Epic #720, Track 1: a PENDING/REJECTED Discord registration is routed to the
+        // waiting-for-approval page instead of the (role-less) guest surface — never a 403 storm.
+        // Resolved once per session; the backend is the source of truth (the backend also withholds
+        // every authority from a pending account, so this redirect is UX, not the access control).
+        String approval = (String) session.getAttribute(APPROVAL_STATE_FLAG);
+        if (approval == null) {
+          approval = fetchApprovalStatus();
+          if (approval != null) {
+            session.setAttribute(APPROVAL_STATE_FLAG, approval);
+          }
+        }
+        if ("PENDING".equals(approval) || "REJECTED".equals(approval)) {
+          if (isApprovalExempt(request)) {
+            filterChain.doFilter(request, response);
+          } else {
+            response.sendRedirect(request.getContextPath() + "/pending-approval");
+          }
+          return;
+        }
+
+        if (session.getAttribute(SYNC_COMPLETE_FLAG) == null) {
+          log.debug(
+              "Session exists, starting role sync for user: {}", maskPrincipal(token.getName()));
+          // Only mark the session synced when the backend role read genuinely succeeded. A
+          // Resilience4j fallback (null) or a thrown error must NOT set the flag — otherwise a
+          // single backend hiccup on the first request of a session would permanently leave the
+          // OidcUser principal without its ROLE_* authorities until the user re-logs in
+          // (REQ-SEC-013).
+          if (syncRoles(token, request, response)) {
+            session.setAttribute(SYNC_COMPLETE_FLAG, true);
+          }
         }
       }
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  /**
+   * Reads the caller's approval status from the backend once per session. Returns {@code null} on
+   * any failure — treated as "not pending" so a backend outage never traps an approved user on the
+   * waiting page (the backend still withholds every authority from a genuinely pending account, so
+   * this is UX, not the access boundary).
+   *
+   * @return the approval status ({@code PENDING}/{@code ACTIVE}/{@code REJECTED}), or {@code null}
+   *     when it could not be read
+   */
+  private String fetchApprovalStatus() {
+    try {
+      RegistrationStatusDto dto =
+          backendApiClient.get("/api/v1/users/me/registration-status", RegistrationStatusDto.class);
+      return dto == null ? null : dto.approvalStatus();
+    } catch (Exception e) {
+      log.warn("Could not read approval status; treating as non-pending for this request.");
+      return null;
+    }
+  }
+
+  /**
+   * Whether the request must NOT be redirected to the waiting page — the page itself (else it
+   * loops), logout, the OAuth endpoints, the error page and static assets.
+   *
+   * @param request the current request
+   * @return {@code true} when the request is exempt from the pending-approval redirect
+   */
+  private static boolean isApprovalExempt(HttpServletRequest request) {
+    String path = request.getRequestURI().substring(request.getContextPath().length());
+    return path.equals("/pending-approval")
+        || path.startsWith("/logout")
+        || path.startsWith("/oauth2")
+        || path.startsWith("/login")
+        || path.startsWith("/error")
+        || path.startsWith("/actuator")
+        || path.startsWith("/css/")
+        || path.startsWith("/js/")
+        || path.startsWith("/images/")
+        || path.startsWith("/logos/")
+        || path.startsWith("/fonts/")
+        || path.equals("/favicon.ico")
+        || path.endsWith(".map");
   }
 
   /**
