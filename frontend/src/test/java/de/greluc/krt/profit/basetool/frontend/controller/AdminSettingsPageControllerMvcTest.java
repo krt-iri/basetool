@@ -23,6 +23,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -95,6 +96,10 @@ class AdminSettingsPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("ageYellowVersion")))
         .andExpect(content().string(containsString("transferFeeVersion")));
+
+    // The orders pages read the age thresholds through getCached, so a successful save must evict
+    // the static cache for the change to surface on the next render.
+    verify(backendApiClient).clearStaticDataCache();
   }
 
   // covers #582 — the cross-field invariant: yellow >= red short-circuits with a 422 problem+json
@@ -136,5 +141,62 @@ class AdminSettingsPageControllerMvcTest {
                 .param("transferFeePercent", "0.5")
                 .param("transferFeeVersion", "0"))
         .andExpect(status().is3xxRedirection());
+
+    // Same eviction guarantee on the classic (no-JS) save path.
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  // Partial-save guarantee (AJAX): when an early setting PUT lands but a later one throws, the
+  // controller still evicts the static cache (it drops it in a finally) so the threshold that did
+  // persist surfaces on the next render instead of being stranded until the 10-min TTL.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void updateSettingsAjax_partialSaveFailure_stillEvictsStaticCache() throws Exception {
+    stubAllPuts();
+    // The yellow PUT lands; the red PUT (a later write) blows up mid-save.
+    when(backendApiClient.put(
+            eq("/api/v1/settings/job_order.age_red_days"), any(), eq(SystemSettingDto.class)))
+        .thenThrow(new RuntimeException("backend down mid-save"));
+
+    mockMvc
+        .perform(
+            post("/admin/settings")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"ageYellowDays\":\"30\",\"ageYellowVersion\":0,"
+                        + "\"ageRedDays\":\"90\",\"ageRedVersion\":0,"
+                        + "\"refineryRoundingMode\":\"UP\",\"refineryRoundingVersion\":0,"
+                        + "\"transferFeePercent\":\"0.5\",\"transferFeeVersion\":0}"))
+        .andExpect(status().is5xxServerError());
+
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  // Partial-save guarantee (classic no-JS path): a later PUT failing must not strand the eviction.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void updateSettings_partialSaveFailure_stillEvictsStaticCache() throws Exception {
+    stubAllPuts();
+    when(backendApiClient.put(
+            eq("/api/v1/settings/job_order.age_red_days"), any(), eq(SystemSettingDto.class)))
+        .thenThrow(new RuntimeException("backend down mid-save"));
+
+    mockMvc
+        .perform(
+            post("/admin/settings")
+                .with(csrf())
+                .param("ageYellowDays", "30")
+                .param("ageYellowVersion", "0")
+                .param("ageRedDays", "90")
+                .param("ageRedVersion", "0")
+                .param("refineryRoundingMode", "UP")
+                .param("refineryRoundingVersion", "0")
+                .param("transferFeePercent", "0.5")
+                .param("transferFeeVersion", "0"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(backendApiClient).clearStaticDataCache();
   }
 }
