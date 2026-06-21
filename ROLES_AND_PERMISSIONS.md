@@ -1,8 +1,8 @@
 # Rollen- und Rechte-Matrix (Profit Basetool)
 
-> **Stand 2026-06-11 (nach Auftrags-Umbau #340, Operations/Auszahlungen, Material-Claims, Personal-Blueprints, Blueprint-Verfügbarkeit #364, Bereichsleitungs-Operationen + Teilnehmer-Sichtbarkeit #500/#501, Bearbeiter-Notizen #520, Blaupausen-Abdeckung bei Item-Aufträgen #526, Raffinerie-Screenshot-Import #439).**
+> **Stand 2026-06-21 (nach Auftrags-Umbau #340, Operations/Auszahlungen, Material-Claims, Personal-Blueprints, Blueprint-Verfügbarkeit #364, Bereichsleitungs-Operationen + Teilnehmer-Sichtbarkeit #500/#501, Bearbeiter-Notizen #520, Blaupausen-Abdeckung bei Item-Aufträgen #526, Raffinerie-Screenshot-Import #439, Kartellbank #556/#666, Bereichsleitung & Organisationsleitung #692, Discord-Login #720).**
 > Diese Matrix wurde gegen die tatsächliche Implementierung verifiziert:
-> die `@PreAuthorize`-Annotationen aller 54 Backend-Controller, die
+> die `@PreAuthorize`-Annotationen aller 69 Backend-Controller, die
 > URL-Matrix in
 > [`backend/.../config/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java)
 > und
