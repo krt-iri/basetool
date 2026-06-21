@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Die Blueprint-Verfügbarkeitsübersicht lädt für die Zählung nur noch die benötigten zwei Spalten statt ganzer Datensätze.** Statt für die Mitglieder-Zählung pro Variantenfamilie sämtliche Blueprint-Datensätze aller Eigentümer vollständig zu laden, holt die Übersicht (und die Blueprint-Eigentümer-Aufstellung in Item-Aufträgen) jetzt nur noch `(Eigentümer, Produktname)`. Reine interne Performance-Verbesserung, vor allem in der Admin-Gesamtansicht.
+
 - **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
 
 ### Fixed

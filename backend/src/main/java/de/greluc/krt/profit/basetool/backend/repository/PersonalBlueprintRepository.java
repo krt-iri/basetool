@@ -114,6 +114,23 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   List<PersonalBlueprint> findAllByOwnerSubIn(Collection<String> ownerSubs);
 
   /**
+   * Projection variant of {@link #findAllByOwnerSubIn(Collection)} for the family-grouping
+   * aggregations (availability overview #364, item-order owner drill-down): both only read the
+   * owner and product name to group by variant family and count distinct owners, so this returns a
+   * two-column {@link BlueprintOwnerProduct} projection instead of hydrating every full blueprint
+   * row of an admin all-scope view (REQ-DATA-003).
+   *
+   * @param ownerSubs the Keycloak {@code sub}s of the in-scope owners
+   * @return one {@code (ownerSub, productName)} projection per owned-blueprint row; never {@code
+   *     null}
+   */
+  @Query(
+      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct("
+          + "b.ownerSub, b.productName) FROM PersonalBlueprint b WHERE b.ownerSub IN :ownerSubs")
+  List<de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct>
+      findOwnerProductByOwnerSubIn(@Param("ownerSubs") Collection<String> ownerSubs);
+
+  /**
    * Owner-restricted product lookup — backs the availability drill-down (#364): given one product
    * key and the Keycloak {@code sub}s of every in-scope member, returns the rows that pin which of
    * those members own the product.

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-14.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
 > **Owner area:** INV/UI · **Related ADRs:** none
 
 # Blueprint availability overview — list & drill-down contract
@@ -47,6 +47,11 @@ users outside the requested family.
   `findAllByProductKeyInAndOwnerSubIn`), resolved server-side: the client cannot widen the scope,
   the multi-user data-isolation rule is unaffected, and the opt-in widens only *whose* blueprints
   are counted, never *who may open* the overview.
+- [ ] The list count aggregation loads only the `(ownerSub, productName)` pair it groups on, via the
+  `findOwnerProductByOwnerSubIn` projection — never the full `PersonalBlueprint` rows — so an admin
+  all-scope view does not hydrate the entire `personal_blueprint` table (every column of every
+  owner's blueprints) just to count owners per family (REQ-DATA-003). The item-order owner
+  drill-down (`JobOrderItemBlueprintOwnersService`) uses the same projection.
 
 **Enforced by:** `PersonalBlueprintOverviewServiceTest`, `BlueprintVariantFamilyCatalogTest` ·
 **Code:** `PersonalBlueprintOverviewService`, `BlueprintVariantFamilyCatalog`,
