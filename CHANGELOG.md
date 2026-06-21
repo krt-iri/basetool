@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.0](https://github.com/krt-profit/basetool/releases/tag/v0.7.0) - 2026-06-21
+
 ### Added
 
 - **Anmeldung mit Discord (Track 1).** Mitglieder können sich jetzt zusätzlich mit Discord anmelden — aber nur, wer im das-kartell Discord ist und dort die Rolle „KRT-Mitglied“ trägt (direkt bei der Anmeldung geprüft, fail-closed). Neu über Discord angemeldete Nutzer landen zunächst in einem Wartezustand ohne Zugriff und müssen von einem Administrator freigegeben werden (Admin-Übersicht unter „Discord-Registrierungen“, Admins werden benachrichtigt); Rollen und Einheiten werden danach wie gewohnt von Hand vergeben. Die bestehende Anmeldung per Benutzername/Passwort selbst bleibt unverändert; neu angelegte Accounts ohne Administratorrechte durchlaufen jetzt jedoch ebenfalls die Freigabe (fail-safe gegen Fehlkonfiguration der Discord-Mapper), bestehende Accounts bleiben aktiv. Wird erst nach der serverseitigen Einrichtung (Discord-App + Keycloak) wirksam.
