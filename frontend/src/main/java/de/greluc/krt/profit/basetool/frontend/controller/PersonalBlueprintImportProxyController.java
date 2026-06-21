@@ -55,11 +55,11 @@ import org.springframework.web.server.ResponseStatusException;
  *
  * <ul>
  *   <li>{@code POST /personal-inventory/blueprints/import/preview} — forwards the uploaded
- *       blueprint export JSON multipart (SCMDB log-watcher or Basetool Blueprint Extractor) to the
- *       backend {@code POST /api/v1/personal-blueprints/import/preview} via the authenticated
- *       {@link WebClient} (which attaches the OAuth2 token) and returns the typed preview
- *       unchanged. A backend parse failure (400) is surfaced as-is so the user sees a meaningful
- *       error.
+ *       blueprint export JSON multipart (SCMDB log-watcher, Basetool Blueprint Extractor, or
+ *       scmdb.net profile / tracking export) to the backend {@code POST
+ *       /api/v1/personal-blueprints/import/preview} via the authenticated {@link WebClient} (which
+ *       attaches the OAuth2 token) and returns the typed preview unchanged. A backend parse failure
+ *       (400) is surfaced as-is so the user sees a meaningful error.
  *   <li>{@code POST /personal-inventory/blueprints/import/apply} — wraps the resolution list in the
  *       backend apply request and relays it via {@link BackendApiClient}.
  * </ul>
@@ -105,7 +105,8 @@ public class PersonalBlueprintImportProxyController {
    * Proxies a blueprint export JSON upload to the backend import-preview endpoint and returns the
    * resolution preview. The backend persists nothing at this step.
    *
-   * @param file the uploaded blueprint export JSON (SCMDB log-watcher or Basetool BP Extractor)
+   * @param file the uploaded blueprint export JSON (SCMDB log-watcher, Basetool BP Extractor, or
+   *     scmdb.net export)
    * @return the import preview (per-name rows + status counts)
    * @throws ResponseStatusException with the backend's status if the upload is rejected (e.g. 400
    *     for an empty / malformed file), or 500 on an unexpected error
