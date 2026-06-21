@@ -120,7 +120,7 @@ public class MissionParticipant extends AbstractEntity<UUID> {
    * SHA-256 hex of the per-row capability token that authorises mutating/deleting THIS guest
    * (unlinked) sign-up without a login (security audit M1 / REQ-SEC-018). Minted once at create
    * time for guest rows only; {@code null} for user-linked participants and for guest rows created
-   * before V176. Only the hash is persisted — the matching plaintext is handed to the anonymous
+   * before V177. Only the hash is persisted — the matching plaintext is handed to the anonymous
    * creator once via {@link #guestEditToken} and never stored — so the column is not a usable
    * credential at rest. {@link
    * de.greluc.krt.profit.basetool.backend.service.MissionSecurityService#canAccessParticipant}

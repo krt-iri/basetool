@@ -1,5 +1,5 @@
 -- =====================================================================
--- V176 - mission_participant: per-row guest edit-token hash (security audit M1)
+-- V177 - mission_participant: per-row guest edit-token hash (security audit M1)
 -- =====================================================================
 -- Why: the slim participant mutate/delete/check-in/out/payout endpoints are
 -- permitAll and were gated only by "the row has no linked user" — so ANY
@@ -21,4 +21,4 @@ ALTER TABLE mission_participant
     ADD COLUMN guest_edit_token_hash VARCHAR(64);
 
 COMMENT ON COLUMN mission_participant.guest_edit_token_hash IS
-    'SHA-256 hex of the per-row capability token minted for an anonymous guest sign-up; required (or a mission-manager role) to mutate/delete the guest row. NULL for user-linked participants and pre-V176 guest rows. Security audit M1 / REQ-SEC-018.';
+    'SHA-256 hex of the per-row capability token minted for an anonymous guest sign-up; required (or a mission-manager role) to mutate/delete the guest row. NULL for user-linked participants and pre-V177 guest rows. Security audit M1 / REQ-SEC-018.';

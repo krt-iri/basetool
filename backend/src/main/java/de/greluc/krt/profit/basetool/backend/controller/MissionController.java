@@ -409,7 +409,7 @@ public class MissionController {
                 .map(this::cleanupOutsiderMissionForGuest)
                 .collect(Collectors.toSet());
 
-    // ADR-0033: the anonymous outsider view drops each participant's payoutPreference + free-text
+    // ADR-0034: the anonymous outsider view drops each participant's payoutPreference + free-text
     // comment (kept on the member-peer view). The peer roster is already PII-stripped; strip these
     // two fields here so getMissionById and the participant endpoints (which all redact through
     // this
@@ -433,7 +433,7 @@ public class MissionController {
         peer.plannedEndTime(),
         peer.actualEndTime(),
         peer.isInternal(),
-        outsiderParticipants, // roster kept, but payout + comment stripped (ADR-0033)
+        outsiderParticipants, // roster kept, but payout + comment stripped (ADR-0034)
         peer.assignedUnits(), // units kept
         peer.frequencies(), // frequencies kept
         outsiderSubMissions,
@@ -486,7 +486,7 @@ public class MissionController {
   }
 
   /**
-   * ADR-0033: removes the two fields the anonymous outsider mission view does not expose — the
+   * ADR-0034: removes the two fields the anonymous outsider mission view does not expose — the
    * per-participant {@code payoutPreference} (financial intent) and the free-text {@code comment}
    * (uncontrolled text, possible incidental PII). Applied ONLY on the strict outsider paths ({@link
    * #cleanupOutsiderMissionForGuest} and the {@code addParticipantSlim} outsider branch); the
@@ -505,10 +505,10 @@ public class MissionController {
         dto.orgUnits(),
         dto.desiredMissionJobType(),
         dto.plannedMissionJobType(),
-        null, // comment — ADR-0033: not exposed to anonymous outsiders
+        null, // comment — ADR-0034: not exposed to anonymous outsiders
         dto.startTime(),
         dto.endTime(),
-        null, // payoutPreference — ADR-0033: not exposed to anonymous outsiders
+        null, // payoutPreference — ADR-0034: not exposed to anonymous outsiders
         dto.version(),
         dto.guestEditToken());
   }
@@ -2040,7 +2040,7 @@ public class MissionController {
     if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
       participants = participants.map(this::cleanupParticipantForGuest);
     }
-    // ADR-0033: outsiders (anonymous / role-less GUEST) additionally lose each participant's
+    // ADR-0034: outsiders (anonymous / role-less GUEST) additionally lose each participant's
     // payoutPreference + comment in the returned roster; the member-peer tier (a member below
     // logistician) keeps them. The freshly created guest's own guestEditToken is preserved.
     if (jwt == null || !authHelperService.isMemberOrAbove()) {

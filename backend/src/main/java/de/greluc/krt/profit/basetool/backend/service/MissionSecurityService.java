@@ -113,7 +113,7 @@ public class MissionSecurityService {
       // GUEST_EDIT_TOKEN_HEADER) that hashes to the row's stored hash, or (b) a mission manager /
       // officer / admin within the owning-OrgUnit scope. The token is checked first so the common
       // anonymous self-edit path never loads the mission aggregate. A guest row with no stored hash
-      // (created before V176) only passes via (b) — the gate fails closed.
+      // (created before V177) only passes via (b) — the gate fails closed.
       if (guestParticipantTokenService.matches(
           request.getHeader(GUEST_EDIT_TOKEN_HEADER), p.getGuestEditTokenHash())) {
         return true;

@@ -1,4 +1,4 @@
-# ADR-0033 — Anonymous outsider view of public missions is operational by design, minus payout and free-text comment
+# ADR-0034 — Anonymous outsider view of public missions is operational by design, minus payout and free-text comment
 
 - **Status:** Accepted
 - **Date:** 2026-06-21

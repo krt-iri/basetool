@@ -439,7 +439,7 @@ not an authorization secret.
 - Every subsequent guest-row mutate/delete is authorised by
   `MissionSecurityService.canAccessParticipant` iff the caller (a) presents a token (header
   `X-Guest-Edit-Token`) that hashes to the stored hash, OR (b) holds a mission-management role in scope
-  (`canManageMission`). A guest row with no stored hash (pre-V176) is editable only via (b) — the gate
+  (`canManageMission`). A guest row with no stored hash (pre-V177) is editable only via (b) — the gate
   **fails closed**.
 - The frontend stores the token client-side (localStorage, keyed by participant id) and replays it via
   the `X-Guest-Edit-Token` header, relayed browser→frontend→backend by the
@@ -458,7 +458,7 @@ not an authorization secret.
 **Enforced by:** `MissionSecurityServiceTest` (`canAccessParticipant_GuestWithValidToken_*`,
 `…_GuestWrongTokenNotManager_ShouldReturnFalse`, `…_GuestNoTokenButManager_*`),
 `GuestParticipantTokenServiceTest`, and the MockMvc integration tests `MissionGuestAccessTest`
-(without-token-forbidden + with-token-allowed) and `MissionAccessControlTest`. **Migration:** V176.
+(without-token-forbidden + with-token-allowed) and `MissionAccessControlTest`. **Migration:** V177.
 **Security audit:** finding M1.
 
 ### REQ-SEC-019 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
@@ -508,7 +508,7 @@ no Staffel the caller can edit.
 ### REQ-SEC-021 — Anonymous outsider mission view withholds payout intent and free-text comments
 
 The anonymous / role-less-`GUEST` ("outsider") view of a public (non-internal) mission is an
-**operational-coordination surface**: by deliberate product decision (ADR-0033) it exposes the
+**operational-coordination surface**: by deliberate product decision (ADR-0034) it exposes the
 participant roster's public callsign tuple (`username`/`displayName`/`rank`), org-unit affiliation,
 job type, assigned ship/unit, mission frequencies, owning organisation and schedule/status, so a
 prospective sign-up can decide whether and how to join. It MUST continue to withhold PII (email /
@@ -524,7 +524,7 @@ Both fields stay on the authenticated member-peer view; only the outsider paths 
 pass every outsider full-mission response routes through — `getMissionById` and the participant write
 endpoints) and the `addParticipantSlim` outsider branch. The shared `cleanupParticipantForGuest` is
 deliberately unchanged. The full residual decision (and the rejected alternatives) is recorded in
-ADR-0033.
+ADR-0034.
 
 **Acceptance**
 
@@ -538,7 +538,7 @@ ADR-0033.
 (`getMissionById_outsider_planned_keepsRosterButHidesDescriptionAndPii` asserts payout + comment are
 `null` for outsiders; `getMissionById_authenticatedCaller_returnsFullDtoUnchanged` keeps them for
 members) and `MissionControllerSlimEndpointsTest` for the `addParticipantSlim` outsider roster.
-**ADR:** [ADR-0033](../adr/0033-anonymous-outsider-mission-visibility.md). **Security audit:**
+**ADR:** [ADR-0034](../adr/0034-anonymous-outsider-mission-visibility.md). **Security audit:**
 finding L3.
 
 ## Out of scope

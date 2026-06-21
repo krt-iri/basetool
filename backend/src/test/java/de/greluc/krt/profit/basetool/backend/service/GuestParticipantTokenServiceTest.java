@@ -75,7 +75,7 @@ class GuestParticipantTokenServiceTest {
     assertFalse(service.matches(null, hash), "null token must not match");
     assertFalse(service.matches("", hash), "blank token must not match");
     assertFalse(
-        service.matches(token, null), "a row with no stored hash (pre-V176) must not match");
+        service.matches(token, null), "a row with no stored hash (pre-V177) must not match");
     assertFalse(service.matches(token, ""), "blank stored hash must not match");
     assertFalse(service.matches(null, null), "null/null must not match");
   }

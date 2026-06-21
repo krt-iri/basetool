@@ -76,7 +76,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *       leaves the API for a mission outsider (anonymous OR authenticated role-less GUEST, detected
  *       via {@code AuthHelperService#isMemberOrAbove()}). Pinning the outsider redaction (the
  *       free-text description hidden, participant PII stripped to the public callsign tuple, owner
- *       / managers / internal inventory+refinery cleared, and — per ADR-0033 — each participant's
+ *       / managers / internal inventory+refinery cleared, and — per ADR-0034 — each participant's
  *       payoutPreference + free-text comment stripped, while organisation, the participant roster,
  *       units and frequencies stay visible) protects the multi-user-data-isolation guarantee in
  *       CLAUDE.md.
@@ -516,7 +516,7 @@ class MissionControllerLifecycleTest {
     MissionDto result = controller.getMissionById(id);
 
     // Outsider redaction (cleanupOutsiderMissionForGuest): on top of the member-peer redaction the
-    // free-text description is hidden and — per ADR-0033 / REQ-SEC-021 — each participant's
+    // free-text description is hidden and — per ADR-0034 / REQ-SEC-021 — each participant's
     // payoutPreference and free-text comment are stripped. Organisation, the participant roster
     // (public callsign tuple), units and frequencies stay visible (explicit product decision);
     // participant PII and owner / managers / internal economy are still stripped, and the finance
@@ -541,7 +541,7 @@ class MissionControllerLifecycleTest {
     assertThat(rosterUser.username()).isEqualTo("alice");
     assertThat(rosterUser.email()).isNull();
     assertThat(rosterUser.roles()).isNull();
-    // ADR-0033 / REQ-SEC-021: payout intent + free-text comment are NOT exposed to outsiders (the
+    // ADR-0034 / REQ-SEC-021: payout intent + free-text comment are NOT exposed to outsiders (the
     // fixture sets payoutPreference=PAYOUT and comment="comment"; both come back null).
     assertThat(rosterParticipant.payoutPreference()).isNull();
     assertThat(rosterParticipant.comment()).isNull();

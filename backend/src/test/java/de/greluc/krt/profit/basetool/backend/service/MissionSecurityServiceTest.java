@@ -346,7 +346,7 @@ class MissionSecurityServiceTest {
     participant.setMission(mission);
     participant.setUser(null);
     participant.setGuestName("Somebody");
-    // pre-V176-style guest row: no token hash at all — only an elevated caller may edit it.
+    // pre-V177-style guest row: no token hash at all — only an elevated caller may edit it.
 
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
     when(authentication.isAuthenticated()).thenReturn(true);
