@@ -23,7 +23,8 @@ A good report typically includes:
 - A clear description of the issue and its impact.
 - The affected version, commit SHA, or container image digest.
 - The affected component (`backend`, `frontend`, `keycloak-theme`,
-  `scripts/`, GitHub Actions workflow, container image, etc.).
+  `keycloak-spi`, `ingest`, `scripts/`, GitHub Actions workflow, container
+  image, etc.).
 - Reproduction steps, a proof of concept, or a minimal test case.
 - Any relevant configuration (Spring profile, Keycloak realm settings,
   reverse-proxy setup) needed to trigger the issue.
@@ -72,7 +73,8 @@ support window across major versions.
 The following are **in scope** for this policy:
 
 - Source code in this repository (`backend/`, `frontend/`, `keycloak-theme/`,
-  `scripts/`, build configuration, Flyway migrations).
+  `keycloak-spi/`, `ingest/`, `scripts/`, build configuration, Flyway
+  migrations).
 - Published container images under
   [`ghcr.io/krt-profit/basetool-backend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-backend)
   and
@@ -116,8 +118,11 @@ Particularly interesting classes of issue, given the project's architecture:
   Thymeleaf view, including missing `@PreAuthorize` annotations.
 - Optimistic-locking bypass leading to lost writes or privilege escalation.
 - Injection (SQL, JPQL, Thymeleaf expression, OS command, template, log).
-- SSRF via the UEX integration, the WebClient, or any administrator-supplied
-  URL.
+- SSRF via the UEX integration, the WebClient, any administrator-supplied
+  URL, or the internet-facing `ingest` gateway.
+- Discord federation membership-gate bypass (`keycloak-spi`) — any
+  authentication bypass that allows login without "DAS KARTELL" guild
+  membership or the required `KRT-Mitglied` role check.
 - Sensitive data appearing in logs (names, emails, tokens, JWTs, password
   hashes) — these MUST never be logged.
 - Supply-chain integrity issues affecting our build, signing, or publishing
