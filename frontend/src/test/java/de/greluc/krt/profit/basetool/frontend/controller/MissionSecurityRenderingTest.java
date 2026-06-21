@@ -109,7 +109,8 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -211,7 +212,8 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -306,7 +308,8 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -411,7 +414,8 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(

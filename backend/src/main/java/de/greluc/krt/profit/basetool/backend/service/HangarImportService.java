@@ -172,6 +172,15 @@ public class HangarImportService {
   /** Strips everything outside {@code [a-z0-9]} for the normalised match form. */
   private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]");
 
+  /**
+   * Application-level cap on a hangar/fleet upload, enforced before the body is materialised into a
+   * Jackson tree (security audit gap-fill). A real ship-list export is well under 1 MB; 8 MB leaves
+   * generous headroom for very large fleets while keeping this member-reachable import off the 64
+   * MB global multipart cap (sized for the admin-only P4K catalogue) — a flat multi-MB array would
+   * otherwise expand into hundreds of MB of transient heap per request.
+   */
+  private static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
+
   private final ShipRepository shipRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final UserRepository userRepository;
@@ -334,6 +343,14 @@ public class HangarImportService {
    *     format
    */
   private @NotNull List<FleetImportEntry> parseEntries(@NotNull MultipartFile file) {
+    // Reject an oversized upload BEFORE readTree builds the in-memory tree (security audit
+    // gap-fill). getSize() reflects the buffered multipart length, so this never reads the body.
+    if (file.getSize() > MAX_IMPORT_BYTES) {
+      throw new BadRequestException(
+          "The uploaded ship-list file is too large (limit "
+              + (MAX_IMPORT_BYTES / (1024 * 1024))
+              + " MB).");
+    }
     JsonNode root;
     try {
       root = objectMapper.readTree(file.getInputStream());

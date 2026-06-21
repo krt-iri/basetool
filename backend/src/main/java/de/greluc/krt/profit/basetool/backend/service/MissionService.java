@@ -112,6 +112,7 @@ public class MissionService {
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository
       orgUnitRepository;
+  private final GuestParticipantTokenService guestParticipantTokenService;
 
   /**
    * <strong>Do not call from new code.</strong> Kept only because the wider service test suite
@@ -869,6 +870,16 @@ public class MissionService {
     } else {
       participant.setGuestName(effectiveGuestName);
       participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
+      // Security audit M1 / REQ-SEC-018: bind this anonymous guest sign-up to its creator with a
+      // per-row capability token. Only the hash is persisted; the plaintext rides back on the
+      // transient field so the create response can hand it to the caller exactly once. A later
+      // guest
+      // mutate/delete must present the token (or hold a mission-management role) — enforced by
+      // MissionSecurityService.canAccessParticipant.
+      String mintedGuestEditToken = guestParticipantTokenService.generateToken();
+      participant.setGuestEditTokenHash(
+          guestParticipantTokenService.hashToken(mintedGuestEditToken));
+      participant.setGuestEditToken(mintedGuestEditToken);
     }
 
     if (desiredJobTypeId != null) {

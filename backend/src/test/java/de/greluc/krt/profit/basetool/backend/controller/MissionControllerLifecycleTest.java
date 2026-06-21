@@ -75,10 +75,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *       MissionController#cleanupOutsiderMissionForGuest} is the only path that controls what
  *       leaves the API for a mission outsider (anonymous OR authenticated role-less GUEST, detected
  *       via {@code AuthHelperService#isMemberOrAbove()}). Pinning the outsider redaction (the
- *       free-text description hidden, participant PII stripped to the public callsign tuple, and
- *       owner / managers / internal inventory+refinery cleared, while organisation, the participant
- *       roster, units, frequencies and per-participant payout preference stay visible) protects the
- *       multi-user-data-isolation guarantee in CLAUDE.md.
+ *       free-text description hidden, participant PII stripped to the public callsign tuple, owner
+ *       / managers / internal inventory+refinery cleared, and — per ADR-0034 — each participant's
+ *       payoutPreference + free-text comment stripped, while organisation, the participant roster,
+ *       units and frequencies stay visible) protects the multi-user-data-isolation guarantee in
+ *       CLAUDE.md.
  *   <li><b>Outsider access blocks</b>: internal missions → 403, completed/cancelled missions → 403
  *       (a past mission must not leak its participant list to a public viewer).
  *   <li><b>Outsider list/search filtering</b> — {@code getAllMissions} / {@code searchMissions}
@@ -148,7 +149,18 @@ class MissionControllerLifecycleTest {
             false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
-            UUID.randomUUID(), user, null, null, null, null, "comment", null, null, null, 1L);
+            UUID.randomUUID(),
+            user,
+            null,
+            null,
+            null,
+            null,
+            "comment",
+            null,
+            null,
+            de.greluc.krt.profit.basetool.backend.model.PayoutPreference.PAYOUT,
+            1L,
+            null);
     return new MissionDto(
         id,
         "Op Foxglove",
@@ -505,11 +517,11 @@ class MissionControllerLifecycleTest {
     MissionDto result = controller.getMissionById(id);
 
     // Outsider redaction (cleanupOutsiderMissionForGuest): on top of the member-peer redaction the
-    // ONLY field hidden is the free-text description. Organisation, the participant roster, units,
-    // frequencies and the per-participant payout preference stay visible (explicit product
-    // decision); participant PII and owner / managers / internal economy are still stripped, and
-    // the
-    // finance ledger stays member-only on its own endpoints.
+    // free-text description is hidden and — per ADR-0034 / REQ-SEC-021 — each participant's
+    // payoutPreference and free-text comment are stripped. Organisation, the participant roster
+    // (public callsign tuple), units and frequencies stay visible (explicit product decision);
+    // participant PII and owner / managers / internal economy are still stripped, and the finance
+    // ledger stays member-only on its own endpoints.
     assertThat(result).isNotNull();
     assertThat(result.name()).isEqualTo("Op Foxglove");
     assertThat(result.status()).isEqualTo("PLANNED");
@@ -525,10 +537,15 @@ class MissionControllerLifecycleTest {
     // The participant roster IS visible to outsiders — but PII is stripped to the public callsign
     // tuple (username / displayName / rank), never email or roles.
     assertThat(result.participants()).hasSize(1);
-    UserDto rosterUser = result.participants().iterator().next().user();
+    MissionParticipantDto rosterParticipant = result.participants().iterator().next();
+    UserDto rosterUser = rosterParticipant.user();
     assertThat(rosterUser.username()).isEqualTo("alice");
     assertThat(rosterUser.email()).isNull();
     assertThat(rosterUser.roles()).isNull();
+    // ADR-0034 / REQ-SEC-021: payout intent + free-text comment are NOT exposed to outsiders (the
+    // fixture sets payoutPreference=PAYOUT and comment="comment"; both come back null).
+    assertThat(rosterParticipant.payoutPreference()).isNull();
+    assertThat(rosterParticipant.comment()).isNull();
   }
 
   // ── GET /api/v1/missions/next (200 / 204 + redaction) ────────────────
@@ -728,7 +745,7 @@ class MissionControllerLifecycleTest {
     MissionParticipant raw = new MissionParticipant();
     MissionParticipantDto dto =
         new MissionParticipantDto(
-            UUID.randomUUID(), null, null, null, null, null, null, null, null, null, 1L);
+            UUID.randomUUID(), null, null, null, null, null, null, null, null, null, 1L, null);
     when(missionService.getUnassignedParticipants(id)).thenReturn(List.of(raw));
     when(missionMapper.toDto(raw)).thenReturn(dto);
 

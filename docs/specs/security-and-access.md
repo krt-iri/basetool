@@ -425,6 +425,122 @@ whitelist (incl. the new `OrgUnitBankAccessService`) and `staffelScopedWriteEndp
 matrix on the ephemeral stack (Phase 7, `e2e`-label-gated) · **ADR:**
 [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:** #692, #696, #700.
 
+### REQ-SEC-018 — Anonymous guest sign-up edits require a per-row capability token
+
+Mission participant write endpoints (`PUT`/`DELETE`/check-in/out/payout on
+`/api/v1/missions/*/participants/*` and the `…/slim` twins) are `permitAll` so the public mission
+sign-up flow works without an account. A **guest** (unlinked) participant row MUST NOT be mutable by a
+caller who merely knows its id — the anonymous-readable roster exposes participant ids, so a bare id is
+not an authorization secret.
+
+- On creation of a guest sign-up the backend mints an unguessable 256-bit **capability token**,
+  persists only its SHA-256 hash on `mission_participant.guest_edit_token_hash`, and returns the
+  plaintext **once** in the create response (`MissionParticipantDto.guestEditToken`).
+- Every subsequent guest-row mutate/delete is authorised by
+  `MissionSecurityService.canAccessParticipant` iff the caller (a) presents a token (header
+  `X-Guest-Edit-Token`) that hashes to the stored hash, OR (b) holds a mission-management role in scope
+  (`canManageMission`). A guest row with no stored hash (pre-V177) is editable only via (b) — the gate
+  **fails closed**.
+- The frontend stores the token client-side (localStorage, keyed by participant id) and replays it via
+  the `X-Guest-Edit-Token` header, relayed browser→frontend→backend by the
+  `GuestEditTokenContext`/`GuestEditTokenContextFilter`/`GuestEditTokenRelayFilter` trio (Reactor
+  context propagation, mirroring the client-IP relay). The token is intentionally lost when the user
+  clears site data — an anonymous caller has no durable server-verifiable identity, so a cleared token
+  degrades to "a mission manager edits it", never to "anyone can edit it".
+
+**Acceptance**
+
+- [x] An anonymous caller without the token is denied (403) on a guest-row mutate/delete/payout.
+- [x] The anonymous creator presenting the minted token may edit/withdraw their own guest row.
+- [x] A mission manager / officer / admin in scope may still manage guest rows without a token.
+- [x] Only the create response ever carries the plaintext token; reads/edits return `null`.
+
+**Enforced by:** `MissionSecurityServiceTest` (`canAccessParticipant_GuestWithValidToken_*`,
+`…_GuestWrongTokenNotManager_ShouldReturnFalse`, `…_GuestNoTokenButManager_*`),
+`GuestParticipantTokenServiceTest`, and the MockMvc integration tests `MissionGuestAccessTest`
+(without-token-forbidden + with-token-allowed) and `MissionAccessControlTest`. **Migration:** V177.
+**Security audit:** finding M1.
+
+### REQ-SEC-019 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
+
+`MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/finance-entries/{entryId}`) gates on
+`MissionSecurityService.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
+authority, so — like every other mission write (`canManageMission`, `canManageManagers`,
+`canChangeOwner`, hardened under audit AUTHZ-1) — an officer may edit/delete a finance entry only when
+the entry's mission is within their owning-OrgUnit scope (`OwnerScopeService.canEditMission`). Only
+`ROLE_ADMIN` bypasses the scope check (system-wide oversight). The entry owner's self-edit path (linked
+participant who is still a registered participant) is unchanged.
+
+**Acceptance**
+
+- [x] An officer scoped to OrgUnit A is denied (403) editing/deleting a finance entry of an OrgUnit-B
+  mission (even a B-internal mission they cannot read).
+- [x] An officer in scope, an admin, and the entry owner-participant are allowed.
+
+**Enforced by:** `MissionSecurityServiceTest`
+(`canEditFinanceEntry_OfficerForeignOrgUnit_ShouldReturnFalse`, `…_OfficerInScope_*`, `…_Admin_*`,
+`…_OwnerStillParticipant_*`). **Security audit:** finding H1.
+
+### REQ-SEC-020 — Member-evaluation writes are scoped to the evaluated member's squadron
+
+MemberEvaluation create/update/delete (`PUT`/`DELETE /api/v1/promotion/evaluations/...`) gates on
+`MemberEvaluationService` with `@PreAuthorize("hasAnyRole('ADMIN','OFFICER')")`. A non-admin write
+must satisfy TWO squadron-scope checks, not one: the evaluation's **category** must belong to a
+squadron the caller may edit (`assertCallerMayEditCategory`) AND the **evaluated member** must belong
+to a Staffel the caller may edit (`assertCallerMayEvaluateUser` →
+`OwnerScopeService.canEditSquadron(member's home Staffel)`). Without the member check an officer of
+squadron X could create/overwrite/delete an evaluation row for a member of squadron Y by pairing the
+victim's id with a category owned by X (a cross-tenant write of member-evaluation data). ADMIN spans
+every squadron and short-circuits; the check fails closed on a malformed member id or a member with
+no Staffel the caller can edit.
+
+**Acceptance**
+
+- [x] An officer is denied (`AccessDeniedException`) upserting/deleting an evaluation for a member
+  outside their editable Staffel scope, even with an in-scope category.
+- [x] An officer may evaluate a member of a Staffel within their scope; an admin may evaluate anyone.
+
+**Enforced by:** `MemberEvaluationServiceTest`
+(`upsert_shouldDenyOfficer_evaluatingForeignSquadronMember`,
+`upsert_shouldAllowOfficer_evaluatingOwnSquadronMember`). **Security audit:** gap-fill finding
+(member-evaluation cross-tenant write).
+
+### REQ-SEC-021 — Anonymous outsider mission view withholds payout intent and free-text comments
+
+The anonymous / role-less-`GUEST` ("outsider") view of a public (non-internal) mission is an
+**operational-coordination surface**: by deliberate product decision (ADR-0034) it exposes the
+participant roster's public callsign tuple (`username`/`displayName`/`rank`), org-unit affiliation,
+job type, assigned ship/unit, mission frequencies, owning organisation and schedule/status, so a
+prospective sign-up can decide whether and how to join. It MUST continue to withhold PII (email /
+real name — enforced by the C-1 ArchUnit rule `anonymousReadableMissionEndpointsMustRedactGuestPii`)
+and, additionally, the two per-participant fields with low public-coordination value and higher
+sensitivity:
+
+- **`payoutPreference`** — a participant's financial intent.
+- the free-text **`comment`** — uncontrolled text that may carry incidental PII.
+
+Both fields stay on the authenticated member-peer view; only the outsider paths strip them, via
+`MissionController.stripOutsiderParticipantFields` applied in `cleanupOutsiderMissionForGuest` (the
+pass every outsider full-mission response routes through — `getMissionById` and the participant write
+endpoints) and the `addParticipantSlim` outsider branch. The shared `cleanupParticipantForGuest` is
+deliberately unchanged. The full residual decision (and the rejected alternatives) is recorded in
+ADR-0034.
+
+**Acceptance**
+
+- [x] An anonymous / role-less-`GUEST` read of a public mission (`GET /api/v1/missions/{id}`, the
+  participant endpoints, `addParticipantSlim`) returns every participant with `payoutPreference` and
+  `comment` `null`.
+- [x] An authenticated member (peer view and above) still sees both fields.
+- [x] PII (email / real name) remains redacted for outsiders (C-1 unchanged).
+
+**Enforced by:** `MissionControllerLifecycleTest`
+(`getMissionById_outsider_planned_keepsRosterButHidesDescriptionAndPii` asserts payout + comment are
+`null` for outsiders; `getMissionById_authenticatedCaller_returnsFullDtoUnchanged` keeps them for
+members) and `MissionControllerSlimEndpointsTest` for the `addParticipantSlim` outsider roster.
+**ADR:** [ADR-0034](../adr/0034-anonymous-outsider-mission-visibility.md). **Security audit:**
+finding L3.
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

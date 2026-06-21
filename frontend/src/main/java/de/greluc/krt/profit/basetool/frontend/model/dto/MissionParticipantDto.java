@@ -29,6 +29,11 @@ import java.util.UUID;
  * Data transfer record carrying Mission Participant payload. The {@code orgUnits} list carries the
  * participant's affiliations (zero, one, or several org units — a Staffel and/or Spezialkommandos),
  * mirroring the backend DTO so the roster renders an org-unit badge per affiliation.
+ *
+ * <p>{@code guestEditToken} mirrors the backend field (security audit M1 / REQ-SEC-018): it is
+ * non-{@code null} only on the create response of an anonymous guest sign-up — the per-row
+ * capability token the browser stores and replays (as {@code X-Guest-Edit-Token}) to later
+ * edit/withdraw that guest row. It is {@code null} on every read/edit response.
  */
 public record MissionParticipantDto(
     UUID id,
@@ -41,7 +46,8 @@ public record MissionParticipantDto(
     Instant startTime,
     Instant endTime,
     PayoutPreference payoutPreference,
-    Long version) {
+    Long version,
+    String guestEditToken) {
   public String getStartTimeFormatted() {
     return formatInstant(startTime);
   }

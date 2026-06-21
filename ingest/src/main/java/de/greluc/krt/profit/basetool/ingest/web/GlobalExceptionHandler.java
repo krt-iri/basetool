@@ -22,12 +22,14 @@ package de.greluc.krt.profit.basetool.ingest.web;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitedException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -38,13 +40,18 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Translates gateway failures into RFC 7807 {@code application/problem+json} (REQ-INGEST-001,
- * REQ-API-*). Validation and malformed bodies are 400s; a backend 4xx is relayed as-is (so the
- * backend's envelope-reject semantics reach the extractor verbatim — REQ-REFINERY-001/003); a
- * backend 5xx, a connection failure, or an open circuit becomes 502; anything else is a generic
- * 500. The handler never echoes a token or PII into the response (REQ-OBS-*).
+ * REQ-API-*). Validation and malformed bodies are 400s; a backend 4xx keeps the backend status and
+ * relays only the backend problem's {@code detail} (content-type-checked + length-capped, so the
+ * envelope-reject message reaches the extractor without echoing a raw response body —
+ * REQ-REFINERY-001/003); a backend 5xx, a connection failure, or an open circuit becomes 502;
+ * anything else is a generic 500. The handler never echoes a token or PII into the response
+ * (REQ-OBS-*).
  *
  * <p>Extends {@link ResponseEntityExceptionHandler} so the framework's standard MVC exceptions (and
  * therefore Spring Boot's auto-configured problem-details advice, which is conditional on no
@@ -52,6 +59,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * to validation and body-parse problems too.
  */
 @Slf4j
+@RequiredArgsConstructor
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -62,6 +70,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   private static final String CODE_UPSTREAM = "BACKEND_RELAY_FAILED";
   private static final String CODE_INTERNAL = "INTERNAL_ERROR";
   private static final String CODE_RATE_LIMITED = "RATE_LIMITED";
+
+  /** Hard cap on the backend-supplied detail relayed to the extractor (security audit gap-fill). */
+  private static final int MAX_RELAYED_DETAIL = 500;
+
+  /** Generic detail used when no safe backend detail can be relayed. */
+  private static final String GENERIC_BACKEND_REJECT = "The import backend rejected the request.";
+
+  /**
+   * Jackson mapper used to extract only the {@code detail}/{@code title} from a backend problem.
+   */
+  private final ObjectMapper objectMapper;
 
   @Override
   protected ResponseEntity<Object> handleMethodArgumentNotValid(
@@ -106,9 +125,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * The backend returned an error status. A 4xx is relayed verbatim (preserving the backend's
-   * localized problem detail and its envelope-reject semantics); a 5xx is collapsed to 502 so the
-   * gateway never surfaces backend internals.
+   * The backend returned an error status. A 4xx keeps the backend status and relays only the
+   * backend problem's sanitised {@code detail} (see {@link #backendDetail}, which
+   * content-type-checks and caps it — never the raw body); a 5xx is collapsed to 502 so the gateway
+   * never surfaces backend internals.
    *
    * @param ex the WebClient response exception
    * @return a relayed 4xx problem, or a 502 for backend 5xx
@@ -204,15 +224,38 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * Extracts a safe detail string from a backend response error. The backend's problem+json body is
-   * already a sanitized, localized message, so it is safe to relay; falls back to a generic phrase
-   * when the body is empty.
+   * Extracts a safe detail string from a backend response error (security audit gap-fill). Only an
+   * RFC 7807 {@code application/problem+json} body is consulted, and only its {@code detail} (or
+   * {@code title}) field is relayed — never the raw body, which could be a non-JSON error page or
+   * carry internal context — capped at {@value #MAX_RELAYED_DETAIL} characters. Falls back to a
+   * generic phrase when the body is missing, not problem+json, or cannot be decoded.
    *
    * @param ex the backend response exception
-   * @return the backend's response body, or a generic fallback
+   * @return the backend problem's detail/title (capped), or a generic fallback
    */
-  private static @NotNull String backendDetail(@NotNull WebClientResponseException ex) {
+  private @NotNull String backendDetail(@NotNull WebClientResponseException ex) {
+    MediaType contentType = ex.getHeaders().getContentType();
+    if (contentType == null || !contentType.isCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)) {
+      return GENERIC_BACKEND_REJECT;
+    }
     String body = ex.getResponseBodyAsString();
-    return body == null || body.isBlank() ? "The import backend rejected the request." : body;
+    if (body.isBlank()) {
+      return GENERIC_BACKEND_REJECT;
+    }
+    try {
+      JsonNode root = objectMapper.readTree(body);
+      String message = root.path("detail").asText("");
+      if (message.isBlank()) {
+        message = root.path("title").asText("");
+      }
+      if (!message.isBlank()) {
+        return message.length() <= MAX_RELAYED_DETAIL
+            ? message
+            : message.substring(0, MAX_RELAYED_DETAIL);
+      }
+    } catch (JacksonException e) {
+      log.debug("Could not parse backend problem+json body; using a generic detail.");
+    }
+    return GENERIC_BACKEND_REJECT;
   }
 }

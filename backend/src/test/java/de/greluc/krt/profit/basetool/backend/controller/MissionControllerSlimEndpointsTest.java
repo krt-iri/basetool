@@ -656,6 +656,9 @@ class MissionControllerSlimEndpointsTest {
     bob.setUsername("bob.callsign");
     bob.setEmail("bob@example.invalid");
     bobEntry.setUser(bob);
+    // ADR-0034: bob carries a free-text comment + the default PAYOUT preference so the outsider
+    // tests can assert both are stripped from the anonymous response.
+    bobEntry.setComment("bob-private-note");
     set.add(bobEntry);
 
     MissionParticipant guestEntry = new MissionParticipant();
@@ -697,6 +700,14 @@ class MissionControllerSlimEndpointsTest {
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"),
         "anonymous response must not leak participant email — audit finding C-1");
+    // ADR-0034 / REQ-SEC-021: the anonymous outsider roster must not carry a participant's
+    // free-text comment or payout preference.
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("bob-private-note"),
+        "ADR-0034: anonymous outsider must not receive a participant's free-text comment");
+    org.junit.jupiter.api.Assertions.assertFalse(
+        body.contains("PAYOUT"),
+        "ADR-0034: anonymous outsider must not receive a participant's payout preference");
   }
 
   @Test

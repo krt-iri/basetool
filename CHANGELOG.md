@@ -59,6 +59,17 @@
 
 - **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster war PatternFlys Standard-Login-Bild (per Keycloak-Common-Theme auf `body` gesetzt); unsere Wabenregel hat jetzt Vorrang. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
 
+### Security
+
+- **Fremde Gast-Anmeldungen an öffentlichen Einsätzen lassen sich nicht mehr von Unbeteiligten ändern oder löschen.** Bisher konnte jede Person mit der (öffentlich sichtbaren) Teilnehmer-ID eine fremde Gast-Anmeldung bearbeiten, abmelden oder deren Auszahlungswunsch umstellen. Eine Gast-Anmeldung ist jetzt an ein einmalig vergebenes, geheimes Bearbeitungs-Token gebunden: nur wer es besitzt (der ursprüngliche Gast) oder eine Einsatzleitungs-Rolle hat, darf die Zeile noch ändern. Wer Cookies bzw. Seitendaten löscht, verliert die Selbstbearbeitung — dann übernimmt die Einsatzleitung.
+- **Offiziere können Finanzeinträge fremder Staffeln nicht mehr bearbeiten oder löschen.** Das Bearbeiten/Löschen eines Missions-Finanzeintrags prüft für Offiziere jetzt zusätzlich die Staffel-Zugehörigkeit der Mission (wie bei allen anderen Schreibvorgängen an Missionen); nur Administratoren behalten den staffelübergreifenden Zugriff.
+- **Offiziere können keine Bewertungen mehr für Mitglieder fremder Staffeln anlegen, ändern oder löschen.** Die Mitglieder-Bewertung prüft jetzt zusätzlich, dass das bewertete Mitglied zur Staffel des Offiziers gehört (bisher wurde nur die Staffel der Bewertungs-Kategorie geprüft); Administratoren bewerten weiterhin staffelübergreifend.
+- **Profilbeschreibung und Anzeigename sind jetzt längenbegrenzt (10.000 bzw. 255 Zeichen).** Überlange Eingaben werden serverseitig mit einer klaren Fehlermeldung abgewiesen, statt unbegrenzt in der Datenbank gespeichert zu werden.
+- **Datei-Importe (Schiffe/Fleetview und Baupläne) sind jetzt auf 8 MB begrenzt.** Übergroße Uploads werden sofort mit einer klaren Fehlermeldung abgewiesen, bevor die Datei vollständig in den Arbeitsspeicher geladen wird (Schutz vor Speicher-Erschöpfung); reale Exporte liegen weit darunter.
+- **Die Begrenzung auf zwei gleichzeitige Sitzungen pro Konto greift jetzt tatsächlich.** Mit den Redis-Sitzungen war das Limit bisher wirkungslos; ab sofort verdrängt die dritte gleichzeitige Anmeldung die älteste Sitzung — eine parallel genutzte, gestohlene Sitzung wird so verlässlich und auch über einen Neustart des Frontends hinweg verdrängt.
+- **Härtung am Ingest-Gateway und an der stillen Neu-Anmeldung.** Lehnt das Backend einen Import ab, gibt das Gateway jetzt nur noch die geprüfte, längenbegrenzte Fehlermeldung des Backends weiter statt der rohen Antwort. Das kurzlebige `SSO_ATTEMPTED`-Cookie der stillen Re-Anmeldung trägt jetzt `SameSite=Strict` wie alle anderen Cookies.
+- **Nicht angemeldete Besucher sehen bei öffentlichen Einsätzen keine Auszahlungswünsche und keine Freitext-Kommentare der Teilnehmer mehr.** Roster, Ränge, Schiff-/Einheiten-Zuweisung, Funkfrequenzen und Organisation bleiben für die öffentliche Anmeldung sichtbar; die Auszahlungsabsicht und Freitext-Notizen einzelner Teilnehmer sind nur noch für angemeldete Mitglieder sichtbar (ADR-0034).
+
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
 
 ### Added

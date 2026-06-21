@@ -183,6 +183,66 @@
 
     window.krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
 
+    // ----------------------------------------------- guest edit token (M1)
+
+    // Security audit M1 / REQ-SEC-018: an anonymous guest who signs up for a mission receives a
+    // per-row capability token in the create response. We persist it in localStorage keyed by the
+    // participant id and replay it as the X-Guest-Edit-Token header on later edit/withdraw of THAT
+    // row, so the guest can self-manage their own sign-up without a login while a third party (who
+    // only saw the public roster) cannot. The token is intentionally lost when the user clears site
+    // data — an anonymous caller has no durable server-verifiable identity, so a cleared token falls
+    // back to "a mission manager edits it", never to "anyone can edit it".
+    const GUEST_TOKEN_PREFIX = 'krtGuestParticipantToken:';
+    const GUEST_TOKEN_HEADER = 'X-Guest-Edit-Token';
+    // Matches the participant id segment of a frontend participant write URL
+    // (/missions/{missionId}/participants/{participantId}/...). The create URL
+    // (.../participants/ajax) has no id segment, so no token is attached to it.
+    const PARTICIPANT_URL_RE = /\/participants\/([0-9a-fA-F-]{36})(?:\/|$|\?)/;
+
+    function storeGuestToken(participantId, token) {
+        if (!participantId || !token) {
+            return;
+        }
+        try {
+            window.localStorage.setItem(GUEST_TOKEN_PREFIX + participantId, token);
+        } catch (_unavailable) {
+            /* localStorage blocked (private mode / policy): self-edit then falls back to staff */
+        }
+    }
+
+    function readGuestToken(participantId) {
+        if (!participantId) {
+            return null;
+        }
+        try {
+            return window.localStorage.getItem(GUEST_TOKEN_PREFIX + participantId);
+        } catch (_unavailable) {
+            return null;
+        }
+    }
+
+    function guestTokenForUrl(url) {
+        if (typeof url !== 'string') {
+            return null;
+        }
+        const m = PARTICIPANT_URL_RE.exec(url);
+        return m ? readGuestToken(m[1]) : null;
+    }
+
+    // Captures any guest edit token returned by a write response (the create response of a guest
+    // sign-up) into the store. The body is either a single participant object or the slim
+    // participant list; only the freshly created guest row carries a non-null guestEditToken.
+    function captureGuestTokens(body) {
+        const items = Array.isArray(body) ? body : [body];
+        items.forEach(function (it) {
+            if (it && typeof it === 'object' && it.guestEditToken && it.id) {
+                storeGuestToken(it.id, it.guestEditToken);
+            }
+        });
+    }
+
+    window.krtGuestToken = { store: storeGuestToken, read: readGuestToken };
+
     // --------------------------------------------------------------- helpers
 
     /**
@@ -346,7 +406,15 @@
         const submitter = opts.submitter || consumePendingSubmitter();
 
         function buildInit() {
-            const init = { method: method, headers: csrfHeaders() };
+            const headers = csrfHeaders();
+            // M1 / REQ-SEC-018: replay the per-row guest edit token (if we hold one for this
+            // participant) so an anonymous guest can edit/withdraw their own sign-up. The frontend
+            // relays the header to the backend, which verifies it against the stored hash.
+            const guestToken = guestTokenForUrl(opts.url);
+            if (guestToken) {
+                headers[GUEST_TOKEN_HEADER] = guestToken;
+            }
+            const init = { method: method, headers: headers };
             if (opts.payload !== undefined && method !== 'GET' && method !== 'DELETE') {
                 init.body = JSON.stringify(opts.payload);
             }
@@ -392,6 +460,10 @@
                 await handleProblem(response, body, opts);
                 return { ok: false, status: response.status, body: body };
             }
+
+            // M1 / REQ-SEC-018: capture a per-row guest edit token returned by a guest sign-up
+            // create response so a later edit/withdraw of that row authenticates as the creator.
+            captureGuestTokens(body);
 
             if (opts.containerSelector && body && body.version != null) {
                 syncVersion(opts.containerSelector, body.version);
