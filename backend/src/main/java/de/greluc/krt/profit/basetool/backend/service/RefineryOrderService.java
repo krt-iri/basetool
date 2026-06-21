@@ -21,11 +21,16 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreItemDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -35,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,6 +110,70 @@ public class RefineryOrderService {
    */
   public Page<RefineryOrder> getMyRefineryOrders(@NotNull UUID userId, @NotNull Pageable pageable) {
     return refineryOrderRepository.findByOwnerId(userId, pageable);
+  }
+
+  /**
+   * Pools the yield of the caller's not-yet-completed refinery orders into one SCU total per
+   * (output material, quality) pair, for the optional refinery fold-in of the blueprint
+   * craftability calculation (#781). "Not yet completed or cancelled" maps to status {@code OPEN} +
+   * {@code IN_PROGRESS}; strictly owner-scoped to {@code userId}. The {@link
+   * RefineryGood#getOutputQuantity() outputQuantity} is tracked in units, so SCU commodities are
+   * converted (100 units = 1 SCU, see {@link #updateGoodOutputQuantity}) before pooling so the
+   * slices merge with the inventory slices.
+   *
+   * @param userId the owning user; never {@code null}
+   * @return one slice per (output material, quality), with the summed SCU yield; never {@code null}
+   */
+  public List<OwnedStockSlice> getOwnedOpenRefineryYieldSlices(@NotNull UUID userId) {
+    List<RefineryOrder> orders =
+        refineryOrderRepository.findOwnedWithGoodsByStatusIn(
+            userId, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS));
+    Map<UUID, Map<Integer, Double>> pooled = new HashMap<>();
+    for (RefineryOrder order : orders) {
+      if (order.getGoods() == null) {
+        continue;
+      }
+      for (RefineryGood good : order.getGoods()) {
+        Material material = good.getOutputMaterial();
+        if (material == null
+            || material.getId() == null
+            || good.getOutputQuantity() == null
+            || good.getQuality() == null) {
+          continue;
+        }
+        double scu = toScu(good.getOutputQuantity(), material.getQuantityType());
+        if (scu <= 0.0d) {
+          continue;
+        }
+        pooled
+            .computeIfAbsent(material.getId(), k -> new HashMap<>())
+            .merge(good.getQuality(), scu, Double::sum);
+      }
+    }
+    List<OwnedStockSlice> slices = new ArrayList<>();
+    pooled.forEach(
+        (materialId, byQuality) ->
+            byQuality.forEach(
+                (quality, scu) -> slices.add(new OwnedStockSlice(materialId, quality, scu))));
+    return slices;
+  }
+
+  /**
+   * Converts a refinery good's {@code outputQuantity} (tracked in units) into SCU. For SCU
+   * commodities 100 units make 1 SCU (the inverse of the ×100 in {@link
+   * #updateGoodOutputQuantity}); non-SCU materials are returned unchanged. Mirrors the refinery
+   * store path so the craftability fold-in measures the same SCU the user would receive on
+   * completion.
+   *
+   * @param outputQuantityUnits the good's output quantity in units
+   * @param quantityType the output material's quantity type (may be {@code null})
+   * @return the equivalent amount in SCU
+   */
+  private static double toScu(int outputQuantityUnits, QuantityType quantityType) {
+    if (quantityType == QuantityType.SCU) {
+      return outputQuantityUnits / 100.0d;
+    }
+    return outputQuantityUnits;
   }
 
   /**

@@ -112,6 +112,28 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       Pageable pageable);
 
   /**
+   * Loads the caller's own refinery orders in the given statuses with their {@code goods} (and each
+   * good's {@code outputMaterial}) eagerly fetched, for the blueprint craftability calculation
+   * (#781). Strictly owner-scoped ({@code ownerId}), never org-unit-scoped — craftability folds in
+   * only the caller's <em>own</em> not-yet-completed refinery yield. Callers pass {@code OPEN} +
+   * {@code IN_PROGRESS} ("not yet completed or cancelled"). The {@code outputMaterial} is part of
+   * the graph so the units→SCU conversion in the service reads the quantity type without an N+1.
+   *
+   * @param ownerId the owning user; never {@code null}
+   * @param statuses the statuses to include (typically {@code OPEN}, {@code IN_PROGRESS})
+   * @return the matching orders with goods loaded; never {@code null}, possibly empty
+   */
+  @EntityGraph(attributePaths = {"goods", "goods.outputMaterial"})
+  @Query(
+      "SELECT DISTINCT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND r.status IN"
+          + " :statuses")
+  List<RefineryOrder> findOwnedWithGoodsByStatusIn(
+      @Param("ownerId") UUID ownerId,
+      @Param("statuses")
+          java.util.Collection<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus>
+              statuses);
+
+  /**
    * Derived Spring-Data query - returns entities matching {@code StatusIn}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */

@@ -72,4 +72,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0032](0032-frontend-single-resilience-pass-at-webclient-filter.md)       | Single frontend resilience pass at the WebClient filter (drop redundant AOP layer)          | Accepted                          |
 | [0033](0033-scmdb-net-export-and-structural-tag-matching.md)              | scmdb.net export as a fourth import shape + structural tag matching                         | Accepted                          |
 | [0034](0034-anonymous-outsider-mission-visibility.md)                     | Anonymous outsider view of public missions is operational by design, minus payout + comment | Accepted                          |
+| [0035](0035-blueprint-craftability-from-own-stock.md)                     | Blueprint craftability computed server-side from the user's own "My Inventory" stock        | Accepted                          |
 

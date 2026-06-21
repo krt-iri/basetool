@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Blueprint-Craftbarkeit aus dem eigenen Lager.** Die Seite "Meine Blueprints" zeigt jetzt pro Blueprint, ob und wie oft er sich aus dem eigenen "Mein Lager"-Bestand craften lässt, welche Output-Stats die Materialqualität liefert und welches Material fehlt. Ein Schalter (Standard aus) rechnet zusätzlich den Ertrag offener und laufender Raffinerie-Aufträge ein. Nur Material-Zutaten (RESOURCE) werden bewertet; ITEM-Zutaten werden als "nicht bewertet" markiert. Alles streng nutzerbezogen.
 - **Die Mitgliederverwaltung zeigt jetzt, ob ein Konto mit Discord verknüpft ist.** Eine neue Spalte zwischen „Missions-Manager" und „Status" zeigt bei verknüpften Konten das Discord-Symbol, sonst einen gedämpften Strich. Nur für Admins sichtbar, und es wird ausschließlich der Verknüpfungs-Status angezeigt — nie die Discord-ID.
 - **Blueprint-Import von scmdb.net.** Der Blueprint-Import auf der Seite „Meine Blueprints“ akzeptiert jetzt zusätzlich den Profil-/Tracking-Export von scmdb.net (neben dem SCMDB-Log-Watcher und dem Basetool Blueprint Extractor). Nur freigeschaltete Blueprints werden übernommen; über den mitgelieferten Blueprint-Schlüssel (Tag) werden Produkte auch dann zuverlässig erkannt, wenn der angezeigte Name abweicht.
 

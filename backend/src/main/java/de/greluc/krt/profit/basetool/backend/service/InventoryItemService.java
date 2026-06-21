@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
+import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -108,6 +109,22 @@ public class InventoryItemService {
   private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderItemService jobOrderItemService;
+
+  /**
+   * Pools the caller's entire "My Inventory" stock into one SCU total per (material, quality) pair
+   * for the blueprint craftability calculation (#781). Strictly owner-scoped to {@code userId}
+   * (both personal and shared rows the user owns count, matching the default {@code /inventory/my}
+   * view); never org-unit-scoped, because craftability answers "what can I craft from my stock".
+   * The quality is preserved in the result so the calculator can consume the best-quality slices
+   * first.
+   *
+   * @param userId the owning user; never {@code null}
+   * @return one slice per (material, quality) the user owns, with the summed SCU; never {@code
+   *     null}
+   */
+  public List<OwnedStockSlice> getOwnedStockSlices(@org.jetbrains.annotations.NotNull UUID userId) {
+    return inventoryItemRepository.sumOwnedStockByMaterialAndQuality(userId);
+  }
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.

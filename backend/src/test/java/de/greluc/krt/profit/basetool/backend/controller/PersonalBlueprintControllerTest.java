@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportApplyRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResolutionDto;
@@ -38,8 +39,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRe
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.service.BlueprintCraftabilityService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -66,6 +69,8 @@ class PersonalBlueprintControllerTest {
 
   @Mock private PersonalBlueprintService service;
   @Mock private BlueprintImportService importService;
+  @Mock private BlueprintCraftabilityService craftabilityService;
+  @Mock private UserService userService;
   @InjectMocks private PersonalBlueprintController controller;
 
   private JwtAuthenticationToken auth;
@@ -146,6 +151,19 @@ class PersonalBlueprintControllerTest {
 
     assertSame(recipe, controller.recipe(id, auth));
     verify(service).recipeForOwn(SUB, id);
+  }
+
+  @Test
+  void craftability_derivesSubAndUserIdAndRelaysFlag() {
+    UUID userId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(any(Jwt.class))).thenReturn(userId);
+    List<BlueprintCraftabilityDto> expected = List.of();
+    when(craftabilityService.computeForOwner(SUB, userId, true)).thenReturn(expected);
+
+    List<BlueprintCraftabilityDto> result = controller.craftability(true, auth);
+
+    assertSame(expected, result);
+    verify(craftabilityService).computeForOwner(SUB, userId, true);
   }
 
   @Test

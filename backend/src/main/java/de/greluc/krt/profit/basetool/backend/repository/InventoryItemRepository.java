@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
+import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -64,6 +65,25 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(attributePaths = {"material", "location", "jobOrder", "mission", "owningOrgUnit"})
   @Query("SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.personal = false")
   List<InventoryItem> findByUserIdAndPersonalFalse(@Param("userId") UUID userId);
+
+  /**
+   * Pools the caller's entire "My Inventory" stock into one SCU total per (material, quality) pair,
+   * across all storage locations, for the blueprint craftability calculation (#781). Scoped
+   * strictly to the owning user ({@code i.user.id = :userId}) — both personal and shared rows the
+   * user owns count, matching the default {@code /inventory/my} view — and never to an org unit,
+   * because craftability answers "what can <em>I</em> craft from <em>my</em> stock". The quality is
+   * kept in the grouping key (not collapsed) so the calculator can consume the best-quality slices
+   * first.
+   *
+   * @param userId the owning user; never {@code null}
+   * @return one slice per (material, quality) the user owns, with the summed SCU; never {@code
+   *     null}
+   */
+  @Query(
+      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice("
+          + "i.material.id, i.quality, SUM(COALESCE(i.amount, 0.0))) FROM InventoryItem i"
+          + " WHERE i.user.id = :userId GROUP BY i.material.id, i.quality")
+  List<OwnedStockSlice> sumOwnedStockByMaterialAndQuality(@Param("userId") UUID userId);
 
   /** Derived Spring-Data query - returns entities matching {@code MaterialAndPersonalFalse}. */
   Page<InventoryItem> findByMaterialAndPersonalFalse(Material material, Pageable pageable);

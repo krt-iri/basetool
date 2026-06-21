@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-16.
-> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
 
@@ -199,3 +199,78 @@ and a global sharer is counted once.
 [`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintOverviewService.java),
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderItemBlueprintOwnersService.java),
 [`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).
+
+### REQ-INV-019 — Craftability of own blueprints from "My Inventory" stock
+
+The blueprint view annotates each of the caller's owned blueprints with whether and how many times
+it can be crafted **right now** from the caller's own stock, the output stats that stock's quality
+would deliver, and what is missing — answering "what can I craft now, how often, with what stats,
+and what's short?" without opening every recipe by hand ([ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), issue #781).
+
+It is **strictly owner-scoped** (JWT `sub`): owned blueprints, stock, and refinery yield all come
+from the caller — no other user's data is ever read. It is **read-only** (no migration), computed
+over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefinery={false|true}`.
+
+- **Stock source.** The caller's "My Inventory" / "Mein Lager" entries (`InventoryItem` where
+  `user == me`, i.e. the `/inventory/my` set — both personal and shared rows the user owns), pooled
+  **per material across all storage locations**. This is NOT the free-text personal-inventory
+  feature; matching is by the real `Material` FK, so it is exact.
+- **Ingredient scope.** Only **RESOURCE** (commodity) ingredients are evaluated. A recipe that also
+  needs **ITEM** ingredients still shows, with the ITEM requirement marked "not evaluated"; an
+  ITEM-only / unresolved recipe is reported as not assessable.
+- **Qualifying stock.** Only stock at or above a per-material **quality floor** counts toward
+  availability **and** the effective quality. The floor is the stricter of (a) the ingredient's
+  `min_quality` and (b) the **no-degradation floor**: the lowest quality at which none of the slot's
+  stat modifiers would *worsen* the output. Worsening is defined on the multiplier (the only datum
+  available — there is no absolute base stat): below neutral (×1.0) for a `higher`-is-better stat,
+  above neutral for a `lower`-is-better stat. A modifier that worsens across its entire band imposes
+  no floor (it is treated as inherently penalised and ignored) so a recipe never silently becomes
+  uncraftable.
+- **Craftable count.** Per material the recipe's RESOURCE lines are aggregated into one required SCU
+  per craft; `N = floor( min over materials of ( qualifying available SCU / required SCU ) )`. The
+  binding ("limiting") material is named.
+- **Effective quality & projected stats.** The effective ingredient quality is the **SCU-weighted
+  average of the best-quality qualifying stock consumed first**, over one craft's requirement. Each
+  build slot's stat slider in the detail pane **defaults to** that effective quality (instead of the
+  band maximum), so the chips show the stats the user's own material would actually deliver; the
+  slider still lets the user explore other qualities. Stat projection reuses the existing modifier
+  model verbatim (`computeModifierValue`: ordered segments honoured, else linear across the band).
+- **Refinery fold-in.** A view toggle, **default OFF**, folds in the yield of the caller's own
+  `OPEN` + `IN_PROGRESS` refinery orders ("not yet completed or cancelled"); the refinery yield's
+  quality participates in the effective-quality calculation. Every figure is produced **twice**
+  (inventory alone, and with refinery), so the toggle switches client-side without a refetch. A
+  blueprint craftable only thanks to the refinery is marked (`⟢`).
+- **UI.** The master-list row carries a craft-status badge (`×N` craftable / `fehlt` not craftable /
+  `×N ⟢` refinery-only); the detail pane shows the craftable counter, the limiting material, and a
+  per-material consumption / shortfall breakdown. Follows the DAS KARTELL master-detail design
+  (status-green / warning-yellow / research-blue accents, orange reserved for the add CTA),
+  responsive across all four device classes, all strings via i18n (de + en + fallback).
+
+**Acceptance criteria:**
+
+- [ ] Given the caller owns a blueprint and enough qualifying RESOURCE stock, then the row and
+  detail show `×N` with `N = floor(min over materials of available/required SCU)`, pooled across
+  all locations.
+- [ ] Given a material has stock spread over several quality tiers, then the reported effective
+  quality is the SCU-weighted average of the best-quality stock consumed first over one craft, and
+  the slot slider defaults to it.
+- [ ] Given stock below an ingredient's `min_quality` or below the no-degradation floor, then that
+  stock does not count toward availability or the effective quality.
+- [ ] Given a not-fully-craftable blueprint, then the detail lists the short materials and the
+  shortfall in SCU and the row shows "fehlt".
+- [ ] Given the refinery toggle is on, then the caller's `OPEN` + `IN_PROGRESS` refinery yield is
+  added (quantity and quality), counts are recomputed, and a blueprint craftable only via refinery
+  is marked `⟢`.
+- [ ] Given a recipe with ITEM ingredients, then it still displays and the ITEM requirement is
+  marked "not evaluated"; an ITEM-only recipe reports as not assessable.
+- [ ] Everything is owner-scoped by JWT `sub`; no other user's blueprints, stock, or refinery
+  orders are visible.
+
+**Code links:** [`BlueprintCraftabilityService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintCraftabilityService.java),
+[`BlueprintModifierMath`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintModifierMath.java),
+[`PersonalBlueprintController#craftability`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
+[`InventoryItemService#getOwnedStockSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/InventoryItemService.java),
+[`RefineryOrderService#getOwnedOpenRefineryYieldSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/RefineryOrderService.java),
+[`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto/BlueprintCraftabilityDto.java),
+[`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
+[`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-recipe.js).
