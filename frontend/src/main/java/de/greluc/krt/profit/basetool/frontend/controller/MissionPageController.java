@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.UnitForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.HashMap;
@@ -51,6 +52,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -118,6 +120,16 @@ public class MissionPageController {
    * token, not the principal object.
    */
   private final FrontendAuthHelperService authHelperService;
+
+  /**
+   * Runs independent backend reads concurrently on virtual threads with the full request-scoped
+   * context (SecurityContext / RequestAttributes / squadron / correlation id) restored, so the
+   * mission-detail render does not pay the sum of their latencies in series. Used for the
+   * member-only finance/sum/refinery-orders trio — three independent per-mission reads that
+   * previously ran back to back on every render (and, since the live-sync presence relay #755, on
+   * every peer's in-place fragment re-fetch too).
+   */
+  private final ParallelPageLoader parallelPageLoader;
 
   private void addOperationsToModel(Model model, boolean isPublic) {
     if (isPublic) {
@@ -605,25 +617,40 @@ public class MissionPageController {
       // empty/collapsed instead of leaking refinery expenses through the shared finance table.
       if (authHelperService.isMemberOrAbove()) {
         try {
-          PageResponse<MissionFinanceEntryDto> financesPage =
-              backendApiClient.get(
-                  "/api/v1/missions/" + id + "/finance-entries?size=1000",
-                  new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {},
-                  false);
+          // The three reads are independent per-mission lookups; run them concurrently instead of
+          // back to back. No .exceptionally on the futures: a failure surfaces through join() as a
+          // CompletionException caught by the block's existing catch, preserving the original
+          // all-or-nothing "skip the Finanzen panel on error" behaviour exactly.
+          CompletableFuture<PageResponse<MissionFinanceEntryDto>> financesFuture =
+              parallelPageLoader.loadAsync(
+                  () ->
+                      backendApiClient.get(
+                          "/api/v1/missions/" + id + "/finance-entries?size=1000",
+                          new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {},
+                          false));
+          CompletableFuture<java.math.BigDecimal> financeSumFuture =
+              parallelPageLoader.loadAsync(
+                  () ->
+                      backendApiClient.get(
+                          "/api/v1/missions/" + id + "/finance-entries/sum",
+                          java.math.BigDecimal.class,
+                          false));
+          CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
+              parallelPageLoader.loadAsync(
+                  () ->
+                      backendApiClient.get(
+                          "/api/v1/refinery-orders/mission/" + id,
+                          new ParameterizedTypeReference<List<RefineryOrderListDto>>() {},
+                          false));
+          CompletableFuture.allOf(financesFuture, financeSumFuture, refineryFuture).join();
+
+          PageResponse<MissionFinanceEntryDto> financesPage = financesFuture.join();
           model.addAttribute("financeEntries", financesPage.content());
 
-          java.math.BigDecimal financeSum =
-              backendApiClient.get(
-                  "/api/v1/missions/" + id + "/finance-entries/sum",
-                  java.math.BigDecimal.class,
-                  false);
+          java.math.BigDecimal financeSum = financeSumFuture.join();
           model.addAttribute("financeSum", financeSum);
 
-          List<RefineryOrderListDto> refineryOrders =
-              backendApiClient.get(
-                  "/api/v1/refinery-orders/mission/" + id,
-                  new ParameterizedTypeReference<List<RefineryOrderListDto>>() {},
-                  false);
+          List<RefineryOrderListDto> refineryOrders = refineryFuture.join();
           model.addAttribute("refineryOrders", refineryOrders);
 
           // Finance tab summary strip (Gesamtsumme / Einnahmen / Ausgaben / je Anteil): income

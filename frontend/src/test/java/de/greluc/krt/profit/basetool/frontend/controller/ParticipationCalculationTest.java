@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
@@ -109,7 +110,10 @@ class ParticipationCalculationTest {
 
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
+            backendApiClient,
+            mock(MessageSource.class),
+            mock(FrontendAuthHelperService.class),
+            new ParallelPageLoader());
     Model model = new ConcurrentModel();
 
     // Act
@@ -209,7 +213,10 @@ class ParticipationCalculationTest {
 
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
+            backendApiClient,
+            mock(MessageSource.class),
+            mock(FrontendAuthHelperService.class),
+            new ParallelPageLoader());
     Model model = new ConcurrentModel();
 
     // Act
