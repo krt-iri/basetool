@@ -91,7 +91,11 @@ final class E2eSupport {
    * #isTransientNavigationAbort}): WebKit's HTTP/2 {@code INTERNAL_ERROR} and its {@code
    * frameAbortedNavigation} wrapper, Firefox's {@code NS_BINDING_ABORTED} and {@code
    * NS_ERROR_ABORT} (Gecko aborts a main-frame navigation under CI load with either code — the
-   * latter surfaced as the dominant Firefox-only flake), Chromium's {@code net::ERR_ABORTED}, and
+   * latter surfaced as the dominant Firefox-only flake), Chromium's {@code net::ERR_ABORTED} and
+   * {@code net::ERR_HTTP2_PROTOCOL_ERROR} (the latter is Chromium's surfacing of an HTTP/2 stream
+   * reset mid-navigation under CI load — the same root cause as WebKit's {@code INTERNAL_ERROR},
+   * with the frontend's Tomcat logging the peer-side symptom as {@code
+   * AsyncRequestNotUsableException} while having already served the document {@code 200}), and
    * Playwright's own "Navigation interrupted by another one". Deliberately narrow so only a genuine
    * abort is retried and every real error propagates unmasked.
    */
@@ -102,6 +106,7 @@ final class E2eSupport {
           "ns_binding_aborted",
           "ns_error_abort",
           "err_aborted",
+          "err_http2_protocol_error",
           "interrupted");
 
   private E2eSupport() {}
@@ -445,11 +450,12 @@ final class E2eSupport {
    * load, been seen to tear down mid-flight. The engines surface that aborted main-frame navigation
    * differently: WebKit as {@code HTTP/2 Error: INTERNAL_ERROR} ({@code frameAbortedNavigation}),
    * Firefox as {@code NS_ERROR_ABORT} / {@code NS_BINDING_ABORTED}, Chromium as {@code
-   * net::ERR_ABORTED} — all thrown as a {@link PlaywrightException} (concretely a {@code
-   * DriverException}). The reset is transient — a brief settle plus a fresh GET succeeds — so
-   * {@link #isTransientNavigationAbort} gates the abort retry to exactly those signatures and lets
-   * every other navigation failure (a real 4xx/5xx document, a wrong URL) propagate immediately and
-   * unmasked.
+   * net::ERR_ABORTED} or — when the HTTP/2 stream is reset mid-navigation — {@code
+   * net::ERR_HTTP2_PROTOCOL_ERROR}, all thrown as a {@link PlaywrightException} (concretely a
+   * {@code DriverException}). The reset is transient — a brief settle plus a fresh GET succeeds —
+   * so {@link #isTransientNavigationAbort} gates the abort retry to exactly those signatures and
+   * lets every other navigation failure (a real 4xx/5xx document, a wrong URL) propagate
+   * immediately and unmasked.
    *
    * <p>It is also timeout-tolerant: each attempt is bounded by {@link #NAVIGATE_TIMEOUT_MILLIS}
    * (above Playwright's 30 s default), and a {@link TimeoutError} from a slow-but-progressing load
@@ -514,10 +520,11 @@ final class E2eSupport {
    * retryable abort of the navigation request itself — as opposed to a genuine failure of the
    * target page. It matches only the engine-specific abort signatures in {@link
    * #NAVIGATION_ABORT_SIGNATURES} (WebKit's {@code INTERNAL_ERROR} / {@code
-   * frameAbortedNavigation}, Firefox's {@code NS_BINDING_ABORTED}, Chromium's {@code ERR_ABORTED},
-   * and Playwright's "Navigation interrupted by another one"). A timeout, a 4xx/5xx, a DNS error or
-   * any other navigation failure carries none of these, so it is reported non-transient and {@link
-   * #navigate} lets it propagate unmasked.
+   * frameAbortedNavigation}, Firefox's {@code NS_BINDING_ABORTED} / {@code NS_ERROR_ABORT},
+   * Chromium's {@code ERR_ABORTED} / {@code ERR_HTTP2_PROTOCOL_ERROR}, and Playwright's "Navigation
+   * interrupted by another one"). A timeout, a 4xx/5xx, a DNS error or any other navigation failure
+   * carries none of these, so it is reported non-transient and {@link #navigate} lets it propagate
+   * unmasked.
    *
    * @param error the exception thrown by {@code page.navigate(...)}
    * @return {@code true} if the message carries a known transient-abort signature; {@code false}
