@@ -81,6 +81,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderMapper jobOrderMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
+  @Mock private JobOrderItemService jobOrderItemService;
 
   @InjectMocks private JobOrderService service;
 

@@ -52,6 +52,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -344,7 +345,11 @@ public class JobOrderService {
                     o.getStatus(),
                     o.getMaterials() != null
                         ? o.getMaterials().stream().map(jobOrderMapper::toDto).toList()
-                        : List.of()))
+                        : List.of(),
+                    // Both order kinds: ITEM orders have no job_order_material rows, so the picker
+                    // must use the kind-agnostic required-material set to filter correctly (#71
+                    // orphan-link fix, REQ-ORDERS-018).
+                    List.copyOf(jobOrderItemService.requiredMaterialIds(o))))
         .toList();
   }
 
@@ -406,6 +411,34 @@ public class JobOrderService {
                     item -> item.amount() != null ? item.amount() : 0.0,
                     java.util.Comparator.reverseOrder()))
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Returns the inventory items linked to the order whose material the order does <em>not</em>
+   * require — "orphaned" links (REQ-ORDERS-019). Because an order's material view is built only
+   * from its requirements, such a link binds stock to the order while staying invisible in every
+   * material row; surfacing it lets a logistician spot and undo a mis-assignment (e.g. a material
+   * linked from the Lager before the link gate of REQ-ORDERS-018 existed). Each linked item's
+   * material is compared against the kind-agnostic required-material set ({@link
+   * JobOrderItemService#requiredMaterialIds(JobOrder)}), so it is correct for ITEM orders too.
+   *
+   * @param jobOrderId the order to inspect.
+   * @return the orphaned linked inventory items as DTOs, ordered like the per-material drill-down;
+   *     empty when every linked item matches a requirement.
+   * @throws NotFoundException when the order does not exist.
+   */
+  public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
+      getOrphanedLinkedInventory(UUID jobOrderId) {
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(jobOrderId)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+    Set<UUID> required = jobOrderItemService.requiredMaterialIds(jobOrder);
+    return inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
+        .filter(
+            item -> item.getMaterial() == null || !required.contains(item.getMaterial().getId()))
+        .map(inventoryItemMapper::toDto)
+        .toList();
   }
 
   /**

@@ -394,6 +394,23 @@ public class JobOrderPageController {
           log.debug("Blueprint coverage unavailable for order {}: {}", id, e.getMessage());
         }
       }
+
+      // Orphaned linked inventory (REQ-ORDERS-019): inventory linked to this order whose material
+      // the order does not require — invisible in the material tables, surfaced as a warning so a
+      // logistician can undo a mis-assignment. Only needed on the full page (not the in-place
+      // section swaps), and isolated so a failure just omits the warning rather than failing the
+      // page.
+      if (fragment == null) {
+        try {
+          model.addAttribute(
+              "orphanedInventory",
+              backendApiClient.get(
+                  "/api/v1/orders/" + id + "/inventory/orphaned",
+                  new ParameterizedTypeReference<List<InventoryItemDto>>() {}));
+        } catch (Exception e) {
+          log.debug("Orphaned inventory unavailable for order {}: {}", id, e.getMessage());
+        }
+      }
     } catch (Exception e) {
       log.error("Failed to fetch order", e);
       log.error("Failed to load job order", e);

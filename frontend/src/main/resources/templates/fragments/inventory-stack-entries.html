@@ -55,7 +55,7 @@
                                     th:value="${order.id}"
                                     th:text="'Auftrag #' + ${order.displayId}"
                                     th:selected="${order.id == entry.jobOrderId}"
-                                    th:if="${order.materials == null or order.materials.isEmpty() or #lists.contains(order.materials.![material.id], entry.material.id)}">
+                                    th:if="${order.id == entry.jobOrderId or (order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id))}">
                             </option>
                         </select>
                     </div>
@@ -179,7 +179,7 @@
                                     th:value="${order.id}"
                                     th:text="'Auftrag #' + ${order.displayId}"
                                     th:selected="${order.id == entry.jobOrderId}"
-                                    th:if="${order.materials == null or order.materials.isEmpty() or #lists.contains(order.materials.![material.id], entry.material.id)}">
+                                    th:if="${order.id == entry.jobOrderId or (order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id))}">
                             </option>
                         </select>
                     </div>
