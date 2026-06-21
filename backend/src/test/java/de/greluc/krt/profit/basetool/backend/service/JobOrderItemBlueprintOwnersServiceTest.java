@@ -31,12 +31,12 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderBlueprintOwnerDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderRequiredBlueprintDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -129,12 +129,8 @@ class JobOrderItemBlueprintOwnersServiceTest {
   /**
    * Builds an owned-blueprint row; {@code productName} is the concrete blueprint the member owns.
    */
-  private static PersonalBlueprint owned(UUID owner, String productName) {
-    PersonalBlueprint b = new PersonalBlueprint();
-    b.setOwnerSub(owner.toString());
-    b.setProductName(productName);
-    b.setProductKey(productName);
-    return b;
+  private static BlueprintOwnerProduct owned(UUID owner, String productName) {
+    return new BlueprintOwnerProduct(owner.toString(), productName);
   }
 
   private static User user(UUID id, String displayName) {
@@ -153,7 +149,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     assertTrue(result.requiredBlueprints().isEmpty());
     assertTrue(result.owners().isEmpty());
     verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
-    verify(personalBlueprintRepository, never()).findAllByOwnerSubIn(any());
+    verify(personalBlueprintRepository, never()).findOwnerProductByOwnerSubIn(any());
   }
 
   @Test
@@ -168,7 +164,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE, BERND));
     // Alice owns both required products; Bernd owns only Aurora.
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
         .thenReturn(
             List.of(
                 owned(ALICE, "Aurora MR"),
@@ -209,7 +205,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE, BERND, CARLA));
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
         .thenReturn(
             List.of(
                 // Alice owns a DIFFERENT variant of the required base -> counts toward Fresnel.
@@ -251,7 +247,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE, BERND));
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
         .thenReturn(
             List.of(
                 owned(ALICE, "Karna Rifle Battery (35 cap)"),
@@ -275,7 +271,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE));
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR")));
     when(userRepository.findAllById(any())).thenReturn(List.of(user(ALICE, "Alice")));
 
@@ -295,7 +291,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE, BERND));
     // Alice owns the required product; Bernd owns only something unrelated.
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR"), owned(BERND, "Gladius")));
     when(userRepository.findAllById(any())).thenReturn(List.of(user(ALICE, "Alice")));
 
@@ -311,14 +307,14 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE));
-    when(personalBlueprintRepository.findAllByOwnerSubIn(eq(Set.of(ALICE.toString()))))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(eq(Set.of(ALICE.toString()))))
         .thenReturn(List.of(owned(ALICE, "Aurora MR")));
     when(userRepository.findAllById(any())).thenReturn(List.of(user(ALICE, "Alice")));
 
     service.getBlueprintOwners(ORDER_ID);
 
     verify(orgUnitMembershipRepository).findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID));
-    verify(personalBlueprintRepository).findAllByOwnerSubIn(eq(Set.of(ALICE.toString())));
+    verify(personalBlueprintRepository).findOwnerProductByOwnerSubIn(eq(Set.of(ALICE.toString())));
   }
 
   @Test
@@ -333,7 +329,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     assertEquals(1, result.requiredBlueprints().size());
     assertEquals(0, result.requiredBlueprints().get(0).ownerCount());
     assertTrue(result.owners().isEmpty());
-    verify(personalBlueprintRepository, never()).findAllByOwnerSubIn(any());
+    verify(personalBlueprintRepository, never()).findOwnerProductByOwnerSubIn(any());
   }
 
   // covers REQ-INV-018 — a user who opted into global sharing is counted in the order's coverage
@@ -349,7 +345,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     // CARLA is not a member of the responsible org unit but opted into global sharing.
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(CARLA));
     ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
-    when(personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs.capture()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs.capture()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR"), owned(CARLA, "Aurora MR")));
     when(userRepository.findAllById(any()))
         .thenReturn(List.of(user(ALICE, "Alice"), user(CARLA, "Carla")));
@@ -381,7 +377,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
         .thenReturn(Set.of(ALICE));
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of());
     ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
-    when(personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs.capture()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs.capture()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR")));
     when(userRepository.findAllById(any())).thenReturn(List.of(user(ALICE, "Alice")));
 

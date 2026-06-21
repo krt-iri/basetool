@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Die Blueprint-Verfügbarkeitsübersicht lädt für die Zählung nur noch die benötigten zwei Spalten statt ganzer Datensätze.** Statt für die Mitglieder-Zählung pro Variantenfamilie sämtliche Blueprint-Datensätze aller Eigentümer vollständig zu laden, holt die Übersicht (und die Blueprint-Eigentümer-Aufstellung in Item-Aufträgen) jetzt nur noch `(Eigentümer, Produktname)`. Reine interne Performance-Verbesserung, vor allem in der Admin-Gesamtansicht.
+
 - **Auftrags- und Nutzerlisten lösen deutlich weniger Datenbankabfragen aus.** Die Auftragsübersicht berechnet Lagerbestände und Anspruchsdaten der ganzen Seite jetzt in wenigen gebündelten Abfragen statt einer pro Material pro Auftrag; die Nutzerliste holt die Staffel-Zugehörigkeit je Nutzer nur noch einmal statt dreimal; die Profit-Sichtbarkeitsprüfung wird pro Anfrage einmal ausgewertet. Rein interne Performance-Verbesserung, kein sichtbares Verhalten ändert sich.
 
 - **Schnellere Datenbankzugriffe durch zusätzliche Indizes.** Sechs fehlende Indizes (`V175`) verhindern sequentielle Tabellen-Scans auf wachsenden Tabellen — u. a. die aktive Auftragstafel (Filter + Sortierung), die offene Bank-Buchungsverteilung, die Discord-Freigabe-Warteschlange und mehrere Fremdschlüssel. Reine Performance-Änderung; sichtbares Verhalten ändert sich nicht.
