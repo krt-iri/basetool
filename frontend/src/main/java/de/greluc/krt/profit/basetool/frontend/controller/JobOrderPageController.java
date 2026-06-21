@@ -123,6 +123,18 @@ public class JobOrderPageController {
   private static final List<String> VALID_SQUADRON_SCOPES = List.of("mine", "all");
 
   /**
+   * Selectable page sizes for the order list. Larger than the shared 10/50/100 contract
+   * (REQ-INV-013) by design (REQ-ORDERS-020): the LOGISTICIAN drag-and-drop priority reorder works
+   * within one page, and the active queue (the default {@code OPEN}+{@code IN_PROGRESS} filter)
+   * must comfortably fit on the first page so reordering stays whole in the common case. A crafted
+   * out-of-list {@code size} snaps back to {@link #DEFAULT_PAGE_SIZE}.
+   */
+  private static final List<Integer> PAGE_SIZES = List.of(50, 100, 200);
+
+  /** Page size applied when the request carries none (or a non-whitelisted one). */
+  private static final int DEFAULT_PAGE_SIZE = 100;
+
+  /**
    * Renders the job-order list ({@code /orders}). Two persisted filters drive the view:
    *
    * <ul>
@@ -148,11 +160,15 @@ public class JobOrderPageController {
    * @param cookieScope previous persisted squadron-scope filter from the cookie
    * @param activeSquadronId active squadron context surfaced by {@code SquadronContextAdvice}; used
    *     to translate {@code scope=mine} into a backend {@code squadronId} param.
+   * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
+   * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link
+   *     #DEFAULT_PAGE_SIZE}
    * @param response servlet response, used to update the persistence cookies
    * @param fragment when {@code "results"}, only the results-table fragment is rendered for an
    *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with orders, selected filters and the aging thresholds
-   *     for the row-color rendering
+   * @param model Thymeleaf model populated with orders, the page envelope ({@code ordersPage}), the
+   *     {@code pageSizes}, the filter-preserving {@code paginationBaseUrl}, the selected filters
+   *     and the aging thresholds for the row-color rendering
    * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
    */
   @GetMapping
@@ -164,6 +180,8 @@ public class JobOrderPageController {
       @CookieValue(name = "orders_filter_scope", required = false) String cookieScope,
       @ModelAttribute("activeSquadronId") UUID activeSquadronId,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
       HttpServletResponse response,
       @RequestParam(required = false) String fragment,
       Model model) {
@@ -216,16 +234,27 @@ public class JobOrderPageController {
       resolvedScope = "mine";
     }
     boolean filterToOwnSquadron = "mine".equals(resolvedScope) && activeSquadronId != null;
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
 
     List<JobOrderDto> orders = new ArrayList<>();
+    PageResponse<JobOrderDto> p = null;
     int yellowDays = 30;
     int redDays = 90;
     try {
       String statusParam = String.join(",", status);
       String squadronParam = filterToOwnSquadron ? "&squadronId=" + activeSquadronId : "";
-      PageResponse<JobOrderDto> p =
+      // Paginated server-side (REQ-ORDERS-020) instead of the former unbounded size=1000 pull;
+      // sort stays priority,asc so the drag-reorder queue order is preserved across pages.
+      p =
           backendApiClient.get(
-              "/api/v1/orders?size=1000&sort=priority,asc&status=" + statusParam + squadronParam,
+              "/api/v1/orders?page="
+                  + effectivePage
+                  + "&size="
+                  + effectiveSize
+                  + "&sort=priority,asc&status="
+                  + statusParam
+                  + squadronParam,
               new ParameterizedTypeReference<>() {});
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
@@ -270,6 +299,9 @@ public class JobOrderPageController {
     }
 
     model.addAttribute("orders", orders);
+    model.addAttribute("ordersPage", p);
+    model.addAttribute("pageSizes", PAGE_SIZES);
+    model.addAttribute("paginationBaseUrl", buildPaginationBaseUrl(status, resolvedScope));
     model.addAttribute("selectedStatuses", status);
     model.addAttribute("selectedScope", resolvedScope);
     // Effective state, after collapsing "mine" to "all" when there is no active squadron context
@@ -282,6 +314,25 @@ public class JobOrderPageController {
       return "orders-index :: ordersResults";
     }
     return "orders-index";
+  }
+
+  /**
+   * Builds the {@code baseUrl} the pagination fragment threads {@code page}/{@code size} onto so
+   * page and size links keep the active status + scope filter. The repeatable {@code status} params
+   * and the {@code scope} radio value are reproduced exactly as the filter form submits them; the
+   * tokens are fixed enum/keyword names, so no extra escaping is required.
+   *
+   * @param status the resolved (never empty) status filter
+   * @param scope the resolved squadron-scope value ({@code mine}/{@code all})
+   * @return {@code /orders?status=...&scope=...} carrying the current filter
+   */
+  private static String buildPaginationBaseUrl(List<String> status, String scope) {
+    List<String> queryParts = new ArrayList<>();
+    for (String s : status) {
+      queryParts.add("status=" + s);
+    }
+    queryParts.add("scope=" + scope);
+    return "/orders?" + String.join("&", queryParts);
   }
 
   /**

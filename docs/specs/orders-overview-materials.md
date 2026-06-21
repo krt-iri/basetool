@@ -112,6 +112,36 @@ detail view.
 /api/v1/orders/{id}/inventory/orphaned`, `JobOrderPageController.viewOrderDetail`,
 `templates/orders-detail.html`
 
+### REQ-ORDERS-020 — Order list is paginated server-side
+
+The order-overview list (`GET /orders`) MUST fetch one **server-side page** of orders instead of
+the former unbounded `size=1000` pull, rendering the shared pagination component (the `.pagination`
+page-nav + the square `.page-btn` size picker from `fragments/pagination.html`, REQ-INV-013 /
+REQ-API-005). The page sizes are **{50, 100, 200} with a default of 100** — a deliberate deviation
+from the shared 10/50/100 / default-50 contract — because the LOGISTICIAN drag-and-drop priority
+reorder operates on the rows of the **current page** (it derives the target priority from adjacent
+visible rows and re-renders the whole results fragment), so the active queue must comfortably fit
+on the first page in the common case. The default status filter (`OPEN`+`IN_PROGRESS`) keeps the
+queue — the only draggable rows, since completed/rejected orders carry no priority — naturally
+bounded. A crafted out-of-list `size` snaps back to the default; the sort stays `priority,asc` so
+queue order is preserved across pages. Page and size links MUST keep the active status and
+squadron-scope filter, and the pagination controls live **inside** the `ordersResults` AJAX-swap
+fragment so a filter change re-renders them.
+
+**Acceptance**
+
+- [ ] A result spanning more than one page renders the page-nav and the 50/100/200 size picker; a
+  short result (≤ the smallest size, single page) renders neither.
+- [ ] Every page-nav and size-picker link carries the active `status` (repeatable) and `scope`
+  params; changing the size jumps back to page 0.
+- [ ] The drag-reorder still persists and re-renders within the current page (sort stays
+  `priority,asc`).
+- [ ] A `?size=` outside {50,100,200} falls back to 100; a negative `?page=` clamps to 0.
+
+**Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageCookieTest` (fetch URL) · **Code:**
+`JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/orders-index.html`,
+`templates/fragments/pagination.html` · **Issues:** #2 (performance audit)
+
 ## Out of scope
 
 - **Quality-floor gating on the link (REQ-ORDERS-018).** The gate and the orphaned-link check key
