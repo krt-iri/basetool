@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Die Auftrags- und Raffinerie-Auftragslisten werden jetzt seitenweise geladen.** Statt immer alle Aufträge auf einmal zu holen, zeigen `/orders` und `/refinery-orders` eine Seite mit Seiten-Navigation und Größenauswahl; die aktiven Filter (Status/Staffel bzw. Status/„Meine Aufträge") bleiben beim Blättern erhalten. Die Auftragsliste nutzt größere Seiten (50/100/200, Standard 100), damit die Drag-&-Drop-Priorisierung wie gewohnt funktioniert; die Raffinerieliste nutzt 10/50/100 (Standard 50).
+
 - **Weniger Hintergrund-Anfragen der Benachrichtigungs-Glocke.** Solange die Echtzeit-Verbindung (SSE) steht, fragt die Ungelesen-Zahl nur noch im langsamen Takt nach (statt fest alle 60 Sekunden); bricht die Verbindung ab, wird wieder schnell abgefragt. Das gilt jetzt auch, wenn die Verbindung unbemerkt stehenbleibt (verbunden, aber ohne Daten): bleibt ein Lebenszeichen aus, schaltet die Glocke von selbst wieder auf den schnellen Takt. Benachrichtigungen erscheinen weiterhin in Echtzeit.
 
 - **Das Lager-Eingabeformular und das Refinery-Auftragsformular laden schneller.** Die Katalog-Listen (Materialien, Standorte, Job-Orders, Missionen, Nutzer, Besitzer-Auswahl) werden jetzt parallel statt nacheinander vom Backend geholt. Bei einem fehlgeschlagenen Abruf bleibt die betroffene Liste leer wie bisher.
