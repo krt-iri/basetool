@@ -9,6 +9,9 @@
 ### Changed
 
 - **Die Auftragsseiten laden etwas schneller.** Die Alters-Schwellwerte werden jetzt zwischengespeichert (statt bei jedem Aufruf neu geladen), und die Logistiker-Zusatzlisten der Auftragsdetails werden parallel statt nacheinander geholt. Kein sichtbarer Funktionsunterschied; eine Anpassung der Schwellwerte im Admin-Bereich wirkt weiterhin sofort.
+
+- **Schlankere Frontend-Backend-Kommunikation.** Backend-Antworten werden zum Frontend jetzt komprimiert (gzip) ausgeliefert, und die doppelte Resilience-Schicht (Wiederholung/Schutzschalter) im Backend-Client wurde auf die eine wirksame reduziert — schnelleres, einheitliches Fehlerverhalten ohne sichtbaren Funktionsunterschied. Zusätzlich neu: optionale Einstellung `spring.session.redis.flush-mode` (Default `IMMEDIATE`; Betreiber können auf `ON_SAVE` umstellen, um Redis-Zugriffe pro Anfrage zu sparen).
+
 - **Die Einsatzdetailseite lädt die Finanz- und Refinery-Daten jetzt parallel statt nacheinander.** Für Mitglieder wurden die drei Abrufe (Finanzeinträge, Finanzsumme, Refinery-Aufträge) bisher seriell ausgeführt; sie laufen nun gleichzeitig, sodass die Detailansicht (und jede Live-Aktualisierung über die Präsenz-Verbindung) schneller fertig ist. Gleiche Daten; schlägt einer der drei Abrufe fehl, wird die Finanzen-Ansicht jetzt einheitlich ausgeblendet statt teilweise angezeigt.
 
 - **Jede angemeldete Seite lädt den Staffel-Katalog nicht mehr bei jedem Aufruf neu.** Die Seitenleisten-/Kontext-Logik holt die (sich selten ändernde) Staffel-Liste jetzt aus dem 10-Minuten-Cache statt bei jedem Rendern frisch vom Backend; für Admins entfällt dadurch auch ein doppelter Abruf derselben Liste pro Seitenaufbau. Spürbar weniger Backend-Last pro Navigation. Das Umschalten der Staffel-Flags „Beförderung aktiv" und „Profit-Berechtigung" durch Admins leert den Cache und wirkt dadurch sofort app-weit statt mit bis zu zehn Minuten Verzögerung.

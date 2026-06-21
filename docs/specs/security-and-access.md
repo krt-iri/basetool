@@ -199,7 +199,10 @@ explicitly at the MVC boundary: `BackendApiClient` rethrows it as `Reauthenticat
 `X-Reauthenticate` header (mirrored in the JSON body) so the shared `krtFetch`/`krtReauth` client
 redirects the window; the notification SSE relay pushes a `reauth` event for the same effect. The
 exception is added to the Resilience4j `ignoreExceptions` so it is neither retried nor counted toward
-the circuit breaker.
+the circuit breaker. This — and all other backend-call resilience (bulkhead, time limiter, retry,
+circuit breaker) — is applied in a **single pass at the WebClient exchange filter** on the
+`backendApi` instance; the formerly redundant method-level `@Retry`/`@CircuitBreaker` AOP layer on
+`BackendApiClient` (a separate `backend` instance) was removed (ADR-0032).
 
 To stop the in-session refresh race that produces this (parallel page + SSE + poll requests each
 replaying the same refresh token, which Keycloak's rotation + reuse detection then revokes — see
