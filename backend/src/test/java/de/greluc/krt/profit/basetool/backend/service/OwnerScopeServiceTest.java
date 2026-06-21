@@ -1298,9 +1298,7 @@ class OwnerScopeServiceTest {
     void blueprintGateAndOversightScopes_shareOneMembershipRead() {
       // REQ-DATA-003: the blueprint-overview gate plus the cascading and own-level oversight scopes
       // all read the caller's membership rows; the request-scoped memo collapses what was a
-      // separate
-      // findAllByIdUserId per resolver (incl. the gate+body double-read) into one query per
-      // request.
+      // separate findAllByIdUserId per resolver (incl. the gate+body double-read) into one query.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));

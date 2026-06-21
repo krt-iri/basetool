@@ -281,15 +281,12 @@ public class OwnerScopeService {
       java.util.Set<UUID> typed = (java.util.Set<UUID>) set;
       return typed;
     }
-    Optional<UUID> userIdOpt = authHelper.currentUserId();
-    java.util.Set<UUID> ids;
-    if (userIdOpt.isEmpty()) {
-      ids = java.util.Set.of();
-    } else {
-      ids =
-          orgUnitCascadeService.expandWithDescendants(
-              orgUnitMembershipRepository.findAllByIdUserId(userIdOpt.get()));
-    }
+    // Reuse the request-memoised membership rows (REQ-DATA-003): the blueprint-overview gate
+    // and the oversight scopes now share one membership read. currentCallerMemberships() is
+    // empty for anonymous callers and expandWithDescendants of an empty input is the empty
+    // set, so both the anonymous and member paths behave exactly as before.
+    java.util.Set<UUID> ids =
+        orgUnitCascadeService.expandWithDescendants(currentCallerMemberships());
     request.setAttribute(CACHE_KEY_MEMBER_ORG_UNIT_IDS, ids);
     return ids;
   }
