@@ -124,13 +124,12 @@ html, .login-pf-page, .login-pf-body, [class*="login-pf"], [class*="pf-c-backgro
     --pf-v6-c-background-image--BackgroundImage: none !important;
 }
 
-/* PatternFly v6 (Keycloak 26.6) renamed the login/page wrappers from the
-   `login-pf-*` classes the reset above targets to `pf-v6-c-login*` /
-   `pf-v6-c-page*`, so PF's default login background (the diamond / perspective
-   grid) was no longer suppressed and showed through. Make these full-viewport
-   wrappers TRANSPARENT — not black — so the body honeycomb wash below shows
-   instead of PF's grid. (The login card keeps its own dark surface; it is not a
-   `pf-*` element, so it is untouched.) */
+/* Defence-in-depth: keep any PatternFly v5/v6 login/page wrappers TRANSPARENT
+   (not black) so the body honeycomb below always shows through, regardless of
+   which PF major Keycloak renders. NOTE: the diamond grid on this KC 26.6 build
+   is actually PF *v3*'s `bg-login.jpg` set on <body> — that is handled by the
+   !important body rule above; this block just stops a future PF wrapper from
+   covering the honeycomb. (The login card is not a `pf-*` element, so untouched.) */
 [class*="pf-v6-c-login"], [class*="pf-c-login"],
 [class*="pf-v6-c-page"], [class*="pf-c-page"] {
     background-image: none !important;
@@ -147,15 +146,18 @@ body {
     align-items: center;
     min-height: 100vh;
     /* Flat black + faint honeycomb wash + a soft top bloom, matching the app
-       login so the SSO redirect has no visual seam. The PF background grid
-       stays hard-reset everywhere else; only <body> carries this pattern. */
-    background-color: var(--color-bg-black);
+       login so the SSO redirect has no visual seam. !important is REQUIRED:
+       Keycloak's `import=common/keycloak` pulls in PatternFly v3's vendor CSS,
+       which sets `body { background-image: url(.../bg-login.jpg) }` (the diamond
+       grid) and loads after this file — so without !important PF's body rule
+       wins on source order and the grid shows instead of the honeycomb. */
+    background-color: var(--color-bg-black) !important;
     background-image:
         radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%),
-        url('../img/honeycomb-bg.svg');
-    background-repeat: no-repeat, repeat;
-    background-size: auto, 46px 26.56px;
-    background-attachment: fixed;
+        url('../img/honeycomb-bg.svg') !important;
+    background-repeat: no-repeat, repeat !important;
+    background-size: auto, 46px 26.56px !important;
+    background-attachment: fixed !important;
 }
 
 .login-container {
