@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -366,6 +366,26 @@ network). Dev/test are exempt (Keycloak stays HTTP; the admin URL is plain HTTP 
 **Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService`, `application-prod.yml`
 (`spring.ssl.bundle.jks.keycloak-trust`), `docker-compose.yml` (`keycloak` command, backend
 `KEYCLOAK_ADMIN_URL`) · **Runbook:** [`deployment.md` &rarr; Keycloak behind NPM over HTTPS](../deployment.md#keycloak-behind-npm-over-https)
+
+### REQ-SEC-018 — The Keycloak user sync MUST page the full user list before reconciling deletions
+
+`UserSyncTask` reconciles local users against Keycloak: after syncing every fetched user it calls
+`UserService.markMissingUsers(currentIds)`, which flags every local user whose Keycloak id did **not**
+appear in the run as no-longer-in-Keycloak. That reconciliation is only safe if the fetched set is the
+**complete** Keycloak user list. The Admin API `GET /users` endpoint caps each response at a server-side
+maximum (~100 by default), so `KeycloakService.fetchUsers()` MUST page through `first`/`max`
+(`app.keycloak.sync.page-size`, default 100, bounded 1–1000) until a short/empty page signals the end.
+
+A single unpaged call returns only the first page, so every user beyond the cap would be wrongly marked
+missing — a silent soft-delete of real members. Fetching the page is a prerequisite of the
+reconciliation, not an optimisation; the two must never diverge.
+
+**Acceptance** (`KeycloakServiceTest`): with a page size of 2 and three users across two pages,
+`fetchUsers()` returns all three, the first request binds `first=0&max=2`, and the second advances to
+`first=2`.
+
+**Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService.fetchAllUsers`,
+`KeycloakSyncProperties.pageSize`, `UserSyncTask`
 
 ### REQ-SEC-015 — Bereich/OL leadership grants officer-equivalent reach, never admin rights
 

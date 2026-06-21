@@ -10,9 +10,21 @@
 
 - **Die Einsatzdetailseite lädt die Finanz- und Refinery-Daten jetzt parallel statt nacheinander.** Für Mitglieder wurden die drei Abrufe (Finanzeinträge, Finanzsumme, Refinery-Aufträge) bisher seriell ausgeführt; sie laufen nun gleichzeitig, sodass die Detailansicht (und jede Live-Aktualisierung über die Präsenz-Verbindung) schneller fertig ist. Gleiche Daten; schlägt einer der drei Abrufe fehl, wird die Finanzen-Ansicht jetzt einheitlich ausgeblendet statt teilweise angezeigt.
 
+- **Jede angemeldete Seite lädt den Staffel-Katalog nicht mehr bei jedem Aufruf neu.** Die Seitenleisten-/Kontext-Logik holt die (sich selten ändernde) Staffel-Liste jetzt aus dem 10-Minuten-Cache statt bei jedem Rendern frisch vom Backend; für Admins entfällt dadurch auch ein doppelter Abruf derselben Liste pro Seitenaufbau. Spürbar weniger Backend-Last pro Navigation. Das Umschalten der Staffel-Flags „Beförderung aktiv" und „Profit-Berechtigung" durch Admins leert den Cache und wirkt dadurch sofort app-weit statt mit bis zu zehn Minuten Verzögerung.
+
+- **Die Blueprint-Verfügbarkeitsübersicht lädt für die Zählung nur noch die benötigten zwei Spalten statt ganzer Datensätze.** Statt für die Mitglieder-Zählung pro Variantenfamilie sämtliche Blueprint-Datensätze aller Eigentümer vollständig zu laden, holt die Übersicht (und die Blueprint-Eigentümer-Aufstellung in Item-Aufträgen) jetzt nur noch `(Eigentümer, Produktname)`. Reine interne Performance-Verbesserung, vor allem in der Admin-Gesamtansicht.
+
+- **Auftrags- und Nutzerlisten lösen deutlich weniger Datenbankabfragen aus.** Die Auftragsübersicht berechnet Lagerbestände und Anspruchsdaten der ganzen Seite jetzt in wenigen gebündelten Abfragen statt einer pro Material pro Auftrag; die Nutzerliste holt die Staffel-Zugehörigkeit je Nutzer nur noch einmal statt dreimal; die Profit-Sichtbarkeitsprüfung wird pro Anfrage einmal ausgewertet. Rein interne Performance-Verbesserung, kein sichtbares Verhalten ändert sich.
+
+- **Schnellere Datenbankzugriffe durch zusätzliche Indizes.** Sechs fehlende Indizes (`V175`) verhindern sequentielle Tabellen-Scans auf wachsenden Tabellen — u. a. die aktive Auftragstafel (Filter + Sortierung), die offene Bank-Buchungsverteilung, die Discord-Freigabe-Warteschlange und mehrere Fremdschlüssel. Reine Performance-Änderung; sichtbares Verhalten ändert sich nicht.
+
+- **Weniger Datenbankabfragen auf Beförderungs-, Hangar-, Leitungs- und Bank-Verwaltungsseiten.** Die Beförderungs-Eignungsprüfung lädt die Bewertungsdaten je Mitglied einmal statt mehrfach pro Rangübergang; die Staffel-Hangarübersicht gruppiert Schiffe einmal statt pro Typ neu zu filtern; die Mitgliedschafts- und Oversight-Abfragen werden pro Anfrage gebündelt; der Bank-Reset/-Storno lädt Kontoinhaber gebündelt. Reine interne Performance-Verbesserung ohne Verhaltensänderung.
+
 - **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
 
 ### Fixed
+
+- **Der Keycloak-Nutzerabgleich liest jetzt alle Nutzer seitenweise, statt nur die erste Seite.** Bei mehr als ~100 Nutzern lieferte Keycloak nur die erste Seite; der Abgleich markierte daraufhin alle übrigen Nutzer fälschlich als „nicht mehr in Keycloak" (stiller Soft-Delete echter Mitglieder). Der Abgleich blättert nun über `first`/`max` durch die komplette Liste (neue Einstellung `app.keycloak.sync.page-size`, Default 100). Betrifft nur Installationen mit mehr als einer vollen Keycloak-Seite an Nutzern.
 
 - **Abschnittsüberschriften, die in einem AJAX-Swap-Container stecken, haben wieder ihren gewohnten Abstand zum Inhalt darüber.** Der Container machte die Überschrift zum ersten Element und entfernte so ihren oberen Abstand, sodass sie direkt am vorherigen Block klebte. Betrifft in den Auftragsdetails „Aggregierte Materialien" und „Übergaben" sowie „Notiz" in der Detailansicht persönlicher Blueprints.
 

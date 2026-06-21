@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
@@ -59,4 +61,14 @@ public class KeycloakSyncProperties {
 
   /** Client Secret for admin access. */
   @NotBlank private String clientSecret;
+
+  /**
+   * Page size for the Keycloak Admin API user listing. The {@code GET /users} endpoint caps each
+   * response at a server-side maximum (~100 by default), so the sync must page through {@code
+   * first}/{@code max} until a short page returns; without paging it would only ever see the first
+   * page and then wrongly flag every user beyond it as missing. Bounded to a sane range.
+   */
+  @Min(1)
+  @Max(1000)
+  private int pageSize = 100;
 }

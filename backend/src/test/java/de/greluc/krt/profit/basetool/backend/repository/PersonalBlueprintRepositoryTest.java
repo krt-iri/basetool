@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,8 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the multi-owner finders {@link PersonalBlueprintRepository} grew for the
- * blueprint availability overview (#364): {@link PersonalBlueprintRepository#findAllByOwnerSubIn}
- * and {@link PersonalBlueprintRepository#findAllByProductKeyAndOwnerSubIn}.
+ * blueprint availability overview (#364): {@link PersonalBlueprintRepository#findAllByOwnerSubIn},
+ * its two-column {@link PersonalBlueprintRepository#findOwnerProductByOwnerSubIn} projection, and
+ * {@link PersonalBlueprintRepository#findAllByProductKeyAndOwnerSubIn}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -64,6 +66,26 @@ class PersonalBlueprintRepositoryTest {
 
     assertEquals(2, rows.size());
     assertTrue(rows.stream().allMatch(r -> Set.of(OWNER_A, OWNER_B).contains(r.getOwnerSub())));
+  }
+
+  @Test
+  void findOwnerProductByOwnerSubIn_projectsOwnerAndNameForGivenOwnersOnly() {
+    repository.save(bp(OWNER_A, "aurora", "Aurora MR"));
+    repository.save(bp(OWNER_B, "cutlass", "Cutlass Black"));
+    repository.save(bp(OWNER_C, "gladius", "Gladius")); // owner out of scope
+
+    List<BlueprintOwnerProduct> rows =
+        repository.findOwnerProductByOwnerSubIn(Set.of(OWNER_A, OWNER_B));
+
+    // Assert the exact (ownerSub, productName) pairs for the in-scope owners only. Comparing the
+    // whole projection (not just the owner subs) pins the constructor-argument order, so a swapped
+    // projection — product name landing in ownerSub — fails here instead of silently mis-grouping
+    // the family aggregation downstream; the absence of OWNER_C also proves the owner restriction.
+    assertEquals(
+        Set.of(
+            new BlueprintOwnerProduct(OWNER_A, "Aurora MR"),
+            new BlueprintOwnerProduct(OWNER_B, "Cutlass Black")),
+        Set.copyOf(rows));
   }
 
   @Test
