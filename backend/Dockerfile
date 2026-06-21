@@ -20,9 +20,10 @@ COPY versions.properties .
 COPY gradle.properties .
 COPY backend/build.gradle.kts backend/
 COPY frontend/build.gradle.kts frontend/
-# settings.gradle.kts includes all three modules, so Gradle configuration needs every module's
+# settings.gradle.kts includes all four modules, so Gradle configuration needs every module's
 # build script present even when only :backend is built.
 COPY ingest/build.gradle.kts ingest/
+COPY keycloak-spi/build.gradle.kts keycloak-spi/
 
 # Dependencies herunterladen, um sie im Docker-Cache zu behalten. The previous
 # `|| true` masked legitimate failures (wrapper download problems, transient
