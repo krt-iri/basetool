@@ -694,6 +694,7 @@ public class MissionPageController {
         case "crew-board" -> "mission-detail :: crewBoard";
         case "finance" -> "mission-detail :: financeSection";
         case "mgmt" -> "mission-detail :: mgmtPanels";
+        case "overview" -> "mission-detail :: overviewSection";
         default -> "mission-detail";
       };
     }

@@ -8,6 +8,12 @@
  *  - renders a small KRT-styled pulse indicator on each .col-header[data-panel-key]
  *    showing who else is currently editing that section.
  *
+ * It also carries the live multi-user sync signal: sendChanged(sections) tells peers the local
+ * user just changed those mission sections, and an inbound {type:"changed",sections:[...]} frame is
+ * re-dispatched as a 'krt:mission-changed' DOM event (a reconnect fires 'krt:mission-resync')
+ * which mission-detail.html turns into in-place fragment re-fetches. Only section keys travel over
+ * the socket — never mission data.
+ *
  * Awareness only — no locks, no save blocking. Reconnects on close with
  * exponential backoff capped at MAX_BACKOFF_MS.
  *
@@ -61,6 +67,10 @@
         this.activeSection = null;
         this.lastState = {};
         this.closedByUs = false;
+        // Tracks whether we have ever had an open socket, so onopen can tell a fresh connect
+        // (initial page load — already in sync) from a re-connect (we may have missed 'changed'
+        // signals while offline, so the page must resync).
+        this.hasConnected = false;
         this._onFocusIn = this._onFocusIn.bind(this);
         this._onFocusOut = this._onFocusOut.bind(this);
         this._onVisibility = this._onVisibility.bind(this);
@@ -106,6 +116,13 @@
         const self = this;
         socket.onopen = function () {
             self.backoff = INITIAL_BACKOFF_MS;
+            // After a re-connect (not the initial open) we may have missed 'changed' signals while
+            // the socket was down — ask the page to resync every visible section so a peer's edit
+            // made during the outage is not lost. The initial load is already fresh, so skip it.
+            if (self.hasConnected) {
+                document.dispatchEvent(new CustomEvent('krt:mission-resync'));
+            }
+            self.hasConnected = true;
             // If the user was already focused on a section before the socket opened
             // (e.g. after a reconnect), re-announce that focus so the indicator on
             // other clients reappears without waiting for the next focusin event.
@@ -121,9 +138,19 @@
             } catch (_e) {
                 return;
             }
-            if (msg && msg.type === 'presence' && msg.sections) {
+            if (!msg) {
+                return;
+            }
+            if (msg.type === 'presence' && msg.sections) {
                 self.lastState = msg.sections;
                 self._render();
+            } else if (msg.type === 'changed' && Array.isArray(msg.sections)) {
+                // A peer mutated the mission. Hand the affected section keys to the page, which
+                // re-fetches those fragments in place (guarded against yanking a section the local
+                // user is actively editing). No mission data rides on the socket — only keys.
+                document.dispatchEvent(
+                    new CustomEvent('krt:mission-changed', { detail: { sections: msg.sections } }),
+                );
             }
         };
         socket.onclose = function () {
@@ -155,6 +182,16 @@
             } catch (_e) {
                 /* drop */
             }
+        }
+    };
+
+    // Announce to peers that the given mission sections were just changed by the local user, so
+    // their views re-fetch those fragments in place. Best-effort: if the socket is not open the
+    // signal is silently dropped (peers still catch up via the resync on their next reconnect, or
+    // a manual reload). Called from window.krtRefreshMissionSection in mission-detail.html.
+    MissionPresence.prototype.sendChanged = function (sections) {
+        if (Array.isArray(sections) && sections.length > 0) {
+            this._send({ type: 'changed', sections: sections });
         }
     };
 

@@ -68,4 +68,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0028](0028-bank-bereich-ol-access-seam.md)                               | Bereich/OL bank access (AREA/CARTEL) via the `OrgUnitBankAccessService` seam                | Accepted — implementation pending |
 | [0029](0029-org-chart-visibility-decoupled-from-profit-eligibility.md)    | Org chart visibility decoupled from `is_profit_eligible` (org-wide chart)                   | Accepted                          |
 | [0030](0030-discord-federation-first-login-membership-gate.md)            | Discord federation via an owned Keycloak SPI with a fail-closed first-login membership gate | Accepted — Track 1 implemented    |
+| [0031](0031-live-mission-sync-over-presence-websocket.md)                 | Live multi-user mission sync over the presence WebSocket (section-key relay)                | Accepted                          |
 
