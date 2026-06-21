@@ -41,9 +41,11 @@ import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -297,8 +299,10 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction reversal =
         persistTransaction(BankTransactionType.REVERSAL, note, original, now);
+    Map<UUID, BankHolder> reversalHolders =
+        loadHolders(legs.stream().map(BankCounterLeg::holderId).toList());
     for (BankCounterLeg leg : legs) {
-      BankHolder holder = requireHolder(leg.holderId());
+      BankHolder holder = requireHolder(reversalHolders, leg.holderId());
       persistPosting(
           reversal, lockedAccounts.get(leg.accountId()), holder, leg.amount().negate(), now);
     }
@@ -339,8 +343,10 @@ public class BankLedgerService {
       }
       BankTransaction tx =
           persistTransaction(BankTransactionType.WIPE_RESET, "SC wipe reset", null, now);
+      Map<UUID, BankHolder> holders =
+          loadHolders(distribution.stream().map(BankHolderBalance::holderId).toList());
       for (BankHolderBalance slice : distribution) {
-        BankHolder holder = requireHolder(slice.holderId());
+        BankHolder holder = requireHolder(holders, slice.holderId());
         persistPosting(tx, account, holder, slice.amount().negate(), now);
         stashesZeroed++;
         totalZeroed = totalZeroed.add(slice.amount());
@@ -407,6 +413,36 @@ public class BankLedgerService {
     return holderRepository
         .findById(holderId)
         .orElseThrow(() -> new NotFoundException("Bank holder not found"));
+  }
+
+  /**
+   * Resolves a holder from a pre-loaded batch ({@link #loadHolders(Collection)}), enforcing the
+   * same not-found contract as {@link #requireHolder(UUID)}.
+   *
+   * @param holders the pre-loaded holder map.
+   * @param holderId the holder to resolve.
+   * @return the managed holder.
+   * @throws NotFoundException when no holder with that id exists.
+   */
+  private BankHolder requireHolder(@NotNull Map<UUID, BankHolder> holders, @NotNull UUID holderId) {
+    BankHolder holder = holders.get(holderId);
+    if (holder == null) {
+      throw new NotFoundException("Bank holder not found");
+    }
+    return holder;
+  }
+
+  /**
+   * Pre-loads the holders referenced by a batch posting loop in one query, keyed by id, so the loop
+   * (wipe-reset / reversal) does not fire {@link #requireHolder(UUID)}'s {@code findById} per
+   * leg/slice (REQ-DATA-003).
+   *
+   * @param holderIds the holder ids to load; may be empty.
+   * @return holder id → entity for every id that exists.
+   */
+  private Map<UUID, BankHolder> loadHolders(@NotNull Collection<UUID> holderIds) {
+    return holderRepository.findAllById(holderIds).stream()
+        .collect(Collectors.toMap(BankHolder::getId, holder -> holder));
   }
 
   /**

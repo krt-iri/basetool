@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -492,6 +493,10 @@ class PromotionEligibilityServiceTest {
     assertEquals(19, result.get(0).toRank());
     assertEquals(19, result.get(1).fromRank());
     assertEquals(18, result.get(1).toRank());
+    // REQ-DATA-003: the member's evaluation set is loaded once for the whole user, not 2× per
+    // transition (was 2×T = 4 reads for these two transitions before the dedup).
+    verify(memberEvaluationRepository, times(1))
+        .findAllByUserIdWithCategoryAndTopicScoped(USER, null);
   }
 
   @Test

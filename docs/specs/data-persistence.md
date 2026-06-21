@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -31,7 +31,39 @@ it before adding a migration.
 
 ### REQ-DATA-003 — No N+1
 
-Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out.
+Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out. Replace a
+`findById`-in-a-loop with one `findAllById` keyed into a map (e.g.
+`MissionService.resolveMembershipOrgUnits`, `BankLedgerService` wipe-reset / reversal holders), and
+memoise a request-constant lookup or verdict on the `HttpServletRequest` — or derive both projections
+from a single load — so repeated per-row / per-resolver reads collapse to one (e.g. the
+`PromotionEligibilityService` evaluation set is loaded once per user across all rank transitions, and
+`OwnerScopeService.currentCallerMemberships()` backs the blueprint-overview gate plus the cascading
+and own-level oversight scopes from one membership read). Dead unbounded eager finders
+(`SELECT i FROM InventoryItem i` with no caller) are deleted, not kept as a foot-gun.
+
+A **paged list** must not fan a per-row query out across the page: enrich the whole page from a
+single batched query keyed by the page's ids and join it in memory, mirroring
+`OperationFinanceService.getOperationFinances` (`findAllByMissionIdIn` + `Collectors.groupingBy`).
+The job-order list follows this — `JobOrderService.getAllJobOrders` loads every order's linked
+stock via `InventoryItemRepository.findMaterialStockRowsByJobOrderIds` and every SK order's claims
+via `MaterialClaimRepository.findByJobOrderIdInOrderByCreatedAtDesc` once per page, then sums each
+material bucket at its own quality floor in memory, instead of one `SUM` per material per order plus
+one claim query per SK order. The single-order write paths keep the per-order queries (a bounded
+handful) via a shared resolver-parameterised projection.
+
+A **request-constant verdict or lookup** consulted more than once per request (e.g. per row) must be
+memoised on the `HttpServletRequest` so it resolves once: `OwnerScopeService.canViewJobOrders()` and
+`currentMemberOrgUnitIds()` cache on a request attribute, and `UserMapper` memoises the per-user
+Staffel-membership lookup so its three derived-field resolvers share one query (falling back to a
+direct query outside an HTTP request).
+
+**Acceptance**: `JobOrderServiceAssigneeAndListTest` (one batched stock query per page with no per-
+material `SUM` on the list path, plus the in-memory sum reproducing the native per-bucket semantics
+at each quality floor), `JobOrderMaterialStockRowQueryDataTest` (the batched projection runs on the
+real Postgres schema, returns only order-linked rows, and its floor sum equals the native
+`sumAmountByMaterialAndJobOrderAndMinQuality` aggregate), `OwnerScopeServiceTest` (profit-eligibility
+count runs once across repeated `canViewJobOrders()`), `UserMapperTest` (one membership lookup per
+user within a request, direct-query fallback without one).
 
 ### REQ-DATA-004 — UEX duplicate companies of one brand merge onto a single manufacturer; the sync is per-company resilient
 
@@ -106,6 +138,35 @@ updated any of its own columns.
 **Acceptance** (`UexItemSyncServiceTest`): each item upsert runs through the `self` proxy; the
 per-item `catch` keeps the run going past a failure so the remaining items still persist; and an
 incoming uuid already owned by another row leaves the row's `external_uuid` null instead of throwing.
+
+### REQ-DATA-006 — every hot predicate and foreign key has a covering index
+
+A query predicate on the read path, and every foreign-key column, must be backed by an index;
+falling back to a sequential scan on a growing table is a defect. New indexes ship as a Flyway
+`V<n>` migration (indexes are access paths only, so they do not affect `ddl-auto=validate`) and
+get a spot-check assertion in `DatabaseIndexMigrationTest` (the canary that proves Flyway ran and
+produced the DDL). Prefer a **partial index** when the hot set is a small slice of a large table
+(status/lifecycle filters), so the index stays proportional to the live set rather than the
+history.
+
+`V175` is the round-three backfill (after the V34 / V92 / V122 sweeps) and adds:
+
+- `idx_job_order_assignees_user_id` — the V147 composite `UNIQUE (job_order_id, user_id)` leads
+  with `job_order_id` and cannot serve a `user_id`-only lookup.
+- `idx_bank_posting_holder_id` — the V153 `(account_id, holder_id)` index leads with `account_id`,
+  so the holder-distribution / `holderTotal` aggregate scanned the unbounded append-only ledger.
+- `idx_bank_transaction_initiated_by`, `idx_app_user_approved_by_id` — foreign keys with no
+  covering index (user-deletion integrity / approver back-references).
+- `idx_app_user_pending_approval` — partial `WHERE approval_status = 'PENDING'` on `created_at`,
+  matching `findByApprovalStatusOrderByCreatedAtAsc` (filter + oldest-first order, no sort).
+- `idx_job_order_active_priority` — partial `WHERE status IN ('OPEN','IN_PROGRESS')` on
+  `(priority ASC NULLS LAST, display_id DESC)`, matching `findAllActiveWithMaterials` so the active
+  board stays constant-cost as terminal orders accumulate.
+
+**Acceptance** (`DatabaseIndexMigrationTest`): each `V175` index is present in the live Postgres
+test schema, and the two partial indexes additionally have their `WHERE` predicate and key ordering
+pinned (via `pg_indexes.indexdef`) so a later migration cannot silently narrow the predicate or flip
+a sort while keeping the index name.
 
 ## Out of scope
 
