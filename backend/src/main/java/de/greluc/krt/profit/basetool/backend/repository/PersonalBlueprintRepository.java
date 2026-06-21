@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -127,8 +128,8 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   @Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct("
           + "b.ownerSub, b.productName) FROM PersonalBlueprint b WHERE b.ownerSub IN :ownerSubs")
-  List<de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct>
-      findOwnerProductByOwnerSubIn(@Param("ownerSubs") Collection<String> ownerSubs);
+  List<BlueprintOwnerProduct> findOwnerProductByOwnerSubIn(
+      @Param("ownerSubs") Collection<String> ownerSubs);
 
   /**
    * Owner-restricted product lookup — backs the availability drill-down (#364): given one product

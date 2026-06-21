@@ -53,9 +53,11 @@ users outside the requested family.
   owner's blueprints) just to count owners per family (REQ-DATA-003). The item-order owner
   drill-down (`JobOrderItemBlueprintOwnersService`) uses the same projection.
 
-**Enforced by:** `PersonalBlueprintOverviewServiceTest`, `BlueprintVariantFamilyCatalogTest` ·
-**Code:** `PersonalBlueprintOverviewService`, `BlueprintVariantFamilyCatalog`,
-`frontend/src/main/resources/static/js/blueprint-overview.js` · **Issues:** #364
+**Enforced by:** `PersonalBlueprintOverviewServiceTest`, `JobOrderItemBlueprintOwnersServiceTest`,
+`PersonalBlueprintRepositoryTest`, `BlueprintVariantFamilyCatalogTest` · **Code:**
+`PersonalBlueprintOverviewService`, `JobOrderItemBlueprintOwnersService`,
+`BlueprintVariantFamilyCatalog`, `frontend/src/main/resources/static/js/blueprint-overview.js` ·
+**Issues:** #364
 
 ### REQ-INV-013 — True server-side pagination with selectable page size
 
