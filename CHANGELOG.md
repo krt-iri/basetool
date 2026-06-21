@@ -8,7 +8,7 @@
 
 ### Changed
 
-- **Schnellere Datenbankzugriffe durch zusätzliche Indizes.** Sechs fehlende Indizes (`V175`) verhindern sequentielle Tabellen-Scans auf wachsenden Tabellen — u. a. die aktive Auftragstafel (Filter + Sortierung), die offene Bank-Buchungsverteilung, die Discord-Freigabe-Warteschlange und mehrere Fremdschlüssel. Reine Performance-Änderung, kein sichtbares Verhalten ändert sich.
+- **Schnellere Datenbankzugriffe durch zusätzliche Indizes.** Sechs fehlende Indizes (`V175`) verhindern sequentielle Tabellen-Scans auf wachsenden Tabellen — u. a. die aktive Auftragstafel (Filter + Sortierung), die offene Bank-Buchungsverteilung, die Discord-Freigabe-Warteschlange und mehrere Fremdschlüssel. Reine Performance-Änderung; sichtbares Verhalten ändert sich nicht.
 
 - **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
 

@@ -132,7 +132,9 @@ history.
   board stays constant-cost as terminal orders accumulate.
 
 **Acceptance** (`DatabaseIndexMigrationTest`): each `V175` index is present in the live Postgres
-test schema.
+test schema, and the two partial indexes additionally have their `WHERE` predicate and key ordering
+pinned (via `pg_indexes.indexdef`) so a later migration cannot silently narrow the predicate or flip
+a sort while keeping the index name.
 
 ## Out of scope
 

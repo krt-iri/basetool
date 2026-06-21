@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.List;
+import java.util.Locale;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -131,6 +132,26 @@ class DatabaseIndexMigrationTest {
     assertIndexExists(jdbc, "app_user", "idx_app_user_approved_by_id");
     assertIndexExists(jdbc, "app_user", "idx_app_user_pending_approval");
     assertIndexExists(jdbc, "job_order", "idx_job_order_active_priority");
+    // The two V175 partial indexes only pay off if the planner can match their WHERE predicate
+    // (and, for the active board, the key ordering) to the query. assertIndexExists checks only the
+    // name, so a future migration could keep the name while narrowing the predicate or flipping a
+    // sort and still pass — pin the shape here so such a regression fails loudly instead.
+    assertIndexDefContains(
+        jdbc,
+        "app_user",
+        "idx_app_user_pending_approval",
+        "created_at",
+        "approval_status",
+        "'PENDING'");
+    assertIndexDefContains(
+        jdbc,
+        "job_order",
+        "idx_job_order_active_priority",
+        "priority",
+        "display_id DESC",
+        "status",
+        "'OPEN'",
+        "'IN_PROGRESS'");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {
@@ -143,5 +164,37 @@ class DatabaseIndexMigrationTest {
     assertThat(rows)
         .as("Expected Flyway-managed index %s on table %s to be present", indexName, table)
         .isNotEmpty();
+  }
+
+  /**
+   * Pins the live {@code CREATE INDEX} definition of {@code indexName} on {@code table} by
+   * asserting (case-insensitively) that every given fragment appears in its {@code pg_get_indexdef}
+   * text. Unlike {@link #assertIndexExists}, which only proves the name is present, this locks the
+   * index <em>shape</em>: the partial-index {@code WHERE} predicate and the key-column ordering. It
+   * catches a migration that keeps the index name but silently narrows the predicate or flips a
+   * sort direction — a change that would otherwise pass green while no longer serving the query the
+   * index was added for.
+   *
+   * @param jdbc the template bound to the live Postgres test schema
+   * @param table the table owning the index
+   * @param indexName the index whose {@code pg_indexes.indexdef} text is inspected
+   * @param fragments substrings, each matched case-insensitively, that must all appear in the
+   *     definition
+   */
+  private static void assertIndexDefContains(
+      JdbcTemplate jdbc, String table, String indexName, String... fragments) {
+    List<String> defs =
+        jdbc.queryForList(
+            "SELECT indexdef FROM pg_indexes WHERE tablename = ? AND indexname = ?",
+            String.class,
+            table,
+            indexName);
+    assertThat(defs).as("Expected index %s on table %s to be present", indexName, table).hasSize(1);
+    String indexDef = defs.get(0).toLowerCase(Locale.ROOT);
+    for (String fragment : fragments) {
+      assertThat(indexDef)
+          .as("Index %s definition should pin fragment '%s'", indexName, fragment)
+          .contains(fragment.toLowerCase(Locale.ROOT));
+    }
   }
 }
