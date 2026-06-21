@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end smoke test (see {@code docs/E2E_TESTING_PLAN.md}): a real Chromium browser completes
+ * End-to-end smoke test (see {@code docs/e2e-test/README.md}): a real Chromium browser completes
  * the Keycloak OIDC authorization-code login against the running frontend, lands back on an
  * authenticated frontend page, and yields a reusable {@code storageState} snapshot.
  *

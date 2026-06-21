@@ -49,7 +49,7 @@ final class E2eSupport {
   /**
    * Total attempts for the Keycloak login flow before giving up. The OIDC round-trip is the suite's
    * documented high-risk flakiness class (issuer timing under CI load — see {@code
-   * docs/E2E_TESTING_PLAN.md}): when the runner is simultaneously building the stack, driving a
+   * docs/e2e-test/README.md}): when the runner is simultaneously building the stack, driving a
    * browser and running the JVM, Keycloak occasionally stalls past the post-credential redirect's
    * 30 s wait, surfacing as a {@link TimeoutError} on an otherwise-correct login. Retrying the
    * whole flow on a freshly re-navigated page absorbs that transient stall; a genuinely broken
@@ -127,7 +127,7 @@ final class E2eSupport {
    *   <li><b>Firefox</b> — the {@code network.dns.localDomains} preference.
    *   <li><b>WebKit</b> — no launch-level override exists; it relies on the OS hosts file mapping
    *       {@code host.docker.internal} to 127.0.0.1 (CI adds the entry — see {@code
-   *       docs/E2E_TESTING_PLAN.md}; on a workstation it must be added manually).
+   *       docs/e2e-test/README.md}; on a workstation it must be added manually).
    * </ul>
    *
    * <p>Against an external deployment ({@code !managesStack}) no remap is applied for any engine —
@@ -250,7 +250,7 @@ final class E2eSupport {
   private static void requireHostDockerInternalOnLoopback() {
     String fix =
         "Add '127.0.0.1 host.docker.internal' to your OS hosts file, or run WebKit against an"
-            + " external deployment via E2E_BASE_URL. See docs/E2E_TESTING_PLAN.md.";
+            + " external deployment via E2E_BASE_URL. See docs/e2e-test/README.md.";
     try {
       InetAddress address = InetAddress.getByName("host.docker.internal");
       if (!address.isLoopbackAddress()) {
