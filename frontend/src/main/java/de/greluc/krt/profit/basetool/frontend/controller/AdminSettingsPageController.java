@@ -326,6 +326,10 @@ public class AdminSettingsPageController {
             SystemSettingDto.class);
       }
 
+      // The job-order age thresholds are read through getCached on the orders pages; drop the static
+      // cache so a threshold change takes effect on the next render instead of after the TTL.
+      backendApiClient.clearStaticDataCache();
+
       redirectAttributes.addFlashAttribute("successToast", "success.settings.update");
     } catch (NumberFormatException e) {
       redirectAttributes.addFlashAttribute("errorToast", "error.settings.invalid.format");
@@ -406,6 +410,10 @@ public class AdminSettingsPageController {
                 SystemSettingDto.class);
         intakeVersion = intake.version();
       }
+
+      // The job-order age thresholds are read through getCached on the orders pages; drop the static
+      // cache so a threshold change takes effect on the next render instead of after the TTL.
+      backendApiClient.clearStaticDataCache();
 
       Map<String, Object> result = new LinkedHashMap<>();
       result.put("ageYellowVersion", yellow.version());

@@ -23,6 +23,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -95,6 +96,10 @@ class AdminSettingsPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("ageYellowVersion")))
         .andExpect(content().string(containsString("transferFeeVersion")));
+
+    // The orders pages read the age thresholds through getCached, so a successful save must evict
+    // the static cache for the change to surface on the next render.
+    verify(backendApiClient).clearStaticDataCache();
   }
 
   // covers #582 — the cross-field invariant: yellow >= red short-circuits with a 422 problem+json
@@ -136,5 +141,8 @@ class AdminSettingsPageControllerMvcTest {
                 .param("transferFeePercent", "0.5")
                 .param("transferFeeVersion", "0"))
         .andExpect(status().is3xxRedirection());
+
+    // Same eviction guarantee on the classic (no-JS) save path.
+    verify(backendApiClient).clearStaticDataCache();
   }
 }
