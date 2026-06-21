@@ -618,12 +618,14 @@ public class MissionPageController {
       if (authHelperService.isMemberOrAbove()) {
         try {
           // The three reads are independent per-mission lookups; run them concurrently instead of
-          // back to back. No .exceptionally on the futures: a failure surfaces through join() as a
-          // CompletionException caught by the block's existing catch, so the rendered outcome is
-          // unchanged (the Finanzen panel is skipped wholesale on any error, as before). The one
-          // side-effect that differs from the serial version: all three GETs are now always
-          // dispatched, whereas serially a failure on the first short-circuited the other two —
-          // harmless here, as these are idempotent reads.
+          // back to back. join() below surfaces any supplier failure as a CompletionException,
+          // caught and unwrapped by the block's catch. Two deliberate differences from the old
+          // serial code: (1) all three GETs are always dispatched, whereas serially a failure on
+          // the first short-circuited the rest — harmless, as these are idempotent reads; (2) on a
+          // failure of any one read the whole Finanzen panel now collapses to its empty state,
+          // whereas the serial code added financeEntries to the model before the later reads and so
+          // could still render the entries table when only the sum/refinery read failed. The
+          // all-or-nothing panel is the intended outcome here.
           CompletableFuture<PageResponse<MissionFinanceEntryDto>> financesFuture =
               parallelPageLoader.loadAsync(
                   () ->
@@ -692,7 +694,14 @@ public class MissionPageController {
                       java.math.BigDecimal.valueOf(registered), 0, java.math.RoundingMode.HALF_UP)
                   : null);
         } catch (Exception e) {
-          log.error("Error loading finance entries or refinery orders", e);
+          // join() reports a supplier failure wrapped in a CompletionException; log its concrete
+          // cause so the line still names the real backend exception, as the serial code did. Other
+          // failures in this block (e.g. the aggregation loop) are logged as-is.
+          Throwable cause =
+              (e instanceof java.util.concurrent.CompletionException && e.getCause() != null)
+                  ? e.getCause()
+                  : e;
+          log.error("Error loading finance entries or refinery orders", cause);
         }
       }
 
