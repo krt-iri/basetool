@@ -511,6 +511,14 @@ a client can neither target an arbitrary fetch nor amplify one frame into an unb
 `overview` fragment (Tab-1 + a `#overview-head-meta` carrier that patches the sticky header title /
 status pill / facts) is added by this requirement so core/schedule/status edits propagate too.
 
+Two server-side guards bound the abuse surface the socket adds. The handshake is **authorized against
+mission access** — `MissionPresenceHandshakeAuthInterceptor` issues the same authenticated
+`GET /api/v1/missions/{id}` the page does, so an authenticated user cannot join the presence room of a
+mission they may not see (an explicit backend 403/404 refuses the handshake; a transient backend error
+fails open so a blip never kills presence). Inbound `changed` frames are **rate-limited per session**
+(a token bucket sized far above any human edit cadence), so a crafted client cannot drive sustained
+re-fetch amplification even within a mission it can see.
+
 An incoming refresh must **never yank a section out from under an active edit**: while a modal is open
 (or focus sits inside the target section's container) the refresh is deferred behind a DS-styled
 "Aktualisierungen verfügbar" pill (no native dialog) that applies the held-back sections on click.
@@ -533,12 +541,25 @@ swap-out point is `MissionPresenceService` / `MissionPresenceWebSocketHandler` (
   destroy their in-progress edit; it is deferred behind the "updates available" pill.
 - [ ] Applying a pushed change does not re-broadcast it (no echo loop), and the originating session
   does not refresh twice.
+- [ ] An authenticated user cannot open the presence socket for a mission the backend forbids
+  (handshake refused), and a flood of `changed` frames from one session is rate-limited.
+
+Coverage note: `MissionLiveSyncE2eTest` exercises the representative path end-to-end (a participant
+add propagating to a second viewer in place, no reload); the remaining mutation kinds in the first
+bullet all route through the same `krtRefreshMissionSection` / `krtNotifyMissionChanged` chokepoint, so
+they inherit the same behaviour, and the per-viewer guest-redaction guarantee rests on the existing
+authenticated fragment GET (covered by the mission fragment/redaction tests) rather than a dedicated
+live-sync case.
 
 **Enforced by:** `MissionPresenceWebSocketHandlerTest` (relay to peers, origin exclusion, key
-sanitising/dedup, no-op on empty) · **Code:** `MissionPresenceWebSocketHandler.broadcastChanged`,
-`mission-presence.js` (`sendChanged` / `krt:mission-changed` / `krt:mission-resync`),
-`mission-detail.html` (`krtRefreshMissionSection` broadcast + live-sync receiver + `overviewSection`
-fragment), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031
+sanitising/dedup, no-op on empty, per-session rate limit) · `MissionPresenceHandshakeAuthInterceptorTest`
+(handshake allowed on authorized read, refused on 403/404, fail-open on transient, 400 on a malformed
+path) · `MissionLiveSyncE2eTest` (two-context live participant-add propagation + no-reload assertion) ·
+**Code:** `MissionPresenceWebSocketHandler.broadcastChanged` / `allowChangedFrame`,
+`MissionPresenceHandshakeAuthInterceptor`, `mission-presence.js` (`sendChanged` / `krt:mission-changed`
+/ `krt:mission-resync`), `mission-detail.html` (`krtRefreshMissionSection` broadcast + live-sync
+receiver with flush-time busy re-check + `overviewSection` fragment + finance-badge `krt:swapped`
+listener), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031
 
 ## Out of scope
 

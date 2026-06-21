@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.MissionPresenceService;
+import de.greluc.krt.profit.basetool.frontend.websocket.MissionPresenceHandshakeAuthInterceptor;
 import de.greluc.krt.profit.basetool.frontend.websocket.MissionPresenceWebSocketHandler;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,27 +50,36 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>The handler is constructed directly here (not component-scanned), so it is given its own plain
  * Jackson 3 {@link JsonMapper} rather than an auto-wired bean. The presence wire format is a
  * minimal hand-built {@code {type, sections}} tree, so no extra modules are needed.
+ *
+ * <p>Beyond the origin allowlist and Spring Security's authentication requirement, the handshake is
+ * gated by {@link MissionPresenceHandshakeAuthInterceptor} on actual mission access, so an
+ * authenticated user cannot join a presence room for a mission they may not see (ADR-0031).
  */
 @Configuration
 @EnableWebSocket
 public class MissionPresenceWebSocketConfig implements WebSocketConfigurer {
 
   private final MissionPresenceService presenceService;
+  private final BackendApiClient backendApiClient;
   private final List<String> allowedOriginPatterns;
 
   /**
-   * Constructor injection of the shared presence store and the WebSocket origin allowlist.
+   * Constructor injection of the shared presence store, the backend client used by the handshake
+   * authorization gate, and the WebSocket origin allowlist.
    *
    * @param presenceService in-memory presence store
+   * @param backendApiClient client used by the handshake interceptor to authorize mission access
    * @param allowedOriginPatterns origin patterns accepted on the WebSocket handshake; sourced from
    *     {@code app.websocket.allowed-origin-patterns} with a production default
    */
   public MissionPresenceWebSocketConfig(
       MissionPresenceService presenceService,
+      BackendApiClient backendApiClient,
       @Value(
               "${app.websocket.allowed-origin-patterns:https://profit-base.online,https://localhost:18081,http://localhost:18081}")
           List<String> allowedOriginPatterns) {
     this.presenceService = presenceService;
+    this.backendApiClient = backendApiClient;
     this.allowedOriginPatterns = allowedOriginPatterns;
   }
 
@@ -88,6 +99,7 @@ public class MissionPresenceWebSocketConfig implements WebSocketConfigurer {
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
     registry
         .addHandler(missionPresenceWebSocketHandler(), "/ws/missions/{missionId}/presence")
+        .addInterceptors(new MissionPresenceHandshakeAuthInterceptor(backendApiClient))
         .setAllowedOriginPatterns(allowedOriginPatterns.toArray(new String[0]));
   }
 }

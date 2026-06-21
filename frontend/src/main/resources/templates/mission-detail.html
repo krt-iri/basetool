@@ -1604,6 +1604,24 @@
         if (badge) { badge.textContent = checkedIn + '/' + registered; }
     });
 
+    // After ANY in-place finance swap — local OR peer-driven (live sync, REQ-FE-010) — patch the
+    // Finanzen tab badge (#finance-tab-count) from the fresh count the fragment exposes in
+    // #finance-count-meta. It lives in the tab nav OUTSIDE #finance-results, so a peer-driven swap
+    // (which does not run the local add/edit/delete handlers) would otherwise leave it stale until a
+    // reload. Mirrors the crew listener above; makes the count the single source of truth so the
+    // local handlers no longer need to patch the badge themselves.
+    document.addEventListener('krt:swapped', function (ev) {
+        const container = ev && ev.detail && ev.detail.container;
+        if (!container || container.id !== 'finance-results') {
+            return;
+        }
+        const meta = document.getElementById('finance-count-meta');
+        const badge = document.getElementById('finance-tab-count');
+        if (meta && badge) {
+            badge.textContent = (meta.textContent || '0').trim();
+        }
+    });
+
     // After an in-place OVERVIEW swap, patch the parts of the sticky header that live OUTSIDE the
     // #overview-results fragment — the mission title (h1), the status pill (text + colour class) and
     // the Server-Join / TS facts — from the fresh values the fragment exposes in #overview-head-meta.
@@ -1686,13 +1704,48 @@
             return !!(container && document.activeElement && container.contains(document.activeElement));
         }
 
+        function refresh(keys) {
+            if (keys.length && window.krtRefreshMissionSection) {
+                window.krtRefreshMissionSection(keys, { broadcast: false });
+            }
+        }
+
+        // Remove the pill once nothing is held back, so it never lingers for an already-current
+        // section.
+        function hidePillIfEmpty() {
+            if (Object.keys(deferred).length === 0) {
+                const pill = document.getElementById('mission-livesync-pill');
+                if (pill) {
+                    pill.remove();
+                }
+            }
+        }
+
+        // The busy test is re-applied here, at flush time — not only when the signal first arrived.
+        // A section that became busy DURING the COALESCE_MS window (the user opened a modal or
+        // focused an inline edit on it) is moved to `deferred` + the pill instead of being swapped
+        // out from under the edit. Sections that are safe to refresh are dropped from `deferred` so
+        // the pill cannot keep claiming updates for a section that just refreshed in place.
         function flushTimer() {
             timer = null;
             const keys = Object.keys(pendingNow);
             keys.forEach(function (k) { delete pendingNow[k]; });
-            if (keys.length && window.krtRefreshMissionSection) {
-                window.krtRefreshMissionSection(keys, { broadcast: false });
+            const ready = [];
+            let nowDeferred = false;
+            keys.forEach(function (k) {
+                if (sectionBusy(k)) {
+                    deferred[k] = true;
+                    nowDeferred = true;
+                } else {
+                    delete deferred[k];
+                    ready.push(k);
+                }
+            });
+            refresh(ready);
+            if (nowDeferred) {
+                showPill();
             }
+            hidePillIfEmpty();
         }
 
         function schedule(sectionKey) {
@@ -1718,12 +1771,21 @@
             pill.className = 'mission-livesync-pill';
             pill.textContent = label;
             pill.addEventListener('click', function () {
-                const keys = Object.keys(deferred);
-                keys.forEach(function (k) { delete deferred[k]; });
-                pill.remove();
-                if (keys.length && window.krtRefreshMissionSection) {
-                    window.krtRefreshMissionSection(keys, { broadcast: false });
-                }
+                // Apply only sections that are no longer busy — a still-open modal / focused edit on
+                // a section keeps it deferred (and the pill) rather than being clobbered by an
+                // explicit click. (Current fragments are display-oriented and their modals are
+                // separate overlays, so this is belt-and-suspenders, but it keeps the guard honest
+                // if a future fragment ever embeds an inline-edit field.)
+                const ready = [];
+                Object.keys(deferred).forEach(function (k) {
+                    if (sectionBusy(k)) {
+                        return;
+                    }
+                    delete deferred[k];
+                    ready.push(k);
+                });
+                refresh(ready);
+                hidePillIfEmpty();
             });
             document.body.appendChild(pill);
         }
@@ -2946,16 +3008,11 @@
         }
         const financeMissionId = window.missionId;
 
-        // After a finance swap, patch the Finanzen tab badge (it lives in the tab nav, outside the
-        // swapped fragment) from the count the fragment exposes in #finance-count-meta.
+        // Re-render the finance fragment in place; the Finanzen tab badge is patched by the
+        // document-level krt:swapped listener above (the single source of truth, shared with
+        // peer-driven swaps), so this no longer patches the badge itself.
         function refreshFinanceAndBadge() {
-            window.krtRefreshMissionSection('finance').then(function () {
-                const meta = document.getElementById('finance-count-meta');
-                const badge = document.getElementById('finance-tab-count');
-                if (meta && badge) {
-                    badge.textContent = (meta.textContent || '0').trim();
-                }
-            });
+            return window.krtRefreshMissionSection('finance');
         }
 
         const addForm = document.getElementById('add-finance-form');

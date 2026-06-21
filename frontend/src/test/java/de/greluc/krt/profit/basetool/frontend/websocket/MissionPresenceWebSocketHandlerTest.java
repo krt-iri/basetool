@@ -262,6 +262,29 @@ class MissionPresenceWebSocketHandlerTest {
     assertThat(service.trackedMissions()).isEmpty();
   }
 
+  @Test
+  void changedSignal_isRateLimitedPerSession() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    // Emit far more than the per-session burst in a tight synchronous loop (well under one token's
+    // refill interval), simulating a crafted flooding client.
+    int emitted = MissionPresenceWebSocketHandler.CHANGED_BURST + 40;
+    for (int i = 0; i < emitted; i++) {
+      handler.handleTextMessage(
+          alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+    }
+
+    // The token bucket caps relayed frames at the burst (a negligible refill may add at most ~1),
+    // so the peer receives far fewer frames than were emitted.
+    assertThat(bob.sent.size())
+        .isGreaterThan(0)
+        .isLessThanOrEqualTo(MissionPresenceWebSocketHandler.CHANGED_BURST + 1)
+        .isLessThan(emitted);
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
   private FakeSession openSession(UUID missionId, OidcUser user) throws Exception {

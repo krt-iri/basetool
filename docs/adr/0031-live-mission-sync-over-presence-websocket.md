@@ -47,7 +47,15 @@ let each peer re-render the affected section through the mechanism it already us
   crew/finance/mgmt sections that already had swap fragments.
 - A refresh is **deferred behind a DS-styled "updates available" pill** when the local user is
   mid-edit (a modal is open, or focus is inside the target section), rather than yanking the DOM.
-  Bursts are coalesced; a reconnect resyncs every visible section to recover missed signals.
+  The busy test is re-applied at flush time, so a modal opened during the coalesce window is also
+  respected. Bursts are coalesced; a reconnect resyncs every visible section to recover missed
+  signals.
+- The socket is **authorized against mission access at the handshake**
+  (`MissionPresenceHandshakeAuthInterceptor` issues the same authenticated `GET /api/v1/missions/{id}`
+  the mission-detail page does), so an authenticated user cannot join the presence room of a mission
+  they may not see — closing the pre-existing auth-only-not-membership handshake gap. Inbound
+  `changed` frames are additionally **rate-limited per session** (a token bucket, far above any human
+  edit cadence) so a crafted client cannot drive unbounded re-fetch amplification.
 
 ## Consequences
 
@@ -68,8 +76,19 @@ let each peer re-render the affected section through the mechanism it already us
 - **Best-effort, not guaranteed**: a dropped frame (offline socket) is recovered by the reconnect
   resync or a manual reload; we do not add delivery guarantees or message ordering.
 - The client `changed` signal is trusted only to make peers **re-fetch authenticated fragments**, so
-  the worst a malicious client achieves is a bounded, same-mission re-fetch amplification — capped by
-  the server-side key allow-list + count cap and the receiver-side debounce.
+  the worst a malicious client could achieve is a bounded, same-mission re-fetch amplification —
+  capped per frame by the server-side key allow-list + count cap and per receiver by the 400 ms
+  debounce. Two server-side guards close the rest of that window: the **handshake membership gate**
+  stops a client joining a mission room it has no access to (so amplification cannot target
+  arbitrary missions), and the **per-session token bucket** caps the inbound `changed` frame rate (so
+  a tight-loop client cannot sustain a flood against a mission it *can* see). The gate **fails open**
+  on transient backend errors — only an explicit 403/404 refuses the handshake — so a backend blip
+  never silently kills presence for a legitimate viewer; this is safe because no data rides the socket
+  and every re-fetch re-authorizes per viewer. Residual: the gate is spoof-adjacent only in that the
+  `changed` trigger is still client-emitted (a connected, authorized viewer can emit a `changed` for a
+  section nothing actually changed) — harmless (peers just re-pull current data) and the throttle
+  bounds it; the spoof-proof server-side `HandlerInterceptor` trigger (below) remains the heavier
+  option not taken.
 
 ## Alternatives considered
 
@@ -82,9 +101,12 @@ let each peer re-render the affected section through the mechanism it already us
   auth, and the single-instance limitation for no gain.
 - **Server-side trigger via a `HandlerInterceptor` on `/missions/{id}/**` writes.** More
   authoritative (spoof-proof, fires only on real success) but needs an endpoint→section map across
-  ~24 routes. Rejected for now in favour of the one-line client chokepoint, which degrades gracefully
-  and carries no per-endpoint mapping; the signal only ever triggers authenticated re-fetches, so the
-  trust delta is small. Kept in reserve if abuse or missed-trigger gaps appear.
+  ~24 routes. Rejected in favour of the one-line client chokepoint, which degrades gracefully and
+  carries no per-endpoint mapping; the signal only ever triggers authenticated re-fetches, so the
+  trust delta is small. The amplification concern it would also eliminate is instead handled by the
+  handshake membership gate + per-session throttle (see Decision/Consequences); the spoof-proof
+  trigger remains the heavier option to revisit only if a missed-trigger or abuse gap actually
+  appears.
 - **Short-interval polling of the mission.** Rejected: wasteful (most missions are idle), laggy, and
   multiplies backend load per open tab — the presence socket already gives us push for free.
 

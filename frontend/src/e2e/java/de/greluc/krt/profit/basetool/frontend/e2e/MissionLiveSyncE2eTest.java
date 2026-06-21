@@ -129,11 +129,17 @@ class MissionLiveSyncE2eTest {
         // is the whole point — B must update WITHOUT reloading.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // The presence socket connects on DOMContentLoaded; give B's socket a beat to register with
-        // the relay before A mutates, so the change frame actually reaches B.
+        // Wait until B's presence socket is actually OPEN (readyState === 1) rather than sleeping a
+        // fixed interval before a race: the server registers the session during the handshake,
+        // which
+        // completes before the client sees OPEN, so an open socket deterministically implies B is
+        // registered with the relay and A's subsequent change frame will reach it.
         pageB.waitForCondition(
-            () -> Boolean.TRUE.equals(pageB.evaluate("!!window.missionPresence")));
-        pageB.waitForTimeout(500);
+            () ->
+                Boolean.TRUE.equals(
+                    pageB.evaluate(
+                        "!!(window.missionPresence && window.missionPresence.socket"
+                            + " && window.missionPresence.socket.readyState === 1)")));
 
         // Context A adds a guest. A distinctive name resolves to no realm user, so it is a guest.
         pageA.locator("#add-participant-btn").click();
