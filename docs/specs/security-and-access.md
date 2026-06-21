@@ -505,6 +505,42 @@ no Staffel the caller can edit.
 `upsert_shouldAllowOfficer_evaluatingOwnSquadronMember`). **Security audit:** gap-fill finding
 (member-evaluation cross-tenant write).
 
+### REQ-SEC-021 — Anonymous outsider mission view withholds payout intent and free-text comments
+
+The anonymous / role-less-`GUEST` ("outsider") view of a public (non-internal) mission is an
+**operational-coordination surface**: by deliberate product decision (ADR-0033) it exposes the
+participant roster's public callsign tuple (`username`/`displayName`/`rank`), org-unit affiliation,
+job type, assigned ship/unit, mission frequencies, owning organisation and schedule/status, so a
+prospective sign-up can decide whether and how to join. It MUST continue to withhold PII (email /
+real name — enforced by the C-1 ArchUnit rule `anonymousReadableMissionEndpointsMustRedactGuestPii`)
+and, additionally, the two per-participant fields with low public-coordination value and higher
+sensitivity:
+
+- **`payoutPreference`** — a participant's financial intent.
+- the free-text **`comment`** — uncontrolled text that may carry incidental PII.
+
+Both fields stay on the authenticated member-peer view; only the outsider paths strip them, via
+`MissionController.stripOutsiderParticipantFields` applied in `cleanupOutsiderMissionForGuest` (the
+pass every outsider full-mission response routes through — `getMissionById` and the participant write
+endpoints) and the `addParticipantSlim` outsider branch. The shared `cleanupParticipantForGuest` is
+deliberately unchanged. The full residual decision (and the rejected alternatives) is recorded in
+ADR-0033.
+
+**Acceptance**
+
+- [x] An anonymous / role-less-`GUEST` read of a public mission (`GET /api/v1/missions/{id}`, the
+  participant endpoints, `addParticipantSlim`) returns every participant with `payoutPreference` and
+  `comment` `null`.
+- [x] An authenticated member (peer view and above) still sees both fields.
+- [x] PII (email / real name) remains redacted for outsiders (C-1 unchanged).
+
+**Enforced by:** `MissionControllerLifecycleTest`
+(`getMissionById_outsider_planned_keepsRosterButHidesDescriptionAndPii` asserts payout + comment are
+`null` for outsiders; `getMissionById_authenticatedCaller_returnsFullDtoUnchanged` keeps them for
+members) and `MissionControllerSlimEndpointsTest` for the `addParticipantSlim` outsider roster.
+**ADR:** [ADR-0033](../adr/0033-anonymous-outsider-mission-visibility.md). **Security audit:**
+finding L3.
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

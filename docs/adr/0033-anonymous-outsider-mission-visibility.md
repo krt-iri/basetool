@@ -1,9 +1,9 @@
 # ADR-0033 — Anonymous outsider view of public missions is operational by design, minus payout and free-text comment
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-21
 - **Deciders:** @greluc
-- **Related:** spec REQ-SEC-021 (to be added if Accepted) · security audit finding L3 · MULTI_SQUADRON_PLAN §7 (historical plan; cited only in code Javadoc, no file in-repo) · issue (none)
+- **Related:** spec REQ-SEC-021 · security audit finding L3 · MULTI_SQUADRON_PLAN §7 (historical plan; cited only in code Javadoc, no file in-repo) · issue (none)
 
 ## Context
 
@@ -31,15 +31,15 @@ We **remove from the anonymous outsider view** the two fields with low public-co
 - **`payoutPreference`** — a participant's financial intent, irrelevant to an outside observer deciding whether to join.
 - the free-text **`comment`** — uncontrolled text that can carry incidental PII or private coordination notes the author never meant to publish.
 
-Both fields **stay on the authenticated member-peer view** (`cleanupMissionForGuest`); only the strict outsider pass nulls them. The single chokepoint is `cleanupOutsiderMissionForGuest` / `cleanupParticipantForGuest`: null `payoutPreference` and `comment` there, leaving every other field untouched. The C-1 ArchUnit rule continues to pass — the redaction chain is unchanged in shape, only stricter.
+Both fields **stay on the authenticated member-peer view** (`cleanupMissionForGuest`); only the strict outsider paths null them, via a small `stripOutsiderParticipantFields` helper applied in `cleanupOutsiderMissionForGuest` (the pass every outsider full-mission response routes through — `getMissionById` and the participant write endpoints) and in the `addParticipantSlim` outsider branch (`jwt == null || !isMemberOrAbove()`). The shared `cleanupParticipantForGuest` is deliberately left unchanged so the member-peer view keeps both fields. (`searchMissions` returns `MissionListDto`, which carries no roster, so it was never an exposure for these per-participant fields.) The C-1 ArchUnit rule continues to pass — the redaction chain is unchanged in shape, only stricter.
 
 The public Thymeleaf `mission-detail.html` already null-tolerates both fields through safe-navigation (`${p?.payoutPreference?.name()}` on the payout `<select>`, `${!#strings.isEmpty(p?.comment)}` on the comment note-mark), so nulling them does not throw; we only confirm the visible result is acceptable — for an outsider the payout `<select>` renders with no option pre-selected and the comment note-mark does not appear.
 
-This decision is **Proposed** and pending ratification by **@greluc**. If Accepted, add **REQ-SEC-021** to `docs/specs/security-and-access.md` recording that the anonymous outsider mission view is an operational-coordination surface that exposes the public roster, unit assignments, frequencies and organisation of non-internal missions while withholding PII, financial intent and free-text comments.
+**Accepted and implemented (2026-06-21).** **REQ-SEC-021** has been added to `docs/specs/security-and-access.md` recording that the anonymous outsider mission view is an operational-coordination surface that exposes the public roster, unit assignments, frequencies and organisation of non-internal missions while withholding PII, financial intent and free-text comments.
 
 ## Consequences
 
-- The exposure is bounded and documented rather than implicit. The public order-of-battle visibility is acknowledged as an accepted cost of running an open sign-up board, not an oversight; finding L3's "intentional-by-design" rating is now backed by a decision record and (if Accepted) a binding REQ-SEC.
+- The exposure is bounded and documented rather than implicit. The public order-of-battle visibility is acknowledged as an accepted cost of running an open sign-up board, not an oversight; finding L3's "intentional-by-design" rating is now backed by a decision record and a binding REQ-SEC (REQ-SEC-021).
 - Two of the higher-sensitivity, lower-value fields leave the anonymous surface, shrinking the scrape value without touching the sign-up workflow. Financial intent and uncontrolled free text are no longer published to unauthenticated callers.
 - The trim is a one-method, two-field null-out at an existing chokepoint — no new endpoint, no migration, no change to `canSeeMission` / `canSeeMissionRow` and no change to the C-1 ArchUnit guard.
 - The member-peer and authenticated views are unaffected, so members keep seeing payout and comment; the public view's payout `<select>` renders unselected and the comment note-mark is hidden for outsiders.
