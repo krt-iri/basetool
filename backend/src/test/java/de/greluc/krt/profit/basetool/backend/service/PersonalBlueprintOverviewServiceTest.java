@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintOverviewOwnerDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -98,6 +99,10 @@ class PersonalBlueprintOverviewServiceTest {
     return b;
   }
 
+  private static BlueprintOwnerProduct op(String name, UUID owner) {
+    return new BlueprintOwnerProduct(owner.toString(), name);
+  }
+
   private static User user(UUID id, String displayName) {
     User u = new User();
     u.setId(id);
@@ -118,12 +123,9 @@ class PersonalBlueprintOverviewServiceTest {
     // such owners, so a squadron-less admin's own blueprints went missing.
     when(personalBlueprintRepository.findAllDistinctOwnerSubs())
         .thenReturn(Set.of(USER_1.toString(), USER_2.toString()));
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
         .thenReturn(
-            List.of(
-                bp("aurora", "Aurora MR", USER_1),
-                bp("aurora", "Aurora MR", USER_2),
-                bp("cutlass", "Cutlass Black", USER_1)));
+            List.of(op("Aurora MR", USER_1), op("Aurora MR", USER_2), op("Cutlass Black", USER_1)));
 
     Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
 
@@ -142,11 +144,9 @@ class PersonalBlueprintOverviewServiceTest {
     when(personalBlueprintRepository.findAllDistinctOwnerSubs())
         .thenReturn(Set.of(USER_1.toString(), USER_2.toString()));
     // USER_1 owns the base, USER_2 owns a cosmetic variant — one family row, count 2, base label.
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
         .thenReturn(
-            List.of(
-                bp("fresnel energy lmg", "Fresnel Energy LMG", USER_1),
-                bp("fresnel \"molten\" energy lmg", "Fresnel \"Molten\" Energy LMG", USER_2)));
+            List.of(op("Fresnel Energy LMG", USER_1), op("Fresnel \"Molten\" Energy LMG", USER_2)));
 
     Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
 
@@ -163,8 +163,8 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
-        .thenReturn(List.of(bp("aurora", "Aurora MR", USER_1)));
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
+        .thenReturn(List.of(op("Aurora MR", USER_1)));
 
     Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
 
@@ -181,7 +181,7 @@ class PersonalBlueprintOverviewServiceTest {
 
     assertTrue(page.getContent().isEmpty());
     assertEquals(0, page.getTotalElements());
-    verify(personalBlueprintRepository, never()).findAllByOwnerSubIn(any());
+    verify(personalBlueprintRepository, never()).findOwnerProductByOwnerSubIn(any());
   }
 
   @Test
@@ -190,9 +190,8 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(personalBlueprintRepository.findAllDistinctOwnerSubs())
         .thenReturn(Set.of(USER_1.toString()));
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
-        .thenReturn(
-            List.of(bp("aurora", "Aurora MR", USER_1), bp("cutlass", "Cutlass Black", USER_1)));
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
+        .thenReturn(List.of(op("Aurora MR", USER_1), op("Cutlass Black", USER_1)));
 
     Page<BlueprintOverviewEntryDto> page =
         service.listAvailableBlueprints(
@@ -210,12 +209,9 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(personalBlueprintRepository.findAllDistinctOwnerSubs())
         .thenReturn(Set.of(USER_1.toString()));
-    when(personalBlueprintRepository.findAllByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
         .thenReturn(
-            List.of(
-                bp("aurora", "Aurora MR", USER_1),
-                bp("scattergun", "Scattergun", USER_1),
-                bp("caterpillar", "Caterpillar", USER_1)));
+            List.of(op("Aurora MR", USER_1), op("Scattergun", USER_1), op("Caterpillar", USER_1)));
 
     Page<BlueprintOverviewEntryDto> page =
         service.listAvailableBlueprints(PageRequest.of(0, 1, Sort.by("productName")), "CAT");
@@ -330,8 +326,8 @@ class PersonalBlueprintOverviewServiceTest {
     // USER_2 is not a member of ORG_A but opted into global sharing — they must still be counted.
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
     ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
-    when(personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs.capture()))
-        .thenReturn(List.of(bp("aurora", "Aurora MR", USER_1), bp("aurora", "Aurora MR", USER_2)));
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs.capture()))
+        .thenReturn(List.of(op("Aurora MR", USER_1), op("Aurora MR", USER_2)));
 
     Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
 

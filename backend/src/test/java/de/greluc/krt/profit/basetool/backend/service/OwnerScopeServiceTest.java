@@ -1295,6 +1295,25 @@ class OwnerScopeServiceTest {
     }
 
     @Test
+    void blueprintGateAndOversightScopes_shareOneMembershipRead() {
+      // REQ-DATA-003: the blueprint-overview gate plus the cascading and own-level oversight scopes
+      // all read the caller's membership rows; the request-scoped memo collapses what was a
+      // separate findAllByIdUserId per resolver (incl. the gate+body double-read) into one query.
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      service.canAccessBlueprintOverview();
+      service.currentOversightScope();
+      service.currentOwnLevelOversightScope();
+
+      verify(orgUnitMembershipRepository, times(1)).findAllByIdUserId(MEMBER_USER_ID);
+    }
+
+    @Test
     void canViewJobOrders_calledTwice_runsProfitEligibilityCountOnce() {
       // The profit-eligibility verdict is request-constant, yet on the order-lookup path
       // canViewJobOrders() is consulted once per row via canSeeJobOrder. The request-scoped memo

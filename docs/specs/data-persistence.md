@@ -31,7 +31,15 @@ it before adding a migration.
 
 ### REQ-DATA-003 — No N+1
 
-Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out.
+Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out. Replace a
+`findById`-in-a-loop with one `findAllById` keyed into a map (e.g.
+`MissionService.resolveMembershipOrgUnits`, `BankLedgerService` wipe-reset / reversal holders), and
+memoise a request-constant lookup or verdict on the `HttpServletRequest` — or derive both projections
+from a single load — so repeated per-row / per-resolver reads collapse to one (e.g. the
+`PromotionEligibilityService` evaluation set is loaded once per user across all rank transitions, and
+`OwnerScopeService.currentCallerMemberships()` backs the blueprint-overview gate plus the cascading
+and own-level oversight scopes from one membership read). Dead unbounded eager finders
+(`SELECT i FROM InventoryItem i` with no caller) are deleted, not kept as a foot-gun.
 
 A **paged list** must not fan a per-row query out across the page: enrich the whole page from a
 single batched query keyed by the page's ids and join it in memory, mirroring
@@ -159,6 +167,36 @@ history.
 test schema, and the two partial indexes additionally have their `WHERE` predicate and key ordering
 pinned (via `pg_indexes.indexdef`) so a later migration cannot silently narrow the predicate or flip
 a sort while keeping the index name.
+
+### REQ-DATA-007 — Slow-changing global catalogues are served from the frontend `STATIC_DATA_CACHE`
+
+A backend list that is **global** (no per-principal variance) and **slow-changing** is fetched through
+`BackendApiClient.getCached(...)` — the 10-minute Caffeine `STATIC_DATA_CACHE`, keyed on the request
+URI — not a plain `get(...)` on every render. The canonical case is the **squadron catalogue** (`GET
+/api/v1/squadrons?size=1000&sort=name,asc`): it is read on **every** authenticated render by
+`SquadronContextAdvice` (`availableSquadrons()` plus the admin switcher's `loadAdminOrgUnitCatalogue()`)
+and by the page controllers that already cache the identical URI (e.g.
+`JobOrderPageController.fetchSquadrons()`). Because the cache key is the URI alone, all those callers
+share **one** entry, so the catalogue is fetched at most once per TTL app-wide and the admin render's
+former double-fetch of the identical URI collapses to a single cached read.
+
+Invariants that must hold:
+
+- **Cacheability is gated on eviction.** A catalogue may be cached **only** if every admin mutation of
+  it evicts the cache via `clearStaticDataCache()`, so no user sees a list more stale than the last
+  mutation. Squadron lifecycle changes (`AdminMissionDataPageController`) evict, so the squadron
+  catalogue is cacheable.
+- **The SpecialCommand catalogue (`/api/v1/special-commands?…`) stays an uncached plain `get`** because
+  `AdminSpecialCommandsPageController` does **not** yet evict `STATIC_DATA_CACHE`; caching it without
+  that wiring would leave the admin switcher's SK list stale for the cache TTL after an SK lifecycle
+  change. Caching it is blocked on wiring SK-mutation eviction first.
+- **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`, and
+  `/api/v1/me/active-org-unit` share a URI across users; a URI-keyed cache would cross-contaminate
+  them, so they remain plain `get(...)`.
+
+**Acceptance** (`SquadronContextAdviceTest`): both `availableSquadrons()` and the admin switcher route
+the squadron catalogue through `getCached`, never a plain `get`; the SpecialCommand catalogue stays a
+plain `get`.
 
 ## Out of scope
 

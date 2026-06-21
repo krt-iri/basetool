@@ -43,17 +43,6 @@ import org.springframework.stereotype.Repository;
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {
 
   /**
-   * Loads every {@link InventoryItem} together with its {@code material}, {@code location}, {@code
-   * user}, {@code jobOrder} and {@code mission} relations in one query - the explicit JPQL plus
-   * {@code @EntityGraph} avoids the N+1 the default {@code findAll()} would emit when callers touch
-   * any of those fields.
-   */
-  @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
-  @Query("SELECT i FROM InventoryItem i")
-  List<InventoryItem> findAllWithEagerRelationships();
-
-  /**
    * Derived Spring-Data query - returns entities matching {@code User}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */

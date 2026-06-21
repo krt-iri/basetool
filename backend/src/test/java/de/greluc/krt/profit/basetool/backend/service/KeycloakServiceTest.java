@@ -20,13 +20,22 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
+import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import java.security.KeyStore;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -80,5 +89,80 @@ class KeycloakServiceTest {
 
     assertTrue(service.fetchUsers().isEmpty());
     verify(sslBundles).getBundle("keycloak-trust");
+  }
+
+  /**
+   * The Keycloak Admin {@code GET /users} endpoint caps each response at a server-side maximum, so
+   * the sync must page through {@code first}/{@code max}. Regression guard for the truncation bug:
+   * with a page size of 2 and three users spread across two pages, {@code fetchUsers} must return
+   * all three — not just the first page — otherwise {@code UserSyncTask} would wrongly flag the
+   * third user as missing and soft-delete it.
+   */
+  @Test
+  void fetchUsers_pagesThroughAllUsers_notJustTheFirstPage() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(2);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+      UUID userB = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
+      UUID userC = UUID.fromString("00000000-0000-0000-0000-0000000000c3");
+
+      // 1) client-credentials token, 2) full first page (== pageSize → keep paging),
+      // 3) short second page (< pageSize → stop), 4-6) per-user realm-role mappings.
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse(
+              "[{\"id\":\""
+                  + userA
+                  + "\",\"username\":\"a\",\"enabled\":true},{\"id\":\""
+                  + userB
+                  + "\",\"username\":\"b\",\"enabled\":true}]"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userC + "\",\"username\":\"c\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(jsonResponse("[]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles);
+
+      List<KeycloakUserDto> users = service.fetchUsers();
+
+      assertEquals(3, users.size(), "all three users across both pages must be returned");
+      assertEquals(
+          Set.of("a", "b", "c"),
+          users.stream().map(KeycloakUserDto::username).collect(Collectors.toSet()));
+
+      server.takeRequest(); // token
+      RecordedRequest firstPage = server.takeRequest();
+      assertTrue(firstPage.getPath().contains("first=0"), "first page must request first=0");
+      assertTrue(firstPage.getPath().contains("max=2"), "first page must bind the page size");
+      RecordedRequest secondPage = server.takeRequest();
+      assertTrue(secondPage.getPath().contains("first=2"), "second page must advance the offset");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * Builds a 200 JSON {@link MockResponse} with the given body.
+   *
+   * @param body the JSON payload.
+   * @return the staged response.
+   */
+  private static MockResponse jsonResponse(String body) {
+    return new MockResponse()
+        .setResponseCode(200)
+        .setHeader("Content-Type", "application/json")
+        .setBody(body);
   }
 }

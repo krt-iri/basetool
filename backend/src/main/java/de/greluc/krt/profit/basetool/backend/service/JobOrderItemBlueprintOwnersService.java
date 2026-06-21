@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderBlueprintOwnerDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderRequiredBlueprintDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
@@ -147,18 +148,19 @@ public class JobOrderItemBlueprintOwnersService {
     Map<UUID, Set<String>> ownedNamesByOwnerId = new LinkedHashMap<>();
     Map<String, Set<UUID>> ownersByFamily = new HashMap<>();
     if (!ownerSubs.isEmpty()) {
-      for (PersonalBlueprint bp : personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs)) {
-        String familyKey = familyResolver.familyKey(bp.getProductName());
+      for (BlueprintOwnerProduct bp :
+          personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs)) {
+        String familyKey = familyResolver.familyKey(bp.productName());
         if (!requiredByFamily.containsKey(familyKey)) {
           continue;
         }
-        UUID ownerId = parseUuid(bp.getOwnerSub());
+        UUID ownerId = parseUuid(bp.ownerSub());
         if (ownerId == null) {
           continue;
         }
         ownedNamesByOwnerId
             .computeIfAbsent(ownerId, id -> new LinkedHashSet<>())
-            .add(bp.getProductName());
+            .add(bp.productName());
         ownersByFamily.computeIfAbsent(familyKey, k -> new LinkedHashSet<>()).add(ownerId);
       }
     }
