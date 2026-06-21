@@ -47,7 +47,7 @@
         <div id="order-header-results"><th:block th:fragment="orderHeader">
         <!-- Title row: order id + kind badge + read-only status pill (visible to all roles). -->
         <div class="od-titlebar">
-            <h3 class="od-title" th:text="#{orders.detail.group.order} + ' #' + ${order.displayId}">Auftrag #1</h3>
+            <h2 class="od-title" th:text="#{orders.detail.group.order} + ' #' + ${order.displayId}">Auftrag #1</h2>
             <span th:switch="${order.type}">
                 <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
                 <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
