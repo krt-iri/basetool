@@ -25,17 +25,27 @@
  *   window.krtFetch (CSRF + 403-retry handled centrally); destructive actions confirm through the
  *   non-native window.showKrtConfirm dialog.
  * - Keeps the unread badge fresh from the server (the single source of truth) after every mutation
- *   and on a 60s poll, paused while the tab is hidden. Per-item DOM is patched in place so the same
- *   handlers drive both the dropdown and the full /notifications page.
+ *   and on a background poll, paused while the tab is hidden. The poll backs off to a slow keepalive
+ *   while the SSE push stream is connected and speeds back up the moment it drops; the slow cadence
+ *   is kept frequent enough to remain the REQ-SEC-012 re-auth safety net (the poll path — not the
+ *   refresh-incapable SSE relay — is what drives token refresh / 401 re-login detection). Per-item
+ *   DOM is patched in place so the same handlers drive both the dropdown and the full /notifications
+ *   page.
  *
  * i18n strings are read from data-* attributes injected by Thymeleaf so this static file carries no
  * hardcoded user-facing text.
  */
 (function () {
-    const POLL_INTERVAL_MS = 60000;
+    // Fast cadence: SSE is down, so the poll is the primary "is there anything new?" mechanism.
+    const POLL_INTERVAL_FAST_MS = 60000;
+    // Slow cadence: SSE is connected and pushes updates in real time, so the poll is only a backstop
+    // — but stays frequent enough to remain the REQ-SEC-012 re-auth keepalive (the poll path is what
+    // refreshes the token / detects a poisoned session; the SSE relay is deliberately refresh-incapable).
+    const POLL_INTERVAL_SLOW_MS = 300000;
     const bell = document.getElementById('notification-bell');
     const i18n = readMessages();
     let pollTimer = null;
+    let sseHealthy = false;
 
     // Read the localized strings the templates expose so this static JS stays text-free.
     function readMessages() {
@@ -407,11 +417,15 @@
         }
     }
 
+    function currentPollIntervalMs() {
+        return sseHealthy ? POLL_INTERVAL_SLOW_MS : POLL_INTERVAL_FAST_MS;
+    }
+
     function startPolling() {
         if (pollTimer || !document.getElementById('notification-badge')) {
             return;
         }
-        pollTimer = window.setInterval(refreshUnreadCount, POLL_INTERVAL_MS);
+        pollTimer = window.setInterval(refreshUnreadCount, currentPollIntervalMs());
     }
 
     function stopPolling() {
@@ -419,6 +433,16 @@
             window.clearInterval(pollTimer);
             pollTimer = null;
         }
+    }
+
+    // Re-arm the poll timer at the cadence implied by the current SSE health. No-op while the tab is
+    // hidden (the timer is stopped; onVisibilityChange restarts it at the right cadence on return).
+    function restartPolling() {
+        if (!pollTimer) {
+            return;
+        }
+        stopPolling();
+        startPolling();
     }
 
     function onVisibilityChange() {
@@ -442,6 +466,24 @@
         }
         try {
             const source = new EventSource('/notifications/stream');
+            // Stream connected → push is live, so back the poll off to the slow keepalive cadence.
+            // Only act on the false→true transition so reconnects don't churn the timer.
+            source.addEventListener('open', function () {
+                if (!sseHealthy) {
+                    sseHealthy = true;
+                    restartPolling();
+                }
+            });
+            // Stream dropped (EventSource will auto-reconnect) → fall back to the fast poll as the
+            // primary mechanism and catch up once. Guarded on the true→false transition so the
+            // repeated error events fired during a reconnect storm don't hammer the count endpoint.
+            source.addEventListener('error', function () {
+                if (sseHealthy) {
+                    sseHealthy = false;
+                    restartPolling();
+                    refreshUnreadCount();
+                }
+            });
             source.addEventListener('notification', function () {
                 refreshUnreadCount();
                 const dropdown = document.getElementById('notification-dropdown');

@@ -201,7 +201,12 @@ heartbeat, exposed at `GET /api/v1/notifications/stream`; the frontend relays it
 via a resilience-free streaming WebClient (`WebClientConfig#sseWebClient`) and an `EventSource`.
 On a `notification` event the client refreshes its unread state immediately. Push is
 **best-effort** — the polling of REQ-NOTIF-006 is the guaranteed fallback, and a failed push or
-broken stream never affects correctness. The registry is single-backend-instance; multi-instance
+broken stream never affects correctness. The unread-count poll adapts to stream health: while the
+`EventSource` is connected it backs off to a slow keepalive (≈5 min) and speeds back up (≈1 min)
+the moment the stream drops, so a healthy SSE session avoids redundant count polls. The slow
+cadence is deliberately frequent enough to remain the REQ-SEC-012 re-auth safety net — the poll
+path (not the refresh-incapable SSE relay) is what drives frontend token refresh and 401 re-login
+detection. The registry is single-backend-instance; multi-instance
 fan-out via Redis pub/sub remains a follow-up.
 
 **Acceptance**
