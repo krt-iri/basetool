@@ -127,6 +127,16 @@ public class OwnerScopeService {
   private static final String CACHE_KEY_MEMBER_ORG_UNIT_IDS =
       OwnerScopeService.class.getName() + ".memberOrgUnitIds";
 
+  /**
+   * Request-attribute key under which {@link #currentCallerMemberships()} caches the current
+   * caller's raw {@code org_unit_membership} rows for the duration of the request. The blueprint-
+   * overview gate plus the cascading and own-level oversight scopes each read the same membership
+   * list; memoising it collapses those repeated {@code findAllByIdUserId} reads (e.g. the gate +
+   * body double-read on the availability overview) to a single query per request.
+   */
+  private static final String CACHE_KEY_CALLER_MEMBERSHIPS =
+      OwnerScopeService.class.getName() + ".callerMemberships";
+
   private final AuthHelperService authHelper;
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
@@ -285,6 +295,31 @@ public class OwnerScopeService {
   }
 
   /**
+   * The current caller's raw {@code org_unit_membership} rows, memoised on the request. Returns an
+   * empty list for an anonymous caller. Shared by the blueprint-overview gate and the cascading /
+   * own-level oversight scopes so they read the membership table once per request instead of once
+   * each (REQ-DATA-003).
+   *
+   * @return the caller's membership rows, never {@code null}.
+   */
+  @NotNull
+  private List<OrgUnitMembership> currentCallerMemberships() {
+    Object cached = request.getAttribute(CACHE_KEY_CALLER_MEMBERSHIPS);
+    if (cached instanceof List<?> list) {
+      @SuppressWarnings("unchecked")
+      List<OrgUnitMembership> typed = (List<OrgUnitMembership>) list;
+      return typed;
+    }
+    List<OrgUnitMembership> memberships =
+        authHelper
+            .currentUserId()
+            .map(orgUnitMembershipRepository::findAllByIdUserId)
+            .orElseGet(List::of);
+    request.setAttribute(CACHE_KEY_CALLER_MEMBERSHIPS, memberships);
+    return memberships;
+  }
+
+  /**
    * {@code true} iff the current principal may enter the Job-Order area at all — i.e. see the order
    * list and order details. Only members of a <em>profit-eligible</em> org unit (Squadron or
    * Spezialkommando) participate in the order workflow: Kartell departments are split into Profit
@@ -343,13 +378,7 @@ public class OwnerScopeService {
     if (authHelper.isAdmin() || authHelper.hasReachableRole("ROLE_OFFICER")) {
       return true;
     }
-    return authHelper
-        .currentUserId()
-        .map(
-            userId ->
-                orgUnitMembershipRepository.findAllByIdUserId(userId).stream()
-                    .anyMatch(OwnerScopeService::isOversightSeat))
-        .orElse(false);
+    return currentCallerMemberships().stream().anyMatch(OwnerScopeService::isOversightSeat);
   }
 
   /**
@@ -393,23 +422,17 @@ public class OwnerScopeService {
     if (authHelper.hasReachableRole("ROLE_OFFICER")) {
       readPersistentSquadronFromUser().ifPresent(oversightOrgUnitIds::add);
     }
-    authHelper
-        .currentUserId()
-        .ifPresent(
-            userId -> {
-              List<OrgUnitMembership> memberships =
-                  orgUnitMembershipRepository.findAllByIdUserId(userId);
-              for (OrgUnitMembership m : memberships) {
-                if (m.isLead()) {
-                  oversightOrgUnitIds.add(m.getId().getOrgUnitId());
-                }
-              }
-              // Epic #692 Phase 6 (REQ-ORG-015/-019): a Bereichsleitung member oversees their
-              // Bereich + its Staffeln/SKs, an OL member every org unit — the cascading,
-              // officer-equivalent reach (never admin). cascadedOfficerReach also contributes the
-              // Bereich/OL seat itself, so the caller's own AREA/CARTEL account is in scope.
-              oversightOrgUnitIds.addAll(orgUnitCascadeService.cascadedOfficerReach(memberships));
-            });
+    List<OrgUnitMembership> memberships = currentCallerMemberships();
+    for (OrgUnitMembership m : memberships) {
+      if (m.isLead()) {
+        oversightOrgUnitIds.add(m.getId().getOrgUnitId());
+      }
+    }
+    // Epic #692 Phase 6 (REQ-ORG-015/-019): a Bereichsleitung member oversees their Bereich + its
+    // Staffeln/SKs, an OL member every org unit — the cascading, officer-equivalent reach (never
+    // admin). cascadedOfficerReach also contributes the Bereich/OL seat itself, so the caller's own
+    // AREA/CARTEL account is in scope.
+    oversightOrgUnitIds.addAll(orgUnitCascadeService.cascadedOfficerReach(memberships));
     Optional<UUID> pinned = readActiveSquadronFromHeader();
     if (pinned.isPresent() && oversightOrgUnitIds.contains(pinned.get())) {
       return new ScopePredicate(false, pinned.get(), Set.of());
@@ -452,16 +475,11 @@ public class OwnerScopeService {
     if (authHelper.hasReachableRole("ROLE_OFFICER")) {
       readPersistentSquadronFromUser().ifPresent(ownLevelOrgUnitIds::add);
     }
-    authHelper
-        .currentUserId()
-        .ifPresent(
-            userId -> {
-              for (OrgUnitMembership m : orgUnitMembershipRepository.findAllByIdUserId(userId)) {
-                if (isOversightSeat(m)) {
-                  ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
-                }
-              }
-            });
+    for (OrgUnitMembership m : currentCallerMemberships()) {
+      if (isOversightSeat(m)) {
+        ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
+      }
+    }
     Optional<UUID> pinned = readActiveSquadronFromHeader();
     if (pinned.isPresent() && ownLevelOrgUnitIds.contains(pinned.get())) {
       return new ScopePredicate(false, pinned.get(), Set.of());

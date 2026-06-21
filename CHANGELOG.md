@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Weniger Datenbankabfragen auf Beförderungs-, Hangar-, Leitungs- und Bank-Verwaltungsseiten.** Die Beförderungs-Eignungsprüfung lädt die Bewertungsdaten je Mitglied einmal statt mehrfach pro Rangübergang; die Staffel-Hangarübersicht gruppiert Schiffe einmal statt pro Typ neu zu filtern; die Mitgliedschafts- und Oversight-Abfragen werden pro Anfrage gebündelt; der Bank-Reset/-Storno lädt Kontoinhaber gebündelt. Reine interne Performance-Verbesserung ohne Verhaltensänderung.
+
 - **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
 
 ### Fixed
