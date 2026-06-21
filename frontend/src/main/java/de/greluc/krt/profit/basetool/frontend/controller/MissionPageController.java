@@ -619,8 +619,11 @@ public class MissionPageController {
         try {
           // The three reads are independent per-mission lookups; run them concurrently instead of
           // back to back. No .exceptionally on the futures: a failure surfaces through join() as a
-          // CompletionException caught by the block's existing catch, preserving the original
-          // all-or-nothing "skip the Finanzen panel on error" behaviour exactly.
+          // CompletionException caught by the block's existing catch, so the rendered outcome is
+          // unchanged (the Finanzen panel is skipped wholesale on any error, as before). The one
+          // side-effect that differs from the serial version: all three GETs are now always
+          // dispatched, whereas serially a failure on the first short-circuited the other two —
+          // harmless here, as these are idempotent reads.
           CompletableFuture<PageResponse<MissionFinanceEntryDto>> financesFuture =
               parallelPageLoader.loadAsync(
                   () ->

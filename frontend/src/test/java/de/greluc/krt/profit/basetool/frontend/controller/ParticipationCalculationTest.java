@@ -43,6 +43,11 @@ import org.springframework.ui.Model;
 
 class ParticipationCalculationTest {
 
+  // Real loader so the parallelized finance/refinery fetches actually run their suppliers (against
+  // the mocked BackendApiClient) on a worker thread, exactly as in production. Shared across the
+  // method-local controller instances; harmless when a test never reaches the member finance block.
+  private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
+
   @Test
   void testParticipationCalculation_KeyType() {
     // Arrange
@@ -113,7 +118,7 @@ class ParticipationCalculationTest {
             backendApiClient,
             mock(MessageSource.class),
             mock(FrontendAuthHelperService.class),
-            new ParallelPageLoader());
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     // Act
@@ -216,7 +221,7 @@ class ParticipationCalculationTest {
             backendApiClient,
             mock(MessageSource.class),
             mock(FrontendAuthHelperService.class),
-            new ParallelPageLoader());
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     // Act

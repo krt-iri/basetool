@@ -588,13 +588,13 @@ class MissionPageControllerTest {
   }
 
   @Test
-  void missionDetail_Member_FetchesFinanceTrioConcurrently() {
+  void missionDetail_Member_FetchesFinanceTrioViaParallelLoader() {
     // For a member, the finance-entries / finance-sum / refinery-orders trio is fetched via the
-    // ParallelPageLoader. All three independent reads must still happen (now concurrently); the
-    // real
-    // PARALLEL loader runs each supplier against the mocked client, so verifying the three calls
-    // proves the parallel block issues them all (#2 / live-sync #755 amplifies this on peer
-    // fragment re-fetches).
+    // ParallelPageLoader. This asserts all three independent reads still happen on the member path
+    // (it does not — and cannot deterministically — assert they overlap in time): the real PARALLEL
+    // loader runs each supplier against the mocked client, so verifying the three calls proves the
+    // parallel block issues them all (#2 / live-sync #755 amplifies this on peer fragment
+    // re-fetches).
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
