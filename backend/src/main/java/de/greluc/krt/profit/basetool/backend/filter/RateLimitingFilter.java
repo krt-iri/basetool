@@ -55,14 +55,17 @@ import tools.jackson.core.io.JsonStringEncoder;
  *
  * <p>Active only on URI patterns listed in {@code app.rate-limit.paths} and disabled wholesale via
  * {@code app.rate-limit.enabled=false}. Patterns are matched with Spring's {@link
- * org.springframework.web.util.pattern.PathPattern} (parsed once and cached per pattern) rather than
- * {@code AntPathMatcher} re-tokenizing on every request; {@code **} is therefore only valid as the
- * final segment, which all configured patterns already are. Buckets are keyed by {@code clientIp +
- * "|" + slot} where
- * {@code slot} is either {@code "path:<pattern>"} for the global default or {@code "rule:<name>"}
- * for an endpoint-specific rule (audit finding L-5, 2026-05-20). The Caffeine cache expires entries
- * after one hour of inactivity (1h hibernate-window keeps abusive clients limited across short
- * pauses) and is capped at 100 000 entries to bound memory under a Slowloris-style attack.
+ * org.springframework.web.util.pattern.PathPattern} (parsed once and cached per pattern) rather
+ * than {@code AntPathMatcher} re-tokenizing on every request; {@code **} is therefore only valid as
+ * the final segment, which all configured patterns already are. Every configured pattern is
+ * compiled and validated once at filter construction, so a malformed pattern (e.g. a mid-path
+ * {@code **}) aborts application startup with a precise message instead of silently leaving the
+ * matching endpoints unprotected at runtime. Buckets are keyed by {@code clientIp + "|" + slot}
+ * where {@code slot} is either {@code "path:<pattern>"} for the global default or {@code
+ * "rule:<name>"} for an endpoint-specific rule (audit finding L-5, 2026-05-20). The Caffeine cache
+ * expires entries after one hour of inactivity (1h hibernate-window keeps abusive clients limited
+ * across short pauses) and is capped at 100 000 entries to bound memory under a Slowloris-style
+ * attack.
  *
  * <p>When both the global default and one or more endpoint-specific rules match, the filter
  * iterates them tightest-first and aborts on the first depleted bucket — so spam against the
@@ -97,11 +100,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * list is compiled into {@link IpAddressMatcher} instances once during construction so that the
    * per-request {@link #resolveClientIp} hot path no longer allocates a fresh matcher (and
    * re-parses the CIDR / IP literal) on every call. Malformed entries are logged once here and
-   * dropped from the cached list, exactly as the previous per-request path did.
+   * dropped from the cached list, exactly as the previous per-request path did. Every configured
+   * rate-limit pattern is likewise compiled and validated here via {@link
+   * #precompileAndValidatePatterns(RateLimitProperties)}, so a malformed pattern fails startup
+   * instead of silently disabling enforcement at runtime.
    *
    * @param properties bucket capacity/refill configuration plus path patterns, endpoint-specific
    *     rules and trusted proxies
    * @param problemProperties RFC&nbsp;7807 problem-type base URI used in the 429 response body
+   * @throws IllegalStateException when any configured rate-limit pattern is blank or not valid
+   *     {@link PathPattern} syntax
    */
   public RateLimitingFilter(
       RateLimitProperties properties, AppProblemProperties problemProperties) {
@@ -113,6 +121,77 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             .maximumSize(BUCKET_MAX_ENTRIES)
             .build();
     this.trustedProxyMatchers = compileTrustedProxies(properties.getTrustedProxies());
+    precompileAndValidatePatterns(properties);
+  }
+
+  /**
+   * Eagerly compiles every configured rate-limit pattern — the global {@link
+   * RateLimitProperties#getPaths()} umbrella plus every {@link RateLimitProperties.Rule#getPaths()
+   * rule pattern} — at filter construction. This serves two purposes: it warms {@link
+   * #compiledPatterns} so no request pays the first-compile cost, and, crucially, it FAILS FAST — a
+   * pattern that {@link PathPattern} cannot parse (e.g. a mid-path {@code **}) or a blank entry
+   * aborts application startup with a message naming the offending pattern and its config origin,
+   * rather than silently degrading to a permanent non-match at runtime and leaving the matching
+   * endpoints unprotected. Because {@code app.rate-limit} configuration is bound once at startup,
+   * this validation covers every pattern the filter will ever evaluate; the {@link
+   * #tryParse(String)} runtime fallback survives only as defense-in-depth for a pattern set mutated
+   * after construction.
+   *
+   * @param properties the validated rate-limit configuration whose patterns are compiled
+   * @throws IllegalStateException when any configured pattern is blank or not valid PathPattern
+   *     syntax
+   */
+  private void precompileAndValidatePatterns(RateLimitProperties properties) {
+    List<String> globalPaths = properties.getPaths();
+    if (globalPaths != null) {
+      for (String pattern : globalPaths) {
+        compileOrFail(pattern, "app.rate-limit.paths");
+      }
+    }
+    List<RateLimitProperties.Rule> rules = properties.getRules();
+    if (rules != null) {
+      for (RateLimitProperties.Rule rule : rules) {
+        List<String> rulePaths = rule.getPaths();
+        if (rulePaths != null) {
+          for (String pattern : rulePaths) {
+            compileOrFail(pattern, "app.rate-limit.rules[" + rule.getName() + "].paths");
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Compiles one configured pattern and stores it in {@link #compiledPatterns}, throwing {@link
+   * IllegalStateException} (which aborts context startup) when it is blank or not valid {@link
+   * PathPattern} syntax. The thrown message names both the offending pattern and the {@code origin}
+   * config key so an operator can fix the typo without grepping; the cause carries the underlying
+   * {@link PatternParseException} for the full parser diagnostic.
+   *
+   * @param rawPattern the raw pattern to compile and cache
+   * @param origin the configuration key the pattern came from, for the failure message (e.g. {@code
+   *     app.rate-limit.paths})
+   * @throws IllegalStateException when {@code rawPattern} is blank or cannot be parsed
+   */
+  private void compileOrFail(String rawPattern, String origin) {
+    if (rawPattern == null || rawPattern.isBlank()) {
+      throw new IllegalStateException(
+          "Blank rate-limit path pattern configured under "
+              + origin
+              + "; every pattern must be a non-blank PathPattern.");
+    }
+    try {
+      compiledPatterns.put(rawPattern, Optional.of(pathPatternParser.parse(rawPattern)));
+    } catch (PatternParseException ex) {
+      throw new IllegalStateException(
+          "Invalid rate-limit path pattern '"
+              + rawPattern
+              + "' configured under "
+              + origin
+              + "; PathPattern allows ** only as the final segment. Reason: "
+              + ex.getMessage(),
+          ex);
+    }
   }
 
   /**
@@ -282,11 +361,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   /**
    * Returns whether {@code rawPattern} matches the already-parsed request {@code parsedPath},
    * compiling the raw pattern into a {@link PathPattern} on first use and caching the result. The
-   * pattern set is bounded by {@code app.rate-limit} configuration (the global {@code paths} plus the
-   * per-rule {@code paths}), so the cache cannot grow with request volume; this replaces the
-   * per-request re-tokenization of pattern <i>and</i> path that {@code AntPathMatcher.match(pattern,
-   * path)} performed on every call. The request path is parsed into a {@link PathContainer} once per
-   * request by the caller and reused across all pattern checks.
+   * pattern set is bounded by {@code app.rate-limit} configuration (the global {@code paths} plus
+   * the per-rule {@code paths}), so the cache cannot grow with request volume; this replaces the
+   * per-request re-tokenization of pattern <i>and</i> path that {@code
+   * AntPathMatcher.match(pattern, path)} performed on every call. The request path is parsed into a
+   * {@link PathContainer} once per request by the caller and reused across all pattern checks.
    *
    * @param rawPattern the raw Ant-style pattern from configuration (e.g. {@code /api/**})
    * @param parsedPath the request path parsed once per request
@@ -302,11 +381,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   /**
    * Compiles one raw rate-limit pattern into a {@link PathPattern}, returning {@link
-   * Optional#empty()} (and logging once at WARN) when the pattern is not valid PathPattern syntax.
+   * Optional#empty()} (and logging at ERROR) when the pattern is not valid PathPattern syntax.
    * PathPattern accepts {@code **} only as the final segment, whereas the previous {@code
    * AntPathMatcher} also tolerated mid-path {@code **}; routing a parse failure to a permanent
-   * non-match keeps a configuration typo from turning every matching request into a 500, exactly as
-   * the old matcher silently failed to match rather than throwing.
+   * non-match keeps a configuration typo from turning every matching request into a 500.
+   *
+   * <p>This is the runtime fallback only — every pattern present at startup is already compiled and
+   * validated by {@link #precompileAndValidatePatterns(RateLimitProperties)}, which fails the boot
+   * outright. Reaching this branch therefore means the pattern set was mutated after construction
+   * (e.g. a {@code @RefreshScope} rebind or a test) to something invalid, which silently disables
+   * enforcement for that pattern — hence ERROR, not WARN.
    *
    * @param rawPattern the raw pattern to compile
    * @return the compiled pattern, or empty when it could not be parsed
@@ -315,8 +399,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     try {
       return Optional.of(pathPatternParser.parse(rawPattern));
     } catch (PatternParseException ex) {
-      log.warn(
-          "Invalid app.rate-limit path pattern '{}'; it will never match. Reason: {}",
+      log.error(
+          "Invalid app.rate-limit path pattern '{}' encountered at runtime; it will never match, "
+              + "leaving the endpoint unprotected. Reason: {}",
           rawPattern,
           ex.getMessage());
       return Optional.empty();

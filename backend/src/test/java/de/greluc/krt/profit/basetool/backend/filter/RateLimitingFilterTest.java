@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.config.AppProblemProperties;
@@ -130,10 +131,11 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    void unparseablePattern_isIgnored_doesNotThrow() {
-      // PathPattern only allows ** as the final segment; a mid-path ** is a configuration error.
-      // The filter must treat such a pattern as a permanent non-match (and not 500 the request),
-      // mirroring how the previous AntPathMatcher silently failed to match rather than throwing.
+    void unparseablePattern_mutatedAfterStartup_isIgnored_doesNotThrow() {
+      // Configured patterns are validated at construction (see StartupValidationTests). This case
+      // mutates the paths to an unparseable value AFTER the filter was built — the runtime
+      // defense-in-depth fallback (tryParse) must then treat it as a permanent non-match and never
+      // 500 the request, even though such a mid-path ** can no longer survive a fresh startup.
       properties.setPaths(List.of("/api/**/legacy/**"));
       MockHttpServletRequest req = newRequest("/api/v1/legacy/x");
 
@@ -150,6 +152,105 @@ class RateLimitingFilterTest {
 
       assertEquals(false, filter.shouldNotFilter(newRequest("/api/v1/missions/m1")));
       assertTrue(filter.shouldNotFilter(newRequest("/api/v1/missions/m1/participants")));
+    }
+
+    @Test
+    void globalUmbrella_matchesSubPathsAndTrailingSlash() {
+      // Parity with the AntPathMatcher the filter replaced: `/api/**` must still cover every shape
+      // a real request can take under the umbrella — a deep sub-path and a trailing-slash variant.
+      properties.setPaths(List.of("/api/**"));
+
+      assertEquals(false, filter.shouldNotFilter(newRequest("/api/v1/missions")));
+      assertEquals(
+          false, filter.shouldNotFilter(newRequest("/api/v1/missions/m1/participants/p1")));
+      assertEquals(false, filter.shouldNotFilter(newRequest("/api/")));
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Startup validation — a misconfigured pattern must fail fast at construction (boot), not
+  // silently disable rate limiting for the matching endpoints at runtime.
+  // ---------------------------------------------------------------
+
+  @Nested
+  class StartupValidationTests {
+
+    @Test
+    void constructor_failsFast_onUnparseableGlobalPattern() {
+      // A mid-path ** is rejected by PathPattern. The filter must refuse to start rather than boot
+      // with an umbrella that silently never matches — that would leave /api/** unprotected.
+      RateLimitProperties bad = newValidProperties();
+      bad.setPaths(List.of("/api/**/legacy/**"));
+
+      IllegalStateException ex =
+          assertThrows(
+              IllegalStateException.class,
+              () -> new RateLimitingFilter(bad, problemProperties),
+              "an unparseable global pattern must abort startup");
+      assertTrue(
+          ex.getMessage().contains("/api/**/legacy/**"),
+          "the failure must name the offending pattern: " + ex.getMessage());
+      assertTrue(
+          ex.getMessage().contains("app.rate-limit.paths"),
+          "the failure must name the offending config key: " + ex.getMessage());
+    }
+
+    @Test
+    void constructor_failsFast_onUnparseableRulePattern() {
+      // The same guard covers per-rule patterns, naming the rule so the operator can find it.
+      RateLimitProperties bad = newValidProperties();
+      RateLimitProperties.Rule rule = new RateLimitProperties.Rule();
+      rule.setName("broken-rule");
+      rule.setMethods(List.of("POST"));
+      rule.setPaths(List.of("/api/**/x/**"));
+      rule.setCapacity(1);
+      rule.setRefillTokens(1);
+      rule.setRefillPeriod(Duration.ofMinutes(1));
+      bad.setRules(List.of(rule));
+
+      IllegalStateException ex =
+          assertThrows(
+              IllegalStateException.class, () -> new RateLimitingFilter(bad, problemProperties));
+      assertTrue(
+          ex.getMessage().contains("broken-rule"),
+          "the failure must name the offending rule: " + ex.getMessage());
+    }
+
+    @Test
+    void constructor_failsFast_onBlankPattern() {
+      RateLimitProperties bad = newValidProperties();
+      bad.setPaths(List.of("   "));
+
+      assertThrows(
+          IllegalStateException.class, () -> new RateLimitingFilter(bad, problemProperties));
+    }
+
+    @Test
+    void constructor_succeeds_onAllValidPatterns() {
+      // A representative valid configuration (global umbrella + a single-* + final-** rule) must
+      // construct cleanly — proving the validator does not reject the shapes actually shipped.
+      RateLimitProperties ok = newValidProperties();
+      RateLimitProperties.Rule rule = new RateLimitProperties.Rule();
+      rule.setName("participant-mutations");
+      rule.setMethods(List.of("POST", "PUT", "DELETE"));
+      rule.setPaths(
+          List.of("/api/v1/missions/*/participants", "/api/v1/missions/*/participants/**"));
+      rule.setCapacity(30);
+      rule.setRefillTokens(30);
+      rule.setRefillPeriod(Duration.ofMinutes(1));
+      ok.setRules(List.of(rule));
+
+      assertNotNull(new RateLimitingFilter(ok, problemProperties));
+    }
+
+    private RateLimitProperties newValidProperties() {
+      RateLimitProperties p = new RateLimitProperties();
+      p.setEnabled(true);
+      p.setPaths(List.of("/api/**"));
+      p.setCapacity(300);
+      p.setRefillTokens(300);
+      p.setRefillPeriod(Duration.ofMinutes(1));
+      return p;
     }
   }
 
