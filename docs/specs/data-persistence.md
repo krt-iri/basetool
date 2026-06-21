@@ -186,6 +186,13 @@ Invariants that must hold:
   it evicts the cache via `clearStaticDataCache()`, so no user sees a list more stale than the last
   mutation. Squadron lifecycle changes (`AdminMissionDataPageController`) evict, so the squadron
   catalogue is cacheable.
+- **The same rule enrols the job-order age thresholds.** `GET /api/v1/settings/job_order.age_yellow_days`
+  and `…age_red_days` are global, slow-changing settings read through `getCached` on the orders list and
+  detail renders (`JobOrderPageController`). Their sole writer is `AdminSettingsPageController`, which
+  evicts `STATIC_DATA_CACHE` on every successful save — on **both** the classic redirect handler and the
+  AJAX twin, in a `finally` around the per-setting PUTs so even a **partial save** (an early setting PUT
+  lands, a later one throws) still drops the cache rather than stranding the persisted threshold until
+  the TTL. Caching them is therefore allowed under the eviction gate above.
 - **The SpecialCommand catalogue (`/api/v1/special-commands?…`) stays an uncached plain `get`** because
   `AdminSpecialCommandsPageController` does **not** yet evict `STATIC_DATA_CACHE`; caching it without
   that wiring would leave the admin switcher's SK list stale for the cache TTL after an SK lifecycle
@@ -196,7 +203,8 @@ Invariants that must hold:
 
 **Acceptance** (`SquadronContextAdviceTest`): both `availableSquadrons()` and the admin switcher route
 the squadron catalogue through `getCached`, never a plain `get`; the SpecialCommand catalogue stays a
-plain `get`.
+plain `get`. (`AdminSettingsPageControllerMvcTest`): every successful settings save — classic and AJAX,
+including a partial save where a later PUT throws — evicts `STATIC_DATA_CACHE`.
 
 ## Out of scope
 

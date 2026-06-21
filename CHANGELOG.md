@@ -9,6 +9,11 @@
 ### Changed
 
 - **Weniger Hintergrund-Anfragen der Benachrichtigungs-Glocke.** Solange die Echtzeit-Verbindung (SSE) steht, fragt die Ungelesen-Zahl nur noch im langsamen Takt nach (statt fest alle 60 Sekunden); bricht die Verbindung ab, wird wieder schnell abgefragt. Benachrichtigungen erscheinen weiterhin in Echtzeit.
+
+- **Das Lager-Eingabeformular und das Refinery-Auftragsformular laden schneller.** Die Katalog-Listen (Materialien, Standorte, Job-Orders, Missionen, Nutzer, Besitzer-Auswahl) werden jetzt parallel statt nacheinander vom Backend geholt. Bei einem fehlgeschlagenen Abruf bleibt die betroffene Liste leer wie bisher.
+
+- **Die Auftragsseiten laden etwas schneller.** Die Alters-Schwellwerte werden jetzt zwischengespeichert (statt bei jedem Aufruf neu geladen), und die Logistiker-Zusatzlisten der Auftragsdetails werden parallel statt nacheinander geholt. Kein sichtbarer Funktionsunterschied; eine Anpassung der Schwellwerte im Admin-Bereich wirkt weiterhin sofort.
+
 - **Schlankere Frontend-Backend-Kommunikation.** Backend-Antworten werden zum Frontend jetzt komprimiert (gzip) ausgeliefert, und die doppelte Resilience-Schicht (Wiederholung/Schutzschalter) im Backend-Client wurde auf die eine wirksame reduziert — schnelleres, einheitliches Fehlerverhalten ohne sichtbaren Funktionsunterschied. Zusätzlich neu: optionale Einstellung `spring.session.redis.flush-mode` (Default `IMMEDIATE`; Betreiber können auf `ON_SAVE` umstellen, um Redis-Zugriffe pro Anfrage zu sparen).
 
 - **Die Einsatzdetailseite lädt die Finanz- und Refinery-Daten jetzt parallel statt nacheinander.** Für Mitglieder wurden die drei Abrufe (Finanzeinträge, Finanzsumme, Refinery-Aufträge) bisher seriell ausgeführt; sie laufen nun gleichzeitig, sodass die Detailansicht (und jede Live-Aktualisierung über die Präsenz-Verbindung) schneller fertig ist. Gleiche Daten; schlägt einer der drei Abrufe fehl, wird die Finanzen-Ansicht jetzt einheitlich ausgeblendet statt teilweise angezeigt.

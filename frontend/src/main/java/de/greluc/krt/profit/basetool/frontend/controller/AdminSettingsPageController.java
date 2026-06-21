@@ -298,32 +298,41 @@ public class AdminSettingsPageController {
       // Convert human-friendly percent to DB-side decimal fraction (0.5% -> 0.005).
       BigDecimal transferFeeRate = transferFeePercent.divide(ONE_HUNDRED, 6, RoundingMode.HALF_UP);
 
-      backendApiClient.put(
-          "/api/v1/settings/job_order.age_yellow_days",
-          new SystemSettingUpdateDto(String.valueOf(yellowDays), ageYellowVersion),
-          SystemSettingDto.class);
-      backendApiClient.put(
-          "/api/v1/settings/job_order.age_red_days",
-          new SystemSettingUpdateDto(String.valueOf(redDays), ageRedVersion),
-          SystemSettingDto.class);
-      backendApiClient.put(
-          "/api/v1/settings/refinery.rounding.mode",
-          new SystemSettingUpdateDto(refineryRoundingMode, refineryRoundingVersion),
-          SystemSettingDto.class);
-      backendApiClient.put(
-          "/api/v1/settings/operation.transfer_fee_rate",
-          new SystemSettingUpdateDto(
-              transferFeeRate.stripTrailingZeros().toPlainString(), transferFeeVersion),
-          SystemSettingDto.class);
-
-      // Only persist the intake SK when an SK is actually selected. The backend setting is
-      // @NotBlank, so a blank submit (no SK chosen yet) is treated as "leave unchanged" rather than
-      // an attempt to clear it.
-      if (intakeSpecialCommandId != null && !intakeSpecialCommandId.isBlank()) {
+      try {
         backendApiClient.put(
-            "/api/v1/settings/" + INTAKE_SK_SETTING_KEY,
-            new SystemSettingUpdateDto(intakeSpecialCommandId.trim(), intakeSpecialCommandVersion),
+            "/api/v1/settings/job_order.age_yellow_days",
+            new SystemSettingUpdateDto(String.valueOf(yellowDays), ageYellowVersion),
             SystemSettingDto.class);
+        backendApiClient.put(
+            "/api/v1/settings/job_order.age_red_days",
+            new SystemSettingUpdateDto(String.valueOf(redDays), ageRedVersion),
+            SystemSettingDto.class);
+        backendApiClient.put(
+            "/api/v1/settings/refinery.rounding.mode",
+            new SystemSettingUpdateDto(refineryRoundingMode, refineryRoundingVersion),
+            SystemSettingDto.class);
+        backendApiClient.put(
+            "/api/v1/settings/operation.transfer_fee_rate",
+            new SystemSettingUpdateDto(
+                transferFeeRate.stripTrailingZeros().toPlainString(), transferFeeVersion),
+            SystemSettingDto.class);
+
+        // Only persist the intake SK when an SK is actually selected. The backend setting is
+        // @NotBlank, so a blank submit (no SK chosen yet) is treated as "leave unchanged" rather
+        // than an attempt to clear it.
+        if (intakeSpecialCommandId != null && !intakeSpecialCommandId.isBlank()) {
+          backendApiClient.put(
+              "/api/v1/settings/" + INTAKE_SK_SETTING_KEY,
+              new SystemSettingUpdateDto(
+                  intakeSpecialCommandId.trim(), intakeSpecialCommandVersion),
+              SystemSettingDto.class);
+        }
+      } finally {
+        // The job-order age thresholds are read via getCached on the orders pages, so evict in a
+        // finally: even a partial save (an early PUT lands, a later one throws) still drops the
+        // cache so the persisted value shows on the next render instead of waiting out the TTL.
+        // Clearing the whole static cache is safe — entries just reload on the next read.
+        backendApiClient.clearStaticDataCache();
       }
 
       redirectAttributes.addFlashAttribute("successToast", "success.settings.update");
@@ -369,52 +378,60 @@ public class AdminSettingsPageController {
       }
       BigDecimal transferFeeRate = transferFeePercent.divide(ONE_HUNDRED, 6, RoundingMode.HALF_UP);
 
-      final SystemSettingDto yellow =
-          backendApiClient.put(
-              "/api/v1/settings/job_order.age_yellow_days",
-              new SystemSettingUpdateDto(String.valueOf(yellowDays), request.ageYellowVersion()),
-              SystemSettingDto.class);
-      final SystemSettingDto red =
-          backendApiClient.put(
-              "/api/v1/settings/job_order.age_red_days",
-              new SystemSettingUpdateDto(String.valueOf(redDays), request.ageRedVersion()),
-              SystemSettingDto.class);
-      final SystemSettingDto rounding =
-          backendApiClient.put(
-              "/api/v1/settings/refinery.rounding.mode",
-              new SystemSettingUpdateDto(
-                  request.refineryRoundingMode(), request.refineryRoundingVersion()),
-              SystemSettingDto.class);
-      final SystemSettingDto fee =
-          backendApiClient.put(
-              "/api/v1/settings/operation.transfer_fee_rate",
-              new SystemSettingUpdateDto(
-                  transferFeeRate.stripTrailingZeros().toPlainString(),
-                  request.transferFeeVersion()),
-              SystemSettingDto.class);
-
-      Long intakeVersion =
-          request.intakeSpecialCommandVersion() != null
-              ? request.intakeSpecialCommandVersion()
-              : 0L;
-      String intakeId = request.intakeSpecialCommandId();
-      if (intakeId != null && !intakeId.isBlank()) {
-        SystemSettingDto intake =
+      try {
+        final SystemSettingDto yellow =
             backendApiClient.put(
-                "/api/v1/settings/" + INTAKE_SK_SETTING_KEY,
-                new SystemSettingUpdateDto(intakeId.trim(), intakeVersion),
+                "/api/v1/settings/job_order.age_yellow_days",
+                new SystemSettingUpdateDto(String.valueOf(yellowDays), request.ageYellowVersion()),
                 SystemSettingDto.class);
-        intakeVersion = intake.version();
-      }
+        final SystemSettingDto red =
+            backendApiClient.put(
+                "/api/v1/settings/job_order.age_red_days",
+                new SystemSettingUpdateDto(String.valueOf(redDays), request.ageRedVersion()),
+                SystemSettingDto.class);
+        final SystemSettingDto rounding =
+            backendApiClient.put(
+                "/api/v1/settings/refinery.rounding.mode",
+                new SystemSettingUpdateDto(
+                    request.refineryRoundingMode(), request.refineryRoundingVersion()),
+                SystemSettingDto.class);
+        final SystemSettingDto fee =
+            backendApiClient.put(
+                "/api/v1/settings/operation.transfer_fee_rate",
+                new SystemSettingUpdateDto(
+                    transferFeeRate.stripTrailingZeros().toPlainString(),
+                    request.transferFeeVersion()),
+                SystemSettingDto.class);
 
-      Map<String, Object> result = new LinkedHashMap<>();
-      result.put("ageYellowVersion", yellow.version());
-      result.put("ageRedVersion", red.version());
-      result.put("refineryRoundingVersion", rounding.version());
-      result.put("transferFeeVersion", fee.version());
-      result.put("intakeSpecialCommandVersion", intakeVersion);
-      result.put("transferFeePercent", transferFeePercent.stripTrailingZeros().toPlainString());
-      return ResponseEntity.ok(result);
+        Long intakeVersion =
+            request.intakeSpecialCommandVersion() != null
+                ? request.intakeSpecialCommandVersion()
+                : 0L;
+        String intakeId = request.intakeSpecialCommandId();
+        if (intakeId != null && !intakeId.isBlank()) {
+          SystemSettingDto intake =
+              backendApiClient.put(
+                  "/api/v1/settings/" + INTAKE_SK_SETTING_KEY,
+                  new SystemSettingUpdateDto(intakeId.trim(), intakeVersion),
+                  SystemSettingDto.class);
+          intakeVersion = intake.version();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ageYellowVersion", yellow.version());
+        result.put("ageRedVersion", red.version());
+        result.put("refineryRoundingVersion", rounding.version());
+        result.put("transferFeeVersion", fee.version());
+        result.put("intakeSpecialCommandVersion", intakeVersion);
+        result.put("transferFeePercent", transferFeePercent.stripTrailingZeros().toPlainString());
+        return ResponseEntity.ok(result);
+      } finally {
+        // The job-order age thresholds are read via getCached on the orders pages, so evict in a
+        // finally: even a partial save (an early PUT lands, a later one throws) still drops the
+        // cache so the persisted value shows on the next render instead of waiting out the TTL.
+        // Clearing the whole static cache is safe — entries just reload on the next read.
+        backendApiClient.clearStaticDataCache();
+      }
     } catch (NumberFormatException e) {
       return validationProblem("error.settings.invalid.format", locale);
     } catch (BackendServiceException e) {

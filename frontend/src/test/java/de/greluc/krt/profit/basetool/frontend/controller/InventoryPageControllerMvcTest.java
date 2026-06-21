@@ -20,9 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -532,5 +535,30 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("stack-entry-count")))
         .andExpect(content().string(containsString("data-stack-loaded=\"false\"")))
         .andExpect(content().string(containsString("stack-entries-content")));
+  }
+
+  /**
+   * Graceful-degradation guard for the parallelized input-form catalog fan-out (#769): the lookups
+   * run concurrently through the real {@link ParallelPageLoader}, but each fetch helper swallows
+   * its own failure and returns an empty list, so {@code allOf(...).join()} must never propagate an
+   * exception. Here the missions lookup throws while the materials lookup succeeds; the page must
+   * still render {@code 200} with an empty {@code missions} model attribute and the populated
+   * {@code materials} attribute — exactly as the serial version degraded.
+   */
+  @Test
+  @WithMockUser(roles = "MEMBER")
+  void viewInputPage_WhenOneCatalogFetchFails_StillRendersWithEmptyList() throws Exception {
+    when(backendApiClient.getCached(
+            eq("/api/v1/materials/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU")));
+    when(backendApiClient.get(eq("/api/v1/missions/lookup"), any(ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(model().attribute("missions", empty()))
+        .andExpect(model().attribute("materials", hasSize(1)));
   }
 }

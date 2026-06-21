@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -63,6 +64,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -106,6 +108,7 @@ public class JobOrderPageController {
 
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
+  private final ParallelPageLoader parallelPageLoader;
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
@@ -226,23 +229,27 @@ public class JobOrderPageController {
               new ParameterizedTypeReference<>() {});
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
-        for (JobOrderDto order : orders) {
-          for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto mat :
-              order.materials()) {
-            log.debug(
-                "Received stock for job order #{} ({}): {}/{} (material: {})",
-                order.displayId(),
-                order.id(),
-                mat.currentStock(),
-                mat.amount(),
-                mat.material().name());
+        // The nested walk exists purely to emit a per-material debug line; skip the whole
+        // orders×materials iteration (and its per-row varargs allocation) when debug is off.
+        if (log.isDebugEnabled()) {
+          for (JobOrderDto order : orders) {
+            for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto mat :
+                order.materials()) {
+              log.debug(
+                  "Received stock for job order #{} ({}): {}/{} (material: {})",
+                  order.displayId(),
+                  order.id(),
+                  mat.currentStock(),
+                  mat.amount(),
+                  mat.material().name());
+            }
           }
         }
       }
 
       try {
         SystemSettingDto yellowSetting =
-            backendApiClient.get(
+            backendApiClient.getCached(
                 "/api/v1/settings/job_order.age_yellow_days", SystemSettingDto.class);
         yellowDays = Integer.parseInt(yellowSetting.value());
       } catch (Exception e) {
@@ -250,7 +257,8 @@ public class JobOrderPageController {
       }
       try {
         SystemSettingDto redSetting =
-            backendApiClient.get("/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
+            backendApiClient.getCached(
+                "/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
         redDays = Integer.parseInt(redSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch red days setting, using default");
@@ -308,10 +316,26 @@ public class JobOrderPageController {
       model.addAttribute("isLogistician", canAssign);
 
       if (canAssign) {
-        model.addAttribute("users", fetchUsers());
-        model.addAttribute("materials", fetchMaterials());
-        model.addAttribute("squadrons", fetchSquadrons());
-        addOwnerPickerOptions(model);
+        // These four logistician-only lookups are independent; fetch them concurrently (two are
+        // uncached round-trips — the user list and the all-kinds org-unit picker) and apply the
+        // results on the request thread. Each fetch helper swallows its own failure and returns an
+        // empty list, so join() never throws and the page degrades exactly as the serial version
+        // did.
+        CompletableFuture<List<UserDto>> usersFuture =
+            parallelPageLoader.loadAsync(this::fetchUsers);
+        CompletableFuture<List<MaterialDto>> materialsFuture =
+            parallelPageLoader.loadAsync(this::fetchMaterials);
+        CompletableFuture<List<SquadronDto>> squadronsFuture =
+            parallelPageLoader.loadAsync(this::fetchSquadrons);
+        CompletableFuture<List<OrgUnitMembershipOptionDto>> requestingOptionsFuture =
+            parallelPageLoader.loadAsync(this::fetchRequestingOrgUnitOptions);
+        CompletableFuture.allOf(
+                usersFuture, materialsFuture, squadronsFuture, requestingOptionsFuture)
+            .join();
+        model.addAttribute("users", usersFuture.join());
+        model.addAttribute("materials", materialsFuture.join());
+        model.addAttribute("squadrons", squadronsFuture.join());
+        applyOwnerPickerOptions(model, requestingOptionsFuture.join());
 
         if (!model.containsAttribute("jobOrderForm")) {
           JobOrderForm form = new JobOrderForm();
@@ -344,7 +368,7 @@ public class JobOrderPageController {
       int redDays = 90;
       try {
         SystemSettingDto yellowSetting =
-            backendApiClient.get(
+            backendApiClient.getCached(
                 "/api/v1/settings/job_order.age_yellow_days", SystemSettingDto.class);
         yellowDays = Integer.parseInt(yellowSetting.value());
       } catch (Exception e) {
@@ -352,7 +376,8 @@ public class JobOrderPageController {
       }
       try {
         SystemSettingDto redSetting =
-            backendApiClient.get("/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
+            backendApiClient.getCached(
+                "/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
         redDays = Integer.parseInt(redSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch red days setting, using default");
@@ -2168,7 +2193,23 @@ public class JobOrderPageController {
    * @param model the Thymeleaf model to populate.
    */
   private void addOwnerPickerOptions(Model model) {
-    List<OrgUnitMembershipOptionDto> requestingOptions = fetchRequestingOrgUnitOptions();
+    applyOwnerPickerOptions(model, fetchRequestingOrgUnitOptions());
+  }
+
+  /**
+   * Populates the two owner-picker model attributes from an already-fetched requesting-org-unit
+   * option list. Split out from {@link #addOwnerPickerOptions(Model)} so the order-detail render
+   * can fetch the list on a {@link ParallelPageLoader} worker thread alongside the other
+   * logistician lookups and then apply the cheap in-memory derivation on the request thread; {@link
+   * #addOwnerPickerOptions(Model)} remains the serial fetch-and-apply entry point for the
+   * create/edit forms.
+   *
+   * @param model the Thymeleaf model to populate.
+   * @param requestingOptions the requesting-org-unit options to expose, and to derive the
+   *     profit-eligible {@code responsibleOptions} subset from.
+   */
+  private void applyOwnerPickerOptions(
+      Model model, List<OrgUnitMembershipOptionDto> requestingOptions) {
     List<OrgUnitMembershipOptionDto> responsibleOptions =
         requestingOptions.stream()
             .filter(o -> Boolean.TRUE.equals(o.isProfitEligible()))
