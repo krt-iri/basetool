@@ -36,19 +36,29 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.PathContainer;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.pattern.PathPattern;
+import org.springframework.web.util.pattern.PathPatternParser;
+import org.springframework.web.util.pattern.PatternParseException;
 import tools.jackson.core.io.JsonStringEncoder;
 
 /**
  * Per-IP token-bucket rate limiter implemented with Bucket4j buckets in a Caffeine cache.
  *
  * <p>Active only on URI patterns listed in {@code app.rate-limit.paths} and disabled wholesale via
- * {@code app.rate-limit.enabled=false}. Buckets are keyed by {@code clientIp + "|" + slot} where
+ * {@code app.rate-limit.enabled=false}. Patterns are matched with Spring's {@link
+ * org.springframework.web.util.pattern.PathPattern} (parsed once and cached per pattern) rather than
+ * {@code AntPathMatcher} re-tokenizing on every request; {@code **} is therefore only valid as the
+ * final segment, which all configured patterns already are. Buckets are keyed by {@code clientIp +
+ * "|" + slot} where
  * {@code slot} is either {@code "path:<pattern>"} for the global default or {@code "rule:<name>"}
  * for an endpoint-specific rule (audit finding L-5, 2026-05-20). The Caffeine cache expires entries
  * after one hour of inactivity (1h hibernate-window keeps abusive clients limited across short
@@ -75,7 +85,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   private final RateLimitProperties properties;
   private final AppProblemProperties problemProperties;
-  private final AntPathMatcher pathMatcher = new AntPathMatcher();
+  private final PathPatternParser pathPatternParser = new PathPatternParser();
+  private final Map<String, Optional<PathPattern>> compiledPatterns = new ConcurrentHashMap<>();
   private final Cache<String, Bucket> bucketCache;
   private final List<IpAddressMatcher> trustedProxyMatchers;
 
@@ -142,8 +153,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     if (patterns == null || patterns.isEmpty()) {
       return true;
     }
+    PathContainer parsedPath = PathContainer.parsePath(path);
     for (String pattern : patterns) {
-      if (pathMatcher.match(pattern, path)) {
+      if (matches(pattern, parsedPath)) {
         return false;
       }
     }
@@ -207,9 +219,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private List<BucketSlot> resolveSlots(HttpServletRequest request) {
     String path = request.getRequestURI();
     String method = request.getMethod();
+    PathContainer parsedPath = PathContainer.parsePath(path);
     List<BucketSlot> slots = new ArrayList<>();
 
-    String globalPattern = firstMatchingPattern(path, properties.getPaths());
+    String globalPattern = firstMatchingPattern(parsedPath, properties.getPaths());
     if (globalPattern != null) {
       slots.add(
           new BucketSlot(
@@ -222,7 +235,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     List<RateLimitProperties.Rule> rules = properties.getRules();
     if (rules != null) {
       for (RateLimitProperties.Rule rule : rules) {
-        if (matchesMethod(rule.getMethods(), method) && matchesAnyPath(rule.getPaths(), path)) {
+        if (matchesMethod(rule.getMethods(), method)
+            && matchesAnyPath(rule.getPaths(), parsedPath)) {
           slots.add(
               new BucketSlot(
                   "rule:" + rule.getName(),
@@ -253,16 +267,60 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     return false;
   }
 
-  private boolean matchesAnyPath(List<String> patterns, String path) {
+  private boolean matchesAnyPath(List<String> patterns, PathContainer parsedPath) {
     if (patterns == null) {
       return false;
     }
     for (String p : patterns) {
-      if (pathMatcher.match(p, path)) {
+      if (matches(p, parsedPath)) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Returns whether {@code rawPattern} matches the already-parsed request {@code parsedPath},
+   * compiling the raw pattern into a {@link PathPattern} on first use and caching the result. The
+   * pattern set is bounded by {@code app.rate-limit} configuration (the global {@code paths} plus the
+   * per-rule {@code paths}), so the cache cannot grow with request volume; this replaces the
+   * per-request re-tokenization of pattern <i>and</i> path that {@code AntPathMatcher.match(pattern,
+   * path)} performed on every call. The request path is parsed into a {@link PathContainer} once per
+   * request by the caller and reused across all pattern checks.
+   *
+   * @param rawPattern the raw Ant-style pattern from configuration (e.g. {@code /api/**})
+   * @param parsedPath the request path parsed once per request
+   * @return {@code true} when the compiled pattern matches the path; {@code false} when it does not
+   *     or when the pattern failed to compile (see {@link #tryParse(String)})
+   */
+  private boolean matches(String rawPattern, PathContainer parsedPath) {
+    return compiledPatterns
+        .computeIfAbsent(rawPattern, this::tryParse)
+        .map(pattern -> pattern.matches(parsedPath))
+        .orElse(false);
+  }
+
+  /**
+   * Compiles one raw rate-limit pattern into a {@link PathPattern}, returning {@link
+   * Optional#empty()} (and logging once at WARN) when the pattern is not valid PathPattern syntax.
+   * PathPattern accepts {@code **} only as the final segment, whereas the previous {@code
+   * AntPathMatcher} also tolerated mid-path {@code **}; routing a parse failure to a permanent
+   * non-match keeps a configuration typo from turning every matching request into a 500, exactly as
+   * the old matcher silently failed to match rather than throwing.
+   *
+   * @param rawPattern the raw pattern to compile
+   * @return the compiled pattern, or empty when it could not be parsed
+   */
+  private Optional<PathPattern> tryParse(String rawPattern) {
+    try {
+      return Optional.of(pathPatternParser.parse(rawPattern));
+    } catch (PatternParseException ex) {
+      log.warn(
+          "Invalid app.rate-limit path pattern '{}'; it will never match. Reason: {}",
+          rawPattern,
+          ex.getMessage());
+      return Optional.empty();
+    }
   }
 
   /**
@@ -299,12 +357,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     return remoteAddr;
   }
 
-  private String firstMatchingPattern(String path, List<String> patterns) {
+  private String firstMatchingPattern(PathContainer parsedPath, List<String> patterns) {
     if (patterns == null) {
       return null;
     }
     for (String p : patterns) {
-      if (pathMatcher.match(p, path)) {
+      if (matches(p, parsedPath)) {
         return p;
       }
     }

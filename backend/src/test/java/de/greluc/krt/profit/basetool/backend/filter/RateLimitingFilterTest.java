@@ -128,6 +128,29 @@ class RateLimitingFilterTest {
 
       assertEquals(false, filter.shouldNotFilter(req));
     }
+
+    @Test
+    void unparseablePattern_isIgnored_doesNotThrow() {
+      // PathPattern only allows ** as the final segment; a mid-path ** is a configuration error.
+      // The filter must treat such a pattern as a permanent non-match (and not 500 the request),
+      // mirroring how the previous AntPathMatcher silently failed to match rather than throwing.
+      properties.setPaths(List.of("/api/**/legacy/**"));
+      MockHttpServletRequest req = newRequest("/api/v1/legacy/x");
+
+      assertTrue(
+          filter.shouldNotFilter(req),
+          "an unparseable pattern must be ignored (treated as non-matching), never thrown");
+    }
+
+    @Test
+    void singleSegmentWildcard_matchesOneSegmentOnly() {
+      // A `*` matches exactly one path segment — the participant-rule shape `/api/v1/missions/*`
+      // must match a one-segment id but NOT a deeper path, where only `**` would.
+      properties.setPaths(List.of("/api/v1/missions/*"));
+
+      assertEquals(false, filter.shouldNotFilter(newRequest("/api/v1/missions/m1")));
+      assertTrue(filter.shouldNotFilter(newRequest("/api/v1/missions/m1/participants")));
+    }
   }
 
   // ---------------------------------------------------------------
