@@ -291,7 +291,8 @@ class UserControllerTest {
         true,
         null,
         1L,
-        null);
+        null,
+        false);
   }
 
   // ── GET /me ─────────────────────────────────────────────────────────────
@@ -589,6 +590,7 @@ class UserControllerTest {
         true,
         null,
         1L,
-        null);
+        null,
+        false);
   }
 }

@@ -109,6 +109,7 @@ public abstract class UserMapper {
   @Mapping(target = "isLogistician", expression = "java(resolveLogistician(user))")
   @Mapping(target = "isMissionManager", expression = "java(resolveMissionManager(user))")
   @Mapping(target = "squadron", expression = "java(resolveSquadron(user))")
+  @Mapping(target = "discordLinked", expression = "java(resolveDiscordLinked(user))")
   public abstract UserDto toDto(User user);
 
   /** Narrow reference DTO (id + display name) used wherever the full user payload is overkill. */
@@ -180,6 +181,24 @@ public abstract class UserMapper {
     return loadStaffelMembership(user)
         .map(OrgUnitMembership::isMissionManager)
         .orElse(Boolean.FALSE);
+  }
+
+  /**
+   * Resolves the {@code discordLinked} indicator for the DTO. Returns {@code true} iff the user has
+   * a non-blank {@code discord_user_id} — i.e. a Discord account is federated to this Basetool
+   * account (REQ-DATA-006). The raw snowflake itself is never copied into the DTO; only this
+   * boolean fact leaves the backend, and the admin member-management page renders it as the Discord
+   * column (REQ-SEC-019). Independent of the Staffel membership, so it needs no membership lookup.
+   *
+   * @param user the user being projected; may be {@code null}.
+   * @return {@code true} iff a Discord account is linked, {@code false} otherwise.
+   */
+  protected Boolean resolveDiscordLinked(User user) {
+    if (user == null) {
+      return Boolean.FALSE;
+    }
+    String discordUserId = user.getDiscordUserId();
+    return discordUserId != null && !discordUserId.isBlank();
   }
 
   /**

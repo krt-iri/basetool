@@ -602,7 +602,8 @@ public class UserController {
         dto.inKeycloak(),
         dto.squadron(),
         dto.version(),
-        null // joinDate
+        null, // joinDate
+        null // discordLinked – Discord-link status is not exposed to peers (admin-only column)
         );
   }
 
@@ -635,6 +636,7 @@ public class UserController {
         dto.inKeycloak(),
         dto.squadron(),
         dto.version(),
-        dto.joinDate());
+        dto.joinDate(),
+        dto.discordLinked());
   }
 }

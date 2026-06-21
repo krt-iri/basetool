@@ -95,7 +95,8 @@ class MissionSecurityRenderingTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             participantId,
@@ -196,7 +197,8 @@ class MissionSecurityRenderingTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             participantId,
@@ -290,7 +292,8 @@ class MissionSecurityRenderingTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             participantId,
@@ -394,7 +397,8 @@ class MissionSecurityRenderingTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             participantId,

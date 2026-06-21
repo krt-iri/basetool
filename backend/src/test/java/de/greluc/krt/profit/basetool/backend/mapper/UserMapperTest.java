@@ -95,6 +95,39 @@ class UserMapperTest {
     assertEquals("desc", dto.description());
     assertEquals(Set.of("ADMIN", "OFFICER"), dto.roles());
     assertEquals(Set.of("USER_MANAGE", "ROLE_ASSIGN", "MISSION_MANAGE"), dto.permissions());
+    // No Discord id wired on the fixture -> the link indicator is false (REQ-SEC-019).
+    assertEquals(Boolean.FALSE, dto.discordLinked());
+  }
+
+  @Test
+  void toDto_withDiscordUserId_setsDiscordLinkedTrue() {
+    // covers REQ-SEC-019 / REQ-DATA-006 — a federated Discord account surfaces as discordLinked,
+    // while the raw snowflake itself is never copied onto the DTO.
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("linked");
+    user.setDiscordUserId("123456789012345678");
+    when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+
+    UserDto dto = mapper.toDto(user);
+
+    assertEquals(Boolean.TRUE, dto.discordLinked());
+  }
+
+  @Test
+  void toDto_withBlankDiscordUserId_setsDiscordLinkedFalse() {
+    // A blank (whitespace-only) Discord id is treated as "not linked" — no symbol shown.
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("blank");
+    user.setDiscordUserId("   ");
+    when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+
+    UserDto dto = mapper.toDto(user);
+
+    assertEquals(Boolean.FALSE, dto.discordLinked());
   }
 
   @Test

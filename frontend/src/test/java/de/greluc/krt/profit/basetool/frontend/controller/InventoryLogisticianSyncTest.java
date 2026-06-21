@@ -95,7 +95,8 @@ class InventoryLogisticianSyncTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
@@ -139,7 +140,8 @@ class InventoryLogisticianSyncTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
@@ -183,7 +185,8 @@ class InventoryLogisticianSyncTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());

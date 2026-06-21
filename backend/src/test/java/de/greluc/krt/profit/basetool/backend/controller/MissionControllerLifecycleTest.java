@@ -144,7 +144,8 @@ class MissionControllerLifecycleTest {
             true,
             null,
             1L,
-            java.time.LocalDate.of(2024, 1, 1));
+            java.time.LocalDate.of(2024, 1, 1),
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             UUID.randomUUID(), user, null, null, null, null, "comment", null, null, null, 1L);

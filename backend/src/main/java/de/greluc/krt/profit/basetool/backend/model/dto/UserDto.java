@@ -24,7 +24,16 @@ import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying User payload. */
+/**
+ * Data transfer record carrying User payload.
+ *
+ * <p>{@code discordLinked} is a privacy-safe, read-only indicator derived from {@code
+ * app_user.discord_user_id} (see {@code UserMapper#toDto}): {@code true} when the user has a
+ * Discord account federated to their Basetool account, {@code false} otherwise. The raw Discord id
+ * (a snowflake) is never carried in any DTO — only the boolean fact of the link, surfaced as the
+ * Discord column on the admin member-management page (REQ-SEC-019). Peer/guest redaction shapes
+ * leave it {@code null} so the link status never reaches non-admins.
+ */
 public record UserDto(
     UUID id,
     String username,
@@ -41,4 +50,5 @@ public record UserDto(
     Boolean inKeycloak,
     @Nullable SquadronReferenceDto squadron,
     Long version,
-    @Nullable LocalDate joinDate) {}
+    @Nullable LocalDate joinDate,
+    Boolean discordLinked) {}
