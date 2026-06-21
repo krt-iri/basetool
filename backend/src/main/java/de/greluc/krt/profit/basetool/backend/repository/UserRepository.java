@@ -306,4 +306,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @Query("SELECT u FROM User u JOIN u.roles r WHERE UPPER(r.name) = 'ADMIN' ORDER BY u.username")
   List<User> findAllAdmins();
+
+  /**
+   * Bulk-nulls the denormalised {@code approved_by_id} pointer on every user approved or rejected
+   * by the given admin. Called by the user-delete flow so deleting an admin who had decided
+   * registrations is not blocked by the self-referential {@code fk_app_user_approved_by} foreign
+   * key (V173, no {@code ON DELETE} clause). Only the convenience pointer is cleared — the decision
+   * itself is preserved in {@code user_approval_event}.
+   *
+   * @param adminId the deciding admin being deleted; never {@code null}.
+   */
+  @org.springframework.data.jpa.repository.Modifying
+  @Query("UPDATE User u SET u.approvedById = null WHERE u.approvedById = :adminId")
+  void clearApprovedBy(
+      @org.springframework.data.repository.query.Param("adminId") @NotNull UUID adminId);
 }

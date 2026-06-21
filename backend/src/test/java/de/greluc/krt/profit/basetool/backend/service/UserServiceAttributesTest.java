@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -94,6 +95,7 @@ class UserServiceAttributesTest {
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private UserApprovalEventRepository userApprovalEventRepository;
 
   @Mock
   private de.greluc.krt.profit.basetool.backend.repository.SquadronRepository squadronRepository;

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-20.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
 > **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0031 (role/unit sync, planned — Track 2)
 
 # Discord integration — login, membership gate & admin approval
@@ -111,9 +111,14 @@ roles/units are assigned manually (Track 1) — no automated mapping.
 - [ ] First admin (Keycloak `ADMIN` realm role) is `ACTIVE` on first login. _(syncUser carve-out; T1.4 e2e.)_
 - [x] Approve ⇒ `ACTIVE` + audit row; reject ⇒ `REJECTED` + reason in the audit.
 - [x] Concurrent approve ⇒ 409 (optimistic `@Version`).
+- [x] Hard-deleting a since-removed (no-longer-in-Keycloak) account first cleans up its V173 approval
+  audit: the subject's own audit rows are deleted, and the deciding-admin (`decided_by_id`) and the
+  denormalised `app_user.approved_by_id` back-references on other rows are nulled. The three audit
+  FKs carry no `ON DELETE` clause, so without this the delete fails with a `409`
+  (`user_approval_event_user_id_fkey`); the approval audit of **other** users is preserved.
 - [ ] Legacy rows backfilled `ACTIVE` (V173). _(schema-validated on boot; T1.4 e2e.)_
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService`, `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route) · **Issues:** #724
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) + `UserServiceDeleteTest` (approval-audit cleanup precedes the user delete) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route) · **Issues:** #724
 
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 
