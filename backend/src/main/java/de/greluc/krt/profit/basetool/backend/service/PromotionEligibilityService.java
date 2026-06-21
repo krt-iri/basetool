@@ -107,11 +107,34 @@ public class PromotionEligibilityService {
       return new PromotionEligibilityResponse(userId, fromRank, toRank, false, false, List.of());
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    return evaluateForRanks(userId, fromRank, toRank, scope, loadEvaluationIndex(userId, scope));
+  }
+
+  /**
+   * Core transition evaluation that reuses a pre-loaded {@link EvaluationIndex}. The member's
+   * evaluation set is constant for a given {@code (userId, scope)}, so {@link
+   * #evaluateAllForUser(String)} loads it once and passes it into every transition instead of
+   * re-querying it 2×T times. The public {@link #evaluateForRanks(String, int, int)} owns the gate
+   * check and builds the index for a single transition.
+   *
+   * @param userId the member's JWT-sub.
+   * @param fromRank the source rank.
+   * @param toRank the target rank.
+   * @param scope the promotion scope (squadron id) the requirements and evaluation are read in.
+   * @param index the member's pre-loaded assigned-level and category→topic maps.
+   * @return the per-rule outcome plus the aggregate {@code eligible} flag.
+   */
+  private PromotionEligibilityResponse evaluateForRanks(
+      @NotNull String userId,
+      int fromRank,
+      int toRank,
+      @Nullable UUID scope,
+      @NotNull EvaluationIndex index) {
     List<RankRequirement> requirements =
         rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(
             fromRank, toRank, scope);
-    Map<UUID, PromotionLevel> levelByCategory = loadAssignedLevels(userId, scope);
-    Map<UUID, UUID> topicByCategory = loadCategoryToTopicIndex(userId, scope);
+    Map<UUID, PromotionLevel> levelByCategory = index.levelByCategory();
+    Map<UUID, UUID> topicByCategory = index.topicByCategory();
 
     Map<UUID, PromotionRequirementCheckResponse> topicScopedResults =
         evaluateTopicScopedDisjoint(requirements, levelByCategory, topicByCategory);
@@ -149,12 +172,15 @@ public class PromotionEligibilityService {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    // Evaluation set + category→topic index are (userId, scope)-constant: load once and share
+    // across every transition instead of re-querying 2× per transition (REQ-DATA-003).
+    EvaluationIndex index = loadEvaluationIndex(userId, scope);
     List<Object[]> transitions = rankRequirementRepository.findDistinctRankTransitionsScoped(scope);
     List<PromotionEligibilityResponse> result = new ArrayList<>(transitions.size());
     for (Object[] row : transitions) {
       int from = ((Number) row[0]).intValue();
       int to = ((Number) row[1]).intValue();
-      result.add(evaluateForRanks(userId, from, to));
+      result.add(evaluateForRanks(userId, from, to, scope, index));
     }
     return result;
   }
@@ -172,28 +198,45 @@ public class PromotionEligibilityService {
     return evaluateAllForUser(userId);
   }
 
-  private Map<UUID, PromotionLevel> loadAssignedLevels(
-      @NotNull String userId, @Nullable UUID scope) {
-    Map<UUID, PromotionLevel> levels = new HashMap<>();
-    for (MemberEvaluation evaluation :
-        memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(userId, scope)) {
-      if (evaluation.getAssignedLevel() != null && evaluation.getCategory() != null) {
-        levels.put(evaluation.getCategory().getId(), evaluation.getAssignedLevel());
-      }
-    }
-    return levels;
-  }
+  /**
+   * The member's per-(user, scope) evaluation projection: the assigned promotion level per category
+   * and the owning topic per category. Both maps are derived from a single pass over the member's
+   * evaluation rows.
+   *
+   * @param levelByCategory category id → the level the member is assigned in it.
+   * @param topicByCategory category id → the topic the category belongs to.
+   */
+  private record EvaluationIndex(
+      Map<UUID, PromotionLevel> levelByCategory, Map<UUID, UUID> topicByCategory) {}
 
-  private Map<UUID, UUID> loadCategoryToTopicIndex(@NotNull String userId, @Nullable UUID scope) {
-    Map<UUID, UUID> map = new HashMap<>();
+  /**
+   * Loads the member's evaluation rows once and derives both the assigned-level-by-category and the
+   * category→topic maps in a single pass. Previously each of those two maps was built by its own
+   * full scan of the identical {@code findAllByUserIdWithCategoryAndTopicScoped} query — two
+   * round-trips per call, multiplied across every rank transition; this collapses them to one
+   * (REQ-DATA-003).
+   *
+   * @param userId the member's JWT-sub.
+   * @param scope the promotion scope (squadron id) to read the evaluation in, or {@code null}.
+   * @return the assigned-level and category→topic maps for the member.
+   */
+  private EvaluationIndex loadEvaluationIndex(@NotNull String userId, @Nullable UUID scope) {
+    Map<UUID, PromotionLevel> levels = new HashMap<>();
+    Map<UUID, UUID> topics = new HashMap<>();
     for (MemberEvaluation evaluation :
         memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(userId, scope)) {
       PromotionCategory category = evaluation.getCategory();
-      if (category != null && category.getTopic() != null) {
-        map.put(category.getId(), category.getTopic().getId());
+      if (category == null) {
+        continue;
+      }
+      if (evaluation.getAssignedLevel() != null) {
+        levels.put(category.getId(), evaluation.getAssignedLevel());
+      }
+      if (category.getTopic() != null) {
+        topics.put(category.getId(), category.getTopic().getId());
       }
     }
-    return map;
+    return new EvaluationIndex(levels, topics);
   }
 
   /**

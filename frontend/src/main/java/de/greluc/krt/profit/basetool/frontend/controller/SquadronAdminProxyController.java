@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
  * and the CSRF-protected session is reused via {@link BackendApiClient}.
  *
  * <p>Both flags live on the cached {@code SquadronDto} that {@code SquadronContextAdvice} reads on
- * every authenticated render, so each toggle evicts {@code STATIC_DATA_CACHE} (REQ-DATA-006) to
+ * every authenticated render, so each toggle evicts {@code STATIC_DATA_CACHE} (REQ-DATA-007) to
  * keep the shared squadron catalogue truthful rather than stale up to the cache TTL.
  *
  * <p>Endpoints carry their own {@code ADMIN}-role gate at the Spring Security layer; the backend
@@ -68,7 +68,7 @@ public class SquadronAdminProxyController {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/promotion-enabled", body, Void.class);
     // The flag lives on the cached SquadronDto that SquadronContextAdvice reads on every render, so
     // a toggle must evict STATIC_DATA_CACHE or the sidebar/title gate stays stale up to the TTL
-    // (REQ-DATA-006 — squadron-catalogue cacheability is gated on every admin mutation evicting).
+    // (REQ-DATA-007 — squadron-catalogue cacheability is gated on every admin mutation evicting).
     backendApiClient.clearStaticDataCache();
     return ResponseEntity.noContent().build();
   }
@@ -88,7 +88,7 @@ public class SquadronAdminProxyController {
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/profit-eligible", body, Void.class);
     // Same reason as setPromotionEnabled: isProfitEligible is part of the cached SquadronDto, so
-    // evict STATIC_DATA_CACHE on the toggle to keep the cached catalogue truthful (REQ-DATA-006).
+    // evict STATIC_DATA_CACHE on the toggle to keep the cached catalogue truthful (REQ-DATA-007).
     backendApiClient.clearStaticDataCache();
     return ResponseEntity.noContent().build();
   }

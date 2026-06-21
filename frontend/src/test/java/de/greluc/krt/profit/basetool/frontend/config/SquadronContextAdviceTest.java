@@ -126,7 +126,7 @@ class SquadronContextAdviceTest {
 
   @Test
   void availableSquadrons_routesSquadronCatalogueThroughCache() {
-    // REQ-DATA-006: the squadron catalogue is a slow-changing global list fetched on every
+    // REQ-DATA-007: the squadron catalogue is a slow-changing global list fetched on every
     // authenticated render; it must go through the 10-min STATIC_DATA_CACHE (getCached), not a
     // per-render plain GET. getCached is unstubbed (returns null → advice degrades to empty); the
     // assertion is about the routing, not the payload.
@@ -144,11 +144,11 @@ class SquadronContextAdviceTest {
 
   @Test
   void adminSwitcher_routesSquadronCatalogueThroughCache_notPlainGet() {
-    // REQ-DATA-006: the admin switcher's squadron catalogue goes through getCached (the same
+    // REQ-DATA-007: the admin switcher's squadron catalogue goes through getCached (the same
     // URI-keyed STATIC_DATA_CACHE entry availableSquadrons() uses), never a plain GET. This pins
     // the routing precondition for the cross-call de-dup; the actual single-fetch is the shared
     // URI-keyed cache (Caffeine), not exercised here since backendApiClient is mocked.
-    // Special-commands stays a plain GET (admin-only, intentionally uncached — see REQ-DATA-006).
+    // Special-commands stays a plain GET (admin-only, intentionally uncached — see REQ-DATA-007).
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(true);
 
