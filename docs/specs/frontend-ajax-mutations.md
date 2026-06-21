@@ -484,13 +484,91 @@ controller-local `@ExceptionHandler` is bypassed.
 `handleMaxUploadSizeExceeded`) · **Config:** `frontend application.yml`
 `server.tomcat.max-part-count` · **Code:** `GlobalExceptionHandler.handleMaxUploadSizeExceeded`
 
+### REQ-FE-010 — Live multi-user mission updates over the presence WebSocket
+
+When several users have the same mission detail page open, a change one of them makes (a participant
+joining, a crew move, a finance entry, a manager/owner change, a core/schedule/status/party-lead/
+frequency edit) must appear on the **others'** views without a manual reload. REQ-FE-001…007 keep the
+**acting** user's own document fresh; they cannot reach a second user's already-rendered page. The gap
+is the in-place sibling of the bfcache gap (REQ-FE-008): the other viewer's DOM is stale until they
+reload.
+
+The transport is the **existing per-mission presence WebSocket** (`/ws/missions/{id}/presence`,
+`mission-presence.js`) — no new channel, no new backend module, no Flyway migration. The acting
+client's `krtRefreshMissionSection(keys)` chokepoint, which already runs after every successful
+mutation, additionally calls `missionPresence.sendChanged(keys)`; the handler relays a
+`{type:"changed","sections":[…]}` frame to every **other** socket on that mission (the originator is
+excluded — it already applied its own change). Each peer turns the frame into a
+`krtRefreshMissionSection(keys, {broadcast: false})` — `broadcast:false` stops the applied change
+from echoing back into a loop.
+
+**Only opaque section keys travel over the socket — never mission data.** Every peer re-pulls the
+affected fragment through its own authenticated, authorization-checked
+`GET /missions/{id}?fragment=…`, so guest field-redaction and the member-only finance gate still
+apply per viewer; a guest never receives privileged data via the push. The relay sanitises the
+inbound `sections` array (keys outside {`crew`,`finance`,`mgmt`,`overview`} dropped, count capped) so
+a client can neither target an arbitrary fetch nor amplify one frame into an unbounded fan-out. The
+`overview` fragment (Tab-1 + a `#overview-head-meta` carrier that patches the sticky header title /
+status pill / facts) is added by this requirement so core/schedule/status edits propagate too.
+
+Two server-side guards bound the abuse surface the socket adds. The handshake is **authorized against
+mission access** — `MissionPresenceHandshakeAuthInterceptor` issues the same authenticated
+`GET /api/v1/missions/{id}` the page does, so an authenticated user cannot join the presence room of a
+mission they may not see (an explicit backend 403/404 refuses the handshake; a transient backend error
+fails open so a blip never kills presence). Inbound `changed` frames are **rate-limited per session**
+(a token bucket sized far above any human edit cadence), so a crafted client cannot drive sustained
+re-fetch amplification even within a mission it can see.
+
+An incoming refresh must **never yank a section out from under an active edit**: while a modal is open
+(or focus sits inside the target section's container) the refresh is deferred behind a DS-styled
+"Aktualisierungen verfügbar" pill (no native dialog) that applies the held-back sections on click.
+Bursts are coalesced (debounce), and a dropped-then-reconnected socket triggers a one-shot resync of
+every visible section to recover signals missed while offline.
+
+**Single-instance, like presence.** The relay reuses the in-memory per-mission session map, so it is
+correct only for a single frontend replica (the current deployment). Scaling the frontend out
+horizontally requires moving both presence and this relay behind a Redis pub/sub fan-out — the
+swap-out point is `MissionPresenceService` / `MissionPresenceWebSocketHandler` (ADR-0031).
+
+**Acceptance**
+
+- [ ] With the same mission open in two sessions, a mutation by user A (participant add, crew move,
+  finance entry, manager/owner change, core/schedule/status/party-lead/frequency edit) appears on
+  user B's view within a short delay without a manual reload.
+- [ ] No mission data crosses the socket — a guest viewer's auto-refresh still renders the
+  guest-redacted fragment and the member-only finance section stays gated per viewer.
+- [ ] An incoming change while user B has a modal open (or is editing the affected section) does not
+  destroy their in-progress edit; it is deferred behind the "updates available" pill.
+- [ ] Applying a pushed change does not re-broadcast it (no echo loop), and the originating session
+  does not refresh twice.
+- [ ] An authenticated user cannot open the presence socket for a mission the backend forbids
+  (handshake refused), and a flood of `changed` frames from one session is rate-limited.
+
+Coverage note: `MissionLiveSyncE2eTest` exercises the representative path end-to-end (a participant
+add propagating to a second viewer in place, no reload); the remaining mutation kinds in the first
+bullet all route through the same `krtRefreshMissionSection` / `krtNotifyMissionChanged` chokepoint, so
+they inherit the same behaviour, and the per-viewer guest-redaction guarantee rests on the existing
+authenticated fragment GET (covered by the mission fragment/redaction tests) rather than a dedicated
+live-sync case.
+
+**Enforced by:** `MissionPresenceWebSocketHandlerTest` (relay to peers, origin exclusion, key
+sanitising/dedup, no-op on empty, per-session rate limit) · `MissionPresenceHandshakeAuthInterceptorTest`
+(handshake allowed on authorized read, refused on 403/404, fail-open on transient, 400 on a malformed
+path) · `MissionLiveSyncE2eTest` (two-context live participant-add propagation + no-reload assertion) ·
+**Code:** `MissionPresenceWebSocketHandler.broadcastChanged` / `allowChangedFrame`,
+`MissionPresenceHandshakeAuthInterceptor`, `mission-presence.js` (`sendChanged` / `krt:mission-changed`
+/ `krt:mission-resync`), `mission-detail.html` (`krtRefreshMissionSection` broadcast + live-sync
+receiver with flush-time busy re-check + `overviewSection` fragment + finance-badge `krt:swapped`
+listener), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
   they each satisfy, not the work list.
 - Switching the CSRF token repository to cookie-based, and adopting htmx or app-wide Alpine — all
   explicitly rejected in ADR-0012.
-- WebSocket / live-collaboration changes beyond the existing `mission-presence.js`.
+- Live-collaboration features beyond the section-refresh sync of REQ-FE-010 (operational-transform
+  text co-editing, server-pushed conflict resolution, cross-replica fan-out via Redis pub/sub).
 - Backend business-logic changes beyond adding JSON proxy endpoints that reuse existing backend
   APIs/DTOs.
 

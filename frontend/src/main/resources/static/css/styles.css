@@ -3817,6 +3817,36 @@ textarea:focus-visible,
     letter-spacing: 0.02em;
 }
 
+/* Live multi-user sync (REQ-FE-010): the deferred-refresh pill, shown bottom-right when a peer's
+   change arrives while the local user is mid-edit. Clicking it applies the held-back refresh. */
+.mission-livesync-pill {
+    position: fixed;
+    right: var(--space-4);
+    bottom: var(--space-4);
+    z-index: 9000;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: var(--space-2) var(--space-4);
+    border: var(--border-accent);
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-dark-gray);
+    color: var(--color-primary);
+    font-family: Lato, sans-serif;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgb(0 0 0 / 45%);
+    animation: krt-presence-pulse 2s infinite;
+}
+
+.mission-livesync-pill:hover,
+.mission-livesync-pill:focus-visible {
+    background: rgb(231 126 35 / 12%);
+}
+
 #missions-results[aria-busy='true'] {
     opacity: 0.55;
     transition: opacity 120ms ease-in-out;
