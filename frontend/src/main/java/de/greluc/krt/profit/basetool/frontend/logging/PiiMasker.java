@@ -46,11 +46,16 @@ public final class PiiMasker {
 
   private static final String JWT_PATTERN =
       "(eyJ[a-zA-Z0-9_-]{5,}\\.eyJ[a-zA-Z0-9_-]{5,}\\.[a-zA-Z0-9_-]{5,})";
+  // Domain uses possessive label groups (?:label\.)++TLD so adjacent quantifiers cannot overlap —
+  // avoids the O(n^2) backtracking the previous [a-zA-Z0-9.-]+\.[a-zA-Z]{2,} exhibited on long
+  // no-TLD '@'-strings, which run on every log line (security audit L5).
   private static final String EMAIL_PATTERN =
-      "([a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})";
+      "([a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@(?:[a-zA-Z0-9-]++\\.)++[a-zA-Z]{2,})";
+  // Value class includes the standard-base64 alphabet (+, /, =) so a base64 secret logged next to
+  // one of these keywords is masked in full, not truncated at the first +/=/ (security audit L6).
   private static final String KEYWORD_TOKEN_PATTERN =
       "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*"
-          + "|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.]+)";
+          + "|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.+/=]+)";
 
   private static final Pattern PII_PATTERN =
       Pattern.compile(JWT_PATTERN + "|" + EMAIL_PATTERN + "|" + KEYWORD_TOKEN_PATTERN);

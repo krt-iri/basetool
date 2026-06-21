@@ -42046,10 +42046,14 @@
             "format" : "int32"
           },
           "description" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 10000,
+            "minLength" : 0
           },
           "displayName" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
           },
           "version" : {
             "type" : "integer",
@@ -42174,10 +42178,14 @@
         "type" : "object",
         "properties" : {
           "description" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 10000,
+            "minLength" : 0
           },
           "displayName" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
           },
           "version" : {
             "type" : "integer",
