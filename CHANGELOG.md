@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
+
 ### Fixed
 
 - **Lagerbestand lässt sich nicht mehr einem Auftrag zuordnen, dessen Materialliste das Material gar nicht enthält.** Solche Zuordnungen tauchten in der aggregierten Materialliste des Auftrags nie auf, banden den Bestand aber trotzdem. Das „Auftrag"-Dropdown im Lager bietet jetzt nur noch Aufträge an, die das Material wirklich benötigen, und bereits bestehende Fehlzuordnungen werden in der Auftragsansicht als Warnhinweis aufgelistet, damit man sie auflösen kann.
