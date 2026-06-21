@@ -196,6 +196,14 @@ public abstract class UserMapper {
    * memo. Only eagerly-loaded scalar fields of the returned membership are read by the callers, so
    * a value surviving into a later transaction within the same request is still safe to read.
    *
+   * <p>The memo assumes a user's Staffel membership is <em>immutable for the duration of the
+   * request</em>: it is populated lazily on first read, so a write endpoint that mutates the
+   * membership before mapping the affected user sees the fresh value (the memo is still empty at
+   * that point). A hypothetical endpoint that maps a user, mutates that same user's membership,
+   * then re-maps the same user in the same request would observe the pre-mutation snapshot — no
+   * such flow exists today; one that needs it must evict {@link #MEMBERSHIP_CACHE_ATTR} after the
+   * mutation.
+   *
    * @param user the user whose Staffel membership to load; never {@code null}.
    * @return the single Staffel membership row if any.
    */

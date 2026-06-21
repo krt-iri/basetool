@@ -49,10 +49,13 @@ memoised on the `HttpServletRequest` so it resolves once: `OwnerScopeService.can
 Staffel-membership lookup so its three derived-field resolvers share one query (falling back to a
 direct query outside an HTTP request).
 
-**Acceptance**: `JobOrderServiceAssigneeAndListTest` (one batched stock query per page, no per-
-material `SUM` on the list path), `OwnerScopeServiceTest` (profit-eligibility count runs once across
-repeated `canViewJobOrders()`), `UserMapperTest` (one membership lookup per user within a request,
-direct-query fallback without one).
+**Acceptance**: `JobOrderServiceAssigneeAndListTest` (one batched stock query per page with no per-
+material `SUM` on the list path, plus the in-memory sum reproducing the native per-bucket semantics
+at each quality floor), `JobOrderMaterialStockRowQueryDataTest` (the batched projection runs on the
+real Postgres schema, returns only order-linked rows, and its floor sum equals the native
+`sumAmountByMaterialAndJobOrderAndMinQuality` aggregate), `OwnerScopeServiceTest` (profit-eligibility
+count runs once across repeated `canViewJobOrders()`), `UserMapperTest` (one membership lookup per
+user within a request, direct-query fallback without one).
 
 ### REQ-DATA-004 — UEX duplicate companies of one brand merge onto a single manufacturer; the sync is per-company resilient
 
