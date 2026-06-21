@@ -86,8 +86,13 @@ final class BlueprintModifierMath {
           if (stepped) {
             return vs == null ? ve : vs;
           }
+          if (vs == null || ve == null) {
+            // A linear segment needs both endpoints to interpolate; an underspecified one yields no
+            // value (mirrors the frontend's null result and keeps the lerp call provably non-null).
+            return null;
+          }
           double t = b.equals(a) ? 0.0d : clamp01((quality - a) / (b - a));
-          return vs == null || ve == null ? vs : lerp(vs, ve, t);
+          return lerp(vs, ve, t);
         }
       }
       return null;

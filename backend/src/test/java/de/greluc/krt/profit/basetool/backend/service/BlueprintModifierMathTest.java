@@ -90,6 +90,24 @@ class BlueprintModifierMathTest {
   }
 
   @Test
+  void computeModifierValue_returnsNullForUnderspecifiedLinearSegment() {
+    // A linear segment missing an endpoint cannot be interpolated, so it yields null rather than a
+    // half-defined value (and the lerp call is never reached with a null operand).
+    BlueprintRequirementModifier modifier = new BlueprintRequirementModifier();
+    modifier.setBetterWhen("higher");
+    modifier.setValueRangeType("linear");
+    BlueprintModifierSegment segment = new BlueprintModifierSegment();
+    segment.setOrderIndex(0);
+    segment.setQualityMin(0.0);
+    segment.setQualityMax(1000.0);
+    segment.setModifierAtStart(0.9);
+    // modifierAtEnd intentionally left unset.
+    modifier.addSegment(segment);
+
+    assertNull(BlueprintModifierMath.computeModifierValue(modifier, 500));
+  }
+
+  @Test
   void isDegrading_higherStatWorsensBelowNeutral() {
     BlueprintRequirementModifier modifier = linear("higher", 0.95, 1.05);
 
