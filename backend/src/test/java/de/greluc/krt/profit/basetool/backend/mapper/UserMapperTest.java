@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -36,7 +38,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 class UserMapperTest {
 
@@ -115,5 +120,45 @@ class UserMapperTest {
   @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto(null));
+  }
+
+  @Test
+  void toDto_withinRequest_loadsStaffelMembershipOncePerUser() {
+    // The three derived-field resolvers (squadron / isLogistician / isMissionManager) each need the
+    // user's Staffel membership. Within an HTTP request the lookup is memoised per user, so the
+    // derived JPQL query runs once instead of three times per toDto.
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("memo");
+    when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    try {
+      mapper.toDto(user);
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+
+    verify(membershipRepository, times(1))
+        .findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
+  }
+
+  @Test
+  void toDto_withoutRequestScope_fallsBackToDirectQuery() {
+    // Outside an HTTP request (e.g. a scheduled task) there is no request scope to memoise on, so
+    // each resolver issues its own lookup — the fallback must not throw.
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("noRequest");
+    when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+
+    UserDto dto = mapper.toDto(user);
+
+    assertNotNull(dto);
+    verify(membershipRepository, times(3))
+        .findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
   }
 }
