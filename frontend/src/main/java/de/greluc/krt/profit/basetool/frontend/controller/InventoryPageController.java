@@ -561,7 +561,8 @@ public class InventoryPageController {
 
     // The input form's catalog lookups are independent; fetch them concurrently (missions, job
     // orders and the owner picker are uncached round-trips) and apply on the request thread. Each
-    // helper swallows its own failure and returns an empty list, so join() never throws and the page
+    // helper swallows its own failure and returns an empty list, so join() never throws and the
+    // page
     // degrades exactly as the serial version did.
     final InventoryForm boundForm = form;
     boolean global = boundForm != null && Boolean.TRUE.equals(boundForm.getIsGlobal());

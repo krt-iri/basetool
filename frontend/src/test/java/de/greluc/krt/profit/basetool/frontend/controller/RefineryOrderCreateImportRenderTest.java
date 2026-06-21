@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -27,6 +29,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -236,6 +239,28 @@ class RefineryOrderCreateImportRenderTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-testid=\"refinery-import-error\"")))
         .andExpect(content().string(containsString("Schema-Version wird nicht unterstützt.")));
+  }
+
+  /**
+   * Graceful-degradation guard for the parallelized create-form catalog fan-out (#769): the lookups
+   * run concurrently through the real {@link de.greluc.krt.profit.basetool.frontend.service
+   * .ParallelPageLoader}, but each fetch helper swallows its own failure and returns an empty
+   * list/map, so {@code allOf(...).join()} must never propagate an exception. Here the users lookup
+   * throws while the materials lookup (stubbed in {@code setUp}) succeeds; the page must still
+   * render {@code 200} with an empty {@code users} model attribute and the populated {@code
+   * materials} attribute — exactly as the serial version degraded.
+   */
+  @Test
+  void createPage_WhenOneCatalogFetchFails_StillRendersWithEmptyList() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
+
+    mockMvc
+        .perform(get("/refinery-orders/create").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(view().name("refinery-orders-create"))
+        .andExpect(model().attribute("users", empty()))
+        .andExpect(model().attribute("materials", hasSize(2)));
   }
 
   private static RefineryGoodForm good(
