@@ -8,6 +8,7 @@
 
 ### Changed
 
+- **Das Lager-Eingabeformular und das Refinery-Auftragsformular laden schneller.** Die Katalog-Listen (Materialien, Standorte, Job-Orders, Missionen, Nutzer, Besitzer-Auswahl) werden jetzt parallel statt nacheinander vom Backend geholt. Bei einem fehlgeschlagenen Abruf bleibt die betroffene Liste leer wie bisher.
 - **Die Einsatzdetailseite lädt die Finanz- und Refinery-Daten jetzt parallel statt nacheinander.** Für Mitglieder wurden die drei Abrufe (Finanzeinträge, Finanzsumme, Refinery-Aufträge) bisher seriell ausgeführt; sie laufen nun gleichzeitig, sodass die Detailansicht (und jede Live-Aktualisierung über die Präsenz-Verbindung) schneller fertig ist. Gleiche Daten; schlägt einer der drei Abrufe fehl, wird die Finanzen-Ansicht jetzt einheitlich ausgeblendet statt teilweise angezeigt.
 
 - **Jede angemeldete Seite lädt den Staffel-Katalog nicht mehr bei jedem Aufruf neu.** Die Seitenleisten-/Kontext-Logik holt die (sich selten ändernde) Staffel-Liste jetzt aus dem 10-Minuten-Cache statt bei jedem Rendern frisch vom Backend; für Admins entfällt dadurch auch ein doppelter Abruf derselben Liste pro Seitenaufbau. Spürbar weniger Backend-Last pro Navigation. Das Umschalten der Staffel-Flags „Beförderung aktiv" und „Profit-Berechtigung" durch Admins leert den Cache und wirkt dadurch sofort app-weit statt mit bis zu zehn Minuten Verzögerung.

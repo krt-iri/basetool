@@ -30,12 +30,15 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -78,6 +81,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class InventoryPageController {
 
   private final BackendApiClient backendApiClient;
+  private final ParallelPageLoader parallelPageLoader;
 
   /**
    * Renders the squadron-wide aggregated inventory view ({@code /inventory}). Sort is fixed to
@@ -555,15 +559,32 @@ public class InventoryPageController {
       form = (InventoryForm) model.getAttribute("inventoryForm");
     }
 
-    if (form != null && Boolean.TRUE.equals(form.getIsGlobal())) {
-      model.addAttribute("users", fetchUsers());
+    // The input form's catalog lookups are independent; fetch them concurrently (missions, job
+    // orders and the owner picker are uncached round-trips) and apply on the request thread. Each
+    // helper swallows its own failure and returns an empty list, so join() never throws and the page
+    // degrades exactly as the serial version did.
+    final InventoryForm boundForm = form;
+    boolean global = boundForm != null && Boolean.TRUE.equals(boundForm.getIsGlobal());
+    CompletableFuture<List<UserReferenceDto>> usersFuture = null;
+    if (global) {
+      usersFuture = parallelPageLoader.loadAsync(this::fetchUsers);
     }
-
-    model.addAttribute("materials", fetchMaterials());
-    model.addAttribute("locations", fetchLocations());
-    model.addAttribute("missions", fetchMissions());
-    model.addAttribute("jobOrders", fetchActiveJobOrders());
-    model.addAttribute("ownerOptions", fetchOwnerPickerOptions(form));
+    var materialsFuture = parallelPageLoader.loadAsync(this::fetchMaterials);
+    var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
+    var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
+    var jobOrdersFuture = parallelPageLoader.loadAsync(this::fetchActiveJobOrders);
+    var ownerFuture = parallelPageLoader.loadAsync(() -> fetchOwnerPickerOptions(boundForm));
+    CompletableFuture.allOf(
+            materialsFuture, locationsFuture, missionsFuture, jobOrdersFuture, ownerFuture)
+        .join();
+    if (usersFuture != null) {
+      model.addAttribute("users", usersFuture.join());
+    }
+    model.addAttribute("materials", materialsFuture.join());
+    model.addAttribute("locations", locationsFuture.join());
+    model.addAttribute("missions", missionsFuture.join());
+    model.addAttribute("jobOrders", jobOrdersFuture.join());
+    model.addAttribute("ownerOptions", ownerFuture.join());
     return "inventory-input";
   }
 

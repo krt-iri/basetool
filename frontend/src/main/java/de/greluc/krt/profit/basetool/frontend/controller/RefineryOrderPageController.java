@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemF
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -48,6 +49,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -81,6 +83,7 @@ public class RefineryOrderPageController {
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final IngestHandoffService ingestHandoffService;
+  private final ParallelPageLoader parallelPageLoader;
 
   /**
    * Parses the start instant submitted by the form as a UTC {@link java.time.Instant}.
@@ -278,17 +281,42 @@ public class RefineryOrderPageController {
         form.setOwnerId(currentUserId);
       }
     }
+    // isLogistician reads the SecurityContext on the request thread; do it here, then fetch the
+    // catalog lookups concurrently (missions, users, rounding mode, yields and the owner picker are
+    // uncached round-trips). Each helper swallows its own failure and returns an empty list/map, so
+    // join() never throws and the form degrades exactly as the serial version did.
     model.addAttribute("isLogistician", isLogistician(principal));
     model.addAttribute("refineryOrderForm", form);
-    model.addAttribute("materials", fetchMaterials());
-    model.addAttribute("methods", fetchMethods());
-    model.addAttribute("locations", fetchLocations());
-    model.addAttribute("missions", fetchMissions());
-    model.addAttribute("users", fetchUsers());
-    model.addAttribute("roundingMode", fetchRoundingMode());
-    UUID preselectedLocationId = form != null ? form.getLocationId() : null;
-    model.addAttribute("materialYieldBonuses", fetchYieldsForLocation(preselectedLocationId));
-    model.addAttribute("ownerOptions", fetchOwnerPickerOptions(form, principal));
+    final RefineryOrderForm boundForm = form;
+    UUID preselectedLocationId = boundForm.getLocationId();
+    var materialsFuture = parallelPageLoader.loadAsync(this::fetchMaterials);
+    var methodsFuture = parallelPageLoader.loadAsync(this::fetchMethods);
+    var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
+    var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
+    var usersFuture = parallelPageLoader.loadAsync(this::fetchUsers);
+    var roundingFuture = parallelPageLoader.loadAsync(this::fetchRoundingMode);
+    var yieldsFuture =
+        parallelPageLoader.loadAsync(() -> fetchYieldsForLocation(preselectedLocationId));
+    var ownerFuture =
+        parallelPageLoader.loadAsync(() -> fetchOwnerPickerOptions(boundForm, principal));
+    CompletableFuture.allOf(
+            materialsFuture,
+            methodsFuture,
+            locationsFuture,
+            missionsFuture,
+            usersFuture,
+            roundingFuture,
+            yieldsFuture,
+            ownerFuture)
+        .join();
+    model.addAttribute("materials", materialsFuture.join());
+    model.addAttribute("methods", methodsFuture.join());
+    model.addAttribute("locations", locationsFuture.join());
+    model.addAttribute("missions", missionsFuture.join());
+    model.addAttribute("users", usersFuture.join());
+    model.addAttribute("roundingMode", roundingFuture.join());
+    model.addAttribute("materialYieldBonuses", yieldsFuture.join());
+    model.addAttribute("ownerOptions", ownerFuture.join());
   }
 
   /**
