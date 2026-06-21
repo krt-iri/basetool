@@ -214,7 +214,7 @@ public class SquadronContextAdvice {
       // Slow-changing global catalogue, identical URI for every caller — route through the
       // 10-min STATIC_DATA_CACHE (same entry the page controllers already cache, evicted on admin
       // squadron mutations) so this advice does not re-fetch it on every authenticated render and
-      // shares the cached entry with the admin switcher's identical call below (REQ-DATA-003).
+      // shares the cached entry with the admin switcher's identical call below (REQ-DATA-006).
       PageResponse<SquadronDto> page =
           backendApiClient.getCached(
               "/api/v1/squadrons?size=1000&sort=name,asc", new ParameterizedTypeReference<>() {});
@@ -284,11 +284,10 @@ public class SquadronContextAdvice {
       log.debug("Failed to load Squadron catalogue for admin switcher", ex);
     }
     try {
-      // NOT cached: unlike the squadron catalogue, special-command admin mutations
+      // NOT cached (REQ-DATA-006): unlike the squadron catalogue, special-command admin mutations
       // (AdminSpecialCommandsPageController create/update/delete/activate) do not evict
       // STATIC_DATA_CACHE, so caching this URI would leave the admin switcher's SK list stale for
-      // up
-      // to the cache TTL after an SK lifecycle change. This call is admin-switcher-only (not every
+      // the cache TTL after an SK lifecycle change. This call is admin-switcher-only (not every
       // render), so a plain fetch is the safe trade-off until SK mutations wire eviction.
       PageResponse<SquadronDto> specialCommands =
           backendApiClient.get(

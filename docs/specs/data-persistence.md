@@ -107,6 +107,36 @@ updated any of its own columns.
 per-item `catch` keeps the run going past a failure so the remaining items still persist; and an
 incoming uuid already owned by another row leaves the row's `external_uuid` null instead of throwing.
 
+### REQ-DATA-006 — Slow-changing global catalogues are served from the frontend `STATIC_DATA_CACHE`
+
+A backend list that is **global** (no per-principal variance) and **slow-changing** is fetched through
+`BackendApiClient.getCached(...)` — the 10-minute Caffeine `STATIC_DATA_CACHE`, keyed on the request
+URI — not a plain `get(...)` on every render. The canonical case is the **squadron catalogue** (`GET
+/api/v1/squadrons?size=1000&sort=name,asc`): it is read on **every** authenticated render by
+`SquadronContextAdvice` (`availableSquadrons()` plus the admin switcher's `loadAdminOrgUnitCatalogue()`)
+and by the page controllers that already cache the identical URI (e.g.
+`JobOrderPageController.fetchSquadrons()`). Because the cache key is the URI alone, all those callers
+share **one** entry, so the catalogue is fetched at most once per TTL app-wide and the admin render's
+former double-fetch of the identical URI collapses to a single cached read.
+
+Invariants that must hold:
+
+- **Cacheability is gated on eviction.** A catalogue may be cached **only** if every admin mutation of
+  it evicts the cache via `clearStaticDataCache()`, so no user sees a list more stale than the last
+  mutation. Squadron lifecycle changes (`AdminMissionDataPageController`) evict, so the squadron
+  catalogue is cacheable.
+- **The SpecialCommand catalogue (`/api/v1/special-commands?…`) stays an uncached plain `get`** because
+  `AdminSpecialCommandsPageController` does **not** yet evict `STATIC_DATA_CACHE`; caching it without
+  that wiring would leave the admin switcher's SK list stale for the cache TTL after an SK lifecycle
+  change. Caching it is blocked on wiring SK-mutation eviction first.
+- **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`, and
+  `/api/v1/me/active-org-unit` share a URI across users; a URI-keyed cache would cross-contaminate
+  them, so they remain plain `get(...)`.
+
+**Acceptance** (`SquadronContextAdviceTest`): both `availableSquadrons()` and the admin switcher route
+the squadron catalogue through `getCached`, never a plain `get`; the SpecialCommand catalogue stays a
+plain `get`.
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
