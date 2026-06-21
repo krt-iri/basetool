@@ -31,11 +31,14 @@ import org.springframework.stereotype.Component;
 /**
  * Scheduled task that mirrors the Keycloak user directory into the local {@code app_user} table.
  *
- * <p>Runs every {@code app.keycloak.sync.interval} (default {@code PT5M}). Pulls the full non-paged
- * user list from Keycloak Admin API, upserts each user via {@link UserService#syncUser}, collects
- * the set of Keycloak {@code id}s that were observed in this run, and then asks the service to mark
- * every local user that is NOT in that set as missing — that is how deletions in Keycloak get
- * reflected locally without ever issuing a hard {@code DELETE}.
+ * <p>Runs every {@code app.keycloak.sync.interval} (default {@code PT5M}). Pulls the full user list
+ * from Keycloak Admin API via {@link KeycloakService#fetchUsers()} (which pages through {@code
+ * first}/{@code max} internally so the set is complete, not just the first server-side page),
+ * upserts each user via {@link UserService#syncUser}, collects the set of Keycloak {@code id}s
+ * observed in this run, and then asks the service to mark every local user that is NOT in that set
+ * as missing — that is how deletions in Keycloak get reflected locally without ever issuing a hard
+ * {@code DELETE}. The completeness of the fetched set is a hard prerequisite (REQ-SEC-018): a
+ * truncated list would soft-delete every real member beyond the page cap.
  */
 @Component
 @RequiredArgsConstructor
