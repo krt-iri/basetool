@@ -613,7 +613,7 @@
              handover history gains a row) via GET /orders/{id}?fragment=handovers. The "Übergabe
              protokollieren" button + the per-row report-download are document-delegated, so they
              survive the swap; the requirement table and header are swapped separately. -->
-        <div id="order-handovers-results"><th:block th:fragment="materialHandoverSection">
+        <div id="order-handovers-results" class="mt-2"><th:block th:fragment="materialHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">

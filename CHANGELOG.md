@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- **In den Auftragsdetails hat die Überschrift „Aggregierte Materialien" wieder den gewohnten Abstand zur Tabelle darüber.** Durch den AJAX-Swap-Container wurde der Titel als erstes Element behandelt und sein oberer Abstand entfernt, sodass er direkt an der Item-Tabelle klebte.
+- **Abschnittsüberschriften, die in einem AJAX-Swap-Container stecken, haben wieder ihren gewohnten Abstand zum Inhalt darüber.** Der Container machte die Überschrift zum ersten Element und entfernte so ihren oberen Abstand, sodass sie direkt am vorherigen Block klebte. Betrifft in den Auftragsdetails „Aggregierte Materialien" und „Übergaben" sowie „Notiz" in der Detailansicht persönlicher Blueprints.
 
 - **Lagerbestand lässt sich nicht mehr einem Auftrag zuordnen, dessen Materialliste das Material gar nicht enthält.** Solche Zuordnungen tauchten in der aggregierten Materialliste des Auftrags nie auf, banden den Bestand aber trotzdem. Das „Auftrag"-Dropdown im Lager bietet jetzt nur noch Aufträge an, die das Material wirklich benötigen, und bereits bestehende Fehlzuordnungen werden in der Auftragsansicht als Warnhinweis aufgelistet, damit man sie auflösen kann.
 
