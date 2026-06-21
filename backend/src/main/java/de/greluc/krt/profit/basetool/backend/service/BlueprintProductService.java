@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -187,6 +188,50 @@ public class BlueprintProductService {
     return buildProductMap("").values().stream()
         .map(p -> new ResolvedProduct(p.productKey, p.displayName, p.outputItemId))
         .toList();
+  }
+
+  /**
+   * Builds the index from a blueprint's structural key (lower-cased, trimmed {@code scwiki_key}) to
+   * its normalized {@code product_key}, over every active recipe. Backs the scmdb.net import's
+   * high-confidence <em>tag match</em> (REQ-INV-019): an scmdb.net export entry carries the
+   * DataForge blueprint key under {@code tag}, which equals a blueprint's {@code scwiki_key}, so
+   * the import can resolve it straight to the owned product — bypassing the name chain and the
+   * CIG-mislabel pitfalls the name match has to correct for (REQ-INV-007).
+   *
+   * <p>The key is lower-cased because the two sources spell the same DataForge identifier with
+   * different casing (the Wiki keeps CamelCase like {@code BP_CRAFT_AMRS_LaserCannon_S1}; scmdb.net
+   * lower-cases it). A structural key that maps to two <em>different</em> product keys (a duplicate
+   * {@code scwiki_key} across recipes with diverging output names — possible because {@code
+   * scwiki_key} is not UNIQUE) is <strong>excluded</strong> rather than resolved to an arbitrary
+   * one, so the tag match only ever fires when unambiguous and the import falls back to the name
+   * chain for that entry.
+   *
+   * @return structural key (lower-cased {@code scwiki_key}) → normalized {@code product_key}, with
+   *     ambiguous keys removed; never {@code null}
+   */
+  @NotNull
+  public Map<String, String> scwikiKeyToProductKeyIndex() {
+    Map<String, String> index = new LinkedHashMap<>();
+    Set<String> ambiguous = new HashSet<>();
+    for (BlueprintProductRow row : blueprintRepository.findActiveProductRows("")) {
+      if (row.scwikiKey() == null || row.outputName() == null) {
+        continue;
+      }
+      String tagKey = row.scwikiKey().trim().toLowerCase(Locale.ROOT);
+      if (tagKey.isEmpty()) {
+        continue;
+      }
+      String productKey = normalizer.normalize(row.outputName());
+      if (productKey.isEmpty()) {
+        continue;
+      }
+      String existing = index.putIfAbsent(tagKey, productKey);
+      if (existing != null && !existing.equals(productKey)) {
+        ambiguous.add(tagKey);
+      }
+    }
+    ambiguous.forEach(index::remove);
+    return index;
   }
 
   /**

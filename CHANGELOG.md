@@ -4,6 +4,19 @@
 
 ### Added
 
+- **Die Mitgliederverwaltung zeigt jetzt, ob ein Konto mit Discord verknüpft ist.** Eine neue Spalte zwischen „Missions-Manager" und „Status" zeigt bei verknüpften Konten das Discord-Symbol, sonst einen gedämpften Strich. Nur für Admins sichtbar, und es wird ausschließlich der Verknüpfungs-Status angezeigt — nie die Discord-ID.
+- **Blueprint-Import von scmdb.net.** Der Blueprint-Import auf der Seite „Meine Blueprints“ akzeptiert jetzt zusätzlich den Profil-/Tracking-Export von scmdb.net (neben dem SCMDB-Log-Watcher und dem Basetool Blueprint Extractor). Nur freigeschaltete Blueprints werden übernommen; über den mitgelieferten Blueprint-Schlüssel (Tag) werden Produkte auch dann zuverlässig erkannt, wenn der angezeigte Name abweicht.
+
+### Fixed
+
+- **Der Blueprint-Import bricht nicht mehr ab, wenn ein Name zuvor in anderer Groß-/Kleinschreibung gelernt wurde.** Gelernte Blueprint-Aliase sind jetzt eindeutig pro Name unabhängig von Groß-/Kleinschreibung (Migration V176, wie bereits bei den Material-Aliasen): zwei nur in der Schreibweise abweichende Einträge können einen Folge-Import nicht mehr mit einem Datenbankfehler (HTTP 500) blockieren.
+
+## [v0.7.5](https://github.com/krt-profit/basetool/releases/tag/v0.7.5) - 2026-06-21
+
+## [v0.7.4](https://github.com/krt-profit/basetool/releases/tag/v0.7.4) - 2026-06-21
+
+### Added
+
 - **Änderungen anderer Nutzer an einem Einsatz erscheinen jetzt live, ohne die Seite neu zu laden.** Tritt jemand bei, wird die Crew umgestellt, ein Finanzeintrag erfasst oder eine Kern-/Termin-/Status-/Einsatzleiter-/Funk-Änderung gemacht, aktualisiert sich die Ansicht auf allen anderen geöffneten Einsatz-Seiten automatisch über die bestehende Präsenz-Verbindung. Bearbeitet man selbst gerade etwas (Dialog offen), wird die Aktualisierung über einen „Aktualisierungen verfügbar“-Hinweis aufgeschoben statt aufgedrängt; über die Verbindung gehen nur Abschnitts-Kennungen, die Daten holt jede Ansicht weiterhin über ihre eigene berechtigungsgeprüfte Anfrage.
 
 ### Changed

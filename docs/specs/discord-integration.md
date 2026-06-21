@@ -43,6 +43,35 @@ all credential-only users coexist.
 
 **Enforced by:** `BackendApplicationTests` (schema validate) · `UserServiceDiscordSyncTest` (subject-only recognition: a Discord login never consults `findByUsername`) · _(planned T1.3: link-persistence test)_ · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserService.syncUser` · **Issues:** #721, #724
 
+### REQ-SEC-019 — Discord-link indicator in member management (admin-only, no raw id)
+
+The admin member-management page (`/members`) surfaces whether each account is Discord-linked, as a
+read-only column **between** the "Missions-Manager" and "Status" columns. The signal is a derived
+boolean `UserDto.discordLinked` — `true` iff the user has a non-blank `discord_user_id`
+(REQ-DATA-006) — computed in `UserMapper.toDto`. The **raw Discord id (snowflake) is never carried
+in any DTO**; only the boolean fact of the link leaves the backend, consistent with the
+never-log/never-expose-Discord-id posture of REQ-SEC-016. The page is already `@PreAuthorize(ADMIN)`
+(frontend) so the indicator is admin-only; every peer/guest redaction shape that strips PII leaves
+`discordLinked` `null`, so the link status never reaches non-admins through any shared-`UserDto`
+path (mission participants, pickers, etc.). The visual treatment follows the monochrome-icon
+design-system convention: linked → the Discord brand mark in the inherited link/text colour
+(`currentColor`, like the sibling GitHub mark), not linked → a muted em-dash.
+
+**Acceptance**
+
+- [x] `UserDto.discordLinked` is `true` exactly when `app_user.discord_user_id` is non-null and
+  non-blank, derived in `UserMapper.toDto`; the raw id is never added to any DTO.
+- [x] `/members` renders a Discord column between "Missions-Manager" and "Status": a linked account
+  shows the `krt-icon-discord` brand mark (neutral `currentColor`, with a localized title/aria-label),
+  a non-linked account shows a muted em-dash.
+- [x] The peer/guest redaction shapes (`UserController.redactToPeerShape`,
+  `MissionController.cleanupUserForGuest`, `MissionFinanceEntryController.redactUserPii`) set
+  `discordLinked = null`, so it is not exposed to non-admin viewers.
+- [x] The three message bundles (default/de/en) carry `members.discord`, `members.discord.linked`,
+  `members.discord.not_linked` (umlauts `\uXXXX`-escaped in the `.properties`).
+
+**Enforced by:** `UserMapperTest` (linked / not-linked / blank-id → `discordLinked`) · `MembersPageDiscordColumnRenderTest` (icon rendered only for the linked member + column header) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) · `MessageBundleConsistencyTest` (key parity) · **Code:** `UserDto`, `UserMapper`, `members.html`, `messages*.properties`
+
 ### REQ-SEC-016 — Fail-closed guild + KRT-Mitglied membership gate
 
 A Discord login MUST be denied (no Keycloak session issued) unless the federated Discord user is a

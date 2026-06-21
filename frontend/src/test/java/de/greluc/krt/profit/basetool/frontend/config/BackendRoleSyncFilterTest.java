@@ -137,7 +137,8 @@ class BackendRoleSyncFilterTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     when(backendApiClient.get(USERS_ME, UserDto.class)).thenReturn(user);
 
     // When

@@ -1,4 +1,4 @@
-# E2E spike isolation override (docs/E2E_TESTING_PLAN.md, Phase 0).
+# E2E spike isolation override (docs/e2e-test/README.md, Phase 0).
 #
 # Replaces the shared `/var/iri/...` host bind mounts (which every stack on this
 # machine shares) with project-scoped named volumes, so the E2E run never reads

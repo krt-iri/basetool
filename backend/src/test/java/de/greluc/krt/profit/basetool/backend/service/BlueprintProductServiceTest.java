@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -185,6 +186,41 @@ class BlueprintProductServiceTest {
     when(blueprintRepository.findActiveProductRows("")).thenReturn(List.of());
 
     assertTrue(service.resolveByProductKey("does-not-exist").isEmpty());
+  }
+
+  @Test
+  void scwikiKeyToProductKeyIndex_mapsLowercasedKeyToProductKey() {
+    // covers REQ-INV-019 — the index lower-cases the scwiki_key and maps it to the normalized
+    // product key, so the scmdb.net tag (a lower-cased DataForge key) resolves the product.
+    when(blueprintRepository.findActiveProductRows(""))
+        .thenReturn(
+            List.of(
+                row("Arclight Pistol", "BP_CRAFT_AMRS_LaserCannon_S1", null, null),
+                row("P8-AR Rifle", "BP_CRAFT_behr_rifle_ballistic_02_civilian", null, null)));
+
+    Map<String, String> index = service.scwikiKeyToProductKeyIndex();
+
+    assertEquals("arclight pistol", index.get("bp_craft_amrs_lasercannon_s1"));
+    assertEquals("p8-ar rifle", index.get("bp_craft_behr_rifle_ballistic_02_civilian"));
+    assertEquals(2, index.size());
+  }
+
+  @Test
+  void scwikiKeyToProductKeyIndex_excludesAmbiguousKeys() {
+    // covers REQ-INV-019 — a scwiki_key (not UNIQUE) shared by two recipes with diverging output
+    // names is ambiguous and excluded, so the tag match never picks an arbitrary product.
+    when(blueprintRepository.findActiveProductRows(""))
+        .thenReturn(
+            List.of(
+                row("Arclight Pistol", "BP_DUP", null, null),
+                row("Different Product", "BP_DUP", null, null),
+                row("P8-AR Rifle", "BP_UNIQUE", null, null)));
+
+    Map<String, String> index = service.scwikiKeyToProductKeyIndex();
+
+    assertFalse(index.containsKey("bp_dup"));
+    assertEquals("p8-ar rifle", index.get("bp_unique"));
+    assertEquals(1, index.size());
   }
 
   @Test

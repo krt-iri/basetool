@@ -248,7 +248,8 @@ public class MissionFinanceEntryController {
         dto.inKeycloak(),
         null, // squadron
         dto.version(),
-        null // joinDate
+        null, // joinDate
+        null // discordLinked – not exposed to guests
         );
   }
 

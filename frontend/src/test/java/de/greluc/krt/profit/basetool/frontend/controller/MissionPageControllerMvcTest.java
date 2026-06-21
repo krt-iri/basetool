@@ -1343,7 +1343,8 @@ class MissionPageControllerMvcTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto participant =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(
@@ -1462,7 +1463,8 @@ class MissionPageControllerMvcTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto participant =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(
@@ -1631,7 +1633,8 @@ class MissionPageControllerMvcTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     de.greluc.krt.profit.basetool.frontend.model.dto.UserDto outsiderUser =
         new de.greluc.krt.profit.basetool.frontend.model.dto.UserDto(
             outsiderUserId,
@@ -1649,7 +1652,8 @@ class MissionPageControllerMvcTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto participant =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(
@@ -1783,7 +1787,8 @@ class MissionPageControllerMvcTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     de.greluc.krt.profit.basetool.frontend.model.dto.UserDto outsiderUser =
         new de.greluc.krt.profit.basetool.frontend.model.dto.UserDto(
             outsiderUserId,
@@ -1801,7 +1806,8 @@ class MissionPageControllerMvcTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto participant =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(

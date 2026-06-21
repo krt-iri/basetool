@@ -30,7 +30,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -52,17 +51,17 @@ import lombok.ToString;
  *
  * <p>The alias points at a product by its normalized {@link #productKey} (plus a {@link
  * #productName} snapshot and the optional resolved {@link #outputItem}) rather than at a single
- * recipe row, because ownership is per product. The unique constraint on {@code (source_system,
- * external_name)} guarantees an external name resolves deterministically — a duplicate add returns
- * HTTP 409.
+ * recipe row, because ownership is per product.
+ *
+ * <p>Uniqueness on {@code (source_system, LOWER(external_name))} guarantees that an external name
+ * resolves deterministically for the case-insensitive resolution lookup — a duplicate add
+ * (including a case-only variant) returns HTTP 409. The constraint lives in the DB as the
+ * functional unique index {@code uq_blueprint_external_alias_source_lower_name} (V176); it cannot
+ * be expressed as a JPA {@code @UniqueConstraint} because of the {@code LOWER()} expression, so
+ * there is intentionally no {@code uniqueConstraints} declaration here (REQ-INV-020).
  */
 @Entity
-@Table(
-    name = "blueprint_external_alias",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uk_blueprint_external_alias_source_external_name",
-            columnNames = {"source_system", "external_name"}))
+@Table(name = "blueprint_external_alias")
 @Getter
 @Setter
 @ToString(exclude = "outputItem")
