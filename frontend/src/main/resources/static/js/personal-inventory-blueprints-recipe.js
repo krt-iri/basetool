@@ -42,6 +42,18 @@
     // id -> recipe JSON, so re-selecting a row never refetches.
     const recipeCache = new Map();
 
+    // Craftability (#781): blueprintId -> craftability JSON. Fetched once for the whole owned set
+    // (with includeRefinery=true, so both inventory-only and refinery-included figures are present)
+    // and re-fetched only after the collection is re-rendered (batch add / import / remove).
+    const craftabilityById = new Map();
+    let detailCraftEl = null;
+    let refineryToggle = null;
+    let refineryOn = false;
+    let activeCraftability = null;
+
+    // Marker on a craft badge/count when the blueprint is craftable ONLY thanks to refinery yield.
+    const REFINERY_GLYPH = '⟢';
+
     function i18n() {
         return window.krtBlueprintsRecipeI18n || {};
     }
@@ -143,7 +155,11 @@
         }
 
         renderDetailHead(row);
+        // Set the active craftability BEFORE rendering the recipe so a cached recipe's quality
+        // sliders default to the effective quality this row's stock would deliver.
+        activeCraftability = craftabilityById.get(attr(row, 'data-id')) || null;
         loadRecipe(attr(row, 'data-id'));
+        renderCraftDetail(attr(row, 'data-id'));
 
         if (options.showDetail && mdEl && window.matchMedia('(max-width: 900px)').matches) {
             mdEl.classList.add('is-detail');
@@ -266,8 +282,8 @@
         }
 
         if (groups.length > 0) {
-            groups.forEach(function (g) {
-                recipeEl.appendChild(renderQualityBlock(g));
+            groups.forEach(function (g, idx) {
+                recipeEl.appendChild(renderQualityBlock(g, idx));
             });
         } else {
             // Legacy fallback for a blueprint synced without requirement groups: the flat
@@ -283,7 +299,7 @@
         }
     }
 
-    function renderQualityBlock(group) {
+    function renderQualityBlock(group, groupIndex) {
         const block = el('div', 'quality-block');
         const slot = group.name || group.groupKey;
         if (slot) {
@@ -351,13 +367,30 @@
                 }),
             );
 
+            // Default the slider to the effective quality the user's own stock would deliver for
+            // this slot (best-first SCU-weighted, honouring the refinery toggle); fall back to the
+            // band maximum when no qualifying stock / craftability data exists (#781).
+            let defaultQ = qmax;
+            const craftGroup =
+                activeCraftability &&
+                activeCraftability.groups &&
+                activeCraftability.groups[groupIndex];
+            if (craftGroup) {
+                const eff = refineryOn
+                    ? craftGroup.effectiveQualityWithRefinery
+                    : craftGroup.effectiveQuality;
+                if (eff != null) {
+                    defaultQ = Math.max(qmin, Math.min(qmax, eff));
+                }
+            }
+
             const qrow = el('div', 'quality-row');
             const range = document.createElement('input');
             range.type = 'range';
             range.step = '1';
             range.min = String(qmin);
             range.max = String(qmax);
-            range.value = String(qmax);
+            range.value = String(defaultQ);
             range.setAttribute(
                 'aria-label',
                 (i18n().qualityAria || 'Quality') +
@@ -365,7 +398,7 @@
             );
             qrow.appendChild(range);
             const qval = el('span', 'quality-value');
-            const qOut = el('output', null, String(Math.round(qmax)));
+            const qOut = el('output', null, String(Math.round(defaultQ)));
             qval.appendChild(qOut);
             const qMaxSmall = document.createElement('small');
             qMaxSmall.textContent = ' / ' + Math.round(qmax);
@@ -496,6 +529,210 @@
         return null;
     }
 
+    /* --------------------------------------------------------- craftability */
+
+    // Formats an SCU figure with two decimals (matching the inventory amount scale, trimmed).
+    function fmtScu(value) {
+        if (value == null) {
+            return '0';
+        }
+        const n = Number(value);
+        return (Math.round(n * 100) / 100).toString();
+    }
+
+    // Fetches craftability for the whole owned set once (both figure sets), then paints the
+    // master-row badges and, if a row is already selected, its detail breakdown + recipe sliders.
+    function loadCraftability() {
+        const url = endpoints().craftability;
+        if (!url) {
+            return;
+        }
+        const sep = url.indexOf('?') === -1 ? '?' : '&';
+        const target = window.safeSameOriginUrl
+            ? window.safeSameOriginUrl(url + sep + 'includeRefinery=true', url)
+            : url + sep + 'includeRefinery=true';
+        fetch(target, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+            .then(function (resp) {
+                return resp.ok ? resp.json() : null;
+            })
+            .then(function (list) {
+                craftabilityById.clear();
+                if (Array.isArray(list)) {
+                    list.forEach(function (c) {
+                        if (c && c.blueprintId) {
+                            craftabilityById.set(c.blueprintId, c);
+                        }
+                    });
+                }
+                decorateRows();
+                if (activeRow) {
+                    const id = attr(activeRow, 'data-id');
+                    activeCraftability = craftabilityById.get(id) || null;
+                    renderCraftDetail(id);
+                    // Re-render the cached recipe so the sliders adopt the effective-quality default.
+                    if (recipeCache.has(id)) {
+                        renderRecipe(recipeCache.get(id));
+                    }
+                }
+            })
+            .catch(function () {
+                /* craftability is purely additive — on failure the page renders without badges */
+            });
+    }
+
+    // Paints / refreshes the per-row craft-status badge from the current toggle state.
+    function decorateRows() {
+        rows().forEach(function (r) {
+            const id = attr(r, 'data-id');
+            let badge = r.querySelector('.krt-bp-craft-badge');
+            if (!badge) {
+                badge = el('span', 'krt-bp-craft-badge');
+                r.appendChild(badge);
+            }
+            clear(badge);
+            badge.className = 'krt-bp-craft-badge';
+            badge.removeAttribute('title');
+
+            const data = craftabilityById.get(id);
+            if (!data || !data.recipeResolved || !data.hasResourceIngredients) {
+                badge.classList.add('is-muted');
+                badge.textContent = '–';
+                if (data && data.hasItemIngredients) {
+                    badge.title = i18n().itemHint || '';
+                }
+                return;
+            }
+            const count = refineryOn ? data.craftableWithRefinery : data.craftable;
+            if (count > 0) {
+                badge.classList.add('is-ok');
+                badge.textContent = '×' + count;
+                if (refineryOn && data.craftableWithRefinery > data.craftable) {
+                    badge.classList.add('is-ref');
+                    const mark = document.createElement('span');
+                    mark.textContent = ' ' + REFINERY_GLYPH;
+                    badge.appendChild(mark);
+                    badge.title = i18n().viaRefinery || '';
+                }
+            } else {
+                badge.classList.add('is-missing');
+                badge.textContent = i18n().badgeMissing || 'fehlt';
+            }
+        });
+    }
+
+    // Fills the detail-pane craftability section for the given blueprint id.
+    function renderCraftDetail(id) {
+        if (!detailCraftEl) {
+            return;
+        }
+        clear(detailCraftEl);
+        const data = craftabilityById.get(id);
+        if (!data) {
+            detailCraftEl.hidden = true;
+            return;
+        }
+        detailCraftEl.hidden = false;
+        detailCraftEl.appendChild(el('h2', 'section-title', i18n().craftTitle || 'Craftbarkeit'));
+
+        if (!data.recipeResolved) {
+            detailCraftEl.appendChild(
+                el('p', 'krt-bp-craft-note', i18n().noRecipe || 'No recipe.'),
+            );
+            return;
+        }
+        if (!data.hasResourceIngredients) {
+            detailCraftEl.appendChild(
+                el(
+                    'p',
+                    'krt-bp-craft-note',
+                    i18n().itemNotEvaluated || 'Only ITEM ingredients — not evaluated.',
+                ),
+            );
+            return;
+        }
+
+        const count = refineryOn ? data.craftableWithRefinery : data.craftable;
+        const summary = el('div', 'krt-bp-craft-summary');
+        summary.appendChild(el('span', 'krt-bp-craft-label', i18n().craftableLabel || 'Craftbar'));
+        const countEl = el(
+            'span',
+            'krt-bp-craft-count chip ' + (count > 0 ? 'chip--success' : 'chip--warning'),
+        );
+        if (count > 0) {
+            countEl.textContent = '×' + count;
+            if (refineryOn && data.craftableWithRefinery > data.craftable) {
+                const mark = el('span', 'krt-bp-craft-refmark', ' ' + REFINERY_GLYPH);
+                mark.title = i18n().viaRefinery || '';
+                countEl.appendChild(mark);
+            }
+        } else {
+            countEl.textContent = i18n().notCraftable || 'Nicht craftbar';
+        }
+        summary.appendChild(countEl);
+        const limit = refineryOn
+            ? data.limitingMaterialNameWithRefinery
+            : data.limitingMaterialName;
+        if (count > 0 && limit) {
+            summary.appendChild(
+                el(
+                    'span',
+                    'krt-bp-craft-limit',
+                    (i18n().limitedBy || 'limitiert durch') + ' ' + limit,
+                ),
+            );
+        }
+        detailCraftEl.appendChild(summary);
+
+        const materials = data.materials || [];
+        if (materials.length > 0) {
+            const list = el('div', 'krt-bp-craft-mats');
+            materials.forEach(function (m) {
+                const avail = refineryOn ? m.availableScuWithRefinery : m.availableScu;
+                const missing = refineryOn ? m.missingScuWithRefinery : m.missingScu;
+                const eff = refineryOn ? m.effectiveQualityWithRefinery : m.effectiveQuality;
+                const row = el('div', 'krt-bp-craft-mat' + (missing > 0 ? ' is-short' : ''));
+                row.appendChild(el('span', 'krt-bp-craft-mat-name', m.materialName || '?'));
+                const figs = el('span', 'krt-bp-craft-mat-figs');
+                figs.appendChild(
+                    el(
+                        'span',
+                        'krt-bp-craft-mat-fig',
+                        fmtScu(avail) + ' / ' + fmtScu(m.requiredScu) + ' SCU',
+                    ),
+                );
+                figs.appendChild(
+                    el(
+                        'span',
+                        'krt-bp-craft-mat-q',
+                        eff != null ? (i18n().qualityShort || 'Q') + ' ' + Math.round(eff) : '–',
+                    ),
+                );
+                if (missing > 0) {
+                    figs.appendChild(
+                        el('span', 'krt-bp-craft-mat-missing', '−' + fmtScu(missing) + ' SCU'),
+                    );
+                }
+                row.appendChild(figs);
+                list.appendChild(row);
+            });
+            detailCraftEl.appendChild(list);
+        }
+    }
+
+    // Refinery toggle: recompute badges + active detail + recipe sliders client-side (both figure
+    // sets are already cached, so no refetch is needed).
+    function onRefineryToggle() {
+        refineryOn = !!(refineryToggle && refineryToggle.checked);
+        decorateRows();
+        if (activeRow) {
+            const id = attr(activeRow, 'data-id');
+            renderCraftDetail(id);
+            if (recipeCache.has(id)) {
+                renderRecipe(recipeCache.get(id));
+            }
+        }
+    }
+
     /* ----------------------------------------------------- filter + keyboard */
 
     function applyClientFilter() {
@@ -550,6 +787,18 @@
         editBtn = document.getElementById('krt-bp-detail-edit');
         deleteBtn = document.getElementById('krt-bp-detail-delete');
         backBtn = document.getElementById('krt-bp-detail-back');
+        detailCraftEl = document.getElementById('krt-bp-detail-craft');
+
+        // The refinery toggle lives outside the swapped collection card, so it survives a re-render
+        // and is wired exactly once (init re-runs on krt:swapped).
+        refineryToggle = document.getElementById('krt-bp-refinery-toggle');
+        if (refineryToggle) {
+            refineryOn = refineryToggle.checked;
+            if (!refineryToggle.dataset.wired) {
+                refineryToggle.addEventListener('change', onRefineryToggle);
+                refineryToggle.dataset.wired = '1';
+            }
+        }
 
         rows().forEach(function (r) {
             r.tabIndex = -1;
@@ -614,6 +863,10 @@
                 mdEl.classList.remove('is-detail');
             }
         }
+
+        // Fetch craftability for the whole owned set (re-fetched on every re-init after a swap, so
+        // the badges + breakdown reflect an add / import / remove).
+        loadCraftability();
     }
 
     if (document.readyState === 'loading') {

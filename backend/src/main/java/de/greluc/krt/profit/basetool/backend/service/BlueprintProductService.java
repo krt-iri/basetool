@@ -29,7 +29,9 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -173,6 +175,59 @@ public class BlueprintProductService {
             variantCount,
             blueprintMapper.toGroupDtos(recipe.getRequirementGroups()),
             blueprintMapper.toIngredientDtos(recipe.getIngredients())));
+  }
+
+  /**
+   * Resolves a batch of normalized product keys to their representative recipe entities in one
+   * pass, for the blueprint craftability calculation (#781). Mirrors {@link #resolveRecipe(String)}
+   * but scans the active master once for the whole set: the first recipe (in the deterministic
+   * {@code findActiveIdNameRows} order) of each matching group is the representative — the
+   * <em>same</em> recipe {@code resolveRecipe} picks, so a craftability overlay aligns
+   * index-for-index with the recipe view. The returned entities are managed; the caller must touch
+   * their lazy recipe collections inside this service's read transaction.
+   *
+   * @param productKeys the normalized product keys to resolve (blank/null entries are ignored)
+   * @return a map from product key to its representative {@link Blueprint}; keys with no active
+   *     recipe are absent
+   */
+  @NotNull
+  public Map<String, Blueprint> resolveRepresentativeBlueprints(
+      @NotNull Collection<String> productKeys) {
+    Set<String> wanted = new HashSet<>();
+    for (String key : productKeys) {
+      if (key != null && !key.isBlank()) {
+        wanted.add(key);
+      }
+    }
+    if (wanted.isEmpty()) {
+      return Map.of();
+    }
+    Map<String, UUID> firstId = new LinkedHashMap<>();
+    for (BlueprintIdNameRow row : blueprintRepository.findActiveIdNameRows()) {
+      if (row.outputName() == null) {
+        continue;
+      }
+      String key = normalizer.normalize(row.outputName());
+      if (wanted.contains(key)) {
+        firstId.putIfAbsent(key, row.id());
+      }
+    }
+    if (firstId.isEmpty()) {
+      return Map.of();
+    }
+    Map<UUID, Blueprint> byId = new HashMap<>();
+    for (Blueprint blueprint : blueprintRepository.findAllById(firstId.values())) {
+      byId.put(blueprint.getId(), blueprint);
+    }
+    Map<String, Blueprint> resolved = new LinkedHashMap<>();
+    firstId.forEach(
+        (key, id) -> {
+          Blueprint blueprint = byId.get(id);
+          if (blueprint != null) {
+            resolved.put(key, blueprint);
+          }
+        });
+    return resolved;
   }
 
   /**

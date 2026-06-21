@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
@@ -154,6 +155,34 @@ public class PersonalInventoryBlueprintsPageController {
     } catch (Exception e) {
       log.warn("Failed to fetch blueprint recipe {}: {}", id, e.getMessage());
       return emptyRecipe();
+    }
+  }
+
+  /**
+   * Craftability proxy backing the blueprint view's craftability annotation (#781). Relays to the
+   * backend craftability endpoint and returns, per owned blueprint, the craftable counts, effective
+   * quality and missing materials as JSON. The frontend requests it once with {@code
+   * includeRefinery=true} so both the inventory-only and refinery-included figures are present and
+   * the toggle switches client-side. Failures collapse to an empty list so the list/detail simply
+   * render without craftability badges rather than a stack trace.
+   *
+   * @param includeRefinery whether the backend folds the caller's open refinery yield into the
+   *     {@code *WithRefinery} figures
+   * @return the per-blueprint craftability, or an empty list on any backend failure
+   */
+  @GetMapping("/craftability")
+  @ResponseBody
+  public List<BlueprintCraftabilityDto> craftability(
+      @RequestParam(required = false, defaultValue = "false") boolean includeRefinery) {
+    try {
+      List<BlueprintCraftabilityDto> result =
+          backendApiClient.get(
+              "/api/v1/personal-blueprints/craftability?includeRefinery=" + includeRefinery,
+              new ParameterizedTypeReference<>() {});
+      return result == null ? Collections.emptyList() : result;
+    } catch (Exception e) {
+      log.warn("Failed to fetch blueprint craftability: {}", e.getMessage());
+      return Collections.emptyList();
     }
   }
 

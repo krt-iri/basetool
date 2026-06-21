@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportApplyRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResultDto;
@@ -29,8 +30,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRe
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.service.BlueprintCraftabilityService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -38,6 +41,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -76,6 +80,8 @@ public class PersonalBlueprintController {
 
   private final PersonalBlueprintService service;
   private final BlueprintImportService importService;
+  private final BlueprintCraftabilityService craftabilityService;
+  private final UserService userService;
 
   /**
    * Lists the caller's owned blueprints (paginated, sortable, optional product-name filter).
@@ -219,6 +225,34 @@ public class PersonalBlueprintController {
   public PersonalBlueprintRecipeResponse recipe(
       @PathVariable UUID id, JwtAuthenticationToken auth) {
     return service.recipeForOwn(requireSub(auth), id);
+  }
+
+  /**
+   * Returns, for every blueprint the caller owns, whether and how many times it can be crafted from
+   * the caller's own "My Inventory" stock — the craftability annotation of the Personal Inventory
+   * blueprint view (#781, REQ-INV-019). Strictly owner-scoped: owned blueprints, stock and refinery
+   * yield all come from the caller. Read-only; only RESOURCE ingredients are evaluated.
+   *
+   * @param includeRefinery whether to fold the caller's {@code OPEN}/{@code IN_PROGRESS} refinery
+   *     yield into the {@code *WithRefinery} figures (default {@code false})
+   * @param auth the caller's JWT authentication
+   * @return one craftability entry per owned blueprint
+   */
+  @GetMapping("/craftability")
+  @Operation(
+      summary =
+          "Craftability of the caller's owned blueprints from their own stock (RESOURCE only).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Per-blueprint craftability for the caller."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public List<BlueprintCraftabilityDto> craftability(
+      @RequestParam(name = "includeRefinery", required = false, defaultValue = "false")
+          boolean includeRefinery,
+      JwtAuthenticationToken auth) {
+    String ownerSub = requireSub(auth);
+    UUID userId = userService.getUserIdFromJwt(auth.getToken());
+    return craftabilityService.computeForOwner(ownerSub, userId, includeRefinery);
   }
 
   /**

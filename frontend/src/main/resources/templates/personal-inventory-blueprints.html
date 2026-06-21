@@ -68,6 +68,17 @@
         </a>
     </nav>
 
+    <!-- Craftability controls (#781): the refinery toggle lives OUTSIDE the swapped collection card
+         so its state survives a batch-add / import / remove re-render; recipe.js reads it and
+         recomputes the list badges + detail breakdown client-side (both figure sets are fetched). -->
+    <div class="krt-bp-craft-toolbar" th:unless="${#lists.isEmpty(blueprints)}">
+        <label class="krt-bp-refinery-toggle" for="krt-bp-refinery-toggle">
+            <input type="checkbox" id="krt-bp-refinery-toggle">
+            <span th:text="#{personalInventory.blueprints.craft.refineryToggle}">Raffinerie-Ertrag einrechnen</span>
+        </label>
+        <span class="krt-bp-craft-toolbar-hint" th:text="#{personalInventory.blueprints.craft.refineryHint}">Offene &amp; laufende Raffinerie-Auftr&auml;ge einrechnen</span>
+    </div>
+
     <!-- Collection: master list left, permanent recipe/stat detail right (V3). The card is an
          in-place AJAX swap target (epic #571 / REQ-FE-005): a batch add, an import-apply and a
          blueprint removal re-render this fragment via GET /personal-inventory/blueprints?fragment=
@@ -140,6 +151,11 @@
                                     th:aria-label="#{personalInventory.blueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
                     </div>
+
+                    <!-- Craftability (#781): counter + per-material consumption / shortfall.
+                         Filled by recipe.js from the bulk craftability fetch; the slot sliders
+                         below default to the effective quality this section computes. -->
+                    <div class="krt-bp-craft" id="krt-bp-detail-craft" hidden></div>
 
                     <h2 class="section-title" th:text="#{personalInventory.blueprints.detail.heading}">Zutaten &amp; Stat-Beitrag nach Zutat-Qualit&auml;t</h2>
                     <div class="krt-bp-detail-recipe" id="krt-bp-detail-recipe"></div>
@@ -289,7 +305,17 @@
         exampleRecipe:    /*[[#{personalInventory.blueprints.recipe.exampleRecipe}]]*/ 'Beispielrezept',
         variants:         /*[[#{personalInventory.blueprints.add.variants}]]*/    'Varianten',
         acquiredLabel:    /*[[#{personalInventory.blueprints.field.acquired}]]*/  'Erhalten am',
-        qualityAria:      /*[[#{personalInventory.blueprints.detail.qualityAria}]]*/ 'Qualitaet'
+        qualityAria:      /*[[#{personalInventory.blueprints.detail.qualityAria}]]*/ 'Qualitaet',
+        craftTitle:       /*[[#{personalInventory.blueprints.craft.title}]]*/         'Craftbarkeit',
+        craftableLabel:   /*[[#{personalInventory.blueprints.craft.craftableLabel}]]*/ 'Craftbar',
+        notCraftable:     /*[[#{personalInventory.blueprints.craft.notCraftable}]]*/  'Nicht craftbar',
+        badgeMissing:     /*[[#{personalInventory.blueprints.craft.badgeMissing}]]*/  'fehlt',
+        viaRefinery:      /*[[#{personalInventory.blueprints.craft.viaRefinery}]]*/   'nur dank Raffinerie',
+        limitedBy:        /*[[#{personalInventory.blueprints.craft.limitedBy}]]*/     'limitiert durch',
+        qualityShort:     /*[[#{personalInventory.blueprints.craft.qualityShort}]]*/  'Q',
+        itemNotEvaluated: /*[[#{personalInventory.blueprints.craft.itemNotEvaluated}]]*/ 'Nur ITEM-Zutaten - nicht bewertet.',
+        itemHint:         /*[[#{personalInventory.blueprints.craft.itemHint}]]*/      'Enthaelt ITEM-Zutaten (nicht bewertet).',
+        noRecipe:         /*[[#{personalInventory.blueprints.craft.noRecipe}]]*/      'Kein Rezept verfuegbar - nicht bewertbar.'
     };
     window.krtBlueprintsEndpoints = {
         search:      /*[[@{/personal-inventory/blueprints/search}]]*/      '/personal-inventory/blueprints/search',
@@ -297,6 +323,7 @@
         updateNote:  /*[[@{/personal-inventory/blueprints/ID_PLACEHOLDER/update-note}]]*/ '/personal-inventory/blueprints/ID_PLACEHOLDER/update-note',
         remove:      /*[[@{/personal-inventory/blueprints/ID_PLACEHOLDER/delete}]]*/ '/personal-inventory/blueprints/ID_PLACEHOLDER/delete',
         recipe:      /*[[@{/personal-inventory/blueprints/ID_PLACEHOLDER/recipe}]]*/ '/personal-inventory/blueprints/ID_PLACEHOLDER/recipe',
+        craftability: /*[[@{/personal-inventory/blueprints/craftability}]]*/ '/personal-inventory/blueprints/craftability',
         importPreview: /*[[@{/personal-inventory/blueprints/import/preview}]]*/ '/personal-inventory/blueprints/import/preview',
         importApply:   /*[[@{/personal-inventory/blueprints/import/apply}]]*/   '/personal-inventory/blueprints/import/apply',
         importStaged:  /*[[@{/personal-inventory/blueprints/import/staged}]]*/  '/personal-inventory/blueprints/import/staged'

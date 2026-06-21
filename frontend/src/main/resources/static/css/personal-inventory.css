@@ -1162,3 +1162,161 @@
         flex: 1 1 100%;
     }
 }
+
+/* ==========================================================================
+   Craftability (#781): refinery toggle, master-row craft badge, and the
+   detail-pane craftability section (counter + per-material breakdown).
+   Status-green / warning-yellow / research-blue accents; orange stays the CTA.
+   ========================================================================== */
+
+.krt-bp-craft-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 0.75rem 0 0;
+}
+
+.krt-bp-refinery-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    cursor: pointer;
+    color: var(--color-gray-1);
+    font-size: 0.8rem;
+}
+
+.krt-bp-refinery-toggle input {
+    flex: none;
+}
+
+.krt-bp-craft-toolbar-hint {
+    color: var(--color-gray-2);
+    font-size: 0.72rem;
+}
+
+/* Master-row badge: pushed to the row's right edge, regardless of the note pencil. */
+.krt-bp-craft-badge {
+    margin-left: auto;
+    flex: none;
+    font-size: 0.62rem;
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.03em;
+    padding: 1px 6px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.krt-bp-craft-badge.is-ok {
+    color: var(--color-success-text);
+    border-color: rgb(46 188 61 / 35%);
+    background: rgb(46 188 61 / 10%);
+}
+
+.krt-bp-craft-badge.is-missing {
+    color: var(--color-warning);
+    border-color: rgb(255 210 63 / 35%);
+    background: rgb(255 210 63 / 10%);
+}
+
+.krt-bp-craft-badge.is-muted {
+    color: var(--color-gray-2);
+}
+
+.krt-bp-craft-badge.is-ref {
+    color: var(--color-info-text);
+    border-color: rgb(108 147 239 / 35%);
+    background: rgb(108 147 239 / 10%);
+}
+
+/* Detail-pane craftability section. */
+.krt-bp-craft-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.krt-bp-craft-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-gray-2);
+}
+
+.krt-bp-craft-count {
+    font-size: 0.85rem;
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+}
+
+.krt-bp-craft-refmark {
+    color: var(--color-info-text);
+}
+
+.krt-bp-craft-limit {
+    font-size: 0.72rem;
+    color: var(--color-gray-2);
+}
+
+.krt-bp-craft-note {
+    margin: 0;
+    font-size: 0.78rem;
+    font-style: italic;
+    color: var(--color-gray-2);
+}
+
+.krt-bp-craft-mats {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.krt-bp-craft-mat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+    padding: 4px 0;
+    border-bottom: 1px solid rgb(40 40 40 / 60%);
+}
+
+.krt-bp-craft-mat:last-child {
+    border-bottom: none;
+}
+
+.krt-bp-craft-mat-name {
+    flex: 1 1 auto;
+    color: var(--color-gray-1);
+}
+
+.krt-bp-craft-mat.is-short .krt-bp-craft-mat-name {
+    color: var(--color-warning);
+}
+
+.krt-bp-craft-mat-figs {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    flex: none;
+}
+
+.krt-bp-craft-mat-fig {
+    color: var(--color-gray-1);
+    font-variant-numeric: tabular-nums;
+}
+
+.krt-bp-craft-mat-q {
+    color: var(--color-info-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.krt-bp-craft-mat-missing {
+    color: var(--color-warning);
+    font-variant-numeric: tabular-nums;
+}

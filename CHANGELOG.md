@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Blueprint-Craftbarkeit aus dem eigenen Lager.** Die Seite "Meine Blueprints" zeigt jetzt pro Blueprint, ob und wie oft er sich aus dem eigenen "Mein Lager"-Bestand craften lässt, welche Output-Stats die Materialqualität liefert und welches Material fehlt. Ein Schalter (Standard aus) rechnet zusätzlich den Ertrag offener und laufender Raffinerie-Aufträge ein. Nur Material-Zutaten (RESOURCE) werden bewertet; ITEM-Zutaten werden als "nicht bewertet" markiert. Alles streng nutzerbezogen.
+
 ## [v0.7.5](https://github.com/krt-profit/basetool/releases/tag/v0.7.5) - 2026-06-21
 
 ## [v0.7.4](https://github.com/krt-profit/basetool/releases/tag/v0.7.4) - 2026-06-21

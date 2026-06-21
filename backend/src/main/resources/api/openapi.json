@@ -32148,6 +32148,117 @@
         } ]
       }
     },
+    "/api/v1/personal-blueprints/craftability" : {
+      "get" : {
+        "tags" : [ "Personal Blueprints" ],
+        "summary" : "Craftability of the caller's owned blueprints from their own stock (RESOURCE only).",
+        "operationId" : "craftability",
+        "parameters" : [ {
+          "name" : "includeRefinery",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Per-blueprint craftability for the caller.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/BlueprintCraftabilityDto"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/outposts" : {
       "get" : {
         "tags" : [ "outpost-controller" ],
@@ -48585,6 +48696,119 @@
           },
           "orgUnitMember" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "BlueprintCraftabilityDto" : {
+        "type" : "object",
+        "properties" : {
+          "blueprintId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "recipeResolved" : {
+            "type" : "boolean"
+          },
+          "hasItemIngredients" : {
+            "type" : "boolean"
+          },
+          "hasResourceIngredients" : {
+            "type" : "boolean"
+          },
+          "craftable" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "craftableWithRefinery" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "limitingMaterialName" : {
+            "type" : "string"
+          },
+          "limitingMaterialNameWithRefinery" : {
+            "type" : "string"
+          },
+          "groups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CraftabilityGroupDto"
+            }
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CraftabilityMaterialDto"
+            }
+          }
+        }
+      },
+      "CraftabilityGroupDto" : {
+        "type" : "object",
+        "properties" : {
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "effectiveQuality" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "effectiveQualityWithRefinery" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "CraftabilityMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "materialName" : {
+            "type" : "string"
+          },
+          "requiredScu" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "qualityFloor" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "availableScu" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "availableScuWithRefinery" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "effectiveQuality" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "effectiveQualityWithRefinery" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "missingScu" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "missingScuWithRefinery" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "craftable" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "craftableWithRefinery" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

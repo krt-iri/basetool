@@ -70,4 +70,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0030](0030-discord-federation-first-login-membership-gate.md)            | Discord federation via an owned Keycloak SPI with a fail-closed first-login membership gate | Accepted — Track 1 implemented    |
 | [0031](0031-live-mission-sync-over-presence-websocket.md)                 | Live multi-user mission sync over the presence WebSocket (section-key relay)                | Accepted                          |
 | [0032](0032-frontend-single-resilience-pass-at-webclient-filter.md)       | Single frontend resilience pass at the WebClient filter (drop redundant AOP layer)          | Accepted                          |
+| [0033](0033-blueprint-craftability-from-own-stock.md)                     | Blueprint craftability computed server-side from the user's own "My Inventory" stock        | Accepted                          |
 
