@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -351,6 +352,25 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("materialId") UUID materialId,
       @Param("jobOrderId") UUID jobOrderId,
       @Param("minQuality") Integer minQuality);
+
+  /**
+   * Batched counterpart to {@link #sumAmountByMaterialAndJobOrderAndMinQuality} for the paged
+   * job-order list: returns every job-order-linked inventory row (one per item, carrying its
+   * material, quality grade and amount) for all given orders in a single query, so the list path
+   * can sum the per-(order, material) buckets in memory at each bucket's own quality floor instead
+   * of firing one {@code SUM} aggregate per bucket per order (REQ-DATA-003). Only rows whose {@code
+   * jobOrder} is one of {@code jobOrderIds} are returned; unlinked stock is excluded by the join.
+   *
+   * @param jobOrderIds the orders whose linked stock to project; an empty collection yields an
+   *     empty list.
+   * @return one {@link JobOrderMaterialStockRow} per linked inventory item, never {@code null}.
+   */
+  @Query(
+      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow("
+          + "i.jobOrder.id, i.material.id, i.quality, i.amount) "
+          + "FROM InventoryItem i WHERE i.jobOrder.id IN :jobOrderIds")
+  List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow>
+      findMaterialStockRowsByJobOrderIds(@Param("jobOrderIds") Collection<UUID> jobOrderIds);
 
   /**
    * Bulk-clears the {@code jobOrder} reference on every inventory item linked to the given

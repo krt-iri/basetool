@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -32,6 +32,27 @@ it before adding a migration.
 ### REQ-DATA-003 — No N+1
 
 Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out.
+
+A **paged list** must not fan a per-row query out across the page: enrich the whole page from a
+single batched query keyed by the page's ids and join it in memory, mirroring
+`OperationFinanceService.getOperationFinances` (`findAllByMissionIdIn` + `Collectors.groupingBy`).
+The job-order list follows this — `JobOrderService.getAllJobOrders` loads every order's linked
+stock via `InventoryItemRepository.findMaterialStockRowsByJobOrderIds` and every SK order's claims
+via `MaterialClaimRepository.findByJobOrderIdInOrderByCreatedAtDesc` once per page, then sums each
+material bucket at its own quality floor in memory, instead of one `SUM` per material per order plus
+one claim query per SK order. The single-order write paths keep the per-order queries (a bounded
+handful) via a shared resolver-parameterised projection.
+
+A **request-constant verdict or lookup** consulted more than once per request (e.g. per row) must be
+memoised on the `HttpServletRequest` so it resolves once: `OwnerScopeService.canViewJobOrders()` and
+`currentMemberOrgUnitIds()` cache on a request attribute, and `UserMapper` memoises the per-user
+Staffel-membership lookup so its three derived-field resolvers share one query (falling back to a
+direct query outside an HTTP request).
+
+**Acceptance**: `JobOrderServiceAssigneeAndListTest` (one batched stock query per page, no per-
+material `SUM` on the list path), `OwnerScopeServiceTest` (profit-eligibility count runs once across
+repeated `canViewJobOrders()`), `UserMapperTest` (one membership lookup per user within a request,
+direct-query fallback without one).
 
 ### REQ-DATA-004 — UEX duplicate companies of one brand merge onto a single manufacturer; the sync is per-company resilient
 

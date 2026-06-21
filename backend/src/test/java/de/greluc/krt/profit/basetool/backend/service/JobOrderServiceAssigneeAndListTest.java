@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -82,6 +84,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private JobOrderMapper jobOrderMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private JobOrderItemService jobOrderItemService;
+  @Mock private MaterialClaimService materialClaimService;
 
   @InjectMocks private JobOrderService service;
 
@@ -118,6 +121,14 @@ class JobOrderServiceAssigneeAndListTest {
                   null,
                   o.getVersion());
             });
+    // The paged list path batches stock once per page via findMaterialStockRowsByJobOrderIds
+    // (REQ-DATA-003); default to an empty index so the routing tests need not model stock.
+    lenient()
+        .when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
+        .thenReturn(List.of());
+    // The list path also batches SK claims once per page; the routing tests use non-SK orders, so
+    // an empty per-order claim map is the right default.
+    lenient().when(materialClaimService.getClaimBucketsForOrders(any())).thenReturn(Map.of());
   }
 
   // ---------------------------------------------------------------
@@ -232,6 +243,26 @@ class JobOrderServiceAssigneeAndListTest {
 
       verify(jobOrderRepository)
           .findScopedJobOrders(allStatuses, null, false, null, union, pageable);
+    }
+
+    @Test
+    void listPath_batchesStockOncePerPageAndAvoidsPerMaterialSum() {
+      // REQ-DATA-003: the paged list must enrich stock with ONE batched query for the whole page,
+      // not the former one-SUM-per-material-per-order fan-out. With two orders on the page the
+      // batch
+      // query is issued exactly once and the per-material aggregate is never called on this path.
+      Page<JobOrder> page =
+          new PageImpl<>(
+              List.of(newJobOrder(JobOrderStatus.OPEN), newJobOrder(JobOrderStatus.IN_PROGRESS)));
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses, null, true, null, Set.of(), pageable))
+          .thenReturn(page);
+
+      service.getAllJobOrders(null, pageable);
+
+      verify(inventoryItemRepository, times(1)).findMaterialStockRowsByJobOrderIds(any());
+      verify(inventoryItemRepository, never())
+          .sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any());
     }
   }
 

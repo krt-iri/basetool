@@ -127,6 +127,17 @@ public class OwnerScopeService {
   private static final String CACHE_KEY_MEMBER_ORG_UNIT_IDS =
       OwnerScopeService.class.getName() + ".memberOrgUnitIds";
 
+  /**
+   * Request-attribute key under which {@link #canViewJobOrders()} caches its boolean verdict for
+   * the duration of the current HTTP request. The profit-eligibility gate is request-constant (it
+   * derives only from the caller's memberships), yet on the order <em>lookup</em> path it is
+   * consulted once per row via the {@code canSeeJobOrder} filter; memoising the verdict collapses
+   * the otherwise-repeated {@code countProfitEligibleByIdIn} aggregate to a single query per
+   * request. A present attribute of type {@link Boolean} means "already resolved this request".
+   */
+  private static final String CACHE_KEY_CAN_VIEW_JOB_ORDERS =
+      OwnerScopeService.class.getName() + ".canViewJobOrders";
+
   private final AuthHelperService authHelper;
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
@@ -308,6 +319,23 @@ public class OwnerScopeService {
    * @return {@code true} iff the caller may view job orders.
    */
   public boolean canViewJobOrders() {
+    if (request.getAttribute(CACHE_KEY_CAN_VIEW_JOB_ORDERS) instanceof Boolean cached) {
+      return cached;
+    }
+    boolean verdict = resolveCanViewJobOrders();
+    request.setAttribute(CACHE_KEY_CAN_VIEW_JOB_ORDERS, verdict);
+    return verdict;
+  }
+
+  /**
+   * Computes the {@link #canViewJobOrders()} verdict without the request-scoped memo — the admin
+   * short-circuit, the empty-membership rejection, and the profit-eligibility count. Split out so
+   * the public method only owns the caching.
+   *
+   * @return {@code true} iff the caller is an admin or a member of at least one profit-eligible org
+   *     unit.
+   */
+  private boolean resolveCanViewJobOrders() {
     if (authHelper.isAdmin()) {
       return true;
     }

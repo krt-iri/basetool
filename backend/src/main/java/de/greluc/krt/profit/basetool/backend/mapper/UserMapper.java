@@ -30,13 +30,18 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 /**
  * MapStruct mapper between {@link User} entities and DTOs.
@@ -65,6 +70,19 @@ public abstract class UserMapper {
   @Autowired protected OrgUnitMembershipRepository membershipRepository;
 
   @Autowired protected SquadronRepository squadronRepository;
+
+  /**
+   * Request-attribute key under which {@link #loadStaffelMembership(User)} memoises the per-user
+   * Staffel-membership lookup for the duration of the current HTTP request. Without it, every
+   * {@link #toDto(User)} call fires the same {@code findAllByIdUserIdAndKind} derived query three
+   * times (once each from {@link #resolveSquadron(User)} / {@link #resolveLogistician(User)} /
+   * {@link #resolveMissionManager(User)}) because a JPQL derived query is not served from
+   * Hibernate's L1 cache — three real round-trips per user, multiplied across a whole page on the
+   * member-facing user list / search endpoints. The memo collapses that to one lookup per distinct
+   * user per request and is keyed by user id.
+   */
+  private static final String MEMBERSHIP_CACHE_ATTR =
+      UserMapper.class.getName() + ".staffelMembershipByUserId";
 
   /**
    * Projects a {@link User} entity to its outbound DTO. The {@code squadron}, {@code
@@ -170,10 +188,42 @@ public abstract class UserMapper {
    * by repository order — so the mapper never throws on a bad-data edge case. The V95 partial
    * unique index prevents the corruption in normal operation.
    *
+   * <p>Memoised per request: the three derived-field resolvers each call this for the same user, so
+   * without caching the underlying derived query runs three times per {@code toDto}. The result is
+   * cached on the {@link RequestAttributes} keyed by user id ({@link #MEMBERSHIP_CACHE_ATTR}), so
+   * it runs at most once per distinct user per request. Outside an HTTP request (e.g. a scheduled
+   * task that maps a user) there is no request scope, so it falls back to the direct query with no
+   * memo. Only eagerly-loaded scalar fields of the returned membership are read by the callers, so
+   * a value surviving into a later transaction within the same request is still safe to read.
+   *
    * @param user the user whose Staffel membership to load; never {@code null}.
    * @return the single Staffel membership row if any.
    */
   private Optional<OrgUnitMembership> loadStaffelMembership(User user) {
+    RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+    if (attrs == null) {
+      return queryStaffelMembership(user);
+    }
+    @SuppressWarnings("unchecked")
+    Map<UUID, Optional<OrgUnitMembership>> cache =
+        (Map<UUID, Optional<OrgUnitMembership>>)
+            attrs.getAttribute(MEMBERSHIP_CACHE_ATTR, RequestAttributes.SCOPE_REQUEST);
+    if (cache == null) {
+      cache = new HashMap<>();
+      attrs.setAttribute(MEMBERSHIP_CACHE_ATTR, cache, RequestAttributes.SCOPE_REQUEST);
+    }
+    return cache.computeIfAbsent(user.getId(), id -> queryStaffelMembership(user));
+  }
+
+  /**
+   * Executes the actual Staffel-membership lookup behind {@link #loadStaffelMembership(User)},
+   * without the request-scoped memo. Tolerates the (illegal) multi-row corruption state by picking
+   * the first row deterministically.
+   *
+   * @param user the user whose Staffel membership to query; never {@code null}.
+   * @return the single Staffel membership row if any.
+   */
+  private Optional<OrgUnitMembership> queryStaffelMembership(User user) {
     List<OrgUnitMembership> rows =
         membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
     return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));

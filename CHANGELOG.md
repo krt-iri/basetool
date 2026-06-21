@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Auftrags- und Nutzerlisten lösen deutlich weniger Datenbankabfragen aus.** Die Auftragsübersicht berechnet Lagerbestände und Anspruchsdaten der ganzen Seite jetzt in wenigen gebündelten Abfragen statt einer pro Material pro Auftrag; die Nutzerliste holt die Staffel-Zugehörigkeit je Nutzer nur noch einmal statt dreimal; die Profit-Sichtbarkeitsprüfung wird pro Anfrage einmal ausgewertet. Rein interne Performance-Verbesserung, kein sichtbares Verhalten ändert sich.
+
 - **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
 
 ### Fixed
