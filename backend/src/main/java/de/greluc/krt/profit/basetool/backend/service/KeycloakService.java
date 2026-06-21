@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import java.net.http.HttpClient;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -178,19 +179,7 @@ public class KeycloakService {
     try {
       String token = getAccessToken();
 
-      List<KeycloakUserDto> users =
-          adminClient()
-              .get()
-              .uri("/admin/realms/{realm}/users", properties.getRealm())
-              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
-              .retrieve()
-              .body(new ParameterizedTypeReference<List<KeycloakUserDto>>() {});
-
-      if (users == null) {
-        return Collections.emptyList();
-      }
-
-      return users.stream()
+      return fetchAllUsers(token).stream()
           .map(
               u -> {
                 Set<String> roles = fetchUserRoles(u.id(), token);
@@ -202,6 +191,50 @@ public class KeycloakService {
       log.error("Failed to fetch users from Keycloak", e);
       return Collections.emptyList();
     }
+  }
+
+  /**
+   * Pages through the Keycloak Admin API {@code GET /users} endpoint and accumulates the full user
+   * list. The endpoint caps each response at a server-side maximum (~100 by default), so a single
+   * unpaged call would return only the first page — and {@link
+   * de.greluc.krt.profit.basetool.backend.task.UserSyncTask} would then wrongly flag every user
+   * beyond that page as missing (a silent soft-delete past the cap). This loops {@code
+   * first}/{@code max} (page size from {@link KeycloakSyncProperties#getPageSize()}) until a short
+   * or empty page signals the end.
+   *
+   * @param token a valid admin access token.
+   * @return every Keycloak user across all pages; never {@code null}, possibly empty.
+   */
+  private List<KeycloakUserDto> fetchAllUsers(String token) {
+    int pageSize = properties.getPageSize();
+    List<KeycloakUserDto> all = new ArrayList<>();
+    int first = 0;
+    while (true) {
+      final int currentFirst = first;
+      List<KeycloakUserDto> page =
+          adminClient()
+              .get()
+              .uri(
+                  uriBuilder ->
+                      uriBuilder
+                          .path("/admin/realms/{realm}/users")
+                          .queryParam("first", currentFirst)
+                          .queryParam("max", pageSize)
+                          .build(properties.getRealm()))
+              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
+              .retrieve()
+              .body(new ParameterizedTypeReference<List<KeycloakUserDto>>() {});
+
+      if (page == null || page.isEmpty()) {
+        break;
+      }
+      all.addAll(page);
+      if (page.size() < pageSize) {
+        break;
+      }
+      first += pageSize;
+    }
+    return all;
   }
 
   private Set<String> fetchUserRoles(UUID userId, String token) {

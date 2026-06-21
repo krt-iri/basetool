@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +42,19 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    */
   @EntityGraph(attributePaths = {"material", "claimingOrgUnit", "claimedByUser"})
   List<MaterialClaim> findByJobOrderIdOrderByCreatedAtDesc(UUID jobOrderId);
+
+  /**
+   * Batched counterpart to {@link #findByJobOrderIdOrderByCreatedAtDesc(UUID)} for the paged
+   * job-order list: loads every claim of all given (SK) orders in one query, eager-loading the same
+   * material / claiming org unit / audit user, so the list path groups them by order id in memory
+   * instead of firing one claim query per SK order (REQ-DATA-003). Ordered newest-first by creation
+   * instant, matching the single-order finder so the grouped per-order sublists keep that order.
+   *
+   * @param jobOrderIds the orders whose claims to load; an empty collection yields an empty list.
+   * @return claims across the given orders, never {@code null}.
+   */
+  @EntityGraph(attributePaths = {"material", "claimingOrgUnit", "claimedByUser"})
+  List<MaterialClaim> findByJobOrderIdInOrderByCreatedAtDesc(Collection<UUID> jobOrderIds);
 
   /**
    * Returns the single claim a squadron holds on one bucket, if any — the upsert lookup that keeps

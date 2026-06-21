@@ -110,15 +110,21 @@ class PromotionAdminRankRequirementsPageMvcTest {
             null);
 
     // SquadronContextAdvice fan-out: squadrons list + non-admin /me/active-org-unit lookup.
+    PageResponse<SquadronDto> squadronPage =
+        new PageResponse<>(
+            List.of(new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, true, false, 0L)),
+            0,
+            1000,
+            1,
+            1,
+            List.of());
     when(backendApiClient.get(contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
-        .thenReturn(
-            new PageResponse<>(
-                List.of(new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, true, false, 0L)),
-                0,
-                1000,
-                1,
-                1,
-                List.of()));
+        .thenReturn(squadronPage);
+    // availableSquadrons() reads the catalogue through the STATIC_DATA_CACHE (getCached) now
+    // (REQ-DATA-007); stub that path too or the officer's promotion-feature flag resolves empty.
+    when(backendApiClient.getCached(
+            contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
+        .thenReturn(squadronPage);
     when(backendApiClient.get(
             eq("/api/v1/me/active-org-unit"),
             eq(SquadronContextAdvice.ActiveOrgUnitResponse.class)))
