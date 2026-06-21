@@ -23,8 +23,6 @@ import de.greluc.krt.profit.basetool.frontend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,16 +41,21 @@ import tools.jackson.databind.json.JsonMapper;
  * {@link BackendServiceException} and exposes typed convenience overloads for every HTTP verb.
  * {@code getCached(...)} layers Spring Cache on top using {@link CacheConfig#STATIC_DATA_CACHE}.
  *
- * <p><b>Resilience layering.</b> Every outbound call — regardless of HTTP verb — already passes
- * through the {@link de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter
- * WebClient filter chain}, which applies the operators bulkhead → time limiter → retry (only on
- * idempotent verbs GET/HEAD/OPTIONS/TRACE, never on writes) → circuit breaker against the {@code
- * backendApi} Resilience4j instance. The filter-level {@link
- * io.github.resilience4j.timelimiter.TimeLimiter} therefore covers POST/PUT/PATCH/DELETE the same
- * way it covers GET — there is no timeout gap on state-changing calls. The method-level
- * {@code @Retry}/{@code @CircuitBreaker} annotations below layer a second, AOP-level resilience
- * pass on top, on the separate {@code backend} Resilience4j instance, so the call is wrapped twice;
- * the filter alone is what guards against a hanging upstream thread.
+ * <p><b>Resilience layering.</b> Every outbound call — regardless of HTTP verb — passes through the
+ * {@link de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter WebClient
+ * filter chain}, which applies the operators bulkhead → time limiter → retry (only on idempotent
+ * verbs GET/HEAD/OPTIONS/TRACE, never on writes) → circuit breaker against the {@code backendApi}
+ * Resilience4j instance. The filter-level {@link io.github.resilience4j.timelimiter.TimeLimiter}
+ * therefore covers POST/PUT/PATCH/DELETE the same way it covers GET — there is no timeout gap on
+ * state-changing calls. This filter chain is the <b>single</b> resilience pass: the formerly
+ * present method-level {@code @Retry}/{@code @CircuitBreaker} AOP annotations (bound to a separate
+ * {@code backend} Resilience4j instance) were removed because they wrapped every call a second time
+ * — double-retrying each GET (up to 2×2 attempts) and tracking a parallel circuit-breaker window —
+ * without adding the one thing that actually guards a hung upstream thread, the {@link
+ * io.github.resilience4j.timelimiter.TimeLimiter}, which only the filter carries. Removing them also
+ * makes a circuit-breaker-open on a write surface as a clean {@code 503} (the filter throws {@link
+ * io.github.resilience4j.circuitbreaker.CallNotPermittedException} inside the reactive chain, where
+ * {@code executePost} et al. map it) instead of escaping the AOP proxy unmapped.
  *
  * <p>Page controllers should call into this client and let {@link
  * de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler} surface failures — do
@@ -74,15 +77,11 @@ public class BackendApiClient {
   private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
   /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   public <T> T get(String uri, ParameterizedTypeReference<T> responseType) {
     return get(uri, responseType, false);
   }
 
   /** GET overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   public <T> T get(String uri, ParameterizedTypeReference<T> responseType, boolean isPublic) {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
   }
@@ -101,16 +100,12 @@ public class BackendApiClient {
    * @param <T> the response body type
    * @return the decoded response body
    */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   public <T> T get(
       String uriTemplate, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
     return executeGet(webClient, uriTemplate, responseType, uriVariables);
   }
 
   /** GET overload for simple (non-generic) return types. */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   public <T> T get(String uri, Class<T> responseType) {
     return get(uri, responseType, false);
   }
@@ -119,8 +114,6 @@ public class BackendApiClient {
    * Class-typed GET overload that targets the anonymous public WebClient when {@code isPublic} is
    * true.
    */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   public <T> T get(String uri, Class<T> responseType, boolean isPublic) {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
   }
@@ -139,8 +132,6 @@ public class BackendApiClient {
    * @param <T> the response body type
    * @return the decoded response body
    */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   public <T> T getPublic(
       String uriTemplate, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
     return executeGet(publicWebClient, uriTemplate, responseType, uriVariables);
@@ -149,8 +140,6 @@ public class BackendApiClient {
   /**
    * Cached GET; subsequent calls within {@link CacheConfig#STATIC_DATA_CACHE}'s TTL hit the cache.
    */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
   public <T> T getCached(String uri, ParameterizedTypeReference<T> responseType) {
     return getCached(uri, responseType, false);
@@ -159,16 +148,12 @@ public class BackendApiClient {
   /**
    * Cached GET overload that targets the anonymous public WebClient when {@code isPublic} is true.
    */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
   public <T> T getCached(String uri, ParameterizedTypeReference<T> responseType, boolean isPublic) {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
   }
 
   /** Class-typed cached GET. */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
   public <T> T getCached(String uri, Class<T> responseType) {
     return getCached(uri, responseType, false);
@@ -178,8 +163,6 @@ public class BackendApiClient {
    * Class-typed cached GET overload that targets the anonymous public WebClient when {@code
    * isPublic} is true.
    */
-  @Retry(name = "backend")
-  @CircuitBreaker(name = "backend")
   @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
   public <T> T getCached(String uri, Class<T> responseType, boolean isPublic) {
     return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
@@ -236,13 +219,11 @@ public class BackendApiClient {
   /**
    * POST against the authenticated backend; {@code body} may be {@code null} for empty payloads.
    */
-  @CircuitBreaker(name = "backend")
   public <T, R> R post(String uri, T body, Class<R> responseType) {
     return post(uri, body, responseType, false);
   }
 
   /** POST overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  @CircuitBreaker(name = "backend")
   public <T, R> R post(String uri, T body, Class<R> responseType, boolean isPublic) {
     return executePost(isPublic ? publicWebClient : webClient, uri, body, responseType);
   }
@@ -260,13 +241,11 @@ public class BackendApiClient {
   }
 
   /** PUT against the authenticated backend; {@code body} may be {@code null} for empty payloads. */
-  @CircuitBreaker(name = "backend")
   public <T, R> R put(String uri, T body, Class<R> responseType) {
     return put(uri, body, responseType, false);
   }
 
   /** PUT overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  @CircuitBreaker(name = "backend")
   public <T, R> R put(String uri, T body, Class<R> responseType, boolean isPublic) {
     return executePut(isPublic ? publicWebClient : webClient, uri, body, responseType);
   }
@@ -284,13 +263,11 @@ public class BackendApiClient {
   }
 
   /** DELETE against the authenticated backend; pass {@code Void.class} for 204 responses. */
-  @CircuitBreaker(name = "backend")
   public <R> R delete(String uri, Class<R> responseType) {
     return delete(uri, responseType, false);
   }
 
   /** DELETE overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  @CircuitBreaker(name = "backend")
   public <R> R delete(String uri, Class<R> responseType, boolean isPublic) {
     return executeDelete(isPublic ? publicWebClient : webClient, uri, responseType);
   }
@@ -308,13 +285,11 @@ public class BackendApiClient {
   /**
    * PATCH against the authenticated backend; {@code body} may be {@code null} for empty payloads.
    */
-  @CircuitBreaker(name = "backend")
   public <T, R> R patch(String uri, T body, Class<R> responseType) {
     return patch(uri, body, responseType, false);
   }
 
   /** PATCH overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  @CircuitBreaker(name = "backend")
   public <T, R> R patch(String uri, T body, Class<R> responseType, boolean isPublic) {
     return executePatch(isPublic ? publicWebClient : webClient, uri, body, responseType);
   }

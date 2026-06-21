@@ -98,6 +98,23 @@ public class RedisSessionConfig {
   private String redisNamespace;
 
   /**
+   * Spring Session Redis flush mode read from {@code spring.session.redis.flush-mode} (default:
+   * {@code IMMEDIATE}).
+   *
+   * <p>{@code @EnableRedisIndexedHttpSession} bypasses Spring Boot's auto-configuration, so {@code
+   * spring.session.redis.flush-mode} is NOT applied to the {@link RedisIndexedSessionRepository}
+   * automatically; this field is injected here and applied via {@link
+   * #sessionRepositoryCustomizer()}. The default stays {@code IMMEDIATE} — every session mutation is
+   * written to Redis the moment it is applied, so a frontend crash mid-request never loses an
+   * already-applied change (the conservative durability the OAuth2 login / token-refresh flow relies
+   * on). Operators who would rather trade that for fewer Redis round-trips on session-heavy requests
+   * can set {@code ON_SAVE}, which defers the write to request completion; the writes that matter
+   * (rotated tokens, flash attributes) still land before the response commits.
+   */
+  @Value("${spring.session.redis.flush-mode:IMMEDIATE}")
+  private FlushMode flushMode;
+
+  /**
    * Provides a Jackson 3 based {@link RedisSerializer} for Spring Session.
    *
    * <p>Uses {@link SecurityJacksonModules#getModules(ClassLoader)} which automatically registers
@@ -219,11 +236,13 @@ public class RedisSessionConfig {
    *   <li>{@code spring.session.redis.namespace} → default {@code spring:session} instead of
    *       configured {@code basetool:session}; causes {@code keys "basetool:session:*"} to return
    *       empty even when sessions are correctly persisted
-   *   <li>{@code spring.session.redis.flush-mode} → default {@code ON_SAVE} instead of {@code
-   *       IMMEDIATE}; sessions may not be written to Redis before a restart
+   *   <li>{@code spring.session.redis.flush-mode} → default {@code ON_SAVE} instead of the {@code
+   *       IMMEDIATE} this application wants; see {@link #flushMode} for the durability rationale and
+   *       the {@code ON_SAVE} opt-out
    * </ul>
    *
-   * <p>This customizer explicitly re-applies all three settings.
+   * <p>This customizer explicitly re-applies all three settings; the flush mode is taken from {@link
+   * #flushMode} (configurable, defaulting to {@code IMMEDIATE}).
    *
    * @return a customizer that sets timeout, namespace, and flush mode on the repository
    */
@@ -232,7 +251,7 @@ public class RedisSessionConfig {
     return repository -> {
       repository.setDefaultMaxInactiveInterval(sessionTimeout);
       repository.setRedisKeyNamespace(redisNamespace);
-      repository.setFlushMode(FlushMode.IMMEDIATE);
+      repository.setFlushMode(flushMode);
     };
   }
 

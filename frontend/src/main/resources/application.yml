@@ -206,8 +206,6 @@ resilience4j:
         ignoreExceptions:
           - org.springframework.security.oauth2.client.ClientAuthorizationException
     instances:
-      backend:
-        baseConfig: default
       backendApi:
         baseConfig: default
   timelimiter:
@@ -216,8 +214,6 @@ resilience4j:
         timeoutDuration: 5s
         cancelRunningFuture: true
     instances:
-      backend:
-        baseConfig: default
       backendApi:
         baseConfig: default
   retry:
@@ -239,8 +235,6 @@ resilience4j:
         ignoreExceptions:
           - org.springframework.security.oauth2.client.ClientAuthorizationException
     instances:
-      backend:
-        baseConfig: default
       backendApi:
         baseConfig: default
   bulkhead:
@@ -255,7 +249,5 @@ resilience4j:
         maxConcurrentCalls: 50
         maxWaitDuration: 1s
     instances:
-      backend:
-        baseConfig: default
       backendApi:
         baseConfig: default

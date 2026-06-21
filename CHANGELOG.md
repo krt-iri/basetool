@@ -8,6 +8,7 @@
 
 ### Changed
 
+- **Schlankere Frontend-Backend-Kommunikation.** Backend-Antworten werden zum Frontend jetzt komprimiert (gzip) ausgeliefert, und die doppelte Resilience-Schicht (Wiederholung/Schutzschalter) im Backend-Client wurde auf die eine wirksame reduziert — schnelleres, einheitliches Fehlerverhalten ohne sichtbaren Funktionsunterschied. Zusätzlich neu: optionale Einstellung `spring.session.redis.flush-mode` (Default `IMMEDIATE`; Betreiber können auf `ON_SAVE` umstellen, um Redis-Zugriffe pro Anfrage zu sparen).
 - **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
 
 ### Fixed
