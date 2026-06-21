@@ -12,11 +12,12 @@ COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY versions.properties .
 COPY gradle.properties .
-# settings.gradle.kts includes all three modules, so Gradle configuration needs every module's
+# settings.gradle.kts includes all four modules, so Gradle configuration needs every module's
 # build script present even when only :ingest is built.
 COPY backend/build.gradle.kts backend/
 COPY frontend/build.gradle.kts frontend/
 COPY ingest/build.gradle.kts ingest/
+COPY keycloak-spi/build.gradle.kts keycloak-spi/
 
 # Cache the dependency layer. A failure here fails the build (no `|| true` mask).
 RUN ./gradlew :ingest:dependencies --no-daemon
