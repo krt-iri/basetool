@@ -31,7 +31,15 @@ it before adding a migration.
 
 ### REQ-DATA-003 — No N+1
 
-Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out.
+Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out. Replace a
+`findById`-in-a-loop with one `findAllById` keyed into a map (e.g.
+`MissionService.resolveMembershipOrgUnits`, `BankLedgerService` wipe-reset / reversal holders), and
+memoise a request-constant lookup or verdict on the `HttpServletRequest` — or derive both projections
+from a single load — so repeated per-row / per-resolver reads collapse to one (e.g. the
+`PromotionEligibilityService` evaluation set is loaded once per user across all rank transitions, and
+`OwnerScopeService.currentCallerMemberships()` backs the blueprint-overview gate plus the cascading
+and own-level oversight scopes from one membership read). Dead unbounded eager finders
+(`SELECT i FROM InventoryItem i` with no caller) are deleted, not kept as a foot-gun.
 
 A **paged list** must not fan a per-row query out across the page: enrich the whole page from a
 single batched query keyed by the page's ids and join it in memory, mirroring
