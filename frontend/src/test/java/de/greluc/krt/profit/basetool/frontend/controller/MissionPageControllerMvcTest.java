@@ -264,7 +264,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -333,7 +334,8 @@ class MissionPageControllerMvcTest {
             checkIn,
             checkOut,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -496,7 +498,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto p2 =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(
             p2Id,
@@ -509,7 +512,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto p3 =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(
             p3Id,
@@ -522,7 +526,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     // 2 checked-in out of 3 registered
     MissionDto mission =
@@ -588,7 +593,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -1351,7 +1357,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -1469,7 +1476,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -1655,7 +1663,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto shipType =
         new de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto(
@@ -1806,7 +1815,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto shipType =
         new de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto(
@@ -2065,7 +2075,8 @@ class MissionPageControllerMvcTest {
             null,
             null,
             de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto gunner =
         new de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto(

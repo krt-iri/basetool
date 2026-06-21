@@ -147,7 +147,7 @@ class MissionControllerLifecycleTest {
             java.time.LocalDate.of(2024, 1, 1));
     MissionParticipantDto participant =
         new MissionParticipantDto(
-            UUID.randomUUID(), user, null, null, null, null, "comment", null, null, null, 1L);
+            UUID.randomUUID(), user, null, null, null, null, "comment", null, null, null, 1L, null);
     return new MissionDto(
         id,
         "Op Foxglove",
@@ -727,7 +727,7 @@ class MissionControllerLifecycleTest {
     MissionParticipant raw = new MissionParticipant();
     MissionParticipantDto dto =
         new MissionParticipantDto(
-            UUID.randomUUID(), null, null, null, null, null, null, null, null, null, 1L);
+            UUID.randomUUID(), null, null, null, null, null, null, null, null, null, 1L, null);
     when(missionService.getUnassignedParticipants(id)).thenReturn(List.of(raw));
     when(missionMapper.toDto(raw)).thenReturn(dto);
 

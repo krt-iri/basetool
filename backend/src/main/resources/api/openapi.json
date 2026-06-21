@@ -44405,6 +44405,9 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "guestEditToken" : {
+            "type" : "string"
           }
         }
       },

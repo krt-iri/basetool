@@ -6,6 +6,11 @@
 
 - **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster war PatternFlys Standard-Login-Bild (per Keycloak-Common-Theme auf `body` gesetzt); unsere Wabenregel hat jetzt Vorrang. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
 
+### Security
+
+- **Fremde Gast-Anmeldungen an öffentlichen Einsätzen lassen sich nicht mehr von Unbeteiligten ändern oder löschen.** Bisher konnte jede Person mit der (öffentlich sichtbaren) Teilnehmer-ID eine fremde Gast-Anmeldung bearbeiten, abmelden oder deren Auszahlungswunsch umstellen. Eine Gast-Anmeldung ist jetzt an ein einmalig vergebenes, geheimes Bearbeitungs-Token gebunden: nur wer es besitzt (der ursprüngliche Gast) oder eine Einsatzleitungs-Rolle hat, darf die Zeile noch ändern. Wer Cookies bzw. Seitendaten löscht, verliert die Selbstbearbeitung — dann übernimmt die Einsatzleitung.
+- **Offiziere können Finanzeinträge fremder Staffeln nicht mehr bearbeiten oder löschen.** Das Bearbeiten/Löschen eines Missions-Finanzeintrags prüft für Offiziere jetzt zusätzlich die Staffel-Zugehörigkeit der Mission (wie bei allen anderen Schreibvorgängen an Missionen); nur Administratoren behalten den staffelübergreifenden Zugriff.
+
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
 
 ### Added

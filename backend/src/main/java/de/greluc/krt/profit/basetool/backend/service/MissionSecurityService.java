@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collection;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -43,10 +44,11 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Methods on this bean are referenced from {@code @PreAuthorize} on controllers and other
  * services (e.g. {@code @missionSecurityService.canEditFinanceEntry(#id, authentication)}). Each
  * method translates a "can the caller do X on resource Y" question into a boolean by combining the
- * caller's authorities with the resource's owner/manager relations. Guest participants (unlinked,
- * no user account) are deliberately editable by anyone so the mission-join flow stays usable
- * without authentication — once a participant is linked to a user, only that user (or an elevated
- * role) can edit them.
+ * caller's authorities with the resource's owner/manager relations. A guest participant (unlinked,
+ * no user account) is editable by a mission manager / officer / admin in scope OR by the anonymous
+ * creator who presents the per-row capability token minted at sign-up (security audit M1 /
+ * REQ-SEC-018, header {@value #GUEST_EDIT_TOKEN_HEADER}); a participant linked to a user is
+ * editable only by that user or an elevated role.
  *
  * <p>Missing resources translate to {@code NotFoundException} rather than {@code false} so a stale
  * frontend gets a deterministic 404 instead of an opaque "access denied" for an entity that no
@@ -64,14 +66,27 @@ public class MissionSecurityService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
   private final OwnerScopeService ownerScopeService;
+  private final GuestParticipantTokenService guestParticipantTokenService;
+  private final HttpServletRequest request;
+
+  /**
+   * Request header carrying the per-row guest capability token (security audit M1 / REQ-SEC-018).
+   * The frontend relays it from the browser to the backend; {@link #canAccessParticipant} verifies
+   * it against the participant's stored hash so an anonymous guest can edit/withdraw only their OWN
+   * sign-up.
+   */
+  public static final String GUEST_EDIT_TOKEN_HEADER = "X-Guest-Edit-Token";
 
   /**
    * Authorizes access to a single participant of a mission.
    *
    * <p>Access is granted when the caller has elevated privileges (MISSION_MANAGER / OFFICER / ADMIN
    * / mission owner or manager) OR when the participant belongs to the currently authenticated user
-   * (Self-Edit: {@code participant.user.id == jwt.sub}). Guest (unlinked) participants are editable
-   * by anyone, matching the add-participant behaviour.
+   * (Self-Edit: {@code participant.user.id == jwt.sub}). A guest (unlinked) participant is editable
+   * by an elevated caller OR by the anonymous creator presenting the per-row capability token
+   * (header {@value #GUEST_EDIT_TOKEN_HEADER}) minted at sign-up — security audit M1 / REQ-SEC-018.
+   * Before M1 a guest row was editable by anyone who knew its id, which let an anonymous caller
+   * vandalise foreign guest sign-ups on public missions.
    *
    * <p>If the participant does not exist (e.g. the frontend holds a stale row whose entry was
    * concurrently deleted in another tab), this method translates the missing row into a {@code 404
@@ -92,7 +107,18 @@ public class MissionSecurityService {
     }
 
     if (p.getUser() == null) {
-      return true;
+      // Security audit M1 / REQ-SEC-018: a guest (unlinked) row is no longer editable by anyone who
+      // merely knows its id (the public roster exposes participant ids). It may be mutated/deleted
+      // by (a) the anonymous creator presenting the per-row capability token (header
+      // GUEST_EDIT_TOKEN_HEADER) that hashes to the row's stored hash, or (b) a mission manager /
+      // officer / admin within the owning-OrgUnit scope. The token is checked first so the common
+      // anonymous self-edit path never loads the mission aggregate. A guest row with no stored hash
+      // (created before V176) only passes via (b) — the gate fails closed.
+      if (guestParticipantTokenService.matches(
+          request.getHeader(GUEST_EDIT_TOKEN_HEADER), p.getGuestEditTokenHash())) {
+        return true;
+      }
+      return canManageMission(missionId, authentication);
     }
 
     if (authentication == null || !authentication.isAuthenticated()) {
@@ -130,10 +156,12 @@ public class MissionSecurityService {
   /**
    * Authorizes editing or deleting a mission finance entry.
    *
-   * <p>Grants access to ADMIN / OFFICER unconditionally; otherwise the entry's linked participant
-   * must belong to the calling user AND the user must currently be a registered participant of the
-   * same mission. The "still a participant" check prevents a former participant from editing their
-   * finance entries after they've been removed from the mission.
+   * <p>Grants access to ADMIN unconditionally and to an OFFICER only when the entry's mission is
+   * within the officer's owning-OrgUnit scope ({@link OwnerScopeService#canEditMission(UUID)} —
+   * security audit H1, mirroring {@link #canManageMission}/{@link #canChangeOwner}); otherwise the
+   * entry's linked participant must belong to the calling user AND the user must currently be a
+   * registered participant of the same mission. The "still a participant" check prevents a former
+   * participant from editing their finance entries after they've been removed from the mission.
    *
    * @param entryId finance entry id
    * @param authentication current Spring Security authentication
@@ -154,15 +182,26 @@ public class MissionSecurityService {
                     new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
                         "Finance entry not found"));
 
-    // Check if user is ADMIN or OFFICER
-    boolean isAdminOrOfficer =
-        authentication.getAuthorities().stream()
-            .anyMatch(
-                a ->
-                    a.getAuthority().equals("ROLE_ADMIN")
-                        || a.getAuthority().equals("ROLE_OFFICER"));
+    Collection<? extends GrantedAuthority> reachable =
+        roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
 
-    if (isAdminOrOfficer) {
+    // ADMIN bypasses every gate (system-wide oversight across squadrons; see
+    // MULTI_SQUADRON_PLAN.md section 1).
+    boolean isAdmin = reachable.stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    if (isAdmin) {
+      return true;
+    }
+
+    // Security audit H1: an OFFICER may edit/delete a finance entry ONLY of a mission within their
+    // own owning-OrgUnit scope. ROLE_OFFICER is a flat, cross-squadron realm authority, so without
+    // the additional ownerScopeService.canEditMission gate a bare officer could mutate the payout
+    // ledger of another squadron's (even internal) mission — the exact cross-tenant write the
+    // sibling mission-write gates (canManageMission line 219, canManageManagers line 272,
+    // canChangeOwner line 324) were already hardened against under audit AUTHZ-1
+    // (MULTI_SQUADRON_PLAN.md section 1: editing is the owning OrgUnit's prerogative). This was the
+    // one mission write left with the global-OFFICER short-circuit.
+    boolean isOfficer = reachable.stream().anyMatch(a -> a.getAuthority().equals("ROLE_OFFICER"));
+    if (isOfficer && ownerScopeService.canEditMission(entry.getMission().getId())) {
       return true;
     }
 

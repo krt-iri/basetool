@@ -27,10 +27,12 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,6 +61,12 @@ class MissionSecurityServiceTest {
 
   @Mock private OwnerScopeService ownerScopeService;
 
+  @Mock private HttpServletRequest request;
+
+  // Real (deterministic) token service so the M1 hash/verify round-trip is genuinely exercised.
+  private final GuestParticipantTokenService guestParticipantTokenService =
+      new GuestParticipantTokenService();
+
   private RoleHierarchy roleHierarchy;
 
   @InjectMocks private MissionSecurityService missionSecurityService;
@@ -79,7 +87,9 @@ class MissionSecurityServiceTest {
             roleHierarchy,
             missionParticipantRepository,
             missionFinanceEntryRepository,
-            ownerScopeService);
+            ownerScopeService,
+            guestParticipantTokenService,
+            request);
 
     missionId = UUID.randomUUID();
     userId = UUID.randomUUID();
@@ -280,19 +290,69 @@ class MissionSecurityServiceTest {
         missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
   }
 
+  // ---------------------------------------------------------------------
+  // M1 / REQ-SEC-018: a guest (unlinked) participant is editable only by the
+  // anonymous creator presenting the per-row capability token, or by a mission
+  // manager / officer / admin. Before M1 a guest row was editable by anyone who
+  // knew its id (cross-actor vandalism / payout tampering on public missions).
+  // ---------------------------------------------------------------------
+
   @Test
-  void canAccessParticipant_GuestParticipant_ShouldReturnTrueForAnyone() {
-    // Given: guest (unlinked) participant
+  void canAccessParticipant_GuestWithValidToken_ShouldReturnTrue() {
+    UUID participantId = UUID.randomUUID();
+    String token = guestParticipantTokenService.generateToken();
+    MissionParticipant participant = new MissionParticipant();
+    participant.setId(participantId);
+    participant.setMission(mission);
+    participant.setUser(null);
+    participant.setGuestName("Somebody");
+    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
+
+    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+    when(request.getHeader(MissionSecurityService.GUEST_EDIT_TOKEN_HEADER)).thenReturn(token);
+
+    // The creator's matching token authorises the edit without any mission-management role.
+    assertTrue(
+        missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+  }
+
+  @Test
+  void canAccessParticipant_GuestWrongTokenNotManager_ShouldReturnFalse() {
+    UUID participantId = UUID.randomUUID();
+    String token = guestParticipantTokenService.generateToken();
+    MissionParticipant participant = new MissionParticipant();
+    participant.setId(participantId);
+    participant.setMission(mission);
+    participant.setUser(null);
+    participant.setGuestName("Somebody");
+    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
+
+    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+    // A third party presents a foreign token and is not a mission manager → denied (the core M1
+    // fix: knowing the public participant id is no longer enough to mutate the guest row).
+    when(request.getHeader(MissionSecurityService.GUEST_EDIT_TOKEN_HEADER))
+        .thenReturn("not-the-real-token");
+    when(authentication.isAuthenticated()).thenReturn(false);
+
+    assertFalse(
+        missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+  }
+
+  @Test
+  void canAccessParticipant_GuestNoTokenButManager_ShouldReturnTrue() {
     UUID participantId = UUID.randomUUID();
     MissionParticipant participant = new MissionParticipant();
     participant.setId(participantId);
     participant.setMission(mission);
     participant.setUser(null);
     participant.setGuestName("Somebody");
+    // pre-V176-style guest row: no token hash at all — only an elevated caller may edit it.
 
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
-    // When / Then: guest entries are editable by anyone, matching add-participant behaviour
     assertTrue(
         missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
   }
@@ -477,5 +537,81 @@ class MissionSecurityServiceTest {
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     assertFalse(missionSecurityService.canChangeOwner(missionId, authentication));
+  }
+
+  // ---------------------------------------------------------------------
+  // canEditFinanceEntry — security audit H1: ADMIN edits any finance entry,
+  // but an OFFICER may edit/delete only within their owning-OrgUnit scope
+  // (canEditMission). A cross-OrgUnit officer must be denied — this was the
+  // one mission write path left with a global-OFFICER short-circuit.
+  // ---------------------------------------------------------------------
+
+  @Test
+  void canEditFinanceEntry_Admin_ShouldReturnTrue() {
+    UUID entryId = UUID.randomUUID();
+    MissionFinanceEntry entry = new MissionFinanceEntry();
+    when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
+
+    assertTrue(missionSecurityService.canEditFinanceEntry(entryId, authentication));
+  }
+
+  @Test
+  void canEditFinanceEntry_OfficerInScope_ShouldReturnTrue() {
+    UUID entryId = UUID.randomUUID();
+    MissionFinanceEntry entry = new MissionFinanceEntry();
+    entry.setMission(mission);
+    when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+
+    assertTrue(missionSecurityService.canEditFinanceEntry(entryId, authentication));
+  }
+
+  @Test
+  void canEditFinanceEntry_OfficerForeignOrgUnit_ShouldReturnFalse() {
+    // The H1 regression: a cross-OrgUnit officer must NOT mutate another squadron's finance entry.
+    UUID entryId = UUID.randomUUID();
+    User otherUser = new User();
+    otherUser.setId(UUID.randomUUID());
+    MissionParticipant participant = new MissionParticipant();
+    participant.setUser(otherUser);
+    MissionFinanceEntry entry = new MissionFinanceEntry();
+    entry.setMission(mission);
+    entry.setParticipant(participant);
+
+    when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(false);
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+
+    assertFalse(missionSecurityService.canEditFinanceEntry(entryId, authentication));
+  }
+
+  @Test
+  void canEditFinanceEntry_OwnerStillParticipant_ShouldReturnTrue() {
+    UUID entryId = UUID.randomUUID();
+    MissionParticipant participant = new MissionParticipant();
+    participant.setUser(user);
+    MissionFinanceEntry entry = new MissionFinanceEntry();
+    entry.setMission(mission);
+    entry.setParticipant(participant);
+
+    when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(
+            i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
+        .thenReturn(Optional.of(participant));
+
+    assertTrue(missionSecurityService.canEditFinanceEntry(entryId, authentication));
   }
 }

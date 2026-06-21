@@ -465,7 +465,12 @@ public class MissionController {
         dto.startTime(),
         dto.endTime(),
         dto.payoutPreference(),
-        dto.version());
+        dto.version(),
+        // M1: preserve the per-row capability token so the anonymous guest-sign-up CREATE response
+        // still hands the creator their edit token. It is non-null only on that create response
+        // (transient on the freshly persisted entity) and null on every read/edit, so redacting it
+        // here would break the legitimate self-edit UX without adding any protection.
+        dto.guestEditToken());
   }
 
   /**
