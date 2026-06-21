@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Discord-Anmeldelink in der Seitenleiste zeigt für nicht angemeldete Nutzer wieder den richtigen Text statt eines Platzhalter-Schlüssels.** Der Übersetzungsschlüssel für „Mit Discord anmelden" fehlte in den Sprachdateien. Hinter dem Text steht jetzt zusätzlich das Discord-Logo.
+
 ### Changed
 
 - **Discord-Login zeigt den Zustimmungs-Bildschirm nicht mehr bei jeder Anmeldung.** Nach der ersten Autorisierung überspringt Discord die Zustimmung (`prompt=none`); nur die allererste Anmeldung zeigt sie noch. Wird mit dem neu bereitgestellten Keycloak-Provider-JAR wirksam.

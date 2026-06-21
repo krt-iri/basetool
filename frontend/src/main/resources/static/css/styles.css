@@ -2603,6 +2603,15 @@ input[type='radio']:focus {
     padding-left: 10px;
 }
 
+/* Discord brand mark trailing the anonymous-sidebar "Sign in with Discord" entry.
+   The label is wrapped in a <span> that is display:contents (.sidebar-links span),
+   so the inter-element gap sits on the icon itself. The glyph inherits the link
+   colour (currentColor) like the footer GitHub mark and turns brand-orange with the
+   label on hover. */
+.sidebar-links a.sidebar-discord-login .krt-icon {
+    margin-left: var(--space-2);
+}
+
 /* Logout is a CSRF-safe POST <button> (see fragments/sidebar.html), not an <a>. Strip the
    user-agent button chrome so it renders identically to the surrounding nav anchors — the
    typography/colour above is shared with the anchors via the grouped selectors. */

@@ -149,7 +149,11 @@
                 <a th:href="@{/missions}" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
                 <a th:href="@{/orders/create}" th:text="#{orders.create.link}">Auftrag anlegen</a>
                 <a th:href="@{/oauth2/authorization/keycloak}" data-testid="nav-login" th:text="#{nav.login}">Login</a>
-                <a th:href="@{/oauth2/authorization/keycloak(idp='discord')}" data-testid="nav-login-discord" th:text="#{nav.login.discord}">Mit Discord anmelden</a>
+                <a th:href="@{/oauth2/authorization/keycloak(idp='discord')}"
+                   data-testid="nav-login-discord" class="sidebar-discord-login">
+                    <span th:text="#{nav.login.discord}">Mit Discord anmelden</span>
+                    <svg class="krt-icon" aria-hidden="true" focusable="false"><use href="#krt-icon-discord"/></svg>
+                </a>
             </span>
                 <details class="sidebar-group" data-group-key="legal">
                     <summary th:text="#{nav.legal}">Rechtliches</summary>

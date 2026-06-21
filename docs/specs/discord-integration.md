@@ -62,8 +62,9 @@ from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never 
 - [x] Role is matched by numeric id; renaming the Discord role does not change the outcome.
 - [ ] No token, payload or Discord id appears in any log line. _(by design — only the coarse decision is logged; proven by the T1.4 PII grep.)_
 - [ ] Credential (non-Discord) login is unaffected by the gate. _(T1.4 e2e.)_
+- [x] The anonymous sidebar exposes a **localized** Discord login entry point (`nav.login.discord`, all three message bundles) that brokers the login this gate guards. It carries the Discord brand mark, which inherits the link colour (`currentColor`) like the footer GitHub mark — no hard-coded blurple, per the monochrome-icon design-system convention.
 
-**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker` · **Issues:** #723, #725
+**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `fragments/sidebar.html`, `fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
 
 ### REQ-SEC-017 — PENDING approval withholds all authorities (fail-safe default)
 
