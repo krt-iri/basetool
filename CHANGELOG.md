@@ -2,17 +2,19 @@
 
 ## [Unreleased]
 
+## [v0.7.2](https://github.com/krt-profit/basetool/releases/tag/v0.7.2) - 2026-06-21
+
 ### Added
 
 - **Auf der Keycloak-Anmeldeseite selbst gibt es jetzt eine „Discord“-Schaltfläche.** Damit ist der Discord-Login auch dort erreichbar, wo die normale Anmeldemaske erscheint — etwa beim Anmelden im Extractor (Device-Grant) oder für alle, die einfach „Anmelden“ wählen und den getrennten Discord-Eintrag in der Seitenleiste übersehen. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (der Discord-IdP darf nicht auf „Hide on login page“ stehen).
 
-### Fixed
-
-- **Der Discord-Anmeldelink in der Seitenleiste zeigt für nicht angemeldete Nutzer wieder den richtigen Text statt eines Platzhalter-Schlüssels.** Der Übersetzungsschlüssel für „Mit Discord anmelden" fehlte in den Sprachdateien. Hinter dem Text steht jetzt zusätzlich das Discord-Logo.
-
 ### Changed
 
 - **Discord-Login zeigt den Zustimmungs-Bildschirm nicht mehr bei jeder Anmeldung.** Nach der ersten Autorisierung überspringt Discord die Zustimmung (`prompt=none`); nur die allererste Anmeldung zeigt sie noch. Wird mit dem neu bereitgestellten Keycloak-Provider-JAR wirksam.
+
+### Fixed
+
+- **Der Discord-Anmeldelink in der Seitenleiste zeigt für nicht angemeldete Nutzer wieder den richtigen Text statt eines Platzhalter-Schlüssels.** Der Übersetzungsschlüssel für „Mit Discord anmelden" fehlte in den Sprachdateien. Hinter dem Text steht jetzt zusätzlich das Discord-Logo.
 
 ## [v0.7.1](https://github.com/krt-profit/basetool/releases/tag/v0.7.1) - 2026-06-21
 
