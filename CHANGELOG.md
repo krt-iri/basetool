@@ -12,7 +12,10 @@
 
 ### Fixed
 
+- **Abschnittsüberschriften, die in einem AJAX-Swap-Container stecken, haben wieder ihren gewohnten Abstand zum Inhalt darüber.** Der Container machte die Überschrift zum ersten Element und entfernte so ihren oberen Abstand, sodass sie direkt am vorherigen Block klebte. Betrifft in den Auftragsdetails „Aggregierte Materialien" und „Übergaben" sowie „Notiz" in der Detailansicht persönlicher Blueprints.
+
 - **Lagerbestand lässt sich nicht mehr einem Auftrag zuordnen, dessen Materialliste das Material gar nicht enthält.** Solche Zuordnungen tauchten in der aggregierten Materialliste des Auftrags nie auf, banden den Bestand aber trotzdem. Das „Auftrag"-Dropdown im Lager bietet jetzt nur noch Aufträge an, die das Material wirklich benötigen, und bereits bestehende Fehlzuordnungen werden in der Auftragsansicht als Warnhinweis aufgelistet, damit man sie auflösen kann.
+
 - **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster war PatternFlys Standard-Login-Bild (per Keycloak-Common-Theme auf `body` gesetzt); unsere Wabenregel hat jetzt Vorrang. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
 
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
