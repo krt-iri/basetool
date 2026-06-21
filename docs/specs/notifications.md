@@ -201,7 +201,17 @@ heartbeat, exposed at `GET /api/v1/notifications/stream`; the frontend relays it
 via a resilience-free streaming WebClient (`WebClientConfig#sseWebClient`) and an `EventSource`.
 On a `notification` event the client refreshes its unread state immediately. Push is
 **best-effort** — the polling of REQ-NOTIF-006 is the guaranteed fallback, and a failed push or
-broken stream never affects correctness. The registry is single-backend-instance; multi-instance
+broken stream never affects correctness. The unread-count poll adapts to stream health: while the
+`EventSource` is connected it backs off to a slow keepalive (≈5 min) and speeds back up (≈1 min)
+the moment the stream drops, so a healthy SSE session avoids redundant count polls. The slow
+cadence is deliberately frequent enough to remain the REQ-SEC-012 re-auth safety net — the poll
+path (not the refresh-incapable SSE relay) is what drives frontend token refresh and 401 re-login
+detection. To keep that window bounded even when a stream silently dies, the backend emits a
+periodic **named** `heartbeat` event (not an SSE comment, which browsers' `EventSource` swallow)
+and the client runs a liveness watchdog: if no SSE traffic (`heartbeat`/`notification`) arrives
+within ~3× the heartbeat interval, the stream is treated as **half-open** (still "connected" but
+dead, so it never fires `error`) and the poll falls back to the fast cadence without waiting for an
+`error`; a later event re-promotes it. The registry is single-backend-instance; multi-instance
 fan-out via Redis pub/sub remains a follow-up.
 
 **Acceptance**
@@ -209,8 +219,12 @@ fan-out via Redis pub/sub remains a follow-up.
 - [x] A created notification pushes a `notification` SSE event to the recipient's live streams.
 - [x] The push is best-effort: a failed send drops the emitter and the client falls back to
   polling.
+- [x] The keepalive is a **named** `heartbeat` event (not a comment) so the client can observe it.
+- [x] A half-open stream (connected but silent) demotes the poll to the fast cadence via the client
+  liveness watchdog, without waiting for an `error`.
 
-**Enforced by:** full build (bean wiring), frontend lint gate · **Code:**
+**Enforced by:** `NotificationStreamServiceTest` (named `connected`/`heartbeat`/`notification`
+events), full build (bean wiring), frontend lint gate · **Code:**
 `service/NotificationStreamService`, `controller/NotificationController#stream`, frontend
 `controller/NotificationPageController#stream`, `config/WebClientConfig#sseWebClient`,
 `static/js/notifications.js`
