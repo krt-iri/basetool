@@ -52,10 +52,10 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code backend} Resilience4j instance) were removed because they wrapped every call a second time
  * — double-retrying each GET (up to 2×2 attempts) and tracking a parallel circuit-breaker window —
  * without adding the one thing that actually guards a hung upstream thread, the {@link
- * io.github.resilience4j.timelimiter.TimeLimiter}, which only the filter carries. Removing them also
- * makes a circuit-breaker-open on a write surface as a clean {@code 503} (the filter throws {@link
- * io.github.resilience4j.circuitbreaker.CallNotPermittedException} inside the reactive chain, where
- * {@code executePost} et al. map it) instead of escaping the AOP proxy unmapped.
+ * io.github.resilience4j.timelimiter.TimeLimiter}, which only the filter carries. Removing them
+ * also makes a circuit-breaker-open on a write surface as a clean {@code 503} (the filter throws
+ * {@link io.github.resilience4j.circuitbreaker.CallNotPermittedException} inside the reactive
+ * chain, where {@code executePost} et al. map it) instead of escaping the AOP proxy unmapped.
  *
  * <p>Page controllers should call into this client and let {@link
  * de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler} surface failures — do

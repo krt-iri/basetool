@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Duration;
+import java.util.Locale;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -69,6 +71,7 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 @Configuration
 @EnableRedisIndexedHttpSession
 @Profile("!test")
+@Slf4j
 public class RedisSessionConfig {
 
   /**
@@ -98,21 +101,29 @@ public class RedisSessionConfig {
   private String redisNamespace;
 
   /**
-   * Spring Session Redis flush mode read from {@code spring.session.redis.flush-mode} (default:
-   * {@code IMMEDIATE}).
+   * Raw {@code spring.session.redis.flush-mode} string (default {@code IMMEDIATE}), turned into a
+   * {@link FlushMode} by {@link #resolveFlushMode()} and applied via {@link
+   * #sessionRepositoryCustomizer()}.
    *
-   * <p>{@code @EnableRedisIndexedHttpSession} bypasses Spring Boot's auto-configuration, so {@code
-   * spring.session.redis.flush-mode} is NOT applied to the {@link RedisIndexedSessionRepository}
-   * automatically; this field is injected here and applied via {@link
-   * #sessionRepositoryCustomizer()}. The default stays {@code IMMEDIATE} — every session mutation is
-   * written to Redis the moment it is applied, so a frontend crash mid-request never loses an
-   * already-applied change (the conservative durability the OAuth2 login / token-refresh flow relies
-   * on). Operators who would rather trade that for fewer Redis round-trips on session-heavy requests
-   * can set {@code ON_SAVE}, which defers the write to request completion; the writes that matter
-   * (rotated tokens, flash attributes) still land before the response commits.
+   * <p>{@code @EnableRedisIndexedHttpSession} bypasses Spring Boot's auto-configuration, so this
+   * property is NOT applied to the {@link RedisIndexedSessionRepository} automatically. The default
+   * stays {@code IMMEDIATE} — every session mutation is written to Redis the moment it is applied,
+   * so a frontend crash mid-request never loses an already-applied change (the conservative
+   * durability the OAuth2 login / token-refresh flow relies on). Operators who would rather trade
+   * that for fewer Redis round-trips on session-heavy requests can set {@code ON_SAVE}, which
+   * defers the write to request completion; the writes that matter (rotated tokens, flash
+   * attributes) still land before the response commits.
+   *
+   * <p>Bound as a {@link String} rather than a {@link FlushMode} on purpose. {@code @Value} enum
+   * conversion is case-sensitive ({@code Enum.valueOf}; Spring's relaxed binding applies only to
+   * {@code @ConfigurationProperties}), and {@code application-prod.yml} already ships {@code
+   * flush-mode: immediate} in lowercase — a direct {@code FlushMode} binding would reject that
+   * value and crash prod startup. {@link #resolveFlushMode()} parses the value leniently (case- and
+   * {@code -}/{@code _}-insensitive) and falls back to the durable {@code IMMEDIATE} default (with
+   * a warning) on an unrecognised value.
    */
   @Value("${spring.session.redis.flush-mode:IMMEDIATE}")
-  private FlushMode flushMode;
+  private String flushModeValue;
 
   /**
    * Provides a Jackson 3 based {@link RedisSerializer} for Spring Session.
@@ -237,12 +248,13 @@ public class RedisSessionConfig {
    *       configured {@code basetool:session}; causes {@code keys "basetool:session:*"} to return
    *       empty even when sessions are correctly persisted
    *   <li>{@code spring.session.redis.flush-mode} → default {@code ON_SAVE} instead of the {@code
-   *       IMMEDIATE} this application wants; see {@link #flushMode} for the durability rationale and
-   *       the {@code ON_SAVE} opt-out
+   *       IMMEDIATE} this application wants; see {@link #flushModeValue} for the durability
+   *       rationale and the {@code ON_SAVE} opt-out
    * </ul>
    *
-   * <p>This customizer explicitly re-applies all three settings; the flush mode is taken from {@link
-   * #flushMode} (configurable, defaulting to {@code IMMEDIATE}).
+   * <p>This customizer explicitly re-applies all three settings; the flush mode is resolved from
+   * {@link #flushModeValue} by {@link #resolveFlushMode()} (configurable, defaulting to {@code
+   * IMMEDIATE}).
    *
    * @return a customizer that sets timeout, namespace, and flush mode on the repository
    */
@@ -251,8 +263,32 @@ public class RedisSessionConfig {
     return repository -> {
       repository.setDefaultMaxInactiveInterval(sessionTimeout);
       repository.setRedisKeyNamespace(redisNamespace);
-      repository.setFlushMode(flushMode);
+      repository.setFlushMode(resolveFlushMode());
     };
+  }
+
+  /**
+   * Parses {@link #flushModeValue} into a {@link FlushMode} leniently.
+   *
+   * <p>Accepts any case and treats {@code -} as {@code _}, so {@code on_save}, {@code ON-SAVE} and
+   * {@code on-save} all resolve to {@link FlushMode#ON_SAVE}. An unrecognised value is logged at
+   * {@code WARN} and resolved to the durable {@link FlushMode#IMMEDIATE} default rather than
+   * failing application startup — a mistyped session-durability flag should degrade to the safe
+   * behaviour, not crash the frontend.
+   *
+   * @return the configured flush mode, or {@link FlushMode#IMMEDIATE} if the value is unrecognised
+   */
+  private FlushMode resolveFlushMode() {
+    String normalised = flushModeValue.strip().toUpperCase(Locale.ROOT).replace('-', '_');
+    try {
+      return FlushMode.valueOf(normalised);
+    } catch (IllegalArgumentException ex) {
+      log.warn(
+          "Unrecognised spring.session.redis.flush-mode '{}'; falling back to IMMEDIATE. "
+              + "Valid values: IMMEDIATE, ON_SAVE.",
+          flushModeValue);
+      return FlushMode.IMMEDIATE;
+    }
   }
 
   /**
