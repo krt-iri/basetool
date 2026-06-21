@@ -36,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
@@ -94,7 +96,9 @@ class UserServiceAttributesTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private MissionOwnershipRepository missionOwnershipRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private MaterialClaimRepository materialClaimRepository;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
 
   @Mock
