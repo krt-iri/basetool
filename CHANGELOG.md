@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Jede angemeldete Seite lädt den Staffel-Katalog nicht mehr bei jedem Aufruf neu.** Die Seitenleisten-/Kontext-Logik holt die (sich selten ändernde) Staffel-Liste jetzt aus dem 10-Minuten-Cache statt bei jedem Rendern frisch vom Backend; für Admins entfällt dadurch auch ein doppelter Abruf derselben Liste pro Seitenaufbau. Spürbar weniger Backend-Last pro Navigation. Das Umschalten der Staffel-Flags „Beförderung aktiv" und „Profit-Berechtigung" durch Admins leert den Cache und wirkt dadurch sofort app-weit statt mit bis zu zehn Minuten Verzögerung.
+
 - **Die Blueprint-Verfügbarkeitsübersicht lädt für die Zählung nur noch die benötigten zwei Spalten statt ganzer Datensätze.** Statt für die Mitglieder-Zählung pro Variantenfamilie sämtliche Blueprint-Datensätze aller Eigentümer vollständig zu laden, holt die Übersicht (und die Blueprint-Eigentümer-Aufstellung in Item-Aufträgen) jetzt nur noch `(Eigentümer, Produktname)`. Reine interne Performance-Verbesserung, vor allem in der Admin-Gesamtansicht.
 
 - **Auftrags- und Nutzerlisten lösen deutlich weniger Datenbankabfragen aus.** Die Auftragsübersicht berechnet Lagerbestände und Anspruchsdaten der ganzen Seite jetzt in wenigen gebündelten Abfragen statt einer pro Material pro Auftrag; die Nutzerliste holt die Staffel-Zugehörigkeit je Nutzer nur noch einmal statt dreimal; die Profit-Sichtbarkeitsprüfung wird pro Anfrage einmal ausgewertet. Rein interne Performance-Verbesserung, kein sichtbares Verhalten ändert sich.
