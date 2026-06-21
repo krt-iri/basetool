@@ -98,6 +98,14 @@ class UserServiceAttributesTest {
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
 
   @Mock
+  private de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository
+      missionOwnershipRepository;
+
+  @Mock
+  private de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository
+      materialClaimRepository;
+
+  @Mock
   private de.greluc.krt.profit.basetool.backend.repository.SquadronRepository squadronRepository;
 
   @Mock private AuthHelperService authHelperService;
