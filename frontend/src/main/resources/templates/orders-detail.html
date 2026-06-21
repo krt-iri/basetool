@@ -38,73 +38,137 @@
     </div>
 
     <div class="hud-box mt-2">
-        <!-- In-place AJAX swap container (#571/#575): the edit modal re-renders this kv-list header
-             (requesting unit / handle / comment + the status select with its fresh @Version) via
-             GET /orders/{id}?fragment=header. The status select's handler is document-delegated and
-             the date spans re-localize on krt:swapped, so both survive the swap. -->
+        <!-- In-place AJAX swap container (#571/#575): the edit modal, status changes and handovers
+             re-render this header fragment (title row + facts-bar + grouped meta card + the status
+             select with its fresh @Version) via GET /orders/{id}?fragment=header. The status select's
+             handler is document-delegated and the date spans re-localize on krt:swapped, so all
+             survive the swap. Layout = Variante A of proposals/orders-detail-header-redesign.html
+             (Facts-Bar + .meta-grid statt einer hohen einspaltigen kv-list). -->
         <div id="order-header-results"><th:block th:fragment="orderHeader">
-        <dl class="kv-list kv-ruled" style="margin-bottom: 2rem;">
-            <dt th:text="#{orders.index.id}">ID</dt>
-            <dd><span id="order-display-id" th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}"></span></dd>
-
-            <dt th:text="#{orders.detail.createdAt}">Erstellt am</dt>
-            <dd><span id="created-date-span" th:data-utc="${order.createdAt}"></span></dd>
-
-            <dt th:text="#{orders.detail.elapsedDays}">Vergangene Tage</dt>
-            <dd><span id="elapsed-days-container">
-                <span id="elapsed-days-span" th:data-utc="${order.createdAt}"></span> <span th:text="#{orders.detail.days}">Tage</span>
-            </span></dd>
-
-            <dt th:text="#{orders.detail.priority}">Priorität</dt>
-            <dd th:text="${order.priority != null ? order.priority : '-'}">-</dd>
-
-            <dt th:text="#{orders.detail.responsible}">Bearbeitende Einheit</dt>
-            <dd>
-                <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
-                      th:title="${order.responsibleOrgUnit.name()}"
-                      th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
-                <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
-            </dd>
-
-            <dt th:text="#{orders.detail.requesting}">Auftraggeber</dt>
-            <dd>
-                <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
-                      th:title="${order.requestingOrgUnit.name()}"
-                      th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
-                <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
-            </dd>
-
-            <dt th:text="#{orders.detail.handle}">Handle</dt>
-            <dd th:text="${order.handle}">handle</dd>
-
-            <dt th:text="#{orders.create.kind}">Auftragsart</dt>
-            <dd th:switch="${order.type}">
+        <!-- Title row: order id + kind badge + read-only status pill (visible to all roles). -->
+        <div class="od-titlebar">
+            <h3 class="od-title" th:text="#{orders.detail.group.order} + ' #' + ${order.displayId}">Auftrag #1</h3>
+            <span th:switch="${order.type}">
                 <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
                 <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
-            </dd>
+            </span>
+            <span th:text="#{__${'status.' + order.status}__}"
+                  th:class="'status-pill status-' + ${#strings.toLowerCase(order.status)}">In Bearbeitung</span>
+        </div>
 
-            <dt th:text="#{orders.index.status}">Status</dt>
-            <dd>
-                <span sec:authorize="!hasRole('LOGISTICIAN')" th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
-                <select sec:authorize="hasRole('LOGISTICIAN')"
-                        id="status-select"
-                        name="status"
-                        data-trigger="od-update-status"
-                        th:data-order-id="${order.id}"
-                        th:data-version="${order.version}"
-                        style="background-color: var(--color-surface-input); color: white; border: 1px solid var(--color-gray-3);">
-                    <option value="OPEN" th:selected="${order.status == 'OPEN'}" th:text="#{status.OPEN}">Offen</option>
-                    <option value="IN_PROGRESS" th:selected="${order.status == 'IN_PROGRESS'}" th:text="#{status.IN_PROGRESS}">In Bearbeitung</option>
-                    <option value="REJECTED" th:selected="${order.status == 'REJECTED'}" th:text="#{status.REJECTED}">Abgelehnt</option>
-                    <option value="COMPLETED" th:selected="${order.status == 'COMPLETED'}" th:text="#{status.COMPLETED}">Abgeschlossen</option>
-                </select>
-            </dd>
+        <!-- Facts bar: the values most-asked when opening an order, scannable without scrolling. -->
+        <div class="facts-bar">
+            <span>
+                <span class="fact-k" th:text="#{orders.detail.createdAt}">Erstellt am</span>
+                <span class="fact-v od-created-date" id="created-date-span" th:data-utc="${order.createdAt}"></span>
+            </span>
+            <span>
+                <span class="fact-k" th:text="#{orders.detail.elapsedDays}">Vergangene Tage</span>
+                <span class="fact-v od-elapsed-cell" id="elapsed-days-container">
+                    <span class="od-elapsed-days" id="elapsed-days-span" th:data-utc="${order.createdAt}"></span> <span th:text="#{orders.detail.days}">Tage</span>
+                </span>
+            </span>
+            <span>
+                <span class="fact-k" th:text="#{orders.detail.priority}">Priorität</span>
+                <span class="fact-v" th:text="${order.priority != null ? order.priority : '—'}">1</span>
+            </span>
+            <span>
+                <span class="fact-k" th:text="#{orders.detail.requesting}">Auftraggeber</span>
+                <span class="fact-v">
+                    <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
+                          th:title="${order.requestingOrgUnit.name()}"
+                          th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
+                    <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
+                </span>
+            </span>
+            <span>
+                <span class="fact-k" th:text="#{orders.detail.responsible}">Bearbeitende Einheit</span>
+                <span class="fact-v">
+                    <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
+                          th:title="${order.responsibleOrgUnit.name()}"
+                          th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
+                    <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
+                </span>
+            </span>
+            <span>
+                <span class="fact-k" th:text="#{orders.index.status}">Status</span>
+                <span th:text="#{__${'status.' + order.status}__}"
+                      th:class="'status-pill status-' + ${#strings.toLowerCase(order.status)}">In Bearbeitung</span>
+            </span>
+        </div>
 
-            <th:block th:if="${order.comment != null and !order.comment.isEmpty()}">
-                <dt class="kv-row-wide" th:text="#{orders.detail.comment}">Kommentar</dt>
-                <dd class="kv-row-wide kv-row-self-start" style="white-space: pre-wrap;" th:text="${order.comment}">Kommentar</dd>
-            </th:block>
-        </dl>
+        <!-- Grouped meta card: same data as the old kv-list, organised into Auftrag / Zeit /
+             Beteiligte so the header collapses to ~half height. -->
+        <div class="meta-grid mt-2">
+            <div class="meta-group">
+                <div class="meta-group-title" th:text="#{orders.detail.group.order}">Auftrag</div>
+                <div class="kv-compact">
+                    <span class="kv-key" th:text="#{orders.index.id}">ID</span>
+                    <span class="kv-val kv-val--mono" id="order-display-id"
+                          th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}">#1</span>
+                    <span class="kv-key" th:text="#{orders.create.kind}">Auftragsart</span>
+                    <span class="kv-val" th:switch="${order.type}">
+                        <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
+                        <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
+                    </span>
+                    <span class="kv-key" th:text="#{orders.detail.priority}">Priorität</span>
+                    <span class="kv-val" th:text="${order.priority != null ? order.priority : '—'}">1</span>
+                </div>
+            </div>
+            <div class="meta-group">
+                <div class="meta-group-title" th:text="#{orders.detail.group.time}">Zeit</div>
+                <div class="kv-compact">
+                    <span class="kv-key" th:text="#{orders.detail.createdAt}">Erstellt am</span>
+                    <span class="kv-val od-created-date" th:data-utc="${order.createdAt}"></span>
+                    <span class="kv-key" th:text="#{orders.detail.elapsedDays}">Vergangene Tage</span>
+                    <span class="kv-val od-elapsed-cell">
+                        <span class="od-elapsed-days" th:data-utc="${order.createdAt}"></span> <span th:text="#{orders.detail.days}">Tage</span>
+                    </span>
+                </div>
+            </div>
+            <div class="meta-group">
+                <div class="meta-group-title" th:text="#{orders.detail.group.participants}">Beteiligte</div>
+                <div class="kv-compact">
+                    <span class="kv-key" th:text="#{orders.detail.requesting}">Auftraggeber</span>
+                    <span class="kv-val">
+                        <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
+                              th:title="${order.requestingOrgUnit.name()}"
+                              th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
+                        <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
+                    </span>
+                    <span class="kv-key" th:text="#{orders.detail.responsible}">Bearbeitende Einheit</span>
+                    <span class="kv-val">
+                        <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
+                              th:title="${order.responsibleOrgUnit.name()}"
+                              th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
+                        <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
+                    </span>
+                    <span class="kv-key" th:text="#{orders.detail.handle}">Handle</span>
+                    <span class="kv-val" th:text="${order.handle}">handle</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comment as a labelled annotation (orange left rule), only when present. -->
+        <div th:if="${order.comment != null and !order.comment.isEmpty()}" class="annotation mt-2">
+            <div class="annotation-label" th:text="#{orders.detail.comment}">Kommentar</div>
+            <span th:text="${order.comment}">Kommentar</span>
+        </div>
+
+        <!-- Status editor — logisticians only; everyone else reads the status pill above. -->
+        <div class="od-status-row" sec:authorize="hasRole('LOGISTICIAN')">
+            <label class="od-status-row-label" for="status-select" th:text="#{orders.index.status}">Status</label>
+            <select id="status-select"
+                    name="status"
+                    data-trigger="od-update-status"
+                    th:data-order-id="${order.id}"
+                    th:data-version="${order.version}">
+                <option value="OPEN" th:selected="${order.status == 'OPEN'}" th:text="#{status.OPEN}">Offen</option>
+                <option value="IN_PROGRESS" th:selected="${order.status == 'IN_PROGRESS'}" th:text="#{status.IN_PROGRESS}">In Bearbeitung</option>
+                <option value="REJECTED" th:selected="${order.status == 'REJECTED'}" th:text="#{status.REJECTED}">Abgelehnt</option>
+                <option value="COMPLETED" th:selected="${order.status == 'COMPLETED'}" th:text="#{status.COMPLETED}">Abgeschlossen</option>
+            </select>
+        </div>
         </th:block></div>
 
         <!-- MATERIAL orders: the direct material-requirement table (click a row to expand the
@@ -1188,32 +1252,39 @@
     const ORDER_AGE_YELLOW = /*[[${ageYellowDays}]]*/ 30;
     const ORDER_AGE_RED = /*[[${ageRedDays}]]*/ 90;
 
-    // Localize the created-date + elapsed-days (kv-list header) and every handover timestamp.
-    // Extracted so it re-runs after a header / handover fragment swap (#575) — it was a one-shot
-    // DOMContentLoaded enhancer, so swapped-in dates would otherwise stay raw ISO strings.
+    // Localize the created-date + elapsed-days (header facts-bar + meta-grid) and every handover
+    // timestamp. Extracted so it re-runs after a header / handover fragment swap (#575) — it was a
+    // one-shot DOMContentLoaded enhancer, so swapped-in dates would otherwise stay raw ISO strings.
+    // Variante A shows created/elapsed in BOTH the facts-bar and the "Zeit" meta-group, so this
+    // localizes every .od-created-date / .od-elapsed-days copy (the facts-bar copy additionally
+    // keeps #created-date-span / #elapsed-days-span / #elapsed-days-container).
     function localizeOrderDates(root) {
         const scope = root || document;
-        const dateSpan = scope.querySelector('#created-date-span');
-        const daysSpan = scope.querySelector('#elapsed-days-span');
-        const daysContainer = scope.querySelector('#elapsed-days-container');
-        if (dateSpan && daysSpan) {
-            const utcDateStr = dateSpan.getAttribute('data-utc');
-            if (utcDateStr) {
-                const date = new Date(utcDateStr);
-                if (!isNaN(date)) {
-                    dateSpan.textContent = date.toLocaleDateString();
-                    const now = new Date();
-                    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-                    daysSpan.textContent = diffDays > 0 ? diffDays : 0;
-                    const targetEl = daysContainer || daysSpan;
-                    if (diffDays >= ORDER_AGE_RED) {
-                        targetEl.classList.add('text-danger');
-                    } else if (diffDays >= ORDER_AGE_YELLOW) {
-                        targetEl.classList.add('text-warning');
-                    }
-                }
+        const now = new Date();
+        scope.querySelectorAll('.od-created-date[data-utc]').forEach(el => {
+            const utcDateStr = el.getAttribute('data-utc');
+            if (!utcDateStr) return;
+            const date = new Date(utcDateStr);
+            if (!isNaN(date)) {
+                el.textContent = date.toLocaleDateString();
             }
-        }
+        });
+        scope.querySelectorAll('.od-elapsed-days[data-utc]').forEach(el => {
+            const utcDateStr = el.getAttribute('data-utc');
+            if (!utcDateStr) return;
+            const date = new Date(utcDateStr);
+            if (isNaN(date)) return;
+            const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+            el.textContent = diffDays > 0 ? diffDays : 0;
+            // Colour the whole "<n> Tage" value (the .od-elapsed-cell wrapper), falling back to the
+            // number span when no wrapper is present.
+            const targetEl = el.closest('.od-elapsed-cell') || el;
+            if (diffDays >= ORDER_AGE_RED) {
+                targetEl.classList.add('text-danger');
+            } else if (diffDays >= ORDER_AGE_YELLOW) {
+                targetEl.classList.add('text-warning');
+            }
+        });
         scope.querySelectorAll('.handover-time-span').forEach(el => {
             const utcDateStr = el.getAttribute('data-utc');
             if (utcDateStr) {
