@@ -28,9 +28,11 @@
  *   and on a background poll, paused while the tab is hidden. The poll backs off to a slow keepalive
  *   while the SSE push stream is connected and speeds back up the moment it drops; the slow cadence
  *   is kept frequent enough to remain the REQ-SEC-012 re-auth safety net (the poll path — not the
- *   refresh-incapable SSE relay — is what drives token refresh / 401 re-login detection). Per-item
- *   DOM is patched in place so the same handlers drive both the dropdown and the full /notifications
- *   page.
+ *   refresh-incapable SSE relay — is what drives token refresh / 401 re-login detection). A liveness
+ *   watchdog catches a half-open stream (one that stays "connected" but stops delivering, so it never
+ *   fires `error`): if no SSE traffic arrives within the liveness window the poll falls back to the
+ *   fast cadence even without an `error`. Per-item DOM is patched in place so the same handlers drive
+ *   both the dropdown and the full /notifications page.
  *
  * i18n strings are read from data-* attributes injected by Thymeleaf so this static file carries no
  * hardcoded user-facing text.
@@ -42,10 +44,16 @@
     // — but stays frequent enough to remain the REQ-SEC-012 re-auth keepalive (the poll path is what
     // refreshes the token / detects a poisoned session; the SSE relay is deliberately refresh-incapable).
     const POLL_INTERVAL_SLOW_MS = 300000;
+    // Liveness window: if no SSE traffic (named `heartbeat` or `notification`) arrives within this
+    // time while we believe the stream is healthy, treat it as half-open (TCP up, stream dead — such
+    // a connection never fires `error`) and fall back to the fast poll. ~3x the backend heartbeat
+    // (PT20S default) so a single dropped beat doesn't trip it. Keep in step with that interval.
+    const SSE_LIVENESS_TIMEOUT_MS = 60000;
     const bell = document.getElementById('notification-bell');
     const i18n = readMessages();
     let pollTimer = null;
     let sseHealthy = false;
+    let sseWatchdogTimer = null;
 
     // Read the localized strings the templates expose so this static JS stays text-free.
     function readMessages() {
@@ -445,12 +453,67 @@
         startPolling();
     }
 
+    // (Re)start the SSE liveness window. Called on every proof of life (open / heartbeat /
+    // notification); if it ever elapses, the stream is half-open and we demote to the fast poll.
+    function bumpSseWatchdog() {
+        if (sseWatchdogTimer) {
+            window.clearTimeout(sseWatchdogTimer);
+        }
+        sseWatchdogTimer = window.setTimeout(onSseWatchdogTimeout, SSE_LIVENESS_TIMEOUT_MS);
+    }
+
+    function clearSseWatchdog() {
+        if (sseWatchdogTimer) {
+            window.clearTimeout(sseWatchdogTimer);
+            sseWatchdogTimer = null;
+        }
+    }
+
+    // The liveness window elapsed with no SSE traffic: the stream is half-open (still "connected"
+    // but dead, so it never fired `error`). Demote to the fast poll so re-auth detection and unread
+    // updates fall back to the poll path (REQ-SEC-012). A later proof-of-life event re-promotes.
+    function onSseWatchdogTimeout() {
+        sseWatchdogTimer = null;
+        markSseUnhealthy();
+    }
+
+    // Proof of life (connection open or any received event): re-arm the watchdog, and on the
+    // false→true flip back the poll off to the slow keepalive. Re-promotes after a half-open demote.
+    function markSseHealthy() {
+        bumpSseWatchdog();
+        if (!sseHealthy) {
+            sseHealthy = true;
+            restartPolling();
+        }
+    }
+
+    // The stream is (or went) unhealthy: stop the watchdog and, on the true→false flip, fall back to
+    // the fast poll plus a one-shot catch-up. The catch-up is skipped while the tab is hidden, where
+    // polling is paused and onVisibilityChange refreshes on return. Guarded so the repeated `error`
+    // events of a reconnect storm don't churn the timer or hammer the count endpoint.
+    function markSseUnhealthy() {
+        clearSseWatchdog();
+        if (sseHealthy) {
+            sseHealthy = false;
+            restartPolling();
+            if (!document.hidden) {
+                refreshUnreadCount();
+            }
+        }
+    }
+
     function onVisibilityChange() {
         if (document.hidden) {
             stopPolling();
         } else {
             startPolling();
             refreshUnreadCount();
+            // A stream can silently die while the tab is backgrounded (and timers are throttled, so
+            // the watchdog may not have fired). Re-arm the liveness window so a now-dead "healthy"
+            // stream self-corrects to the fast poll within SSE_LIVENESS_TIMEOUT_MS of return.
+            if (sseHealthy) {
+                bumpSseWatchdog();
+            }
         }
     }
 
@@ -466,30 +529,25 @@
         }
         try {
             const source = new EventSource('/notifications/stream');
-            // Stream connected → push is live, so back the poll off to the slow keepalive cadence.
-            // Only act on the false→true transition so reconnects don't churn the timer.
+            // Connection established → push is live: mark healthy (backs the poll off to the slow
+            // keepalive on the flip) and arm the liveness watchdog.
             source.addEventListener('open', function () {
-                if (!sseHealthy) {
-                    sseHealthy = true;
-                    restartPolling();
-                }
+                markSseHealthy();
             });
-            // Stream dropped (EventSource will auto-reconnect) → fall back to the fast poll as the
-            // primary mechanism and catch up once. Guarded on the true→false transition so the
-            // repeated error events fired during a reconnect storm don't hammer the count endpoint.
+            // Stream dropped (EventSource will auto-reconnect) → fall back to the fast poll. The
+            // reconnect-storm and tab-hidden guards live in markSseUnhealthy.
             source.addEventListener('error', function () {
-                if (sseHealthy) {
-                    sseHealthy = false;
-                    restartPolling();
-                    // One-shot catch-up, but never while the tab is hidden: polling is paused there
-                    // (the timer is stopped), and onVisibilityChange already refreshes on return, so
-                    // firing here would be a redundant background fetch against the paused contract.
-                    if (!document.hidden) {
-                        refreshUnreadCount();
-                    }
-                }
+                markSseUnhealthy();
+            });
+            // Named keepalive (REQ-NOTIF-010): pure proof of life. Resets the liveness watchdog and
+            // re-promotes to the slow cadence if a half-open stall had demoted us. The payload is
+            // irrelevant — only its arrival matters.
+            source.addEventListener('heartbeat', function () {
+                markSseHealthy();
             });
             source.addEventListener('notification', function () {
+                // A delivered notification is also proof the stream is live.
+                markSseHealthy();
                 refreshUnreadCount();
                 const dropdown = document.getElementById('notification-dropdown');
                 if (dropdown && !dropdown.classList.contains('notification-dropdown-hidden')) {

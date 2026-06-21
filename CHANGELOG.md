@@ -8,7 +8,7 @@
 
 ### Changed
 
-- **Weniger Hintergrund-Anfragen der Benachrichtigungs-Glocke.** Solange die Echtzeit-Verbindung (SSE) steht, fragt die Ungelesen-Zahl nur noch im langsamen Takt nach (statt fest alle 60 Sekunden); bricht die Verbindung ab, wird wieder schnell abgefragt. Benachrichtigungen erscheinen weiterhin in Echtzeit.
+- **Weniger Hintergrund-Anfragen der Benachrichtigungs-Glocke.** Solange die Echtzeit-Verbindung (SSE) steht, fragt die Ungelesen-Zahl nur noch im langsamen Takt nach (statt fest alle 60 Sekunden); bricht die Verbindung ab, wird wieder schnell abgefragt. Das gilt jetzt auch, wenn die Verbindung unbemerkt stehenbleibt (verbunden, aber ohne Daten): bleibt ein Lebenszeichen aus, schaltet die Glocke von selbst wieder auf den schnellen Takt. Benachrichtigungen erscheinen weiterhin in Echtzeit.
 
 - **Das Lager-Eingabeformular und das Refinery-Auftragsformular laden schneller.** Die Katalog-Listen (Materialien, Standorte, Job-Orders, Missionen, Nutzer, Besitzer-Auswahl) werden jetzt parallel statt nacheinander vom Backend geholt. Bei einem fehlgeschlagenen Abruf bleibt die betroffene Liste leer wie bisher.
 
