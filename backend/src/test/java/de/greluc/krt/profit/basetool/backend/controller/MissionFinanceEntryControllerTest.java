@@ -95,10 +95,11 @@ class MissionFinanceEntryControllerTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
-            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L);
+            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L, null);
     return new MissionFinanceEntryDto(
         UUID.randomUUID(),
         missionId,

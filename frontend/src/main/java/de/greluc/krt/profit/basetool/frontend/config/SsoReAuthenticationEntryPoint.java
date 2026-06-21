@@ -25,6 +25,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -114,21 +116,38 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
   private void setSsoAttemptedCookie(@NotNull HttpServletResponse response) {
     log.debug("[SSO] Setting SSO_ATTEMPTED cookie to prevent redirect loop");
-    Cookie cookie = new Cookie(SSO_ATTEMPTED_COOKIE, "1");
-    cookie.setHttpOnly(true);
-    cookie.setSecure(true);
-    cookie.setPath("/");
-    cookie.setMaxAge(60); // expires after 60 seconds – only needed for the redirect cycle
-    response.addCookie(cookie);
+    // SameSite=Strict to match the session / XSRF cookies (security audit gap-fill); jakarta's
+    // Cookie has no SameSite setter, so emit a ResponseCookie Set-Cookie header. 60s max-age — only
+    // needed for the redirect cycle.
+    writeSsoAttemptedCookie(response, "1", 60);
   }
 
   private void clearSsoAttemptedCookie(@NotNull HttpServletResponse response) {
     log.debug("[SSO] Clearing SSO_ATTEMPTED cookie");
-    Cookie cookie = new Cookie(SSO_ATTEMPTED_COOKIE, "");
-    cookie.setHttpOnly(true);
-    cookie.setSecure(true);
-    cookie.setPath("/");
-    cookie.setMaxAge(0);
-    response.addCookie(cookie);
+    writeSsoAttemptedCookie(response, "", 0);
+  }
+
+  /**
+   * Emits the {@code SSO_ATTEMPTED} cookie as a {@link ResponseCookie} {@code Set-Cookie} header
+   * with {@code Secure}, {@code HttpOnly} and {@code SameSite=Strict} — matching the rest of the
+   * app's cookie posture (the servlet {@link Cookie} API cannot set {@code SameSite}). A {@code
+   * maxAge} of {@code 0} clears the cookie.
+   *
+   * @param response the servlet response to write the {@code Set-Cookie} header on
+   * @param value the cookie value ({@code "1"} to set, {@code ""} to clear)
+   * @param maxAgeSeconds the cookie max-age in seconds ({@code 0} to expire immediately)
+   */
+  private void writeSsoAttemptedCookie(
+      @NotNull HttpServletResponse response, @NotNull String value, long maxAgeSeconds) {
+    response.addHeader(
+        HttpHeaders.SET_COOKIE,
+        ResponseCookie.from(SSO_ATTEMPTED_COOKIE, value)
+            .httpOnly(true)
+            .secure(true)
+            .sameSite("Strict")
+            .path("/")
+            .maxAge(maxAgeSeconds)
+            .build()
+            .toString());
   }
 }

@@ -95,7 +95,8 @@ class MissionSecurityRenderingTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             participantId,
@@ -108,7 +109,8 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -196,7 +198,8 @@ class MissionSecurityRenderingTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             participantId,
@@ -209,7 +212,8 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -290,7 +294,8 @@ class MissionSecurityRenderingTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             participantId,
@@ -303,7 +308,8 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(
@@ -394,7 +400,8 @@ class MissionSecurityRenderingTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
             participantId,
@@ -407,7 +414,8 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L);
+            1L,
+            null);
 
     MissionDto mission =
         new MissionDto(

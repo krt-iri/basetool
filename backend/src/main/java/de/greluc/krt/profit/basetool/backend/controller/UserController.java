@@ -490,8 +490,15 @@ public class UserController {
   @lombok.Data
   public static class UserAttributesRequest {
     @jakarta.validation.constraints.NotNull private Integer rank;
+
+    // Bound the free-text fields (security audit L1): description is a TEXT column with no DB
+    // backstop, so without @Size an authenticated caller could store a multi-MB blob per write.
+    @jakarta.validation.constraints.Size(max = 10_000)
     private String description;
+
+    @jakarta.validation.constraints.Size(max = 255)
     private String displayName;
+
     @jakarta.validation.constraints.NotNull private Long version;
     @org.jetbrains.annotations.Nullable private LocalDate joinDate;
   }
@@ -499,8 +506,17 @@ public class UserController {
   /** Body for {@link #updateMyDescription}. */
   @lombok.Data
   public static class UserDescriptionRequest {
+    // Bound the free-text self-service fields (security audit L1): description maps to a TEXT
+    // column
+    // with no DB length backstop. @Size only rejects over-length input; the fields stay nullable
+    // (a null description means "no change", a blank displayName clears it) so partial-update
+    // semantics are unchanged — do NOT add @NotBlank.
+    @jakarta.validation.constraints.Size(max = 10_000)
     private String description;
+
+    @jakarta.validation.constraints.Size(max = 255)
     private String displayName;
+
     @jakarta.validation.constraints.NotNull private Long version;
   }
 
@@ -602,7 +618,8 @@ public class UserController {
         dto.inKeycloak(),
         dto.squadron(),
         dto.version(),
-        null // joinDate
+        null, // joinDate
+        null // discordLinked – Discord-link status is not exposed to peers (admin-only column)
         );
   }
 
@@ -635,6 +652,7 @@ public class UserController {
         dto.inKeycloak(),
         dto.squadron(),
         dto.version(),
-        dto.joinDate());
+        dto.joinDate(),
+        dto.discordLinked());
   }
 }

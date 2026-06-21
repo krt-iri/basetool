@@ -58,6 +58,10 @@ class MissionGuestAccessTest {
 
   @Autowired private JobTypeRepository jobTypeRepository;
 
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.service.GuestParticipantTokenService
+      guestParticipantTokenService;
+
   private User registeredUser;
   private Mission mission;
   private JobType testJobType;
@@ -126,11 +130,44 @@ class MissionGuestAccessTest {
   }
 
   @Test
-  void testUpdateParticipant_Anonymous_OnGuestEntry_ShouldBeAllowed() throws Exception {
-    // Add guest participant
+  void testUpdateParticipant_Anonymous_OnGuestEntry_WithoutToken_ShouldBeForbidden()
+      throws Exception {
+    // Security audit M1 / REQ-SEC-018: an anonymous caller who merely knows a guest participant's
+    // id (exposed in the public roster) may no longer mutate it — without the per-row capability
+    // token the guest row is editable only by a mission manager. This is the core M1 fix.
     MissionParticipant p = new MissionParticipant();
     p.setMission(mission);
     p.setGuestName("Guest1");
+    p.setGuestEditTokenHash(guestParticipantTokenService.hashToken("the-real-token"));
+    mission.getParticipants().add(p);
+    mission = missionRepository.save(mission);
+
+    p = mission.getParticipants().iterator().next();
+
+    String updateJson =
+        "{\"desiredMissionJobTypeId\": \""
+            + testJobType.getId()
+            + "\", \"comment\": \"Vandalism\", \"version\": 0}";
+
+    // Anonymous request with NO X-Guest-Edit-Token header → forbidden.
+    mockMvc
+        .perform(
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateJson))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void testUpdateParticipant_Anonymous_OnGuestEntry_WithValidToken_ShouldBeAllowed()
+      throws Exception {
+    // Option B self-edit: the anonymous creator who presents the per-row capability token minted at
+    // sign-up CAN edit/withdraw their own guest sign-up (security audit M1 / REQ-SEC-018).
+    String token = guestParticipantTokenService.generateToken();
+    MissionParticipant p = new MissionParticipant();
+    p.setMission(mission);
+    p.setGuestName("Guest1");
+    p.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
     mission.getParticipants().add(p);
     mission = missionRepository.save(mission);
 
@@ -141,10 +178,10 @@ class MissionGuestAccessTest {
             + testJobType.getId()
             + "\", \"comment\": \"Guest Update\", \"version\": 0}";
 
-    // Anonymous request
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
+                .header("X-Guest-Edit-Token", token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
         .andExpect(status().isOk());

@@ -173,6 +173,14 @@ class PiiMaskerTest {
     }
 
     @Test
+    void base64Token_secretReplacedInFull_keywordKept() {
+      // L6: the value class covers the standard-base64 alphabet (+, /, =), so a base64 secret is
+      // masked in full rather than truncated at the first +/=/ with the tail leaked verbatim.
+      assertEquals("token=***", PiiMasker.mask("token=ab+cd/ef12=="));
+      assertEquals("bearer ***", PiiMasker.mask("bearer aGVsbG8+d29ybGQ/Zm9v=="));
+    }
+
+    @Test
     void sessionIdVariants_replaced() {
       assertEquals("session-id=***", PiiMasker.mask("session-id=qWeRtY12345"));
       assertEquals("session_id: ***", PiiMasker.mask("session_id: qWeRtY12345"));

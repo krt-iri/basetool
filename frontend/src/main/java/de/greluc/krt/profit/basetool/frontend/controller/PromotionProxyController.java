@@ -232,9 +232,18 @@ public class PromotionProxyController {
       @PathVariable @NotNull String userId,
       @PathVariable @NotNull UUID categoryId,
       @RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.put(
-        "/api/v1/promotion/evaluations/user/" + userId + "/category/" + categoryId,
-        body,
-        Map.class);
+    // Security audit L7: userId is the only untyped String path variable in this controller (it is
+    // a Keycloak sub, not a UUID), so it must be RFC-3986 path-encoded rather than concatenated
+    // into
+    // the non-encoding .put(String) overload — otherwise reserved characters could reshape the
+    // forwarded backend path/query. Mirrors the UriComponentsBuilder remediation in
+    // MaterialProxyController (M-2) and UserProxyController (L-1). Do NOT URLEncoder-form-encode
+    // (space->'+' re-mangling across the frontend->backend hop) and do NOT retype userId to UUID.
+    String uri =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(
+                "/api/v1/promotion/evaluations/user/{userId}/category/{categoryId}")
+            .buildAndExpand(userId, categoryId)
+            .toUriString();
+    return backendApiClient.put(uri, body, Map.class);
   }
 }

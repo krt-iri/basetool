@@ -91,7 +91,8 @@ class OfficerRefineryAccessTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
 
     // Mocking user list for dropdown
@@ -112,7 +113,8 @@ class OfficerRefineryAccessTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     PageResponse<UserDto> userPage =
         new PageResponse<>(List.of(userDto, memberDto), 0, 10, 2L, 1, Collections.emptyList());
     when(backendApiClient.get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class)))
@@ -172,7 +174,8 @@ class OfficerRefineryAccessTest {
             true,
             null,
             1L,
-            null);
+            null,
+            false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(officerDto);
 
     UserReferenceDto ownerRef = new UserReferenceDto(otherUserId, "other", "Other", "Other", null);

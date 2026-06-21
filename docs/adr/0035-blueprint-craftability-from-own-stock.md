@@ -1,4 +1,4 @@
-# ADR-0033 — Blueprint craftability computed from the user's own stock
+# ADR-0035 — Blueprint craftability computed from the user's own stock
 
 - **Status:** Accepted
 - **Date:** 2026-06-21

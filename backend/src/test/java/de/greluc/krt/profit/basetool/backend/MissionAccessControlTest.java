@@ -79,6 +79,10 @@ class MissionAccessControlTest {
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.service.GuestParticipantTokenService
+      guestParticipantTokenService;
+
   private final JsonMapper objectMapper = JsonMapper.builder().build();
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -454,18 +458,21 @@ class MissionAccessControlTest {
   }
 
   @Test
-  void testUpdateParticipant_AnonymousGuest_Allowed() throws Exception {
-    // Given
+  void testUpdateParticipant_AnonymousGuest_WithToken_Allowed() throws Exception {
+    // Security audit M1 / REQ-SEC-018: an anonymous guest may edit their own sign-up only by
+    // presenting the per-row capability token (X-Guest-Edit-Token) minted at create time.
     Mission mission = new Mission();
     mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
+    String token = guestParticipantTokenService.generateToken();
     MissionParticipant participant = new MissionParticipant();
     participant.setMission(mission);
     participant.setUser(null); // Guest
     participant.setGuestName("Guest User");
+    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
     participant = missionParticipantRepository.save(participant);
     mission.getParticipants().add(participant);
     missionRepository.save(mission);
@@ -474,24 +481,28 @@ class MissionAccessControlTest {
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + participant.getId())
+                .header("X-Guest-Edit-Token", token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"guestName\": \"New Name\", \"version\": 0}"))
         .andExpect(status().isOk());
   }
 
   @Test
-  void testUpdatePayoutPreference_AnonymousGuest_Allowed() throws Exception {
-    // Given
+  void testUpdatePayoutPreference_AnonymousGuest_WithToken_Allowed() throws Exception {
+    // Security audit M1 / REQ-SEC-018: payout-preference is sticky and finance-relevant, so the
+    // guest-row gate (token or mission-manager) applies here too.
     Mission mission = new Mission();
     mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
+    String token = guestParticipantTokenService.generateToken();
     MissionParticipant participant = new MissionParticipant();
     participant.setMission(mission);
     participant.setUser(null); // Guest
     participant.setGuestName("Guest User");
+    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
     participant = missionParticipantRepository.save(participant);
     mission.getParticipants().add(participant);
     missionRepository.save(mission);
@@ -504,6 +515,7 @@ class MissionAccessControlTest {
                     + "/participants/"
                     + participant.getId()
                     + "/payout-preference")
+                .header("X-Guest-Edit-Token", token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"preference\": \"PAYOUT\", \"version\": 0}"))
         .andExpect(status().isOk());

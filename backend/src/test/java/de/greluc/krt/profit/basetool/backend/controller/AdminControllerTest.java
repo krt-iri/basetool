@@ -83,7 +83,8 @@ class AdminControllerTest {
         true,
         null,
         1L,
-        null);
+        null,
+        false);
   }
 
   // ── /api/v1/admin/roles ───────────────────────────────────────────────

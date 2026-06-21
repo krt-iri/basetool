@@ -67,6 +67,9 @@ class SsoReAuthenticationEntryPointTest {
     assertTrue(attemptedCookie.isHttpOnly(), "Cookie must be HttpOnly");
     assertTrue(attemptedCookie.getSecure(), "Cookie must be Secure");
     assertEquals(60, attemptedCookie.getMaxAge(), "Cookie should expire after 60 seconds");
+    assertTrue(
+        response.getHeader("Set-Cookie").contains("SameSite=Strict"),
+        "SSO_ATTEMPTED cookie must carry SameSite=Strict like the session / XSRF cookies");
   }
 
   @Test

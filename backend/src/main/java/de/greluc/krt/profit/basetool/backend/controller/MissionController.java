@@ -409,6 +409,18 @@ public class MissionController {
                 .map(this::cleanupOutsiderMissionForGuest)
                 .collect(Collectors.toSet());
 
+    // ADR-0034: the anonymous outsider view drops each participant's payoutPreference + free-text
+    // comment (kept on the member-peer view). The peer roster is already PII-stripped; strip these
+    // two fields here so getMissionById and the participant endpoints (which all redact through
+    // this
+    // method for outsiders) never expose them to unauthenticated callers.
+    Set<MissionParticipantDto> outsiderParticipants =
+        peer.participants() == null
+            ? null
+            : peer.participants().stream()
+                .map(this::stripOutsiderParticipantFields)
+                .collect(Collectors.toSet());
+
     return new MissionDto(
         peer.id(),
         peer.name(),
@@ -421,7 +433,7 @@ public class MissionController {
         peer.plannedEndTime(),
         peer.actualEndTime(),
         peer.isInternal(),
-        peer.participants(), // roster kept (PII already stripped by the peer pass)
+        outsiderParticipants, // roster kept, but payout + comment stripped (ADR-0034)
         peer.assignedUnits(), // units kept
         peer.frequencies(), // frequencies kept
         outsiderSubMissions,
@@ -465,7 +477,40 @@ public class MissionController {
         dto.startTime(),
         dto.endTime(),
         dto.payoutPreference(),
-        dto.version());
+        dto.version(),
+        // M1: preserve the per-row capability token so the anonymous guest-sign-up CREATE response
+        // still hands the creator their edit token. It is non-null only on that create response
+        // (transient on the freshly persisted entity) and null on every read/edit, so redacting it
+        // here would break the legitimate self-edit UX without adding any protection.
+        dto.guestEditToken());
+  }
+
+  /**
+   * ADR-0034: removes the two fields the anonymous outsider mission view does not expose — the
+   * per-participant {@code payoutPreference} (financial intent) and the free-text {@code comment}
+   * (uncontrolled text, possible incidental PII). Applied ONLY on the strict outsider paths ({@link
+   * #cleanupOutsiderMissionForGuest} and the {@code addParticipantSlim} outsider branch); the
+   * shared {@link #cleanupParticipantForGuest} deliberately keeps both fields so the authenticated
+   * member-peer view is unchanged (REQ-SEC-021). Every other field — including the M1 {@code
+   * guestEditToken} — passes through untouched.
+   *
+   * @param dto an already-PII-redacted participant DTO from the guest cleanup pass
+   * @return a copy with {@code payoutPreference} and {@code comment} nulled
+   */
+  private MissionParticipantDto stripOutsiderParticipantFields(MissionParticipantDto dto) {
+    return new MissionParticipantDto(
+        dto.id(),
+        dto.user(),
+        dto.guestName(),
+        dto.orgUnits(),
+        dto.desiredMissionJobType(),
+        dto.plannedMissionJobType(),
+        null, // comment — ADR-0034: not exposed to anonymous outsiders
+        dto.startTime(),
+        dto.endTime(),
+        null, // payoutPreference — ADR-0034: not exposed to anonymous outsiders
+        dto.version(),
+        dto.guestEditToken());
   }
 
   /**
@@ -493,7 +538,8 @@ public class MissionController {
         dto.inKeycloak(),
         null, // squadron – not exposed to guests
         dto.version(),
-        null // joinDate – not exposed to guests
+        null, // joinDate – not exposed to guests
+        null // discordLinked – not exposed to guests
         );
   }
 
@@ -1994,6 +2040,12 @@ public class MissionController {
     // future endpoint added with the same {@code @ownerScopeService.canSeeMission(#id)} gate.
     if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
       participants = participants.map(this::cleanupParticipantForGuest);
+    }
+    // ADR-0034: outsiders (anonymous / role-less GUEST) additionally lose each participant's
+    // payoutPreference + comment in the returned roster; the member-peer tier (a member below
+    // logistician) keeps them. The freshly created guest's own guestEditToken is preserved.
+    if (jwt == null || !authHelperService.isMemberOrAbove()) {
+      participants = participants.map(this::stripOutsiderParticipantFields);
     }
     return participants.toList();
   }

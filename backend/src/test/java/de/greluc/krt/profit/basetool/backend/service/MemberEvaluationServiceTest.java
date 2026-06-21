@@ -43,6 +43,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class MemberEvaluationServiceTest {
@@ -54,6 +55,10 @@ class MemberEvaluationServiceTest {
   @Mock private MemberEvaluationMapper mapper;
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+
+  @Mock private AuthHelperService authHelperService;
 
   /**
    * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
@@ -134,6 +139,7 @@ class MemberEvaluationServiceTest {
     when(repository.findByUserIdAndCategoryId(userId, categoryId)).thenReturn(Optional.empty());
     when(repository.save(any(MemberEvaluation.class))).thenReturn(saved);
     when(mapper.toResponse(saved)).thenReturn(response);
+    when(authHelperService.isAdmin()).thenReturn(true);
 
     // When
     MemberEvaluationResponse result = service.upsert(userId, categoryId, request);
@@ -164,6 +170,7 @@ class MemberEvaluationServiceTest {
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(repository.findByUserIdAndCategoryId(userId, categoryId))
         .thenReturn(Optional.of(existing));
+    when(authHelperService.isAdmin()).thenReturn(true);
 
     // When / Then
     assertThrows(
@@ -188,12 +195,84 @@ class MemberEvaluationServiceTest {
   }
 
   @Test
+  void upsert_shouldDenyOfficer_evaluatingForeignSquadronMember() {
+    // Gap-fill security audit: an OFFICER may not write an evaluation for a member whose home
+    // Staffel is outside the caller's editable scope, even when the category belongs to the
+    // officer's own squadron. Without the target-member scope check this was a cross-tenant write.
+    String foreignMemberId = UUID.randomUUID().toString();
+    UUID categoryId = UUID.randomUUID();
+    UUID foreignStaffelId = UUID.randomUUID();
+    PromotionCategory category =
+        PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
+    MemberEvaluationUpdateRequest request =
+        new MemberEvaluationUpdateRequest(null, PromotionLevel.LEVEL_B);
+
+    when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(UUID.fromString(foreignMemberId)))
+        .thenReturn(Optional.of(foreignStaffelId));
+    when(ownerScopeService.canEditSquadron(foreignStaffelId)).thenReturn(false);
+
+    // When / Then
+    assertThrows(
+        AccessDeniedException.class, () -> service.upsert(foreignMemberId, categoryId, request));
+    verify(repository, never()).save(any(MemberEvaluation.class));
+  }
+
+  @Test
+  void upsert_shouldAllowOfficer_evaluatingOwnSquadronMember() {
+    // The legitimate path: an OFFICER evaluating a member of a Staffel within their editable scope.
+    String memberId = UUID.randomUUID().toString();
+    UUID categoryId = UUID.randomUUID();
+    UUID ownStaffelId = UUID.randomUUID();
+    PromotionCategory category =
+        PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
+    MemberEvaluationUpdateRequest request =
+        new MemberEvaluationUpdateRequest(null, PromotionLevel.LEVEL_B);
+    MemberEvaluation saved =
+        MemberEvaluation.builder()
+            .userId(memberId)
+            .category(category)
+            .assignedLevel(PromotionLevel.LEVEL_B)
+            .build();
+    MemberEvaluationResponse response =
+        new MemberEvaluationResponse(
+            UUID.randomUUID(),
+            0L,
+            memberId,
+            categoryId,
+            "Flug Kenntnisse",
+            UUID.randomUUID(),
+            "Grundlagen",
+            PromotionLevel.LEVEL_B,
+            null,
+            null);
+
+    when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(UUID.fromString(memberId)))
+        .thenReturn(Optional.of(ownStaffelId));
+    when(ownerScopeService.canEditSquadron(ownStaffelId)).thenReturn(true);
+    when(repository.findByUserIdAndCategoryId(memberId, categoryId)).thenReturn(Optional.empty());
+    when(repository.save(any(MemberEvaluation.class))).thenReturn(saved);
+    when(mapper.toResponse(saved)).thenReturn(response);
+
+    // When
+    MemberEvaluationResponse result = service.upsert(memberId, categoryId, request);
+
+    // Then
+    assertEquals(PromotionLevel.LEVEL_B, result.assignedLevel());
+    verify(repository).save(any(MemberEvaluation.class));
+  }
+
+  @Test
   void delete_shouldCallRepositoryDelete() {
     // Given
     UUID id = UUID.randomUUID();
     MemberEvaluation entity =
         MemberEvaluation.builder().userId("user-A").assignedLevel(PromotionLevel.LEVEL_A).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(authHelperService.isAdmin()).thenReturn(true);
 
     // When
     service.delete(id);

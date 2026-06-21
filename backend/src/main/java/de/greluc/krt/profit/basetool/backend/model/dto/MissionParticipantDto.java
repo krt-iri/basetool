@@ -29,6 +29,12 @@ import java.util.UUID;
  * participant's affiliations (zero, one, or several org units — a Staffel and/or Spezialkommandos),
  * replacing the former single {@code squadron} field so a member of both a Staffel and an SK has
  * both badges rendered on the roster.
+ *
+ * <p>{@code guestEditToken} is non-{@code null} ONLY on the create response of an anonymous guest
+ * sign-up (security audit M1 / REQ-SEC-018): the per-row capability token the caller must keep and
+ * present (as the {@code X-Guest-Edit-Token} header) to later edit/withdraw that guest row without
+ * a login. It is {@code null} on every read/edit response — only the token's hash is persisted, so
+ * it cannot be surfaced again after creation.
  */
 public record MissionParticipantDto(
     UUID id,
@@ -41,4 +47,5 @@ public record MissionParticipantDto(
     Instant startTime,
     Instant endTime,
     PayoutPreference payoutPreference,
-    Long version) {}
+    Long version,
+    String guestEditToken) {}

@@ -111,6 +111,8 @@ public class WebClientConfig {
   private final UserLocaleRelayFilter userLocaleRelayFilter;
   private final de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter
       clientIpRelayFilter;
+  private final de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenRelayFilter
+      guestEditTokenRelayFilter;
   private final org.springframework.core.env.Environment environment;
   private final SslBundles sslBundles;
 
@@ -354,6 +356,7 @@ public class WebClientConfig {
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
+        .filter(guestEditTokenRelayFilter.relayGuestEditToken())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(
@@ -384,6 +387,9 @@ public class WebClientConfig {
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
+        // Anonymous guest path: relay the per-row guest edit token so a guest can edit/withdraw
+        // their own sign-up (security audit M1 / REQ-SEC-018).
+        .filter(guestEditTokenRelayFilter.relayGuestEditToken())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(

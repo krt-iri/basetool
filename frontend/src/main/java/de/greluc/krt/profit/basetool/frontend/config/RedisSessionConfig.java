@@ -32,10 +32,13 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.security.jackson.SecurityJacksonModules;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.FlushMode;
+import org.springframework.session.Session;
 import org.springframework.session.config.SessionRepositoryCustomizer;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisIndexedHttpSession;
+import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 import org.springframework.validation.AbstractBindingResult;
 import org.springframework.validation.Errors;
 import tools.jackson.databind.json.JsonMapper;
@@ -309,5 +312,34 @@ public class RedisSessionConfig {
   @Bean
   public OAuth2AuthorizedClientRepository authorizedClientRepository() {
     return new HttpSessionOAuth2AuthorizedClientRepository();
+  }
+
+  /**
+   * Backs Spring Security's concurrent-session control ({@code maximumSessions}) with the
+   * Redis-indexed session store instead of the default in-memory {@code SessionRegistryImpl}.
+   *
+   * <p>With {@code @EnableRedisIndexedHttpSession} the HTTP session is owned by Spring Session, not
+   * the servlet container, so the container never fires the {@code HttpSessionListener} events that
+   * {@code HttpSessionEventPublisher} → {@code SessionRegistryImpl} depend on — the in-memory
+   * registry stays empty and {@code maximumSessions} silently no-ops (security audit gap-fill: the
+   * earlier M-14 wiring never actually functioned with Redis-backed sessions). A {@link
+   * SpringSessionBackedSessionRegistry} instead resolves a principal's active sessions directly
+   * from the Redis principal-name index, so the cap is enforced for real and survives a frontend
+   * restart (the sessions live in Redis, not local heap). Consumed by {@code
+   * SecurityConfig.filterChain(...).sessionManagement().maximumSessions(2).sessionRegistry(...)}.
+   *
+   * <p>Only present outside the {@code test} profile (this whole config is
+   * {@code @Profile("!test")}); in tests {@code maximumSessions} falls back to the default
+   * registry, which is harmless because the suite does not exercise concurrent-session eviction.
+   *
+   * @param sessionRepository the Redis-indexed session repository, which is a {@link
+   *     FindByIndexNameSessionRepository} thanks to {@code @EnableRedisIndexedHttpSession}.
+   * @param <S> the concrete {@link Session} type managed by the repository.
+   * @return a session registry backed by the Redis session store.
+   */
+  @Bean
+  public <S extends Session> SpringSessionBackedSessionRegistry<S> sessionRegistry(
+      FindByIndexNameSessionRepository<S> sessionRepository) {
+    return new SpringSessionBackedSessionRegistry<>(sessionRepository);
   }
 }

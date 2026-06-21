@@ -5,6 +5,12 @@
 ### Added
 
 - **Blueprint-Craftbarkeit aus dem eigenen Lager.** Die Seite "Meine Blueprints" zeigt jetzt pro Blueprint, ob und wie oft er sich aus dem eigenen "Mein Lager"-Bestand craften lässt, welche Output-Stats die Materialqualität liefert und welches Material fehlt. Ein Schalter (Standard aus) rechnet zusätzlich den Ertrag offener und laufender Raffinerie-Aufträge ein. Nur Material-Zutaten (RESOURCE) werden bewertet; ITEM-Zutaten werden als "nicht bewertet" markiert. Alles streng nutzerbezogen.
+- **Die Mitgliederverwaltung zeigt jetzt, ob ein Konto mit Discord verknüpft ist.** Eine neue Spalte zwischen „Missions-Manager" und „Status" zeigt bei verknüpften Konten das Discord-Symbol, sonst einen gedämpften Strich. Nur für Admins sichtbar, und es wird ausschließlich der Verknüpfungs-Status angezeigt — nie die Discord-ID.
+- **Blueprint-Import von scmdb.net.** Der Blueprint-Import auf der Seite „Meine Blueprints“ akzeptiert jetzt zusätzlich den Profil-/Tracking-Export von scmdb.net (neben dem SCMDB-Log-Watcher und dem Basetool Blueprint Extractor). Nur freigeschaltete Blueprints werden übernommen; über den mitgelieferten Blueprint-Schlüssel (Tag) werden Produkte auch dann zuverlässig erkannt, wenn der angezeigte Name abweicht.
+
+### Fixed
+
+- **Der Blueprint-Import bricht nicht mehr ab, wenn ein Name zuvor in anderer Groß-/Kleinschreibung gelernt wurde.** Gelernte Blueprint-Aliase sind jetzt eindeutig pro Name unabhängig von Groß-/Kleinschreibung (Migration V176, wie bereits bei den Material-Aliasen): zwei nur in der Schreibweise abweichende Einträge können einen Folge-Import nicht mehr mit einem Datenbankfehler (HTTP 500) blockieren.
 
 ## [v0.7.5](https://github.com/krt-profit/basetool/releases/tag/v0.7.5) - 2026-06-21
 
@@ -53,6 +59,17 @@
 - **Lagerbestand lässt sich nicht mehr einem Auftrag zuordnen, dessen Materialliste das Material gar nicht enthält.** Solche Zuordnungen tauchten in der aggregierten Materialliste des Auftrags nie auf, banden den Bestand aber trotzdem. Das „Auftrag"-Dropdown im Lager bietet jetzt nur noch Aufträge an, die das Material wirklich benötigen, und bereits bestehende Fehlzuordnungen werden in der Auftragsansicht als Warnhinweis aufgelistet, damit man sie auflösen kann.
 
 - **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster war PatternFlys Standard-Login-Bild (per Keycloak-Common-Theme auf `body` gesetzt); unsere Wabenregel hat jetzt Vorrang. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
+
+### Security
+
+- **Fremde Gast-Anmeldungen an öffentlichen Einsätzen lassen sich nicht mehr von Unbeteiligten ändern oder löschen.** Bisher konnte jede Person mit der (öffentlich sichtbaren) Teilnehmer-ID eine fremde Gast-Anmeldung bearbeiten, abmelden oder deren Auszahlungswunsch umstellen. Eine Gast-Anmeldung ist jetzt an ein einmalig vergebenes, geheimes Bearbeitungs-Token gebunden: nur wer es besitzt (der ursprüngliche Gast) oder eine Einsatzleitungs-Rolle hat, darf die Zeile noch ändern. Wer Cookies bzw. Seitendaten löscht, verliert die Selbstbearbeitung — dann übernimmt die Einsatzleitung.
+- **Offiziere können Finanzeinträge fremder Staffeln nicht mehr bearbeiten oder löschen.** Das Bearbeiten/Löschen eines Missions-Finanzeintrags prüft für Offiziere jetzt zusätzlich die Staffel-Zugehörigkeit der Mission (wie bei allen anderen Schreibvorgängen an Missionen); nur Administratoren behalten den staffelübergreifenden Zugriff.
+- **Offiziere können keine Bewertungen mehr für Mitglieder fremder Staffeln anlegen, ändern oder löschen.** Die Mitglieder-Bewertung prüft jetzt zusätzlich, dass das bewertete Mitglied zur Staffel des Offiziers gehört (bisher wurde nur die Staffel der Bewertungs-Kategorie geprüft); Administratoren bewerten weiterhin staffelübergreifend.
+- **Profilbeschreibung und Anzeigename sind jetzt längenbegrenzt (10.000 bzw. 255 Zeichen).** Überlange Eingaben werden serverseitig mit einer klaren Fehlermeldung abgewiesen, statt unbegrenzt in der Datenbank gespeichert zu werden.
+- **Datei-Importe (Schiffe/Fleetview und Baupläne) sind jetzt auf 8 MB begrenzt.** Übergroße Uploads werden sofort mit einer klaren Fehlermeldung abgewiesen, bevor die Datei vollständig in den Arbeitsspeicher geladen wird (Schutz vor Speicher-Erschöpfung); reale Exporte liegen weit darunter.
+- **Die Begrenzung auf zwei gleichzeitige Sitzungen pro Konto greift jetzt tatsächlich.** Mit den Redis-Sitzungen war das Limit bisher wirkungslos; ab sofort verdrängt die dritte gleichzeitige Anmeldung die älteste Sitzung — eine parallel genutzte, gestohlene Sitzung wird so verlässlich und auch über einen Neustart des Frontends hinweg verdrängt.
+- **Härtung am Ingest-Gateway und an der stillen Neu-Anmeldung.** Lehnt das Backend einen Import ab, gibt das Gateway jetzt nur noch die geprüfte, längenbegrenzte Fehlermeldung des Backends weiter statt der rohen Antwort. Das kurzlebige `SSO_ATTEMPTED`-Cookie der stillen Re-Anmeldung trägt jetzt `SameSite=Strict` wie alle anderen Cookies.
+- **Nicht angemeldete Besucher sehen bei öffentlichen Einsätzen keine Auszahlungswünsche und keine Freitext-Kommentare der Teilnehmer mehr.** Roster, Ränge, Schiff-/Einheiten-Zuweisung, Funkfrequenzen und Organisation bleiben für die öffentliche Anmeldung sichtbar; die Auszahlungsabsicht und Freitext-Notizen einzelner Teilnehmer sind nur noch für angemeldete Mitglieder sichtbar (ADR-0034).
 
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
 

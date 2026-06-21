@@ -41,6 +41,20 @@ updates:
     commit-message:
       prefix: "chore(docker)"
 
+  # The ingest gateway is internet-facing like backend/frontend, so its base
+  # image must get the same automated CVE bumps (security audit gap-fill).
+  - package-ecosystem: docker
+    directory: /ingest
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(docker)"
+
   - package-ecosystem: docker-compose
     directory: /
     schedule:

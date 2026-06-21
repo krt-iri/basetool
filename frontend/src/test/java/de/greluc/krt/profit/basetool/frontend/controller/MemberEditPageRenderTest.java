@@ -87,7 +87,8 @@ class MemberEditPageRenderTest {
                 true,
                 null,
                 1L,
-                null));
+                null,
+                false));
 
     String html =
         mockMvc

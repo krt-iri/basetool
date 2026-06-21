@@ -208,7 +208,10 @@ public class MissionFinanceEntryController {
             participant.startTime(),
             participant.endTime(),
             participant.payoutPreference(),
-            participant.version());
+            participant.version(),
+            // Finance-entry responses are reads, never a guest sign-up create — no edit token is
+            // ever minted or surfaced here (M1).
+            null);
     return new MissionFinanceEntryDto(
         dto.id(), dto.missionId(), redacted, dto.note(), dto.type(), dto.amount(), dto.version());
   }
@@ -245,7 +248,8 @@ public class MissionFinanceEntryController {
         dto.inKeycloak(),
         null, // squadron
         dto.version(),
-        null // joinDate
+        null, // joinDate
+        null // discordLinked – not exposed to guests
         );
   }
 

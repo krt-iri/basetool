@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
-> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0033](../adr/0033-blueprint-craftability-from-own-stock.md)
+> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
 
@@ -205,7 +205,7 @@ and a global sharer is counted once.
 The blueprint view annotates each of the caller's owned blueprints with whether and how many times
 it can be crafted **right now** from the caller's own stock, the output stats that stock's quality
 would deliver, and what is missing — answering "what can I craft now, how often, with what stats,
-and what's short?" without opening every recipe by hand ([ADR-0033](../adr/0033-blueprint-craftability-from-own-stock.md), issue #781).
+and what's short?" without opening every recipe by hand ([ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), issue #781).
 
 It is **strictly owner-scoped** (JWT `sub`): owned blueprints, stock, and refinery yield all come
 from the caller — no other user's data is ever read. It is **read-only** (no migration), computed

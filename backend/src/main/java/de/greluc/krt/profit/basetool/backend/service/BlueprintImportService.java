@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -64,13 +65,14 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <ol>
  *   <li>{@link #previewImport(String, MultipartFile)} parses an uploaded blueprint export — the
- *       SCMDB log-watcher or the <a
+ *       SCMDB log-watcher, the <a
  *       href="https://github.com/krt-profit/basetool-bp-extractor">Basetool Blueprint
- *       Extractor</a>, both of which carry a {@code blueprints} array of identically-named entries
- *       — de-duplicates by product name, and resolves each name against the master product list
- *       through a fixed chain — normalized exact match, then a curated {@code
- *       blueprint_external_alias} lookup, then dependency-free fuzzy suggestions — flagging names
- *       the caller already owns. Nothing is persisted.
+ *       Extractor</a>, or the <a href="https://scmdb.net">scmdb.net</a> profile / tracking export
+ *       (REQ-INV-014), all of which carry a {@code blueprints} array — de-duplicates by product
+ *       name, and resolves each entry against the master product list through a fixed chain: first
+ *       the scmdb.net structural {@code tag} match (REQ-INV-019), then normalized exact name match,
+ *       then a curated {@code blueprint_external_alias} lookup, then dependency-free fuzzy
+ *       suggestions — flagging names the caller already owns. Nothing is persisted.
  *   <li>{@link #applyImport(String, List)} takes the user's per-name resolutions, creates the
  *       missing {@code personal_blueprint} rows, and — for every manual pick (where the name did
  *       not already match by normalization) — learns a {@code blueprint_external_alias} so the next
@@ -95,6 +97,14 @@ public class BlueprintImportService {
   /** External catalogue every import row and learned alias belongs to. */
   private static final BlueprintExternalAliasSource SOURCE = BlueprintExternalAliasSource.SCMDB;
 
+  /**
+   * Application-level cap on a blueprint-export upload, enforced before the body is materialised
+   * into a Jackson tree (security audit gap-fill). A real blueprint export is well under 1 MB; 8 MB
+   * leaves generous headroom while keeping this member-reachable import off the 64 MB global
+   * multipart cap (sized for the admin-only P4K catalogue).
+   */
+  private static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
+
   private final ObjectMapper objectMapper;
   private final BlueprintProductService blueprintProductService;
   private final BlueprintNameNormalizer normalizer;
@@ -104,9 +114,10 @@ public class BlueprintImportService {
   private final GameItemRepository gameItemRepository;
 
   /**
-   * Parses an uploaded blueprint export (SCMDB log-watcher or Basetool Blueprint Extractor) and
-   * previews how each unique blueprint name resolves against the master product list for {@code
-   * ownerSub}. No rows are persisted.
+   * Parses an uploaded blueprint export (SCMDB log-watcher, Basetool Blueprint Extractor, or
+   * scmdb.net profile / tracking export) and previews how each unique blueprint resolves against
+   * the master product list for {@code ownerSub} — scmdb.net entries first try their structural
+   * {@code tag}, then every entry falls through the name chain. No rows are persisted.
    *
    * @param ownerSub Keycloak {@code sub} the import is being previewed for (owned-flag computation)
    * @param file the uploaded blueprint export JSON
@@ -120,12 +131,19 @@ public class BlueprintImportService {
 
     Map<String, ResolvedProduct> productByKey = productIndex();
     List<ResolvedProduct> allProducts = new ArrayList<>(productByKey.values());
+    // The structural tag index is only consulted for entries carrying a tag (scmdb.net). Build it
+    // lazily so the watcher / extractor / bare-array imports — which never carry a tag — pay no
+    // extra active-blueprint scan, exactly as before this source was added.
+    Map<String, String> tagIndex =
+        parsed.stream().anyMatch(e -> e.tag() != null)
+            ? blueprintProductService.scwikiKeyToProductKeyIndex()
+            : Map.of();
 
     // First pass: resolve each name (without the owned check) and collect resolved keys.
     List<Resolution> resolutions = new ArrayList<>(parsed.size());
     Set<String> resolvedKeys = new HashSet<>();
     for (ParsedEntry entry : parsed) {
-      Resolution resolution = resolve(entry, productByKey, allProducts);
+      Resolution resolution = resolve(entry, productByKey, allProducts, tagIndex);
       resolutions.add(resolution);
       if (resolution.product != null) {
         resolvedKeys.add(resolution.product.productKey());
@@ -267,12 +285,19 @@ public class BlueprintImportService {
   /**
    * Persists a {@code blueprint_external_alias} for a manual resolution — one where the external
    * name does not already normalize to the chosen product key — unless an alias for that name
-   * already exists or was just created in this request.
+   * (case-insensitively) already exists or was just created in this request.
+   *
+   * <p>The duplicate guard folds case on both sides — the in-request seen-set keys on the
+   * lower-cased name and the DB check uses {@code findBySourceSystemAndExternalNameIgnoreCase} —
+   * matching the case-insensitive resolution lookup and the {@code (source_system,
+   * LOWER(external_name))} unique index (REQ-INV-020). This stops two case-only variants (which the
+   * tag match REQ-INV-019 can route here for differently-cased display names) from inserting two
+   * rows that the {@code Optional}-returning resolution lookup would then choke on.
    *
    * @param ownerSub Keycloak {@code sub} stamped as the alias creator
-   * @param externalName the SCMDB name being resolved (exact, trimmed)
+   * @param externalName the SCMDB / scmdb.net name being resolved (exact, trimmed)
    * @param product the chosen product
-   * @param aliasNamesSeen exact external names already aliased in this request (mutated)
+   * @param aliasNamesSeen lower-cased external names already aliased in this request (mutated)
    * @return {@code true} if a new alias row was persisted
    */
   private boolean learnAliasIfManual(
@@ -283,8 +308,10 @@ public class BlueprintImportService {
     if (externalName.isEmpty() || normalizer.normalize(externalName).equals(product.productKey())) {
       return false;
     }
-    if (!aliasNamesSeen.add(externalName)
-        || aliasRepository.findBySourceSystemAndExternalName(SOURCE, externalName).isPresent()) {
+    if (!aliasNamesSeen.add(externalName.toLowerCase(Locale.ROOT))
+        || aliasRepository
+            .findBySourceSystemAndExternalNameIgnoreCase(SOURCE, externalName)
+            .isPresent()) {
       return false;
     }
     BlueprintExternalAlias alias = new BlueprintExternalAlias();
@@ -306,19 +333,40 @@ public class BlueprintImportService {
   }
 
   /**
-   * Resolves one parsed name through the fixed chain (exact → alias → fuzzy), without the
-   * owned-flag check which the caller applies afterwards from a single bulk lookup.
+   * Resolves one parsed entry through the fixed chain (structural tag → exact name → alias →
+   * fuzzy), without the owned-flag check which the caller applies afterwards from a single bulk
+   * lookup.
    *
-   * @param entry the parsed external name + acquisition suggestion
+   * <p>The <strong>tag</strong> step (REQ-INV-019) runs first and only for the scmdb.net export,
+   * which uniquely carries the DataForge blueprint key: it short-circuits to a {@link
+   * BlueprintImportStatus#MATCHED} when the entry's {@code tag} maps (case-insensitively, and only
+   * when unambiguous) to a known product key, bypassing the name match entirely. This makes the
+   * scmdb.net import robust against the CIG-mislabeled {@code output_name}s the name match has to
+   * correct for (REQ-INV-007) and against cosmetic-variant name drift. For the watcher / extractor
+   * exports, which carry no {@code tag}, the step is a no-op and the name chain decides as before.
+   *
+   * @param entry the parsed external name + tag + acquisition suggestion
    * @param productByKey master products indexed by normalized key
    * @param allProducts master products as a list (fuzzy candidate set)
+   * @param tagIndex structural key (lower-cased {@code scwiki_key}) → normalized product key
    * @return the resolution (status, resolved product, suggestions)
    */
   @NotNull
   private Resolution resolve(
       @NotNull ParsedEntry entry,
       @NotNull Map<String, ResolvedProduct> productByKey,
-      @NotNull List<ResolvedProduct> allProducts) {
+      @NotNull List<ResolvedProduct> allProducts,
+      @NotNull Map<String, String> tagIndex) {
+    ResolvedProduct viaTag = resolveViaTag(entry.tag(), productByKey, tagIndex);
+    if (viaTag != null) {
+      return new Resolution(
+          entry.externalName(),
+          BlueprintImportStatus.MATCHED,
+          viaTag,
+          entry.suggestedAcquiredAt(),
+          List.of());
+    }
+
     String normalized = normalizer.normalize(entry.externalName());
 
     ResolvedProduct exact = productByKey.get(normalized);
@@ -356,6 +404,34 @@ public class BlueprintImportService {
   }
 
   /**
+   * Resolves the scmdb.net structural {@code tag} (the DataForge blueprint key) to a master product
+   * (REQ-INV-019): the tag is matched case-insensitively against the {@code scwiki_key} index and,
+   * when it maps to a known product key, dereferenced to that product. Returns {@code null} when
+   * the entry carries no tag (watcher / extractor exports), when the tag is unknown or ambiguous
+   * (absent from the index — the index excludes ambiguous keys), or when the mapped product key no
+   * longer resolves to a master product, so the caller falls back to the name chain.
+   *
+   * @param tag the raw structural blueprint key from the upload, or {@code null}
+   * @param productByKey master products indexed by normalized product key
+   * @param tagIndex structural key (lower-cased {@code scwiki_key}) → normalized product key
+   * @return the resolved product, or {@code null} if the tag does not unambiguously resolve
+   */
+  @Nullable
+  private ResolvedProduct resolveViaTag(
+      @Nullable String tag,
+      @NotNull Map<String, ResolvedProduct> productByKey,
+      @NotNull Map<String, String> tagIndex) {
+    if (tag == null || tag.isBlank()) {
+      return null;
+    }
+    String productKey = tagIndex.get(tag.trim().toLowerCase(Locale.ROOT));
+    if (productKey == null) {
+      return null;
+    }
+    return productByKey.get(productKey);
+  }
+
+  /**
    * Looks up a curated SCMDB alias for the raw external name and dereferences it to a master
    * product. Falls back to the alias's own name / output-item snapshot if the master no longer
    * carries that product key (a renamed-away product), so a learned alias never silently regresses
@@ -386,10 +462,16 @@ public class BlueprintImportService {
 
   /**
    * Reads the multipart body and converts it into the de-duplicated parsed entries. Accepts either
-   * the documented {@code {"blueprints": [...]}} object (both the SCMDB log-watcher and the
-   * Basetool Blueprint Extractor wrap their records this way) or a bare array of blueprint records.
-   * Duplicate product names collapse to one entry that keeps the earliest acquisition time as the
-   * suggestion; blank names are dropped.
+   * the documented {@code {"blueprints": [...]}} object (the SCMDB log-watcher, the Basetool
+   * Blueprint Extractor, and the scmdb.net profile / tracking export all wrap their records this
+   * way — REQ-INV-014) or a bare array of blueprint records. The scmdb.net {@code name} key is read
+   * as {@code productName} (via {@code @JsonAlias}); scmdb.net checklist entries the user has not
+   * unlocked yet ({@code completed == false}) are skipped, while a {@code null} / {@code true} flag
+   * (the watcher / extractor exports, which list only acquired blueprints) counts as owned. Entries
+   * collapse by their structural {@code tag} when present, else by trimmed product name, keeping
+   * the earliest acquisition time as the suggestion — so two distinct blueprints scmdb.net shows
+   * under one name (different tags) stay separate while tag-less duplicates merge as before; blank
+   * names are dropped.
    *
    * @param file the uploaded blueprint export JSON
    * @return parsed entries in first-seen order (possibly empty)
@@ -399,6 +481,14 @@ public class BlueprintImportService {
   private List<ParsedEntry> parse(@NotNull MultipartFile file) {
     if (file.isEmpty()) {
       throw new BadRequestException("The uploaded file is empty.");
+    }
+    // Reject an oversized upload BEFORE readTree builds the in-memory tree (security audit
+    // gap-fill). getSize() reflects the buffered multipart length, so this never reads the body.
+    if (file.getSize() > MAX_IMPORT_BYTES) {
+      throw new BadRequestException(
+          "The uploaded blueprint file is too large (limit "
+              + (MAX_IMPORT_BYTES / (1024 * 1024))
+              + " MB).");
     }
     JsonNode root;
     try {
@@ -419,31 +509,48 @@ public class BlueprintImportService {
     }
     if (raw == null) {
       throw new BadRequestException(
-          "The uploaded file must contain a 'blueprints' array (SCMDB log-watcher or Basetool"
-              + " Blueprint Extractor export).");
+          "The uploaded file must contain a 'blueprints' array (SCMDB log-watcher, Basetool"
+              + " Blueprint Extractor, or scmdb.net export).");
     }
 
-    // Collapse duplicates by exact (trimmed) name, keeping the earliest acquisition time.
-    LinkedHashMap<String, Instant> earliestByName = new LinkedHashMap<>();
+    // Collapse duplicates, keeping the earliest acquisition time per group. The de-dup key is the
+    // structural tag (lower-cased) when present, else the trimmed product name. Keying on the tag
+    // is what stops two DISTINCT DataForge blueprints that scmdb.net happens to display under the
+    // same name — e.g. a genuine piece and a CIG-mislabeled one both shown as "Antium Core Jet"
+    // (REQ-INV-007) — from collapsing into one (which would drop one tag and import only one of the
+    // two owned products). Tag-less entries (watcher / extractor / bare array) key on the name, so
+    // their de-dup behaviour is unchanged. scmdb.net checklist entries the user has not unlocked
+    // yet
+    // (completed == false) are skipped.
+    LinkedHashMap<String, Instant> earliestByKey = new LinkedHashMap<>();
+    LinkedHashMap<String, String> nameByKey = new LinkedHashMap<>();
+    LinkedHashMap<String, String> tagByKey = new LinkedHashMap<>();
     for (BlueprintExportEntryDto entry : raw) {
       if (entry == null || entry.productName() == null || entry.productName().isBlank()) {
         continue;
       }
+      if (Boolean.FALSE.equals(entry.completed())) {
+        continue;
+      }
       String name = entry.productName().trim();
+      String tag = entry.tag() == null || entry.tag().isBlank() ? null : entry.tag().trim();
       Instant acquiredAt = acquiredAtOf(entry);
-      if (!earliestByName.containsKey(name)) {
-        earliestByName.put(name, acquiredAt);
+      String dedupKey = tag != null ? "t:" + tag.toLowerCase(Locale.ROOT) : "n:" + name;
+      if (!earliestByKey.containsKey(dedupKey)) {
+        earliestByKey.put(dedupKey, acquiredAt);
+        nameByKey.put(dedupKey, name);
+        tagByKey.put(dedupKey, tag);
       } else {
-        Instant current = earliestByName.get(name);
+        Instant current = earliestByKey.get(dedupKey);
         if (acquiredAt != null && (current == null || acquiredAt.isBefore(current))) {
-          earliestByName.put(name, acquiredAt);
+          earliestByKey.put(dedupKey, acquiredAt);
         }
       }
     }
 
-    List<ParsedEntry> entries = new ArrayList<>(earliestByName.size());
-    for (Map.Entry<String, Instant> e : earliestByName.entrySet()) {
-      entries.add(new ParsedEntry(e.getKey(), e.getValue()));
+    List<ParsedEntry> entries = new ArrayList<>(earliestByKey.size());
+    for (String key : earliestByKey.keySet()) {
+      entries.add(new ParsedEntry(nameByKey.get(key), tagByKey.get(key), earliestByKey.get(key)));
     }
     return entries;
   }
@@ -594,14 +701,17 @@ public class BlueprintImportService {
   }
 
   /**
-   * A single de-duplicated export entry after parsing: the external product name plus the earliest
-   * acquisition instant seen for it.
+   * A single de-duplicated export entry after parsing: the external product name, the structural
+   * blueprint tag (scmdb.net only), and the earliest acquisition instant seen for it.
    *
-   * @param externalName the export {@code productName} (trimmed)
+   * @param externalName the export {@code productName} / scmdb.net {@code name} (trimmed)
+   * @param tag the scmdb.net structural blueprint key for the tag match (REQ-INV-019), or {@code
+   *     null} for the watcher / extractor exports, which do not carry it
    * @param suggestedAcquiredAt the earliest acquisition instant (from {@code ts} or {@code
    *     receivedAt}), or {@code null}
    */
-  private record ParsedEntry(@NotNull String externalName, @Nullable Instant suggestedAcquiredAt) {}
+  private record ParsedEntry(
+      @NotNull String externalName, @Nullable String tag, @Nullable Instant suggestedAcquiredAt) {}
 
   /**
    * Intermediate per-name resolution carried between the two preview passes. Mutable status is not

@@ -42157,10 +42157,14 @@
             "format" : "int32"
           },
           "description" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 10000,
+            "minLength" : 0
           },
           "displayName" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
           },
           "version" : {
             "type" : "integer",
@@ -42251,6 +42255,9 @@
           "joinDate" : {
             "type" : "string",
             "format" : "date"
+          },
+          "discordLinked" : {
+            "type" : "boolean"
           }
         }
       },
@@ -42285,10 +42292,14 @@
         "type" : "object",
         "properties" : {
           "description" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 10000,
+            "minLength" : 0
           },
           "displayName" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
           },
           "version" : {
             "type" : "integer",
@@ -44625,6 +44636,9 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "guestEditToken" : {
+            "type" : "string"
           }
         }
       },
