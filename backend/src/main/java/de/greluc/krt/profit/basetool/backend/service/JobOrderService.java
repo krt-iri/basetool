@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequest
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -49,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -306,15 +308,29 @@ public class JobOrderService {
     List<JobOrderStatus> effectiveStatuses =
         (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    return jobOrderRepository
-        .findScopedJobOrders(
+    Page<JobOrder> page =
+        jobOrderRepository.findScopedJobOrders(
             effectiveStatuses,
             squadronId,
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
-            pageable)
-        .map(this::mapToDtoWithStock);
+            pageable);
+
+    // Batch the per-row enrichment once for the whole page (REQ-DATA-003): instead of one stock SUM
+    // per material per order (O(orders × materials)) plus one claim query per SK order, load every
+    // order's linked stock in a single query and sum the buckets in memory, and load every SK
+    // order's claims in a single query. The single-order write paths keep the per-order resolvers.
+    List<JobOrder> orders = page.getContent();
+    Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex =
+        loadStockIndex(orders.stream().map(JobOrder::getId).toList());
+    Map<UUID, List<de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto>> claimsByOrder =
+        materialClaimService.getClaimBucketsForOrders(
+            orders.stream().filter(JobOrderService::isSpecialCommandResponsible).toList());
+    StockResolver stockResolver =
+        (orderId, materialId, floor) -> sumStockAtFloor(stockIndex, orderId, materialId, floor);
+    ClaimResolver claimResolver = order -> claimsByOrder.getOrDefault(order.getId(), List.of());
+    return page.map(o -> mapToDtoWithStock(o, stockResolver, claimResolver));
   }
 
   /**
@@ -993,6 +1009,33 @@ public class JobOrderService {
   }
 
   private JobOrderDto mapToDtoWithStock(JobOrder jobOrder) {
+    StockResolver stockResolver =
+        (orderId, materialId, floor) -> {
+          Double stock =
+              inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
+                  materialId, orderId, floor);
+          return stock != null ? stock : 0.0;
+        };
+    // Lambda (not a bound method reference) so the claim service is dereferenced lazily, only when
+    // the resolver actually runs — i.e. for SK orders — mirroring the original conditional call.
+    return mapToDtoWithStock(
+        jobOrder, stockResolver, order -> materialClaimService.getClaimBucketsForOrder(order));
+  }
+
+  /**
+   * Core order projection shared by the single-order write paths and the paged list. The {@code
+   * stockResolver} and {@code claimResolver} abstract where the per-bucket stock and the SK claim
+   * view come from — the single-order path backs them with per-order queries, the list path with
+   * page-batched lookups (REQ-DATA-003) — so the DTO assembly itself lives in exactly one place and
+   * behaves identically on both paths.
+   *
+   * @param jobOrder the managed order to project.
+   * @param stockResolver resolves the order-linked stock of one material at a quality floor.
+   * @param claimResolver resolves the SK claim view of one order ({@code List.of()} for non-SK).
+   * @return the assembled order DTO with per-bucket stock and (for SK orders) claims.
+   */
+  private JobOrderDto mapToDtoWithStock(
+      JobOrder jobOrder, StockResolver stockResolver, ClaimResolver claimResolver) {
     JobOrderDto baseDto = jobOrderMapper.toDto(jobOrder);
 
     // Phase 5 (#345): on a public SK order, every material/aggregated bucket carries the
@@ -1002,7 +1045,7 @@ public class JobOrderService {
     // so the detail UI renders no claim columns for them.
     Map<String, de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimByBucket =
         isSpecialCommandResponsible(jobOrder)
-            ? materialClaimService.getClaimBucketsForOrder(jobOrder).stream()
+            ? claimResolver.claimsFor(jobOrder).stream()
                 .collect(
                     Collectors.toMap(
                         b -> bucketKey(b.material().id(), b.qualityRequirement().name()), b -> b))
@@ -1012,9 +1055,9 @@ public class JobOrderService {
         baseDto.materials().stream()
             .map(
                 matDto -> {
-                  Double stock =
-                      inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-                          matDto.material().id(), jobOrder.getId(), matDto.minQuality());
+                  double stock =
+                      stockResolver.stockFor(
+                          jobOrder.getId(), matDto.material().id(), matDto.minQuality());
                   log.debug(
                       "Stock for job order #{} (ID: {}), material {}: {} / required: {} (min"
                           + " quality: {})",
@@ -1039,7 +1082,7 @@ public class JobOrderService {
                       matDto.material(),
                       matDto.minQuality(),
                       matDto.amount(),
-                      stock != null ? stock : 0.0,
+                      stock,
                       bucket != null ? bucket.claims() : List.of(),
                       bucket != null ? bucket.openRemaining() : null,
                       matDto.version());
@@ -1049,7 +1092,7 @@ public class JobOrderService {
     boolean isItem = jobOrder.getType() == JobOrderType.ITEM;
     List<JobOrderItemDto> items = isItem ? jobOrderItemService.toItemDtos(jobOrder) : List.of();
     List<AggregatedMaterialDto> aggregatedMaterials =
-        isItem ? enrichAggregatedWithClaims(jobOrder, claimByBucket) : List.of();
+        isItem ? enrichAggregatedWithClaims(jobOrder, claimByBucket, stockResolver) : List.of();
     List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto> itemHandovers =
         isItem
             ? jobOrder.getItemHandovers().stream().map(jobOrderItemHandoverMapper::toDto).toList()
@@ -1087,11 +1130,14 @@ public class JobOrderService {
    *
    * @param jobOrder the item order.
    * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders.
+   * @param stockResolver resolves the order-linked stock of one material at a quality floor (per-
+   *     order query on the single-order path, page-batched lookup on the list path).
    * @return the aggregated rows, stock- and claim-enriched.
    */
   private List<AggregatedMaterialDto> enrichAggregatedWithClaims(
       JobOrder jobOrder,
-      Map<String, de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimByBucket) {
+      Map<String, de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimByBucket,
+      StockResolver stockResolver) {
     return jobOrderItemService.aggregateMaterials(jobOrder).stream()
         .map(
             agg -> {
@@ -1100,9 +1146,8 @@ public class JobOrderService {
                           == de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD
                       ? GOOD_QUALITY_FLOOR
                       : null;
-              Double stock =
-                  inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-                      agg.material().id(), jobOrder.getId(), minQuality);
+              double stock =
+                  stockResolver.stockFor(jobOrder.getId(), agg.material().id(), minQuality);
               de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto bucket =
                   claimByBucket.get(
                       bucketKey(agg.material().id(), agg.qualityRequirement().name()));
@@ -1110,11 +1155,106 @@ public class JobOrderService {
                   agg.material(),
                   agg.qualityRequirement(),
                   agg.totalQuantity(),
-                  stock != null ? stock : 0.0,
+                  stock,
                   bucket != null ? bucket.claims() : agg.claims(),
                   bucket != null ? bucket.openRemaining() : agg.openAmount());
             })
         .toList();
+  }
+
+  /**
+   * Resolves the order-linked stock of one material at a quality floor for {@link
+   * #mapToDtoWithStock(JobOrder, StockResolver, ClaimResolver)}. The single-order path backs it
+   * with the per-order {@code SUM} query; the paged list backs it with an in-memory sum over the
+   * page-batched stock index (REQ-DATA-003).
+   */
+  @FunctionalInterface
+  private interface StockResolver {
+    /**
+     * Returns the total stock of {@code materialId} linked to {@code jobOrderId} whose quality
+     * meets or exceeds {@code qualityFloor} ({@code null} floor = no quality restriction); {@code
+     * 0.0} when nothing matches — the exact semantics of {@code
+     * sumAmountByMaterialAndJobOrderAndMinQuality}.
+     *
+     * @param jobOrderId the order the stock is linked to.
+     * @param materialId the material to sum.
+     * @param qualityFloor the minimum quality, or {@code null} for no floor.
+     * @return the summed amount, never negative, {@code 0.0} when empty.
+     */
+    double stockFor(UUID jobOrderId, UUID materialId, Integer qualityFloor);
+  }
+
+  /**
+   * Resolves the SK claim view of one order for {@link #mapToDtoWithStock(JobOrder, StockResolver,
+   * ClaimResolver)}. The single-order path backs it with the per-order claim query; the paged list
+   * backs it with the page-batched claim lookup (REQ-DATA-003). Only invoked for SK-responsible
+   * orders.
+   */
+  @FunctionalInterface
+  private interface ClaimResolver {
+    /**
+     * Returns the per-bucket claim view of {@code order}.
+     *
+     * @param order the SK order whose claim buckets to return.
+     * @return the claim buckets, never {@code null}.
+     */
+    List<de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimsFor(JobOrder order);
+  }
+
+  /**
+   * Loads every job-order-linked inventory row for the given orders in one query and indexes it by
+   * order id then material id, so the paged list can sum each material bucket at its own quality
+   * floor in memory (REQ-DATA-003) instead of firing a {@code SUM} aggregate per bucket per order.
+   *
+   * @param orderIds the orders whose linked stock to index; empty yields an empty index.
+   * @return order id → material id → the linked inventory rows, never {@code null}.
+   */
+  private Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> loadStockIndex(
+      Collection<UUID> orderIds) {
+    if (orderIds.isEmpty()) {
+      return Map.of();
+    }
+    return inventoryItemRepository.findMaterialStockRowsByJobOrderIds(orderIds).stream()
+        .collect(
+            Collectors.groupingBy(
+                JobOrderMaterialStockRow::jobOrderId,
+                Collectors.groupingBy(JobOrderMaterialStockRow::materialId)));
+  }
+
+  /**
+   * Sums the pre-loaded stock rows of one (order, material) bucket at a quality floor, reproducing
+   * the {@code COALESCE(SUM(amount), 0.0) WHERE (:floor IS NULL OR quality >= :floor)} semantics of
+   * {@code sumAmountByMaterialAndJobOrderAndMinQuality} entirely in memory.
+   *
+   * @param stockIndex the page-batched index from {@link #loadStockIndex(Collection)}.
+   * @param jobOrderId the order to sum within.
+   * @param materialId the material to sum.
+   * @param qualityFloor the minimum quality, or {@code null} for no floor.
+   * @return the summed amount; {@code 0.0} when the bucket has no matching rows.
+   */
+  private static double sumStockAtFloor(
+      Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex,
+      UUID jobOrderId,
+      UUID materialId,
+      Integer qualityFloor) {
+    Map<UUID, List<JobOrderMaterialStockRow>> byMaterial = stockIndex.get(jobOrderId);
+    if (byMaterial == null) {
+      return 0.0;
+    }
+    List<JobOrderMaterialStockRow> rows = byMaterial.get(materialId);
+    if (rows == null) {
+      return 0.0;
+    }
+    double sum = 0.0;
+    for (JobOrderMaterialStockRow row : rows) {
+      if (row.amount() == null) {
+        continue;
+      }
+      if (qualityFloor == null || (row.quality() != null && row.quality() >= qualityFloor)) {
+        sum += row.amount();
+      }
+    }
+    return sum;
   }
 
   /**
