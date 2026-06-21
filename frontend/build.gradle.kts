@@ -273,7 +273,7 @@ tasks.register("minifyStaticCss") {
 tasks.named("classes").configure { dependsOn("minifyStaticCss") }
 
 // ---------------------------------------------------------------------------
-// E2E (Playwright) source set + task — Phase 0 spike (docs/E2E_TESTING_PLAN.md).
+// E2E (Playwright) source set + task — Phase 0 spike (docs/e2e-test/README.md).
 //
 // Deliberately NOT wired into `check` / `test` / `build`: the suite needs a
 // running stack and a downloaded Chromium, so it only runs on an explicit

@@ -38,7 +38,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  * frontend) for end-to-end tests and tears it down once at the end of the test run.
  *
  * <p>It drives the {@code docker compose} CLI directly rather than Testcontainers' {@code
- * ComposeContainer}: the Phase-0 spike (see {@code docs/E2E_TESTING_PLAN.md}) established that
+ * ComposeContainer}: the Phase-0 spike (see {@code docs/e2e-test/README.md}) established that
  * {@code ComposeContainer} cannot express this stack's combination of {@code --profile dev}, four
  * stacked {@code -f} files, fixed published ports, and the {@code !override} isolation tags. The
  * exact compose invocation here mirrors the documented local test-stack flow plus the {@code
