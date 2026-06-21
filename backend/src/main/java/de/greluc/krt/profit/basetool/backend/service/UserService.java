@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
@@ -91,8 +93,10 @@ public class UserService {
   private final ShipRepository shipRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final MissionRepository missionRepository;
+  private final MissionOwnershipRepository missionOwnershipRepository;
   private final JobOrderRepository jobOrderRepository;
   private final MissionParticipantRepository missionParticipantRepository;
+  private final MaterialClaimRepository materialClaimRepository;
   private final de.greluc.krt.profit.basetool.backend.repository.SquadronRepository
       squadronRepository;
   private final AuthHelperService authHelperService;
@@ -992,6 +996,16 @@ public class UserService {
    * calls) so the order matches the FK constraints; auto-cascading would surface confusing FK
    * errors when the table order changes.
    *
+   * <p>Every {@code app_user} foreign key that carries no {@code ON DELETE} clause is resolved here
+   * before the final {@link UserRepository#delete} — reassigned to the fallback admin (owned
+   * aggregates: inventory, ships, refinery orders, missions and the {@code mission_ownership}
+   * companion) or unlinked (managers, job-order assignees, mission participants, and the audit-only
+   * {@code material_claim.claimed_by_user_id} stamp). The {@code mission_ownership.owner_id}
+   * reassignment must stay paired with {@code missionRepository.updateOwner}: the parent mission
+   * survives the delete (its owner having been moved to the admin), so the {@code ON DELETE
+   * CASCADE} on {@code mission_id} never fires to clear the row, and the FK-less {@code owner_id}
+   * would otherwise dangle and FK-fail (SQLSTATE 23503).
+   *
    * @param userId user to delete
    * @throws NoSuchElementException when the user id is unknown
    */
@@ -1027,11 +1041,20 @@ public class UserService {
     shipRepository.updateOwner(user, admin);
     refineryOrderRepository.updateOwner(user, admin);
     missionRepository.updateOwner(user, admin);
+    // The mission_ownership companion (1:1 with mission, owner_id FK has no ON DELETE clause) must
+    // be reassigned in lock-step with mission.owner above; otherwise its dangling owner_id FK-fails
+    // (23503) on the final delete, because the parent mission survives so its mission_id cascade
+    // never clears the row.
+    missionOwnershipRepository.updateOwner(user, admin);
 
     // Remove ManyToMany and nullable references
     missionRepository.removeManager(userId);
     jobOrderRepository.removeAssignee(userId);
     missionParticipantRepository.unlinkUser(userId);
+    // material_claim.claimed_by_user_id (V131) is an audit-only FK with no ON DELETE clause; null
+    // it
+    // so an ex-logistician who ever filed a claim does not FK-fail (23503) on the delete below.
+    materialClaimRepository.unlinkClaimedByUser(userId);
 
     // Delete the user
     userRepository.delete(user);

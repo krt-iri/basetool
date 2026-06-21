@@ -206,6 +206,50 @@ the squadron catalogue through `getCached`, never a plain `get`; the SpecialComm
 plain `get`. (`AdminSettingsPageControllerMvcTest`): every successful settings save — classic and AJAX,
 including a partial save where a later PUT throws — evicts `STATIC_DATA_CACHE`.
 
+### REQ-DATA-008 — User deletion reassigns or clears every `app_user` FK that lacks an `ON DELETE` clause
+
+`UserService.deleteUser(userId)` removes an ex-member (only users already gone from Keycloak,
+`in_keycloak = false`). Before the terminating `userRepository.delete(user)`, **every foreign key
+referencing `app_user(id)` that carries no `ON DELETE` clause (Postgres default `NO ACTION`) must be
+explicitly reassigned or nulled in code** — otherwise the delete FK-fails with `SQLSTATE 23503`.
+Foreign keys that declare their own `ON DELETE CASCADE` / `SET NULL` are handled DB-side and need no
+code. The reassignment target is a surviving admin (never the user being deleted; resolved from
+`findAllAdmins`, falling back to the current admin caller).
+
+Concrete handling, in order:
+
+- **Reassigned to the admin** (mandatory ownership): `inventory_item.user_id`, `ship.owner_id`,
+  `refinery_order.owner_id`, `mission.owner_id`, and — paired with the last — the 1:1 companion
+  `mission_ownership.owner_id`. The companion (V63, FK-less `owner_id`) **must follow
+  `mission.owner`**: the mission survives the delete (its owner moved to the admin), so the
+  `ON DELETE CASCADE` on `mission_ownership.mission_id` never fires to clear the row, and a dangling
+  `owner_id` would FK-fail. It is reassigned (not nulled / row-deleted) so the companion keeps
+  mirroring `mission.owner`; the bulk update must not bump `mission_ownership.version` (the owner
+  association is excluded from the parent's optimistic lock).
+- **Unlinked / cleared** (reversible or audit-only references): `mission_managers` and
+  `job_order_assignees` via the join-table deletes (`removeManager` / `removeAssignee`, also
+  `ON DELETE CASCADE`); `mission_participant.user_id` via `unlinkUser` (set null, the participant row
+  with its guest name + status survives); `material_claim.claimed_by_user_id` (V131, FK-less,
+  audit-only) via `unlinkClaimedByUser` (set null — re-pointing it at the admin would falsely
+  attribute the claim, and the claim is a live independent aggregate that must survive).
+
+`mission_finance_entry` carries **no** direct `app_user` FK (the V40 `user_id`/`fk_mfe_user`
+`ON DELETE RESTRICT` pair was dropped in V41 in favour of `mission_participant_id`
+`ON DELETE CASCADE`); it reaches a user only through `mission_participant.user_id`, already nulled by
+`unlinkUser`. The approval self/audit FKs added in V173 (`app_user.approved_by_id`,
+`user_approval_event.user_id` / `decided_by_id`) are tracked and resolved by the Discord-approval
+work, not here.
+
+**Acceptance**: `UserServiceDeleteTest` (Mockito) verifies the companion reassignment and the
+material-claim unlink are invoked, and that both run before `userRepository.delete`;
+`UserDeletionForeignKeyIntegrityTest` (real Postgres) deletes a user who owns a mission and stamped a
+material claim and asserts no `23503`, the mission + its companion are reassigned to the same admin,
+and the claim survives with a null stamp.
+
+**Enforced by:** `UserService.deleteUser` (explicit ordered reassignment),
+`MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
+`db/migration/V63` (companion table without auto-cascade on `owner_id`).
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-

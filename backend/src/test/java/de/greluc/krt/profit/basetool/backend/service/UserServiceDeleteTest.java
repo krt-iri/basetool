@@ -44,8 +44,10 @@ class UserServiceDeleteTest {
   @Mock private ShipRepository shipRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private MissionRepository missionRepository;
+  @Mock private MissionOwnershipRepository missionOwnershipRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private MaterialClaimRepository materialClaimRepository;
   @Mock private RoleRepository roleRepository;
   // Required so the AuthHelperService constructor parameter of UserService is
   // satisfied. shouldThrowExceptionIfNoAdminFound exercises the deleteUser
@@ -91,10 +93,34 @@ class UserServiceDeleteTest {
     verify(shipRepository).updateOwner(user, admin);
     verify(refineryOrderRepository).updateOwner(user, admin);
     verify(missionRepository).updateOwner(user, admin);
+    verify(missionOwnershipRepository).updateOwner(user, admin);
     verify(missionRepository).removeManager(userId);
     verify(jobOrderRepository).removeAssignee(userId);
     verify(missionParticipantRepository).unlinkUser(userId);
+    verify(materialClaimRepository).unlinkClaimedByUser(userId);
     verify(userRepository).delete(user);
+  }
+
+  @Test
+  void shouldReassignMissionOwnershipCompanionBeforeDeletingUser() {
+    // Given a user that owns missions: the mission_ownership companion (its owner_id FK has no
+    // ON DELETE clause) must be reassigned in lock-step with mission.owner and strictly before the
+    // app_user row is removed, otherwise the dangling owner_id FK-fails (23503) on delete.
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    // When
+    userService.deleteUser(userId);
+
+    // Then the companion is reassigned alongside the mission owner, the audit-only material-claim
+    // stamp is cleared, and all of that happens strictly before the app_user row is removed.
+    var inOrder =
+        inOrder(
+            missionRepository, missionOwnershipRepository, materialClaimRepository, userRepository);
+    inOrder.verify(missionRepository).updateOwner(user, admin);
+    inOrder.verify(missionOwnershipRepository).updateOwner(user, admin);
+    inOrder.verify(materialClaimRepository).unlinkClaimedByUser(userId);
+    inOrder.verify(userRepository).delete(user);
   }
 
   @Test

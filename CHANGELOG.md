@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- **Das Löschen eines ausgeschiedenen Nutzers durch einen Admin schlägt nicht mehr fehl, wenn der Nutzer Einsätze besessen oder Materialeintragungen vorgenommen hat.** Die Einsatz-Eigentümerschaft wird jetzt auch in der begleitenden Eigentümer-Tabelle auf einen Admin übertragen und der Bearbeiter-Vermerk an Materialeintragungen vor dem Löschen geleert, sodass keine verwaisten Verweise mehr die Löschung mit einem Datenbankfehler (SQLSTATE 23503) blockieren.
+
 - **Der Keycloak-Nutzerabgleich liest jetzt alle Nutzer seitenweise, statt nur die erste Seite.** Bei mehr als ~100 Nutzern lieferte Keycloak nur die erste Seite; der Abgleich markierte daraufhin alle übrigen Nutzer fälschlich als „nicht mehr in Keycloak" (stiller Soft-Delete echter Mitglieder). Der Abgleich blättert nun über `first`/`max` durch die komplette Liste (neue Einstellung `app.keycloak.sync.page-size`, Default 100). Betrifft nur Installationen mit mehr als einer vollen Keycloak-Seite an Nutzern.
 
 - **Abschnittsüberschriften, die in einem AJAX-Swap-Container stecken, haben wieder ihren gewohnten Abstand zum Inhalt darüber.** Der Container machte die Überschrift zum ersten Element und entfernte so ihren oberen Abstand, sodass sie direkt am vorherigen Block klebte. Betrifft in den Auftragsdetails „Aggregierte Materialien" und „Übergaben" sowie „Notiz" in der Detailansicht persönlicher Blueprints.
