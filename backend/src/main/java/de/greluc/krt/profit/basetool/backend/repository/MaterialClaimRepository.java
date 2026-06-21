@@ -84,4 +84,21 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    */
   List<MaterialClaim> findByJobOrderIdAndMaterialIdAndQualityRequirement(
       UUID jobOrderId, UUID materialId, QualityRequirement qualityRequirement);
+
+  /**
+   * Bulk-clears the {@code claimedByUser} audit reference on every claim stamped by the given user;
+   * used by the user-delete flow. The {@code material_claim.claimed_by_user_id} foreign key (V131)
+   * carries no {@code ON DELETE} clause, so a deleted user that ever filed a claim would otherwise
+   * make {@code UserService.deleteUser} FK-fail (SQLSTATE 23503). Nulled rather than reassigned
+   * because the column is audit-only metadata (who last touched the claim) — re-pointing it at the
+   * fallback admin would falsely attribute the claim; the claim itself is an independent live
+   * aggregate that must survive, so it is not deleted either. Mirrors {@code
+   * MissionParticipantRepository.unlinkUser}.
+   *
+   * @param userId the user whose audit stamp is cleared from every claim
+   */
+  @org.springframework.data.jpa.repository.Modifying
+  @org.springframework.data.jpa.repository.Query(
+      "UPDATE MaterialClaim mc SET mc.claimedByUser = null WHERE mc.claimedByUser.id = :userId")
+  void unlinkClaimedByUser(@org.springframework.data.repository.query.Param("userId") UUID userId);
 }
