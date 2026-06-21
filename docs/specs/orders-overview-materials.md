@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-20.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Order-overview Materialien column
@@ -54,6 +54,63 @@ material renders the empty-materials placeholder.
 `JobOrderServiceTest` (UpdateItemJobOrderTests — aggregated stock enrichment) · **Code:**
 `JobOrderService.enrichAggregatedWithClaims`, `JobOrderItemService.aggregateMaterials`,
 `AggregatedMaterialDto.currentStock`, `templates/orders-index.html` · **Issues:** #595
+
+### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
+
+Because the order's material view (the `MATERIAL` requirement rows and the `ITEM` aggregated
+list, REQ-ORDERS-017) is built **solely from the order's requirements** with linked stock
+matched onto those rows, an inventory item linked for a material the order does **not** require
+has no row to surface under — it binds stock to the order while staying invisible everywhere in
+the order.
+
+Linking an inventory item to a job order — whether on create or via the in-place
+association edit (the Lager "Auftrag" picker) — MUST be rejected with HTTP `400` when the item's
+material is not one of the order's **required materials**. The required-material set is
+kind-agnostic: for a `MATERIAL` order its material lines, for an `ITEM` order the materials
+derived and snapshotted from the ordered items' blueprints (`JobOrderItemService.requiredMaterialIds`).
+The Lager "Auftrag" picker MUST hide an order that does not require the row's material; it MAY
+still list the order a row is **already** assigned to, so an existing (possibly orphaned) link
+stays visible and clearable. The picker filter MUST be correct for `ITEM` orders too — these
+carry no `job_order_material` rows, so the reference payload exposes
+`JobOrderReferenceDto.requiredMaterialIds` (both kinds) for the filter rather than the
+MATERIAL-only `materials` list.
+
+**Acceptance**
+
+- [ ] Creating or updating an inventory item with a job-order link whose material the order does
+  not require returns `400` and persists nothing.
+- [ ] The same link succeeds when the order requires the material (both order kinds).
+- [ ] The Lager "Auftrag" dropdown for a row offers only orders that require that row's material,
+  plus the order the row is already assigned to.
+
+**Enforced by:** `InventoryItemServiceTest` (create/update gate),
+`JobOrderItemServiceTest` (`requiredMaterialIds`) · **Code:**
+`InventoryItemService.createInventoryItem` / `updateInventoryItem`,
+`JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
+`JobOrderService.findAllActiveReference`, `templates/fragments/inventory-stack-entries.html`
+
+### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory
+
+To make pre-existing orphaned links (inventory linked before the REQ-ORDERS-018 gate, or via a
+future path) discoverable, the order **detail** page MUST surface every inventory item linked to
+the order whose material is **not** among the order's requirements, as a warning section listing
+material, owner, location, quality and amount. The list is the order-linked inventory minus the
+required-material set; it is empty (section hidden) when every linked item matches a requirement.
+The link itself is undone from the Lager (setting the entry's "Auftrag" back to none). Computing
+the warning MUST NOT add an N+1 to the order **list** endpoint — it is only resolved on the
+detail view.
+
+**Acceptance**
+
+- [ ] An order with an inventory item linked for a non-required material shows the
+  orphaned-inventory warning listing that item; an order with none shows no warning.
+- [ ] The warning renders for both order kinds and is not computed for the order-list rows.
+
+**Enforced by:** `JobOrderServiceTest`
+(`getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired`) · **Code:**
+`JobOrderService.getOrphanedLinkedInventory`, `JobOrderController` `GET
+/api/v1/orders/{id}/inventory/orphaned`, `JobOrderPageController.viewOrderDetail`,
+`templates/orders-detail.html`
 
 ## Out of scope
 

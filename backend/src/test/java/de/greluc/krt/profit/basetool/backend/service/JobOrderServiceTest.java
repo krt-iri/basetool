@@ -1202,6 +1202,66 @@ class JobOrderServiceTest {
     assertEquals(dto3.id(), result.get(3).id(), "4th: Beta, quality 70, ArcCorp");
   }
 
+  @Test
+  void getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired() {
+    // REQ-ORDERS-019: of the inventory linked to the order, only the item whose material is NOT a
+    // requirement is returned (the invisible, orphaned link — the Torite -> #71 case).
+    UUID orderId = UUID.randomUUID();
+    UUID requiredMatId = UUID.randomUUID();
+    UUID orphanMatId = UUID.randomUUID();
+
+    de.greluc.krt.profit.basetool.backend.model.JobOrder order =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    order.setId(orderId);
+
+    de.greluc.krt.profit.basetool.backend.model.Material requiredMat =
+        new de.greluc.krt.profit.basetool.backend.model.Material();
+    requiredMat.setId(requiredMatId);
+    de.greluc.krt.profit.basetool.backend.model.Material orphanMat =
+        new de.greluc.krt.profit.basetool.backend.model.Material();
+    orphanMat.setId(orphanMatId);
+
+    de.greluc.krt.profit.basetool.backend.model.InventoryItem requiredItem =
+        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    requiredItem.setId(UUID.randomUUID());
+    requiredItem.setMaterial(requiredMat);
+    de.greluc.krt.profit.basetool.backend.model.InventoryItem orphanItem =
+        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    orphanItem.setId(UUID.randomUUID());
+    orphanItem.setMaterial(orphanMat);
+
+    InventoryItemDto orphanDto =
+        new InventoryItemDto(
+            orphanItem.getId(),
+            null,
+            null,
+            null,
+            661,
+            0.18,
+            false,
+            orderId,
+            71,
+            null,
+            null,
+            null,
+            null,
+            1L,
+            null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(jobOrderItemService.requiredMaterialIds(order))
+        .thenReturn(java.util.Set.of(requiredMatId));
+    when(inventoryItemRepository.findByJobOrderIdOrdered(orderId))
+        .thenReturn(List.of(requiredItem, orphanItem));
+    when(inventoryItemMapper.toDto(orphanItem)).thenReturn(orphanDto);
+
+    List<InventoryItemDto> result = jobOrderService.getOrphanedLinkedInventory(orderId);
+
+    assertEquals(1, result.size(), "only the non-required (orphaned) link is returned");
+    assertEquals(orphanDto.id(), result.get(0).id());
+    verify(inventoryItemMapper, never()).toDto(requiredItem);
+  }
+
   // ---------------------------------------------------------------
   // updateItemJobOrder — item-order edit (item lines + metadata)
   // ---------------------------------------------------------------

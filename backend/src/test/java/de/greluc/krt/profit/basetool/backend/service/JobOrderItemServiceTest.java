@@ -70,6 +70,54 @@ class JobOrderItemServiceTest {
   @InjectMocks private JobOrderItemService service;
 
   @Test
+  void requiredMaterialIdsCollectsMaterialLinesForMaterialOrderAndDerivedForItemOrder() {
+    // REQ-ORDERS-018: the kind-agnostic required-material set. MATERIAL order -> its material
+    // lines;
+    // ITEM order -> the snapshotted per-item materials. Each kind's other collection is empty.
+    de.greluc.krt.profit.basetool.backend.model.Material steel =
+        new de.greluc.krt.profit.basetool.backend.model.Material();
+    steel.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.model.Material gold =
+        new de.greluc.krt.profit.basetool.backend.model.Material();
+    gold.setId(UUID.randomUUID());
+
+    de.greluc.krt.profit.basetool.backend.model.JobOrder materialOrder =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    materialOrder.addMaterial(
+        de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial.builder()
+            .material(steel)
+            .amount(5.0)
+            .build());
+    materialOrder.addMaterial(
+        de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial.builder()
+            .material(gold)
+            .amount(1.0)
+            .build());
+
+    assertThat(service.requiredMaterialIds(materialOrder))
+        .containsExactlyInAnyOrder(steel.getId(), gold.getId());
+
+    de.greluc.krt.profit.basetool.backend.model.Material iron =
+        new de.greluc.krt.profit.basetool.backend.model.Material();
+    iron.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial req =
+        de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial.builder()
+            .material(iron)
+            .requiredQuantity(2.0)
+            .qualityRequirement(de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD)
+            .build();
+    de.greluc.krt.profit.basetool.backend.model.JobOrderItem item =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+    item.addMaterial(req);
+    de.greluc.krt.profit.basetool.backend.model.JobOrder itemOrder =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    itemOrder.setType(de.greluc.krt.profit.basetool.backend.model.JobOrderType.ITEM);
+    itemOrder.addItem(item);
+
+    assertThat(service.requiredMaterialIds(itemOrder)).containsExactly(iron.getId());
+  }
+
+  @Test
   void buildItemLineDerivesResourceMaterialsScalingByAmountWithQualityDefaultAndOverride() {
     // Given a weapon blueprint with two RESOURCE ingredients plus an ITEM and an unresolved line.
     GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
