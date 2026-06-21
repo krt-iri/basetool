@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Discord-Anmeldelink in der Seitenleiste zeigt für nicht angemeldete Nutzer wieder den richtigen Text statt eines Platzhalter-Schlüssels.** Der Übersetzungsschlüssel für „Mit Discord anmelden" fehlte in den Sprachdateien. Hinter dem Text steht jetzt zusätzlich das Discord-Logo.
+
 ## [v0.7.1](https://github.com/krt-profit/basetool/releases/tag/v0.7.1) - 2026-06-21
 
 ## [v0.7.0](https://github.com/krt-profit/basetool/releases/tag/v0.7.0) - 2026-06-21
