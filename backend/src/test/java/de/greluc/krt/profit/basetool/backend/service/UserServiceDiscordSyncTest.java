@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.util.ReflectionTestUtils.setField;
 
 import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
@@ -187,6 +188,26 @@ class UserServiceDiscordSyncTest {
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
     User result = userService.syncUser(jwt(false, List.of("Admin")));
+
+    assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  @Test
+  void newNonAdmin_landsActive_whenApprovalNotRequired() {
+    // With app.registration.require-approval=false (the e2e stack), a brand-new non-admin is
+    // created
+    // ACTIVE rather than PENDING, so on-the-fly fixture seeding is never blocked by the approval
+    // gate
+    // on an ephemeral DB that has no V173 ACTIVE backfill.
+    setField(userService, "requireApproval", false);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+    when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
+    when(roleRepository.findByNameIgnoreCase("Guest"))
+        .thenReturn(Optional.of(role("GUEST", "Guest")));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    User result = userService.syncUser(jwt(false, List.of()));
 
     assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
     verify(eventPublisher, never()).publishEvent(any());

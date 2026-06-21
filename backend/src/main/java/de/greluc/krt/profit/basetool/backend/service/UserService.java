@@ -51,6 +51,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -100,6 +101,18 @@ public class UserService {
   private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
   private final UserApprovalEventRepository userApprovalEventRepository;
   private final ApplicationEventPublisher eventPublisher;
+
+  /**
+   * Whether a brand-new non-admin registration must be approved by an admin before it is granted
+   * any authorities (REQ-SEC-017 fail-safe default). {@code true} in prod and by default. Set to
+   * {@code false} ONLY in controlled non-prod stacks (the Playwright e2e stack, via {@code
+   * APP_REGISTRATION_REQUIRE_APPROVAL=false}) where fixture users are provisioned on the fly and an
+   * interactive approval step would deadlock the seeder — there, a new non-admin keeps the {@code
+   * ACTIVE} entity default. Field-injected with a {@code true} initializer so Mockito unit tests
+   * (no Spring) exercise the secure default without extra wiring.
+   */
+  @Value("${app.registration.require-approval:true}")
+  private boolean requireApproval = true;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -284,7 +297,7 @@ public class UserService {
     // queue, so it raises no extra notification.
     boolean isAdmin = localRoles.stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()));
     boolean newPendingRegistration = false;
-    if (created && !isAdmin) {
+    if (created && !isAdmin && requireApproval) {
       user.setApprovalStatus(ApprovalStatus.PENDING);
       newPendingRegistration = viaDiscord;
       changed = true;
@@ -374,7 +387,9 @@ public class UserService {
     // announced by the interactive login path (REQ-NOTIF-012), and the new rows still surface in
     // the
     // admin pending queue.
-    if (created && localRoles.stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()))) {
+    if (created
+        && requireApproval
+        && localRoles.stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()))) {
       user.setApprovalStatus(ApprovalStatus.PENDING);
       changed = true;
     }

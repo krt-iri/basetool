@@ -77,6 +77,14 @@ services:
     # activates; the map merges with — does not replace — the base template's environment.
     environment:
       APP_RATE_LIMIT_ENABLED: "false"
+      # BackendSeeder provisions fixture users on the fly by logging them in, which lazily creates
+      # their app_user row. The prod fail-safe (REQ-SEC-017: a brand-new non-admin lands PENDING and
+      # needs admin approval) would leave those seeded users with no authorities -> 403 on the very
+      # next seeding call -> initializationError in every multi-user @BeforeAll. The e2e DB is
+      # ephemeral, so the V173 ACTIVE backfill that protects existing prod rows does not apply here.
+      # This stack therefore creates new non-admins ACTIVE; the approval lifecycle itself is covered
+      # by backend unit tests (UserServiceDiscordSyncTest / UserServiceApprovalTest), not e2e.
+      APP_REGISTRATION_REQUIRE_APPROVAL: "false"
     # Drop the test stack's host.docker.internal -> host-gateway mapping so the Keycloak network
     # alias (above) resolves instead — the host-gateway route can't reach KC's 127.0.0.1-bound
     # published port on a Linux runner.
