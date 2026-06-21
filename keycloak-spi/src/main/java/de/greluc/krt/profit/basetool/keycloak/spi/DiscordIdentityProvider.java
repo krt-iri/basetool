@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.keycloak.spi;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.ws.rs.core.UriBuilder;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,6 +30,7 @@ import java.time.Duration;
 import org.keycloak.broker.oidc.AbstractOAuth2IdentityProvider;
 import org.keycloak.broker.oidc.OAuth2IdentityProviderConfig;
 import org.keycloak.broker.oidc.mappers.AbstractJsonUserAttributeMapper;
+import org.keycloak.broker.provider.AuthenticationRequest;
 import org.keycloak.broker.provider.BrokeredIdentityContext;
 import org.keycloak.broker.provider.IdentityBrokerException;
 import org.keycloak.broker.social.SocialIdentityProvider;
@@ -92,6 +94,22 @@ public class DiscordIdentityProvider
   @Override
   protected String getDefaultScopes() {
     return DEFAULT_SCOPE;
+  }
+
+  /**
+   * Appends {@code prompt=none} to Discord's authorization request so a returning member is not
+   * shown the OAuth consent screen on every login. Discord defaults to {@code prompt=consent},
+   * which re-prompts on each authorization; with {@code prompt=none} Discord skips the screen once
+   * the user has authorized the app for these scopes — the very first authorization still shows it.
+   * This only changes the consent UX: the full authorization-code exchange (and therefore the
+   * membership gate, which reuses the obtained access token) is unaffected.
+   *
+   * @param request the brokered authentication request being built
+   * @return the authorization-URL builder with {@code prompt=none} appended
+   */
+  @Override
+  protected UriBuilder createAuthorizationUrl(AuthenticationRequest request) {
+    return super.createAuthorizationUrl(request).queryParam("prompt", "none");
   }
 
   @Override
