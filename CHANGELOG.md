@@ -54,6 +54,7 @@
 - **Profilbeschreibung und Anzeigename sind jetzt längenbegrenzt (10.000 bzw. 255 Zeichen).** Überlange Eingaben werden serverseitig mit einer klaren Fehlermeldung abgewiesen, statt unbegrenzt in der Datenbank gespeichert zu werden.
 - **Datei-Importe (Schiffe/Fleetview und Baupläne) sind jetzt auf 8 MB begrenzt.** Übergroße Uploads werden sofort mit einer klaren Fehlermeldung abgewiesen, bevor die Datei vollständig in den Arbeitsspeicher geladen wird (Schutz vor Speicher-Erschöpfung); reale Exporte liegen weit darunter.
 - **Die Begrenzung auf zwei gleichzeitige Sitzungen pro Konto greift jetzt tatsächlich.** Mit den Redis-Sitzungen war das Limit bisher wirkungslos; ab sofort verdrängt die dritte gleichzeitige Anmeldung die älteste Sitzung — eine parallel genutzte, gestohlene Sitzung wird so verlässlich und auch über einen Neustart des Frontends hinweg verdrängt.
+- **Härtung am Ingest-Gateway und an der stillen Neu-Anmeldung.** Lehnt das Backend einen Import ab, gibt das Gateway jetzt nur noch die geprüfte, längenbegrenzte Fehlermeldung des Backends weiter statt der rohen Antwort. Das kurzlebige `SSO_ATTEMPTED`-Cookie der stillen Re-Anmeldung trägt jetzt `SameSite=Strict` wie alle anderen Cookies.
 
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
 
