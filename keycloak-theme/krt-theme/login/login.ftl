@@ -36,6 +36,21 @@
                     <input tabindex="4" class="krt-button" name="login" id="kc-login" type="submit" value="${msg("doLogIn")}"/>
                 </div>
             </form>
+
+            <#-- Social / IdP login buttons (e.g. Discord). Rendered on the Keycloak login page itself
+                 so the entry point is reachable from EVERY login surface — the credential form, the
+                 device-grant verification page used by the extractor, and direct logins — not only the
+                 app sidebar shortcut. Keycloak populates `social.providers` only with IdPs that are
+                 NOT hidden on the login page, so a `discord` IdP with "Hide on login page" = OFF shows
+                 up here automatically. -->
+            <#if realm.password && social.providers??>
+                <div id="kc-social-providers" class="krt-social">
+                    <div class="krt-social-divider"><span>${msg("identity-provider-login-label")}</span></div>
+                    <#list social.providers as p>
+                        <a id="social-${p.alias}" class="krt-button-social" href="${p.loginUrl}">${p.displayName!}</a>
+                    </#list>
+                </div>
+            </#if>
         </div>
     </#if>
 </@layout.registrationLayout>

@@ -73,6 +73,10 @@ Realm `iri` → **Identity providers** → **Add provider** → **Social → Dis
 - **Default Scopes:** `identify email guilds.members.read` (the gate needs `guilds.members.read`).
 - **Store Tokens:** **ON** (the gate reuses the stored Discord access token).
 - **Trust Email:** optional; leave OFF unless you accept Discord's `verified` flag.
+- **Hide on login page:** leave **OFF** (the default). Keycloak lists only non-hidden IdPs in the
+  login page's social block, so this is what makes the **Discord** button appear on the Keycloak login
+  form itself — reachable from the extractor's device-grant login and any direct login, not just the
+  app-sidebar shortcut (the krt-theme renders the block; see §5).
 - Save.
 
 ### 3a. Attribute importer mapper (the `discord_user_id` auto-link)
