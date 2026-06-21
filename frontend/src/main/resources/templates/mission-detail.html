@@ -222,8 +222,8 @@
             </div>
         </div>
         <div class="facts-bar">
-            <span><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span class="fact-v krt-local-dt" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span class="fact-v krt-local-dt" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
+            <span><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span id="facts-planned-start" class="fact-v krt-local-dt" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
+            <span><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span id="facts-ts" class="fact-v krt-local-dt" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
             <span th:title="#{mission.participants.count.tooltip}"><span class="fact-k" th:text="#{mission.participants}">Teilnehmer</span><span id="facts-registered" class="fact-v" th:text="${mission.registeredParticipants}">0</span></span>
             <span><span class="fact-k" th:text="#{mission.facts.checked_in}">Eingecheckt</span><span id="facts-checked-in" class="fact-v" th:text="${mission.checkedInParticipants}">0</span></span>
             <span th:if="${financeSum != null}"><span class="fact-k" th:text="#{mission.finance.total}">Gesamtsumme</span><span class="fact-v" th:classappend="${financeSum >= 0 ? 'pos' : 'neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span></span>
@@ -239,6 +239,19 @@
     <div class="tab-panes">
         <!-- ================= Tab 1: Uebersicht (read-only landing tab) ================= -->
         <section th:unless="${isNew}" id="pane-ueb" class="tab-pane" role="tabpanel" aria-labelledby="tab-ueb">
+            <!-- In-place AJAX swap container (live multi-user sync, REQ-FE-010): a core / schedule /
+                 flags / party-lead / frequency change re-renders this fragment via
+                 GET /missions/{id}?fragment=overview. The #overview-results wrapper persists (only its
+                 innerHTML is replaced). #overview-head-meta carries the fresh title / status / times so
+                 the krt:swapped listener can patch the sticky header (h1, status pill, facts bar), which
+                 live OUTSIDE this fragment — generalising the crew #crew-count-meta precedent. -->
+            <div id="overview-results"><th:block th:fragment="overviewSection">
+            <span id="overview-head-meta" hidden
+                  th:attr="data-title=${#messages.msg('mission.prefix') + ' ' + mission.name},
+                           data-status=${#strings.toLowerCase(mission.status)},
+                           data-status-label=${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status},
+                           data-planned-start-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'},
+                           data-meeting-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}"></span>
             <div class="pane-grid-2">
                 <div class="kpanel">
                     <div class="kpanel-head" th:text="#{mission.overview.briefing}">Auftrag</div>
@@ -302,6 +315,7 @@
                     </div>
                 </div>
             </div>
+            </th:block></div>
             <!-- No jump cards: every aggregate (Teilnehmer/Finanzen/Wirtschaft) is reachable via
                  the tab nav itself, duplicate cards added no information (owner feedback). -->
         </section>
@@ -1475,6 +1489,11 @@
         'unsaved.continue': /*[[#{mission.tab.unsaved.continue}]]*/ 'Switch tab',
         'unsaved.cancel': /*[[#{general.cancel}]]*/ 'Cancel'
     };
+    // Live multi-user sync (REQ-FE-010): label for the "updates available" pill shown when a peer's
+    // change arrives while the local user is mid-edit (so we defer the refresh instead of yanking it).
+    window.MISSION_LIVESYNC_I18N = {
+        'mission.livesync.updates_available': /*[[#{mission.livesync.updates_available}]]*/ 'Updates available'
+    };
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionId = missionId;
     window.missionCanEdit = /*[[${!isNew and mission != null and mission.canEdit}]]*/ false;
@@ -1511,13 +1530,23 @@
     // pass ['crew','finance'] because a participant also renders in the payout table (list, share and
     // participation %). Accepts a single key or an array; returns a Promise resolving when all swaps
     // complete so callers can close a modal afterwards.
-    window.krtRefreshMissionSection = function (sectionKeys) {
+    window.krtRefreshMissionSection = function (sectionKeys, opts) {
         const keys = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
         const map = {
             crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
             finance: { container: '#finance-results', fragmentValue: 'finance' },
-            mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' }
+            mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' },
+            overview: { container: '#overview-results', fragmentValue: 'overview' }
         };
+        // Live multi-user sync (REQ-FE-010): tell other users viewing this mission that these
+        // sections just changed, so their views re-fetch the same fragments in place. Suppressed
+        // when this refresh is itself the application of a peer's signal (opts.broadcast === false),
+        // otherwise the inbound change would echo straight back into a loop.
+        if ((!opts || opts.broadcast !== false)
+            && window.missionPresence
+            && typeof window.missionPresence.sendChanged === 'function') {
+            window.missionPresence.sendChanged(keys);
+        }
         return Promise.all(keys.map(function (sectionKey) {
             const cfg = map[sectionKey];
             if (!cfg || !window.missionId || !document.querySelector(cfg.container)) {
@@ -1537,6 +1566,16 @@
                         && window.MISSION_SUBRES_I18N['mission.section.refresh.error']) || ''
             });
         }));
+    };
+
+    // Broadcast-only sibling of krtRefreshMissionSection (REQ-FE-010): signal peers that these
+    // sections changed WITHOUT re-fetching locally — for handlers that already patched their own DOM
+    // surgically (payout preference, party-lead, frequency) and so do not need a self re-render.
+    window.krtNotifyMissionChanged = function (sectionKeys) {
+        const keys = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
+        if (window.missionPresence && typeof window.missionPresence.sendChanged === 'function') {
+            window.missionPresence.sendChanged(keys);
+        }
     };
 
     // Patch the participant counts that live in the page header — the facts bar (#facts-registered,
@@ -1564,6 +1603,158 @@
         if (checkedInEl) { checkedInEl.textContent = checkedIn; }
         if (badge) { badge.textContent = checkedIn + '/' + registered; }
     });
+
+    // After an in-place OVERVIEW swap, patch the parts of the sticky header that live OUTSIDE the
+    // #overview-results fragment — the mission title (h1), the status pill (text + colour class) and
+    // the Server-Join / TS facts — from the fresh values the fragment exposes in #overview-head-meta.
+    // Generalises the crew #crew-count-meta precedent so a peer's core / schedule / status change is
+    // reflected in the header without a full reload.
+    document.addEventListener('krt:swapped', function (ev) {
+        const container = ev && ev.detail && ev.detail.container;
+        if (!container || container.id !== 'overview-results') {
+            return;
+        }
+        const meta = document.getElementById('overview-head-meta');
+        if (!meta) {
+            return;
+        }
+        const title = meta.getAttribute('data-title');
+        const h1 = document.querySelector('.mission-head-title h1');
+        if (h1 && title != null) {
+            h1.textContent = title;
+        }
+        const status = (meta.getAttribute('data-status') || '').trim();
+        const statusLabel = meta.getAttribute('data-status-label');
+        const pill = document.querySelector('.mission-head-title .status-pill');
+        if (pill && status) {
+            pill.className = 'status-pill status-' + status;
+            if (statusLabel != null) {
+                pill.textContent = statusLabel;
+            }
+        }
+        function patchFact(id, utcAttr) {
+            const el = document.getElementById(id);
+            if (!el) {
+                return;
+            }
+            const utc = meta.getAttribute(utcAttr);
+            el.setAttribute('data-utc', utc != null ? utc : 'null');
+            if (typeof window.krtLocalizeDates === 'function') {
+                window.krtLocalizeDates(el.parentNode || el);
+            }
+        }
+        patchFact('facts-planned-start', 'data-planned-start-utc');
+        patchFact('facts-ts', 'data-meeting-utc');
+    });
+
+    // ---- Live multi-user sync receiver (REQ-FE-010 / ADR-0031) ----------------------------------
+    // mission-presence.js dispatches 'krt:mission-changed' {sections:[...]} when ANOTHER user mutates
+    // this mission, and 'krt:mission-resync' after a dropped socket reconnects (signals may have been
+    // missed while offline). We re-fetch the affected section fragments via
+    // krtRefreshMissionSection(..., {broadcast:false}) — broadcast:false stops the applied change
+    // from echoing back into a loop. The data never travels over the socket: every peer re-pulls
+    // through its own authenticated, authorization-checked fragment endpoint, so guest redaction and
+    // the member-only finance gate still apply per viewer.
+    (function () {
+        const SECTION_CONTAINERS = {
+            crew: '#crew-board-results',
+            finance: '#finance-results',
+            mgmt: '#mission-mgmt-results',
+            overview: '#overview-results'
+        };
+        const ALL_SECTIONS = Object.keys(SECTION_CONTAINERS);
+        const COALESCE_MS = 400;
+        const pendingNow = {};   // sections queued for the next debounce tick (Set-like map)
+        const deferred = {};     // sections held back because the user is editing (Set-like map)
+        let timer = null;
+
+        function anyModalOpen() {
+            return Array.prototype.some.call(
+                document.querySelectorAll('.krt-modal-overlay'),
+                function (o) { return window.getComputedStyle(o).display !== 'none'; }
+            );
+        }
+
+        // Never yank a section out from under an active edit. A modal open anywhere means the user is
+        // mid-edit; focus inside the section's own container means inline editing there.
+        function sectionBusy(sectionKey) {
+            if (anyModalOpen()) {
+                return true;
+            }
+            const sel = SECTION_CONTAINERS[sectionKey];
+            const container = sel && document.querySelector(sel);
+            return !!(container && document.activeElement && container.contains(document.activeElement));
+        }
+
+        function flushTimer() {
+            timer = null;
+            const keys = Object.keys(pendingNow);
+            keys.forEach(function (k) { delete pendingNow[k]; });
+            if (keys.length && window.krtRefreshMissionSection) {
+                window.krtRefreshMissionSection(keys, { broadcast: false });
+            }
+        }
+
+        function schedule(sectionKey) {
+            pendingNow[sectionKey] = true;
+            if (!timer) {
+                timer = setTimeout(flushTimer, COALESCE_MS);
+            }
+        }
+
+        function showPill() {
+            let pill = document.getElementById('mission-livesync-pill');
+            if (pill) {
+                return;
+            }
+            const dict = window.MISSION_LIVESYNC_I18N || {};
+            const label = (dict['mission.livesync.updates_available'] != null
+                && dict['mission.livesync.updates_available'] !== '')
+                ? dict['mission.livesync.updates_available']
+                : 'Aktualisierungen verfügbar';
+            pill = document.createElement('button');
+            pill.id = 'mission-livesync-pill';
+            pill.type = 'button';
+            pill.className = 'mission-livesync-pill';
+            pill.textContent = label;
+            pill.addEventListener('click', function () {
+                const keys = Object.keys(deferred);
+                keys.forEach(function (k) { delete deferred[k]; });
+                pill.remove();
+                if (keys.length && window.krtRefreshMissionSection) {
+                    window.krtRefreshMissionSection(keys, { broadcast: false });
+                }
+            });
+            document.body.appendChild(pill);
+        }
+
+        function apply(sections) {
+            const keys = (Array.isArray(sections) && sections.length) ? sections : ALL_SECTIONS;
+            let anyDeferred = false;
+            keys.forEach(function (sectionKey) {
+                const sel = SECTION_CONTAINERS[sectionKey];
+                if (!sel || !document.querySelector(sel)) {
+                    return; // unknown key, or this viewer cannot see the section (e.g. no mgmt panel)
+                }
+                if (sectionBusy(sectionKey)) {
+                    deferred[sectionKey] = true;
+                    anyDeferred = true;
+                } else {
+                    schedule(sectionKey);
+                }
+            });
+            if (anyDeferred) {
+                showPill();
+            }
+        }
+
+        document.addEventListener('krt:mission-changed', function (ev) {
+            apply(ev && ev.detail ? ev.detail.sections : null);
+        });
+        document.addEventListener('krt:mission-resync', function () {
+            apply(null); // refresh everything visible after a reconnect
+        });
+    })();
 </script>
 <script th:attr="nonce=${cspNonce}">
     // ---- KRT modal helpers: open with focus, dismiss buttons, Esc, focus trap. ----
@@ -1844,6 +2035,9 @@
                             }
                         }
                         window.krtModalClose(frequencyModal);
+                        // Already patched the frequency displays in place above; just signal peers to
+                        // re-render their overview (the value is mirrored there) — REQ-FE-010.
+                        if (window.krtNotifyMissionChanged) { window.krtNotifyMissionChanged('overview'); }
                     }
                 });
             }
@@ -2492,6 +2686,9 @@
                 partyLeadInput.value = dto.partyLeadUser
                     ? (dto.partyLeadUser.effectiveName || '')
                     : (dto.partyLeadGuestName || '');
+                // Already patched in place above; just signal peers to re-render their overview
+                // (party lead is mirrored there) — live sync, REQ-FE-010.
+                if (window.krtNotifyMissionChanged) { window.krtNotifyMissionChanged('overview'); }
             });
         }
     });
@@ -2576,7 +2773,8 @@
                     }
                 }
                 // Participation % in the payout table is derived from the actual times — refresh it.
-                window.krtRefreshMissionSection('finance');
+                // 'overview' too: the Tab-1 actual start/end mirror this change for peers (REQ-FE-010).
+                window.krtRefreshMissionSection(['finance', 'overview']);
             }
         });
     }
@@ -2702,6 +2900,9 @@
         const missionDto = result.body;
         if (!missionDto) return;
         selectElement.setAttribute('data-original-value', value);
+        // The payout preference shows in the finance/payout table; signal peers to re-render it
+        // (this handler patches its own view in place, REQ-FE-010).
+        if (window.krtNotifyMissionChanged) { window.krtNotifyMissionChanged('finance'); }
         const participantId = selectElement.getAttribute('data-participant-id');
         if (participantId && missionDto.participants) {
             const updatedParticipant = missionDto.participants.find(p => p.id === participantId);
@@ -3155,6 +3356,11 @@
                 writeVersions(versions);
                 clearFieldErrors();
                 if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(SAVED);
+                // Re-render the overview pane (name / status / schedule / flags mirror the edited
+                // core data) and signal peers to do the same (live multi-user sync, REQ-FE-010). The
+                // form lives in the Verwaltung tab, so swapping the hidden overview pane is invisible
+                // to this user but keeps it consistent and fixes the prior stale-overview behaviour.
+                if (window.krtRefreshMissionSection) { window.krtRefreshMissionSection('overview'); }
             } finally {
                 inFlight = false;
                 if (submitBtn) submitBtn.disabled = false;

@@ -205,6 +205,63 @@ class MissionPresenceWebSocketHandlerTest {
     assertThat(tabB.isOpen()).isTrue();
   }
 
+  @Test
+  void changedSignal_isRelayedToOtherSessions_butNotToOrigin() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    alice.sent.clear();
+    bob.sent.clear();
+
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\",\"finance\"]}"));
+
+    // The originator already applied its own change locally — it must not receive the echo.
+    assertThat(alice.sent).isEmpty();
+    // Every other socket on the same mission gets the section keys (and nothing else).
+    JsonNode relayed = lastBroadcast(bob);
+    assertThat(relayed.get("type").asString()).isEqualTo("changed");
+    List<String> sections = new ArrayList<>();
+    relayed.get("sections").forEach(node -> sections.add(node.asString()));
+    assertThat(sections).containsExactly("crew", "finance");
+  }
+
+  @Test
+  void changedSignal_dropsUnknownKeysAndDeduplicates() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    handler.handleTextMessage(
+        alice,
+        new TextMessage(
+            "{\"type\":\"changed\",\"sections\":[\"crew\",\"bogus\",\"crew\",\"mgmt\",42]}"));
+
+    JsonNode relayed = lastBroadcast(bob);
+    List<String> sections = new ArrayList<>();
+    relayed.get("sections").forEach(node -> sections.add(node.asString()));
+    // "bogus" and the non-string 42 are dropped; the duplicate "crew" appears once.
+    assertThat(sections).containsExactly("crew", "mgmt");
+  }
+
+  @Test
+  void changedSignal_withNoValidSections_relaysNothing() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"bogus\"]}"));
+    handler.handleTextMessage(alice, new TextMessage("{\"type\":\"changed\",\"sections\":[]}"));
+    handler.handleTextMessage(alice, new TextMessage("{\"type\":\"changed\"}"));
+
+    // Nothing valid to relay — peers receive no frame, and presence state is untouched.
+    assertThat(bob.sent).isEmpty();
+    assertThat(service.trackedMissions()).isEmpty();
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
   private FakeSession openSession(UUID missionId, OidcUser user) throws Exception {

@@ -63,12 +63,18 @@ import tools.jackson.databind.node.ObjectNode;
  *       |"heartbeat", "sectionKey":"..."}} and updates the {@link MissionPresenceService};
  *   <li>after every mutation broadcasts the full snapshot for that mission to every connected
  *       socket on the same mission so all clients converge on the same indicator state;
+ *   <li>relays a {@code {"type":"changed","sections":[...]}} signal — emitted by a client when its
+ *       user mutates the mission — to every <em>other</em> socket on the same mission, so peers
+ *       re-fetch the affected section fragments and see the change without reloading (live
+ *       multi-user sync). The payload carries only opaque section keys, never mission data: each
+ *       peer re-pulls through its own authenticated, authorization-checked fragment endpoint;
  *   <li>runs a scheduled reaper at {@link #REAPER_INTERVAL} that drops entries past TTL and
  *       broadcasts a fresh snapshot to the affected rooms.
  * </ul>
  *
- * <p>The wire format is intentionally minimal — no STOMP, no SockJS. The server never pushes
- * unsolicited messages other than presence snapshots.
+ * <p>The wire format is intentionally minimal — no STOMP, no SockJS. The only server-originated
+ * frames are presence snapshots and the relayed {@code changed} signal described above; the latter
+ * is sanitised (unknown section keys dropped, count capped) before it is fanned out.
  *
  * <p><b>Concurrency:</b> the per-mission session map is a {@link ConcurrentHashMap}, but broadcasts
  * iterate over a defensive copy so that a slow consumer's {@link WebSocketSession#sendMessage} call
@@ -80,6 +86,17 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
 
   /** How often the reaper runs to drop expired presence entries and broadcast updates. */
   public static final Duration REAPER_INTERVAL = Duration.ofSeconds(10);
+
+  /**
+   * Section keys the {@code changed} relay accepts and re-broadcasts. Anything else in an inbound
+   * {@code sections} array is dropped, so a client can never make peers re-fetch an arbitrary URL —
+   * the keys map one-to-one onto the in-place fragment swaps wired in {@code mission-detail.html}.
+   */
+  private static final Set<String> BROADCASTABLE_SECTIONS =
+      Set.of("crew", "finance", "mgmt", "overview");
+
+  /** Hard cap on the number of section keys relayed per {@code changed} frame (abuse guard). */
+  private static final int MAX_CHANGED_SECTIONS = 8;
 
   private static final String ATTR_MISSION_ID = "missionPresence.missionId";
   private static final String ATTR_USER_ID = "missionPresence.userId";
@@ -177,8 +194,18 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     String type = textValue(node, "type");
+    if (type == null) {
+      return;
+    }
+    // Live multi-user sync: relay the mutating client's "section changed" signal to its peers.
+    // Handled before the presence path because the frame carries a "sections" array, not the
+    // "sectionKey" the focus/blur/heartbeat messages use.
+    if ("changed".equals(type)) {
+      broadcastChanged(missionId, node.get("sections"), session);
+      return;
+    }
     String sectionKey = textValue(node, "sectionKey");
-    if (type == null || sectionKey == null || sectionKey.isBlank()) {
+    if (sectionKey == null || sectionKey.isBlank()) {
       return;
     }
 
@@ -274,6 +301,66 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     }
     TextMessage message = new TextMessage(payload);
     for (WebSocketSession session : List.copyOf(mates)) {
+      sendSafe(session, message);
+    }
+  }
+
+  /**
+   * Relays a client's {@code changed} signal to every other socket on the same mission. The inbound
+   * {@code sections} array is sanitised — non-string entries and keys outside {@link
+   * #BROADCASTABLE_SECTIONS} are dropped and the count is capped at {@link #MAX_CHANGED_SECTIONS} —
+   * so a malicious client can neither inject an arbitrary fetch target nor amplify a single frame
+   * into an unbounded fan-out. The originating session is skipped: it already applied its own
+   * change locally, so echoing back to it would trigger a redundant re-fetch (and, without the
+   * client-side suppression, a relay loop).
+   *
+   * @param missionId mission the signal belongs to
+   * @param sectionsNode the raw {@code sections} JSON node from the client (may be {@code null} or
+   *     not an array, in which case nothing is relayed)
+   * @param origin the session that sent the signal, excluded from the fan-out
+   */
+  private void broadcastChanged(
+      @NotNull UUID missionId, JsonNode sectionsNode, @NotNull WebSocketSession origin) {
+    if (sectionsNode == null || !sectionsNode.isArray() || sectionsNode.isEmpty()) {
+      return;
+    }
+    List<String> sections = new ArrayList<>();
+    for (JsonNode element : sectionsNode) {
+      if (sections.size() >= MAX_CHANGED_SECTIONS) {
+        break;
+      }
+      if (element != null && element.isString()) {
+        String key = element.asString();
+        if (BROADCASTABLE_SECTIONS.contains(key) && !sections.contains(key)) {
+          sections.add(key);
+        }
+      }
+    }
+    if (sections.isEmpty()) {
+      return;
+    }
+    Set<WebSocketSession> mates = sessionsByMission.get(missionId);
+    if (mates == null || mates.isEmpty()) {
+      return;
+    }
+    String payload;
+    try {
+      ObjectNode root = objectMapper.createObjectNode();
+      root.put("type", "changed");
+      ArrayNode sectionsArray = root.putArray("sections");
+      for (String key : sections) {
+        sectionsArray.add(key);
+      }
+      payload = objectMapper.writeValueAsString(root);
+    } catch (JacksonException e) {
+      log.warn("Failed to serialise change relay for mission {}", missionId, e);
+      return;
+    }
+    TextMessage message = new TextMessage(payload);
+    for (WebSocketSession session : List.copyOf(mates)) {
+      if (session == origin) {
+        continue;
+      }
       sendSafe(session, message);
     }
   }
