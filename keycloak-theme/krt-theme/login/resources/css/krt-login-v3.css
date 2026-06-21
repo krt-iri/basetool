@@ -990,3 +990,64 @@ input[type="checkbox"]:focus-visible,
     outline: 2px solid var(--color-primary) !important;
     outline-offset: 2px !important;
 }
+
+/* ── Social / IdP login (Discord etc.) ───────────────────────────────────────
+   Rendered by login.ftl's social block on the Keycloak login page itself.
+   Secondary, OUTLINED on the input surface so the filled-orange primary CTA
+   stays the single brand bloom per screen (action hierarchy). Square-first,
+   Lato bold uppercase; orange border + bloom on hover/focus. */
+.krt-social {
+    margin-top: 24px;
+}
+
+.krt-social-divider {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    color: var(--color-gray-2);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.krt-social-divider::before,
+.krt-social-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-color: var(--color-gray-3);
+}
+
+.krt-social-divider span {
+    padding: 0 12px;
+}
+
+.krt-button-social {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px;
+    margin-top: 10px;
+    background-color: var(--color-surface-input);
+    color: var(--color-gray-1);
+    border: 1px solid var(--color-gray-2);
+    border-radius: 0;
+    font-family: var(--font-headline);
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color 0.3s, color 0.3s, box-shadow 0.3s;
+}
+
+.krt-button-social:hover,
+.krt-button-social:focus {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    box-shadow: var(--glow-primary);
+    outline: none;
+}

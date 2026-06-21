@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Auf der Keycloak-Anmeldeseite selbst gibt es jetzt eine „Discord“-Schaltfläche.** Damit ist der Discord-Login auch dort erreichbar, wo die normale Anmeldemaske erscheint — etwa beim Anmelden im Extractor (Device-Grant) oder für alle, die einfach „Anmelden“ wählen und den getrennten Discord-Eintrag in der Seitenleiste übersehen. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (der Discord-IdP darf nicht auf „Hide on login page“ stehen).
+
 ### Fixed
 
 - **Der Discord-Anmeldelink in der Seitenleiste zeigt für nicht angemeldete Nutzer wieder den richtigen Text statt eines Platzhalter-Schlüssels.** Der Übersetzungsschlüssel für „Mit Discord anmelden" fehlte in den Sprachdateien. Hinter dem Text steht jetzt zusätzlich das Discord-Logo.
