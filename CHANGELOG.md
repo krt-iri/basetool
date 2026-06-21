@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster stammte aus PatternFly 6 (Keycloak 26.6), dessen Login-Wrapper das Theme bisher nicht zurücksetzte. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
+
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21
 
 ### Added

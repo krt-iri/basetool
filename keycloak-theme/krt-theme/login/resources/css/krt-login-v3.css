@@ -124,6 +124,19 @@ html, .login-pf-page, .login-pf-body, [class*="login-pf"], [class*="pf-c-backgro
     --pf-v6-c-background-image--BackgroundImage: none !important;
 }
 
+/* PatternFly v6 (Keycloak 26.6) renamed the login/page wrappers from the
+   `login-pf-*` classes the reset above targets to `pf-v6-c-login*` /
+   `pf-v6-c-page*`, so PF's default login background (the diamond / perspective
+   grid) was no longer suppressed and showed through. Make these full-viewport
+   wrappers TRANSPARENT — not black — so the body honeycomb wash below shows
+   instead of PF's grid. (The login card keeps its own dark surface; it is not a
+   `pf-*` element, so it is untouched.) */
+[class*="pf-v6-c-login"], [class*="pf-c-login"],
+[class*="pf-v6-c-page"], [class*="pf-c-page"] {
+    background-image: none !important;
+    background-color: transparent !important;
+}
+
 body {
     color: var(--color-gray-1);
     font-family: var(--font-body);
@@ -1027,6 +1040,7 @@ input[type="checkbox"]:focus-visible,
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 10px;
     box-sizing: border-box;
     width: 100%;
     padding: 14px;
@@ -1050,4 +1064,15 @@ input[type="checkbox"]:focus-visible,
     color: var(--color-primary);
     box-shadow: var(--glow-primary);
     outline: none;
+}
+
+/* The Discord mark in the social button. Monochrome (`fill: currentColor`) so it
+   inherits the button text colour — gray at rest, brand orange on hover/focus —
+   matching the monochrome-icon design-system convention (same as the sidebar
+   mark and the footer GitHub mark). */
+.krt-social-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    flex-shrink: 0;
 }
