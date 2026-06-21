@@ -63,6 +63,10 @@ from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never 
 - [ ] No token, payload or Discord id appears in any log line. _(by design — only the coarse decision is logged; proven by the T1.4 PII grep.)_
 - [ ] Credential (non-Discord) login is unaffected by the gate. _(T1.4 e2e.)_
 - [x] The anonymous sidebar exposes a **localized** Discord login entry point (`nav.login.discord`, all three message bundles) that brokers the login this gate guards. It carries the Discord brand mark, which inherits the link colour (`currentColor`) like the footer GitHub mark — no hard-coded blurple, per the monochrome-icon design-system convention.
+- [x] The Keycloak login page itself renders configured (non-hidden) IdPs as social buttons via the
+  krt-theme `login.ftl` social block, so the Discord entry point is reachable from the credential
+  form, the extractor's device-grant verification page, and any direct login — not only the app
+  sidebar. Requires the `discord` IdP's "Hide on login page" = OFF.
 
 **Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `fragments/sidebar.html`, `fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
 
