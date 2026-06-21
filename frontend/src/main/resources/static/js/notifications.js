@@ -481,7 +481,12 @@
                 if (sseHealthy) {
                     sseHealthy = false;
                     restartPolling();
-                    refreshUnreadCount();
+                    // One-shot catch-up, but never while the tab is hidden: polling is paused there
+                    // (the timer is stopped), and onVisibilityChange already refreshes on return, so
+                    // firing here would be a redundant background fetch against the paused contract.
+                    if (!document.hidden) {
+                        refreshUnreadCount();
+                    }
                 }
             });
             source.addEventListener('notification', function () {
