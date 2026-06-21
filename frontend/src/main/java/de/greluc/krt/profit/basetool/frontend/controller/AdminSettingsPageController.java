@@ -328,11 +328,10 @@ public class AdminSettingsPageController {
               SystemSettingDto.class);
         }
       } finally {
-        // The job-order age thresholds are read through getCached on the orders pages. Evict in a
-        // finally so even a partial save (an early PUT lands, a later one throws) still surfaces
-        // the
-        // persisted change on the next render instead of stranding it until the TTL; dropping the
-        // whole static cache is safe — entries just reload on the next read.
+        // The job-order age thresholds are read via getCached on the orders pages, so evict in a
+        // finally: even a partial save (an early PUT lands, a later one throws) still drops the
+        // cache so the persisted value shows on the next render instead of waiting out the TTL.
+        // Clearing the whole static cache is safe — entries just reload on the next read.
         backendApiClient.clearStaticDataCache();
       }
 
@@ -427,11 +426,10 @@ public class AdminSettingsPageController {
         result.put("transferFeePercent", transferFeePercent.stripTrailingZeros().toPlainString());
         return ResponseEntity.ok(result);
       } finally {
-        // The job-order age thresholds are read through getCached on the orders pages. Evict in a
-        // finally so even a partial save (an early PUT lands, a later one throws) still surfaces
-        // the
-        // persisted change on the next render instead of stranding it until the TTL; dropping the
-        // whole static cache is safe — entries just reload on the next read.
+        // The job-order age thresholds are read via getCached on the orders pages, so evict in a
+        // finally: even a partial save (an early PUT lands, a later one throws) still drops the
+        // cache so the persisted value shows on the next render instead of waiting out the TTL.
+        // Clearing the whole static cache is safe — entries just reload on the next read.
         backendApiClient.clearStaticDataCache();
       }
     } catch (NumberFormatException e) {
