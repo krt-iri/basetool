@@ -131,6 +131,35 @@ updated any of its own columns.
 per-item `catch` keeps the run going past a failure so the remaining items still persist; and an
 incoming uuid already owned by another row leaves the row's `external_uuid` null instead of throwing.
 
+### REQ-DATA-006 — every hot predicate and foreign key has a covering index
+
+A query predicate on the read path, and every foreign-key column, must be backed by an index;
+falling back to a sequential scan on a growing table is a defect. New indexes ship as a Flyway
+`V<n>` migration (indexes are access paths only, so they do not affect `ddl-auto=validate`) and
+get a spot-check assertion in `DatabaseIndexMigrationTest` (the canary that proves Flyway ran and
+produced the DDL). Prefer a **partial index** when the hot set is a small slice of a large table
+(status/lifecycle filters), so the index stays proportional to the live set rather than the
+history.
+
+`V175` is the round-three backfill (after the V34 / V92 / V122 sweeps) and adds:
+
+- `idx_job_order_assignees_user_id` — the V147 composite `UNIQUE (job_order_id, user_id)` leads
+  with `job_order_id` and cannot serve a `user_id`-only lookup.
+- `idx_bank_posting_holder_id` — the V153 `(account_id, holder_id)` index leads with `account_id`,
+  so the holder-distribution / `holderTotal` aggregate scanned the unbounded append-only ledger.
+- `idx_bank_transaction_initiated_by`, `idx_app_user_approved_by_id` — foreign keys with no
+  covering index (user-deletion integrity / approver back-references).
+- `idx_app_user_pending_approval` — partial `WHERE approval_status = 'PENDING'` on `created_at`,
+  matching `findByApprovalStatusOrderByCreatedAtAsc` (filter + oldest-first order, no sort).
+- `idx_job_order_active_priority` — partial `WHERE status IN ('OPEN','IN_PROGRESS')` on
+  `(priority ASC NULLS LAST, display_id DESC)`, matching `findAllActiveWithMaterials` so the active
+  board stays constant-cost as terminal orders accumulate.
+
+**Acceptance** (`DatabaseIndexMigrationTest`): each `V175` index is present in the live Postgres
+test schema, and the two partial indexes additionally have their `WHERE` predicate and key ordering
+pinned (via `pg_indexes.indexdef`) so a later migration cannot silently narrow the predicate or flip
+a sort while keeping the index name.
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
