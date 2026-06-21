@@ -24,11 +24,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * Internal DTO for parsing the root of an uploaded external blueprint export (#327, Phase 4). Both
- * supported exporters — the SCMDB log-watcher and the <a
- * href="https://github.com/krt-profit/basetool-bp-extractor">Basetool Blueprint Extractor</a> —
- * wrap their records in a top-level {@code blueprints} array; every other top-level field (schema
- * version, tool metadata, mission list, player summaries, …) is ignored.
+ * Internal DTO for parsing the root of an uploaded external blueprint export (#327, Phase 4;
+ * scmdb.net export added later). All three supported exporters — the SCMDB log-watcher, the <a
+ * href="https://github.com/krt-profit/basetool-bp-extractor">Basetool Blueprint Extractor</a>, and
+ * the <a href="https://scmdb.net">scmdb.net</a> profile / tracking export — wrap their records in a
+ * top-level {@code blueprints} array; every other top-level field (schema version, tool metadata,
+ * mission list, player / profile summaries, …) is ignored. In the scmdb.net export the sibling
+ * {@code missions} array (the player's mission tracker) is consumed by neither this import nor any
+ * other basetool surface — only {@code blueprints} is read.
  *
  * <p>{@code additionalSourceFolders} is mirrored from the Blueprint Extractor's {@code
  * BlueprintExport} contract for explicitness only — the import never consumes it. The extractor
