@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,7 +40,10 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -47,9 +51,11 @@ import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -81,6 +87,8 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderMapper jobOrderMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
+  @Mock private JobOrderItemService jobOrderItemService;
+  @Mock private MaterialClaimService materialClaimService;
 
   @InjectMocks private JobOrderService service;
 
@@ -117,6 +125,14 @@ class JobOrderServiceAssigneeAndListTest {
                   null,
                   o.getVersion());
             });
+    // The paged list path batches stock once per page via findMaterialStockRowsByJobOrderIds
+    // (REQ-DATA-003); default to an empty index so the routing tests need not model stock.
+    lenient()
+        .when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
+        .thenReturn(List.of());
+    // The list path also batches SK claims once per page; the routing tests use non-SK orders, so
+    // an empty per-order claim map is the right default.
+    lenient().when(materialClaimService.getClaimBucketsForOrders(any())).thenReturn(Map.of());
   }
 
   // ---------------------------------------------------------------
@@ -231,6 +247,76 @@ class JobOrderServiceAssigneeAndListTest {
 
       verify(jobOrderRepository)
           .findScopedJobOrders(allStatuses, null, false, null, union, pageable);
+    }
+
+    @Test
+    void listPath_batchesStockOncePerPageAndAvoidsPerMaterialSum() {
+      // REQ-DATA-003: the paged list must enrich stock with ONE batched query for the whole page,
+      // not the former one-SUM-per-material-per-order fan-out. With two orders on the page the
+      // batch
+      // query is issued exactly once and the per-material aggregate is never called on this path.
+      Page<JobOrder> page =
+          new PageImpl<>(
+              List.of(newJobOrder(JobOrderStatus.OPEN), newJobOrder(JobOrderStatus.IN_PROGRESS)));
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses, null, true, null, Set.of(), pageable))
+          .thenReturn(page);
+
+      service.getAllJobOrders(null, pageable);
+
+      verify(inventoryItemRepository, times(1)).findMaterialStockRowsByJobOrderIds(any());
+      verify(inventoryItemRepository, never())
+          .sumAmountByMaterialAndJobOrderAndMinQuality(any(), any(), any());
+    }
+
+    @Test
+    void listPath_sumsBatchedStockAtEachBucketsQualityFloor() {
+      // REQ-DATA-003: the list path sums the page-batched stock rows in memory, reproducing the
+      // native COALESCE(SUM(amount), 0) + (:floor IS NULL OR quality >= :floor) semantics for ANY
+      // floor — not just the GOOD/NONE pair. matNoFloor counts every grade; matFloor650 keeps only
+      // quality >= 650. The defensive null-quality / null-amount branches are exercised too (the
+      // columns are NOT NULL in the DB, so they are unreachable in production but must stay safe).
+      UUID orderId = JOB_ORDER_ID;
+      UUID matNoFloor = UUID.randomUUID();
+      UUID matFloor650 = UUID.randomUUID();
+
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses, null, true, null, Set.of(), pageable))
+          .thenReturn(new PageImpl<>(List.of(order)));
+      when(jobOrderMapper.toDto(order))
+          .thenReturn(
+              jobOrderDtoWithMaterials(
+                  order,
+                  materialLine(matNoFloor, null, 100.0),
+                  materialLine(matFloor650, 650, 100.0)));
+      when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
+          .thenReturn(
+              List.of(
+                  new JobOrderMaterialStockRow(orderId, matNoFloor, 300, 10.0),
+                  new JobOrderMaterialStockRow(orderId, matNoFloor, null, 5.0),
+                  new JobOrderMaterialStockRow(orderId, matNoFloor, 900, 20.0),
+                  new JobOrderMaterialStockRow(
+                      orderId, matNoFloor, 900, null), // null amount skipped
+                  new JobOrderMaterialStockRow(orderId, matFloor650, 640, 7.0), // below floor: out
+                  new JobOrderMaterialStockRow(orderId, matFloor650, 650, 3.0), // boundary: in
+                  new JobOrderMaterialStockRow(orderId, matFloor650, 900, 4.0), // above floor: in
+                  new JobOrderMaterialStockRow(orderId, matFloor650, null, 99.0))); // null q: out
+
+      Page<JobOrderDto> result = service.getAllJobOrders(null, pageable);
+
+      Map<UUID, Double> stockByMaterial =
+          result.getContent().get(0).materials().stream()
+              .collect(Collectors.toMap(m -> m.material().id(), JobOrderMaterialDto::currentStock));
+      assertEquals(
+          35.0,
+          stockByMaterial.get(matNoFloor),
+          "no floor: every grade (incl. ungraded) counts, null-amount row skipped (10 + 5 + 20)");
+      assertEquals(
+          7.0,
+          stockByMaterial.get(matFloor650),
+          "floor 650: only non-null quality >= 650 counts (3 + 4); below-floor and null-quality"
+              + " out");
     }
   }
 
@@ -532,6 +618,70 @@ class JobOrderServiceAssigneeAndListTest {
     o.setStatus(status);
     o.setVersion(1L);
     return o;
+  }
+
+  /**
+   * Builds a minimal {@link JobOrderMaterialDto} line for the list-path stock test: only {@code
+   * material().id()} (the stock-index key) and {@code minQuality} (the quality floor) matter to
+   * {@link JobOrderService}'s stock resolver; {@code currentStock} starts at {@code 0.0} and is the
+   * value the service must overwrite from the page-batched index.
+   *
+   * @param materialId the material identity the stock rows are keyed by.
+   * @param minQuality the bucket's quality floor, or {@code null} for "Keine" (no floor).
+   * @param requiredAmount the line's required amount (irrelevant to the sum, carried for realism).
+   * @return the material line DTO.
+   */
+  private JobOrderMaterialDto materialLine(
+      UUID materialId, Integer minQuality, double requiredAmount) {
+    MaterialDto material =
+        new MaterialDto(
+            materialId,
+            "mat-" + materialId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0L);
+    return new JobOrderMaterialDto(
+        UUID.randomUUID(), material, minQuality, requiredAmount, 0.0, List.of(), null, 0L);
+  }
+
+  /**
+   * Wraps the given material lines in a {@code MATERIAL}-type {@link JobOrderDto} mirroring the
+   * shape the shared mapper stub produces, so the list path enriches real material rows (the
+   * default {@code stubMapperEchoingEmptyMaterials} returns none).
+   *
+   * @param order the order whose scalar fields seed the DTO.
+   * @param materials the material lines the list path must stock-enrich.
+   * @return the populated order DTO.
+   */
+  private JobOrderDto jobOrderDtoWithMaterials(JobOrder order, JobOrderMaterialDto... materials) {
+    return new JobOrderDto(
+        order.getId(),
+        order.getDisplayId(),
+        null,
+        null,
+        order.getHandle(),
+        order.getComment(),
+        order.getPriority(),
+        order.getStatus(),
+        JobOrderType.MATERIAL,
+        List.of(materials),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        null,
+        order.getVersion());
   }
 
   private User newUser(UUID id) {

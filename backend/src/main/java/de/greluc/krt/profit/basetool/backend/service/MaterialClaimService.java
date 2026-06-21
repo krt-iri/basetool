@@ -42,10 +42,13 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -122,12 +125,29 @@ public class MaterialClaimService {
    * @return the per-bucket claim view, never {@code null}.
    */
   public List<ClaimBucketDto> getClaimBucketsForOrder(@NotNull JobOrder order) {
+    return getClaimBucketsForOrder(
+        order, materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId()));
+  }
+
+  /**
+   * Batched-list variant of {@link #getClaimBucketsForOrder(JobOrder)} that takes the order's
+   * claims pre-loaded by the caller (newest-first), so the paged job-order list can fetch every SK
+   * order's claims in one {@code findByJobOrderIdInOrderByCreatedAtDesc} query and avoid the
+   * per-order claim query (REQ-DATA-003). The {@code claims} must be exactly this order's claims;
+   * the bucketing, required-amount and open-remaining computation are identical to the single-order
+   * path.
+   *
+   * @param order the managed order whose buckets to project.
+   * @param orderClaims this order's claims, newest-first; may be empty.
+   * @return the per-bucket claim view, never {@code null}.
+   */
+  public List<ClaimBucketDto> getClaimBucketsForOrder(
+      @NotNull JobOrder order, @NotNull List<MaterialClaim> orderClaims) {
     Map<Bucket, Double> required = requiredByBucket(order);
     Map<UUID, Material> materials = materialsByBucket(order);
 
     Map<Bucket, List<MaterialClaim>> claimsByBucket = new LinkedHashMap<>();
-    for (MaterialClaim claim :
-        materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId())) {
+    for (MaterialClaim claim : orderClaims) {
       claimsByBucket
           .computeIfAbsent(
               new Bucket(claim.getMaterial().getId(), claim.getQualityRequirement()),
@@ -152,6 +172,35 @@ public class MaterialClaimService {
               claims.stream().map(this::toClaimDto).toList()));
     }
     return buckets;
+  }
+
+  /**
+   * Batch variant of {@link #getClaimBucketsForOrder(JobOrder)} for the paged job-order list: loads
+   * the claims of all given orders in a single query and returns the per-order bucket view keyed by
+   * order id, so the list path issues one claim query instead of one per SK order (REQ-DATA-003).
+   * Pass only the orders that can carry claims (SK-responsible); other orders need no entry (their
+   * claim view is empty by construction).
+   *
+   * @param orders the orders whose claim views to project; an empty collection yields an empty map.
+   * @return order id → its per-bucket claim view; orders with no claims still get their required
+   *     buckets with empty claim lists.
+   */
+  public Map<UUID, List<ClaimBucketDto>> getClaimBucketsForOrders(
+      @NotNull Collection<JobOrder> orders) {
+    if (orders.isEmpty()) {
+      return Map.of();
+    }
+    List<UUID> orderIds = orders.stream().map(JobOrder::getId).toList();
+    Map<UUID, List<MaterialClaim>> claimsByOrder =
+        materialClaimRepository.findByJobOrderIdInOrderByCreatedAtDesc(orderIds).stream()
+            .collect(Collectors.groupingBy(claim -> claim.getJobOrder().getId()));
+    Map<UUID, List<ClaimBucketDto>> result = new HashMap<>();
+    for (JobOrder order : orders) {
+      result.put(
+          order.getId(),
+          getClaimBucketsForOrder(order, claimsByOrder.getOrDefault(order.getId(), List.of())));
+    }
+    return result;
   }
 
   /**

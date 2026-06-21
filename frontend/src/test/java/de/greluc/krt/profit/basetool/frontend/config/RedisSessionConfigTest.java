@@ -20,10 +20,19 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.session.FlushMode;
+import org.springframework.session.config.SessionRepositoryCustomizer;
+import org.springframework.session.data.redis.RedisIndexedSessionRepository;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import tools.jackson.databind.json.JsonMapper;
@@ -41,6 +50,11 @@ import tools.jackson.databind.json.JsonMapper;
  * that hides {@code BindingResult.getModel()} from the serialiser, breaking the cycle without
  * dropping the field errors / target / object-name. These tests pin that behaviour so it cannot
  * silently regress when the configuration is touched in the future.
+ *
+ * <p>Also pins {@link RedisSessionConfig#sessionRepositoryCustomizer()}: the configurable {@code
+ * spring.session.redis.flush-mode} must bind leniently (case- and {@code -}/{@code _}-insensitive)
+ * and fall back to the durable {@code IMMEDIATE} default on an unrecognised value rather than
+ * crashing startup, while the session timeout and key namespace stay applied.
  */
 class RedisSessionConfigTest {
 
@@ -74,6 +88,57 @@ class RedisSessionConfigTest {
     assertThat(json)
         .as("Object name must survive so Spring can re-attach the BindingResult to the right model")
         .contains("sampleForm");
+  }
+
+  /**
+   * The flush mode is resolved leniently: any case and {@code -}/{@code _} spelling of a valid
+   * constant binds, and an unrecognised value degrades to the durable {@code IMMEDIATE} default.
+   * The lowercase {@code on_save} case is the load-bearing one — it is the spelling Spring's own
+   * docs use, and a direct {@code @Value FlushMode} binding would crash startup on it.
+   *
+   * @param configured the raw {@code spring.session.redis.flush-mode} value
+   * @param expected the {@link FlushMode} the customizer must apply to the repository
+   */
+  @ParameterizedTest
+  @CsvSource({
+    "IMMEDIATE,IMMEDIATE",
+    "ON_SAVE,ON_SAVE",
+    "on_save,ON_SAVE",
+    "on-save,ON_SAVE",
+    "Immediate,IMMEDIATE",
+    "bogus,IMMEDIATE"
+  })
+  void customizerResolvesFlushModeLeniently(String configured, FlushMode expected) {
+    RedisIndexedSessionRepository repository = applyCustomizer(configured);
+    verify(repository).setFlushMode(expected);
+  }
+
+  /** The customizer also re-applies the configured session timeout and Redis key namespace. */
+  @Test
+  void customizerAppliesTimeoutAndNamespace() {
+    RedisIndexedSessionRepository repository = applyCustomizer("IMMEDIATE");
+    verify(repository).setDefaultMaxInactiveInterval(Duration.ofHours(240));
+    verify(repository).setRedisKeyNamespace("basetool:session");
+  }
+
+  /**
+   * Instantiates {@link RedisSessionConfig} with the given flush-mode value (plus fixed timeout and
+   * namespace), runs its {@link RedisSessionConfig#sessionRepositoryCustomizer()} against a mock
+   * repository, and returns that mock for verification.
+   *
+   * @param flushModeValue the raw {@code spring.session.redis.flush-mode} value to inject
+   * @return the mock repository the customizer was applied to
+   */
+  private static RedisIndexedSessionRepository applyCustomizer(String flushModeValue) {
+    RedisSessionConfig config = new RedisSessionConfig();
+    ReflectionTestUtils.setField(config, "sessionTimeout", Duration.ofHours(240));
+    ReflectionTestUtils.setField(config, "redisNamespace", "basetool:session");
+    ReflectionTestUtils.setField(config, "flushModeValue", flushModeValue);
+    SessionRepositoryCustomizer<RedisIndexedSessionRepository> customizer =
+        config.sessionRepositoryCustomizer();
+    RedisIndexedSessionRepository repository = mock(RedisIndexedSessionRepository.class);
+    customizer.customize(repository);
+    return repository;
   }
 
   /**

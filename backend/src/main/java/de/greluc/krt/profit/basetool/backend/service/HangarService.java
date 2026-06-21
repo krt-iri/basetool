@@ -35,7 +35,9 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -184,6 +186,11 @@ public class HangarService {
                 types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
             : java.util.Collections.emptyList();
 
+    // Index the ships by their type once (O(ships)) instead of re-scanning the whole list per
+    // ship-type row (the former O(types × ships) filter inside the page map).
+    Map<UUID, List<Ship>> shipsByType =
+        ships.stream().collect(Collectors.groupingBy(s -> s.getShipType().getId()));
+
     return p.map(
         obj -> {
           de.greluc.krt.profit.basetool.backend.model.ShipType type =
@@ -191,8 +198,7 @@ public class HangarService {
           List<SquadronShipDetailDto> details = null;
           if (includeOwnerDetails) {
             details =
-                ships.stream()
-                    .filter(s -> s.getShipType().getId().equals(type.getId()))
+                shipsByType.getOrDefault(type.getId(), List.of()).stream()
                     .map(
                         s ->
                             new SquadronShipDetailDto(

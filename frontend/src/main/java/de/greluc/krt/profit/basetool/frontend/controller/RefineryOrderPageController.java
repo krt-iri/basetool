@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemF
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -48,6 +49,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -78,9 +80,16 @@ import tools.jackson.databind.JsonNode;
 @Slf4j
 public class RefineryOrderPageController {
 
+  /** Selectable page sizes for the order list (shared REQ-INV-013 contract: 10/50/100). */
+  private static final List<Integer> PAGE_SIZES = List.of(10, 50, 100);
+
+  /** Page size applied when the request carries none (or a non-whitelisted one). */
+  private static final int DEFAULT_PAGE_SIZE = 50;
+
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final IngestHandoffService ingestHandoffService;
+  private final ParallelPageLoader parallelPageLoader;
 
   /**
    * Parses the start instant submitted by the form as a UTC {@link java.time.Instant}.
@@ -116,17 +125,24 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Renders the refinery-order list ({@code /refinery-orders}). Default filter is {@code
-   * OPEN}+{@code IN_PROGRESS} so the operational view is uncluttered by completed/canceled orders.
-   * The {@code onlyMine} toggle switches between the all-orders endpoint and the per-user endpoint
-   * — both return at most 1000 rows in one page, sorted by {@code startedAt} desc.
+   * Renders one server-side page of the refinery-order list ({@code /refinery-orders}). Default
+   * filter is {@code OPEN}+{@code IN_PROGRESS} so the operational view is uncluttered by
+   * completed/canceled orders. The {@code onlyMine} toggle switches between the all-orders endpoint
+   * and the per-user endpoint; both are fetched one {@link #PAGE_SIZES}-bounded page at a time
+   * (sorted by {@code startedAt} desc) instead of the former unbounded {@code size=1000} pull, so a
+   * large order history no longer loads in a single response (REQ-REFINERY-019). {@code size} is
+   * restricted to {@link #PAGE_SIZES} so a crafted query string cannot reinstate the unbounded
+   * fetch.
    *
    * @param status optional list of statuses to include
    * @param onlyMine if true, restrict to the caller's own orders
+   * @param page zero-based page index, defaulted/clamped to 0
+   * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else the default
    * @param fragment when {@code "results"}, only the results-table fragment is rendered for an
    *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with {@code orders}, selected statuses and the full
-   *     status list for the filter UI
+   * @param model Thymeleaf model populated with {@code orders}, the page envelope ({@code
+   *     ordersPage}), the {@code pageSizes} and the filter-preserving {@code paginationBaseUrl},
+   *     plus the selected statuses and the full status list for the filter UI
    * @param principal authenticated OIDC user (used to derive the logistician hint)
    * @return the {@code refinery-orders-index} view name, or its {@code refineryOrdersResults}
    *     fragment selector
@@ -136,27 +152,38 @@ public class RefineryOrderPageController {
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false) Boolean onlyMine,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     if (status == null || status.isEmpty()) {
       status = List.of("OPEN", "IN_PROGRESS");
     }
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
 
     boolean isLogistician = isLogistician(principal);
 
     List<RefineryOrderListDto> orders = new ArrayList<>();
+    PageResponse<RefineryOrderListDto> p = null;
     try {
       String statusParam = String.join(",", status);
-      // Now everyone sees all orders (Read-only for normal members)
+      // Everyone sees all orders (read-only for normal members); the per-user endpoint backs the
+      // "Meine Auftraege" toggle. Both are paginated server-side now (REQ-REFINERY-019).
+      String endpoint =
+          Boolean.TRUE.equals(onlyMine)
+              ? "/api/v1/refinery-orders/my-orders"
+              : "/api/v1/refinery-orders/all";
       String url =
-          "/api/v1/refinery-orders/all?size=1000&sort=startedAt,desc&status=" + statusParam;
-      if (Boolean.TRUE.equals(onlyMine)) {
-        url =
-            "/api/v1/refinery-orders/my-orders?size=1000&sort=startedAt,desc&status=" + statusParam;
-      }
-      PageResponse<RefineryOrderListDto> p =
-          backendApiClient.get(url, new ParameterizedTypeReference<>() {});
+          endpoint
+              + "?page="
+              + effectivePage
+              + "&size="
+              + effectiveSize
+              + "&sort=startedAt,desc&status="
+              + statusParam;
+      p = backendApiClient.get(url, new ParameterizedTypeReference<>() {});
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
       }
@@ -165,6 +192,9 @@ public class RefineryOrderPageController {
       model.addAttribute("errorToast", "error.refineryorder.load");
     }
     model.addAttribute("orders", orders);
+    model.addAttribute("ordersPage", p);
+    model.addAttribute("pageSizes", PAGE_SIZES);
+    model.addAttribute("paginationBaseUrl", buildPaginationBaseUrl(status, onlyMine));
     model.addAttribute("selectedStatuses", status);
     model.addAttribute("onlyMine", Boolean.TRUE.equals(onlyMine));
     model.addAttribute("allStatuses", List.of("OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED"));
@@ -172,6 +202,27 @@ public class RefineryOrderPageController {
       return "refinery-orders-index :: refineryOrdersResults";
     }
     return "refinery-orders-index";
+  }
+
+  /**
+   * Builds the {@code baseUrl} the pagination fragment threads {@code page}/{@code size} onto so
+   * page and size links preserve the active filter. The repeatable {@code status} params and the
+   * {@code onlyMine} flag are reproduced exactly as the filter form submits them; the status tokens
+   * are fixed enum names, so no extra escaping is required.
+   *
+   * @param status the resolved (never empty) status filter
+   * @param onlyMine the resolved own-orders toggle
+   * @return {@code /refinery-orders?status=...&onlyMine=true} carrying the current filter
+   */
+  private static String buildPaginationBaseUrl(List<String> status, Boolean onlyMine) {
+    List<String> queryParts = new ArrayList<>();
+    for (String s : status) {
+      queryParts.add("status=" + s);
+    }
+    if (Boolean.TRUE.equals(onlyMine)) {
+      queryParts.add("onlyMine=true");
+    }
+    return "/refinery-orders?" + String.join("&", queryParts);
   }
 
   /**
@@ -278,17 +329,42 @@ public class RefineryOrderPageController {
         form.setOwnerId(currentUserId);
       }
     }
+    // isLogistician reads the SecurityContext on the request thread; do it here, then fetch the
+    // catalog lookups concurrently (missions, users, rounding mode, yields and the owner picker are
+    // uncached round-trips). Each helper swallows its own failure and returns an empty list/map, so
+    // join() never throws and the form degrades exactly as the serial version did.
     model.addAttribute("isLogistician", isLogistician(principal));
     model.addAttribute("refineryOrderForm", form);
-    model.addAttribute("materials", fetchMaterials());
-    model.addAttribute("methods", fetchMethods());
-    model.addAttribute("locations", fetchLocations());
-    model.addAttribute("missions", fetchMissions());
-    model.addAttribute("users", fetchUsers());
-    model.addAttribute("roundingMode", fetchRoundingMode());
-    UUID preselectedLocationId = form != null ? form.getLocationId() : null;
-    model.addAttribute("materialYieldBonuses", fetchYieldsForLocation(preselectedLocationId));
-    model.addAttribute("ownerOptions", fetchOwnerPickerOptions(form, principal));
+    final RefineryOrderForm boundForm = form;
+    UUID preselectedLocationId = boundForm.getLocationId();
+    var materialsFuture = parallelPageLoader.loadAsync(this::fetchMaterials);
+    var methodsFuture = parallelPageLoader.loadAsync(this::fetchMethods);
+    var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
+    var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
+    var usersFuture = parallelPageLoader.loadAsync(this::fetchUsers);
+    var roundingFuture = parallelPageLoader.loadAsync(this::fetchRoundingMode);
+    var yieldsFuture =
+        parallelPageLoader.loadAsync(() -> fetchYieldsForLocation(preselectedLocationId));
+    var ownerFuture =
+        parallelPageLoader.loadAsync(() -> fetchOwnerPickerOptions(boundForm, principal));
+    CompletableFuture.allOf(
+            materialsFuture,
+            methodsFuture,
+            locationsFuture,
+            missionsFuture,
+            usersFuture,
+            roundingFuture,
+            yieldsFuture,
+            ownerFuture)
+        .join();
+    model.addAttribute("materials", materialsFuture.join());
+    model.addAttribute("methods", methodsFuture.join());
+    model.addAttribute("locations", locationsFuture.join());
+    model.addAttribute("missions", missionsFuture.join());
+    model.addAttribute("users", usersFuture.join());
+    model.addAttribute("roundingMode", roundingFuture.join());
+    model.addAttribute("materialYieldBonuses", yieldsFuture.join());
+    model.addAttribute("ownerOptions", ownerFuture.join());
   }
 
   /**

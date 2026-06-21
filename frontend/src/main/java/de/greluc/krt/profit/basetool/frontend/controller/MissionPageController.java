@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.UnitForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.HashMap;
@@ -51,6 +52,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -118,6 +120,16 @@ public class MissionPageController {
    * token, not the principal object.
    */
   private final FrontendAuthHelperService authHelperService;
+
+  /**
+   * Runs independent backend reads concurrently on virtual threads with the full request-scoped
+   * context (SecurityContext / RequestAttributes / squadron / correlation id) restored, so the
+   * mission-detail render does not pay the sum of their latencies in series. Used for the
+   * member-only finance/sum/refinery-orders trio — three independent per-mission reads that
+   * previously ran back to back on every render (and, since the live-sync presence relay #755, on
+   * every peer's in-place fragment re-fetch too).
+   */
+  private final ParallelPageLoader parallelPageLoader;
 
   private void addOperationsToModel(Model model, boolean isPublic) {
     if (isPublic) {
@@ -605,25 +617,45 @@ public class MissionPageController {
       // empty/collapsed instead of leaking refinery expenses through the shared finance table.
       if (authHelperService.isMemberOrAbove()) {
         try {
-          PageResponse<MissionFinanceEntryDto> financesPage =
-              backendApiClient.get(
-                  "/api/v1/missions/" + id + "/finance-entries?size=1000",
-                  new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {},
-                  false);
+          // The three reads are independent per-mission lookups; run them concurrently instead of
+          // back to back. join() below surfaces any supplier failure as a CompletionException,
+          // caught and unwrapped by the block's catch. Two deliberate differences from the old
+          // serial code: (1) all three GETs are always dispatched, whereas serially a failure on
+          // the first short-circuited the rest — harmless, as these are idempotent reads; (2) on a
+          // failure of any one read the whole Finanzen panel now collapses to its empty state,
+          // whereas the serial code added financeEntries to the model before the later reads and so
+          // could still render the entries table when only the sum/refinery read failed. The
+          // all-or-nothing panel is the intended outcome here.
+          CompletableFuture<PageResponse<MissionFinanceEntryDto>> financesFuture =
+              parallelPageLoader.loadAsync(
+                  () ->
+                      backendApiClient.get(
+                          "/api/v1/missions/" + id + "/finance-entries?size=1000",
+                          new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {},
+                          false));
+          CompletableFuture<java.math.BigDecimal> financeSumFuture =
+              parallelPageLoader.loadAsync(
+                  () ->
+                      backendApiClient.get(
+                          "/api/v1/missions/" + id + "/finance-entries/sum",
+                          java.math.BigDecimal.class,
+                          false));
+          CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
+              parallelPageLoader.loadAsync(
+                  () ->
+                      backendApiClient.get(
+                          "/api/v1/refinery-orders/mission/" + id,
+                          new ParameterizedTypeReference<List<RefineryOrderListDto>>() {},
+                          false));
+          CompletableFuture.allOf(financesFuture, financeSumFuture, refineryFuture).join();
+
+          PageResponse<MissionFinanceEntryDto> financesPage = financesFuture.join();
           model.addAttribute("financeEntries", financesPage.content());
 
-          java.math.BigDecimal financeSum =
-              backendApiClient.get(
-                  "/api/v1/missions/" + id + "/finance-entries/sum",
-                  java.math.BigDecimal.class,
-                  false);
+          java.math.BigDecimal financeSum = financeSumFuture.join();
           model.addAttribute("financeSum", financeSum);
 
-          List<RefineryOrderListDto> refineryOrders =
-              backendApiClient.get(
-                  "/api/v1/refinery-orders/mission/" + id,
-                  new ParameterizedTypeReference<List<RefineryOrderListDto>>() {},
-                  false);
+          List<RefineryOrderListDto> refineryOrders = refineryFuture.join();
           model.addAttribute("refineryOrders", refineryOrders);
 
           // Finance tab summary strip (Gesamtsumme / Einnahmen / Ausgaben / je Anteil): income
@@ -662,7 +694,14 @@ public class MissionPageController {
                       java.math.BigDecimal.valueOf(registered), 0, java.math.RoundingMode.HALF_UP)
                   : null);
         } catch (Exception e) {
-          log.error("Error loading finance entries or refinery orders", e);
+          // join() reports a supplier failure wrapped in a CompletionException; log its concrete
+          // cause so the line still names the real backend exception, as the serial code did. Other
+          // failures in this block (e.g. the aggregation loop) are logged as-is.
+          Throwable cause =
+              (e instanceof java.util.concurrent.CompletionException && e.getCause() != null)
+                  ? e.getCause()
+                  : e;
+          log.error("Error loading finance entries or refinery orders", cause);
         }
       }
 
@@ -694,6 +733,7 @@ public class MissionPageController {
         case "crew-board" -> "mission-detail :: crewBoard";
         case "finance" -> "mission-detail :: financeSection";
         case "mgmt" -> "mission-detail :: mgmtPanels";
+        case "overview" -> "mission-detail :: overviewSection";
         default -> "mission-detail";
       };
     }

@@ -143,7 +143,7 @@ class JobOrderListRenderTest {
             1L);
 
     when(backendApiClient.get(
-            eq("/api/v1/orders?size=1000&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
             any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
 

@@ -46,3 +46,23 @@ OS / browser push notifications are out of scope — the indicator is in-app onl
 - **Reusing the mission-presence WebSocket** — rejected: it is frontend-local (no backend
   bus); a backend→frontend channel is genuinely new.
 
+## Addendum (2026-06-21) — named `heartbeat` as a client liveness signal
+
+The SSE keepalive was originally an SSE *comment* (`:heartbeat`): it keeps the connection alive
+across proxy idle timeouts but is invisible to the browser, because `EventSource` swallows comment
+lines and fires no JS event. A *half-open* connection (TCP up, backend stream dead) therefore never
+surfaces to the client — `EventSource` only fires `error` on a transport-level failure — so the
+adaptive unread-count poll (REQ-NOTIF-010) stayed backed off to its slow keepalive and the
+REQ-SEC-012 re-auth detection window degraded to that interval.
+
+To close this, the keepalive is now a **named** `heartbeat` event carrying a small payload (a named
+SSE event must carry `data` to be dispatched by `EventSource`). It still keeps the connection alive,
+and additionally drives a client-side liveness watchdog: when several beats are missed the poll
+demotes to the fast cadence without waiting for an `error`, and a later event re-promotes it. The
+change is backward compatible — the frontend relay already forwards named events transparently (it
+relays `connected`/`notification`), and a named event is bytes-on-the-wire just like a comment for
+proxy-keepalive purposes.
+
+This **refines, not reverses**, the SSE-as-enhancement decision above: polling remains the
+guaranteed fallback and SSE remains best-effort. Status stays **Accepted**.
+

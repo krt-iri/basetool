@@ -28,4 +28,28 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MissionOwnershipRepository extends JpaRepository<MissionOwnership, UUID> {
   /** Derived Spring-Data query - returns entities matching {@code MissionId}. */
   Optional<MissionOwnership> findByMissionId(UUID missionId);
+
+  /**
+   * Bulk-reassigns the owner of every {@code mission_ownership} companion row from {@code oldUser}
+   * to {@code newUser}, keeping the 1:1 companion in step with {@link
+   * MissionRepository#updateOwner(de.greluc.krt.profit.basetool.backend.model.User,
+   * de.greluc.krt.profit.basetool.backend.model.User)} which reassigns {@code mission.owner_id}.
+   * Required by {@code UserService.deleteUser}: the {@code mission_ownership.owner_id} foreign key
+   * carries no {@code ON DELETE} clause, so leaving it pointed at a deleted user would FK-fail
+   * (SQLSTATE 23503) when the {@code app_user} row is removed — the parent mission survives (its
+   * owner having been reassigned), so the {@code ON DELETE CASCADE} on {@code mission_id} never
+   * fires to clear the row. Mirrors the plain bulk-update style of the sibling {@code updateOwner}
+   * methods (no {@code clearAutomatically}); it deliberately does not bump {@code
+   * mission_ownership.version}, matching {@code mission.owner} being
+   * {@code @OptimisticLock(excluded = true)}.
+   *
+   * @param oldUser the user being removed, whose owned companion rows are reassigned
+   * @param newUser the replacement owner (the fallback admin)
+   */
+  @org.springframework.data.jpa.repository.Modifying
+  @org.springframework.data.jpa.repository.Query(
+      "UPDATE MissionOwnership mo SET mo.owner = :newUser WHERE mo.owner = :oldUser")
+  void updateOwner(
+      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User oldUser,
+      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User newUser);
 }

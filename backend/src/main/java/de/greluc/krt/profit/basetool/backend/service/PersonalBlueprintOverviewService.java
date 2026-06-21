@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintOverviewOwnerDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -112,17 +113,18 @@ public class PersonalBlueprintOverviewService {
     // atomic. The row's display label is the case-preserving base name derived from the first-seen
     // member's blueprint, so a family owned only via a variant still reads as its base.
     Map<String, ProductAggregate> byKey = new LinkedHashMap<>();
-    for (PersonalBlueprint bp : personalBlueprintRepository.findAllByOwnerSubIn(ownerSubs)) {
-      String familyKey = familyResolver.familyKey(bp.getProductName());
+    for (BlueprintOwnerProduct bp :
+        personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs)) {
+      String familyKey = familyResolver.familyKey(bp.productName());
       if (familyKey.isEmpty()) {
         continue;
       }
       byKey
           .computeIfAbsent(
               familyKey,
-              key -> new ProductAggregate(familyResolver.displayBaseName(bp.getProductName())))
+              key -> new ProductAggregate(familyResolver.displayBaseName(bp.productName())))
           .owners
-          .add(bp.getOwnerSub());
+          .add(bp.ownerSub());
     }
     String needle =
         search == null || search.isBlank() ? null : search.trim().toLowerCase(Locale.ROOT);

@@ -38,8 +38,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  *
  * <p>Single-backend-instance only — multi-instance fan-out via Redis pub/sub is a noted follow-up
  * (ADR-0016). Push is strictly best-effort: a failed send simply drops that emitter, and the
- * frontend's polling (REQ-NOTIF-006) remains the guaranteed fallback. A periodic heartbeat comment
- * keeps idle connections alive across proxies.
+ * frontend's polling (REQ-NOTIF-006) remains the guaranteed fallback. A periodic named {@code
+ * heartbeat} event keeps idle connections alive across proxies and doubles as a browser-visible
+ * liveness signal so the client can detect a half-open stream (TCP up, stream dead) and fall back
+ * to the fast poll (REQ-NOTIF-010, REQ-SEC-012).
  */
 @Service
 @Slf4j
@@ -59,7 +61,7 @@ public class NotificationStreamService {
    */
   @NotNull
   public SseEmitter subscribe(@NotNull UUID recipientSub) {
-    SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
+    SseEmitter emitter = newEmitter();
     emittersBySub.computeIfAbsent(recipientSub, key -> ConcurrentHashMap.newKeySet()).add(emitter);
     emitter.onCompletion(() -> remove(recipientSub, emitter));
     emitter.onTimeout(() -> remove(recipientSub, emitter));
@@ -94,7 +96,16 @@ public class NotificationStreamService {
     }
   }
 
-  /** Sends a heartbeat comment to all live emitters so idle SSE connections are not reaped. */
+  /**
+   * Sends a named {@code heartbeat} event to all live emitters so idle SSE connections survive
+   * proxy idle timeouts and the browser gets a periodic liveness signal.
+   *
+   * <p>It is a named event (carrying a token payload), not an SSE comment, on purpose: browsers'
+   * {@code EventSource} swallow comments at the protocol level, so a comment cannot reset a
+   * client-side liveness watchdog. A named event lets the client notice a half-open stream (no
+   * traffic for several beats) and fall back to the fast unread-count poll (REQ-NOTIF-010,
+   * REQ-SEC-012). Dead emitters are dropped on send failure.
+   */
   @Scheduled(fixedRateString = "${app.notifications.sse.heartbeat-interval:PT20S}")
   public void heartbeat() {
     emittersBySub.forEach(
@@ -102,11 +113,23 @@ public class NotificationStreamService {
             emitters.forEach(
                 emitter -> {
                   try {
-                    emitter.send(SseEmitter.event().comment("heartbeat"));
+                    emitter.send(SseEmitter.event().name("heartbeat").data("ok"));
                   } catch (IOException | RuntimeException e) {
                     remove(recipientSub, emitter);
                   }
                 }));
+  }
+
+  /**
+   * Creates the {@link SseEmitter} backing a new subscription, with the registry's connection
+   * timeout. Extracted as a seam so tests can substitute a mock emitter and assert on the events
+   * the registry sends (connected / heartbeat / notification).
+   *
+   * @return a fresh emitter holding the connection open for {@link #EMITTER_TIMEOUT_MS}
+   */
+  @NotNull
+  protected SseEmitter newEmitter() {
+    return new SseEmitter(EMITTER_TIMEOUT_MS);
   }
 
   private void remove(@NotNull UUID recipientSub, @NotNull SseEmitter emitter) {

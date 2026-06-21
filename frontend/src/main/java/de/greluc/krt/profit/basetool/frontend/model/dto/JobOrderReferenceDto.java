@@ -22,10 +22,16 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 import java.util.UUID;
 
-/** Data transfer record carrying Job Order Reference payload. */
+/**
+ * Frontend mirror of the backend {@code JobOrderReferenceDto}. {@code requiredMaterialIds} carries
+ * the order's distinct required material ids across both order kinds (ITEM-derived included) so the
+ * Lager "Auftrag" dropdown can hide an order that does not require a row's material
+ * (REQ-ORDERS-018); {@code materials} stays the MATERIAL-order lines (empty for ITEM orders).
+ */
 public record JobOrderReferenceDto(
     UUID id,
     Integer displayId,
     String handle,
     String status,
-    List<JobOrderMaterialDto> materials) {}
+    List<JobOrderMaterialDto> materials,
+    List<UUID> requiredMaterialIds) {}

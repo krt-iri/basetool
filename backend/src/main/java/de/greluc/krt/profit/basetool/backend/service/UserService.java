@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
@@ -91,8 +93,10 @@ public class UserService {
   private final ShipRepository shipRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final MissionRepository missionRepository;
+  private final MissionOwnershipRepository missionOwnershipRepository;
   private final JobOrderRepository jobOrderRepository;
   private final MissionParticipantRepository missionParticipantRepository;
+  private final MaterialClaimRepository materialClaimRepository;
   private final de.greluc.krt.profit.basetool.backend.repository.SquadronRepository
       squadronRepository;
   private final AuthHelperService authHelperService;
@@ -988,12 +992,28 @@ public class UserService {
 
   /**
    * Deletes a user account along with all owned data (ships, inventory, refinery orders, mission
-   * memberships). Used by admins to remove ex-members. The cascade is explicit (per-table delete
-   * calls) so the order matches the FK constraints; auto-cascading would surface confusing FK
-   * errors when the table order changes.
+   * memberships) and its Discord-approval audit trail (epic #720 / V173). Used by admins to remove
+   * ex-members; only a user no longer present in Keycloak may be deleted. The cascade is explicit
+   * (per-table delete / reassign calls) so the order matches the FK constraints; auto-cascading
+   * would surface confusing FK errors when the table order changes. References whose FK declares
+   * {@code ON DELETE SET NULL} / {@code CASCADE} (bank tables, org-unit membership, org-chart, …)
+   * are left to the database; the no-{@code ON DELETE} references — the owner columns (reassigned
+   * to an admin) and the V173 approval audit (cleaned up here) — must be resolved explicitly first.
+   *
+   * <p>Every {@code app_user} foreign key that carries no {@code ON DELETE} clause is resolved here
+   * before the final {@link UserRepository#delete} — reassigned to the fallback admin (owned
+   * aggregates: inventory, ships, refinery orders, missions and the {@code mission_ownership}
+   * companion) or unlinked (managers, job-order assignees, mission participants, and the audit-only
+   * {@code material_claim.claimed_by_user_id} stamp). The {@code mission_ownership.owner_id}
+   * reassignment must stay paired with {@code missionRepository.updateOwner}: the parent mission
+   * survives the delete (its owner having been moved to the admin), so the {@code ON DELETE
+   * CASCADE} on {@code mission_id} never fires to clear the row, and the FK-less {@code owner_id}
+   * would otherwise dangle and FK-fail (SQLSTATE 23503).
    *
    * @param userId user to delete
    * @throws NoSuchElementException when the user id is unknown
+   * @throws IllegalStateException when the user is still present in Keycloak, or when no other
+   *     admin exists to receive the reassigned owner references
    */
   @Transactional
   public void deleteUser(UUID userId) {
@@ -1027,11 +1047,33 @@ public class UserService {
     shipRepository.updateOwner(user, admin);
     refineryOrderRepository.updateOwner(user, admin);
     missionRepository.updateOwner(user, admin);
+    // The mission_ownership companion (1:1 with mission, owner_id FK has no ON DELETE clause) must
+    // be reassigned in lock-step with mission.owner above; otherwise its dangling owner_id FK-fails
+    // (23503) on the final delete, because the parent mission survives so its mission_id cascade
+    // never clears the row.
+    missionOwnershipRepository.updateOwner(user, admin);
 
     // Remove ManyToMany and nullable references
     missionRepository.removeManager(userId);
     jobOrderRepository.removeAssignee(userId);
     missionParticipantRepository.unlinkUser(userId);
+    // material_claim.claimed_by_user_id (V131) is an audit-only FK with no ON DELETE clause; null
+    // it
+    // so an ex-logistician who ever filed a claim does not FK-fail (23503) on the delete below.
+    materialClaimRepository.unlinkClaimedByUser(userId);
+
+    // Discord-approval audit cleanup (epic #720 / REQ-SEC-017, V173). These three references into
+    // app_user declare no ON DELETE clause (Postgres NO ACTION), so without explicit cleanup a
+    // decided-on or deciding account cannot be hard-deleted. This is the reported regression: an
+    // approved, since-removed Discord registration could not be deleted because of FK
+    // user_approval_event_user_id_fkey (409). The subject's own audit rows are deleted (user_id is
+    // NOT NULL, so they cannot be orphaned); rows the deleted account decided keep the audit but
+    // lose their now-gone decider link; and the denormalised app_user.approved_by_id back-pointer
+    // on other users is nulled. The approval audit of OTHER users survives. Must run before the
+    // app_user delete below so the FK is satisfied at flush.
+    userApprovalEventRepository.deleteByUserId(userId);
+    userApprovalEventRepository.clearDecidedBy(userId);
+    userRepository.clearApprovedBy(userId);
 
     // Delete the user
     userRepository.delete(user);

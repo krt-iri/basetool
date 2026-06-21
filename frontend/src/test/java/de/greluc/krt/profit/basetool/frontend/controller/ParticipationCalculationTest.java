@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
@@ -41,6 +42,11 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 class ParticipationCalculationTest {
+
+  // Real loader so the parallelized finance/refinery fetches actually run their suppliers (against
+  // the mocked BackendApiClient) on a worker thread, exactly as in production. Shared across the
+  // method-local controller instances; harmless when a test never reaches the member finance block.
+  private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
 
   @Test
   void testParticipationCalculation_KeyType() {
@@ -110,7 +116,10 @@ class ParticipationCalculationTest {
 
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
+            backendApiClient,
+            mock(MessageSource.class),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     // Act
@@ -222,7 +231,10 @@ class ParticipationCalculationTest {
 
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(MessageSource.class), mock(FrontendAuthHelperService.class));
+            backendApiClient,
+            mock(MessageSource.class),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     // Act

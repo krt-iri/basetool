@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.frontend.model.dto.*;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -42,13 +43,20 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 class InventoryPageControllerTest {
 
+  /**
+   * Shared real {@link ParallelPageLoader} for the input-page tests. The loader runs each catalog
+   * supplier on a virtual thread against the mocked {@link BackendApiClient}; a single static
+   * instance avoids spinning up a fresh virtual-thread executor per test method.
+   */
+  private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
+
   private BackendApiClient backendApiClient;
   private InventoryPageController controller;
 
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new InventoryPageController(backendApiClient);
+    controller = new InventoryPageController(backendApiClient, PARALLEL);
   }
 
   @Test

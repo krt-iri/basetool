@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -63,6 +64,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -106,6 +108,7 @@ public class JobOrderPageController {
 
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
+  private final ParallelPageLoader parallelPageLoader;
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
@@ -118,6 +121,18 @@ public class JobOrderPageController {
    * status filter.
    */
   private static final List<String> VALID_SQUADRON_SCOPES = List.of("mine", "all");
+
+  /**
+   * Selectable page sizes for the order list. Larger than the shared 10/50/100 contract
+   * (REQ-INV-013) by design (REQ-ORDERS-020): the LOGISTICIAN drag-and-drop priority reorder works
+   * within one page, and the active queue (the default {@code OPEN}+{@code IN_PROGRESS} filter)
+   * must comfortably fit on the first page so reordering stays whole in the common case. A crafted
+   * out-of-list {@code size} snaps back to {@link #DEFAULT_PAGE_SIZE}.
+   */
+  private static final List<Integer> PAGE_SIZES = List.of(50, 100, 200);
+
+  /** Page size applied when the request carries none (or a non-whitelisted one). */
+  private static final int DEFAULT_PAGE_SIZE = 100;
 
   /**
    * Renders the job-order list ({@code /orders}). Two persisted filters drive the view:
@@ -145,11 +160,15 @@ public class JobOrderPageController {
    * @param cookieScope previous persisted squadron-scope filter from the cookie
    * @param activeSquadronId active squadron context surfaced by {@code SquadronContextAdvice}; used
    *     to translate {@code scope=mine} into a backend {@code squadronId} param.
+   * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
+   * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link
+   *     #DEFAULT_PAGE_SIZE}
    * @param response servlet response, used to update the persistence cookies
    * @param fragment when {@code "results"}, only the results-table fragment is rendered for an
    *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with orders, selected filters and the aging thresholds
-   *     for the row-color rendering
+   * @param model Thymeleaf model populated with orders, the page envelope ({@code ordersPage}), the
+   *     {@code pageSizes}, the filter-preserving {@code paginationBaseUrl}, the selected filters
+   *     and the aging thresholds for the row-color rendering
    * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
    */
   @GetMapping
@@ -161,6 +180,8 @@ public class JobOrderPageController {
       @CookieValue(name = "orders_filter_scope", required = false) String cookieScope,
       @ModelAttribute("activeSquadronId") UUID activeSquadronId,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
       HttpServletResponse response,
       @RequestParam(required = false) String fragment,
       Model model) {
@@ -213,36 +234,51 @@ public class JobOrderPageController {
       resolvedScope = "mine";
     }
     boolean filterToOwnSquadron = "mine".equals(resolvedScope) && activeSquadronId != null;
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
 
     List<JobOrderDto> orders = new ArrayList<>();
+    PageResponse<JobOrderDto> p = null;
     int yellowDays = 30;
     int redDays = 90;
     try {
       String statusParam = String.join(",", status);
       String squadronParam = filterToOwnSquadron ? "&squadronId=" + activeSquadronId : "";
-      PageResponse<JobOrderDto> p =
+      // Paginated server-side (REQ-ORDERS-020) instead of the former unbounded size=1000 pull;
+      // sort stays priority,asc so the drag-reorder queue order is preserved across pages.
+      p =
           backendApiClient.get(
-              "/api/v1/orders?size=1000&sort=priority,asc&status=" + statusParam + squadronParam,
+              "/api/v1/orders?page="
+                  + effectivePage
+                  + "&size="
+                  + effectiveSize
+                  + "&sort=priority,asc&status="
+                  + statusParam
+                  + squadronParam,
               new ParameterizedTypeReference<>() {});
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
-        for (JobOrderDto order : orders) {
-          for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto mat :
-              order.materials()) {
-            log.debug(
-                "Received stock for job order #{} ({}): {}/{} (material: {})",
-                order.displayId(),
-                order.id(),
-                mat.currentStock(),
-                mat.amount(),
-                mat.material().name());
+        // The nested walk exists purely to emit a per-material debug line; skip the whole
+        // orders×materials iteration (and its per-row varargs allocation) when debug is off.
+        if (log.isDebugEnabled()) {
+          for (JobOrderDto order : orders) {
+            for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto mat :
+                order.materials()) {
+              log.debug(
+                  "Received stock for job order #{} ({}): {}/{} (material: {})",
+                  order.displayId(),
+                  order.id(),
+                  mat.currentStock(),
+                  mat.amount(),
+                  mat.material().name());
+            }
           }
         }
       }
 
       try {
         SystemSettingDto yellowSetting =
-            backendApiClient.get(
+            backendApiClient.getCached(
                 "/api/v1/settings/job_order.age_yellow_days", SystemSettingDto.class);
         yellowDays = Integer.parseInt(yellowSetting.value());
       } catch (Exception e) {
@@ -250,7 +286,8 @@ public class JobOrderPageController {
       }
       try {
         SystemSettingDto redSetting =
-            backendApiClient.get("/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
+            backendApiClient.getCached(
+                "/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
         redDays = Integer.parseInt(redSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch red days setting, using default");
@@ -262,6 +299,9 @@ public class JobOrderPageController {
     }
 
     model.addAttribute("orders", orders);
+    model.addAttribute("ordersPage", p);
+    model.addAttribute("pageSizes", PAGE_SIZES);
+    model.addAttribute("paginationBaseUrl", buildPaginationBaseUrl(status, resolvedScope));
     model.addAttribute("selectedStatuses", status);
     model.addAttribute("selectedScope", resolvedScope);
     // Effective state, after collapsing "mine" to "all" when there is no active squadron context
@@ -274,6 +314,25 @@ public class JobOrderPageController {
       return "orders-index :: ordersResults";
     }
     return "orders-index";
+  }
+
+  /**
+   * Builds the {@code baseUrl} the pagination fragment threads {@code page}/{@code size} onto so
+   * page and size links keep the active status + scope filter. The repeatable {@code status} params
+   * and the {@code scope} radio value are reproduced exactly as the filter form submits them; the
+   * tokens are fixed enum/keyword names, so no extra escaping is required.
+   *
+   * @param status the resolved (never empty) status filter
+   * @param scope the resolved squadron-scope value ({@code mine}/{@code all})
+   * @return {@code /orders?status=...&scope=...} carrying the current filter
+   */
+  private static String buildPaginationBaseUrl(List<String> status, String scope) {
+    List<String> queryParts = new ArrayList<>();
+    for (String s : status) {
+      queryParts.add("status=" + s);
+    }
+    queryParts.add("scope=" + scope);
+    return "/orders?" + String.join("&", queryParts);
   }
 
   /**
@@ -308,10 +367,26 @@ public class JobOrderPageController {
       model.addAttribute("isLogistician", canAssign);
 
       if (canAssign) {
-        model.addAttribute("users", fetchUsers());
-        model.addAttribute("materials", fetchMaterials());
-        model.addAttribute("squadrons", fetchSquadrons());
-        addOwnerPickerOptions(model);
+        // These four logistician-only lookups are independent; fetch them concurrently (two are
+        // uncached round-trips — the user list and the all-kinds org-unit picker) and apply the
+        // results on the request thread. Each fetch helper swallows its own failure and returns an
+        // empty list, so join() never throws and the page degrades exactly as the serial version
+        // did.
+        CompletableFuture<List<UserDto>> usersFuture =
+            parallelPageLoader.loadAsync(this::fetchUsers);
+        CompletableFuture<List<MaterialDto>> materialsFuture =
+            parallelPageLoader.loadAsync(this::fetchMaterials);
+        CompletableFuture<List<SquadronDto>> squadronsFuture =
+            parallelPageLoader.loadAsync(this::fetchSquadrons);
+        CompletableFuture<List<OrgUnitMembershipOptionDto>> requestingOptionsFuture =
+            parallelPageLoader.loadAsync(this::fetchRequestingOrgUnitOptions);
+        CompletableFuture.allOf(
+                usersFuture, materialsFuture, squadronsFuture, requestingOptionsFuture)
+            .join();
+        model.addAttribute("users", usersFuture.join());
+        model.addAttribute("materials", materialsFuture.join());
+        model.addAttribute("squadrons", squadronsFuture.join());
+        applyOwnerPickerOptions(model, requestingOptionsFuture.join());
 
         if (!model.containsAttribute("jobOrderForm")) {
           JobOrderForm form = new JobOrderForm();
@@ -344,7 +419,7 @@ public class JobOrderPageController {
       int redDays = 90;
       try {
         SystemSettingDto yellowSetting =
-            backendApiClient.get(
+            backendApiClient.getCached(
                 "/api/v1/settings/job_order.age_yellow_days", SystemSettingDto.class);
         yellowDays = Integer.parseInt(yellowSetting.value());
       } catch (Exception e) {
@@ -352,7 +427,8 @@ public class JobOrderPageController {
       }
       try {
         SystemSettingDto redSetting =
-            backendApiClient.get("/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
+            backendApiClient.getCached(
+                "/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
         redDays = Integer.parseInt(redSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch red days setting, using default");
@@ -392,6 +468,23 @@ public class JobOrderPageController {
                   JobOrderItemBlueprintOwnersDto.class));
         } catch (Exception e) {
           log.debug("Blueprint coverage unavailable for order {}: {}", id, e.getMessage());
+        }
+      }
+
+      // Orphaned linked inventory (REQ-ORDERS-019): inventory linked to this order whose material
+      // the order does not require — invisible in the material tables, surfaced as a warning so a
+      // logistician can undo a mis-assignment. Only needed on the full page (not the in-place
+      // section swaps), and isolated so a failure just omits the warning rather than failing the
+      // page.
+      if (fragment == null) {
+        try {
+          model.addAttribute(
+              "orphanedInventory",
+              backendApiClient.get(
+                  "/api/v1/orders/" + id + "/inventory/orphaned",
+                  new ParameterizedTypeReference<List<InventoryItemDto>>() {}));
+        } catch (Exception e) {
+          log.debug("Orphaned inventory unavailable for order {}: {}", id, e.getMessage());
         }
       }
     } catch (Exception e) {
@@ -2151,7 +2244,23 @@ public class JobOrderPageController {
    * @param model the Thymeleaf model to populate.
    */
   private void addOwnerPickerOptions(Model model) {
-    List<OrgUnitMembershipOptionDto> requestingOptions = fetchRequestingOrgUnitOptions();
+    applyOwnerPickerOptions(model, fetchRequestingOrgUnitOptions());
+  }
+
+  /**
+   * Populates the two owner-picker model attributes from an already-fetched requesting-org-unit
+   * option list. Split out from {@link #addOwnerPickerOptions(Model)} so the order-detail render
+   * can fetch the list on a {@link ParallelPageLoader} worker thread alongside the other
+   * logistician lookups and then apply the cheap in-memory derivation on the request thread; {@link
+   * #addOwnerPickerOptions(Model)} remains the serial fetch-and-apply entry point for the
+   * create/edit forms.
+   *
+   * @param model the Thymeleaf model to populate.
+   * @param requestingOptions the requesting-org-unit options to expose, and to derive the
+   *     profit-eligible {@code responsibleOptions} subset from.
+   */
+  private void applyOwnerPickerOptions(
+      Model model, List<OrgUnitMembershipOptionDto> requestingOptions) {
     List<OrgUnitMembershipOptionDto> responsibleOptions =
         requestingOptions.stream()
             .filter(o -> Boolean.TRUE.equals(o.isProfitEligible()))

@@ -1866,11 +1866,19 @@ public class MissionService {
    *     empty.
    */
   private java.util.List<OrgUnit> resolveMembershipOrgUnits(@NotNull UUID userId) {
-    return orgUnitMembershipService.findAllMembershipsForUser(userId).stream()
-        .map(m -> m.getId().getOrgUnitId())
-        .map(id -> orgUnitRepository.findById(id).orElse(null))
-        .filter(java.util.Objects::nonNull)
-        .toList();
+    java.util.List<UUID> orgUnitIds =
+        orgUnitMembershipService.findAllMembershipsForUser(userId).stream()
+            .map(m -> m.getId().getOrgUnitId())
+            .toList();
+    if (orgUnitIds.isEmpty()) {
+      return java.util.List.of();
+    }
+    // One batched lookup instead of findById per membership; re-key to preserve membership order
+    // and drop any id that no longer resolves (mirrors the previous nonNull filter).
+    java.util.Map<UUID, OrgUnit> byId =
+        orgUnitRepository.findAllById(orgUnitIds).stream()
+            .collect(java.util.stream.Collectors.toMap(OrgUnit::getId, o -> o));
+    return orgUnitIds.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
   }
 
   /**

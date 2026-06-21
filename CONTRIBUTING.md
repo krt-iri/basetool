@@ -73,18 +73,18 @@ confidentially to
 Most of the substance lives in dedicated documents. Read the one that
 matches what you are about to change *before* you open a PR:
 
-| Topic                                                                                                         | Where                                                                                                    |
-|:--------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------|
-| Project overview, prerequisites, local dev/test stack, deployment runbook                                     | [`README.md`](README.md)                                                                                 |
-| Release notes and every user-visible change                                                                   | [`CHANGELOG.md`](CHANGELOG.md)                                                                           |
-| Security vulnerability reporting, supported versions, scope, safe harbor                                      | [`.github/SECURITY.md`](.github/SECURITY.md)                                                             |
-| Architectural invariants, build/test commands, AI-assistant guardrails                                        | [`CLAUDE.md`](CLAUDE.md)                                                                                 |
-| Role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`) | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)                                                   |
-| Flyway migration conventions (destructive-ops two-phase rule, data migrations, pre-merge checklist)           | [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md) |
-| "DAS KARTELL" Corporate Design Manual (brand colours, fonts, department palette)                              | [`Styleguide.md`](Styleguide.md)                                                                         |
-| Pull-request expectations (template + checklist that ships with every PR)                                     | [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)                                   |
-| Production deployment runbook (host bootstrap, releases, rollback, PAT rotation)                              | [`docs/deployment.md`](docs/deployment.md)                                                               |
-| License                                                                                                       | [`LICENSE.md`](LICENSE.md) — GPL-3.0                                                                     |
+| Topic                                                                                                         | Where                                                                                                                                                                            |
+|:--------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Project overview, prerequisites, local dev/test stack, deployment runbook                                     | [`README.md`](README.md)                                                                                                                                                         |
+| Release notes and every user-visible change                                                                   | [`CHANGELOG.md`](CHANGELOG.md)                                                                                                                                                   |
+| Security vulnerability reporting, supported versions, scope, safe harbor                                      | [`.github/SECURITY.md`](.github/SECURITY.md)                                                                                                                                     |
+| Architectural invariants, build/test commands, AI-assistant guardrails                                        | [`CLAUDE.md`](CLAUDE.md)                                                                                                                                                         |
+| Role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`) | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)                                                                                                                           |
+| Flyway migration conventions (destructive-ops two-phase rule, data migrations, pre-merge checklist)           | [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md)                                                                         |
+| "DAS KARTELL" Corporate Design Manual (brand colours, fonts, department palette)                              | [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md) (binding rules: [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)) |
+| Pull-request expectations (template + checklist that ships with every PR)                                     | [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)                                                                                                           |
+| Production deployment runbook (host bootstrap, releases, rollback, PAT rotation)                              | [`docs/deployment.md`](docs/deployment.md)                                                                                                                                       |
+| License                                                                                                       | [`LICENSE.md`](LICENSE.md) — GPL-3.0                                                                                                                                             |
 
 CLAUDE.md and the SECURITY.md are the two documents that most often
 surprise first-time contributors — please read them before touching the
@@ -546,7 +546,8 @@ Javadoc is **gate-enforced** via Checkstyle (`MissingJavadocType`,
 ### Frontend / UI
 
 The UI follows the *DAS KARTELL* Corporate Design Manual strictly — see
-[`Styleguide.md`](Styleguide.md) and the *Frontend / UI rules* section
+[`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md)
+and the *Frontend / UI rules* section
 of [`CLAUDE.md`](CLAUDE.md). Highlights:
 
 - **Brand colour** `#E77E23` (orange). Logo only in this orange, white,
@@ -639,9 +640,13 @@ you touch these areas.
   `InventoryItem` (direct Lager-View), `RefineryOrder`, `Operation`,
   and `Mission` (with a public-escape carve-out for non-internal
   missions).
-- `JobOrder` is intentionally **cross-squadron** and carries both a
-  `creating_squadron_id` (immutable) and a `requesting_squadron_id`
-  (editable on whose behalf the order runs).
+- `JobOrder` is intentionally **cross-squadron** and carries a
+  `responsible_org_unit_id` (the processing unit — governs visibility,
+  changed only via `PATCH /{id}/responsible-org-unit`) and a
+  `requesting_org_unit_id` (the customer — grants no visibility). It is
+  conditionally scoped: an SK-responsible order is a public shared queue
+  that squadrons sign up for via material claims, a squadron-responsible
+  order is private to that squadron + admins (reworked in #340, `V129`).
 - Scope is enforced in the service layer via
   [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java);
   controllers gate detail / write endpoints with
@@ -726,7 +731,7 @@ bugs that shipped. The short version:
 ### Logging
 
 - Both modules emit one access-log line per request and enrich every log
-  line with MDC fields `correlationId`, `userId`, and `squadronId`.
+  line with MDC fields `correlationId`, `userId`, and `orgUnitId`.
 - The `prod` profile additionally writes structured JSON
   (`LogstashEncoder`) to `logs/{backend,frontend}.json` with errors
   rolled into `*-error.log` for fast triage.

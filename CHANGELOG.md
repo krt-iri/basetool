@@ -2,7 +2,47 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Änderungen anderer Nutzer an einem Einsatz erscheinen jetzt live, ohne die Seite neu zu laden.** Tritt jemand bei, wird die Crew umgestellt, ein Finanzeintrag erfasst oder eine Kern-/Termin-/Status-/Einsatzleiter-/Funk-Änderung gemacht, aktualisiert sich die Ansicht auf allen anderen geöffneten Einsatz-Seiten automatisch über die bestehende Präsenz-Verbindung. Bearbeitet man selbst gerade etwas (Dialog offen), wird die Aktualisierung über einen „Aktualisierungen verfügbar“-Hinweis aufgeschoben statt aufgedrängt; über die Verbindung gehen nur Abschnitts-Kennungen, die Daten holt jede Ansicht weiterhin über ihre eigene berechtigungsgeprüfte Anfrage.
+
+### Changed
+
+- **Die Auftrags- und Raffinerie-Auftragslisten werden jetzt seitenweise geladen.** Statt immer alle Aufträge auf einmal zu holen, zeigen `/orders` und `/refinery-orders` eine Seite mit Seiten-Navigation und Größenauswahl; die aktiven Filter (Status/Staffel bzw. Status/„Meine Aufträge") bleiben beim Blättern erhalten. Die Auftragsliste nutzt größere Seiten (50/100/200, Standard 100), damit die Drag-&-Drop-Priorisierung wie gewohnt funktioniert; die Raffinerieliste nutzt 10/50/100 (Standard 50).
+
+- **Weniger Hintergrund-Anfragen der Benachrichtigungs-Glocke.** Solange die Echtzeit-Verbindung (SSE) steht, fragt die Ungelesen-Zahl nur noch im langsamen Takt nach (statt fest alle 60 Sekunden); bricht die Verbindung ab, wird wieder schnell abgefragt. Das gilt jetzt auch, wenn die Verbindung unbemerkt stehenbleibt (verbunden, aber ohne Daten): bleibt ein Lebenszeichen aus, schaltet die Glocke von selbst wieder auf den schnellen Takt. Benachrichtigungen erscheinen weiterhin in Echtzeit.
+
+- **Das Lager-Eingabeformular und das Refinery-Auftragsformular laden schneller.** Die Katalog-Listen (Materialien, Standorte, Job-Orders, Missionen, Nutzer, Besitzer-Auswahl) werden jetzt parallel statt nacheinander vom Backend geholt. Bei einem fehlgeschlagenen Abruf bleibt die betroffene Liste leer wie bisher.
+
+- **Die Auftragsseiten laden etwas schneller.** Die Alters-Schwellwerte werden jetzt zwischengespeichert (statt bei jedem Aufruf neu geladen), und die Logistiker-Zusatzlisten der Auftragsdetails werden parallel statt nacheinander geholt. Kein sichtbarer Funktionsunterschied; eine Anpassung der Schwellwerte im Admin-Bereich wirkt weiterhin sofort.
+
+- **Schlankere Frontend-Backend-Kommunikation.** Backend-Antworten werden zum Frontend jetzt komprimiert (gzip) ausgeliefert, und die doppelte Resilience-Schicht (Wiederholung/Schutzschalter) im Backend-Client wurde auf die eine wirksame reduziert — schnelleres, einheitliches Fehlerverhalten ohne sichtbaren Funktionsunterschied. Zusätzlich neu: optionale Einstellung `spring.session.redis.flush-mode` (Default `IMMEDIATE`; Betreiber können auf `ON_SAVE` umstellen, um Redis-Zugriffe pro Anfrage zu sparen).
+
+- **Die Einsatzdetailseite lädt die Finanz- und Refinery-Daten jetzt parallel statt nacheinander.** Für Mitglieder wurden die drei Abrufe (Finanzeinträge, Finanzsumme, Refinery-Aufträge) bisher seriell ausgeführt; sie laufen nun gleichzeitig, sodass die Detailansicht (und jede Live-Aktualisierung über die Präsenz-Verbindung) schneller fertig ist. Gleiche Daten; schlägt einer der drei Abrufe fehl, wird die Finanzen-Ansicht jetzt einheitlich ausgeblendet statt teilweise angezeigt.
+
+- **Jede angemeldete Seite lädt den Staffel-Katalog nicht mehr bei jedem Aufruf neu.** Die Seitenleisten-/Kontext-Logik holt die (sich selten ändernde) Staffel-Liste jetzt aus dem 10-Minuten-Cache statt bei jedem Rendern frisch vom Backend; für Admins entfällt dadurch auch ein doppelter Abruf derselben Liste pro Seitenaufbau. Spürbar weniger Backend-Last pro Navigation. Das Umschalten der Staffel-Flags „Beförderung aktiv" und „Profit-Berechtigung" durch Admins leert den Cache und wirkt dadurch sofort app-weit statt mit bis zu zehn Minuten Verzögerung.
+
+- **Die Blueprint-Verfügbarkeitsübersicht lädt für die Zählung nur noch die benötigten zwei Spalten statt ganzer Datensätze.** Statt für die Mitglieder-Zählung pro Variantenfamilie sämtliche Blueprint-Datensätze aller Eigentümer vollständig zu laden, holt die Übersicht (und die Blueprint-Eigentümer-Aufstellung in Item-Aufträgen) jetzt nur noch `(Eigentümer, Produktname)`. Reine interne Performance-Verbesserung, vor allem in der Admin-Gesamtansicht.
+
+- **Auftrags- und Nutzerlisten lösen deutlich weniger Datenbankabfragen aus.** Die Auftragsübersicht berechnet Lagerbestände und Anspruchsdaten der ganzen Seite jetzt in wenigen gebündelten Abfragen statt einer pro Material pro Auftrag; die Nutzerliste holt die Staffel-Zugehörigkeit je Nutzer nur noch einmal statt dreimal; die Profit-Sichtbarkeitsprüfung wird pro Anfrage einmal ausgewertet. Rein interne Performance-Verbesserung, kein sichtbares Verhalten ändert sich.
+
+- **Schnellere Datenbankzugriffe durch zusätzliche Indizes.** Sechs fehlende Indizes (`V175`) verhindern sequentielle Tabellen-Scans auf wachsenden Tabellen — u. a. die aktive Auftragstafel (Filter + Sortierung), die offene Bank-Buchungsverteilung, die Discord-Freigabe-Warteschlange und mehrere Fremdschlüssel. Reine Performance-Änderung; sichtbares Verhalten ändert sich nicht.
+
+- **Weniger Datenbankabfragen auf Beförderungs-, Hangar-, Leitungs- und Bank-Verwaltungsseiten.** Die Beförderungs-Eignungsprüfung lädt die Bewertungsdaten je Mitglied einmal statt mehrfach pro Rangübergang; die Staffel-Hangarübersicht gruppiert Schiffe einmal statt pro Typ neu zu filtern; die Mitgliedschafts- und Oversight-Abfragen werden pro Anfrage gebündelt; der Bank-Reset/-Storno lädt Kontoinhaber gebündelt. Reine interne Performance-Verbesserung ohne Verhaltensänderung.
+
+- **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
+
 ### Fixed
+
+- **Das Löschen eines ausgeschiedenen Nutzers durch einen Admin schlägt nicht mehr fehl, wenn der Nutzer Einsätze besessen oder Materialeintragungen vorgenommen hat.** Die Einsatz-Eigentümerschaft wird jetzt auch in der begleitenden Eigentümer-Tabelle auf einen Admin übertragen und der Bearbeiter-Vermerk an Materialeintragungen vor dem Löschen geleert, sodass keine verwaisten Verweise mehr die Löschung mit einem Datenbankfehler (SQLSTATE 23503) blockieren.
+
+- **Ein bereits in Keycloak gelöschter Nutzer ließ sich nicht mehr aus dem Basetool löschen, wenn zuvor über seine Registrierung eine Discord-Freigabe entschieden wurde.** Die Löschung scheiterte an der Freigabe-Historie (V173), deren Fremdschlüssel beim Entfernen bisher nicht aufgelöst wurden (Datenbank-Constraint-Verletzung → 409). Beim endgültigen Löschen eines Nutzers werden seine eigenen Freigabe-Audit-Einträge jetzt mitentfernt und die Verweise auf ihn als entscheidender Admin aufgelöst; die Freigabe-Historie anderer Nutzer bleibt unberührt.
+
+- **Der Keycloak-Nutzerabgleich liest jetzt alle Nutzer seitenweise, statt nur die erste Seite.** Bei mehr als ~100 Nutzern lieferte Keycloak nur die erste Seite; der Abgleich markierte daraufhin alle übrigen Nutzer fälschlich als „nicht mehr in Keycloak" (stiller Soft-Delete echter Mitglieder). Der Abgleich blättert nun über `first`/`max` durch die komplette Liste (neue Einstellung `app.keycloak.sync.page-size`, Default 100). Betrifft nur Installationen mit mehr als einer vollen Keycloak-Seite an Nutzern.
+
+- **Abschnittsüberschriften, die in einem AJAX-Swap-Container stecken, haben wieder ihren gewohnten Abstand zum Inhalt darüber.** Der Container machte die Überschrift zum ersten Element und entfernte so ihren oberen Abstand, sodass sie direkt am vorherigen Block klebte. Betrifft in den Auftragsdetails „Aggregierte Materialien" und „Übergaben" sowie „Notiz" in der Detailansicht persönlicher Blueprints.
+
+- **Lagerbestand lässt sich nicht mehr einem Auftrag zuordnen, dessen Materialliste das Material gar nicht enthält.** Solche Zuordnungen tauchten in der aggregierten Materialliste des Auftrags nie auf, banden den Bestand aber trotzdem. Das „Auftrag"-Dropdown im Lager bietet jetzt nur noch Aufträge an, die das Material wirklich benötigen, und bereits bestehende Fehlzuordnungen werden in der Auftragsansicht als Warnhinweis aufgelistet, damit man sie auflösen kann.
 
 - **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster war PatternFlys Standard-Login-Bild (per Keycloak-Common-Theme auf `body` gesetzt); unsere Wabenregel hat jetzt Vorrang. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
 

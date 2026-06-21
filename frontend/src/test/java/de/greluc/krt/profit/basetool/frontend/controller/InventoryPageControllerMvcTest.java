@@ -20,9 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -32,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.controller.InventoryPageController
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -274,6 +278,78 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
+   * Picker-filter guard (REQ-ORDERS-018): the Lager "Auftrag" dropdown for a stack entry must offer
+   * only orders whose requirements include the entry's material. This is the exact reported
+   * regression — an ITEM order (no {@code job_order_material} rows, so an empty {@code materials}
+   * list) was offered for every material; the filter now keys on {@code requiredMaterialIds}, which
+   * is populated for both order kinds. Stubs two ITEM orders for the same lookup: one that requires
+   * the entry's material (must render) and one that does not (must be hidden).
+   */
+  @Test
+  @WithMockUser(roles = "MEMBER", username = "test-user-123")
+  void viewMyStackEntries_ShouldOfferOnlyOrdersThatRequireTheEntryMaterial() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID matchingOrderId = UUID.randomUUID();
+    UUID unrelatedOrderId = UUID.randomUUID();
+
+    InventoryItemDto item =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-02-03T10:15:30Z"));
+
+    // Both ITEM orders carry an empty MATERIAL-lines list; only requiredMaterialIds distinguishes
+    // them (the ITEM-order case the old materials-based filter could not handle).
+    JobOrderReferenceDto matching =
+        new JobOrderReferenceDto(
+            matchingOrderId, 71, "h1", "IN_PROGRESS", List.of(), List.of(materialId));
+    JobOrderReferenceDto unrelated =
+        new JobOrderReferenceDto(
+            unrelatedOrderId, 99, "h2", "IN_PROGRESS", List.of(), List.of(UUID.randomUUID()));
+
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/my-inventory/stack/entries")) {
+                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+              }
+              if (url.contains("/orders/lookup")) {
+                return List.of(matching, unrelated);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/my/stack/entries")
+                .param("materialId", materialId.toString())
+                .param("locationId", locationId.toString())
+                .param("quality", "90")
+                .param("personal", "false"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("value=\"" + matchingOrderId + "\"")))
+        .andExpect(content().string(not(containsString("value=\"" + unrelatedOrderId + "\""))));
+  }
+
+  /**
    * Same as {@link #viewMyStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption()} for the
    * logistician/admin stack-entries drill-down ({@code /inventory/all/stack/entries} → {@code
    * stackEntriesAdmin} fragment), which additionally carries the owning {@code userId} in the stack
@@ -459,5 +535,30 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("stack-entry-count")))
         .andExpect(content().string(containsString("data-stack-loaded=\"false\"")))
         .andExpect(content().string(containsString("stack-entries-content")));
+  }
+
+  /**
+   * Graceful-degradation guard for the parallelized input-form catalog fan-out (#769): the lookups
+   * run concurrently through the real {@link ParallelPageLoader}, but each fetch helper swallows
+   * its own failure and returns an empty list, so {@code allOf(...).join()} must never propagate an
+   * exception. Here the missions lookup throws while the materials lookup succeeds; the page must
+   * still render {@code 200} with an empty {@code missions} model attribute and the populated
+   * {@code materials} attribute — exactly as the serial version degraded.
+   */
+  @Test
+  @WithMockUser(roles = "MEMBER")
+  void viewInputPage_WhenOneCatalogFetchFails_StillRendersWithEmptyList() throws Exception {
+    when(backendApiClient.getCached(
+            eq("/api/v1/materials/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU")));
+    when(backendApiClient.get(eq("/api/v1/missions/lookup"), any(ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(model().attribute("missions", empty()))
+        .andExpect(model().attribute("materials", hasSize(1)));
   }
 }

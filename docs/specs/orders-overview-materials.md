@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-20.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Order-overview Materialien column
@@ -55,8 +55,102 @@ material renders the empty-materials placeholder.
 `JobOrderService.enrichAggregatedWithClaims`, `JobOrderItemService.aggregateMaterials`,
 `AggregatedMaterialDto.currentStock`, `templates/orders-index.html` · **Issues:** #595
 
+### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
+
+Because the order's material view (the `MATERIAL` requirement rows and the `ITEM` aggregated
+list, REQ-ORDERS-017) is built **solely from the order's requirements** with linked stock
+matched onto those rows, an inventory item linked for a material the order does **not** require
+has no row to surface under — it binds stock to the order while staying invisible everywhere in
+the order.
+
+Linking an inventory item to a job order — whether on create or via the in-place
+association edit (the Lager "Auftrag" picker) — MUST be rejected with HTTP `400` when the item's
+material is not one of the order's **required materials**. The required-material set is
+kind-agnostic: for a `MATERIAL` order its material lines, for an `ITEM` order the materials
+derived and snapshotted from the ordered items' blueprints (`JobOrderItemService.requiredMaterialIds`).
+The Lager "Auftrag" picker MUST hide an order that does not require the row's material; it MAY
+still list the order a row is **already** assigned to, so an existing (possibly orphaned) link
+stays visible and clearable. The picker filter MUST be correct for `ITEM` orders too — these
+carry no `job_order_material` rows, so the reference payload exposes
+`JobOrderReferenceDto.requiredMaterialIds` (both kinds) for the filter rather than the
+MATERIAL-only `materials` list.
+
+**Acceptance**
+
+- [ ] Creating or updating an inventory item with a job-order link whose material the order does
+  not require returns `400` and persists nothing.
+- [ ] The same link succeeds when the order requires the material (both order kinds).
+- [ ] The Lager "Auftrag" dropdown for a row offers only orders that require that row's material,
+  plus the order the row is already assigned to.
+
+**Enforced by:** `InventoryItemServiceTest` (create/update gate),
+`JobOrderItemServiceTest` (`requiredMaterialIds`) · **Code:**
+`InventoryItemService.createInventoryItem` / `updateInventoryItem`,
+`JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
+`JobOrderService.findAllActiveReference`, `templates/fragments/inventory-stack-entries.html`
+
+### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory
+
+To make pre-existing orphaned links (inventory linked before the REQ-ORDERS-018 gate, or via a
+future path) discoverable, the order **detail** page MUST surface every inventory item linked to
+the order whose material is **not** among the order's requirements, as a warning section listing
+material, owner, location, quality and amount. The list is the order-linked inventory minus the
+required-material set; it is empty (section hidden) when every linked item matches a requirement.
+The link itself is undone from the Lager (setting the entry's "Auftrag" back to none). Computing
+the warning MUST NOT add an N+1 to the order **list** endpoint — it is only resolved on the
+detail view.
+
+**Acceptance**
+
+- [ ] An order with an inventory item linked for a non-required material shows the
+  orphaned-inventory warning listing that item; an order with none shows no warning.
+- [ ] The warning renders for both order kinds and is not computed for the order-list rows.
+
+**Enforced by:** `JobOrderServiceTest`
+(`getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired`) · **Code:**
+`JobOrderService.getOrphanedLinkedInventory`, `JobOrderController` `GET
+/api/v1/orders/{id}/inventory/orphaned`, `JobOrderPageController.viewOrderDetail`,
+`templates/orders-detail.html`
+
+### REQ-ORDERS-020 — Order list is paginated server-side
+
+The order-overview list (`GET /orders`) MUST fetch one **server-side page** of orders instead of
+the former unbounded `size=1000` pull, rendering the shared pagination component (the `.pagination`
+page-nav + the square `.page-btn` size picker from `fragments/pagination.html`, REQ-INV-013 /
+REQ-API-005). The page sizes are **{50, 100, 200} with a default of 100** — a deliberate deviation
+from the shared 10/50/100 / default-50 contract — because the LOGISTICIAN drag-and-drop priority
+reorder operates on the rows of the **current page** (it derives the target priority from adjacent
+visible rows and re-renders the whole results fragment), so the active queue must comfortably fit
+on the first page in the common case. The default status filter (`OPEN`+`IN_PROGRESS`) keeps the
+queue — the only draggable rows, since completed/rejected orders carry no priority — naturally
+bounded. A crafted out-of-list `size` snaps back to the default; the sort stays `priority,asc` so
+queue order is preserved across pages. Page and size links MUST keep the active status and
+squadron-scope filter, and the pagination controls live **inside** the `ordersResults` AJAX-swap
+fragment so a filter change re-renders them.
+
+**Acceptance**
+
+- [ ] A result spanning more than one page renders the page-nav and the 50/100/200 size picker; a
+  short result (≤ the smallest size, single page) renders neither.
+- [ ] Every page-nav and size-picker link carries the active `status` (repeatable) and `scope`
+  params; changing the size jumps back to page 0.
+- [ ] The drag-reorder still persists and re-renders within the current page (sort stays
+  `priority,asc`).
+- [ ] A `?size=` outside {50,100,200} falls back to 100; a negative `?page=` clamps to 0.
+
+**Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageCookieTest` (fetch URL) · **Code:**
+`JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/orders-index.html`,
+`templates/fragments/pagination.html` · **Issues:** #2 (performance audit)
+
 ## Out of scope
 
+- **Quality-floor gating on the link (REQ-ORDERS-018).** The gate and the orphaned-link check key
+  on **material membership only**, not on the order's minimum quality. An inventory item below a
+  required material's quality floor may still be linked — it simply contributes `0` to that bucket's
+  stock and is **not** flagged as orphaned, because its material *is* required. This is intentional:
+  the material view still shows the row, so the link is never invisible; the per-material picker
+  (`getInventoryItemsForJobOrderMaterial`) continues to filter candidates by quality as a separate
+  concern.
 - The item-order **detail** page's aggregated panel — it keeps its material+quality rows and
   claim columns; this change only adds the stock the overview consumes and does not alter the
   detail rendering.

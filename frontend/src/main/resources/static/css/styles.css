@@ -3274,6 +3274,18 @@ input[type='radio']:focus {
 .status-canceled {
     color: var(--color-danger-text);
 }
+/* JobOrder statuses (orders-detail header pill). COMPLETED reuses the shared
+   neutral .status-completed above. OPEN = info, IN_PROGRESS = warning (the
+   warning hue clears WCAG as text), REJECTED = danger. */
+.status-open {
+    color: var(--color-info-text);
+}
+.status-in_progress {
+    color: var(--color-warning);
+}
+.status-rejected {
+    color: var(--color-danger-text);
+}
 
 /*
  * Modal Styles — KRT canonical modal pattern.
@@ -3803,6 +3815,36 @@ textarea:focus-visible,
 .krt-presence-count {
     font-weight: var(--fw-bold);
     letter-spacing: 0.02em;
+}
+
+/* Live multi-user sync (REQ-FE-010): the deferred-refresh pill, shown bottom-right when a peer's
+   change arrives while the local user is mid-edit. Clicking it applies the held-back refresh. */
+.mission-livesync-pill {
+    position: fixed;
+    right: var(--space-4);
+    bottom: var(--space-4);
+    z-index: 9000;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: var(--space-2) var(--space-4);
+    border: var(--border-accent);
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-dark-gray);
+    color: var(--color-primary);
+    font-family: Lato, sans-serif;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgb(0 0 0 / 45%);
+    animation: krt-presence-pulse 2s infinite;
+}
+
+.mission-livesync-pill:hover,
+.mission-livesync-pill:focus-visible {
+    background: rgb(231 126 35 / 12%);
 }
 
 #missions-results[aria-busy='true'] {
@@ -4362,6 +4404,114 @@ textarea:focus-visible,
     color: var(--color-white);
     font-weight: var(--fw-bold);
     font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------- META GROUP GRID -- */
+/* Detail-page header that would otherwise be a tall single-column kv-list.
+   Group related fields into 2–3 labelled columns so the header collapses to
+   ~half height and the page's primary content rises above the fold. Pair with
+   a .facts-bar (high-signal values) + a status pill in the title row.
+   Comment/description goes in .annotation, not as another kv row. */
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0 28px;
+}
+@media (width <= 760px) {
+    .meta-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+@media (width <= 480px) {
+    .meta-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.meta-grid .meta-group {
+    border-top: 2px solid var(--color-gray-3);
+    padding-top: 9px;
+    margin-top: 4px;
+}
+.meta-grid .meta-group-title {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-2);
+    margin-bottom: 8px;
+}
+/* Compact two-column key/value used inside a meta-group (denser than .kv-list). */
+.kv-compact {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 5px 14px;
+    align-items: baseline;
+}
+.kv-compact .kv-key {
+    color: var(--color-gray-2);
+    font-size: 0.75rem;
+    font-weight: var(--fw-bold);
+}
+.kv-compact .kv-val {
+    color: var(--color-white);
+    font-size: 0.92rem;
+    overflow-wrap: anywhere;
+}
+.kv-compact .kv-val--mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Annotation block — a labelled note/comment with an orange left rule. For
+   free-text that shouldn't compete with structured kv data. */
+.annotation {
+    border-left: 3px solid var(--color-primary);
+    background: var(--color-surface-input);
+    padding: 9px 13px;
+    font-weight: 300;
+    white-space: pre-wrap;
+}
+.annotation .annotation-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-2);
+    margin-bottom: 3px;
+}
+
+/* ------------------------------------------------- ORDER-DETAIL HEADER --- */
+/* The orders-detail header (Variante A): a title row above the facts-bar +
+   meta-grid, plus the logistician-only status-select row under the card. */
+.od-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.od-title {
+    margin: 0;
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+    font-size: 1.1rem;
+}
+.od-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+.od-status-row-label {
+    color: var(--color-gray-2);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: var(--fw-bold);
 }
 
 /* ---------------------------------------------------------------- MODAL -- */

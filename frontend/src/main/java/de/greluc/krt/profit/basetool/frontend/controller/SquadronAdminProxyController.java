@@ -33,10 +33,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Same-origin proxy for the admin-only squadron toggle endpoints. Currently exposes only the
- * per-squadron promotion-feature flag flip; the admin-settings page sends a PATCH here when the
- * admin clicks the "Beförderung aktiv" checkbox so the browser never has to know the backend
- * hostname and the CSRF-protected session is reused via {@link BackendApiClient}.
+ * Same-origin proxy for the admin-only squadron toggle endpoints — the per-squadron
+ * promotion-feature flag and the profit-eligibility flag. The admin-settings page sends a PATCH
+ * here when the admin flips either checkbox so the browser never has to know the backend hostname
+ * and the CSRF-protected session is reused via {@link BackendApiClient}.
+ *
+ * <p>Both flags live on the cached {@code SquadronDto} that {@code SquadronContextAdvice} reads on
+ * every authenticated render, so each toggle evicts {@code STATIC_DATA_CACHE} (REQ-DATA-007) to
+ * keep the shared squadron catalogue truthful rather than stale up to the cache TTL.
  *
  * <p>Endpoints carry their own {@code ADMIN}-role gate at the Spring Security layer; the backend
  * re-checks the role, so this proxy is defence-in-depth and not the sole guard.
@@ -62,6 +66,10 @@ public class SquadronAdminProxyController {
   public ResponseEntity<Void> setPromotionEnabled(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/promotion-enabled", body, Void.class);
+    // The flag lives on the cached SquadronDto that SquadronContextAdvice reads on every render, so
+    // a toggle must evict STATIC_DATA_CACHE or the sidebar/title gate stays stale up to the TTL
+    // (REQ-DATA-007 — squadron-catalogue cacheability is gated on every admin mutation evicting).
+    backendApiClient.clearStaticDataCache();
     return ResponseEntity.noContent().build();
   }
 
@@ -79,6 +87,9 @@ public class SquadronAdminProxyController {
   public ResponseEntity<Void> setProfitEligible(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/profit-eligible", body, Void.class);
+    // Same reason as setPromotionEnabled: isProfitEligible is part of the cached SquadronDto, so
+    // evict STATIC_DATA_CACHE on the toggle to keep the cached catalogue truthful (REQ-DATA-007).
+    backendApiClient.clearStaticDataCache();
     return ResponseEntity.noContent().build();
   }
 }
