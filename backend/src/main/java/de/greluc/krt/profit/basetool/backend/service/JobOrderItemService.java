@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
@@ -48,8 +50,10 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -249,6 +253,47 @@ public class JobOrderItemService {
                     String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(a -> a.qualityRequirement().name()))
         .toList();
+  }
+
+  /**
+   * Collects the distinct material ids an order requires, across both order kinds: an {@code ITEM}
+   * order's requirements are its snapshotted per-item materials ({@code items → materials}); a
+   * {@code MATERIAL} order's are its material lines ({@code materials}). The two collections are
+   * mutually exclusive per kind, so the result is the non-empty one.
+   *
+   * <p>This is the authoritative "may this material be linked to this order?" set: the inventory →
+   * job-order link gate ({@code InventoryItemService}) rejects a material that is not in it, the
+   * Lager order picker hides orders that do not require the row's material, and the order-detail
+   * orphaned-link warning flags already-linked inventory whose material is absent here. A material
+   * not in this set has no requirement row to surface under, so its link would be invisible.
+   *
+   * <p>Walks the lazy {@code items}/{@code items.materials} (ITEM) or {@code materials} (MATERIAL)
+   * collections, so it must run inside a transaction; every current caller is
+   * {@code @Transactional}.
+   *
+   * @param order the order whose required materials to collect.
+   * @return the distinct required material ids, insertion-ordered; never {@code null}, possibly
+   *     empty (an order with no requirements accepts no inventory link).
+   */
+  @NotNull
+  public Set<UUID> requiredMaterialIds(@NotNull JobOrder order) {
+    Set<UUID> ids = new LinkedHashSet<>();
+    if (order.getType() == JobOrderType.ITEM) {
+      for (JobOrderItem item : order.getItems()) {
+        for (JobOrderItemMaterial req : item.getMaterials()) {
+          if (req.getMaterial() != null) {
+            ids.add(req.getMaterial().getId());
+          }
+        }
+      }
+    } else {
+      for (JobOrderMaterial mat : order.getMaterials()) {
+        if (mat.getMaterial() != null) {
+          ids.add(mat.getMaterial().getId());
+        }
+      }
+    }
+    return ids;
   }
 
   private JobOrderItemDto toItemDto(JobOrderItem item) {

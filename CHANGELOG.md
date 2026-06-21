@@ -2,10 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Kopfbereich der Auftragsdetails (`/orders/{id}`) ist entschlackt.** Die hohe einspaltige Metadatenliste weicht einer Titelzeile (Auftrag-Nr. + Art + Status), einer kompakten Fakten-Leiste und einer in drei Gruppen (Auftrag/Zeit/Beteiligte) gegliederten Karte; der Kommentar steht jetzt als abgesetzter Hinweis. Dadurch wird der Kopf rund halb so hoch und die bestellten Items bzw. benötigten Materialien sind ohne Scrollen sichtbar. Status, Rollen-Sichtbarkeit und die optimistische Sperre bleiben unverändert.
+
 ### Fixed
 
 - **In den Auftragsdetails hat die Überschrift „Aggregierte Materialien" wieder den gewohnten Abstand zur Tabelle darüber.** Durch den AJAX-Swap-Container wurde der Titel als erstes Element behandelt und sein oberer Abstand entfernt, sodass er direkt an der Item-Tabelle klebte.
 
+- **Lagerbestand lässt sich nicht mehr einem Auftrag zuordnen, dessen Materialliste das Material gar nicht enthält.** Solche Zuordnungen tauchten in der aggregierten Materialliste des Auftrags nie auf, banden den Bestand aber trotzdem. Das „Auftrag"-Dropdown im Lager bietet jetzt nur noch Aufträge an, die das Material wirklich benötigen, und bereits bestehende Fehlzuordnungen werden in der Auftragsansicht als Warnhinweis aufgelistet, damit man sie auflösen kann.
 - **Auf der Keycloak-Anmeldeseite erscheint wieder der gewohnte Wabenhintergrund statt des PatternFly-Standardrasters, und der „Discord“-Anmeldebutton trägt jetzt das Discord-Logo.** Das Raster war PatternFlys Standard-Login-Bild (per Keycloak-Common-Theme auf `body` gesetzt); unsere Wabenregel hat jetzt Vorrang. Wird mit dem neu bereitgestellten Keycloak-Theme wirksam (ggf. Browser-Cache leeren / Hard-Reload).
 
 ## [v0.7.3](https://github.com/krt-profit/basetool/releases/tag/v0.7.3) - 2026-06-21

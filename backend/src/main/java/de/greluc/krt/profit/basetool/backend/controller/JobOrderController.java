@@ -575,6 +575,27 @@ public class JobOrderController {
   }
 
   /**
+   * Returns the inventory items linked to the order whose material the order does not require —
+   * "orphaned" links surfaced as a warning on the order detail (REQ-ORDERS-019). Such links bind
+   * stock to the order while staying invisible in every material row.
+   *
+   * @param id job-order id
+   * @return orphaned inventory-item DTOs (empty when every linked item matches a requirement)
+   */
+  @GetMapping("/{id}/inventory/orphaned")
+  @Operation(
+      summary = "Get orphaned linked inventory for a job order",
+      description =
+          "Returns inventory items linked to the order whose material is not among the order's"
+              + " requirements (invisible orphaned links).")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @Transactional(readOnly = true)
+  public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
+      getOrphanedLinkedInventory(@PathVariable UUID id) {
+    return jobOrderService.getOrphanedLinkedInventory(id);
+  }
+
+  /**
    * Updates the status. Transitions to a terminal state (COMPLETED, REJECTED) cascade an atomic
    * unlink of every inventory item that pointed at the order, run after the dirty-check phase
    * (canonical {@code completeJobOrderWithinTransaction} pattern — the inner method is {@code
