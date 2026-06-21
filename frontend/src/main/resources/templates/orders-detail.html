@@ -417,6 +417,41 @@
         </th:block></div>
         </th:block>
 
+        <!-- Orphaned linked inventory (REQ-ORDERS-019): inventory linked to this order whose
+             material the order does not require, so it never appears in the material/aggregated
+             tables above. Rendered for both order kinds; populated server-side
+             (JobOrderPageController.viewOrderDetail). The link is undone from the Lager by setting
+             the entry's "Auftrag" back to "Kein Auftrag". -->
+        <div th:if="${orphanedInventory != null and !orphanedInventory.isEmpty()}" class="alert alert-warning mt-2">
+            <strong th:text="#{orders.detail.orphanedInventory.title}">Verknüpfter, nicht benötigter Bestand</strong>
+            <p style="margin: 0.5rem 0 0;" th:text="#{orders.detail.orphanedInventory.body}">Dieser Lagerbestand ist dem Auftrag zugeordnet, gehört aber zu keinem benötigten Material und erscheint daher nicht in den Materiallisten. Die Zuordnung kann im Lager aufgehoben werden.</p>
+            <div class="table-responsive" style="margin-top: 0.5rem;">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{orders.detail.orphanedInventory.material}">Material</th>
+                        <th th:text="#{orders.detail.orphanedInventory.owner}">Besitzer</th>
+                        <th th:text="#{orders.detail.orphanedInventory.location}">Ort</th>
+                        <th th:text="#{orders.detail.orphanedInventory.quality}">Qualität</th>
+                        <th th:text="#{orders.detail.orphanedInventory.amount}">Menge</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="inv : ${orphanedInventory}">
+                        <td th:text="${inv.material != null ? inv.material.name() : '-'}">Torite</td>
+                        <td th:text="${inv.user != null ? inv.user.effectiveName() : '-'}">-</td>
+                        <td th:text="${inv.location != null ? inv.location.name() : '-'}">-</td>
+                        <td th:text="${inv.quality}">0</td>
+                        <td th:switch="${inv.material != null ? inv.material.quantityType() : 'SCU'}">
+                            <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(inv.amount, 1)} #{material.quantity.piece}|"></span>
+                            <span th:case="*" th:text="|${#numbers.formatDecimal(inv.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Section-refresh error fragment (#575, mirrors the #574 fix): returned (HTTP 200) by
              GET /orders/{id}?fragment=… when the backend read fails, so an in-place swap shows a
              section-sized inline notice instead of a full-page redirect being followed into the

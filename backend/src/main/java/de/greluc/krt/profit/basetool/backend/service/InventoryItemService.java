@@ -107,6 +107,7 @@ public class InventoryItemService {
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
+  private final JobOrderItemService jobOrderItemService;
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.
@@ -597,6 +598,7 @@ public class InventoryItemService {
           jobOrderRepository
               .findById(dto.jobOrderId())
               .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+      assertMaterialRequiredByJobOrder(material, jobOrder);
     }
 
     Boolean isPersonal = dto.personal() != null ? dto.personal() : false;
@@ -685,6 +687,7 @@ public class InventoryItemService {
           jobOrderRepository
               .findById(dto.jobOrderId())
               .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+      assertMaterialRequiredByJobOrder(material, jobOrder);
       item.setJobOrder(jobOrder);
     } else {
       item.setJobOrder(null);
@@ -708,6 +711,32 @@ public class InventoryItemService {
     // The client writes that back, and the user's NEXT in-place edit of the same row then 409s.
     // Flushing here makes the response @Version authoritative (REQ-FE-003).
     return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+  }
+
+  /**
+   * Rejects linking an inventory item to a job order whose requirements do not include the item's
+   * material (REQ-ORDERS-018). An order's material view is built solely from its requirements
+   * (material lines for a MATERIAL order, blueprint-derived materials for an ITEM order) with
+   * linked stock matched onto those rows; a link for a non-required material therefore never
+   * surfaces in the order — it would bind stock to the order while staying invisible (an orphaned
+   * link). The authoritative required-material set is {@link
+   * JobOrderItemService#requiredMaterialIds(JobOrder)}, which covers both order kinds. Both call
+   * sites are {@code @Transactional}, so the helper's lazy walk of the order's item/material
+   * collections is safe.
+   *
+   * @param material the inventory item's material.
+   * @param jobOrder the order the item is being linked to.
+   * @throws BadRequestException when the order does not require the material.
+   */
+  private void assertMaterialRequiredByJobOrder(Material material, JobOrder jobOrder) {
+    if (!jobOrderItemService.requiredMaterialIds(jobOrder).contains(material.getId())) {
+      throw new BadRequestException(
+          "Material "
+              + material.getId()
+              + " is not required by job order "
+              + jobOrder.getId()
+              + "; an inventory item can only be linked to an order that needs its material.");
+    }
   }
 
   /**

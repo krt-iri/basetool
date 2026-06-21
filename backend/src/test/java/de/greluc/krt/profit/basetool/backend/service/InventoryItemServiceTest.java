@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,6 +77,8 @@ class InventoryItemServiceTest {
 
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private JobOrderItemService jobOrderItemService;
 
   @InjectMocks private InventoryItemService inventoryItemService;
 
@@ -145,6 +148,7 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(jobOrder.getId())).thenReturn(Optional.of(jobOrder));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(material.getId()));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item)).thenReturn(mapped);
 
@@ -499,6 +503,120 @@ class InventoryItemServiceTest {
   }
 
   @Test
+  void createInventoryItem_shouldRejectWhenMaterialNotRequiredByJobOrder() {
+    // REQ-ORDERS-018: a material may only be linked to an order that requires it; otherwise the
+    // link
+    // binds stock to the order while staying invisible in its (requirement-driven) material view.
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder jobOrder = new JobOrder();
+    jobOrder.setId(jobOrderId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
+    // The order requires a DIFFERENT material than the one being linked.
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_shouldAllowWhenMaterialRequiredByJobOrder() {
+    // REQ-ORDERS-018: linking is permitted when the order actually requires the material.
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder jobOrder = new JobOrder();
+    jobOrder.setId(jobOrderId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(materialId));
+    InventoryItem saved = new InventoryItem();
+    when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(saved);
+    when(inventoryItemMapper.toDto(saved)).thenReturn(null);
+
+    inventoryItemService.createInventoryItem(dto, userId, false);
+
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertSame(jobOrder, captor.getValue().getJobOrder());
+  }
+
+  @Test
+  void updateInventoryItem_shouldRejectWhenMaterialNotRequiredByJobOrder() {
+    // REQ-ORDERS-018: the link gate also applies to the in-place association edit (the Lager path
+    // that produced the original orphaned Torite→#71 link).
+    UUID itemId = UUID.randomUUID();
+    UUID currentUserId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+
+    InventoryItemUpdateDto dto =
+        new InventoryItemUpdateDto(materialId, locationId, 100, 10.0, false, jobOrderId, null, 1L);
+
+    InventoryItem existingItem = new InventoryItem();
+    existingItem.setId(itemId);
+    existingItem.setVersion(1L);
+    existingItem.setPersonal(false);
+    User user = new User();
+    user.setId(currentUserId);
+    existingItem.setUser(user);
+
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder jobOrder = new JobOrder();
+    jobOrder.setId(jobOrderId);
+
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false));
+    verify(inventoryItemRepository, never()).saveAndFlush(any(InventoryItem.class));
+  }
+
+  @Test
   void createInventoryItem_shouldRoundAmountToThreeDecimals() {
     // Given
     UUID userId = UUID.randomUUID();
@@ -783,6 +901,7 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(newJobOrderId)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(material.getId()));
     when(missionRepository.findById(newMissionId)).thenReturn(Optional.of(mission));
     when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class))).thenReturn(existingItem);
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
