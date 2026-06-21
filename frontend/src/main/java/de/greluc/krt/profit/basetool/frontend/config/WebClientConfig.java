@@ -221,8 +221,19 @@ public class WebClientConfig {
                         new WriteTimeoutHandler(
                             httpProperties.getWriteTimeout().toMillis(), TimeUnit.MILLISECONDS)));
       } else {
+        // Request gzip on the regular request/response path: send `Accept-Encoding` and decompress
+        // transparently. The backend already advertises `server.compression.enabled=true` for
+        // application/json, so the heavy read payloads (the materials trade matrix, full order /
+        // hangar lists) travel the frontend↔backend hop compressed. NOT applied on the streaming
+        // path (see the `if (streaming)` branch): the SSE relay is `text/event-stream` — outside
+        // the
+        // backend's compression mime-types anyway — and per-event gzip would only buffer the
+        // stream.
+        // The in-memory codec limit is unaffected: it bounds the decompressed body, not the wire
+        // size.
         httpClient =
             httpClient
+                .compress(true)
                 .responseTimeout(httpProperties.getResponseTimeout())
                 .doOnConnected(
                     conn ->
