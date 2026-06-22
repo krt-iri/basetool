@@ -88,7 +88,9 @@ class OrgUnitBankPageControllerMvcTest {
             "IRI",
             "SQUADRON",
             new BigDecimal("1850000"),
-            true);
+            true,
+            new BigDecimal("420000"),
+            List.of(new BigDecimal("1430000"), new BigDecimal("1850000")));
     BankBookingRequestDto request =
         new BankBookingRequestDto(
             UUID.randomUUID(),
@@ -128,6 +130,10 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
+        // The 30-day trend renders: the sign-colored delta label + the inline SVG sparkline,
+        // mirroring the bank dashboard cards (REQ-BANK-016).
+        .andExpect(content().string(Matchers.containsString("kpi-delta")))
+        .andExpect(content().string(Matchers.containsString("kpi-sparkline")))
         // The request modal exists and the card primes it with the org unit id.
         .andExpect(content().string(Matchers.containsString("org-unit-request-modal")))
         .andExpect(
@@ -170,7 +176,9 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             null,
             new BigDecimal("250000"),
-            false);
+            false,
+            BigDecimal.ZERO,
+            List.of());
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of(special));

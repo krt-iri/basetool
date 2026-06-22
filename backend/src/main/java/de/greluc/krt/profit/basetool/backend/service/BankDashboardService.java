@@ -30,8 +30,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,16 +46,15 @@ import org.springframework.transaction.annotation.Transactional;
  * with balance, 30-day delta and the daily balance series for the server-rendered sparkline, plus
  * the management-only totals strip. Everything derives from THREE statements — the account list,
  * one grouped balance query and one windowed posting-slice query — never from per-account
- * round-trips (REQ-DATA-003).
+ * round-trips (REQ-DATA-003). The per-account delta and sparkline series are derived via {@link
+ * BankTrendCalculator}, the same helper the org-unit balance page uses, so both surfaces show an
+ * identical 30-day trend.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
 public class BankDashboardService {
-
-  /** Length of the dashboard trend window in days (REQ-BANK-016). */
-  private static final int WINDOW_DAYS = 30;
 
   private final BankAccountRepository accountRepository;
   private final BankPostingRepository postingRepository;
@@ -83,7 +80,7 @@ public class BankDashboardService {
             : postingRepository.accountBalances(ids).stream()
                 .collect(
                     Collectors.toMap(BankAccountBalance::accountId, BankAccountBalance::balance));
-    Instant cutoff = Instant.now().minusSeconds((long) WINDOW_DAYS * 24 * 3600);
+    Instant cutoff = BankTrendCalculator.windowCutoff();
     Map<UUID, List<BankPostingSlice>> slices =
         ids.isEmpty()
             ? Map.of()
@@ -117,7 +114,7 @@ public class BankDashboardService {
               account.getStatus(),
               balance,
               delta,
-              sparkline(balance, delta, accountSlices)));
+              BankTrendCalculator.sparkline(balance, delta, accountSlices)));
       totalBalance = totalBalance.add(balance);
       if (account.getStatus() == BankAccountStatus.ACTIVE) {
         active++;
@@ -131,38 +128,5 @@ public class BankDashboardService {
             ? new BankDashboardTotalsDto(totalBalance, inflow, outflow, active, closed)
             : null;
     return new BankDashboardDto(management, cards, totals);
-  }
-
-  /**
-   * Derives the end-of-day balance series of the last {@value WINDOW_DAYS} days from the window's
-   * posting slices: the series starts at {@code balance - delta} (the balance at window start) and
-   * walks the daily nets; the last value equals the current balance. Days are bucketed in UTC,
-   * matching the ledger's storage zone.
-   *
-   * @param balance the account's current balance
-   * @param delta the net change inside the window
-   * @param slices the account's posting slices inside the window
-   * @return {@value WINDOW_DAYS} end-of-day balances, oldest first
-   */
-  private static List<BigDecimal> sparkline(
-      @NotNull BigDecimal balance,
-      @NotNull BigDecimal delta,
-      @NotNull List<BankPostingSlice> slices) {
-    LocalDate today = LocalDate.now(ZoneOffset.UTC);
-    Map<LocalDate, BigDecimal> dailyNet =
-        slices.stream()
-            .collect(
-                Collectors.groupingBy(
-                    slice -> slice.createdAt().atZone(ZoneOffset.UTC).toLocalDate(),
-                    Collectors.reducing(
-                        BigDecimal.ZERO, BankPostingSlice::amount, BigDecimal::add)));
-    List<BigDecimal> series = new ArrayList<>(WINDOW_DAYS);
-    BigDecimal running = balance.subtract(delta);
-    for (int i = WINDOW_DAYS - 1; i >= 0; i--) {
-      LocalDate day = today.minusDays(i);
-      running = running.add(dailyNet.getOrDefault(day, BigDecimal.ZERO));
-      series.add(running);
-    }
-    return series;
   }
 }

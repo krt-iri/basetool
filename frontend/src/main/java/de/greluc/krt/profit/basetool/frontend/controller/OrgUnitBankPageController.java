@@ -22,7 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -67,12 +70,33 @@ public class OrgUnitBankPageController {
         backendApiClient.get(
             "/api/v1/org-units/bank/requests",
             new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
-    model.addAttribute("balances", balances == null ? List.<OrgUnitBankBalanceDto>of() : balances);
+    List<OrgUnitBankBalanceDto> safeBalances =
+        balances == null ? List.<OrgUnitBankBalanceDto>of() : balances;
+    model.addAttribute("balances", safeBalances);
     model.addAttribute(
         "ownRequests", ownRequests == null ? List.<BankBookingRequestDto>of() : ownRequests);
+    model.addAttribute("sparks", sparksByAccountId(safeBalances));
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";
     }
     return "org-unit-bank";
+  }
+
+  /**
+   * Pre-scales each balance card's 30-day end-of-day series into its SVG sparkline polyline ({@link
+   * BankSparkline}), keyed by account id — Thymeleaf should not carry the scaling logic, and keying
+   * by account id lets the template look the spark up per card the same way the bank-detail page
+   * reads its distribution percents.
+   *
+   * @param balances the visible balance cards (never {@code null})
+   * @return account id to its scaled sparkline; same iteration order as {@code balances}
+   */
+  private static Map<UUID, BankSparkline.Spark> sparksByAccountId(
+      List<OrgUnitBankBalanceDto> balances) {
+    Map<UUID, BankSparkline.Spark> sparks = new LinkedHashMap<>();
+    for (OrgUnitBankBalanceDto balance : balances) {
+      sparks.put(balance.accountId(), BankSparkline.of(balance.sparkline()));
+    }
+    return sparks;
   }
 }

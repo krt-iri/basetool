@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import java.math.BigDecimal;
@@ -145,6 +146,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(List.of(ownAccount, foreignAccount, areaAccount));
     when(bankPostingRepository.accountBalances(List.of(ownAccountId)))
         .thenReturn(List.of(new BankAccountBalance(ownAccountId, new BigDecimal("12345"))));
+    when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
 
     // When
     List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
@@ -194,6 +196,7 @@ class OrgUnitBankAccessServiceTest {
     // Only account A has postings; account B has none -> must read as zero
     when(bankPostingRepository.accountBalances(List.of(accountAId, accountBId)))
         .thenReturn(List.of(new BankAccountBalance(accountAId, new BigDecimal("500"))));
+    when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
 
     // When
     List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
@@ -269,6 +272,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(List.of(areaAccount, childAccount, foreignAccount));
     when(bankPostingRepository.accountBalances(List.of(areaAccountId, childAccountId)))
         .thenReturn(List.of(new BankAccountBalance(areaAccountId, new BigDecimal("100"))));
+    when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
 
     List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
 
@@ -349,6 +353,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(List.of(areaAccount, activeSpecial, closedSpecial, foreignSquadron));
     when(bankPostingRepository.accountBalances(List.of(areaAccountId, activeSpecialId)))
         .thenReturn(List.of(new BankAccountBalance(activeSpecialId, new BigDecimal("999"))));
+    when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
 
     List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
 
@@ -398,6 +403,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(List.of(ownAccount, activeSpecial));
     when(bankPostingRepository.accountBalances(List.of(ownAccountId)))
         .thenReturn(List.of(new BankAccountBalance(ownAccountId, new BigDecimal("10"))));
+    when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
 
     List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
 
@@ -424,12 +430,43 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(List.of(activeAccount, closedAccount));
     when(bankPostingRepository.accountBalances(List.of(activeAccountId)))
         .thenReturn(List.of(new BankAccountBalance(activeAccountId, new BigDecimal("1"))));
+    when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
 
     List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
 
     assertThat(result)
         .extracting(OrgUnitBankBalanceDto::accountId)
         .containsExactly(activeAccountId);
+  }
+
+  @Test
+  void listOverseenOrgUnitBalances_computesDelta30dAndSparklineFromWindowSlices() {
+    // The card carries the same 30-day trend the bank dashboard shows (REQ-BANK-016): the delta is
+    // the net of the window's slices and the sparkline's last point equals the current balance.
+    UUID staffelId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    when(ownerScopeService.currentOwnLevelOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(account));
+    when(bankPostingRepository.accountBalances(List.of(accountId)))
+        .thenReturn(List.of(new BankAccountBalance(accountId, new BigDecimal("1000"))));
+    Instant now = Instant.now();
+    when(bankPostingRepository.postingSlicesSince(anyCollection(), any()))
+        .thenReturn(
+            List.of(
+                new BankPostingSlice(accountId, now.minusSeconds(7200), new BigDecimal("500")),
+                new BankPostingSlice(accountId, now.minusSeconds(3600), new BigDecimal("-200"))));
+
+    List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
+
+    assertThat(result).hasSize(1);
+    OrgUnitBankBalanceDto dto = result.getFirst();
+    assertThat(dto.delta30d()).isEqualByComparingTo("300");
+    assertThat(dto.sparkline()).hasSize(30);
+    assertThat(dto.sparkline().getLast()).isEqualByComparingTo("1000");
   }
 
   private static BankBookingRequestDto dto(UUID accountId, UUID orgUnitId) {

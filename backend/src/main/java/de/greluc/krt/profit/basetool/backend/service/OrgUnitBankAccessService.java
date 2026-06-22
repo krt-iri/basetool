@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import java.math.BigDecimal;
@@ -35,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -112,9 +114,13 @@ public class OrgUnitBankAccessService {
    * </ul>
    *
    * <p>The balance is the compute-on-read posting sum (ADR-0010), fetched for all matched accounts
-   * in a single grouped query (no N+1). The result is balance-only — no history, no holders, no
-   * audit. A caller who can see nothing (plain member) receives an empty list rather than an error,
-   * so the endpoint never leaks the existence of accounts the caller may not see.
+   * in a single grouped query (no N+1). Each card also carries the same 30-day trend the bank
+   * dashboard shows (REQ-BANK-016) — the signed delta and the daily end-of-day sparkline series,
+   * derived via {@link BankTrendCalculator} from one additional windowed posting-slice query (again
+   * no per-account N+1). It still exposes no transaction history, no holder distribution and no
+   * audit — those stay a bank-staff surface. A caller who can see nothing (plain member) receives
+   * an empty list rather than an error, so the endpoint never leaks the existence of accounts the
+   * caller may not see.
    *
    * @return the visible account balances, ordered by account number; never {@code null}, empty when
    *     the caller may view no active account
@@ -141,14 +147,24 @@ public class OrgUnitBankAccessService {
     // while subordinate accounts reached by the cascade and the view-only special accounts are not.
     var requestScope = ownerScopeService.currentOwnLevelOversightScope();
     Map<UUID, BigDecimal> balances = balancesByAccountId(visible);
+    Map<UUID, List<BankPostingSlice>> slicesByAccount = slicesByAccountId(visible);
     return visible.stream()
         .map(
-            account ->
-                toDto(
-                    account,
-                    balances.getOrDefault(account.getId(), BigDecimal.ZERO),
-                    account.getOrgUnit() != null
-                        && requestScope.permits(account.getOrgUnit().getId())))
+            account -> {
+              BigDecimal balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
+              List<BankPostingSlice> slices =
+                  slicesByAccount.getOrDefault(account.getId(), List.of());
+              BigDecimal delta = BankTrendCalculator.windowDelta(slices);
+              boolean canRequest =
+                  account.getOrgUnit() != null
+                      && requestScope.permits(account.getOrgUnit().getId());
+              return toDto(
+                  account,
+                  balance,
+                  canRequest,
+                  delta,
+                  BankTrendCalculator.sparkline(balance, delta, slices));
+            })
         .toList();
   }
 
@@ -248,6 +264,24 @@ public class OrgUnitBankAccessService {
   }
 
   /**
+   * Fetches the last 30 days of posting slices for the given accounts in a single windowed query
+   * (REQ-DATA-003, mirroring the dashboard's no-N+1 read) and groups them by account id, so the
+   * 30-day delta and sparkline series can be derived per account in memory (REQ-BANK-016). Accounts
+   * with no postings in the window produce no entry and are treated as an empty list by the caller.
+   *
+   * @param accounts the visible accounts
+   * @return a map of account id to its in-window posting slices (only accounts with slices appear)
+   */
+  @NotNull
+  private Map<UUID, List<BankPostingSlice>> slicesByAccountId(@NotNull List<BankAccount> accounts) {
+    List<UUID> ids = accounts.stream().map(BankAccount::getId).toList();
+    return bankPostingRepository
+        .postingSlicesSince(ids, BankTrendCalculator.windowCutoff())
+        .stream()
+        .collect(Collectors.groupingBy(BankPostingSlice::accountId));
+  }
+
+  /**
    * Projects one visible account and its resolved balance into the balance-only wire shape. Handles
    * both flavours: an org-unit account (its {@code orgUnit} is non-null, the fields are populated)
    * and a special account (Sonderkonto, REQ-BANK-028) whose {@code orgUnit} is {@code null}, in
@@ -259,11 +293,17 @@ public class OrgUnitBankAccessService {
    * @param canRequest {@code true} iff the account is the caller's own-level org-unit account (the
    *     F2 request affordance applies); {@code false} for a view-only subordinate or special
    *     account
-   * @return the balance-only DTO for the account
+   * @param delta30d the net balance change over the last 30 days (signed)
+   * @param sparkline the 30 end-of-day balances of the window, oldest first (last entry = balance)
+   * @return the balance-only DTO for the account, carrying the 30-day trend figures (REQ-BANK-016)
    */
   @NotNull
   private OrgUnitBankBalanceDto toDto(
-      @NotNull BankAccount account, @NotNull BigDecimal balance, boolean canRequest) {
+      @NotNull BankAccount account,
+      @NotNull BigDecimal balance,
+      boolean canRequest,
+      @NotNull BigDecimal delta30d,
+      @NotNull List<BigDecimal> sparkline) {
     OrgUnit orgUnit = account.getOrgUnit();
     return new OrgUnitBankBalanceDto(
         account.getId(),
@@ -276,6 +316,8 @@ public class OrgUnitBankAccessService {
         orgUnit == null ? null : orgUnit.getShorthand(),
         orgUnit == null ? null : orgUnit.getKind(),
         balance,
-        canRequest);
+        canRequest,
+        delta30d,
+        sparkline);
   }
 }

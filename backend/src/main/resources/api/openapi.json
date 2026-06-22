@@ -49739,6 +49739,15 @@
           },
           "canRequest" : {
             "type" : "boolean"
+          },
+          "delta30d" : {
+            "type" : "number"
+          },
+          "sparkline" : {
+            "type" : "array",
+            "items" : {
+              "type" : "number"
+            }
           }
         }
       },
