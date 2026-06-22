@@ -533,6 +533,46 @@ public class OwnerScopeService {
   }
 
   /**
+   * {@code true} iff the caller holds <b>Bereich- or OL-level oversight</b> — the seniority that,
+   * on the org-unit bank page, additionally reveals the cartel-wide special accounts
+   * (Sonderkonten), which belong to no single org unit and are therefore not reachable through the
+   * org-unit cascade (REQ-BANK-028). Unlike {@link #isOversightSeat(OrgUnitMembership)} this
+   * deliberately <em>excludes</em> the SK-lead seat and the officer role: an officer or SK lead
+   * oversees only their own unit's account, so they do not get the org-wide special-account view.
+   * The seats that qualify are the Bereichsleitung flags ({@code is_bereichsleiter}/{@code
+   * is_bereichskoordinator}/{@code is_bereichsoperator}) and the OL flag ({@code is_ol_member}); a
+   * flag-less (chart-only) Bereich/OL membership does not qualify. Admins always qualify — they see
+   * every account anyway.
+   *
+   * <p>This is consulted only by the org-unit-aware bank seam ({@link OrgUnitBankAccessService});
+   * it adds no org-unit logic to the bank itself, which stays org-unit-blind (REQ-BANK-008,
+   * ADR-0011).
+   *
+   * @return {@code true} iff the caller is an admin or holds a Bereich-/OL-level oversight seat.
+   */
+  public boolean currentUserHasAreaOrOlOversight() {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    return currentCallerMemberships().stream().anyMatch(OwnerScopeService::isAreaOrOlSeat);
+  }
+
+  /**
+   * {@code true} iff the membership is a Bereich- or OL-level oversight seat — the subset of {@link
+   * #isOversightSeat(OrgUnitMembership)} that excludes the SK-lead seat. Backs {@link
+   * #currentUserHasAreaOrOlOversight()}.
+   *
+   * @param m the membership row to classify; never {@code null}.
+   * @return {@code true} iff the membership is a Bereichsleitung or OL seat.
+   */
+  private static boolean isAreaOrOlSeat(@NotNull OrgUnitMembership m) {
+    return m.isBereichsleiter()
+        || m.isBereichskoordinator()
+        || m.isBereichsoperator()
+        || m.isOlMember();
+  }
+
+  /**
    * Convenience entry point for the aggregate-service create paths: returns the {@link Squadron}
    * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller has
    * no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services use

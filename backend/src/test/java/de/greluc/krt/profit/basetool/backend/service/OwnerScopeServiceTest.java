@@ -1775,6 +1775,95 @@ class OwnerScopeServiceTest {
   }
 
   @Nested
+  class CurrentUserHasAreaOrOlOversightTests {
+
+    @Test
+    void admin_qualifies() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.currentUserHasAreaOrOlOversight());
+    }
+
+    @Test
+    void officerWithoutAreaOrOlSeat_doesNotQualify() {
+      // The officer role / a plain Staffel membership is not a Bereich/OL seat — special accounts
+      // (Sonderkonten) stay hidden for officers (REQ-BANK-028).
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertFalse(service.currentUserHasAreaOrOlOversight());
+    }
+
+    @Test
+    void skLead_doesNotQualify() {
+      // An SK-lead oversees only their own SK account, not the org-wide special accounts.
+      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, UUID.randomUUID());
+      lead.setLead(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
+
+      assertFalse(service.currentUserHasAreaOrOlOversight());
+    }
+
+    @Test
+    void bereichsleiter_qualifies() {
+      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
+      seat.setBereichsleiter(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
+
+      assertTrue(service.currentUserHasAreaOrOlOversight());
+    }
+
+    @Test
+    void bereichskoordinator_qualifies() {
+      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
+      seat.setBereichskoordinator(true);
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
+
+      assertTrue(service.currentUserHasAreaOrOlOversight());
+    }
+
+    @Test
+    void olMember_qualifies() {
+      OrgUnitMembership seat = olMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
+
+      assertTrue(service.currentUserHasAreaOrOlOversight());
+    }
+
+    @Test
+    void flaglessBereichSeat_doesNotQualify() {
+      // A chart-only (flag-less) Bereich seat — an SK-Leiter's organisational membership
+      // (REQ-ORG-017) — is not an oversight seat and does not unlock the special-account view.
+      OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(flaglessBereich));
+
+      assertFalse(service.currentUserHasAreaOrOlOversight());
+    }
+
+    @Test
+    void anonymous_doesNotQualify() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.empty());
+
+      assertFalse(service.currentUserHasAreaOrOlOversight());
+    }
+  }
+
+  @Nested
   class CurrentOversightScopeTests {
 
     @Test
