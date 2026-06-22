@@ -66,7 +66,7 @@ class JobOrderRepositoryActiveLookupOrderingTest {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     Squadron squadron = new Squadron();
     squadron.setName("Prio-Order-" + tag);
-    squadron.setShorthand("PO" + tag.substring(0, 3));
+    squadron.setShorthand("PO" + tag);
     OrgUnit owner = squadronRepository.save(squadron);
 
     UUID prio30 = saveActiveOrder(owner, 30);

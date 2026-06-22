@@ -325,7 +325,7 @@ class LogisticianRoleTest {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     SpecialCommand sk = new SpecialCommand();
     sk.setName("Lead-SK-" + tag);
-    sk.setShorthand("L" + tag.substring(0, 3));
+    sk.setShorthand("L" + tag);
     sk = specialCommandRepository.save(sk);
     specialCommandRepository.flush();
 
