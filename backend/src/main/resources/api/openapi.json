@@ -48562,6 +48562,9 @@
           "minQuality" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "quantityType" : {
+            "type" : "string"
           }
         }
       },
@@ -48826,6 +48829,10 @@
           "craftableWithRefinery" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "quantityType" : {
+            "type" : "string",
+            "enum" : [ "SCU", "PIECE" ]
           }
         }
       },

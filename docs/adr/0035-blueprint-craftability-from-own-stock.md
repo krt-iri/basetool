@@ -53,6 +53,13 @@ SCU. No migration.
 - **Stat projection reuses the existing modifier math verbatim** — the frontend
   `computeModifierValue` is mirrored on the server (`BlueprintModifierMath`) so server and slider
   agree exactly.
+- **Quantity unit follows the material, not the field name.** A RESOURCE ingredient may resolve to a
+  `PIECE`-quantity material. The calculation runs in the material's own unit on both sides (stock and
+  refinery yield are already piece counts for a PIECE material), the per-craft requirement is rounded
+  to a whole piece exactly as `JobOrderItemService.roundForQuantityType` does, and the per-material
+  breakdown carries the material's `quantityType` so the UI labels amounts "SCU" / "Stück" and formats
+  pieces as whole numbers. The `*Scu`-named DTO fields are historical; they carry whichever unit the
+  material uses.
 
 ## Consequences
 

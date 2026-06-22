@@ -35,10 +35,13 @@ import java.util.UUID;
  * @param availableScuWithRefinery qualifying SCU including the open refinery yield
  * @param effectiveQuality SCU-weighted quality from inventory alone, or {@code null}
  * @param effectiveQualityWithRefinery the same including the open refinery yield, or {@code null}
- * @param missingScu SCU short of one craft from inventory alone
- * @param missingScuWithRefinery SCU short of one craft including refinery yield
+ * @param missingScu amount short of one craft from inventory alone (in the {@code quantityType}
+ *     unit)
+ * @param missingScuWithRefinery amount short of one craft including refinery yield
  * @param craftable crafts this material alone allows from inventory
  * @param craftableWithRefinery crafts this material alone allows including refinery yield
+ * @param quantityType the material's quantity unit ({@code "SCU"} / {@code "PIECE"}); the {@code
+ *     *Scu} figures are in this unit, so the UI labels them "SCU" or "Stück" accordingly
  */
 public record CraftabilityMaterialDto(
     UUID materialId,
@@ -52,4 +55,5 @@ public record CraftabilityMaterialDto(
     double missingScu,
     double missingScuWithRefinery,
     int craftable,
-    int craftableWithRefinery) {}
+    int craftableWithRefinery,
+    String quantityType) {}

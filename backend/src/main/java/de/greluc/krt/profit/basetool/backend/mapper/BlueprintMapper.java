@@ -152,7 +152,11 @@ public interface BlueprintMapper {
 
   /**
    * Maps an ingredient line to its DTO, taking the display name from the Wiki snapshot and the kind
-   * from the enum name.
+   * from the enum name. For a RESOURCE line it also surfaces the resolved material's {@code
+   * quantityType} so the UI can label the {@code quantityScu} amount in the right unit (SCU vs
+   * Stück) — a deliberate, bounded touch of the lazy {@code material} association (one recipe's
+   * ingredients, inside the read transaction); ITEM lines and unresolved RESOURCE lines carry a
+   * {@code null} quantity type.
    *
    * @param ingredient the ingredient entity
    * @return the ingredient DTO
@@ -161,6 +165,11 @@ public interface BlueprintMapper {
   @Mapping(
       target = "kind",
       expression = "java(ingredient.getKind() == null ? null : ingredient.getKind().name())")
+  @Mapping(
+      target = "quantityType",
+      expression =
+          "java(ingredient.getMaterial() == null || ingredient.getMaterial().getQuantityType()"
+              + " == null ? null : ingredient.getMaterial().getQuantityType().name())")
   BlueprintRequirementIngredientDto toIngredientDto(BlueprintIngredient ingredient);
 
   /**

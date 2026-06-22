@@ -453,7 +453,13 @@
         line.appendChild(strong);
         const metaParts = [];
         if (ing.quantityScu != null) {
-            metaParts.push(Number(ing.quantityScu).toFixed(2) + ' SCU');
+            // A RESOURCE line can resolve to a PIECE material (quantityScu then holds a whole piece
+            // count): render it as an integer + "Stück" rather than a 2-decimal "SCU" amount.
+            if (ing.quantityType === 'PIECE') {
+                metaParts.push(Math.round(Number(ing.quantityScu)) + ' ' + unitLabel('PIECE'));
+            } else {
+                metaParts.push(Number(ing.quantityScu).toFixed(2) + ' ' + unitLabel('SCU'));
+            }
         }
         if (ing.quantityUnits != null) {
             metaParts.push(ing.quantityUnits + 'x');
@@ -538,6 +544,21 @@
         }
         const n = Number(value);
         return (Math.round(n * 100) / 100).toString();
+    }
+
+    // The unit label for a material's quantityType ('PIECE' -> Stück, anything else -> SCU). Mirrors
+    // the unit-aware rendering every other inventory surface uses (inventory-index.html et al.).
+    function unitLabel(quantityType) {
+        return quantityType === 'PIECE' ? i18n().unitPiece || 'Stück' : i18n().unitScu || 'SCU';
+    }
+
+    // Formats a quantity in its material's own unit: whole pieces for PIECE, the trimmed 2-decimal
+    // SCU scale otherwise. So a PIECE material reads "2", an SCU material "0.36".
+    function fmtAmount(value, quantityType) {
+        if (quantityType === 'PIECE') {
+            return value == null ? '0' : String(Math.round(Number(value)));
+        }
+        return fmtScu(value);
     }
 
     // Fetches craftability for the whole owned set once (both figure sets), then paints the
@@ -690,6 +711,8 @@
                 const avail = refineryOn ? m.availableScuWithRefinery : m.availableScu;
                 const missing = refineryOn ? m.missingScuWithRefinery : m.missingScu;
                 const eff = refineryOn ? m.effectiveQualityWithRefinery : m.effectiveQuality;
+                const qt = m.quantityType;
+                const unit = unitLabel(qt);
                 const row = el('div', 'krt-bp-craft-mat' + (missing > 0 ? ' is-short' : ''));
                 row.appendChild(el('span', 'krt-bp-craft-mat-name', m.materialName || '?'));
                 const figs = el('span', 'krt-bp-craft-mat-figs');
@@ -697,7 +720,7 @@
                     el(
                         'span',
                         'krt-bp-craft-mat-fig',
-                        fmtScu(avail) + ' / ' + fmtScu(m.requiredScu) + ' SCU',
+                        fmtAmount(avail, qt) + ' / ' + fmtAmount(m.requiredScu, qt) + ' ' + unit,
                     ),
                 );
                 figs.appendChild(
@@ -709,7 +732,11 @@
                 );
                 if (missing > 0) {
                     figs.appendChild(
-                        el('span', 'krt-bp-craft-mat-missing', '−' + fmtScu(missing) + ' SCU'),
+                        el(
+                            'span',
+                            'krt-bp-craft-mat-missing',
+                            '−' + fmtAmount(missing, qt) + ' ' + unit,
+                        ),
                     );
                 }
                 row.appendChild(figs);

@@ -160,6 +160,51 @@ class BlueprintCraftabilityServiceTest {
   }
 
   @Test
+  void computeForOwner_pieceMaterialCountsInWholePiecesAndRoundsTheRequirement() {
+    stubOwned(owned("widget", "Widget"));
+    Blueprint bp = new Blueprint();
+    BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
+    slot.setOrderIndex(0);
+    slot.setName("Frame");
+    bp.addRequirementGroup(slot);
+    // A RESOURCE ingredient resolving to a PIECE material: its 2.6 per-craft quantity rounds to a
+    // whole 3 pieces (parity with JobOrderItemService.roundForQuantityType), so 7 owned pieces
+    // craft
+    // floor(7/3) = 2 times — the count must be in pieces, not treated as SCU.
+    bp.addIngredient(resource(0, material(MAT_A, "Hadanite", QuantityType.PIECE), 2.6, null, slot));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("widget", bp));
+    when(inventoryItemService.getOwnedStockSlices(USER_ID))
+        .thenReturn(List.of(new OwnedStockSlice(MAT_A, 400, 7.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+
+    assertEquals(2, dto.craftable());
+    assertEquals("Hadanite", dto.limitingMaterialName());
+    CraftabilityMaterialDto hadanite = material(dto, MAT_A);
+    assertEquals(QuantityType.PIECE, hadanite.quantityType());
+    assertEquals(3.0, hadanite.requiredScu(), 1e-9); // 2.6 rounded up to a whole piece
+    assertEquals(7.0, hadanite.availableScu(), 1e-9);
+    assertEquals(0.0, hadanite.missingScu(), 1e-9);
+    assertEquals(2, hadanite.craftable());
+  }
+
+  @Test
+  void computeForOwner_scuMaterialReportsScuQuantityType() {
+    stubOwned(owned("widget", "Widget"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("widget", twoSlotBlueprint()));
+    when(inventoryItemService.getOwnedStockSlices(USER_ID))
+        .thenReturn(
+            List.of(new OwnedStockSlice(MAT_A, 1000, 25.0), new OwnedStockSlice(MAT_B, 600, 12.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+
+    assertEquals(QuantityType.SCU, material(dto, MAT_A).quantityType());
+    assertEquals(QuantityType.SCU, material(dto, MAT_B).quantityType());
+  }
+
+  @Test
   void computeForOwner_itemOnlyRecipeIsNotAssessable() {
     stubOwned(owned("widget", "Widget"));
     Blueprint bp = new Blueprint();
@@ -251,10 +296,14 @@ class BlueprintCraftabilityServiceTest {
   }
 
   private static Material material(UUID id, String name) {
+    return material(id, name, QuantityType.SCU);
+  }
+
+  private static Material material(UUID id, String name, QuantityType quantityType) {
     Material material = new Material();
     material.setId(id);
     material.setName(name);
-    material.setQuantityType(QuantityType.SCU);
+    material.setQuantityType(quantityType);
     return material;
   }
 
