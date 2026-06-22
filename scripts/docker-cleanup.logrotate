@@ -9,12 +9,12 @@
 # =============================================================================
 
 /var/log/iri-docker-cleanup.log {
-    su root adm
+    su deploy adm
     weekly
     rotate 8
     compress
     delaycompress
     missingok
     notifempty
-    create 0640 root adm
+    create 0640 deploy adm
 }
