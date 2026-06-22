@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Bereichs- und Organisationsleitung sehen auf der Seite „Bank meiner Org-Einheit" jetzt auch die organisationsweiten Sonderkonten** — rein lesend, ohne Ein-/Auszahlungsanträge. Außerdem zeigt die Seite nur noch aktive Konten; geschlossene Konten erscheinen dort nicht mehr.
+
 ## [v0.7.8](https://github.com/krt-profit/basetool/releases/tag/v0.7.8) - 2026-06-22
 
 ### Fixed
