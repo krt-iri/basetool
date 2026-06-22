@@ -109,6 +109,7 @@ class RefineryOrderServiceLifecycleTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private OwnerScopeService ownerScopeService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private RefineryOrderService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();

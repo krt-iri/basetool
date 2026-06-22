@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
@@ -70,6 +71,7 @@ public class MissionFinanceEntryService {
   private final de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository
       refineryOrderRepository;
   private final MissionMapper missionMapper;
+  private final AuditService auditService;
 
   /**
    * Returns paged finance entries for the mission.
@@ -151,8 +153,14 @@ public class MissionFinanceEntryService {
             .amount(dto.amount())
             .build();
 
-    entry = financeEntryRepository.save(entry);
-    return missionMapper.toDto(entry);
+    MissionFinanceEntry saved = financeEntryRepository.save(entry);
+    auditService.record(
+        AuditEventType.MISSION_FINANCE_ENTRY_CREATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "entry=" + entry.getId() + " type=" + dto.type() + " amount=" + dto.amount());
+    return missionMapper.toDto(saved);
   }
 
   /**
@@ -184,6 +192,12 @@ public class MissionFinanceEntryService {
     entry.setNote(dto.note());
     entry.setType(dto.type());
     entry.setAmount(dto.amount());
+    auditService.record(
+        AuditEventType.MISSION_FINANCE_ENTRY_UPDATED,
+        entry.getMission() != null ? entry.getMission().getId() : null,
+        entry.getMission() != null ? entry.getMission().getName() : null,
+        null,
+        "entry=" + entryId + " type=" + dto.type() + " amount=" + dto.amount());
 
     entry = financeEntryRepository.save(entry);
     return missionMapper.toDto(entry);
@@ -203,6 +217,14 @@ public class MissionFinanceEntryService {
             .findById(entryId)
             .orElseThrow(() -> new NotFoundException("Finance entry not found"));
 
+    UUID auditMissionId = entry.getMission() != null ? entry.getMission().getId() : null;
+    String auditMissionName = entry.getMission() != null ? entry.getMission().getName() : null;
     financeEntryRepository.delete(entry);
+    auditService.record(
+        AuditEventType.MISSION_FINANCE_ENTRY_DELETED,
+        auditMissionId,
+        auditMissionName,
+        null,
+        "entry=" + entryId);
   }
 }

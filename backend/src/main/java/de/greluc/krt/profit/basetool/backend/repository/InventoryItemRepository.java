@@ -413,12 +413,16 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
   /**
    * Bulk-reassigns every inventory item owned by {@code oldUser} to {@code newUser}; used by the
-   * user-merge flow so stock is preserved when two Keycloak accounts get consolidated.
+   * user-deletion cascade so stock is preserved when an account is removed.
+   *
+   * @param oldUser the previous owner
+   * @param newUser the new owner (the fallback admin)
+   * @return the number of inventory rows reassigned
    */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
       "UPDATE InventoryItem i SET i.user = :newUser WHERE i.user = :oldUser")
-  void updateOwner(
+  int updateOwner(
       @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User oldUser,
       @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User newUser);
 

@@ -139,4 +139,27 @@ public class BankAuditService {
             bankAuditEventMapper.toDto(
                 event, event.getAccountId() == null ? null : accountNos.get(event.getAccountId())));
   }
+
+  /**
+   * Purges bank audit rows older than a cutoff — the admin retention delete (REQ-AUDIT-004) — and
+   * records the purge itself as a bank audit event so the deletion leaves a trace. The bulk delete
+   * runs first; the {@code AUDIT_LOG_PURGED} marker is written afterwards (its timestamp is newer
+   * than the cutoff, so it survives) and carries the deleted count and cutoff in its details. Write
+   * transaction on purpose: the marker insert ({@code record}, {@code MANDATORY}) runs inside it.
+   *
+   * @param before the exclusive cutoff; rows older than this are removed
+   * @return the number of bank audit rows deleted (excludes the purge marker itself)
+   */
+  @Transactional
+  public int purgeBefore(@NotNull Instant before) {
+    int deleted = auditEventRepository.deleteByOccurredAtBefore(before);
+    record(
+        BankAuditEventType.AUDIT_LOG_PURGED,
+        null,
+        null,
+        null,
+        "deleted=" + deleted + " before=" + before);
+    log.info("Purged {} bank audit events older than {}", deleted, before);
+    return deleted;
+  }
 }

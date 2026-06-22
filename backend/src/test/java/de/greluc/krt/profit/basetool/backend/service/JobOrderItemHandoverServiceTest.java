@@ -66,6 +66,7 @@ class JobOrderItemHandoverServiceTest {
   @Mock private UserService userService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
   @Mock private SquadronRepository squadronRepository;
+  @Mock private AuditService auditService;
   @InjectMocks private JobOrderItemHandoverService service;
 
   private UUID orderId;

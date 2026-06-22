@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
@@ -68,6 +69,7 @@ class InventoryItemServiceBulkCheckoutTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
 
+  @Mock private AuditService auditService;
   @InjectMocks private InventoryItemService inventoryItemService;
 
   // -------------------------------------------------------------------------

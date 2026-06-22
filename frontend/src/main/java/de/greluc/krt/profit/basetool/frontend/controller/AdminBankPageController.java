@@ -19,35 +19,32 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankWipeResetResultDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Spring MVC controller for the admin bank pages (epic #556 Phase 4, REQ-BANK-013/-012): the
- * wipe-reset danger card ({@code /admin/bank}, A1 mockup) and the audit-log viewer ({@code
- * /admin/bank-audit}, A2 mockup). Admin-only — class-level {@code @PreAuthorize} matches the
- * backend's admin URL gate; bank management does NOT reach these pages (REQ-BANK-010).
+ * Spring MVC controller for the admin bank pages (epic #556 Phase 4, REQ-BANK-013): the wipe-reset
+ * danger card ({@code /admin/bank}, A1 mockup). Admin-only — class-level {@code @PreAuthorize}
+ * matches the backend's admin URL gate; bank management does NOT reach these pages (REQ-BANK-010).
+ *
+ * <p>The audit-log viewer moved to the unified {@code /admin/audit-log} page (REQ-AUDIT-001,
+ * ADR-0037); the legacy {@code /admin/bank-audit} URL redirects there with the bank tab preselected
+ * so old bookmarks keep working.
  *
  * <p>The wipe-reset is a server-side PRG form post (not AJAX) gated by a type-to-confirm hurdle in
  * the browser; the backend re-enforces the admin role and the idempotency.
@@ -57,35 +54,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminBankPageController {
-
-  /** Audit-log page size; the table is dense and read-only, so a large page is fine. */
-  private static final int AUDIT_PAGE_SIZE = 50;
-
-  /** The event types offered in the audit filter dropdown, in a sensible grouping order. */
-  private static final List<String> EVENT_TYPES =
-      List.of(
-          "ACCOUNT_CREATED",
-          "ACCOUNT_RENAMED",
-          "ACCOUNT_CLOSED",
-          "ACCOUNT_REOPENED",
-          "HOLDER_REGISTERED",
-          "HOLDER_DEACTIVATED",
-          "HOLDER_REACTIVATED",
-          "GRANT_CREATED",
-          "GRANT_UPDATED",
-          "GRANT_REVOKED",
-          "DEPOSIT_BOOKED",
-          "WITHDRAWAL_BOOKED",
-          "TRANSFER_BOOKED",
-          "HOLDER_REBOOKED",
-          "TRANSACTION_REVERSED",
-          "WIPE_RESET_EXECUTED",
-          "STATEMENT_EXPORTED",
-          "MANAGEMENT_REPORT_EXPORTED",
-          "BOOKING_REQUEST_CREATED",
-          "BOOKING_REQUEST_CONFIRMED",
-          "BOOKING_REQUEST_REJECTED",
-          "BOOKING_REQUEST_CANCELLED");
 
   private final BackendApiClient backendApiClient;
 
@@ -98,6 +66,17 @@ public class AdminBankPageController {
   @GetMapping("/admin/bank")
   public String bankAdmin() {
     return "admin/bank";
+  }
+
+  /**
+   * Redirects the legacy bank-audit URL to the unified audit-log page with the bank tab selected
+   * (REQ-AUDIT-001) so existing bookmarks and links keep working.
+   *
+   * @return a redirect to the unified audit-log page, bank tab
+   */
+  @GetMapping("/admin/bank-audit")
+  public String bankAuditRedirect() {
+    return "redirect:/admin/audit-log?domain=BANK";
   }
 
   /**
@@ -192,94 +171,5 @@ public class AdminBankPageController {
     return ResponseEntity.status(e.getStatusCode())
         .contentType(MediaType.APPLICATION_PROBLEM_JSON)
         .body(body);
-  }
-
-  /**
-   * Renders the paged, filterable audit-log viewer.
-   *
-   * @param from period start filter (ISO instant), or absent
-   * @param to period end filter (ISO instant), or absent
-   * @param accountId account filter, or absent
-   * @param eventType event-type filter, or absent
-   * @param page zero-based page index
-   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
-   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model
-   * @return the {@code admin/bank-audit} view name, or its {@code auditResults} fragment selector
-   */
-  @GetMapping("/admin/bank-audit")
-  public String bankAudit(
-      @RequestParam(required = false) String from,
-      @RequestParam(required = false) String to,
-      @RequestParam(required = false) String accountId,
-      @RequestParam(required = false) String eventType,
-      @RequestParam(required = false, defaultValue = "0") int page,
-      @RequestParam(required = false) String fragment,
-      Model model) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/bank/admin/audit")
-            .queryParam("page", Math.max(page, 0))
-            .queryParam("size", AUDIT_PAGE_SIZE);
-    if (from != null && !from.isBlank()) {
-      uri.queryParam("from", from);
-    }
-    if (to != null && !to.isBlank()) {
-      uri.queryParam("to", to);
-    }
-    if (accountId != null && !accountId.isBlank()) {
-      uri.queryParam("accountId", accountId);
-    }
-    if (eventType != null && !eventType.isBlank()) {
-      uri.queryParam("eventType", eventType);
-    }
-
-    PageResponse<BankAuditEventDto> events = null;
-    try {
-      events =
-          backendApiClient.get(
-              uri.toUriString(),
-              new ParameterizedTypeReference<PageResponse<BankAuditEventDto>>() {});
-    } catch (Exception e) {
-      log.error("Failed to load bank audit log", e);
-      model.addAttribute("error", "admin.bank.audit.error.load");
-    }
-
-    model.addAttribute("events", events);
-    model.addAttribute("eventTypes", EVENT_TYPES);
-    model.addAttribute("filterFrom", from);
-    model.addAttribute("filterTo", to);
-    model.addAttribute("filterAccountId", accountId);
-    model.addAttribute("filterEventType", eventType);
-    model.addAttribute("paginationBaseUrl", buildBaseUrl(from, to, accountId, eventType));
-    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "admin/bank-audit :: auditResults";
-    }
-    return "admin/bank-audit";
-  }
-
-  /**
-   * Builds the pagination base URL preserving the active filters so paging keeps the filter set.
-   *
-   * @param from period start filter, or {@code null}
-   * @param to period end filter, or {@code null}
-   * @param accountId account filter, or {@code null}
-   * @param eventType event-type filter, or {@code null}
-   * @return the base URL with the filter query parameters (no page/size)
-   */
-  private static String buildBaseUrl(String from, String to, String accountId, String eventType) {
-    UriComponentsBuilder base = UriComponentsBuilder.fromPath("/admin/bank-audit");
-    if (from != null && !from.isBlank()) {
-      base.queryParam("from", from);
-    }
-    if (to != null && !to.isBlank()) {
-      base.queryParam("to", to);
-    }
-    if (accountId != null && !accountId.isBlank()) {
-      base.queryParam("accountId", accountId);
-    }
-    if (eventType != null && !eventType.isBlank()) {
-      base.queryParam("eventType", eventType);
-    }
-    return base.toUriString();
   }
 }

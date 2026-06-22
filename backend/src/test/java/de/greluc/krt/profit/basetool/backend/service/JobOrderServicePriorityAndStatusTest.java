@@ -83,6 +83,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialClaimService materialClaimService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private JobOrderService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();

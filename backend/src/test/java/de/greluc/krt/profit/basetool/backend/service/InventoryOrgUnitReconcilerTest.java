@@ -55,6 +55,7 @@ class InventoryOrgUnitReconcilerTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
 
+  @Mock private AuditService auditService;
   @InjectMocks private InventoryOrgUnitReconciler reconciler;
 
   private Material matA;

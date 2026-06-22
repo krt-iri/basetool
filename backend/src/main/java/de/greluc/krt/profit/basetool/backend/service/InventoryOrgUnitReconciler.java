@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
@@ -62,6 +63,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryOrgUnitReconciler {
 
   private final InventoryItemRepository inventoryItemRepository;
+  private final AuditService auditService;
 
   /**
    * Reacts to a user gaining their <em>first</em> org-unit membership by promoting their
@@ -73,7 +75,15 @@ public class InventoryOrgUnitReconciler {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void onUserGainedFirstOrgUnit(@NotNull UUID userId, @NotNull OrgUnit firstOrgUnit) {
-    restamp(userId, firstOrgUnit, false);
+    int restamped = restamp(userId, firstOrgUnit, false);
+    if (restamped > 0) {
+      auditService.record(
+          AuditEventType.INVENTORY_ORG_RESTAMPED,
+          null,
+          null,
+          userId,
+          "trigger=GAINED_FIRST orgUnit=" + firstOrgUnit.getId() + " rows=" + restamped);
+    }
   }
 
   /**
@@ -86,7 +96,15 @@ public class InventoryOrgUnitReconciler {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void onUserLostLastOrgUnit(@NotNull UUID userId) {
-    restamp(userId, null, true);
+    int restamped = restamp(userId, null, true);
+    if (restamped > 0) {
+      auditService.record(
+          AuditEventType.INVENTORY_ORG_RESTAMPED,
+          null,
+          null,
+          userId,
+          "trigger=LOST_LAST orgUnit=NULL rows=" + restamped);
+    }
   }
 
   /**
@@ -101,12 +119,13 @@ public class InventoryOrgUnitReconciler {
    *     demoting).
    * @param demoteAllToNull {@code true} to clear every org stamp, {@code false} to promote only the
    *     {@code NULL}-org rows.
+   * @return the number of rows actually re-stamped (0 when nothing changed)
    */
-  private void restamp(
+  private int restamp(
       UUID userId, @Nullable OrgUnit newOrgForOwnerlessRows, boolean demoteAllToNull) {
     List<InventoryItem> rows = inventoryItemRepository.findByUserIdAndPersonalFalse(userId);
     if (rows.isEmpty()) {
-      return;
+      return 0;
     }
 
     int restamped = 0;
@@ -125,5 +144,6 @@ public class InventoryOrgUnitReconciler {
       log.info(
           "Reconciled inventory org stamp for user {}: {} row(s) re-stamped", userId, restamped);
     }
+    return restamped;
   }
 }

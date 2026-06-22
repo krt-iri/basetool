@@ -22,18 +22,22 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for the insert-only bank audit trail (epic #556, REQ-BANK-012). Strictly
- * insert-and-read: audit rows are never updated, deleted or retention-swept — the trail is the
- * point. Read access is admin-only and enforced at the controller/URL layer, not here.
+ * Spring Data repository for the append-only bank audit trail (epic #556, REQ-BANK-012). Rows are
+ * only ever inserted and read during normal operation; the single exception is the admin-triggered
+ * retention purge (REQ-AUDIT-004), a deliberate, itself-audited bulk delete of rows older than a
+ * chosen cutoff — there is no automatic retention sweep. Read and purge access are admin-only and
+ * enforced at the controller/URL layer, not here.
  */
 @Repository
 public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, UUID> {
@@ -75,4 +79,42 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
    * @return {@code true} when an audit event references the transaction
    */
   boolean existsByTransactionId(UUID transactionId);
+
+  /**
+   * All bank audit events in a period, oldest first — the chronological feed the period PDF export
+   * renders (REQ-AUDIT-001 unified viewer). Unpaged: the export is admin-only and period-bounded.
+   *
+   * @param from period start (inclusive)
+   * @param to period end (inclusive)
+   * @return the period's events in ascending time order
+   */
+  @Query(
+      "SELECT e FROM BankAuditEvent e WHERE e.occurredAt >= :from AND e.occurredAt <= :to"
+          + " ORDER BY e.occurredAt ASC")
+  List<BankAuditEvent> findForExport(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Counts bank audit rows in a period — the export size guard. The export query is unpaged (one
+   * document per period), so the report service checks this count first and rejects a period that
+   * would still load a pathologically large result set into memory.
+   *
+   * @param from period start (inclusive)
+   * @param to period end (inclusive)
+   * @return the number of bank audit events in the period
+   */
+  @Query(
+      "SELECT COUNT(e) FROM BankAuditEvent e WHERE e.occurredAt >= :from AND e.occurredAt <= :to")
+  long countForExport(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Bulk-deletes bank audit rows strictly older than a cutoff — the admin retention purge
+   * (REQ-AUDIT-004). The purge is itself audit-logged by the caller <em>after</em> this delete (its
+   * row is newer than the cutoff, so it survives).
+   *
+   * @param before the exclusive cutoff; rows with {@code occurredAt < before} are removed
+   * @return the number of rows deleted
+   */
+  @Modifying
+  @Query("DELETE FROM BankAuditEvent e WHERE e.occurredAt < :before")
+  int deleteByOccurredAtBefore(@Param("before") Instant before);
 }

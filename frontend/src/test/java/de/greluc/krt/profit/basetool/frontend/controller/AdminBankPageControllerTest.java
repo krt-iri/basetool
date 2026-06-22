@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -29,22 +28,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankWipeResetResultDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.ui.ConcurrentModel;
-import org.springframework.ui.Model;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
-@SuppressWarnings("unchecked")
+/**
+ * Unit tests for {@link AdminBankPageController}: the wipe-reset PRG flow and the legacy bank-audit
+ * redirect. The audit viewer itself moved to the unified {@code /admin/audit-log} page
+ * (REQ-AUDIT-001) and is covered by {@code AdminAuditLogPageControllerTest}.
+ */
 class AdminBankPageControllerTest {
 
   private BackendApiClient backendApiClient;
@@ -120,76 +116,8 @@ class AdminBankPageControllerTest {
   }
 
   @Test
-  void bankAudit_buildsFilteredUriAndExposesEventTypes() {
-    // Given
-    Model model = new ConcurrentModel();
-    PageResponse<BankAuditEventDto> empty =
-        new PageResponse<>(List.of(), 0, 50, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(empty);
-
-    // When
-    String view =
-        controller.bankAudit(
-            "2026-01-01T00:00:00Z",
-            "2026-02-01T00:00:00Z",
-            "acc-1",
-            "DEPOSIT_BOOKED",
-            0,
-            null,
-            model);
-
-    // Then
-    assertEquals("admin/bank-audit", view);
-    List<String> eventTypes = (List<String>) model.getAttribute("eventTypes");
-    assertNotNull(eventTypes);
-    assertTrue(eventTypes.contains("WIPE_RESET_EXECUTED"));
-    assertEquals("DEPOSIT_BOOKED", model.getAttribute("filterEventType"));
-    String base = (String) model.getAttribute("paginationBaseUrl");
-    assertTrue(base.contains("eventType=DEPOSIT_BOOKED"));
-    assertTrue(base.contains("accountId=acc-1"));
-  }
-
-  @Test
-  void bankAudit_backendFailure_setsErrorAttribute() {
-    // Given
-    Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenThrow(new RuntimeException("down"));
-
-    // When
-    controller.bankAudit(null, null, null, null, 0, null, model);
-
-    // Then
-    assertEquals("admin.bank.audit.error.load", model.getAttribute("error"));
-  }
-
-  @Test
-  void bankAudit_unfilteredBaseUrlHasNoQuery() {
-    // Given
-    Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(new PageResponse<BankAuditEventDto>(List.of(), 0, 50, 0, 0, List.of()));
-
-    // When
-    controller.bankAudit(null, null, null, null, 0, null, model);
-
-    // Then
-    assertEquals("/admin/bank-audit", model.getAttribute("paginationBaseUrl"));
-  }
-
-  @Test
-  void bankAudit_fragmentResults_returnsResultsFragmentSelector() {
-    // Given — an AJAX swap request (fragment=results) for in-place filter/paging (#573).
-    Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(new PageResponse<BankAuditEventDto>(List.of(), 0, 50, 0, 0, List.of()));
-
-    // When
-    String view = controller.bankAudit(null, null, null, null, 0, "results", model);
-
-    // Then — only the results fragment is rendered, not the full page.
-    assertEquals("admin/bank-audit :: auditResults", view);
+  void bankAuditRedirect_redirectsToUnifiedAuditLogBankTab() {
+    assertEquals("redirect:/admin/audit-log?domain=BANK", controller.bankAuditRedirect());
   }
 
   @Test

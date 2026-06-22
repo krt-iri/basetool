@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
@@ -130,6 +131,7 @@ public class OperationService {
   private final SystemSettingService systemSettingService;
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
+  private final AuditService auditService;
 
   /**
    * Returns paged operation list.
@@ -289,7 +291,14 @@ public class OperationService {
         ownerScopeService.currentOrgUnit().ifPresent(operation::setOwningOrgUnit);
       }
     }
-    return operationRepository.save(operation);
+    Operation saved = operationRepository.save(operation);
+    auditService.record(
+        AuditEventType.OPERATION_CREATED,
+        operation.getId(),
+        operation.getName(),
+        null,
+        "status=" + operation.getStatus());
+    return saved;
   }
 
   /**
@@ -333,7 +342,14 @@ public class OperationService {
     // pre-increment version. The in-place AJAX twin (updateOperationAjax, #576) hands that version
     // straight back to the form; a stale value makes the user's next consecutive save 409. Forcing
     // the flush here bumps @Version before the mapping reads it. Same precedent as JobOrderService.
-    return operationRepository.saveAndFlush(operation);
+    Operation saved = operationRepository.saveAndFlush(operation);
+    auditService.record(
+        AuditEventType.OPERATION_UPDATED,
+        operation.getId(),
+        operation.getName(),
+        null,
+        "status=" + operation.getStatus());
+    return saved;
   }
 
   /**
@@ -365,7 +381,9 @@ public class OperationService {
     }
     operation.getMissions().clear();
 
+    String deletedOperationName = operation.getName();
     operationRepository.delete(operation);
+    auditService.record(AuditEventType.OPERATION_DELETED, id, deletedOperationName, null, null);
     log.info("Successfully deleted operation with ID: {}", id);
   }
 
@@ -581,6 +599,12 @@ public class OperationService {
     // current paidOut flag, the audit fields are only inspected when paidOut=true.
 
     payoutStatusRepository.save(status);
+    auditService.record(
+        AuditEventType.OPERATION_PAYOUT_TOGGLED,
+        operationId,
+        status.getOperation() != null ? status.getOperation().getName() : null,
+        null,
+        "paidOut=" + paidOut);
 
     // Re-render the full row so the caller can patch its DOM without a second round-trip. We use
     // the same canonical path as the read endpoint to guarantee the displayed amount stays in

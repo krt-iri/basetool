@@ -78,6 +78,7 @@ class MaterialClaimServiceTest {
   @Mock private MaterialMapper materialMapper;
   @Mock private SquadronMapper squadronMapper;
 
+  @Mock private AuditService auditService;
   @InjectMocks private MaterialClaimService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();

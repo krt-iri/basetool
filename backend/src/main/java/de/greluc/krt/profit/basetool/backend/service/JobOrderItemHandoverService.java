@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
@@ -66,6 +67,7 @@ public class JobOrderItemHandoverService {
   private final UserService userService;
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final SquadronRepository squadronRepository;
+  private final AuditService auditService;
 
   /**
    * Records an item handover against an item order: increments each referenced line's {@code
@@ -133,6 +135,21 @@ public class JobOrderItemHandoverService {
     if (allDelivered) {
       jobOrderService.completeJobOrderWithinTransaction(jobOrder);
     }
+
+    // The recipientHandle is user free text and is never written to the audit details.
+    // completeJobOrderWithinTransaction already recorded JOB_ORDER_COMPLETED when the order was
+    // fulfilled, so this method records only the handover.
+    auditService.record(
+        AuditEventType.JOB_ORDER_ITEM_HANDOVER_CREATED,
+        jobOrderId,
+        "#" + jobOrder.getDisplayId() + " '" + jobOrder.getHandle() + "'",
+        null,
+        "handover="
+            + saved.getId()
+            + " entries="
+            + dto.entries().size()
+            + " autoCompleted="
+            + allDelivered);
 
     return resultDto;
   }

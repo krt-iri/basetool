@@ -80,6 +80,7 @@ class InventoryItemServiceTest {
 
   @Mock private JobOrderItemService jobOrderItemService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private InventoryItemService inventoryItemService;
 
   @Test

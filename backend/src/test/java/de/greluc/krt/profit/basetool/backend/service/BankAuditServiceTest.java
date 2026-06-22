@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -101,5 +103,26 @@ class BankAuditServiceTest {
     ArgumentCaptor<BankAuditEvent> saved = ArgumentCaptor.forClass(BankAuditEvent.class);
     verify(auditEventRepository).save(saved.capture());
     assertEquals("system", saved.getValue().getActorHandle());
+  }
+
+  @Test
+  void purgeBefore_deletesRowsAndRecordsPurgeMarker() {
+    // Given — an admin retention purge of the bank trail (REQ-AUDIT-004).
+    Instant before = Instant.parse("2026-01-01T00:00:00Z");
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(auditEventRepository.deleteByOccurredAtBefore(before)).thenReturn(3);
+    when(auditEventRepository.save(any(BankAuditEvent.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    // When
+    int deleted = bankAuditService.purgeBefore(before);
+
+    // Then — the count is returned and an AUDIT_LOG_PURGED marker carries the count + cutoff.
+    assertEquals(3, deleted);
+    verify(auditEventRepository).deleteByOccurredAtBefore(before);
+    ArgumentCaptor<BankAuditEvent> saved = ArgumentCaptor.forClass(BankAuditEvent.class);
+    verify(auditEventRepository).save(saved.capture());
+    assertEquals(BankAuditEventType.AUDIT_LOG_PURGED, saved.getValue().getEventType());
+    assertTrue(saved.getValue().getDetails().contains("deleted=3"), "details carry the count");
   }
 }
