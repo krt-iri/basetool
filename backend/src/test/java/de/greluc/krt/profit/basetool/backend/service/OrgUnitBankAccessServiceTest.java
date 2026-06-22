@@ -58,12 +58,12 @@ import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Unit tests for {@link OrgUnitBankAccessService} — the F1 officer/lead balance view
- * (REQ-BANK-021/-027/-028). Verifies that the oversight scope drives exactly which org-unit accounts
- * are returned, that an unscoped org-unit account never leaks, that a caller with no oversight is
- * given an empty list without even issuing the balance query, and that an account without postings
- * reads as zero. Also pins the REQ-BANK-028 refinements: a Bereich/OL overseer additionally sees the
- * cartel-wide special accounts (Sonderkonten) view-only while an officer does not, and only active
- * accounts are listed.
+ * (REQ-BANK-021/-027/-028). Verifies that the oversight scope drives exactly which org-unit
+ * accounts are returned, that an unscoped org-unit account never leaks, that a caller with no
+ * oversight is given an empty list without even issuing the balance query, and that an account
+ * without postings reads as zero. Also pins the REQ-BANK-028 refinements: a Bereich/OL overseer
+ * additionally sees the cartel-wide special accounts (Sonderkonten) view-only while an officer does
+ * not, and only active accounts are listed.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitBankAccessServiceTest {
