@@ -67,6 +67,7 @@ class UexRefinerySyncServiceTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private TerminalRepository terminalRepository;
 
+  @Mock private AuditService auditService;
   @InjectMocks private UexRefinerySyncService service;
 
   // ── syncRefiningMethods ────────────────────────────────────────────────

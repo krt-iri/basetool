@@ -92,6 +92,7 @@ class JobOrderServiceTest {
 
   @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+  @Mock private AuditService auditService;
   @InjectMocks private JobOrderService jobOrderService;
 
   private Material material;

@@ -81,6 +81,11 @@ public enum BankAuditEventType {
   MANAGEMENT_REPORT_EXPORTED,
 
   /**
+   * The bank audit log itself was exported as a PDF for a period (REQ-AUDIT-001 unified viewer).
+   */
+  AUDIT_LOG_EXPORTED,
+
+  /**
    * An org-unit officer/lead raised a confirm-before-post booking request (REQ-BANK-022). Audited
    * on creation while still off-ledger (PENDING), before any money moves.
    */

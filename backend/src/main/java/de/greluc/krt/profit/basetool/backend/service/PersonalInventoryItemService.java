@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalInventoryItemMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
@@ -87,6 +88,7 @@ public class PersonalInventoryItemService {
   private final PersonalInventoryItemMapper mapper;
   private final CityRepository cityRepository;
   private final SpaceStationRepository spaceStationRepository;
+  private final AuditService auditService;
 
   // ---------------------------------------------------------------------------------
   // Owner-scoped API
@@ -143,6 +145,15 @@ public class PersonalInventoryItemService {
     entity.setLocationNameSnapshot(snapshot);
     PersonalInventoryItem saved = repository.save(entity);
     log.info("Created personal inventory item id={} for ownerSub={}", saved.getId(), ownerSub);
+    // Covers both createOwn and the admin createForUser (which delegates here): the actor (self vs
+    // admin) is resolved by AuditService; target_user_id is the owner. Do not also record in
+    // createForUser or the event would be doubled.
+    auditService.record(
+        AuditEventType.PERSONAL_INVENTORY_CREATED,
+        saved.getId(),
+        personalLabel(saved),
+        parseSub(ownerSub),
+        "qty=" + saved.getQuantity() + " loc=" + saved.getLocationNameSnapshot());
     return mapper.toResponse(saved);
   }
 
@@ -176,8 +187,11 @@ public class PersonalInventoryItemService {
   @Transactional
   public void deleteOwn(@NotNull String ownerSub, @NotNull UUID id) {
     PersonalInventoryItem entity = loadOwn(ownerSub, id);
+    String label = personalLabel(entity);
     repository.delete(entity);
     log.info("Deleted personal inventory item id={} for ownerSub={}", id, ownerSub);
+    auditService.record(
+        AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, parseSub(ownerSub), "scope=own");
   }
 
   // ---------------------------------------------------------------------------------
@@ -250,8 +264,12 @@ public class PersonalInventoryItemService {
             .findById(id)
             .orElseThrow(
                 () -> new EntityNotFoundException("PersonalInventoryItem not found: " + id));
+    String label = personalLabel(entity);
+    String ownerSub = entity.getOwnerSub();
     repository.delete(entity);
     log.info("Admin deleted personal inventory item id={} ownerSub={}", id, entity.getOwnerSub());
+    auditService.record(
+        AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, parseSub(ownerSub), "scope=admin");
   }
 
   // ---------------------------------------------------------------------------------
@@ -340,7 +358,45 @@ public class PersonalInventoryItemService {
     PersonalInventoryItem saved = repository.save(entity);
     log.info(
         "Updated personal inventory item id={} ownerSub={}", saved.getId(), saved.getOwnerSub());
+    // Shared by updateOwn and the admin updateForUser; the actor distinguishes them. Recorded here
+    // (not in the two public methods) so the event fires exactly once per update.
+    auditService.record(
+        AuditEventType.PERSONAL_INVENTORY_UPDATED,
+        saved.getId(),
+        personalLabel(saved),
+        parseSub(saved.getOwnerSub()),
+        "qty=" + saved.getQuantity() + " loc=" + saved.getLocationNameSnapshot());
     return mapper.toResponse(saved);
+  }
+
+  /**
+   * Composes the audit subject label for a personal inventory item — {@code name @ location}.
+   *
+   * @param item the personal inventory item
+   * @return the {@code name @ location} label
+   */
+  private static String personalLabel(PersonalInventoryItem item) {
+    return item.getName() + " @ " + item.getLocationNameSnapshot();
+  }
+
+  /**
+   * Parses the owner's Keycloak {@code sub} into a {@link UUID} for the audit {@code
+   * target_user_id} column. Real Keycloak subs are UUIDs (the app's user ids are the subs); a
+   * non-UUID sub yields {@code null} rather than failing the write.
+   *
+   * @param sub the Keycloak {@code sub}, or {@code null}
+   * @return the parsed UUID, or {@code null} when absent/non-UUID
+   */
+  @Nullable
+  private static UUID parseSub(@Nullable String sub) {
+    if (sub == null || sub.isBlank()) {
+      return null;
+    }
+    try {
+      return UUID.fromString(sub.trim());
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
   }
 
   /**

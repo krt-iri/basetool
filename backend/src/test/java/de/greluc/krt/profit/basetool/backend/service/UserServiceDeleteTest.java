@@ -60,6 +60,7 @@ class UserServiceDeleteTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private UserService userService;
 
   private User user;

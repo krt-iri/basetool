@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
@@ -110,6 +111,7 @@ public class JobOrderService {
   private final OwnerScopeService ownerScopeService;
   private final ApplicationEventPublisher eventPublisher;
   private final MaterialClaimService materialClaimService;
+  private final AuditService auditService;
   private final JobOrderMapper jobOrderMapper;
   private final JobOrderItemService jobOrderItemService;
   private final de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper
@@ -165,6 +167,19 @@ public class JobOrderService {
     jobOrderRepository.flush();
     normalizePriorities();
     publishJobOrderCreated(jobOrder);
+    auditService.record(
+        AuditEventType.JOB_ORDER_CREATED,
+        jobOrder.getId(),
+        orderLabel(jobOrder),
+        null,
+        "type=MATERIAL materials="
+            + jobOrder.getMaterials().size()
+            + " responsibleOrgUnit="
+            + orgUnitRef(responsible)
+            + " requestingOrgUnit="
+            + orgUnitRef(requesting)
+            + " priority="
+            + jobOrder.getPriority());
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -226,6 +241,19 @@ public class JobOrderService {
     jobOrderRepository.flush();
     normalizePriorities();
     publishJobOrderCreated(jobOrder);
+    auditService.record(
+        AuditEventType.JOB_ORDER_ITEM_CREATED,
+        jobOrder.getId(),
+        orderLabel(jobOrder),
+        null,
+        "type=ITEM lines="
+            + jobOrder.getItems().size()
+            + " responsibleOrgUnit="
+            + orgUnitRef(responsible)
+            + " requestingOrgUnit="
+            + orgUnitRef(requesting)
+            + " priority="
+            + jobOrder.getPriority());
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -494,6 +522,7 @@ public class JobOrderService {
     }
 
     JobOrderStatus status = dto.status();
+    final JobOrderStatus previousStatus = jobOrder.getStatus();
     boolean isTerminal = (status == JobOrderStatus.COMPLETED || status == JobOrderStatus.REJECTED);
     boolean wasTerminal =
         (jobOrder.getStatus() == JobOrderStatus.COMPLETED
@@ -517,6 +546,28 @@ public class JobOrderService {
 
     if (isTerminal && !wasTerminal) {
       inventoryItemRepository.unlinkJobOrder(jobOrder.getId());
+    }
+
+    // COMPLETED is funneled to one event type whether reached manually here or auto via a handover
+    // (completeJobOrderWithinTransaction). A manual completion via this endpoint does NOT go
+    // through
+    // that funnel, so it is recorded here; emitting only one event per call avoids a STATUS_CHANGED
+    // +
+    // COMPLETED duplicate.
+    if (status == JobOrderStatus.COMPLETED) {
+      auditService.record(
+          AuditEventType.JOB_ORDER_COMPLETED,
+          jobOrder.getId(),
+          orderLabel(jobOrder),
+          null,
+          "from=" + previousStatus + " autoCompleted=false");
+    } else {
+      auditService.record(
+          AuditEventType.JOB_ORDER_STATUS_CHANGED,
+          jobOrder.getId(),
+          orderLabel(jobOrder),
+          null,
+          "from=" + previousStatus + " to=" + status);
     }
 
     return mapToDtoWithStock(jobOrder);
@@ -583,6 +634,12 @@ public class JobOrderService {
       o.setPriority(currentPrio++);
     }
 
+    auditService.record(
+        AuditEventType.JOB_ORDER_PRIORITY_CHANGED,
+        targetOrder.getId(),
+        orderLabel(targetOrder),
+        null,
+        "fromPriority=" + oldPriority + " toPriority=" + targetOrder.getPriority());
     return mapToDtoWithStock(targetOrder);
   }
 
@@ -664,7 +721,19 @@ public class JobOrderService {
 
     // Reconciliation (Phase 4 / #344, decision #6): an edit that drops a material bucket withdraws
     // any now-orphaned claims on that bucket. No-op for non-SK orders (which carry no claims).
-    materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
+    int orphanedClaimsWithdrawn =
+        materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
+    auditService.record(
+        AuditEventType.JOB_ORDER_UPDATED,
+        jobOrder.getId(),
+        orderLabel(jobOrder),
+        null,
+        "materialsRemoved="
+            + removedMaterialIds.size()
+            + " materials="
+            + jobOrder.getMaterials().size()
+            + " orphanedClaimsWithdrawn="
+            + orphanedClaimsWithdrawn);
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -752,7 +821,17 @@ public class JobOrderService {
 
     // Reconciliation (Phase 4 / #344, decision #6): withdraw claims whose bucket the re-derived
     // lines no longer require.
-    materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
+    int orphanedClaimsWithdrawn =
+        materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
+    auditService.record(
+        AuditEventType.JOB_ORDER_ITEM_UPDATED,
+        jobOrder.getId(),
+        orderLabel(jobOrder),
+        null,
+        "lines="
+            + jobOrder.getItems().size()
+            + " orphanedClaimsWithdrawn="
+            + orphanedClaimsWithdrawn);
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -772,12 +851,18 @@ public class JobOrderService {
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
 
     final Integer priority = jobOrder.getPriority();
+    // Snapshot the order's identity BEFORE the hard delete so the audit row stays readable
+    // afterwards (the audit table keeps a plain UUID, no FK to job_order).
+    final UUID deletedId = jobOrder.getId();
+    final String deletedLabel = orderLabel(jobOrder);
     inventoryItemRepository.unlinkJobOrder(id);
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();
     if (priority != null) {
       normalizePriorities();
     }
+    auditService.record(
+        AuditEventType.JOB_ORDER_DELETED, deletedId, deletedLabel, null, "priorityWas=" + priority);
   }
 
   /**
@@ -806,7 +891,14 @@ public class JobOrderService {
             .findById(userId)
             .orElseThrow(() -> new NotFoundException("User not found: " + userId));
     jobOrder.addAssignee(JobOrderAssignee.builder().user(user).build());
-    return mapToDtoWithStock(jobOrderRepository.saveAndFlush(jobOrder));
+    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
+    auditService.record(
+        AuditEventType.JOB_ORDER_ASSIGNEE_ADDED,
+        saved.getId(),
+        orderLabel(saved),
+        userId,
+        "assignee=" + userId);
+    return mapToDtoWithStock(saved);
   }
 
   /**
@@ -831,10 +923,19 @@ public class JobOrderService {
       throw new NotFoundException("Material not linked to job order: " + materialId);
     }
 
+    // Snapshot the label before the @Modifying(clearAutomatically) bulk unlink detaches the
+    // context.
+    final String label = orderLabel(jobOrder);
     inventoryItemRepository.unlinkJobOrderMaterial(jobOrderId, materialId);
 
     jobOrder.getMaterials().removeIf(m -> m.getMaterial().getId().equals(materialId));
     jobOrderRepository.save(jobOrder);
+    auditService.record(
+        AuditEventType.JOB_ORDER_MATERIAL_UNLINKED,
+        jobOrderId,
+        label,
+        null,
+        "material=" + materialId);
   }
 
   /**
@@ -846,9 +947,10 @@ public class JobOrderService {
    */
   @Transactional
   public void unlinkInventoryItem(UUID jobOrderId, UUID inventoryItemId) {
-    jobOrderRepository
-        .findById(jobOrderId)
-        .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(jobOrderId)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
 
     InventoryItem item =
         inventoryItemRepository
@@ -861,6 +963,12 @@ public class JobOrderService {
     }
 
     item.setJobOrder(null);
+    auditService.record(
+        AuditEventType.JOB_ORDER_INVENTORY_UNLINKED,
+        jobOrderId,
+        orderLabel(jobOrder),
+        null,
+        "inventoryItem=" + inventoryItemId);
   }
 
   /**
@@ -876,10 +984,20 @@ public class JobOrderService {
         jobOrderRepository
             .findById(jobOrderId)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    jobOrder
-        .getAssignees()
-        .removeIf(a -> a.getUser() != null && a.getUser().getId().equals(userId));
-    return mapToDtoWithStock(jobOrderRepository.saveAndFlush(jobOrder));
+    boolean removed =
+        jobOrder
+            .getAssignees()
+            .removeIf(a -> a.getUser() != null && a.getUser().getId().equals(userId));
+    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
+    if (removed) {
+      auditService.record(
+          AuditEventType.JOB_ORDER_ASSIGNEE_REMOVED,
+          saved.getId(),
+          orderLabel(saved),
+          userId,
+          "assignee=" + userId);
+    }
+    return mapToDtoWithStock(saved);
   }
 
   /**
@@ -953,7 +1071,24 @@ public class JobOrderService {
 
     String trimmed = (note == null || note.isBlank()) ? null : note.strip();
     assignee.setNote(trimmed);
-    return mapToDtoWithStock(jobOrderRepository.saveAndFlush(jobOrder));
+    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
+    // PII: the note body is user free text — record only its presence/length, never the content.
+    if (trimmed != null) {
+      auditService.record(
+          AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_SET,
+          saved.getId(),
+          orderLabel(saved),
+          userId,
+          "assignee=" + userId + " noteLength=" + trimmed.length());
+    } else {
+      auditService.record(
+          AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_CLEARED,
+          saved.getId(),
+          orderLabel(saved),
+          userId,
+          "assignee=" + userId);
+    }
+    return mapToDtoWithStock(saved);
   }
 
   /**
@@ -987,6 +1122,14 @@ public class JobOrderService {
       jobOrderRepository.flush();
       normalizePriorities();
       inventoryItemRepository.unlinkJobOrder(jobOrder.getId());
+      // Single funnel for auto-completion (every handover path completes through here): one
+      // JOB_ORDER_COMPLETED event, recorded only on the actual OPEN/IN_PROGRESS → COMPLETED edge.
+      auditService.record(
+          AuditEventType.JOB_ORDER_COMPLETED,
+          jobOrder.getId(),
+          orderLabel(jobOrder),
+          null,
+          "autoCompleted=true");
     }
   }
 
@@ -1443,9 +1586,21 @@ public class JobOrderService {
     // Squadron→SK escalation never had any. Claims are an independent aggregate, so this delete
     // does
     // not touch the order's @Version.
+    int claimsWithdrawn = 0;
     if (target.getKind() == OrgUnitKind.SQUADRON) {
-      materialClaimService.withdrawAllForOrderWithinTransaction(jobOrder);
+      claimsWithdrawn = materialClaimService.withdrawAllForOrderWithinTransaction(jobOrder);
     }
+    auditService.record(
+        AuditEventType.JOB_ORDER_REASSIGNED,
+        jobOrder.getId(),
+        orderLabel(jobOrder),
+        null,
+        "fromOrgUnit="
+            + orgUnitRef(previous)
+            + " toOrgUnit="
+            + orgUnitRef(target)
+            + " claimsWithdrawn="
+            + claimsWithdrawn);
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -1490,5 +1645,27 @@ public class JobOrderService {
     }
     String trimmed = comment.strip();
     return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  /**
+   * Composes the audit subject label for a job order — {@code #<displayId> '<handle>'}, the
+   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001). The handle is a
+   * non-personal order title and is safe to snapshot.
+   *
+   * @param jobOrder the order
+   * @return the {@code #<displayId> '<handle>'} label
+   */
+  private static String orderLabel(JobOrder jobOrder) {
+    return "#" + jobOrder.getDisplayId() + " '" + jobOrder.getHandle() + "'";
+  }
+
+  /**
+   * Renders an org unit for an audit details payload as {@code <id>(<KIND>)}.
+   *
+   * @param orgUnit the org unit, or {@code null}
+   * @return {@code <id>(<KIND>)} or {@code -} when {@code null}
+   */
+  private static String orgUnitRef(OrgUnit orgUnit) {
+    return orgUnit == null ? "-" : orgUnit.getId() + "(" + orgUnit.getKind() + ")";
   }
 }

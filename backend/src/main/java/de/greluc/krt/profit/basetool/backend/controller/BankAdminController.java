@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.service.BankAuditReportService;
 import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
@@ -34,10 +35,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -57,6 +62,7 @@ public class BankAdminController {
 
   private final BankLedgerService bankLedgerService;
   private final BankAuditService bankAuditService;
+  private final BankAuditReportService bankAuditReportService;
 
   /**
    * Resets all account balances and holder sub-balances to zero after a Star Citizen wipe
@@ -111,5 +117,52 @@ public class BankAdminController {
         result.getTotalElements(),
         result.getTotalPages(),
         PaginationUtil.toSortStrings(result.getSort()));
+  }
+
+  /**
+   * Exports the bank audit log as a KRT-design PDF for a chosen period (REQ-AUDIT-001 unified
+   * viewer; mirrors the per-area audit export). The optional {@code X-User-Time-Zone} header
+   * localizes the timestamps; an invalid IANA zone is silently dropped. The export is itself
+   * audit-logged.
+   *
+   * @param from period start (inclusive, ISO instant)
+   * @param to period end (inclusive, ISO instant); must not be before {@code from}
+   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
+   */
+  @Operation(summary = "Export the bank audit log as a PDF for a period (admin)")
+  @GetMapping("/audit/export")
+  public ResponseEntity<byte[]> exportAuditLog(
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
+    byte[] pdf =
+        bankAuditReportService.generateAuditLogPdf(
+            from, to, BankAccountController.parse(userTimeZone));
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_PDF);
+    headers.setContentDispositionFormData("attachment", "audit-bank.pdf");
+    return ResponseEntity.ok().headers(headers).body(pdf);
+  }
+
+  /**
+   * Exports the bank audit log as a downloadable JSON document for a chosen period (REQ-AUDIT-003).
+   * The export is itself audit-logged.
+   *
+   * @param from period start (inclusive, ISO instant)
+   * @param to period end (inclusive, ISO instant); must not be before {@code from}
+   * @return the period's bank audit events as JSON with attachment headers
+   */
+  @Operation(summary = "Export the bank audit log as JSON for a period (admin)")
+  @GetMapping("/audit/export.json")
+  public ResponseEntity<java.util.List<BankAuditEventDto>> exportAuditLogJson(
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+    java.util.List<BankAuditEventDto> events =
+        bankAuditReportService.generateAuditLogJson(from, to);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    headers.setContentDispositionFormData("attachment", "audit-bank.json");
+    return ResponseEntity.ok().headers(headers).body(events);
   }
 }

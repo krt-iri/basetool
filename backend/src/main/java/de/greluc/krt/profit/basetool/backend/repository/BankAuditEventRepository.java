@@ -75,4 +75,18 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
    * @return {@code true} when an audit event references the transaction
    */
   boolean existsByTransactionId(UUID transactionId);
+
+  /**
+   * All bank audit events in a period, oldest first — the chronological feed the period PDF export
+   * renders (REQ-AUDIT-001 unified viewer). Unpaged: the export is admin-only and period-bounded.
+   *
+   * @param from period start (inclusive)
+   * @param to period end (inclusive)
+   * @return the period's events in ascending time order
+   */
+  @Query(
+      "SELECT e FROM BankAuditEvent e WHERE e.occurredAt >= :from AND e.occurredAt <= :to"
+          + " ORDER BY e.occurredAt ASC")
+  java.util.List<BankAuditEvent> findForExport(
+      @Param("from") Instant from, @Param("to") Instant to);
 }

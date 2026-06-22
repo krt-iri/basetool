@@ -74,6 +74,7 @@ class PersonalInventoryItemServiceTest {
 
   @Mock private SpaceStationRepository spaceStationRepository;
 
+  @Mock private AuditService auditService;
   @InjectMocks private PersonalInventoryItemService service;
 
   private City lorville;

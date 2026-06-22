@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import java.util.Optional;
 import java.util.UUID;
@@ -76,6 +77,7 @@ class InventoryItemServiceVersionFlushTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
 
+  @Mock private AuditService auditService;
   @InjectMocks private InventoryItemService inventoryItemService;
 
   private User userWithId(UUID id) {

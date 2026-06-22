@@ -1,0 +1,204 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.model;
+
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * Classifies an {@link AuditEvent} row across the four audited areas (REQ-AUDIT-001). Each constant
+ * carries the {@link AuditDomain} it belongs to, so the persisted {@code domain} column and the
+ * event type can never disagree and the admin viewer's per-tab event filter is derived from the
+ * enum itself. Like {@link BankAuditEventType} this is the source of truth and is deliberately NOT
+ * mirrored by a database CHECK constraint (V113/V154 precedent): the set grows with the domains.
+ */
+public enum AuditEventType {
+
+  // ---------------------------------------------------------------- INVENTORY (Lager) --
+  /** A warehouse inventory row was created. */
+  INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
+
+  /** A warehouse inventory row's associations / quality / amount were edited. */
+  INVENTORY_ITEM_UPDATED(AuditDomain.INVENTORY),
+
+  /** A warehouse inventory row's free-text note was set or cleared. */
+  INVENTORY_ITEM_NOTE_UPDATED(AuditDomain.INVENTORY),
+
+  /** Stock was discarded/consumed (book-out type {@code DISCARD}); the row may be depleted. */
+  INVENTORY_ITEM_CONSUMED(AuditDomain.INVENTORY),
+
+  /** Stock was transferred to another owner/location (book-out type {@code TRANSFER}). */
+  INVENTORY_ITEM_TRANSFERRED(AuditDomain.INVENTORY),
+
+  /** Stock was sold, creating a mission finance entry (book-out type {@code SELL}). */
+  INVENTORY_ITEM_SOLD(AuditDomain.INVENTORY),
+
+  /** A material-collection row's delivered flag was toggled. */
+  INVENTORY_ITEM_DELIVERY_TOGGLED(AuditDomain.INVENTORY),
+
+  /** The caller bulk-checked-out several of their own inventory rows in one action. */
+  INVENTORY_BULK_CHECKED_OUT(AuditDomain.INVENTORY),
+
+  /** The admin emptied the whole (scoped) global warehouse — one summarizing event. */
+  INVENTORY_WIPED(AuditDomain.INVENTORY),
+
+  /** A new inventory row was created from refinery output (cross-domain store). */
+  INVENTORY_RECEIVED_FROM_REFINERY(AuditDomain.INVENTORY),
+
+  /** Inventory stock was decremented/deleted by a job-order handover (cross-domain). */
+  INVENTORY_HANDED_OVER(AuditDomain.INVENTORY),
+
+  /** A user's inventory rows were re-stamped onto/off an org unit on a membership change. */
+  INVENTORY_ORG_RESTAMPED(AuditDomain.INVENTORY),
+
+  /** A deleted user's inventory rows were bulk-reassigned to the fallback admin. */
+  INVENTORY_OWNER_REASSIGNED(AuditDomain.INVENTORY),
+
+  /** The inventory audit log was exported as a PDF for a period. */
+  INVENTORY_AUDIT_EXPORTED(AuditDomain.INVENTORY),
+
+  // ------------------------------------------------------------- JOB_ORDER (Aufträge) --
+  /** A material job order was created. */
+  JOB_ORDER_CREATED(AuditDomain.JOB_ORDER),
+
+  /** An item job order was created. */
+  JOB_ORDER_ITEM_CREATED(AuditDomain.JOB_ORDER),
+
+  /** A material job order was edited (materials/handle/requesting unit). */
+  JOB_ORDER_UPDATED(AuditDomain.JOB_ORDER),
+
+  /** An item job order was edited (item lines rebuilt). */
+  JOB_ORDER_ITEM_UPDATED(AuditDomain.JOB_ORDER),
+
+  /** A job order's status was changed via the status endpoint. */
+  JOB_ORDER_STATUS_CHANGED(AuditDomain.JOB_ORDER),
+
+  /** A job order was moved to a new priority slot. */
+  JOB_ORDER_PRIORITY_CHANGED(AuditDomain.JOB_ORDER),
+
+  /** A job order was hard-deleted (label snapshotted into details before deletion). */
+  JOB_ORDER_DELETED(AuditDomain.JOB_ORDER),
+
+  /** A job order reached COMPLETED — the single funnel for manual and auto-completion. */
+  JOB_ORDER_COMPLETED(AuditDomain.JOB_ORDER),
+
+  /** A job order's responsible (processing) org unit was reassigned. */
+  JOB_ORDER_REASSIGNED(AuditDomain.JOB_ORDER),
+
+  /** A user was added as a job-order assignee. */
+  JOB_ORDER_ASSIGNEE_ADDED(AuditDomain.JOB_ORDER),
+
+  /** A user was removed as a job-order assignee. */
+  JOB_ORDER_ASSIGNEE_REMOVED(AuditDomain.JOB_ORDER),
+
+  /** An assignee's free-text note was set (note body never stored — length only). */
+  JOB_ORDER_ASSIGNEE_NOTE_SET(AuditDomain.JOB_ORDER),
+
+  /** An assignee's free-text note was cleared. */
+  JOB_ORDER_ASSIGNEE_NOTE_CLEARED(AuditDomain.JOB_ORDER),
+
+  /** A material requirement bucket was unlinked from a job order. */
+  JOB_ORDER_MATERIAL_UNLINKED(AuditDomain.JOB_ORDER),
+
+  /** A single inventory row was detached from a job order. */
+  JOB_ORDER_INVENTORY_UNLINKED(AuditDomain.JOB_ORDER),
+
+  /** A material handover was recorded against a job order. */
+  JOB_ORDER_HANDOVER_CREATED(AuditDomain.JOB_ORDER),
+
+  /** An item handover was recorded against a job order. */
+  JOB_ORDER_ITEM_HANDOVER_CREATED(AuditDomain.JOB_ORDER),
+
+  /** A squadron claim on a public SK order was created or updated (upsert). */
+  JOB_ORDER_CLAIM_UPSERTED(AuditDomain.JOB_ORDER),
+
+  /** A squadron claim was withdrawn. */
+  JOB_ORDER_CLAIM_WITHDRAWN(AuditDomain.JOB_ORDER),
+
+  /** The job-order audit log was exported as a PDF for a period. */
+  JOB_ORDER_AUDIT_EXPORTED(AuditDomain.JOB_ORDER),
+
+  // --------------------------------------------------------- REFINERY (Raffinerie) --
+  /** A refinery order was created. */
+  REFINERY_ORDER_CREATED(AuditDomain.REFINERY),
+
+  /** A refinery order was edited (incl. status moves folded into details). */
+  REFINERY_ORDER_UPDATED(AuditDomain.REFINERY),
+
+  /** A refinery order was cancelled (soft-delete to status CANCELED). */
+  REFINERY_ORDER_CANCELED(AuditDomain.REFINERY),
+
+  /** A refinery order was completed, storing its yields to inventory. */
+  REFINERY_ORDER_STORED(AuditDomain.REFINERY),
+
+  /** An admin created a refining-method reference row. */
+  REFINERY_METHOD_CREATED(AuditDomain.REFINERY),
+
+  /** An admin edited a refining-method reference row (name/description). */
+  REFINERY_METHOD_UPDATED(AuditDomain.REFINERY),
+
+  /** An admin deleted a refining-method reference row. */
+  REFINERY_METHOD_DELETED(AuditDomain.REFINERY),
+
+  /** The scheduled UEX refining-method sync ran — one summarizing event per run. */
+  REFINERY_METHODS_SYNCED(AuditDomain.REFINERY),
+
+  /** The scheduled UEX refinery-yield sync ran — one summarizing event per run. */
+  REFINERY_YIELDS_SYNCED(AuditDomain.REFINERY),
+
+  /** A deleted user's refinery orders were bulk-reassigned to the fallback admin. */
+  REFINERY_ORDERS_REASSIGNED(AuditDomain.REFINERY),
+
+  /** The refinery audit log was exported as a PDF for a period. */
+  REFINERY_AUDIT_EXPORTED(AuditDomain.REFINERY),
+
+  // ------------------------------------------------- PERSONAL_INVENTORY (Mein Inventar) --
+  /** A personal inventory item was created (admin-on-behalf sets the target user). */
+  PERSONAL_INVENTORY_CREATED(AuditDomain.PERSONAL_INVENTORY),
+
+  /** A personal inventory item was updated. */
+  PERSONAL_INVENTORY_UPDATED(AuditDomain.PERSONAL_INVENTORY),
+
+  /** A personal inventory item was deleted. */
+  PERSONAL_INVENTORY_DELETED(AuditDomain.PERSONAL_INVENTORY),
+
+  /** The personal-inventory audit log was exported as a PDF for a period. */
+  PERSONAL_INVENTORY_AUDIT_EXPORTED(AuditDomain.PERSONAL_INVENTORY);
+
+  /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
+  private final AuditDomain domain;
+
+  /**
+   * Binds an event type to its functional area.
+   *
+   * @param domain the area this event type belongs to
+   */
+  AuditEventType(@NotNull AuditDomain domain) {
+    this.domain = domain;
+  }
+
+  /**
+   * The functional area this event type belongs to.
+   *
+   * @return the owning {@link AuditDomain}
+   */
+  public @NotNull AuditDomain domain() {
+    return domain;
+  }
+}

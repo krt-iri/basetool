@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
@@ -35,7 +36,9 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +71,27 @@ public class JobOrderHandoverService {
   private final UserService userService;
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final SquadronRepository squadronRepository;
+  private final AuditService auditService;
+
+  /**
+   * One handed-over inventory row's scalar snapshot, captured before the row is decremented/deleted
+   * so the {@code INVENTORY_HANDED_OVER} audit events can be emitted after the bulk unlinks without
+   * touching a detached/deleted entity (bulk-clear landmine rules, CLAUDE.md).
+   *
+   * @param itemId the source inventory row id
+   * @param label the {@code material @ location} label snapshot
+   * @param material the material name snapshot
+   * @param amount the handed-over amount
+   * @param remaining the post-decrement amount (0 when depleted)
+   * @param depleted whether the source row was removed
+   */
+  private record HandedItem(
+      UUID itemId,
+      String label,
+      String material,
+      double amount,
+      double remaining,
+      boolean depleted) {}
 
   /**
    * Creates a JobOrder handover and atomically applies the resulting effects:
@@ -143,6 +167,12 @@ public class JobOrderHandoverService {
     // {@code clearAutomatically=true} bulk update detaches the aggregate mid-iteration.
     Set<UUID> materialsToUnlink = new HashSet<>();
 
+    // Snapshot each handed-over inventory row BEFORE it is decremented/deleted; the
+    // INVENTORY_HANDED_OVER audit events are emitted after the bulk unlinks from these snapshots,
+    // never by re-reading a detached/deleted entity (bulk-clear landmine rules).
+    final Integer orderDisplayId = jobOrder.getDisplayId();
+    final List<HandedItem> handedItems = new ArrayList<>();
+
     for (JobOrderHandoverItemCreateDto itemDto : dto.items()) {
       // The InventoryItem is only used as a transient lookup source for the snapshot data
       // (material, quality) and to update / delete the source inventory row. It is intentionally
@@ -191,6 +221,20 @@ public class JobOrderHandoverService {
 
       handover.addItem(handoverItem);
 
+      boolean itemDepleted = remainingAmount <= QUANTITY_EPSILON;
+      String materialName =
+          inventoryItem.getMaterial() != null ? inventoryItem.getMaterial().getName() : "—";
+      String locationName =
+          inventoryItem.getLocation() != null ? inventoryItem.getLocation().getName() : "—";
+      handedItems.add(
+          new HandedItem(
+              inventoryItem.getId(),
+              materialName + " @ " + locationName,
+              materialName,
+              itemDto.amount(),
+              itemDepleted ? 0.0 : remainingAmount,
+              itemDepleted));
+
       if (remainingAmount <= QUANTITY_EPSILON) {
         inventoryItemRepository.delete(inventoryItem);
       } else {
@@ -221,7 +265,7 @@ public class JobOrderHandoverService {
     // bulk UPDATEs run and avoids implicit re-merge of detached entities.
     JobOrderHandover savedHandover = jobOrderHandoverRepository.save(handover);
     // Capture the DTO while the entity graph is still attached and fully initialised.
-    JobOrderHandoverDto resultDto = jobOrderHandoverMapper.toDto(savedHandover);
+    final JobOrderHandoverDto resultDto = jobOrderHandoverMapper.toDto(savedHandover);
 
     // Run the (potentially session-clearing) bulk unlinks ONCE per fulfilled material, AFTER
     // all per-item bookkeeping is done.  Each call carries
@@ -252,6 +296,40 @@ public class JobOrderHandoverService {
       // the running transaction (see {@code AGENTS.md} — "INTRA-TRANSACTION SERVICE CALLS").
       jobOrderService.completeJobOrderWithinTransaction(managedJobOrder);
     }
+
+    // Emit the audit events AFTER the bulk unlinks + completion, from the loop-captured snapshots
+    // (never re-reading a detached/deleted inventory entity). One INVENTORY_HANDED_OVER per item
+    // (cross-domain inventory effect) plus one JOB_ORDER_HANDOVER_CREATED. The recipientHandle is
+    // user free text and is never written to the audit details. completeJobOrderWithinTransaction
+    // already recorded JOB_ORDER_COMPLETED when the order was fulfilled, so this method does not.
+    for (HandedItem h : handedItems) {
+      auditService.record(
+          AuditEventType.INVENTORY_HANDED_OVER,
+          h.itemId(),
+          h.label(),
+          null,
+          "source=HANDOVER jobOrder=#"
+              + orderDisplayId
+              + " material="
+              + h.material()
+              + " amount="
+              + h.amount()
+              + " remaining="
+              + h.remaining()
+              + " depleted="
+              + h.depleted());
+    }
+    auditService.record(
+        AuditEventType.JOB_ORDER_HANDOVER_CREATED,
+        jobOrderId,
+        "#" + managedJobOrder.getDisplayId() + " '" + managedJobOrder.getHandle() + "'",
+        null,
+        "handover="
+            + savedHandover.getId()
+            + " items="
+            + handedItems.size()
+            + " autoCompleted="
+            + allFulfilled);
 
     return resultDto;
   }

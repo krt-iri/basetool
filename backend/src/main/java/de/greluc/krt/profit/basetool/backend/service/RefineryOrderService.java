@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -82,6 +83,7 @@ public class RefineryOrderService {
   private final JobOrderRepository jobOrderRepository;
   private final RefineryYieldRepository refineryYieldRepository;
   private final OwnerScopeService ownerScopeService;
+  private final AuditService auditService;
 
   /**
    * Owner-scoped paged list with optional status filter.
@@ -420,7 +422,21 @@ public class RefineryOrderService {
     order.setOtherExpenses(zeroToNull(order.getOtherExpenses()));
     order.setOreSales(zeroToNull(order.getOreSales()));
 
-    return refineryOrderRepository.save(order);
+    RefineryOrder saved = refineryOrderRepository.save(order);
+    auditService.record(
+        AuditEventType.REFINERY_ORDER_CREATED,
+        saved.getId(),
+        refineryLabel(saved),
+        saved.getOwner() != null ? saved.getOwner().getId() : null,
+        "location="
+            + locationName(saved)
+            + " method="
+            + methodName(saved)
+            + " goods="
+            + (saved.getGoods() != null ? saved.getGoods().size() : 0)
+            + " status="
+            + saved.getStatus());
+    return saved;
   }
 
   private static Double zeroToNull(Double value) {
@@ -502,6 +518,7 @@ public class RefineryOrderService {
     order.setExpenses(zeroToNull(details.getExpenses()));
     order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
     order.setOreSales(zeroToNull(details.getOreSales()));
+    final RefineryOrderStatus previousStatus = order.getStatus();
     if (details.getStatus() != null) {
       order.setStatus(details.getStatus());
     }
@@ -566,7 +583,23 @@ public class RefineryOrderService {
               });
     }
 
-    return refineryOrderRepository.save(order);
+    RefineryOrder saved = refineryOrderRepository.save(order);
+    auditService.record(
+        AuditEventType.REFINERY_ORDER_UPDATED,
+        saved.getId(),
+        refineryLabel(saved),
+        saved.getOwner() != null ? saved.getOwner().getId() : null,
+        "location="
+            + locationName(saved)
+            + " method="
+            + methodName(saved)
+            + " goods="
+            + (saved.getGoods() != null ? saved.getGoods().size() : 0)
+            + " status="
+            + previousStatus
+            + "->"
+            + saved.getStatus());
+    return saved;
   }
 
   /**
@@ -587,8 +620,15 @@ public class RefineryOrderService {
       throw new AccessDeniedException("Access denied: You do not own this refinery order");
     }
 
+    final RefineryOrderStatus previousStatus = order.getStatus();
     order.setStatus(de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.CANCELED);
     refineryOrderRepository.save(order);
+    auditService.record(
+        AuditEventType.REFINERY_ORDER_CANCELED,
+        order.getId(),
+        refineryLabel(order),
+        order.getOwner() != null ? order.getOwner().getId() : null,
+        "previousStatus=" + previousStatus);
   }
 
   /**
@@ -624,6 +664,8 @@ public class RefineryOrderService {
             || !order.getOwner().getId().equals(userId))) {
       throw new AccessDeniedException("Access denied: You do not own this refinery order");
     }
+
+    final RefineryOrderStatus previousStatus = order.getStatus();
 
     for (RefineryOrderStoreItemDto itemDto : dto.items()) {
       final de.greluc.krt.profit.basetool.backend.model.Material mat =
@@ -704,6 +746,24 @@ public class RefineryOrderService {
       item.setNote(incomingNote);
 
       inventoryItemRepository.save(item);
+      // Cross-domain inventory effect: each stored refinery output creates one warehouse row. No
+      // @Modifying(clearAutomatically) runs in this loop, so the audit insert is loop-safe. The id
+      // is generated onto the managed entity by save() (GenerationType.UUID), so read it off item.
+      auditService.record(
+          AuditEventType.INVENTORY_RECEIVED_FROM_REFINERY,
+          item.getId(),
+          mat.getName() + " @ " + loc.getName(),
+          assignee.getId(),
+          "source=REFINERY refineryOrder="
+              + orderId
+              + " material="
+              + mat.getName()
+              + " amount="
+              + item.getAmount()
+              + " q="
+              + itemDto.quality()
+              + " jobOrder="
+              + (jobOrder != null ? "#" + jobOrder.getDisplayId() : "-"));
 
       // Write the adjusted amount back into the refinery order so that the
       // actually stored output amount is documented there as well.
@@ -714,6 +774,12 @@ public class RefineryOrderService {
 
     order.setStatus(de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.COMPLETED);
     refineryOrderRepository.save(order);
+    auditService.record(
+        AuditEventType.REFINERY_ORDER_STORED,
+        order.getId(),
+        refineryLabel(order),
+        order.getOwner() != null ? order.getOwner().getId() : null,
+        "items=" + dto.items().size() + " status=" + previousStatus + "->COMPLETED");
   }
 
   private static String normalizeNote(String note) {
@@ -722,6 +788,39 @@ public class RefineryOrderService {
     }
     String trimmed = note.trim();
     return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  /**
+   * Composes the audit subject label for a refinery order. The order has no name/number field, so
+   * the deletion-proof identity snapshot is the composite {@code <owner> · <location>}
+   * (REQ-AUDIT-001); the started-at and other facts go into the event details.
+   *
+   * @param order the refinery order
+   * @return the {@code <owner> · <location>} label
+   */
+  private static String refineryLabel(RefineryOrder order) {
+    String owner = order.getOwner() != null ? order.getOwner().getEffectiveName() : "—";
+    return owner + " · " + locationName(order);
+  }
+
+  /**
+   * The order's location name for an audit payload, or {@code -} when unset.
+   *
+   * @param order the refinery order
+   * @return the location name or {@code -}
+   */
+  private static String locationName(RefineryOrder order) {
+    return order.getLocation() != null ? order.getLocation().getName() : "-";
+  }
+
+  /**
+   * The order's refining-method name for an audit payload, or {@code none} when unset.
+   *
+   * @param order the refinery order
+   * @return the method name or {@code none}
+   */
+  private static String methodName(RefineryOrder order) {
+    return order.getRefiningMethod() != null ? order.getRefiningMethod().getName() : "none";
   }
 
   /**

@@ -90,6 +90,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private MaterialClaimService materialClaimService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private JobOrderService service;
 
   private static final UUID JOB_ORDER_ID = UUID.randomUUID();

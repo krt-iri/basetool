@@ -468,6 +468,10 @@ public class SecurityConfig {
                     // authenticated() catch-all plus the BankSecurityService method gates.
                     .requestMatchers("/api/v1/bank/admin/**")
                     .hasRole("ADMIN")
+                    // Activity audit logs (REQ-AUDIT-001, ADR-0037): the per-area viewer and PDF
+                    // export are URL-gated to ADMIN on top of the method-level @PreAuthorize.
+                    .requestMatchers("/api/v1/audit/**")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Audit-Logs für Lager, Aufträge, Raffinerie und Mein Inventar.** Jede Aktivität in diesen vier Bereichen wird jetzt — wie schon bei der Bank — lückenlos und unveränderbar protokolliert. Admins finden alle Logs auf einer neuen Seite „Audit-Logs" (Administration → System & Daten) mit einem Umschalter zwischen Bank, Lager, Aufträge, Raffinerie und Mein Inventar, gefiltert nach Zeitraum, Akteur und Ereignistyp. Jedes Log lässt sich für einen gewählten Zeitraum als PDF im KRT-Design oder als JSON exportieren (die Bank ebenfalls). Sichtbar ausschließlich für Admins; die alte Adresse `/admin/bank-audit` leitet auf die neue Seite weiter.
+
 ## [v0.7.8](https://github.com/krt-profit/basetool/releases/tag/v0.7.8) - 2026-06-22
 
 ### Fixed

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.audit.title} + ' - ' + ${appTitle}">Audit-Logs - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.audit.title}">Audit-Logs</h1>
+        <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+           th:text="#{admin.audit.subtitle}">Jede Aktivit&auml;t, l&uuml;ckenlos protokolliert.</p>
+    </div>
+
+    <!-- Five-way area switcher (REQ-AUDIT-001): bank + the four generic areas. Each tab is a plain
+         link so the active tab survives a full reload; filtering + paging within a tab swap in
+         place via audit-log.js. -->
+    <nav class="tab-nav mt-2" role="tablist" th:aria-label="#{admin.audit.title}" data-testid="audit-tabs">
+        <a th:each="d : ${domains}" class="tab"
+           th:classappend="${d == activeDomain} ? 'active' : ''"
+           role="tab" th:aria-selected="${d == activeDomain} ? 'true' : 'false'"
+           th:href="@{/admin/audit-log(domain=${d})}"
+           th:attr="data-testid='audit-tab-' + ${d}"
+           th:text="#{'admin.audit.domain.' + ${d}}">Bereich</a>
+    </nav>
+
+    <div th:if="${error != null}" class="hud-box mt-2" style="border-color: var(--color-danger);"
+         data-testid="audit-error">
+        <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <!-- Filter bar: period (split datetime), actor, event type. Filtering + paging are in-place via
+         audit-log.js (krtFetch.swap); the GET form is the no-JS fallback. The hidden domain field
+         keeps the active tab across swaps. -->
+    <form id="audit-filter-form" method="get" th:action="@{/admin/audit-log}" class="bank-filterbar mt-2 no-track">
+        <input type="hidden" name="domain" th:value="${activeDomain}">
+        <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
+            <label for="audit-from-date" th:text="#{admin.audit.filter.from}">Von</label>
+            <input type="hidden" name="from" th:value="${filterFrom}">
+            <div class="bank-datetime-row">
+                <input type="date" id="audit-from-date" class="date-part">
+                <input type="time" class="time-part" th:aria-label="#{admin.audit.filter.from}">
+            </div>
+        </div>
+        <div class="bank-form-row datetime-split-group" data-datetime-filter-role="end">
+            <label for="audit-to-date" th:text="#{admin.audit.filter.to}">Bis</label>
+            <input type="hidden" name="to" th:value="${filterTo}">
+            <div class="bank-datetime-row">
+                <input type="date" id="audit-to-date" class="date-part">
+                <input type="time" class="time-part" th:aria-label="#{admin.audit.filter.to}">
+            </div>
+        </div>
+        <div class="bank-form-row">
+            <label for="audit-actor" th:text="#{admin.audit.filter.actor}">Akteur-ID</label>
+            <input type="text" id="audit-actor" name="actorUserId" th:value="${filterActorUserId}"
+                   data-testid="audit-filter-actor" th:placeholder="#{admin.audit.filter.actor.placeholder}">
+        </div>
+        <div class="bank-form-row">
+            <label for="audit-event" th:text="#{admin.audit.filter.event}">Ereignistyp</label>
+            <select id="audit-event" name="eventType" data-testid="audit-filter-event">
+                <option value="" th:text="#{admin.audit.filter.allEvents}">Alle Ereignisse</option>
+                <option th:each="et : ${eventTypes}" th:value="${et}"
+                        th:selected="${filterEventType == et}"
+                        th:text="#{${eventKeyPrefix + et}}">Ereignis</option>
+            </select>
+        </div>
+        <div class="bank-filter-actions">
+            <button type="submit" class="btn btn--cta" data-testid="audit-filter-apply"
+                    th:text="#{admin.audit.filter.apply}">Filtern</button>
+            <a id="audit-filter-reset" th:href="@{/admin/audit-log(domain=${activeDomain})}" class="btn btn-ghost"
+               th:text="#{admin.audit.filter.reset}">Zur&uuml;cksetzen</a>
+            <button type="button" class="btn btn-ghost" data-trigger="open-modal-display"
+                    data-modal-id="audit-export-modal" data-testid="audit-export-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                <span th:text="#{admin.audit.export.open}">PDF exportieren</span>
+            </button>
+        </div>
+    </form>
+
+    <div class="bank-panel mt-2" data-testid="audit-panel">
+        <div class="bank-panel-body">
+            <div id="audit-results">
+            <th:block th:fragment="auditResults">
+            <div class="table-responsive" th:if="${events != null and !#lists.isEmpty(events.content())}">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.audit.col.time}">Zeitpunkt</th>
+                        <th th:text="#{admin.audit.col.actor}">Akteur</th>
+                        <th th:text="#{admin.audit.col.event}">Ereignis</th>
+                        <th th:text="#{admin.audit.col.subject}">Betroffen</th>
+                        <th th:text="#{admin.audit.col.details}">Details</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="e : ${events.content()}" data-testid="audit-row">
+                        <td><span class="utc-time" th:text="${e.occurredAt()}">2026-06-12T18:30:00Z</span></td>
+                        <td th:text="${e.actorHandle()}">greluc</td>
+                        <td>
+                            <span class="chip" style="font-size: 0.55rem;"
+                                  th:text="#{${e.eventLabelKey()}}">Ereignis</span>
+                        </td>
+                        <td th:text="${e.subject()}">&mdash;</td>
+                        <td class="bank-note-cell" th:text="${e.details()}" th:title="${e.details()}">Details</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-center text-muted"
+               th:if="${events == null or #lists.isEmpty(events.content())}"
+               data-testid="audit-empty" th:text="#{admin.audit.empty}">Keine Ereignisse.</p>
+            <nav th:if="${events != null}"
+                 th:replace="~{fragments/pagination :: pagination(${events}, ${paginationBaseUrl})}"></nav>
+            </th:block>
+            </div>
+        </div>
+    </div>
+
+    <!-- Period PDF export (REQ-AUDIT-001): a period picker -> backend PDF via the proxy, downloaded
+         as a blob (no native dialogs; errors render inline). The endpoint is the active tab's proxy
+         path; audit-log.js reads the synced from/to hidden inputs and fetches the blob. -->
+    <div class="krt-modal-overlay" id="audit-export-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{admin.audit.export.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{admin.audit.export.title}">Audit-Log exportieren</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="audit-export-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="audit-download-form no-track"
+                  th:attr="data-endpoint=${exportEndpoint},data-filename='audit-' + ${activeDomain} + '.pdf',data-period-required=#{admin.audit.export.periodRequired},data-download-error=#{admin.audit.export.error}">
+                <div class="krt-modal-body">
+                    <p class="bank-field-hint" th:text="#{admin.audit.export.hint}">Zeitraum in deiner Lokalzeit; das PDF rendert die Zeitstempel ebenfalls lokal.</p>
+                    <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
+                        <label for="audit-export-from-date" th:text="#{admin.audit.filter.from}">Von</label>
+                        <input type="hidden" name="from">
+                        <div class="bank-datetime-row">
+                            <input type="date" id="audit-export-from-date" class="date-part"
+                                   data-testid="audit-export-from-date">
+                            <input type="time" id="audit-export-from-time" class="time-part"
+                                   th:aria-label="#{admin.audit.filter.from}">
+                        </div>
+                        <span class="bank-field-error" data-error-for="from"></span>
+                    </div>
+                    <div class="bank-form-row datetime-split-group" data-datetime-filter-role="end">
+                        <label for="audit-export-to-date" th:text="#{admin.audit.filter.to}">Bis</label>
+                        <input type="hidden" name="to">
+                        <div class="bank-datetime-row">
+                            <input type="date" id="audit-export-to-date" class="date-part"
+                                   data-testid="audit-export-to-date">
+                            <input type="time" id="audit-export-to-time" class="time-part"
+                                   th:aria-label="#{admin.audit.filter.to}">
+                        </div>
+                        <span class="bank-field-error" data-error-for="to"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="audit-export-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-ghost" data-format="json"
+                            data-testid="audit-export-submit-json"
+                            th:text="#{admin.audit.export.submitJson}">JSON herunterladen</button>
+                    <button type="submit" class="btn btn--cta" data-format="pdf"
+                            data-testid="audit-export-submit"
+                            th:text="#{admin.audit.export.submit}">PDF herunterladen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<script th:src="@{/js/audit-log.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.model;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * One immutable activity audit-trail row for the four audited areas (REQ-AUDIT-001), persisted in
+ * the shared {@code audit_event} table created by Flyway V179 and readable only by admins.
+ *
+ * <p>Insert-only event log modeled after {@link BankAuditEvent} / {@link ExternalSyncReport}: no
+ * {@code @Version}, no updates, {@link #occurredAt} is the single timestamp. Every audited mutation
+ * appends exactly one row in the same transaction as the business write — an audit failure fails
+ * the mutation, so the trail has no silent gaps. The {@link #domain} discriminator keeps the four
+ * logs logically separate inside one physical table (ADR-0037).
+ *
+ * <p>Reference columns are plain UUIDs (no JPA relations): audit rows must outlive every referenced
+ * aggregate (job orders are hard-deleted, inventory rows are depleted), and the admin viewer
+ * renders the deletion-proof {@link #actorHandle} and {@link #subjectLabel} snapshots rather than
+ * joining live rows.
+ *
+ * <p>This table is business data, not logging — the observability rule (never log names, emails or
+ * tokens to the <em>log stream</em>) is unaffected; free-text user content (notes, recipient
+ * handles) is never written into {@link #details}.
+ */
+@Entity
+@Table(name = "audit_event")
+@Getter
+@Setter
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AuditEvent {
+
+  /** Surrogate primary key, generated client-side by Hibernate ({@code GenerationType.UUID}). */
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
+
+  /** Instant the audited mutation happened (UTC); stamped by {@code AuditService}. */
+  @Column(name = "occurred_at", nullable = false, updatable = false)
+  private Instant occurredAt;
+
+  /** The functional area this row belongs to; the admin viewer's tab discriminator. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "domain", nullable = false, length = 30)
+  private AuditDomain domain;
+
+  /** What happened; the enum is the source of truth (no DB CHECK, V113/V154 precedent). */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "event_type", nullable = false, length = 60)
+  private AuditEventType eventType;
+
+  /**
+   * The acting user's id (JWT {@code sub}); the database FK is {@code ON DELETE SET NULL}, the
+   * {@link #actorHandle} snapshot keeps the row attributable afterwards.
+   */
+  @Nullable
+  @Column(name = "actor_user_id")
+  private UUID actorUserId;
+
+  /** Denormalized actor handle snapshot — the trail must survive user deletion (REQ-AUDIT-001). */
+  @Column(name = "actor_handle", nullable = false)
+  private String actorHandle;
+
+  /** The primary affected aggregate's id (inventory row / job order / refinery order / item). */
+  @Nullable
+  @Column(name = "subject_id")
+  private UUID subjectId;
+
+  /**
+   * Denormalized human-readable label of the subject (e.g. {@code material @ location}, {@code
+   * #<displayId> '<handle>'}) — snapshotted so the trail stays readable after the subject is gone.
+   */
+  @Nullable
+  @Column(name = "subject_label", length = 255)
+  private String subjectLabel;
+
+  /** The affected user for events about a user (assignee, transfer recipient, on-behalf-of). */
+  @Nullable
+  @Column(name = "target_user_id")
+  private UUID targetUserId;
+
+  /**
+   * Compact human-readable details payload — amounts, counts, before/after values, export
+   * parameters. Free-form text; the admin viewer shows it verbatim. Never carries user free text.
+   */
+  @Nullable
+  @Column(columnDefinition = "TEXT")
+  private String details;
+}
