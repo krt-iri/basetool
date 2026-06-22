@@ -59,6 +59,24 @@ keycloak = "26.6.3"
 # JUnit pinned explicitly for the keycloak-spi module only — it has no Spring Boot
 # dependency-management to supply a JUnit version, unlike backend/frontend.
 junit = "5.13.4"
+## ⬆ = "5.14.0-RC1"
+## ⬆ = "5.14.0"
+## ⬆ = "5.14.1"
+## ⬆ = "5.14.2"
+## ⬆ = "5.14.3"
+## ⬆ = "5.14.4"
+## ⬆ = "6.0.0-M1"
+## ⬆ = "6.0.0-M2"
+## ⬆ = "6.0.0-RC1"
+## ⬆ = "6.0.0-RC2"
+## ⬆ = "6.0.0-RC3"
+## ⬆ = "6.0.0"
+## ⬆ = "6.0.1"
+## ⬆ = "6.0.2"
+## ⬆ = "6.0.3"
+## ⬆ = "6.1.0-M1"
+## ⬆ = "6.1.0-RC1"
+## ⬆ = "6.1.0"
 
 [libraries]
 
