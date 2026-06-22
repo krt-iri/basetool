@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-22.
-> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0031 (role/unit sync, planned — Track 2)
+> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); role/unit sync (planned — Track 2)
 
 # Discord integration — login, membership gate & admin approval
 
@@ -21,9 +21,16 @@ owned Keycloak provider module (`keycloak-spi/`), per [ADR-0030](../adr/0030-dis
 ### REQ-DATA-006 — Discord account link on the user
 
 Every Basetool user MAY carry a single Discord account id. The `app_user.discord_user_id` column
-(nullable, **unique**, text) records the Discord user id (numeric snowflake). It is written by the
-Keycloak Discord identity-provider attribute mapper into the token and persisted by the backend at
-login (auto-link). `null` for users who never used Discord. Because the link is the recognition key
+(nullable, **unique**, text) records the Discord user id (numeric snowflake). The source of truth is
+the Keycloak **federated-identity link** (`discord` alias), not the import-time user attribute, so
+the link is recognised for an account however and *whenever* it was linked — registered via Discord
+**or** an existing credential account linked later (ADR-0036). It reaches the backend two ways, both
+persisting onto this column: (1) the `discord_user_id` token claim, emitted by the SPI
+`DiscordFederatedIdentityMapper` from the federated link on **every** login (so even a pure
+credential login of a linked user carries it), persisted by `UserService.syncUser(Jwt)`; and (2) the
+scheduled Admin-API user sync, which reads `GET /users/{id}/federated-identity` and persists the
+`discord` link via `UserService.syncUser(KeycloakUserDto)` — back-filling already-linked accounts
+with no re-login. `null` for users who never linked Discord. Because the link is the recognition key
 for a returning Discord user, it must be unique across users; Postgres treats `NULL` as distinct, so
 all credential-only users coexist.
 
@@ -33,15 +40,21 @@ all credential-only users coexist.
 - [ ] The JPA `User` entity maps it (`@Column(name = "discord_user_id", unique = true)`), and
   `ddl-auto: validate` boots clean against the migration.
 - [ ] Two distinct users cannot hold the same non-null Discord id (DB unique).
-- [](T1.3) On login of a federated Discord identity, the backend persists the `discord_user_id`
-  claim onto the user row; a credential login leaves it untouched.
+- [x] The backend persists the `discord_user_id` onto the user row whenever it sees it — from the
+  token claim on any login (`syncUser(Jwt)`) and from the Admin-API federated-identity read on the
+  scheduled sync (`syncUser(KeycloakUserDto)`). Both paths only **set** the link, never clear it on a
+  missing value (a best-effort lookup returns `null` on failure, which must not wipe a real link).
+- [x] The `discord_user_id` claim is sourced from the federated link by `DiscordFederatedIdentityMapper`,
+  so it is present for accounts linked **after** creation and on **every** login method — not only for
+  accounts that registered via Discord (ADR-0036, fixes the missing member-list indicator).
 - [x] A Discord login is recognised **only** by the Keycloak subject / `discord_user_id`, never by
   `preferred_username`. The legacy username fallback (kept for pre-UUID credential rows) is suppressed
   for a Discord login, so a fresh Discord identity is never silently matched onto a pre-existing row —
   no account-link or privilege inheritance, and the PENDING gate (REQ-SEC-017) can never be bypassed
-  that way. Track 1 does no auto-linking of an existing account to a Discord identity (open decision #2).
+  that way. Surfacing the link claim on an existing user's login does not re-trigger the PENDING gate:
+  the "new registration" decision keys off `created` (no row by subject), which an existing user is not.
 
-**Enforced by:** `BackendApplicationTests` (schema validate) · `UserServiceDiscordSyncTest` (subject-only recognition: a Discord login never consults `findByUsername`) · _(planned T1.3: link-persistence test)_ · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserService.syncUser` · **Issues:** #721, #724
+**Enforced by:** `BackendApplicationTests` (schema validate) · `UserServiceDiscordSyncTest` (subject-only recognition: a Discord login never consults `findByUsername`) · `UserServiceSyncTest` (scheduled sync back-fills the Discord link, and leaves it untouched on a `null`) · `KeycloakServiceTest` (the Admin-API sync attaches the `discord` federated id, ignores other IdPs) · `DiscordFederatedIdentityMapperTest` (claim derived from the federated link) · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserService.syncUser`, `KeycloakService.fetchUsers`, `DiscordFederatedIdentityMapper` · **Issues:** #721, #724 · **Decision:** ADR-0036
 
 ### REQ-SEC-019 — Discord-link indicator in member management (admin-only, no raw id)
 
@@ -216,6 +229,10 @@ is a name — REQ-OBS).
 
 - **Baseline floor on approval** — does approval auto-grant a baseline `SQUADRON_MEMBER`, or does the
   admin seat every role by hand? Track-1 default: by hand (epic open decision #1).
-- **Existing-member migration** — link an existing credential account to a Discord identity, or only
-  forward via Discord login? (epic open decision #2). Promote the resolved answer to an ADR.
+- **Existing-member migration** — ~~link an existing credential account to a Discord identity, or only
+  forward via Discord login? (epic open decision #2)~~ **Resolved (ADR-0036):** an existing account
+  may be linked to Discord via the Keycloak Account Console and is recognised exactly like a Discord
+  registration. The link is sourced from the Keycloak federated identity (SPI claim mapper +
+  Admin-API backfill), not the import-time attribute, so the member-list indicator lights up for it
+  on every login method.
 

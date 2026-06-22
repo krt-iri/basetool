@@ -6,6 +6,10 @@
 
 - **Der Discord-Server-Nickname wird bei der Freigabe-Entscheidung angezeigt.** Die Admin-Liste „Discord-Registrierungen" zeigt jetzt neben dem Namen den serverspezifischen Discord-Nickname (den „Nick" im Kartell-Server), damit eine neue Anmeldung der Person leichter zugeordnet werden kann. Die Erfassung läuft beim Login über Discord, dient nur der Anzeige und ist ausschließlich für Admins sichtbar; ist kein Nickname gesetzt (oder die Erfassung nicht eingerichtet), erscheint ein gedämpfter Strich. Setzt eine einmalige Keycloak-Einrichtung voraus (Umgebungsvariable `DISCORD_GUILD_ID` plus zwei Mapper, siehe Runbook).
 
+### Fixed
+
+- **Das Discord-Symbol in der Mitgliederverwaltung erscheint jetzt auch bei Konten, die ihren bestehenden Account nachträglich mit Discord verknüpft haben** — nicht mehr nur bei Konten, die sich direkt über Discord registriert haben. Der Verknüpfungs-Status wird jetzt aus der Keycloak-Federated-Identity-Verknüpfung abgeleitet (statt aus einem nur beim Erstlogin gesetzten Attribut), greift auf jedem Anmeldeweg (auch Passwort-Login) und wird für bereits verknüpfte Konten beim nächsten Nutzer-Sync ohne erneute Anmeldung nachgetragen. Wirkt mit dem neu bereitgestellten Keycloak-Provider-JAR und der angepassten Realm-Konfiguration (siehe `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`).
+
 ## [v0.7.6](https://github.com/krt-profit/basetool/releases/tag/v0.7.6) - 2026-06-21
 
 ### Added

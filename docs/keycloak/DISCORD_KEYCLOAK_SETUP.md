@@ -79,7 +79,7 @@ Realm `iri` → **Identity providers** → **Add provider** → **Social → Dis
   app-sidebar shortcut (the krt-theme renders the block; see §5).
 - Save.
 
-### 3a. Attribute importer mapper (the `discord_user_id` auto-link)
+### 3a. Attribute importer mapper (keeps the Discord id on the Keycloak user)
 
 On the new Discord IdP → **Mappers** → **Add mapper**:
 
@@ -87,25 +87,57 @@ On the new Discord IdP → **Mappers** → **Add mapper**:
 - **Mapper type:** *Attribute Importer* (the Discord user-attribute mapper from the SPI).
 - **Social Profile JSON Field Path:** `id`
 - **User Attribute Name:** `discord_user_id`
+- **Sync Mode Override:** **`force`** — see the note below.
 
-### 3b. Carry the link into the token
+> **Set Sync Mode Override to `force`.** Under the default (`inherit` → the IdP's `import`/`legacy`)
+> this importer writes the attribute **only** when Keycloak *creates* a user from the Discord
+> federation — i.e. only for accounts that *register* via Discord. An existing account that links
+> Discord later goes through `updateBrokeredUser`, which the JSON attribute importer honours **only**
+> under `force`; otherwise the attribute (and historically the token claim) stayed empty and the
+> member list showed no Discord icon for it. With `force` the attribute is refreshed on every Discord
+> broker login and at account-console linking. Since ADR-0036 the **token claim no longer depends on
+> this attribute** (see 3b), so this mapper is now defence-in-depth + admin-console visibility; `force`
+> keeps the stored attribute honest. (Our `DiscordIdentityProvider` calls `storeUserProfileForMapper`
+> on every brokered round-trip, so the `/users/@me` JSON node is present and `force` *sets* the id
+> rather than clearing it.)
+
+### 3b. Carry the link into the token (federated-identity mapper — the claim source)
+
+The claim is sourced from the Keycloak **federated-identity link**, not the user attribute, so it is
+present for accounts linked at any time and on every login method (ADR-0036). Use the SPI protocol
+mapper from the provider JAR (step 2):
 
 Realm `iri` → **Clients → `basetool-frontend` → Client scopes →
-`basetool-frontend-dedicated` → Add mapper → By configuration → User Attribute**:
+`basetool-frontend-dedicated` → Add mapper → By configuration → *Discord Federated Identity***:
 
 - **Name:** `discord_user_id`
-- **User Attribute:** `discord_user_id`
+- **Identity provider alias:** `discord` (must match the IdP alias from step 3)
 - **Token Claim Name:** `discord_user_id`
 - **Add to ID token / access token / userinfo:** ON · **Claim JSON Type:** String
 
-The backend reads this `discord_user_id` claim and persists it on `app_user` (REQ-DATA-006).
+The backend reads this `discord_user_id` claim and persists it on `app_user` (REQ-DATA-006). Because
+the mapper reads the federated link at token-issuance time, **every** login — including a pure
+username/password login of a Discord-linked account — carries the claim.
 
-> **Required for the approval gate.** The PENDING admin-approval flow (REQ-SEC-017) keys off this
-> `discord_user_id` claim to recognise a Discord federated login. If mappers 3a/3b are missing, a
-> Discord user still passes the membership gate (step 4) but is created `ACTIVE` and skips admin
-> approval — so do not skip 3a/3b.
+> **Do not also add the legacy *User Attribute* mapper for `discord_user_id`.** Two mappers writing
+> the same claim conflict. The federated-identity mapper replaces it; the attribute importer in 3a
+> keeps the user attribute for visibility only, it is not mapped into the token.
 
-### 3c. (Optional) Capture the per-guild server nickname for the approval queue
+### 3c. Back-fill already-linked accounts (automatic — no operator step)
+
+The backend's scheduled user sync (`app.keycloak.sync.*`, the existing `backend-service` admin
+client) now also reads each user's `GET /users/{id}/federated-identity` and persists the `discord`
+link onto `app_user.discord_user_id`. This repairs accounts that linked Discord **before** the
+federated-identity mapper (3b) was deployed, with no re-login — they appear with the Discord icon
+within one sync interval. No extra Keycloak config is needed beyond the admin client already used for
+user sync (it needs `view-users`).
+
+> **The approval gate (REQ-SEC-017) does NOT depend on these mappers.** Every brand-new non-admin
+> registration lands `PENDING` regardless of whether the `discord_user_id` claim is present — the
+> decision is deliberately decoupled from Discord detection. Mappers 3a/3b drive the member-list
+> Discord indicator (REQ-SEC-019) and recognising a returning Discord user, not admin approval.
+
+### 3d. (Optional) Capture the per-guild server nickname for the approval queue
 
 To show each pending user's **das-kartell server nickname** in the admin approval queue
 (REQ-DATA-008), capture the Discord `nick` and carry it into a token claim, mirroring
@@ -177,7 +209,7 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 - A Discord account **in** das-kartell **with** KRT-Mitglied → federation completes, lands the user
   PENDING (admin approval required, T1.3), and writes `discord_user_id`.
 - A Discord account **not** in the guild, or **without** KRT-Mitglied → login denied, no session.
-- If the optional nickname capture (§3c) is configured, the admin approval queue shows the user's
+- If the optional nickname capture (§3d) is configured, the admin approval queue shows the user's
   das-kartell server nickname; otherwise that column stays blank (the login is unaffected either way).
 - Keycloak/SPI logs contain **no** Discord ids, tokens or profile payloads.
 - Username/password login is unchanged.
