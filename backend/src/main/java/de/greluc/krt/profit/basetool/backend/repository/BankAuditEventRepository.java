@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -90,8 +91,7 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
   @Query(
       "SELECT e FROM BankAuditEvent e WHERE e.occurredAt >= :from AND e.occurredAt <= :to"
           + " ORDER BY e.occurredAt ASC")
-  java.util.List<BankAuditEvent> findForExport(
-      @Param("from") Instant from, @Param("to") Instant to);
+  List<BankAuditEvent> findForExport(@Param("from") Instant from, @Param("to") Instant to);
 
   /**
    * Counts bank audit rows in a period — the export size guard. The export query is unpaged (one

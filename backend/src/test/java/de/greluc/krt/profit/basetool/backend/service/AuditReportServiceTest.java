@@ -164,6 +164,26 @@ class AuditReportServiceTest {
         () -> auditReportService.generateAuditLogJson(AuditDomain.JOB_ORDER, from, to));
   }
 
+  @Test
+  void export_acceptsExactlyTheCapRowCount() {
+    // Boundary: the guard is count > MAX_EXPORT_ROWS, so EXACTLY the cap (100_000) must be
+    // ACCEPTED.
+    // A >→>= regression would reject it; this pins the inclusive edge.
+    lenient()
+        .when(messageSource.getMessage(any(String.class), isNull(), eq(Locale.GERMAN)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    Instant from = Instant.now().minus(1, ChronoUnit.HOURS);
+    Instant to = Instant.now().plus(1, ChronoUnit.HOURS);
+    when(auditEventRepository.countForExport(AuditDomain.REFINERY, from, to)).thenReturn(100_000L);
+    when(auditEventRepository.findForExport(AuditDomain.REFINERY, from, to)).thenReturn(List.of());
+
+    // Does not throw — it renders the (empty) document and records the export.
+    byte[] pdf = auditReportService.generateAuditLogPdf(AuditDomain.REFINERY, from, to, null);
+    org.junit.jupiter.api.Assertions.assertNotNull(pdf);
+    verify(auditService)
+        .record(eq(AuditEventType.REFINERY_AUDIT_EXPORTED), isNull(), isNull(), isNull(), any());
+  }
+
   private static String extractText(byte[] pdf) throws IOException {
     PdfReader reader = new PdfReader(pdf);
     try {

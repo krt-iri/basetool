@@ -15,8 +15,10 @@ areas — Lagerverwaltung (`InventoryItem`), Auftragsverwaltung (`JobOrder`), Ra
 **separate** (a tab per area, a separate PDF per area) but read on **one** admin page, and each
 exportable as a period PDF.
 
-Two questions had to be settled: (1) one shared table for the four new areas vs. four Bank-style
-tables, and (2) whether the existing bank trail is folded into the same store or stays separate.
+Two questions had to be settled: (1) one shared table for the new areas vs. a Bank-style table per
+area, and (2) whether the existing bank trail is folded into the same store or stays separate. (The
+initial scope was four areas — Lager, Aufträge, Raffinerie, Mein Inventar; Missionen and Operationen
+were added in the same change and dropped straight into the shared table, validating the decision.)
 
 The instrumentation is the risky part: these services are the ones the project's optimistic-locking
 rules (CLAUDE.md "Concurrency") exist for — bulk `@Modifying(clearAutomatically=true)` unlinks,
@@ -25,11 +27,11 @@ placed naïvely.
 
 ## Decision
 
-We will store the four new areas' events in **one shared `audit_event` table** with a `domain`
-discriminator (`INVENTORY`, `JOB_ORDER`, `REFINERY`, `PERSONAL_INVENTORY`) and a single
-`AuditEventType` enum whose every constant carries its domain. The **bank keeps its own
+We will store the new areas' events in **one shared `audit_event` table** with a `domain`
+discriminator (`INVENTORY`, `JOB_ORDER`, `REFINERY`, `PERSONAL_INVENTORY`, `MISSION`, `OPERATION`)
+and a single `AuditEventType` enum whose every constant carries its domain. The **bank keeps its own
 `bank_audit_event` table** (it has bank-specific reference columns — account/transaction — and
-shipped first); it is surfaced as a fifth tab on the same unified `/admin/audit-log` page rather
+shipped first); it is surfaced as a further tab on the same unified `/admin/audit-log` page rather
 than migrated.
 
 One passive `AuditService.record(eventType, subjectId, subjectLabel, targetUserId, details)`

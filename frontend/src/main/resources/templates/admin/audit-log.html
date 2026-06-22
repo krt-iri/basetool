@@ -130,7 +130,7 @@
                 </table>
             </div>
             <p class="text-center text-muted"
-               th:if="${events == null or #lists.isEmpty(events.content())}"
+               th:if="${error == null and (events == null or #lists.isEmpty(events.content()))}"
                data-testid="audit-empty" th:text="#{admin.audit.empty}">Keine Ereignisse.</p>
             <nav th:if="${events != null}"
                  th:replace="~{fragments/pagination :: pagination(${events}, ${paginationBaseUrl})}"></nav>

@@ -90,7 +90,9 @@ public class AuditService {
             .domain(eventType.domain())
             .eventType(eventType)
             .actorUserId(actorId.orElse(null))
-            .actorHandle(actorHandle)
+            // Clamp to the actor_handle column width (255), symmetric with subjectLabel — an
+            // over-long effective name must never throw and roll back the business mutation.
+            .actorHandle(truncate(actorHandle))
             .subjectId(subjectId)
             .subjectLabel(truncate(subjectLabel))
             .targetUserId(targetUserId)

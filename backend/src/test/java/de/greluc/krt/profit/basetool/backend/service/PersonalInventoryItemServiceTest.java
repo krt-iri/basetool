@@ -154,6 +154,16 @@ class PersonalInventoryItemServiceTest {
         persisted.getLocationNameSnapshot(),
         "snapshot must be denormalized from the local UEX mirror");
     assertEquals(3, result.quantity());
+    // REQ-AUDIT-001: a personal-inventory create records exactly one PERSONAL_INVENTORY_CREATED.
+    verify(auditService)
+        .record(
+            eq(
+                de.greluc.krt.profit.basetool.backend.model.AuditEventType
+                    .PERSONAL_INVENTORY_CREATED),
+            any(),
+            any(),
+            any(),
+            any());
   }
 
   @Test

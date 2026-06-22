@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -145,12 +146,11 @@ public class AuditAdminController {
    */
   @Operation(summary = "Export an activity audit log as JSON for a period (admin)")
   @GetMapping("/{domain}/export.json")
-  public ResponseEntity<java.util.List<AuditEventDto>> exportAuditLogJson(
+  public ResponseEntity<List<AuditEventDto>> exportAuditLogJson(
       @PathVariable AuditDomain domain,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
-    java.util.List<AuditEventDto> events =
-        auditReportService.generateAuditLogJson(domain, from, to);
+    List<AuditEventDto> events = auditReportService.generateAuditLogJson(domain, from, to);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setContentDispositionFormData(

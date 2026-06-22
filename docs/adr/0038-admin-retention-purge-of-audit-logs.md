@@ -9,7 +9,8 @@
 
 [ADR-0037](0037-shared-multi-domain-activity-audit-log.md) shipped the activity audit logs as
 **append-only** and explicitly accepted that the tables **grow unbounded** ("the trail is the
-point"). With every mutation in five areas now writing a row — plus per-run UEX-sync summaries — the
+point"). With every mutation across seven logs (the six shared-table areas plus the bank) now
+writing a row — plus per-run UEX-sync summaries — the
 owner asked for a way to keep the tables bounded: let admins delete entries older than a chosen date,
 **separately for each log including the bank**, with a reminder to take a backup first.
 

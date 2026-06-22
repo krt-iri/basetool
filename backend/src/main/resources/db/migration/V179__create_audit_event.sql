@@ -2,7 +2,7 @@
 -- V179 - Activity audit log (REQ-AUDIT-001, ADR-0037): audit_event
 -- =====================================================================
 -- Why: every audited mutation in the inventory / job-order / refinery /
--- personal-inventory areas writes exactly one row to this insert-only
+-- personal-inventory / mission / operation areas writes exactly one row to this insert-only
 -- table, mirroring bank_audit_event (V154): no version column, no
 -- updates, occurred_at is the single timestamp. The actor is stored
 -- twice - as an FK (SET NULL on user deletion) AND as a denormalized
@@ -11,7 +11,7 @@
 -- enums grow with the domains and the JPA @Enumerated(STRING) mapping is
 -- the source of truth (V113/V154 precedent).
 --
--- One physical table, four logical logs: the `domain` discriminator
+-- One physical table, six logical logs: the `domain` discriminator
 -- keeps the logs separate for the admin viewer's tabs and the per-area
 -- PDF export (ADR-0037). The bank keeps its own bank_audit_event table.
 --
@@ -45,9 +45,9 @@ CREATE INDEX idx_audit_event_actor
     ON audit_event (actor_user_id);
 
 COMMENT ON TABLE audit_event IS
-    'Immutable, admin-only activity audit trail across four areas (REQ-AUDIT-001, ADR-0037). One row per audited mutation; insert-only, no version.';
+    'Immutable, admin-only activity audit trail across six areas (REQ-AUDIT-001, ADR-0037). One row per audited mutation; insert-only, no version.';
 COMMENT ON COLUMN audit_event.domain IS
-    'Functional area discriminator: INVENTORY, JOB_ORDER, REFINERY, PERSONAL_INVENTORY.';
+    'Functional area discriminator: INVENTORY, JOB_ORDER, REFINERY, PERSONAL_INVENTORY, MISSION, OPERATION.';
 COMMENT ON COLUMN audit_event.actor_handle IS
     'Denormalized actor handle snapshot - the trail survives user deletion.';
 COMMENT ON COLUMN audit_event.subject_label IS

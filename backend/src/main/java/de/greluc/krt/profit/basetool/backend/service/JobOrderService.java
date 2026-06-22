@@ -553,8 +553,10 @@ public class JobOrderService {
     // through
     // that funnel, so it is recorded here; emitting only one event per call avoids a STATUS_CHANGED
     // +
-    // COMPLETED duplicate.
-    if (status == JobOrderStatus.COMPLETED) {
+    // COMPLETED duplicate. Gate on the actual transition EDGE (not status alone), mirroring the
+    // auto-completion funnel: a no-op PUT status=COMPLETED on an already-completed order is a plain
+    // STATUS_CHANGED, not a spurious second JOB_ORDER_COMPLETED.
+    if (status == JobOrderStatus.COMPLETED && previousStatus != JobOrderStatus.COMPLETED) {
       auditService.record(
           AuditEventType.JOB_ORDER_COMPLETED,
           jobOrder.getId(),

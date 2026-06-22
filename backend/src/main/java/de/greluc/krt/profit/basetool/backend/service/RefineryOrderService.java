@@ -792,15 +792,18 @@ public class RefineryOrderService {
 
   /**
    * Composes the audit subject label for a refinery order. The order has no name/number field, so
-   * the deletion-proof identity snapshot is the composite {@code <owner> · <location>}
-   * (REQ-AUDIT-001); the started-at and other facts go into the event details.
+   * the deletion-proof identity snapshot is the <strong>non-personal</strong> composite {@code
+   * <method> · <location>}. REQ-AUDIT-001 limits {@code subjectLabel} to a non-personal display
+   * label (no person names) — the order owner is captured separately as the audit row's target user
+   * ({@code targetUserId}), so embedding the owner's handle here would be redundant and would
+   * durably retain a third party's name in the append-only trail. Started-at and other facts go
+   * into the event details.
    *
    * @param order the refinery order
-   * @return the {@code <owner> · <location>} label
+   * @return the {@code <method> · <location>} label
    */
   private static String refineryLabel(RefineryOrder order) {
-    String owner = order.getOwner() != null ? order.getOwner().getEffectiveName() : "—";
-    return owner + " · " + locationName(order);
+    return methodName(order) + " · " + locationName(order);
   }
 
   /**
