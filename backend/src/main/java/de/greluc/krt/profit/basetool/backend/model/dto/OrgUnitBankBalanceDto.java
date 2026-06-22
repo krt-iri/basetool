@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -63,6 +64,10 @@ import org.jetbrains.annotations.Nullable;
  *     false} for a subordinate account reached through the cascading view <em>and</em> for every
  *     special account (Sonderkonto) — those are view-only, and the backend rejects a request
  *     against them.
+ * @param delta30d the net balance change over the last 30 days (signed), so the card can show the
+ *     same trend figure as the bank dashboard (REQ-BANK-016)
+ * @param sparkline the end-of-day balances of the last 30 days, oldest first, last entry = current
+ *     balance; the frontend scales these into the inline SVG sparkline shown on the card
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
@@ -75,4 +80,6 @@ public record OrgUnitBankBalanceDto(
     @Nullable String orgUnitShorthand,
     @Nullable OrgUnitKind orgUnitKind,
     BigDecimal balance,
-    boolean canRequest) {}
+    boolean canRequest,
+    BigDecimal delta30d,
+    List<BigDecimal> sparkline) {}

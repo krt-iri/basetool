@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -50,6 +51,11 @@ import org.jetbrains.annotations.Nullable;
  * @param canRequest {@code true} iff this is the caller's own-level org-unit account (the request
  *     button is shown); {@code false} for a view-only subordinate account reached by the cascade
  *     (epic #692 Phase 6, owner decision Q4) and for every special account
+ * @param delta30d the net balance change over the last 30 days (signed), rendered as the
+ *     sign-colored trend figure on the card (REQ-BANK-016, mirroring the bank dashboard)
+ * @param sparkline the end-of-day balances of the last 30 days, oldest first, last entry = current
+ *     balance; scaled into the card's inline SVG sparkline by {@link
+ *     de.greluc.krt.profit.basetool.frontend.controller.BankSparkline}
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
@@ -62,4 +68,6 @@ public record OrgUnitBankBalanceDto(
     @Nullable String orgUnitShorthand,
     @Nullable String orgUnitKind,
     BigDecimal balance,
-    boolean canRequest) {}
+    boolean canRequest,
+    BigDecimal delta30d,
+    List<BigDecimal> sparkline) {}

@@ -55,15 +55,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class BankPageController {
 
-  /** ViewBox width of the dashboard sparkline (matches the D1 mockup's 96x26 SVG). */
-  private static final double SPARK_WIDTH = 96d;
-
-  /** ViewBox height of the dashboard sparkline. */
-  private static final double SPARK_HEIGHT = 26d;
-
-  /** Vertical padding inside the sparkline viewBox so extremes do not clip. */
-  private static final double SPARK_PAD = 2d;
-
   private final BackendApiClient backendApiClient;
 
   /**
@@ -238,40 +229,14 @@ public class BankPageController {
   }
 
   /**
-   * Scales one card's end-of-day balance series into the 96x26 sparkline polyline (D1 mockup). A
-   * flat series renders as the muted mid-height line, mirroring the mockup's zero-delta card.
+   * Wraps one backend card payload with its scaled sparkline polyline ({@link BankSparkline}),
+   * ready for the template.
    *
    * @param account the backend card payload
    * @return the card view with pre-computed points
    */
   private static BankDashboardCardView toCardView(@NotNull BankDashboardAccountDto account) {
-    List<BigDecimal> series = account.sparkline();
-    if (series == null || series.isEmpty()) {
-      return new BankDashboardCardView(account, null, true);
-    }
-    BigDecimal min = series.getFirst();
-    BigDecimal max = series.getFirst();
-    for (BigDecimal v : series) {
-      if (v.compareTo(min) < 0) {
-        min = v;
-      }
-      if (v.compareTo(max) > 0) {
-        max = v;
-      }
-    }
-    boolean flat = max.compareTo(min) == 0;
-    double range = flat ? 1d : max.subtract(min).doubleValue();
-    double stepX = series.size() > 1 ? SPARK_WIDTH / (series.size() - 1) : SPARK_WIDTH;
-    StringBuilder points = new StringBuilder();
-    for (int i = 0; i < series.size(); i++) {
-      double x = series.size() > 1 ? i * stepX : SPARK_WIDTH / 2;
-      double normalized = flat ? 0.5d : series.get(i).subtract(min).doubleValue() / range;
-      double y = SPARK_HEIGHT - SPARK_PAD - normalized * (SPARK_HEIGHT - 2 * SPARK_PAD);
-      if (i > 0) {
-        points.append(' ');
-      }
-      points.append(Math.round(x * 10) / 10.0).append(',').append(Math.round(y * 10) / 10.0);
-    }
-    return new BankDashboardCardView(account, points.toString(), flat);
+    BankSparkline.Spark spark = BankSparkline.of(account.sparkline());
+    return new BankDashboardCardView(account, spark.points(), spark.flat());
   }
 }

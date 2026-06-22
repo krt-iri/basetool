@@ -536,19 +536,29 @@ org-unit-blind.
 > **Amendment (REQ-BANK-028):** the page lists **only active accounts** (a `CLOSED` account is
 > filtered out), and a Bereich/OL overseer (or admin) additionally sees the cartel-wide **special
 > accounts** (Sonderkonten) **view-only**.
+>
+> **Amendment (30-day trend):** each card additionally shows the same **30-day trend** the bank
+> dashboard renders (REQ-BANK-016) — the sign-colored net delta and the server-computed inline SVG
+> sparkline of the daily end-of-day balances. The figures are derived per account from one extra
+> windowed posting-slice query (no per-account N+1) via the shared `BankTrendCalculator` /
+> `BankSparkline` helpers, so both surfaces stay identical. This stays balance-/aggregate-only — it
+> still exposes no transaction history, holders or audit.
 
 **Acceptance**
 
 - [x] An officer/lead sees only the balance of org units in their oversight scope; a plain
   member receives an empty list (no leak of account existence). (`OrgUnitBankAccessServiceTest`)
-- [x] The response carries no history/holders/audit — balance + account identity only.
+- [x] The response carries no history/holders/audit — balance + account identity + the 30-day
+  delta/sparkline aggregates only.
+- [x] Each card shows the 30-day delta + sparkline trend, derived from the windowed posting slices
+  with no per-account N+1 (`OrgUnitBankAccessServiceTest`, frontend `OrgUnitBankPageControllerMvcTest`).
 - [x] The seam is the only class bridging `OwnerScopeService` and the bank accounts
   repository (`ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`); `BankSecurityService`
   never depends on `OwnerScopeService` (`bankClassesMustNotConsultOrgUnitScope`).
 - [x] A slim standalone page lists the overseen balances, gated to officers/leads, not
   `BANK_EMPLOYEE` (frontend `OrgUnitBankPageControllerMvcTest`).
 
-**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId`, frontend `controller/OrgUnitBankPageController`, `templates/org-unit-bank.html` · **Issues:** #666, #668, #669
+**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest`, frontend `BankPageControllerTest` (sparkline scaling) · **Code:** `service/OrgUnitBankAccessService`, `service/BankTrendCalculator`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId`, `repository/BankPostingRepository#postingSlicesSince`, frontend `controller/OrgUnitBankPageController`, frontend `controller/BankSparkline`, `templates/org-unit-bank.html` · **Issues:** #666, #668, #669
 
 ### REQ-BANK-022 — Confirm-before-post booking requests: create & cancel
 

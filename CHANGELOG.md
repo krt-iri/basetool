@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Die Seite „Bank meiner Org-Einheit" zeigt pro Konto jetzt den 30-Tage-Trend** — die vorzeichenfarbige Veränderung der letzten 30 Tage plus ein kompaktes Verlaufsdiagramm (Sparkline), genau wie in der Bankübersicht. Reine Anzeige; Buchungshistorie, Halter und Audit bleiben weiterhin der Bank vorbehalten.
+
 - **Wöchentliches Docker-Aufräumen auf dem Produktions-VM.** Neues Wartungsskript `scripts/docker-cleanup.sh` (plus cron.d-Drop-in und logrotate-Konfiguration) entfernt jeden Samstag um 02:00 UTC ungenutzte Docker-Ressourcen — Images, Build-Cache, gestoppte Container, Netzwerke und anonyme Volumes —, damit die Festplatte nicht vollläuft. Belegte Ressourcen und frisch gezogene Images (Standardfenster 14 Tage) bleiben unangetastet; die persistenten Bind-Mount-Daten unter `/var/iri` sind ohnehin nicht betroffen. Reiner Betriebs-/Deploy-Zusatz ohne Auswirkung auf die App; Einrichtung siehe `docs/deployment.md`.
 
 ### Changed

@@ -34,7 +34,7 @@
     <div id="org-unit-bank-results" th:fragment="orgUnitBank">
 
         <div class="bank-acc-grid mt-2" th:if="${!#lists.isEmpty(balances)}">
-            <div th:each="b : ${balances}" class="kpi-card"
+            <div th:each="b : ${balances}" class="kpi-card" th:with="spark=${sparks.get(b.accountId())}"
                  data-testid="org-unit-bank-card" th:attr="data-account-no=${b.accountNo()}">
                 <div class="kpi-card-top">
                     <div>
@@ -58,6 +58,19 @@
                 <div class="kpi-label" th:text="#{bank.orgUnit.balance}">Kontostand</div>
                 <div class="kpi-value"
                      th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
+                <!-- 30-day trend: sign-colored delta + inline SVG sparkline, identical to the bank
+                     dashboard cards (REQ-BANK-016). The SVG is decorative (aria-hidden); the delta
+                     carries the accessible figure. -->
+                <div class="kpi-card-foot">
+                    <span class="kpi-delta"
+                          th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
+                          th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'POINT')} + ' ' + #{bank.dashboard.delta30}">&#9650; +420.000 / 30 T</span>
+                    <svg th:if="${spark != null and spark.points() != null}" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">
+                        <polyline th:attr="points=${spark.points()}"
+                                  th:classappend="${spark.flat()} ? ' kpi-sparkline--flat' : ''"
+                                  class="kpi-sparkline" fill="none" stroke-width="1.5"/>
+                    </svg>
+                </div>
                 <div class="kpi-card-foot">
                     <!-- Own-level account (officer's Staffel / Bereich's AREA / OL's CARTEL): the F2
                          request affordance. A subordinate account reached by the cascade is view-only
