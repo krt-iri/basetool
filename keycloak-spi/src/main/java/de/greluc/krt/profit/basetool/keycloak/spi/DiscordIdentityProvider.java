@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.keycloak.spi;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.ws.rs.core.UriBuilder;
 import java.io.IOException;
 import java.net.URI;
@@ -63,13 +64,34 @@ public class DiscordIdentityProvider
   /** Discord OAuth2 token endpoint. */
   public static final String TOKEN_URL = "https://discord.com/api/oauth2/token";
 
+  /** Discord API base URL shared by the profile and the guild-member (nickname) calls. */
+  public static final String API_BASE_URL = "https://discord.com/api/v10";
+
   /** Discord current-user profile endpoint ({@code GET /users/@me}). */
-  public static final String PROFILE_URL = "https://discord.com/api/v10/users/@me";
+  public static final String PROFILE_URL = API_BASE_URL + "/users/@me";
+
+  /**
+   * Synthetic field injected into the brokered {@code /users/@me} profile JSON to carry the user's
+   * per-guild server nickname ({@code nick}). It lets a standard <em>Attribute Importer</em> mapper
+   * map the nickname to the {@code discord_guild_nickname} user attribute exactly the way {@code
+   * id} maps to {@code discord_user_id} — Discord's {@code /users/@me} payload itself has no
+   * nickname, which is per-guild and only available via the guild-member call. Absent when no
+   * nickname was captured. Epic #720 / REQ-DATA-008.
+   */
+  public static final String GUILD_NICK_PROFILE_FIELD = "guild_nick";
+
+  /**
+   * Name of the environment variable holding the das-kartell guild id used to fetch the server
+   * nickname. When unset or blank the nickname capture is skipped entirely (no extra Discord call),
+   * so the feature is fully optional and never affects the login or the fail-closed membership
+   * gate.
+   */
+  static final String GUILD_ID_ENV = "DISCORD_GUILD_ID";
 
   /**
    * Default OAuth2 scopes. {@code identify} + {@code email} populate the brokered profile; {@code
    * guilds.members.read} is required by the membership gate (T1.2) to read the user's roles in the
-   * configured guild via the user's own token.
+   * configured guild via the user's own token, and by the optional nickname capture below.
    */
   public static final String DEFAULT_SCOPE = "identify email guilds.members.read";
 
@@ -77,6 +99,12 @@ public class DiscordIdentityProvider
 
   private static final HttpClient HTTP_CLIENT =
       HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).build();
+
+  // Best-effort (fail-open) reader for the per-guild server nickname; shares the profile-call
+  // client
+  // and timeout. Never breaks the login — see enrichWithGuildNickname.
+  private static final DiscordGuildNicknameReader NICKNAME_READER =
+      new DiscordGuildNicknameReader(HTTP_CLIENT, HTTP_TIMEOUT);
 
   /**
    * Creates the provider and pins the Discord OAuth2 endpoints onto its config.
@@ -130,6 +158,7 @@ public class DiscordIdentityProvider
             "Discord profile request returned HTTP " + response.statusCode());
       }
       JsonNode profile = JsonSerialization.readValue(response.body(), JsonNode.class);
+      enrichWithGuildNickname(profile, accessToken);
       return extractIdentityFromProfile(null, profile);
     } catch (IOException e) {
       throw new IdentityBrokerException("Could not obtain the Discord user profile", e);
@@ -165,5 +194,39 @@ public class DiscordIdentityProvider
     AbstractJsonUserAttributeMapper.storeUserProfileForMapper(
         user, profile, getConfig().getAlias());
     return user;
+  }
+
+  /**
+   * Best-effort: fetches the user's per-guild server nickname and injects it into the profile JSON
+   * under {@link #GUILD_NICK_PROFILE_FIELD} so a standard <em>Attribute Importer</em> mapper can
+   * carry it onward to the {@code discord_guild_nickname} user attribute. Runs on every Discord
+   * login (so the nickname stays current with the mapper's FORCE sync mode), but is skipped — with
+   * no Discord call — when {@link #GUILD_ID_ENV} is unset or the profile is not a JSON object. It
+   * <strong>never throws</strong>: a missing or failed nickname capture must never break or delay
+   * the login beyond the reader's bounded timeout (REQ-DATA-008), in deliberate contrast to the
+   * fail-closed membership gate.
+   *
+   * @param profile the parsed {@code /users/@me} profile, mutated in place when a nickname is found
+   * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
+   */
+  private void enrichWithGuildNickname(JsonNode profile, String accessToken) {
+    String guildId = configuredGuildId();
+    if (guildId == null || !(profile instanceof ObjectNode objectProfile)) {
+      return;
+    }
+    NICKNAME_READER
+        .readNickname(API_BASE_URL, guildId, accessToken)
+        .ifPresent(nick -> objectProfile.put(GUILD_NICK_PROFILE_FIELD, nick));
+  }
+
+  /**
+   * Reads the das-kartell guild id for nickname capture from the {@link #GUILD_ID_ENV} environment
+   * variable.
+   *
+   * @return the trimmed guild id, or {@code null} when unset or blank (nickname capture disabled)
+   */
+  private String configuredGuildId() {
+    String value = System.getenv(GUILD_ID_ENV);
+    return (value == null || value.isBlank()) ? null : value.trim();
   }
 }

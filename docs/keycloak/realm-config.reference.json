@@ -125,12 +125,26 @@
           }
         },
         {
+          "_comment": "ADR-0036: sourced from the Keycloak federated-identity link via the SPI DiscordFederatedIdentityMapper (protocolMapper id 'discord-federated-identity-mapper'), NOT from the imported user attribute, so the claim is present for accounts linked at any time and on every login method. Replaces the former oidc-usermodel-attribute-mapper on 'discord_user_id'.",
           "name": "discord_user_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "discord-federated-identity-mapper",
+          "config": {
+            "idp.alias": "discord",
+            "claim.name": "discord_user_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "discord_guild_nickname",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "config": {
-            "user.attribute": "discord_user_id",
-            "claim.name": "discord_user_id",
+            "user.attribute": "discord_guild_nickname",
+            "claim.name": "discord_guild_nickname",
             "jsonType.label": "String",
             "access.token.claim": "true",
             "id.token.claim": "true",

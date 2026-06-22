@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -118,7 +119,10 @@ class KeycloakServiceTest {
       UUID userC = UUID.fromString("00000000-0000-0000-0000-0000000000c3");
 
       // 1) client-credentials token, 2) full first page (== pageSize → keep paging),
-      // 3) short second page (< pageSize → stop), 4-6) per-user realm-role mappings.
+      // 3) short second page (< pageSize → stop), then per user a realm-role mapping followed by a
+      // federated-identity lookup (roles A, federated A, roles B, federated B, roles C, federated
+      // C)
+      // — all empty here, so this stays a pure pagination check.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse(
@@ -129,6 +133,9 @@ class KeycloakServiceTest {
                   + "\",\"username\":\"b\",\"enabled\":true}]"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userC + "\",\"username\":\"c\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
@@ -148,6 +155,95 @@ class KeycloakServiceTest {
       assertTrue(firstPage.getPath().contains("max=2"), "first page must bind the page size");
       RecordedRequest secondPage = server.takeRequest();
       assertTrue(secondPage.getPath().contains("first=2"), "second page must advance the offset");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * The sync joins each user's {@code discord} federated-identity link (Admin API {@code
+   * /federated-identity}) onto the DTO, so an account that linked Discord is recognised regardless
+   * of how it linked (REQ-DATA-006). With one user whose federated-identity list carries a {@code
+   * discord} entry, the returned DTO must carry that snowflake.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_attachesDiscordFederatedId() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      // token, single short page (stop), roles A (empty), federated identities A (one discord
+      // link).
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(
+          jsonResponse(
+              "[{\"identityProvider\":\"discord\",\"userId\":\"123456789012345678\","
+                  + "\"userName\":\"a#1\"}]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles);
+
+      List<KeycloakUserDto> users = service.fetchUsers();
+
+      assertEquals(1, users.size());
+      assertEquals("123456789012345678", users.get(0).discordUserId());
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * A user whose only federated identity is a non-Discord provider has no Discord link, so the
+   * DTO's {@code discordUserId} must be {@code null} — the indicator must never light up off
+   * another IdP.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_ignoresNonDiscordFederatedIdentity() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(
+          jsonResponse("[{\"identityProvider\":\"github\",\"userId\":\"99\",\"userName\":\"a\"}]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles);
+
+      List<KeycloakUserDto> users = service.fetchUsers();
+
+      assertEquals(1, users.size());
+      assertNull(users.get(0).discordUserId());
     } finally {
       server.shutdown();
     }

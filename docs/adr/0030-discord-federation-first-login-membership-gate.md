@@ -3,7 +3,7 @@
 - **Status:** Accepted — Track 1 implemented (operator Discord + Keycloak setup pending)
 - **Date:** 2026-06-20
 - **Deciders:** @greluc, Claude
-- **Related:** spec REQ-SEC-016 · REQ-DATA-006 · REQ-SEC-017 · REQ-NOTIF-012 · issue #720 · #721 · #723 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
+- **Related:** spec REQ-SEC-016 · REQ-DATA-006 · REQ-SEC-017 · REQ-NOTIF-012 · REQ-DATA-008 · issue #720 · #721 · #723 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
 
 ## Context
 
@@ -51,6 +51,15 @@ approval gate are independent layers — the first proves *Kartell membership*, 
 *human admission control*. After approval, Basetool roles/units stay **manually** managed in Track 1
 (the automated Discord-role → app-role/unit sync is Track 2).
 
+We also capture the user's **per-guild server nickname** to give the approving admin a recognisable
+in-server identity (REQ-DATA-008). Discord's `/users/@me` profile has no nickname (it is per-guild),
+so `DiscordIdentityProvider` fetches the guild-member object best-effort, injects the `nick` into the
+brokered profile JSON, and a standard *Attribute Importer* + protocol mapper carry it into the
+`discord_guild_nickname` claim — exactly the `discord_user_id` shape. Crucially this capture is
+**fail-open**: unlike the membership gate, a missing or failed nickname must never block the login,
+because it is display-only and admin-only. The two postures coexist by design — *fail closed* on the
+security boundary, *fail open* on cosmetic enrichment.
+
 ## Consequences
 
 - **Membership is enforced at the strongest boundary.** A non-member or a member lacking
@@ -66,6 +75,11 @@ approval gate are independent layers — the first proves *Kartell membership*, 
   touching the module; the compile-against-the-real-jars build catches API drift early.
 - **One synchronous outbound call per first login** (to Discord, ≤10 s timeout). Fail-closed means a
   Discord outage blocks *new* Discord logins — acceptable; credential login is unaffected.
+- **Two opposite failure postures, on purpose.** The membership gate fails **closed** (a Discord
+  hiccup denies a new login); the optional nickname capture fails **open** (a Discord hiccup just
+  omits the nickname). The nickname adds a second best-effort guild-member call per login when the
+  `DISCORD_GUILD_ID` env var is set — bounded by the same timeout and swallowing every error, so it
+  can never break or stall a login (REQ-DATA-008).
 - **Discord secrets live as Keycloak component config supplied at deploy** (IdP client id/secret;
   gate guild id + role id) — never committed. The redacted shape is documented in the realm
   reference and the runbook.

@@ -320,7 +320,8 @@ class UserServiceSyncTest {
 
     @Test
     void returnsEarly_whenDtoIdIsNull() {
-      KeycloakUserDto dto = new KeycloakUserDto(null, "alice", "alice@example.com", true, Set.of());
+      KeycloakUserDto dto =
+          new KeycloakUserDto(null, "alice", "alice@example.com", true, Set.of(), null);
 
       userService.syncUser(dto);
 
@@ -337,7 +338,7 @@ class UserServiceSyncTest {
       when(roleRepository.findByNameIgnoreCase("Guest"))
           .thenReturn(Optional.of(role(99L, "Guest")));
 
-      userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, Set.of()));
+      userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, Set.of(), null));
 
       assertTrue(existing.isInKeycloak(), "must flip back to true once seen again");
       verify(userRepository, times(1)).save(existing);
@@ -350,7 +351,7 @@ class UserServiceSyncTest {
           .thenReturn(Optional.of(role(99L, "Guest")));
 
       userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of()));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
 
       verify(userRepository, times(1)).save(any(User.class));
     }
@@ -367,7 +368,7 @@ class UserServiceSyncTest {
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of()));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
 
       verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.PENDING));
     }
@@ -382,7 +383,7 @@ class UserServiceSyncTest {
       when(roleRepository.findByNameIgnoreCase("ADMIN")).thenReturn(Optional.of(adminRole));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      userService.syncUser(new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN")));
+      userService.syncUser(new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN"), null));
 
       verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.ACTIVE));
     }
@@ -400,8 +401,57 @@ class UserServiceSyncTest {
       when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
 
       userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of()));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
 
+      verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void backfillsDiscordLink_whenExistingUserLinkedLater() {
+      // The reported bug (REQ-DATA-006): a pre-existing credential account that linked Discord
+      // AFTER creation. The import-time token claim only covers accounts that registered via
+      // Discord, so this account showed no Discord indicator. The scheduled sync reads the Discord
+      // federated identity from the Admin API and back-fills the local link with no re-login.
+      User existing = newUser(USER_ID, "linkedlater");
+      existing.setEmail("l@example.com");
+      existing.setInKeycloak(true);
+      existing.setVersion(4L);
+      existing.setDiscordUserId(null);
+      Role guest = role(99L, "Guest");
+      existing.setRoles(new HashSet<>(Set.of(guest)));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userService.syncUser(
+          new KeycloakUserDto(
+              USER_ID, "linkedlater", "l@example.com", true, Set.of(), "123456789012345678"));
+
+      assertEquals("123456789012345678", existing.getDiscordUserId());
+      verify(userRepository, times(1)).save(existing);
+    }
+
+    @Test
+    void leavesExistingDiscordLink_whenDtoCarriesNoFederatedId() {
+      // A null discordUserId means "the federated-identity lookup found nothing OR failed" — it is
+      // NOT a signal to unlink. An already-linked user must keep their link (and the run must not
+      // even save, since nothing changed), so a transient Admin-API hiccup can never wipe the link.
+      User existing = newUser(USER_ID, "linked");
+      existing.setEmail("l@example.com");
+      existing.setInKeycloak(true);
+      existing.setVersion(2L);
+      existing.setDiscordUserId("123456789012345678");
+      Role guest = role(99L, "Guest");
+      existing.setRoles(new HashSet<>(Set.of(guest)));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
+
+      userService.syncUser(
+          new KeycloakUserDto(USER_ID, "linked", "l@example.com", true, Set.of(), null));
+
+      assertEquals("123456789012345678", existing.getDiscordUserId());
       verify(userRepository, never()).save(any());
     }
   }
@@ -475,7 +525,7 @@ class UserServiceSyncTest {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
     when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(role(99L, "Guest")));
 
-    userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, null));
+    userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, null, null));
 
     verify(roleRepository, times(1)).findByNameIgnoreCase("Guest");
   }

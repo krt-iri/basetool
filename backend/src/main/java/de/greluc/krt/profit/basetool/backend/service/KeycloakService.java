@@ -84,6 +84,15 @@ public class KeycloakService {
    */
   private static final String KEYCLOAK_TRUST_BUNDLE = "keycloak-trust";
 
+  /**
+   * Alias of the Discord identity provider in the realm. Must match the alias configured in
+   * Keycloak (fixed to {@code discord} by {@code docs/keycloak/DISCORD_KEYCLOAK_SETUP.md}, since
+   * the alias is the broker redirect path and the {@code kc_idp_hint}). Used to pick the Discord
+   * entry out of a user's federated-identity list when back-filling the local Discord link
+   * (REQ-DATA-006).
+   */
+  private static final String DISCORD_IDP_ALIAS = "discord";
+
   private final KeycloakSyncProperties properties;
 
   /**
@@ -183,7 +192,9 @@ public class KeycloakService {
           .map(
               u -> {
                 Set<String> roles = fetchUserRoles(u.id(), token);
-                return new KeycloakUserDto(u.id(), u.username(), u.email(), u.enabled(), roles);
+                String discordUserId = fetchDiscordFederatedId(u.id(), token);
+                return new KeycloakUserDto(
+                    u.id(), u.username(), u.email(), u.enabled(), roles, discordUserId);
               })
           .toList();
 
@@ -260,6 +271,54 @@ public class KeycloakService {
     } catch (Exception e) {
       log.warn("Failed to fetch roles for user {}", userId, e);
       return Collections.emptySet();
+    }
+  }
+
+  /**
+   * Reads the user's {@code discord} federated-identity link from {@code GET
+   * /users/{id}/federated-identity} and returns its Discord snowflake, or {@code null} when the
+   * user has no Discord link. The federated-identity link exists for <em>every</em> user who linked
+   * Discord regardless of how (Discord registration, first-broker-login link, or account-console
+   * linking) — which is why reading it here back-fills the local {@code discord_user_id} for
+   * accounts that linked Discord <em>after</em> creation, the ones the import-time attribute never
+   * covered (REQ-DATA-006). Best-effort: any failure (network, auth, malformed) is logged without
+   * the id and yields {@code null}, so a transient Admin-API hiccup never throws — and {@link
+   * UserService#syncUser(KeycloakUserDto)} treats a {@code null} as "leave the existing link
+   * alone", never clearing it, so a hiccup cannot wipe a real link. The raw snowflake is never
+   * logged.
+   *
+   * @param userId the Keycloak user id whose federated identities to read.
+   * @param token a valid admin access token.
+   * @return the linked Discord user id (snowflake), or {@code null} when absent or unreadable.
+   */
+  @Nullable
+  private String fetchDiscordFederatedId(UUID userId, String token) {
+    try {
+      List<Map<String, Object>> identities =
+          adminClient()
+              .get()
+              .uri(
+                  "/admin/realms/{realm}/users/{id}/federated-identity",
+                  properties.getRealm(),
+                  userId)
+              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
+              .retrieve()
+              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+
+      if (identities == null) {
+        return null;
+      }
+      return identities.stream()
+          .filter(i -> DISCORD_IDP_ALIAS.equals(i.get("identityProvider")))
+          .map(i -> (String) i.get("userId"))
+          .filter(Objects::nonNull)
+          .map(String::trim)
+          .filter(id -> !id.isEmpty())
+          .findFirst()
+          .orElse(null);
+    } catch (Exception e) {
+      log.warn("Failed to fetch federated identities for user {}", userId, e);
+      return null;
     }
   }
 
