@@ -201,12 +201,16 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
 
   /**
    * Bulk-reassigns every refinery order owned by {@code oldUser} to {@code newUser}; used by the
-   * user-merge flow so refinery history is preserved when two Keycloak accounts get consolidated.
+   * user-deletion cascade so refinery history is preserved when an account is removed.
+   *
+   * @param oldUser the previous owner
+   * @param newUser the new owner (the fallback admin)
+   * @return the number of refinery orders reassigned
    */
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
       "UPDATE RefineryOrder r SET r.owner = :newUser WHERE r.owner = :oldUser")
-  void updateOwner(
+  int updateOwner(
       @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User oldUser,
       @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User newUser);
 }

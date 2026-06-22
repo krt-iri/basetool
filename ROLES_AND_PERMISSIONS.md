@@ -429,18 +429,19 @@ gebunden.
 
 ### 3.10 Stammdaten, Ankündigungen, System
 
-| Funktion (Gate)                                                                                                                                                         | Anonym | Member | Log. | MM | Officer | Admin |
-|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| **Öffentlich** lesbare Stammdaten (Materialien, Locations, Schiffstypen, Hersteller, Sternensysteme, Refining-Methoden, Frequenz-/Job-Typen, Staffeln, System-Settings) |   ✅    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Angemeldet** lesbare Stammdaten (Terminals, Material-Kategorien)                                                                                                      |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Admin-only** Stammdaten – auch zum Lesen (Städte, Raumstationen, Outposts, POIs, Material-Aliase, Blueprints) (`hasRole('ADMIN')`)                                    |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Stammdaten **schreiben** (anlegen/ändern/löschen/Sichtbarkeit/Overrides) (`hasRole('ADMIN')`)                                                                           |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| UEX-Location-Typeahead / Blueprint-Produkt-Suche (`isAuthenticated()`)                                                                                                  |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Ankündigung **lesen** (`GET /announcement`, `isAuthenticated()`)                                                                                                        |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Ankündigung **schreiben/löschen** (inkl. Roh-Lesesicht `GET /announcement/admin`) (`hasRole('ADMIN')`)                                                                  |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Sync-Reports lesen/aufräumen (`hasRole('ADMIN')`)                                                                                                                       |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| System-Setting schreiben (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                    |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Rollen-/Rechteverwaltung, Member-Attribute/Rang, Flag-Vergabe (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`)                                                         |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Funktion (Gate)                                                                                                                                                                                                                   | Anonym | Member | Log. | MM | Officer | Admin |
+|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
+| **Öffentlich** lesbare Stammdaten (Materialien, Locations, Schiffstypen, Hersteller, Sternensysteme, Refining-Methoden, Frequenz-/Job-Typen, Staffeln, System-Settings)                                                           |   ✅    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Angemeldet** lesbare Stammdaten (Terminals, Material-Kategorien)                                                                                                                                                                |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Admin-only** Stammdaten – auch zum Lesen (Städte, Raumstationen, Outposts, POIs, Material-Aliase, Blueprints) (`hasRole('ADMIN')`)                                                                                              |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Stammdaten **schreiben** (anlegen/ändern/löschen/Sichtbarkeit/Overrides) (`hasRole('ADMIN')`)                                                                                                                                     |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| UEX-Location-Typeahead / Blueprint-Produkt-Suche (`isAuthenticated()`)                                                                                                                                                            |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Ankündigung **lesen** (`GET /announcement`, `isAuthenticated()`)                                                                                                                                                                  |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Ankündigung **schreiben/löschen** (inkl. Roh-Lesesicht `GET /announcement/admin`) (`hasRole('ADMIN')`)                                                                                                                            |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Sync-Reports lesen/aufräumen (`hasRole('ADMIN')`)                                                                                                                                                                                 |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| **Audit-Logs** (Bank/Lager/Aufträge/Raffinerie/Mein Inventar/Missionen/Operationen) lesen + Zeitraum-PDF/JSON + Aufbewahrungs-Bereinigung (`/admin/audit-log`, `/api/v1/audit/**`, URL- **und** Methoden-Gate `hasRole('ADMIN')`) |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| System-Setting schreiben (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                              |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Rollen-/Rechteverwaltung, Member-Attribute/Rang, Flag-Vergabe (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`)                                                                                                                   |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 Welche Stammdaten anonym lesbar sind, legt allein die `permitAll`-Liste in
 `SecurityConfig` fest (siehe §1.1) — alles andere ist mindestens angemeldet,
@@ -461,16 +462,16 @@ Rollen und der Admin-Pin haben keinerlei Einfluss, in beide Richtungen.
 Spalten hier: **Member** = beliebige Org-Rolle ohne Bankrolle · **Bank-MA** =
 `Bank Employee` (mit Grants) · **Bankleitung** = `Bank Management`.
 
-| Funktion (Gate)                                                                                        | Anonym | Member |  Bank-MA  | Bankleitung | Admin |
-|:-------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:-----------:|:-----:|
-| Bankbereich betreten, Dashboard, Konten **mit Grant-Zeile** sehen (`hasRole('BANK_EMPLOYEE')` + Grant) |   ❌    |   ❌    |     ✅     |      ✅      |   ✅   |
-| **Alle** Konten/Halter/Grants sehen (`hasRole('BANK_MANAGEMENT')`)                                     |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Einzahlen / Auszahlen / Transfer (`@bankSecurityService.canDeposit/Withdraw/Transfer`, je Konto-Flag)  |   ❌    |   ❌    | ✅ je Flag |      ✅      |   ✅   |
-| Konten anlegen/umbenennen/schließen/wiedereröffnen, Halter-Registry, Grants verwalten                  |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Storno (`POST /bank/transactions/{id}/reversal`, `hasRole('BANK_MANAGEMENT')`)                         |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Kontoauszug-PDF (gesehene Konten) / 3-Monats-Report (`BANK_MANAGEMENT`)                                |   ❌    |   ❌    |   ✅ / ❌   |      ✅      |   ✅   |
-| **Audit-Log** lesen (`/api/v1/bank/admin/audit`, URL- **und** Methoden-Gate `hasRole('ADMIN')`)        |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
-| **Wipe-Reset** (`/api/v1/bank/admin/wipe-reset`, `hasRole('ADMIN')`)                                   |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
+| Funktion (Gate)                                                                                                             | Anonym | Member |  Bank-MA  | Bankleitung | Admin |
+|:----------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:-----------:|:-----:|
+| Bankbereich betreten, Dashboard, Konten **mit Grant-Zeile** sehen (`hasRole('BANK_EMPLOYEE')` + Grant)                      |   ❌    |   ❌    |     ✅     |      ✅      |   ✅   |
+| **Alle** Konten/Halter/Grants sehen (`hasRole('BANK_MANAGEMENT')`)                                                          |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Einzahlen / Auszahlen / Transfer (`@bankSecurityService.canDeposit/Withdraw/Transfer`, je Konto-Flag)                       |   ❌    |   ❌    | ✅ je Flag |      ✅      |   ✅   |
+| Konten anlegen/umbenennen/schließen/wiedereröffnen, Halter-Registry, Grants verwalten                                       |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Storno (`POST /bank/transactions/{id}/reversal`, `hasRole('BANK_MANAGEMENT')`)                                              |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Kontoauszug-PDF (gesehene Konten) / 3-Monats-Report (`BANK_MANAGEMENT`)                                                     |   ❌    |   ❌    |   ✅ / ❌   |      ✅      |   ✅   |
+| **Audit-Log** lesen + Aufbewahrungs-Bereinigung (`/api/v1/bank/admin/audit`, URL- **und** Methoden-Gate `hasRole('ADMIN')`) |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
+| **Wipe-Reset** (`/api/v1/bank/admin/wipe-reset`, `hasRole('ADMIN')`)                                                        |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
 
 Die Bankleitung sieht das Audit-Log **nicht** — es ist bewusst Admin-only
 (REQ-BANK-012). Grants können nur an Nutzer mit der Rolle `Bank Employee`

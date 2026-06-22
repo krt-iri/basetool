@@ -108,6 +108,7 @@ class RefineryOrderServiceTest {
   @Mock private RefineryYieldRepository refineryYieldRepository;
   @Mock private OwnerScopeService ownerScopeService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private RefineryOrderService refineryOrderService;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
@@ -889,6 +890,7 @@ class RefineryOrderServiceTest {
       UUID userId = UUID.randomUUID();
       User user = new User();
       user.setId(userId);
+      user.setDisplayName("PII Owner Name");
       when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
       Location loc = new Location();
@@ -918,6 +920,23 @@ class RefineryOrderServiceTest {
           "client-supplied id must be nulled so save() does an INSERT, not a merge UPSERT");
       assertNull(
           captor.getValue().getVersion(), "client-supplied version must be nulled on create");
+
+      // REQ-AUDIT-001 + security fix: a refinery create records exactly one REFINERY_ORDER_CREATED,
+      // and its subjectLabel must NOT embed the owner's personal display name (the owner is
+      // captured
+      // separately as the audit row's target user). Pins the non-personal <method> · <location>
+      // label so a regression to <owner> · <location> is caught.
+      ArgumentCaptor<String> labelCaptor = ArgumentCaptor.forClass(String.class);
+      verify(auditService)
+          .record(
+              eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.REFINERY_ORDER_CREATED),
+              any(),
+              labelCaptor.capture(),
+              any(),
+              any());
+      org.junit.jupiter.api.Assertions.assertFalse(
+          labelCaptor.getValue().contains("PII Owner Name"),
+          "refinery audit subjectLabel must not contain the owner's personal name");
     }
   }
 }

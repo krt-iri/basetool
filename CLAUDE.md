@@ -17,6 +17,15 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
 - **Every change to the project updates the requirements in the same PR** — add a new
   `REQ-<AREA>-NNN` or adapt the existing one(s) it touches. Code and spec move together; a
   behaviour change with no matching spec change is incomplete.
+- **Every change to an audited area keeps its audit log in sync** — the audited areas (Bank,
+  Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen) log **every** state-mutating
+  activity (REQ-AUDIT-001, [`docs/specs/audit.md`](docs/specs/audit.md)). When you add, change or
+  remove such an activity, adapt its audit logging in the **same PR**: add or adjust the
+  `AuditEventType` and the `auditService.record(...)` call (honouring the optimistic-locking
+  landmines below and the "no user free text / no PII in the details payload" rule), extend the
+  unified viewer's per-area event-type filter and the DE/EN i18n labels, and reconcile the
+  REQ-AUDIT-001 coverage list. A new mutation in an audited area with no matching audit event is
+  incomplete.
 - **Every architecturally significant or design decision is recorded as an ADR**
   ([`docs/adr/README.md`](docs/adr/README.md)) before or with the change that implements it.
 - **Requirements must always be honoured.** Code must not silently contradict a

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -109,6 +110,7 @@ public class InventoryItemService {
   private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderItemService jobOrderItemService;
+  private final AuditService auditService;
 
   /**
    * Pools the caller's entire "My Inventory" stock into one SCU total per (material, quality) pair
@@ -644,7 +646,23 @@ public class InventoryItemService {
     item.setMission(mission);
     item.setJobOrder(jobOrder);
 
-    return inventoryItemMapper.toDto(inventoryItemRepository.save(item));
+    InventoryItem saved = inventoryItemRepository.save(item);
+    auditService.record(
+        AuditEventType.INVENTORY_ITEM_CREATED,
+        item.getId(),
+        inventoryLabel(item),
+        item.getUser().getId(),
+        "qty="
+            + item.getAmount()
+            + " q="
+            + item.getQuality()
+            + " personal="
+            + item.getPersonal()
+            + " jobOrder="
+            + jobOrderRef(item)
+            + " mission="
+            + (item.getMission() != null ? item.getMission().getName() : "-"));
+    return inventoryItemMapper.toDto(saved);
   }
 
   /**
@@ -727,7 +745,23 @@ public class InventoryItemService {
     // save() leaves the @Version increment unflushed and the mapped DTO carries the STALE version.
     // The client writes that back, and the user's NEXT in-place edit of the same row then 409s.
     // Flushing here makes the response @Version authoritative (REQ-FE-003).
-    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+    InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
+    auditService.record(
+        AuditEventType.INVENTORY_ITEM_UPDATED,
+        item.getId(),
+        inventoryLabel(item),
+        item.getUser().getId(),
+        "qty="
+            + item.getAmount()
+            + " q="
+            + item.getQuality()
+            + " personal="
+            + item.getPersonal()
+            + " jobOrder="
+            + jobOrderRef(item)
+            + " mission="
+            + (item.getMission() != null ? item.getMission().getName() : "-"));
+    return inventoryItemMapper.toDto(saved);
   }
 
   /**
@@ -805,7 +839,17 @@ public class InventoryItemService {
 
     // saveAndFlush so the response carries the post-increment @Version (see updateInventoryItem) —
     // otherwise editing a note right after an association change 409s.
-    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+    InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
+    // PII: the note body is user free text — record only its presence/length, never the content.
+    auditService.record(
+        AuditEventType.INVENTORY_ITEM_NOTE_UPDATED,
+        item.getId(),
+        inventoryLabel(item),
+        item.getUser().getId(),
+        normalizedNote == null
+            ? "note=cleared"
+            : "note=present(" + normalizedNote.length() + " chars)");
+    return inventoryItemMapper.toDto(saved);
   }
 
   /**
@@ -871,6 +915,15 @@ public class InventoryItemService {
 
     double remainingAmount = roundAmount(item.getAmount() - dto.amount());
 
+    // Snapshot the source row's scalar identity BEFORE any decrement/delete so the audit row stays
+    // accurate even when the source is depleted to zero and removed (bulk-clear landmine rules).
+    final UUID sourceId = item.getId();
+    final String sourceLabel = inventoryLabel(item);
+    final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
+    final UUID sourceOwnerId = item.getUser().getId();
+    final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
+    UUID financeEntryId = null;
+
     if (checkoutType == CheckoutType.TRANSFER
         && (dto.targetUserId() != null || dto.targetLocationId() != null)) {
       User targetUser = item.getUser();
@@ -924,6 +977,21 @@ public class InventoryItemService {
         // current within the transaction so any future in-place consumer of a transfer cannot 409.
         inventoryItemRepository.saveAndFlush(item);
       }
+      auditService.record(
+          AuditEventType.INVENTORY_ITEM_TRANSFERRED,
+          sourceId,
+          sourceLabel,
+          targetUser.getId(),
+          "material="
+              + materialName
+              + " amount="
+              + dto.amount()
+              + " toLoc="
+              + (targetLocation != null ? targetLocation.getName() : "—")
+              + " newRow="
+              + newItem.getId()
+              + " depleted="
+              + depleted);
       return inventoryItemMapper.toDto(savedNew);
     } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
       MissionParticipant participant =
@@ -947,16 +1015,99 @@ public class InventoryItemService {
               + " at "
               + dto.terminal());
       missionFinanceEntryRepository.save(entry);
+      // Read the id off the managed entity (set by save()); the dedicated capture avoids relying on
+      // the save() return value, which a unit-test mock leaves null.
+      financeEntryId = entry.getId();
     }
 
     if (remainingAmount <= QUANTITY_EPSILON) { // Floating point precision safety
       inventoryItemRepository.delete(item);
+      recordBookOutTail(
+          checkoutType,
+          sourceId,
+          sourceLabel,
+          materialName,
+          sourceOwnerId,
+          dto,
+          0.0,
+          financeEntryId);
       return null;
     } else {
       item.setAmount(remainingAmount);
       // saveAndFlush so a partial book-out's response carries the fresh @Version (see
       // updateInventoryItem) — otherwise a follow-up edit of the reduced row 409s.
-      return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+      InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
+      recordBookOutTail(
+          checkoutType,
+          sourceId,
+          sourceLabel,
+          materialName,
+          sourceOwnerId,
+          dto,
+          remainingAmount,
+          financeEntryId);
+      return inventoryItemMapper.toDto(saved);
+    }
+  }
+
+  /**
+   * Records the audit event for the consume/sell tail of {@link #bookOutInventoryItem} (the
+   * transfer branch records its own event). SELL events carry the
+   * terminal/sell-amount/finance-entry; DISCARD events carry the consumed/remaining amounts.
+   *
+   * @param type the resolved checkout type (never {@code TRANSFER} here)
+   * @param sourceId the source row id (snapshotted before a possible delete)
+   * @param sourceLabel the source row's {@code material @ location} label snapshot
+   * @param materialName the material name snapshot
+   * @param ownerId the source row owner's id
+   * @param dto the book-out request (read for terminal/sell amount)
+   * @param remaining the post-decrement amount (0 when the row was depleted)
+   * @param financeEntryId the created finance entry id for a SELL with a mission, or {@code null}
+   */
+  private void recordBookOutTail(
+      CheckoutType type,
+      UUID sourceId,
+      String sourceLabel,
+      String materialName,
+      UUID ownerId,
+      InventoryItemBookOutDto dto,
+      double remaining,
+      UUID financeEntryId) {
+    boolean rowDepleted = remaining <= QUANTITY_EPSILON;
+    if (type == CheckoutType.SELL) {
+      auditService.record(
+          AuditEventType.INVENTORY_ITEM_SOLD,
+          sourceId,
+          sourceLabel,
+          ownerId,
+          "material="
+              + materialName
+              + " amount="
+              + dto.amount()
+              + " terminal="
+              + dto.terminal()
+              + " sellAmount="
+              + dto.sellAmount()
+              + " financeEntry="
+              + (financeEntryId != null ? financeEntryId : "-")
+              + " depleted="
+              + rowDepleted);
+    } else {
+      auditService.record(
+          AuditEventType.INVENTORY_ITEM_CONSUMED,
+          sourceId,
+          sourceLabel,
+          ownerId,
+          "type="
+              + type
+              + " material="
+              + materialName
+              + " amount="
+              + dto.amount()
+              + " remaining="
+              + remaining
+              + " depleted="
+              + rowDepleted);
     }
   }
 
@@ -990,6 +1141,15 @@ public class InventoryItemService {
         removed,
         scope.adminAllScope(),
         scope.activeOrgUnitId());
+    auditService.record(
+        AuditEventType.INVENTORY_WIPED,
+        null,
+        null,
+        null,
+        "scope="
+            + (scope.adminAllScope() ? "adminAll" : "active=" + scope.activeOrgUnitId())
+            + " removed="
+            + removed);
     return removed;
   }
 
@@ -1037,6 +1197,12 @@ public class InventoryItemService {
     inventoryItemRepository.deleteAllById(toDelete);
     log.info(
         "Bulk checkout completed: {} items removed for user {}", toDelete.size(), currentUserId);
+    auditService.record(
+        AuditEventType.INVENTORY_BULK_CHECKED_OUT,
+        null,
+        null,
+        currentUserId,
+        "count=" + toDelete.size());
   }
 
   /**
@@ -1105,7 +1271,37 @@ public class InventoryItemService {
     // saveAndFlush so the response carries the flushed @Version — the material-collection delivered
     // checkbox syncs the returned version onto the row in place (no reload), so a plain save would
     // return the stale pre-flush version and a second consecutive toggle of the same row would 409.
-    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+    InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
+    auditService.record(
+        AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,
+        item.getId(),
+        inventoryLabel(item),
+        item.getUser().getId(),
+        "delivered=" + request.delivered() + " jobOrder=" + jobOrderRef(saved));
+    return inventoryItemMapper.toDto(saved);
+  }
+
+  /**
+   * Composes the audit subject label for an inventory row — {@code material @ location}, the
+   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001).
+   *
+   * @param item the inventory row (associations may be lazily loaded but are within the tx)
+   * @return the {@code material @ location} label
+   */
+  private static String inventoryLabel(InventoryItem item) {
+    String mat = item.getMaterial() != null ? item.getMaterial().getName() : "—";
+    String loc = item.getLocation() != null ? item.getLocation().getName() : "—";
+    return mat + " @ " + loc;
+  }
+
+  /**
+   * Renders an inventory row's job-order reference for an audit details payload.
+   *
+   * @param item the inventory row
+   * @return {@code #<displayId>} when linked, {@code -} otherwise
+   */
+  private static String jobOrderRef(InventoryItem item) {
+    return item.getJobOrder() != null ? "#" + item.getJobOrder().getDisplayId() : "-";
   }
 
   private Double roundAmount(Double amount) {

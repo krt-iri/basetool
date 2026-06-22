@@ -71,6 +71,7 @@ class MissionServiceSectionPatchTest {
 
   @Mock private UserRepository userRepository;
 
+  @Mock private AuditService auditService;
   @InjectMocks private MissionService missionService;
 
   private UUID missionId;

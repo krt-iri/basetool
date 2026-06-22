@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -76,6 +77,7 @@ class MissionFinanceEntryServiceTest {
   @Mock private MissionMapper missionMapper;
 
   // Constructor-injected but not exercised in these tests; declared so
+  @Mock private AuditService auditService;
   // @InjectMocks satisfies the constructor signature without an NPE.
 
   @InjectMocks private MissionFinanceEntryService service;
@@ -320,6 +322,16 @@ class MissionFinanceEntryServiceTest {
       assertEquals("note", saved.getNote());
       assertEquals(FinanceType.INCOME, saved.getType());
       assertEquals(new BigDecimal("123.45"), saved.getAmount());
+      // REQ-AUDIT-001: a finance-entry create records exactly one MISSION_FINANCE_ENTRY_CREATED.
+      verify(auditService, times(1))
+          .record(
+              eq(
+                  de.greluc.krt.profit.basetool.backend.model.AuditEventType
+                      .MISSION_FINANCE_ENTRY_CREATED),
+              any(),
+              any(),
+              any(),
+              any());
     }
   }
 

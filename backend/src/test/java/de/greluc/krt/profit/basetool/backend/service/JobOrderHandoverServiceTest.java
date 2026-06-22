@@ -62,6 +62,7 @@ class JobOrderHandoverServiceTest {
   @Mock
   private de.greluc.krt.profit.basetool.backend.repository.SquadronRepository squadronRepository;
 
+  @Mock private AuditService auditService;
   @InjectMocks private JobOrderHandoverService service;
 
   private UUID orderId;

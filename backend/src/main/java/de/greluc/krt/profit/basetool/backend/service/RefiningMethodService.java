@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import java.util.UUID;
@@ -46,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefiningMethodService {
 
   private final RefiningMethodRepository refiningMethodRepository;
+  private final AuditService auditService;
 
   /**
    * Returns cached page of refining methods.
@@ -84,7 +86,14 @@ public class RefiningMethodService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.REFINING_METHODS_CACHE, allEntries = true)
   public RefiningMethod createRefiningMethod(@NotNull RefiningMethod refiningMethod) {
-    return refiningMethodRepository.save(refiningMethod);
+    RefiningMethod saved = refiningMethodRepository.save(refiningMethod);
+    auditService.record(
+        AuditEventType.REFINERY_METHOD_CREATED,
+        saved.getId(),
+        saved.getName(),
+        null,
+        "name=" + saved.getName());
+    return saved;
   }
 
   /**
@@ -102,10 +111,18 @@ public class RefiningMethodService {
       @NotNull UUID id, @NotNull RefiningMethod refiningMethodDetails) {
     RefiningMethod refiningMethod = getRefiningMethod(id);
 
+    String previousName = refiningMethod.getName();
     refiningMethod.setName(refiningMethodDetails.getName());
     refiningMethod.setDescription(refiningMethodDetails.getDescription());
 
-    return refiningMethodRepository.save(refiningMethod);
+    RefiningMethod saved = refiningMethodRepository.save(refiningMethod);
+    auditService.record(
+        AuditEventType.REFINERY_METHOD_UPDATED,
+        saved.getId(),
+        saved.getName(),
+        null,
+        "name=" + previousName + "->" + saved.getName());
+    return saved;
   }
 
   /**
@@ -118,6 +135,8 @@ public class RefiningMethodService {
   @CacheEvict(cacheNames = CacheConfig.REFINING_METHODS_CACHE, allEntries = true)
   public void deleteRefiningMethod(@NotNull UUID id) {
     RefiningMethod refiningMethod = getRefiningMethod(id);
+    String name = refiningMethod.getName();
     refiningMethodRepository.delete(refiningMethod);
+    auditService.record(AuditEventType.REFINERY_METHOD_DELETED, id, name, null, "name=" + name);
   }
 }

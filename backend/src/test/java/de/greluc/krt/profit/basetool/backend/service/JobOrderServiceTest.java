@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
@@ -92,6 +93,7 @@ class JobOrderServiceTest {
 
   @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+  @Mock private AuditService auditService;
   @InjectMocks private JobOrderService jobOrderService;
 
   private Material material;
@@ -244,6 +246,14 @@ class JobOrderServiceTest {
     verify(jobOrderRepository, times(2)).lockAllJobOrders();
     verify(jobOrderRepository).findMaxPriority();
     verify(jobOrderRepository).save(any(JobOrder.class));
+    // REQ-AUDIT-001: a material job-order create records exactly one JOB_ORDER_CREATED audit event.
+    verify(auditService)
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_CREATED),
+            any(),
+            any(),
+            any(),
+            any());
   }
 
   @Test

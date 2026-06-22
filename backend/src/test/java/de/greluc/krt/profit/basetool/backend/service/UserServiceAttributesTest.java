@@ -108,6 +108,7 @@ class UserServiceAttributesTest {
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private UserService userService;
 
   private static final UUID USER_ID = UUID.randomUUID();

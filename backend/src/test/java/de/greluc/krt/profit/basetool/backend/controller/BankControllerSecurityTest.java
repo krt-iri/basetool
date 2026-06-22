@@ -23,12 +23,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.service.BankAccountService;
+import de.greluc.krt.profit.basetool.backend.service.BankAuditReportService;
 import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.service.BankDashboardService;
 import de.greluc.krt.profit.basetool.backend.service.BankGrantService;
@@ -72,6 +74,7 @@ class BankControllerSecurityTest {
   @MockitoBean private BankGrantService bankGrantService;
   @MockitoBean private BankDashboardService bankDashboardService;
   @MockitoBean private BankAuditService bankAuditService;
+  @MockitoBean private BankAuditReportService bankAuditReportService;
   @MockitoBean private BankSecurityService bankSecurityService;
   @MockitoBean private BankStatementReportService bankStatementReportService;
   @MockitoBean private BankManagementReportService bankManagementReportService;
@@ -265,6 +268,45 @@ class BankControllerSecurityTest {
     mockMvc
         .perform(
             post("/api/v1/bank/admin/wipe-reset")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void bankAuditPurge_management_isForbidden_admin_isAllowed() throws Exception {
+    // The retention purge is admin-only (REQ-AUDIT-004) — bank management must NOT pass the
+    // admin-only /api/v1/bank/admin/** gate.
+    mockMvc
+        .perform(
+            delete("/api/v1/bank/admin/audit")
+                .param("before", "2026-01-01T00:00:00Z")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
+        .andExpect(status().isForbidden());
+    when(bankAuditService.purgeBefore(any())).thenReturn(0);
+    mockMvc
+        .perform(
+            delete("/api/v1/bank/admin/audit")
+                .param("before", "2026-01-01T00:00:00Z")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void bankAuditExportJson_management_isForbidden_admin_isAllowed() throws Exception {
+    // The JSON export is admin-only (REQ-AUDIT-003) — bank management must NOT pass.
+    mockMvc
+        .perform(
+            get("/api/v1/bank/admin/audit/export.json")
+                .param("from", "2026-01-01T00:00:00Z")
+                .param("to", "2026-02-01T00:00:00Z")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
+        .andExpect(status().isForbidden());
+    when(bankAuditReportService.generateAuditLogJson(any(), any())).thenReturn(java.util.List.of());
+    mockMvc
+        .perform(
+            get("/api/v1/bank/admin/audit/export.json")
+                .param("from", "2026-01-01T00:00:00Z")
+                .param("to", "2026-02-01T00:00:00Z")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk());
   }

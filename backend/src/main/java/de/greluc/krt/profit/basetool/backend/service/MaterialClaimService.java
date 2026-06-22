@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
@@ -89,6 +90,7 @@ public class MaterialClaimService {
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
+  private final AuditService auditService;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
 
@@ -275,6 +277,7 @@ public class MaterialClaimService {
         .flatMap(userRepository::findById)
         .ifPresent(claim::setClaimedByUser);
 
+    boolean isNew = claim.getId() == null;
     MaterialClaim saved = materialClaimRepository.save(claim);
     // Audit (Phase 7, #347): identifiers + amount only — never names/emails. The request-scoped MDC
     // (correlationId / userId / orgUnitId) is attached by CorrelationIdFilter.
@@ -285,6 +288,23 @@ public class MaterialClaimService {
         dto.qualityRequirement(),
         dto.claimingOrgUnitId(),
         amount);
+    auditService.record(
+        AuditEventType.JOB_ORDER_CLAIM_UPSERTED,
+        order.getId(),
+        orderLabel(order),
+        null,
+        "claim="
+            + saved.getId()
+            + " material="
+            + dto.materialId()
+            + " quality="
+            + dto.qualityRequirement()
+            + " claimingOrgUnit="
+            + dto.claimingOrgUnitId()
+            + " amount="
+            + amount
+            + " mode="
+            + (isNew ? "created" : "updated"));
     return toClaimDto(saved);
   }
 
@@ -311,7 +331,23 @@ public class MaterialClaimService {
           "MaterialClaim " + claimId + " does not belong to order " + jobOrderId);
     }
     assertCanManage(order, claim.getClaimingOrgUnit().getId());
+    final UUID claimMaterialId = claim.getMaterial().getId();
+    final QualityRequirement claimQuality = claim.getQualityRequirement();
+    final UUID claimingOrgUnitId = claim.getClaimingOrgUnit().getId();
     materialClaimRepository.delete(claim);
+    auditService.record(
+        AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN,
+        order.getId(),
+        orderLabel(order),
+        null,
+        "claim="
+            + claimId
+            + " material="
+            + claimMaterialId
+            + " quality="
+            + claimQuality
+            + " claimingOrgUnit="
+            + claimingOrgUnitId);
     log.info(
         "Material claim withdrawn: order={} claim={} material={} quality={} claimingOrgUnit={}",
         jobOrderId,
@@ -329,9 +365,11 @@ public class MaterialClaimService {
    * touched.
    *
    * @param order the managed order whose claims are being withdrawn.
+   * @return the number of claims withdrawn (0 when the order had none); folded into the parent
+   *     reassignment's audit event by the caller.
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public void withdrawAllForOrderWithinTransaction(@NotNull JobOrder order) {
+  public int withdrawAllForOrderWithinTransaction(@NotNull JobOrder order) {
     List<MaterialClaim> claims =
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId());
     if (!claims.isEmpty()) {
@@ -341,6 +379,7 @@ public class MaterialClaimService {
           claims.size(),
           order.getId());
     }
+    return claims.size();
   }
 
   /**
@@ -358,9 +397,11 @@ public class MaterialClaimService {
    * the bulk withdrawal free of the optimistic-locking traps in CLAUDE.md.
    *
    * @param order the managed order whose buckets define which claims survive.
+   * @return the number of orphaned claims withdrawn (0 when none); folded into the parent edit's
+   *     audit event by the caller.
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public void withdrawOrphanedClaimsWithinTransaction(@NotNull JobOrder order) {
+  public int withdrawOrphanedClaimsWithinTransaction(@NotNull JobOrder order) {
     Map<Bucket, Double> required = requiredByBucket(order);
     List<MaterialClaim> orphaned =
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId()).stream()
@@ -376,6 +417,7 @@ public class MaterialClaimService {
           orphaned.size(),
           order.getId());
     }
+    return orphaned.size();
   }
 
   /**
@@ -587,5 +629,16 @@ public class MaterialClaimService {
    */
   private static double round3(double value) {
     return Math.round(value * 1000.0) / 1000.0;
+  }
+
+  /**
+   * Composes the audit subject label for the claim's parent order — {@code #<displayId>
+   * '<handle>'}.
+   *
+   * @param order the parent order
+   * @return the {@code #<displayId> '<handle>'} label
+   */
+  private static String orderLabel(JobOrder order) {
+    return "#" + order.getDisplayId() + " '" + order.getHandle() + "'";
   }
 }

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexRefineryYieldDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexRefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
@@ -56,6 +57,7 @@ public class UexRefinerySyncService {
   private final RefineryYieldRepository refineryYieldRepository;
   private final MaterialRepository materialRepository;
   private final TerminalRepository terminalRepository;
+  private final AuditService auditService;
 
   /**
    * Syncs the {@code refining_method} table from UEX. Rows are upserted by name. Empty response or
@@ -103,6 +105,14 @@ public class UexRefinerySyncService {
       }
     }
     log.info("Finished UEX Refining Methods sync: {} added, {} updated", added, updated);
+    // System-actor summary event (one per run, never per row); actor resolves to "system" as no
+    // security context exists on the scheduled path.
+    auditService.record(
+        AuditEventType.REFINERY_METHODS_SYNCED,
+        null,
+        null,
+        null,
+        "source=UEX added=" + added + " updated=" + updated);
   }
 
   /**
@@ -147,5 +157,11 @@ public class UexRefinerySyncService {
       processed++;
     }
     log.info("Finished UEX Refinery Yields sync: Processed {} yields", processed);
+    auditService.record(
+        AuditEventType.REFINERY_YIELDS_SYNCED,
+        null,
+        null,
+        null,
+        "source=UEX processed=" + processed);
   }
 }

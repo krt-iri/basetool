@@ -81,6 +81,17 @@ public enum BankAuditEventType {
   MANAGEMENT_REPORT_EXPORTED,
 
   /**
+   * The bank audit log itself was exported as a PDF or JSON for a period (REQ-AUDIT-001 viewer).
+   */
+  AUDIT_LOG_EXPORTED,
+
+  /**
+   * Bank audit rows older than an admin-chosen cutoff were purged for retention (REQ-AUDIT-004).
+   * The purge itself is recorded (this event survives, being newer than the cutoff).
+   */
+  AUDIT_LOG_PURGED,
+
+  /**
    * An org-unit officer/lead raised a confirm-before-post booking request (REQ-BANK-022). Audited
    * on creation while still off-ledger (PENDING), before any money moves.
    */
