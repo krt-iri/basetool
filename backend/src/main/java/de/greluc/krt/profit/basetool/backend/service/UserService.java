@@ -382,6 +382,22 @@ public class UserService {
       changed = true;
     }
 
+    // Persist the Discord account link discovered out-of-band via the Keycloak Admin API
+    // (/federated-identity, see KeycloakService#fetchDiscordFederatedId). This is what surfaces the
+    // link for accounts that linked Discord AFTER creation — the import-time token claim only
+    // covers
+    // accounts that registered via Discord (REQ-DATA-006). Like syncUser(Jwt) this only SETS the
+    // link, never clears it: the federated-identity fetch is best-effort and returns null on any
+    // failure, so clearing on a null would wrongly wipe a real link on a transient Admin-API
+    // hiccup.
+    String discordUserId = dto.discordUserId();
+    if (discordUserId != null
+        && !discordUserId.isBlank()
+        && !Objects.equals(user.getDiscordUserId(), discordUserId)) {
+      user.setDiscordUserId(discordUserId);
+      changed = true;
+    }
+
     // Fail-safe approval default (REQ-SEC-017), mirroring syncUser(Jwt). A brand-new non-admin user
     // first discovered by the scheduled reconciliation lands PENDING, so the scheduler can never
     // pre-create an ACTIVE row that a later interactive login would inherit (created == false) and
