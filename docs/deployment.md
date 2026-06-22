@@ -242,18 +242,27 @@ It is safe by construction: all persistent production data lives in `/var/iri/..
 bind mounts, which the Docker daemon does not manage and `docker volume prune`
 cannot touch.
 
+The job runs as the **`deploy`** user (not root), consistent with `deploy.sh`
+and the `iri-deploy.timer` pipeline — `deploy` is in the `docker` group, so it
+can reach the Docker socket. The drop-in sets `DOCKER_CONFIG=/var/lib/iri/.docker`
+because `deploy` has no usable `$HOME` (`--no-create-home`), the same reason
+`deploy.sh` pins it.
+
 Preview what it would reclaim, then install the weekly cron (Saturday 02:00 UTC):
 
 ```bash
-sudo /var/iri/code/scripts/docker-cleanup.sh --dry-run        # show plan + disk usage
+sudo -u deploy /var/iri/code/scripts/docker-cleanup.sh --dry-run   # show plan + disk usage
 
 sudo cp /var/iri/code/scripts/docker-cleanup.cron      /etc/cron.d/iri-docker-cleanup
 sudo cp /var/iri/code/scripts/docker-cleanup.logrotate /etc/logrotate.d/iri-docker-cleanup
 sudo chmod 0644 /etc/cron.d/iri-docker-cleanup
 
+sudo chown deploy:deploy /var/iri/code/scripts/docker-cleanup.sh   # owner = deploy
+sudo chmod 0750          /var/iri/code/scripts/docker-cleanup.sh   # rwx for deploy, none for others
+
 sudo touch /var/log/iri-docker-cleanup.log
-sudo chown root:adm /var/log/iri-docker-cleanup.log
-sudo chmod 0640     /var/log/iri-docker-cleanup.log
+sudo chown deploy:adm /var/log/iri-docker-cleanup.log
+sudo chmod 0640       /var/log/iri-docker-cleanup.log
 ```
 
 The `CRON_TZ=UTC` line in the drop-in pins the schedule to UTC regardless of the
