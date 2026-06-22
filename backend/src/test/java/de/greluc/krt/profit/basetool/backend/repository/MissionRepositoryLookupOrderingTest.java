@@ -70,7 +70,7 @@ class MissionRepositoryLookupOrderingTest {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     Squadron squadron = new Squadron();
     squadron.setName("Lookup-Order-" + tag);
-    squadron.setShorthand("LO" + tag.substring(0, 3));
+    squadron.setShorthand("LO" + tag);
     OrgUnit owner = squadronRepository.save(squadron);
 
     UUID newestId = saveMission(owner, "Zulu", Instant.parse("2026-03-01T00:00:00Z"));
@@ -102,7 +102,7 @@ class MissionRepositoryLookupOrderingTest {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     Squadron squadron = new Squadron();
     squadron.setName("Next-Status-" + tag);
-    squadron.setShorthand("NS" + tag.substring(0, 3));
+    squadron.setShorthand("NS" + tag);
     OrgUnit owner = squadronRepository.save(squadron);
 
     Instant lowerBound = Instant.parse("2099-01-01T00:00:00Z");
@@ -130,8 +130,8 @@ class MissionRepositoryLookupOrderingTest {
   @Test
   void findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    OrgUnit mine = newSquadron("Scoped-Mine-" + tag, "SM" + tag.substring(0, 3));
-    OrgUnit foreign = newSquadron("Scoped-Foreign-" + tag, "SF" + tag.substring(0, 3));
+    OrgUnit mine = newSquadron("Scoped-Mine-" + tag, "SM" + tag);
+    OrgUnit foreign = newSquadron("Scoped-Foreign-" + tag, "SF" + tag);
 
     Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
     // Foreign public mission with the globally-earliest start — must be excluded by scope.
@@ -176,7 +176,7 @@ class MissionRepositoryLookupOrderingTest {
   @Test
   void findNextScopedMission_allowInternalFalse_excludesOwnInternalMission() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    OrgUnit mine = newSquadron("Scoped-Int-" + tag, "SI" + tag.substring(0, 3));
+    OrgUnit mine = newSquadron("Scoped-Int-" + tag, "SI" + tag);
 
     Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
     // Earlier but internal — excluded when allowInternal=false, returned when true.

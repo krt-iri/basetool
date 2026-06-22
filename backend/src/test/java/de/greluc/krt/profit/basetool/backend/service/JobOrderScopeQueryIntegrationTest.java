@@ -83,9 +83,9 @@ class JobOrderScopeQueryIntegrationTest {
     transactionTemplate.executeWithoutResult(
         status -> {
           String tag = UUID.randomUUID().toString().substring(0, 8);
-          Squadron sqA = newSquadron("Scope-A-" + tag, "A" + tag.substring(0, 3));
-          Squadron sqB = newSquadron("Scope-B-" + tag, "B" + tag.substring(0, 3));
-          SpecialCommand sk = newSpecialCommand("Scope-SK-" + tag, "S" + tag.substring(0, 3));
+          Squadron sqA = newSquadron("Scope-A-" + tag, "A" + tag);
+          Squadron sqB = newSquadron("Scope-B-" + tag, "B" + tag);
+          SpecialCommand sk = newSpecialCommand("Scope-SK-" + tag, "S" + tag);
           squadronAId = sqA.getId();
           squadronBId = sqB.getId();
           skId = sk.getId();
@@ -158,14 +158,14 @@ class JobOrderScopeQueryIntegrationTest {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     Squadron profit = new Squadron();
     profit.setName("Profit-" + tag);
-    profit.setShorthand("P" + tag.substring(0, 3));
+    profit.setShorthand("P" + tag);
     profit.setProfitEligible(true);
     Squadron nonProfit = new Squadron();
     nonProfit.setName("NonProfit-" + tag);
-    nonProfit.setShorthand("N" + tag.substring(0, 3));
+    nonProfit.setShorthand("N" + tag);
     SpecialCommand profitSk = new SpecialCommand();
     profitSk.setName("ProfitSK-" + tag);
-    profitSk.setShorthand("X" + tag.substring(0, 3));
+    profitSk.setShorthand("X" + tag);
     profitSk.setProfitEligible(true);
     UUID profitId = squadronRepository.save(profit).getId();
     UUID nonProfitId = squadronRepository.save(nonProfit).getId();
