@@ -20,44 +20,59 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The current balance of one org-unit bank account, exposed to an officer or lead who oversees that
- * org unit (REQ-BANK-021, F1). Deliberately balance-only: it carries the account's identity (so the
- * frontend can label the card and target a booking request against the org unit) and its current
- * balance, but never the transaction history, the holder distribution or the audit trail — those
- * stay a bank-staff surface. One instance is produced per overseen org unit that actually owns an
- * account; org units without an account are simply absent from the list.
+ * The current balance of one bank account visible on the org-unit bank page (REQ-BANK-021/-028,
+ * F1). Deliberately balance-only: it carries the account's identity (so the frontend can label the
+ * card and target a booking request against the org unit) and its current balance, but never the
+ * transaction history, the holder distribution or the audit trail — those stay a bank-staff
+ * surface.
  *
- * @param accountId the org-unit account's id (the caller's own account; used to key the F2 request
- *     form, never to reach a staff endpoint)
+ * <p>Two flavours share this shape. Most instances describe an <b>org-unit account</b> (the
+ * caller's own-level account or a subordinate one reached by the cascading view); for those the
+ * {@code orgUnit*} fields are populated. Since REQ-BANK-028 a Bereich/OL overseer additionally sees
+ * the cartel-wide <b>special accounts</b> (Sonderkonten, {@link BankAccountType#SPECIAL}); those
+ * belong to no org unit, so their {@code orgUnitId}/{@code orgUnitName}/{@code orgUnitKind} are
+ * {@code null}, {@code canRequest} is always {@code false} (view-only), and the frontend labels the
+ * card by {@link #type} instead of the org-unit shorthand. Only {@link BankAccountStatus#ACTIVE}
+ * accounts are ever listed (REQ-BANK-028).
+ *
+ * @param accountId the account's id (for an own-level org-unit account it keys the F2 request form;
+ *     never used to reach a staff endpoint)
  * @param accountNo the human-readable {@code KB-<n>} account number
  * @param accountName the account's display name
- * @param status the account lifecycle status (ACTIVE / CLOSED)
- * @param orgUnitId the owning org unit's id
- * @param orgUnitName the owning org unit's long-form name
- * @param orgUnitShorthand the owning org unit's 3–5 letter shorthand, or {@code null} for a legacy
- *     row without one
+ * @param status the account lifecycle status (always {@link BankAccountStatus#ACTIVE} here — closed
+ *     accounts are filtered out, REQ-BANK-028)
+ * @param type the account type ({@code ORG_UNIT} / {@code AREA} / {@code CARTEL} / {@code
+ *     SPECIAL}); lets the frontend label a special account (Sonderkonto) that carries no org-unit
+ *     identity
+ * @param orgUnitId the owning org unit's id, or {@code null} for a special account (Sonderkonto)
+ * @param orgUnitName the owning org unit's long-form name, or {@code null} for a special account
+ * @param orgUnitShorthand the owning org unit's 3–5 letter shorthand, or {@code null} for a special
+ *     account or a legacy org-unit row without one
  * @param orgUnitKind the owning org unit's kind (SQUADRON / SPECIAL_COMMAND / BEREICH /
- *     ORGANISATIONSLEITUNG), for styling
+ *     ORGANISATIONSLEITUNG), or {@code null} for a special account
  * @param balance the account's current balance in whole aUEC (compute-on-read, ADR-0010)
- * @param canRequest {@code true} iff this is the caller's <em>own-level</em> account, so the F2
- *     booking-request affordance applies (epic #692 Phase 6, owner decision Q4). {@code false} for
- *     a subordinate account reached through the cascading view — those are view-only, and the
- *     backend rejects a request against them.
+ * @param canRequest {@code true} iff this is the caller's <em>own-level</em> org-unit account, so
+ *     the F2 booking-request affordance applies (epic #692 Phase 6, owner decision Q4). {@code
+ *     false} for a subordinate account reached through the cascading view <em>and</em> for every
+ *     special account (Sonderkonto) — those are view-only, and the backend rejects a request
+ *     against them.
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
     String accountNo,
     String accountName,
     BankAccountStatus status,
-    UUID orgUnitId,
-    String orgUnitName,
+    BankAccountType type,
+    @Nullable UUID orgUnitId,
+    @Nullable String orgUnitName,
     @Nullable String orgUnitShorthand,
-    OrgUnitKind orgUnitKind,
+    @Nullable OrgUnitKind orgUnitKind,
     BigDecimal balance,
     boolean canRequest) {}

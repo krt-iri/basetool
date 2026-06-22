@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
@@ -61,7 +63,9 @@ import org.springframework.transaction.annotation.Transactional;
  *       oversees their own Staffel; an SK lead the SK(s) they lead; a Bereichsleitung its Bereich's
  *       AREA account <em>and</em> every child Staffel/SK account; an OL member the CARTEL account
  *       plus every AREA/ORG_UNIT account; an admin all (or the pinned one). A plain member resolves
- *       to an empty scope and sees nothing.
+ *       to an empty scope and sees nothing. On top of that, a Bereich/OL overseer (or admin)
+ *       additionally sees the cartel-wide <b>special accounts</b> (Sonderkonten, REQ-BANK-028),
+ *       view-only, since those belong to no org unit. Only active accounts are listed.
  *   <li><b>F2 request — own-level only</b> ({@link
  *       OwnerScopeService#currentOwnLevelOversightScope()}): the same callers may raise a
  *       confirm-before-post request only against their <em>own-level</em> account (officer →
@@ -80,55 +84,86 @@ public class OrgUnitBankAccessService {
   private final BankBookingRequestService bankBookingRequestService;
 
   /**
-   * Lists the current balance of every bank account the caller oversees (REQ-BANK-021, F1).
+   * Lists the current balance of every bank account the caller may view on the org-unit bank page
+   * (REQ-BANK-021/-027/-028, F1).
    *
-   * <p>Resolves the caller's <em>cascading</em> oversight scope ({@link
-   * OwnerScopeService#currentOversightScope()}) and keeps only the accounts whose owning org unit
-   * that scope permits. Since epic #692 Phase 6 (REQ-ORG-019) the owning org unit is the uniform
-   * {@code org_unit_id} FK across all linked account kinds — a Staffel/SK for {@code ORG_UNIT}, the
-   * Bereich for {@code AREA}, the Organisationsleitung for {@code CARTEL} — so a Bereichsleitung
-   * sees its AREA account <em>and</em> every child Staffel/SK account, and an OL member sees the
-   * CARTEL account plus every AREA and ORG_UNIT account, all through the same filter with no
-   * per-kind branching. Strict silo holds: the cascade only contributes the caller's own subtree,
-   * so a foreign Bereich's accounts are never matched. Legacy {@code area_name}-only AREA accounts
-   * (no FK) carry no owning org unit and are excluded.
+   * <p>Two visibility rules combine into the listed set, and only {@link BankAccountStatus#ACTIVE}
+   * accounts are ever included — closed accounts are filtered out so the page shows live accounts
+   * only (REQ-BANK-028):
+   *
+   * <ul>
+   *   <li><b>Org-unit accounts by the cascading oversight scope</b> ({@link
+   *       OwnerScopeService#currentOversightScope()}): keeps the accounts whose owning org unit the
+   *       scope permits. Since epic #692 Phase 6 (REQ-ORG-019) the owning org unit is the uniform
+   *       {@code org_unit_id} FK across all linked account kinds — a Staffel/SK for {@code
+   *       ORG_UNIT}, the Bereich for {@code AREA}, the Organisationsleitung for {@code CARTEL} — so
+   *       a Bereichsleitung sees its AREA account <em>and</em> every child Staffel/SK account, and
+   *       an OL member sees the CARTEL account plus every AREA and ORG_UNIT account, all through
+   *       the same filter with no per-kind branching. Strict silo holds: the cascade only
+   *       contributes the caller's own subtree, so a foreign Bereich's accounts are never matched.
+   *       Legacy {@code area_name}-only AREA accounts (no FK) carry no owning org unit and are
+   *       excluded.
+   *   <li><b>Cartel-wide special accounts (Sonderkonten) for Bereich/OL overseers</b>
+   *       (REQ-BANK-028): a caller who holds a Bereich- or OL-level oversight seat (or an admin)
+   *       additionally sees every {@code SPECIAL} account — these belong to no org unit, so they
+   *       are added by type, not by scope. They are strictly <b>view-only</b>: {@code canRequest}
+   *       is always {@code false} and the F2 create path rejects them (no owning org unit to
+   *       scope). Officers and SK leads (no Bereich/OL seat) do not see special accounts.
+   * </ul>
    *
    * <p>The balance is the compute-on-read posting sum (ADR-0010), fetched for all matched accounts
    * in a single grouped query (no N+1). The result is balance-only — no history, no holders, no
-   * audit — and excludes overseen org units that own no account. A caller with no oversight scope
-   * (plain member) receives an empty list rather than an error, so the endpoint never leaks the
-   * existence of accounts the caller may not see.
+   * audit. A caller who can see nothing (plain member) receives an empty list rather than an error,
+   * so the endpoint never leaks the existence of accounts the caller may not see.
    *
-   * @return the overseen account balances, ordered by account number; never {@code null}, empty
-   *     when the caller oversees no org unit that owns an account
+   * @return the visible account balances, ordered by account number; never {@code null}, empty when
+   *     the caller may view no active account
    */
   @NotNull
   @Transactional(readOnly = true)
   public List<OrgUnitBankBalanceDto> listOverseenOrgUnitBalances() {
     var scope = ownerScopeService.currentOversightScope();
-    List<BankAccount> overseen =
+    boolean canViewSpecialAccounts = ownerScopeService.currentUserHasAreaOrOlOversight();
+    List<BankAccount> visible =
         bankAccountRepository.findAllByOrderByAccountNoAsc().stream()
-            .filter(account -> account.getOrgUnit() != null)
-            .filter(account -> scope.permits(account.getOrgUnit().getId()))
+            .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
+            .filter(
+                account ->
+                    isOverseenOrgUnitAccount(account, scope)
+                        || (canViewSpecialAccounts && account.getType() == BankAccountType.SPECIAL))
             .toList();
-    if (overseen.isEmpty()) {
+    if (visible.isEmpty()) {
       return List.of();
     }
-    // The own-level (non-cascading) scope decides which of the overseen accounts the caller may
-    // also
+    // The own-level (non-cascading) scope decides which of the visible accounts the caller may also
     // raise a booking request against (F2, owner decision Q4): their own-level account is
     // requestable
-    // while subordinate accounts reached by the cascade above are view-only.
+    // while subordinate accounts reached by the cascade and the view-only special accounts are not.
     var requestScope = ownerScopeService.currentOwnLevelOversightScope();
-    Map<UUID, BigDecimal> balances = balancesByAccountId(overseen);
-    return overseen.stream()
+    Map<UUID, BigDecimal> balances = balancesByAccountId(visible);
+    return visible.stream()
         .map(
             account ->
                 toDto(
                     account,
                     balances.getOrDefault(account.getId(), BigDecimal.ZERO),
-                    requestScope.permits(account.getOrgUnit().getId())))
+                    account.getOrgUnit() != null
+                        && requestScope.permits(account.getOrgUnit().getId())))
         .toList();
+  }
+
+  /**
+   * {@code true} iff the account is an org-unit account whose owning org unit the caller's
+   * cascading oversight scope permits. A special account (no owning org unit) is never matched here
+   * — those are admitted separately, by type, for Bereich/OL overseers (REQ-BANK-028).
+   *
+   * @param account the candidate account
+   * @param scope the caller's cascading oversight scope
+   * @return {@code true} iff the account has an owning org unit the scope permits
+   */
+  private static boolean isOverseenOrgUnitAccount(
+      @NotNull BankAccount account, @NotNull ScopePredicate scope) {
+    return account.getOrgUnit() != null && scope.permits(account.getOrgUnit().getId());
   }
 
   /**
@@ -213,13 +248,18 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Projects one overseen account and its resolved balance into the balance-only wire shape.
+   * Projects one visible account and its resolved balance into the balance-only wire shape. Handles
+   * both flavours: an org-unit account (its {@code orgUnit} is non-null, the fields are populated)
+   * and a special account (Sonderkonto, REQ-BANK-028) whose {@code orgUnit} is {@code null}, in
+   * which case the org-unit fields are emitted as {@code null} and the frontend labels the card by
+   * {@link BankAccount#getType()}.
    *
-   * @param account the org-unit account (its {@code orgUnit} is non-null by the list filter)
+   * @param account the visible account
    * @param balance the account's resolved balance, zero when it has no postings
-   * @param canRequest {@code true} iff the account is the caller's own-level account (the F2
-   *     request affordance applies); {@code false} for a view-only subordinate account
-   * @return the balance-only DTO for the account's owning org unit
+   * @param canRequest {@code true} iff the account is the caller's own-level org-unit account (the
+   *     F2 request affordance applies); {@code false} for a view-only subordinate or special
+   *     account
+   * @return the balance-only DTO for the account
    */
   @NotNull
   private OrgUnitBankBalanceDto toDto(
@@ -230,10 +270,11 @@ public class OrgUnitBankAccessService {
         account.getAccountNo(),
         account.getName(),
         account.getStatus(),
-        orgUnit.getId(),
-        orgUnit.getName(),
-        orgUnit.getShorthand(),
-        orgUnit.getKind(),
+        account.getType(),
+        orgUnit == null ? null : orgUnit.getId(),
+        orgUnit == null ? null : orgUnit.getName(),
+        orgUnit == null ? null : orgUnit.getShorthand(),
+        orgUnit == null ? null : orgUnit.getKind(),
         balance,
         canRequest);
   }

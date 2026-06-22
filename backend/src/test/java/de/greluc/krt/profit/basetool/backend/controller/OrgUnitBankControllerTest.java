@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -64,6 +65,7 @@ class OrgUnitBankControllerTest {
             "KB-0001",
             "IRIDIUM",
             BankAccountStatus.ACTIVE,
+            BankAccountType.ORG_UNIT,
             UUID.randomUUID(),
             "IRIDIUM",
             "IRI",

@@ -82,6 +82,7 @@ class OrgUnitBankPageControllerMvcTest {
             "KB-0001",
             "Staffel IRIDIUM",
             "ACTIVE",
+            "ORG_UNIT",
             orgUnitId,
             "IRIDIUM",
             "IRI",
@@ -150,5 +151,38 @@ class OrgUnitBankPageControllerMvcTest {
   @WithMockUser(roles = {"SQUADRON_MEMBER"})
   void orgUnitBank_plainMemberIsForbidden() throws Exception {
     mockMvc.perform(get("/org-unit-bank")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = {"LOGISTICIAN"})
+  void orgUnitBank_specialAccountRendersViewOnlyWithoutRequestButton() throws Exception {
+    // REQ-BANK-028: a special account (Sonderkonto) carries no org-unit identity, is view-only and
+    // must not offer the booking-request button. Pins that the template handles the null org unit.
+    OrgUnitBankBalanceDto special =
+        new OrgUnitBankBalanceDto(
+            UUID.randomUUID(),
+            "KB-0042",
+            "Event Sonderkonto",
+            "ACTIVE",
+            "SPECIAL",
+            null,
+            null,
+            null,
+            null,
+            new BigDecimal("250000"),
+            false);
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(special));
+    when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("Event Sonderkonto")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-viewonly")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-btn"))));
   }
 }
