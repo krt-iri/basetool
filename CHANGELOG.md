@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.9](https://github.com/krt-profit/basetool/releases/tag/v0.7.9) - 2026-06-22
+
 ### Added
 
 - **Die Seite „Bank meiner Org-Einheit" zeigt pro Konto jetzt den 30-Tage-Trend** — die vorzeichenfarbige Veränderung der letzten 30 Tage plus ein kompaktes Verlaufsdiagramm (Sparkline), genau wie in der Bankübersicht. Reine Anzeige; Buchungshistorie, Halter und Audit bleiben weiterhin der Bank vorbehalten.
