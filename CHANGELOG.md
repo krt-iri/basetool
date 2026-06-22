@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Der Discord-Server-Nickname wird bei der Freigabe-Entscheidung angezeigt.** Die Admin-Liste „Discord-Registrierungen" zeigt jetzt neben dem Namen den serverspezifischen Discord-Nickname (den „Nick" im Kartell-Server), damit eine neue Anmeldung der Person leichter zugeordnet werden kann. Die Erfassung läuft beim Login über Discord, dient nur der Anzeige und ist ausschließlich für Admins sichtbar; ist kein Nickname gesetzt (oder die Erfassung nicht eingerichtet), erscheint ein gedämpfter Strich. Setzt eine einmalige Keycloak-Einrichtung voraus (Umgebungsvariable `DISCORD_GUILD_ID` plus zwei Mapper, siehe Runbook).
+
 ## [v0.7.6](https://github.com/krt-profit/basetool/releases/tag/v0.7.6) - 2026-06-21
 
 ### Added

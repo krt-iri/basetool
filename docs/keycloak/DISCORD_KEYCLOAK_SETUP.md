@@ -105,6 +105,49 @@ The backend reads this `discord_user_id` claim and persists it on `app_user` (RE
 > Discord user still passes the membership gate (step 4) but is created `ACTIVE` and skips admin
 > approval — so do not skip 3a/3b.
 
+### 3c. (Optional) Capture the per-guild server nickname for the approval queue
+
+To show each pending user's **das-kartell server nickname** in the admin approval queue
+(REQ-DATA-008), capture the Discord `nick` and carry it into a token claim, mirroring
+`discord_user_id`. This is **optional and fail-open** — skip it and the nickname column simply stays
+empty; it never affects the login or the membership gate.
+
+1. **Provide the guild id.** The nickname comes from the guild-member call, so the identity provider
+   (the SPI inside Keycloak) needs the das-kartell guild id. It is **already wired** into the
+   **Keycloak** service in `docker-compose.yml` as `DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}` (the
+   `:-` makes it optional — unset disables nickname capture, fail-open), so you only set the value
+   in `.env` (it is **not** a secret — any guild member can read it):
+
+   ```dotenv
+   # .env (repo root) — gitignored, never committed
+   DISCORD_GUILD_ID=<das-kartell guild id>   # same value as the gate's Guild ID (step 4.3)
+   ```
+
+   > **`.env` alone is not enough for a *new* variable.** Compose uses `.env` only to interpolate
+   > `${...}` references that already exist in a service's `environment:` block — it does not inject
+   > `.env` keys into containers by itself. `DISCORD_GUILD_ID` is pre-wired here, so setting it in
+   > `.env` suffices; a brand-new variable would also need its `environment:` reference added.
+
+   Restart Keycloak to pick up the change.
+
+2. **Attribute importer mapper.** On the Discord IdP → **Mappers** → **Add mapper**:
+
+   - **Name:** `discord-guild-nickname`
+   - **Mapper type:** *Attribute Importer*
+   - **Social Profile JSON Field Path:** `guild_nick` *(the synthetic field the provider injects)*
+   - **User Attribute Name:** `discord_guild_nickname`
+   - **Sync Mode Override:** **Force** *(so the nickname refreshes on every login, not only the first)*
+3. **Carry it into the token.** Realm `iri` → **Clients → `basetool-frontend` → Client scopes →
+   `basetool-frontend-dedicated` → Add mapper → By configuration → User Attribute**:
+   - **Name:** `discord_guild_nickname`
+   - **User Attribute:** `discord_guild_nickname`
+   - **Token Claim Name:** `discord_guild_nickname`
+   - **Add to ID token / access token / userinfo:** ON · **Claim JSON Type:** String
+
+The backend reads the `discord_guild_nickname` claim and persists it on `app_user` for display in the
+approval queue. Discord caps a server nickname at 32 characters; the SPI and backend bound it
+defensively.
+
 ---
 
 ## 4. Bind the fail-closed membership gate (the safety property)
@@ -134,6 +177,8 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 - A Discord account **in** das-kartell **with** KRT-Mitglied → federation completes, lands the user
   PENDING (admin approval required, T1.3), and writes `discord_user_id`.
 - A Discord account **not** in the guild, or **without** KRT-Mitglied → login denied, no session.
+- If the optional nickname capture (§3c) is configured, the admin approval queue shows the user's
+  das-kartell server nickname; otherwise that column stays blank (the login is unaffected either way).
 - Keycloak/SPI logs contain **no** Discord ids, tokens or profile payloads.
 - Username/password login is unchanged.
 - The Discord consent screen is shown only on the **first** authorization; subsequent logins skip it

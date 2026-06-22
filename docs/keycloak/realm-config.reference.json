@@ -136,6 +136,19 @@
             "id.token.claim": "true",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "discord_guild_nickname",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "discord_guild_nickname",
+            "claim.name": "discord_guild_nickname",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
         }
       ],
       "defaultClientScopes": [

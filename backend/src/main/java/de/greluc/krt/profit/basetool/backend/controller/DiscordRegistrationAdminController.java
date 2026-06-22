@@ -104,6 +104,10 @@ public class DiscordRegistrationAdminController {
 
   private PendingRegistrationDto toDto(User user) {
     return new PendingRegistrationDto(
-        user.getId(), user.getEffectiveName(), user.getCreatedAt(), user.getVersion());
+        user.getId(),
+        user.getEffectiveName(),
+        user.getDiscordGuildNickname(),
+        user.getCreatedAt(),
+        user.getVersion());
   }
 }

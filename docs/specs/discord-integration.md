@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-22.
 > **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0031 (role/unit sync, planned — Track 2)
 
 # Discord integration — login, membership gate & admin approval
@@ -163,6 +163,42 @@ or PII in the payload), via the existing data-driven notification rule engine (a
 - [ ] Exactly one notification per admin, end to end. _(notification engine; T1.4 e2e.)_
 
 **Enforced by:** `DiscordRegistrationPendingEvent` (no PII by construction) + `V174` seed; the rule-engine fan-out is covered by the epic-#622 tests · **Code:** `UserService.syncUser`, `DiscordRegistrationPendingEvent`, `V174` · **Issues:** #724
+
+### REQ-DATA-008 — Discord guild nickname captured at login & shown at approval (admin-only)
+
+To let an admin recognise who a pending Discord registration actually is, Basetool captures the
+user's **per-guild server nickname** — the Discord `nick` they carry inside the `das-kartell` guild,
+distinct from the global `username` / `global_name` — and shows it beside the name in the admin
+registration-approval queue. The `app_user.discord_guild_nickname` column (nullable, `VARCHAR(255)`)
+holds it. Capture is **best-effort and fail-open**: `DiscordIdentityProvider` fetches the
+guild-member object (`GET /users/@me/guilds/{guildId}/member`, guild id from the `DISCORD_GUILD_ID`
+env var, scope `guilds.members.read`), injects the `nick` into the brokered profile JSON under
+`guild_nick`, and a Keycloak Attribute Importer + protocol mapper carry it into the
+`discord_guild_nickname` token claim (mirroring `discord_user_id`); the backend persists it in
+`UserService.syncUser`. Any failure — no nickname set, capture mappers absent, env var unset, Discord
+error/timeout — simply leaves it `null`; it must **never** block or delay the login, in deliberate
+contrast to the fail-closed membership gate (REQ-SEC-016). It refreshes on every Discord login
+(mapper sync mode FORCE). It is **display-only** (grants nothing), **admin-only** (carried solely in
+the approval-queue `PendingRegistrationDto`, never in any shared `UserDto`), and **never logged** (it
+is a name — REQ-OBS).
+
+**Acceptance**
+
+- [ ] `app_user.discord_guild_nickname` exists: nullable `VARCHAR(255)` (V178); `ddl-auto: validate`
+  boots clean against the migration.
+- [x] The Keycloak SPI reads `nick` best-effort and **fails open** — a Discord error/timeout or an
+  absent nickname yields no value and never breaks the login (`DiscordGuildNicknameReaderTest`).
+- [x] `UserService.syncUser(Jwt)` persists a non-blank `discord_guild_nickname` claim (trimmed,
+  length-bounded) and leaves the field `null` when the claim is absent (`UserServiceDiscordSyncTest`).
+- [x] The admin approval queue renders the captured nickname beside the name; a registration with no
+  captured nickname falls back to a muted em-dash (`AdminDiscordRegistrationsNicknameRenderTest`).
+- [x] The nickname rides only the admin-only `PendingRegistrationDto` — never added to any shared
+  `UserDto`, so it is never exposed to non-admins.
+- [ ] Operator: the `DISCORD_GUILD_ID` env var and the two Keycloak mappers (Attribute Importer
+  `guild_nick` → `discord_guild_nickname`, sync mode FORCE; the `discord_guild_nickname` protocol
+  mapper) are configured per the runbook. If absent, the column stays `null` (graceful no-op).
+
+**Enforced by:** `DiscordGuildNicknameReaderTest` (keycloak-spi fail-open matrix) · `UserServiceDiscordSyncTest` (claim persisted / absent) · `AdminDiscordRegistrationsNicknameRenderTest` (frontend column) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) · `MessageBundleConsistencyTest` (key parity) · **Code:** `DiscordIdentityProvider`, `DiscordGuildNicknameReader`, `User`, `V178__add_discord_guild_nickname_to_app_user.sql`, `UserService.syncUser`, `PendingRegistrationDto` (backend + frontend), `DiscordRegistrationAdminController`, `admin/discord-registrations.html` · **Issues:** #720
 
 ## Out of scope
 

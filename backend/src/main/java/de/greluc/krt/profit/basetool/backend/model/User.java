@@ -122,6 +122,20 @@ public class User extends AbstractEntity<UUID> {
   private String discordUserId;
 
   /**
+   * The user's per-guild Discord server nickname (the {@code nick} they carry inside the
+   * das-kartell guild), captured best-effort at each Discord login and surfaced to an admin in the
+   * Discord registration-approval queue so the decision can be tied to a recognisable in-server
+   * identity (REQ-DATA-008). Written from the {@code discord_guild_nickname} token claim, which the
+   * Keycloak Discord IdP fills from the guild-member call — Discord's plain profile has no
+   * nickname. {@code null} when the user set no server nickname, never logged in via Discord, or
+   * the optional capture mappers are not configured. Display-only: it grants nothing and is exposed
+   * only on the admin-only approval queue, never in any shared user DTO.
+   */
+  @Nullable
+  @Column(name = "discord_guild_nickname")
+  private String discordGuildNickname;
+
+  /**
    * Account approval lifecycle (epic #720, Track 1, REQ-SEC-017 — fail-safe default). A brand-new
    * non-admin registration is {@link ApprovalStatus#PENDING} (no authorities granted — only {@code
    * ROLE_PENDING_APPROVAL}) until an admin approves, whether it arrived via Discord or credentials;

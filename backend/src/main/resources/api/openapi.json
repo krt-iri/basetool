@@ -47085,6 +47085,9 @@
           "username" : {
             "type" : "string"
           },
+          "serverNickname" : {
+            "type" : "string"
+          },
           "registeredAt" : {
             "type" : "string",
             "format" : "date-time"

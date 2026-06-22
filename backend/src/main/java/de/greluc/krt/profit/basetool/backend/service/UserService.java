@@ -287,6 +287,17 @@ public class UserService {
       changed = true;
     }
 
+    // Persist the per-guild Discord server nickname (REQ-DATA-008) from the optional IdP-mapped
+    // claim. Display-only — shown to admins in the registration-approval queue so a decision can be
+    // tied to a recognisable in-server identity. Captured best-effort, so it may be absent (no
+    // nickname set, non-Discord login, or capture mappers not configured); refreshes on every
+    // login.
+    String guildNickname = normalizeGuildNickname(jwt.getClaimAsString("discord_guild_nickname"));
+    if (!Objects.equals(user.getDiscordGuildNickname(), guildNickname)) {
+      user.setDiscordGuildNickname(guildNickname);
+      changed = true;
+    }
+
     // Approval lifecycle (epic #720, Track 1 / REQ-SEC-017 — fail-safe default). EVERY brand-new
     // non-admin registration lands PENDING and receives no authorities until an admin approves,
     // regardless of whether the login arrived via Discord or credentials. This is deliberately
@@ -435,6 +446,27 @@ public class UserService {
       roleRepository.findByNameIgnoreCase("Guest").ifPresent(localRoles::add);
     }
     return localRoles;
+  }
+
+  /**
+   * Normalises a raw Discord guild-nickname claim for storage: trims it, maps blank/empty to {@code
+   * null}, and bounds it to the {@code discord_guild_nickname} column width (255 chars) so a
+   * pathologically long attribute can never fail the login save. The Keycloak SPI already caps the
+   * captured value, so this length bound is only a defensive backstop (REQ-DATA-008).
+   *
+   * @param raw the raw {@code discord_guild_nickname} claim value, possibly {@code null}
+   * @return the trimmed, length-bounded nickname, or {@code null} when the claim is absent or blank
+   */
+  @Nullable
+  private static String normalizeGuildNickname(@Nullable String raw) {
+    if (raw == null) {
+      return null;
+    }
+    String trimmed = raw.trim();
+    if (trimmed.isEmpty()) {
+      return null;
+    }
+    return trimmed.length() > 255 ? trimmed.substring(0, 255) : trimmed;
   }
 
   /**
