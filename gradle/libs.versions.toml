@@ -57,8 +57,10 @@ node = "24.17.0"
 # stable across a minor, so an exact match avoids any load-time surprises.
 keycloak = "26.6.3"
 # JUnit pinned explicitly for the keycloak-spi module only — it has no Spring Boot
-# dependency-management to supply a JUnit version, unlike backend/frontend.
-junit = "5.13.4"
+# dependency-management to supply a JUnit version, unlike backend/frontend. Kept in
+# lockstep with the JUnit version Spring Boot 4.1.0 manages for those modules (6.0.3)
+# so the whole repo runs one JUnit, rather than chasing the newest upstream release.
+junit = "6.0.3"
 
 [libraries]
 

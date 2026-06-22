@@ -503,7 +503,8 @@ bei der Bestätigung Geld; Überziehungs-/Halterprüfung greifen dann wie bei ei
 direkten Buchung (REQ-BANK-023). Beim Anlegen werden Bankleitung + die für das Konto
 berechtigten Bank-MA per In-App-Benachrichtigung informiert (REQ-BANK-026,
 `ACCOUNT_GRANT`-Selektor). Ein Konto mit offenem Antrag lässt sich nicht schließen
-(409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). Das Audit-Log bleibt Admin-only.
+(409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). Das Audit-Log bleibt Admin-only. Die Seite zeigt
+ausschließlich **aktive** Konten (REQ-BANK-028).
 
 ---
 
@@ -583,10 +584,13 @@ analog zu `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
   `canEditOrgUnit(target)`, nicht über Adminschaft (REQ-ORG-016).
 - **Auswahlpicker:** Bereichsleitung/OL erhalten einen admin-ähnlichen Drill-down-Picker, aber nur in
   **ihnen untergeordnete** Einheiten (Bereichsleitung: Staffeln/SKs ihres Bereichs; OL: alles).
-- **Bank (REQ-BANK-027):** Die Ansicht kaskadiert (eigenes Ebenen-Konto **und** untergeordnete Konten),
-  Ein-/Auszahlungs**anträge** aber **nur auf dem eigenen Ebenen-Konto** (Bereich → `AREA`-Konto, OL →
-  `CARTEL`/Kartell-Konto); untergeordnete Konten sind per Picker nur einsehbar. Die Bank bleibt
-  OrgUnit-blind (Logik nur im `OrgUnitBankAccessService`-Seam).
+- **Bank (REQ-BANK-027/-028):** Die Ansicht kaskadiert (eigenes Ebenen-Konto **und** untergeordnete
+  Konten), Ein-/Auszahlungs**anträge** aber **nur auf dem eigenen Ebenen-Konto** (Bereich →
+  `AREA`-Konto, OL → `CARTEL`/Kartell-Konto); untergeordnete Konten sind per Picker nur einsehbar.
+  Bereich/OL (und Admins) sehen auf der Seite `/org-unit-bank` zusätzlich die organisationsweiten
+  **Sonderkonten** (`SPECIAL`) — rein lesend, kein Antrag —; Offiziere/SK-Leads nicht. Die Seite zeigt
+  außerdem **nur aktive Konten**. Die Bank bleibt OrgUnit-blind (Logik nur im
+  `OrgUnitBankAccessService`-Seam).
 - **Mitgliedschaftsregeln (REQ-ORG-017):** bis zu **zwei** Staffeln (auch aus verschiedenen Bereichen)
   und beliebig viele SKs; SK-Leiter, Bereichsleitung und OL gehören **keiner** Staffel an; SK-Leiter
   gehören **immer** der Bereichsleitung des Bereichs ihres SK an; OL-Mitglieder dürfen einem Bereich

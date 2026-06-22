@@ -58,10 +58,12 @@ import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Unit tests for {@link OrgUnitBankAccessService} — the F1 officer/lead balance view
- * (REQ-BANK-021). Verifies that the oversight scope drives exactly which org-unit accounts are
- * returned, that area / cartel accounts (no owning org unit) never leak, that a caller with no
+ * (REQ-BANK-021/-027/-028). Verifies that the oversight scope drives exactly which org-unit
+ * accounts are returned, that an unscoped org-unit account never leaks, that a caller with no
  * oversight is given an empty list without even issuing the balance query, and that an account
- * without postings reads as zero.
+ * without postings reads as zero. Also pins the REQ-BANK-028 refinements: a Bereich/OL overseer
+ * additionally sees the cartel-wide special accounts (Sonderkonten) view-only while an officer does
+ * not, and only active accounts are listed.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitBankAccessServiceTest {
@@ -109,6 +111,18 @@ class OrgUnitBankAccessServiceTest {
     account.setType(BankAccountType.AREA);
     account.setStatus(BankAccountStatus.ACTIVE);
     account.setOrgUnit(bereich);
+    return account;
+  }
+
+  /** A cartel-wide special account (Sonderkonto) — type {@code SPECIAL}, no owning org unit. */
+  private static BankAccount specialAccount(UUID id, String accountNo, BankAccountStatus status) {
+    BankAccount account = new BankAccount();
+    account.setId(id);
+    account.setAccountNo(accountNo);
+    account.setName(accountNo + " special account");
+    account.setType(BankAccountType.SPECIAL);
+    account.setStatus(status);
+    account.setOrgUnit(null);
     return account;
   }
 
@@ -308,6 +322,114 @@ class OrgUnitBankAccessServiceTest {
     assertThrows(AccessDeniedException.class, () -> service.createBookingRequest(request));
     verify(bankAccountRepository, never()).findByOrgUnitId(any());
     verifyNoInteractions(bankBookingRequestService);
+  }
+
+  @Test
+  void listOverseenOrgUnitBalances_areaOrOlOverseer_alsoSeesSpecialAccountsViewOnlyAndActiveOnly() {
+    // REQ-BANK-028: a Bereich/OL overseer additionally sees the cartel-wide special accounts
+    // (Sonderkonten) — view-only (canRequest=false) — while CLOSED accounts are filtered out and a
+    // foreign org-unit account stays out of scope.
+    UUID bereichId = UUID.randomUUID();
+    UUID areaAccountId = UUID.randomUUID();
+    UUID activeSpecialId = UUID.randomUUID();
+    BankAccount areaAccount =
+        areaAccount(areaAccountId, "KB-0001", bereich(bereichId, "Profit", "PRF"));
+    BankAccount activeSpecial =
+        specialAccount(activeSpecialId, "KB-0002", BankAccountStatus.ACTIVE);
+    BankAccount closedSpecial =
+        specialAccount(UUID.randomUUID(), "KB-0003", BankAccountStatus.CLOSED);
+    BankAccount foreignSquadron =
+        account(UUID.randomUUID(), "KB-0004", squadron(UUID.randomUUID(), "Foreign", "FRG"));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(bereichId)));
+    when(ownerScopeService.currentUserHasAreaOrOlOversight()).thenReturn(true);
+    when(ownerScopeService.currentOwnLevelOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(bereichId)));
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(List.of(areaAccount, activeSpecial, closedSpecial, foreignSquadron));
+    when(bankPostingRepository.accountBalances(List.of(areaAccountId, activeSpecialId)))
+        .thenReturn(List.of(new BankAccountBalance(activeSpecialId, new BigDecimal("999"))));
+
+    List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
+
+    // The Bereich's own AREA account + the ACTIVE special account; the CLOSED special and the
+    // foreign squadron account are excluded.
+    assertThat(result)
+        .extracting(OrgUnitBankBalanceDto::accountId)
+        .containsExactlyInAnyOrder(areaAccountId, activeSpecialId);
+    // The AREA account is the caller's own level → requestable; it keeps its org-unit identity.
+    assertThat(result)
+        .filteredOn(dto -> dto.accountId().equals(areaAccountId))
+        .singleElement()
+        .satisfies(
+            dto -> {
+              assertThat(dto.canRequest()).isTrue();
+              assertThat(dto.orgUnitId()).isEqualTo(bereichId);
+            });
+    // The special account is view-only and carries no org-unit identity, only its type + balance.
+    assertThat(result)
+        .filteredOn(dto -> dto.accountId().equals(activeSpecialId))
+        .singleElement()
+        .satisfies(
+            dto -> {
+              assertThat(dto.canRequest()).isFalse();
+              assertThat(dto.orgUnitId()).isNull();
+              assertThat(dto.orgUnitName()).isNull();
+              assertThat(dto.orgUnitKind()).isNull();
+              assertThat(dto.type()).isEqualTo(BankAccountType.SPECIAL);
+              assertThat(dto.balance()).isEqualByComparingTo("999");
+            });
+  }
+
+  @Test
+  void listOverseenOrgUnitBalances_officerWithoutAreaOrOlSeat_doesNotSeeSpecialAccounts() {
+    // An officer (no Bereich/OL seat) must NOT see the cartel-wide special accounts (REQ-BANK-028).
+    UUID staffelId = UUID.randomUUID();
+    UUID ownAccountId = UUID.randomUUID();
+    BankAccount ownAccount = account(ownAccountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
+    BankAccount activeSpecial =
+        specialAccount(UUID.randomUUID(), "KB-0002", BankAccountStatus.ACTIVE);
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    when(ownerScopeService.currentUserHasAreaOrOlOversight()).thenReturn(false);
+    when(ownerScopeService.currentOwnLevelOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(List.of(ownAccount, activeSpecial));
+    when(bankPostingRepository.accountBalances(List.of(ownAccountId)))
+        .thenReturn(List.of(new BankAccountBalance(ownAccountId, new BigDecimal("10"))));
+
+    List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
+
+    assertThat(result).extracting(OrgUnitBankBalanceDto::accountId).containsExactly(ownAccountId);
+  }
+
+  @Test
+  void listOverseenOrgUnitBalances_excludesClosedOrgUnitAccounts() {
+    // REQ-BANK-028: the page lists ACTIVE accounts only — a CLOSED account in scope is hidden.
+    UUID staffelAId = UUID.randomUUID();
+    UUID staffelBId = UUID.randomUUID();
+    UUID activeAccountId = UUID.randomUUID();
+    BankAccount activeAccount =
+        account(activeAccountId, "KB-0001", squadron(staffelAId, "A", "AAA"));
+    BankAccount closedAccount =
+        account(UUID.randomUUID(), "KB-0002", squadron(staffelBId, "B", "BBB"));
+    closedAccount.setStatus(BankAccountStatus.CLOSED);
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelAId, staffelBId)));
+    when(ownerScopeService.currentUserHasAreaOrOlOversight()).thenReturn(false);
+    when(ownerScopeService.currentOwnLevelOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelAId, staffelBId)));
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(List.of(activeAccount, closedAccount));
+    when(bankPostingRepository.accountBalances(List.of(activeAccountId)))
+        .thenReturn(List.of(new BankAccountBalance(activeAccountId, new BigDecimal("1"))));
+
+    List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
+
+    assertThat(result)
+        .extracting(OrgUnitBankBalanceDto::accountId)
+        .containsExactly(activeAccountId);
   }
 
   private static BankBookingRequestDto dto(UUID accountId, UUID orgUnitId) {

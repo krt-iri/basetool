@@ -229,6 +229,47 @@ journalctl -u iri-deploy.service -f
 This pulls `:stable`, applies, waits for health, then exits. The stack is
 live.
 
+### 8. Weekly Docker housekeeping (optional)
+
+Every `deploy.sh` run already does a best-effort prune of dangling images, but
+over time unused image layers, build cache and stopped containers still
+accumulate and can fill the disk. [`scripts/docker-cleanup.sh`](../scripts/docker-cleanup.sh)
+is a stand-alone janitor that prunes unused images (`-a`), build cache, stopped
+containers, unused networks and anonymous volumes — each only when no container
+references it, and each gated by an age window so freshly pulled images survive
+(image default: 14 days, comfortably outliving the `deploy.sh` rollback anchor).
+It is safe by construction: all persistent production data lives in `/var/iri/...`
+bind mounts, which the Docker daemon does not manage and `docker volume prune`
+cannot touch.
+
+The job runs as the **`deploy`** user (not root), consistent with `deploy.sh`
+and the `iri-deploy.timer` pipeline — `deploy` is in the `docker` group, so it
+can reach the Docker socket. The drop-in sets `DOCKER_CONFIG=/var/lib/iri/.docker`
+because `deploy` has no usable `$HOME` (`--no-create-home`), the same reason
+`deploy.sh` pins it.
+
+Preview what it would reclaim, then install the weekly cron (Saturday 02:00 UTC):
+
+```bash
+sudo -u deploy /var/iri/code/scripts/docker-cleanup.sh --dry-run   # show plan + disk usage
+
+sudo cp /var/iri/code/scripts/docker-cleanup.cron      /etc/cron.d/iri-docker-cleanup
+sudo cp /var/iri/code/scripts/docker-cleanup.logrotate /etc/logrotate.d/iri-docker-cleanup
+sudo chmod 0644 /etc/cron.d/iri-docker-cleanup
+
+sudo chown deploy:deploy /var/iri/code/scripts/docker-cleanup.sh   # owner = deploy
+sudo chmod 0750          /var/iri/code/scripts/docker-cleanup.sh   # rwx for deploy, none for others
+
+sudo touch /var/log/iri-docker-cleanup.log
+sudo chown deploy:adm /var/log/iri-docker-cleanup.log
+sudo chmod 0640       /var/log/iri-docker-cleanup.log
+```
+
+The `CRON_TZ=UTC` line in the drop-in pins the schedule to UTC regardless of the
+host's local timezone. Retention windows and the volume-prune toggle are
+overridable via `IRI_CLEANUP_*` environment variables — see the script header
+or `docker-cleanup.sh --help`.
+
 ---
 
 ## Normal deploy flow

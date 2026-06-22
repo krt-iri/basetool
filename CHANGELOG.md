@@ -6,6 +6,12 @@
 
 - **Audit-Logs für Lager, Aufträge, Raffinerie und Mein Inventar.** Jede Aktivität in diesen vier Bereichen wird jetzt — wie schon bei der Bank — lückenlos und unveränderbar protokolliert. Admins finden alle Logs auf einer neuen Seite „Audit-Logs" (Administration → System & Daten) mit einem Umschalter zwischen Bank, Lager, Aufträge, Raffinerie und Mein Inventar, gefiltert nach Zeitraum, Akteur und Ereignistyp. Jedes Log lässt sich für einen gewählten Zeitraum als PDF im KRT-Design oder als JSON exportieren (die Bank ebenfalls). Sichtbar ausschließlich für Admins; die alte Adresse `/admin/bank-audit` leitet auf die neue Seite weiter.
 
+- **Wöchentliches Docker-Aufräumen auf dem Produktions-VM.** Neues Wartungsskript `scripts/docker-cleanup.sh` (plus cron.d-Drop-in und logrotate-Konfiguration) entfernt jeden Samstag um 02:00 UTC ungenutzte Docker-Ressourcen — Images, Build-Cache, gestoppte Container, Netzwerke und anonyme Volumes —, damit die Festplatte nicht vollläuft. Belegte Ressourcen und frisch gezogene Images (Standardfenster 14 Tage) bleiben unangetastet; die persistenten Bind-Mount-Daten unter `/var/iri` sind ohnehin nicht betroffen. Reiner Betriebs-/Deploy-Zusatz ohne Auswirkung auf die App; Einrichtung siehe `docs/deployment.md`.
+
+### Changed
+
+- **Bereichs- und Organisationsleitung sehen auf der Seite „Bank meiner Org-Einheit" jetzt auch die organisationsweiten Sonderkonten** — rein lesend, ohne Ein-/Auszahlungsanträge. Außerdem zeigt die Seite nur noch aktive Konten; geschlossene Konten erscheinen dort nicht mehr.
+
 ## [v0.7.8](https://github.com/krt-profit/basetool/releases/tag/v0.7.8) - 2026-06-22
 
 ### Fixed
