@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.dto.AuditPurgeResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
@@ -40,6 +41,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -164,5 +166,20 @@ public class BankAdminController {
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setContentDispositionFormData("attachment", "audit-bank.json");
     return ResponseEntity.ok().headers(headers).body(events);
+  }
+
+  /**
+   * Purges bank audit-log entries older than a cutoff — the admin retention delete (REQ-AUDIT-004).
+   * The deletion is itself audit-logged ({@code AUDIT_LOG_PURGED}). The UI warns the admin to
+   * export a PDF/JSON backup beforehand; the backend does not enforce a prior export.
+   *
+   * @param before the exclusive cutoff (ISO instant); entries older than this are removed
+   * @return the number of bank audit rows deleted
+   */
+  @Operation(summary = "Purge the bank audit log's entries older than a cutoff (admin)")
+  @DeleteMapping("/audit")
+  public AuditPurgeResultDto purgeAuditLog(
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
+    return new AuditPurgeResultDto(bankAuditService.purgeBefore(before));
   }
 }

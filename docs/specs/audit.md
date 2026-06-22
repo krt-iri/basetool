@@ -23,10 +23,11 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
-Every state-mutating activity in the four areas writes exactly **one** row to an **insert-only**
-audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, no updates) **in the
-same transaction as the business write**. An audit-insert failure rolls the mutation back, so the
-trail has **no silent gaps**. Each event stores: timestamp (UTC), the acting user's id (FK `ON
+Every state-mutating activity in the four areas writes exactly **one** row to an **append-only**
+audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated; the
+sole deletion path is the explicit admin retention purge, REQ-AUDIT-004) **in the same transaction
+as the business write**. An audit-insert failure rolls the mutation back, so the trail has **no
+silent gaps**. Each event stores: timestamp (UTC), the acting user's id (FK `ON
 DELETE SET NULL`) **plus** a denormalized actor-handle snapshot (the trail must survive user
 deletion), the `domain`, the event type, the affected subject's id + a denormalized subject-label
 snapshot, an optional target-user reference, and a compact details payload.
@@ -119,3 +120,35 @@ chosen `format=pdf|json` in the details.
 **Enforced by:** `AuditReportServiceTest`, `BankAuditReportServiceTest`, `AuditAdminControllerSecurityTest`
 · **Code:** `service/AuditReportService`, `service/BankAuditReportService`,
 `service/pdf/AuditLogPdfFormat`, `controller/AuditReportProxyController`
+
+### REQ-AUDIT-004 — Admin retention purge (delete entries older than a cutoff)
+
+Each log can be **pruned** by an admin: a per-log action deletes that log's entries **older than an
+admin-chosen cutoff** (`occurredAt < before`). It is available **separately for every log**,
+including the bank — the four generic areas via `DELETE /api/v1/audit/{domain}`, the bank via
+`DELETE /api/v1/bank/admin/audit`, both gated to `hasRole('ADMIN')` at the URL matcher (and a
+method-level `@PreAuthorize` on the generic controller). The purge is scoped to the selected log
+only — purging one area never touches another.
+
+The deletion is **irreversible**, so the UI **warns the admin to export a PDF/JSON backup
+(REQ-AUDIT-003) first** before confirming: a prominent warning in the design-system delete modal (no
+native dialogs). The backend does **not** force a prior export — the warning is advisory.
+
+The purge **is itself audit-logged**: it writes one `*_AUDIT_PURGED` event (the bank's
+`AUDIT_LOG_PURGED`) carrying the deleted count and the cutoff in its details. That marker's timestamp
+is newer than the cutoff, so it survives its own purge — a deletion always leaves a trace. The
+endpoints return the deleted count, which the page reports back to the admin. There is **no automatic
+retention sweep**; purging is always an explicit admin action.
+
+**Acceptance**
+
+- [ ] An admin purges one log older than a cutoff: older rows are gone, newer rows remain, the other
+  logs are untouched, and exactly one `*_AUDIT_PURGED` marker (with count + cutoff) is written.
+- [ ] The delete modal shows the backup-recommended warning; non-admins get 403 on every purge
+  endpoint.
+
+**Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `AuditAdminControllerSecurityTest` ·
+**Code:** `service/AuditService#purgeBefore`, `service/BankAuditService#purgeBefore`,
+`controller/AuditAdminController`, `controller/BankAdminController`, `model/dto/AuditPurgeResultDto`,
+`templates/admin/audit-log.html`, `static/js/audit-log.js` · **Decision:**
+[ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md)

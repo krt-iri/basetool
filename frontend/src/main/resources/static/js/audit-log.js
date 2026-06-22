@@ -68,6 +68,25 @@
         }
     }
 
+    // Reload the results table after a purge so the deleted rows disappear, rebuilding the URL from
+    // the current filter form exactly like the in-place filter does (keeps the active tab + filters).
+    const reloadAuditResults = function () {
+        if (!resultsContainer || !window.krtFetch) {
+            return;
+        }
+        let url = '/admin/audit-log';
+        if (form) {
+            const data = new FormData(form);
+            const params = new URLSearchParams();
+            for (const [key, value] of data.entries()) {
+                if (value !== '') params.append(key, value);
+            }
+            const query = params.toString();
+            if (query) url += '?' + query;
+        }
+        window.krtFetch.swap({ url: url, container: resultsContainer, history: true });
+    };
+
     // ---------------------------------------------------------------------------
     // Period export (PDF or JSON) — fetch -> blob -> hidden <a download>, the documented
     // bank.js download pattern (a real fetch is needed to attach the X-User-Time-Zone
@@ -168,6 +187,55 @@
         const filename = json ? baseName.replace(/\.pdf$/, '.json') : baseName;
         downloadBlob(url, filename, function () {
             showError(frm, '_global', downloadError);
+        });
+    });
+
+    // ---------------------------------------------------------------------------
+    // Period retention purge (REQ-AUDIT-004) — DELETE the active tab's audit rows older than the
+    // chosen cutoff via krtFetch.write (CSRF + double-submit guard + JSON parse for free), then
+    // render the deleted count inline and reload the table. The on-screen warning recommends a
+    // PDF/JSON backup first; this is an irreversible delete.
+    // ---------------------------------------------------------------------------
+    document.addEventListener('submit', function (event) {
+        const frm = event.target.closest('form.audit-purge-form');
+        if (!frm) {
+            return;
+        }
+        event.preventDefault();
+        clearErrors(frm);
+        const successSlot = frm.querySelector('[data-success-slot]');
+        if (successSlot) {
+            successSlot.textContent = '';
+        }
+        const before = frm.querySelector('input[name="before"]');
+        const required = frm.getAttribute('data-period-required') || '';
+        const deleteError = frm.getAttribute('data-delete-error') || required;
+        if (!before || !before.value) {
+            showError(frm, 'before', required);
+            return;
+        }
+        if (!window.krtFetch || typeof window.krtFetch.write !== 'function') {
+            showError(frm, '_global', deleteError);
+            return;
+        }
+        const endpoint = frm.getAttribute('data-endpoint');
+        const url = endpoint + '?before=' + encodeURIComponent(before.value);
+        const successTemplate = frm.getAttribute('data-success-template') || '';
+        window.krtFetch.write({
+            url: url,
+            method: 'DELETE',
+            submitter: event.submitter,
+            toast: false,
+            errorMessage: deleteError,
+            onSuccess: function (body) {
+                const count = body && typeof body.deletedCount === 'number' ? body.deletedCount : 0;
+                if (successSlot) {
+                    successSlot.textContent = successTemplate
+                        ? successTemplate.replace('{0}', String(count))
+                        : String(count);
+                }
+                reloadAuditResults();
+            },
         });
     });
 })();

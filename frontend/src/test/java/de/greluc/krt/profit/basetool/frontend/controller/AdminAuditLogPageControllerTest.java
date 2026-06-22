@@ -84,6 +84,7 @@ class AdminAuditLogPageControllerTest {
     assertEquals("admin/audit-log", view);
     assertEquals("BANK", model.getAttribute("activeDomain"));
     assertEquals("/api/proxy/audit/BANK/export", model.getAttribute("exportEndpoint"));
+    assertEquals("/api/proxy/audit/BANK", model.getAttribute("purgeEndpoint"));
     PageResponse<AuditRowView> events = (PageResponse<AuditRowView>) model.getAttribute("events");
     assertNotNull(events);
     AuditRowView row = events.content().get(0);
@@ -119,6 +120,7 @@ class AdminAuditLogPageControllerTest {
     assertEquals("admin/audit-log", view);
     assertEquals("INVENTORY", model.getAttribute("activeDomain"));
     assertEquals("/api/proxy/audit/INVENTORY/export", model.getAttribute("exportEndpoint"));
+    assertEquals("/api/proxy/audit/INVENTORY", model.getAttribute("purgeEndpoint"));
     PageResponse<AuditRowView> events = (PageResponse<AuditRowView>) model.getAttribute("events");
     AuditRowView row = events.content().get(0);
     assertEquals("Quantanium @ Port Olisar", row.subject());

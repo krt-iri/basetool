@@ -125,6 +125,41 @@ public class AuditService {
   }
 
   /**
+   * Purges one area's audit rows older than a cutoff — the admin retention delete (REQ-AUDIT-004) —
+   * and records the purge itself as an audit event so the deletion leaves a trace. The bulk delete
+   * runs first; the {@code *_AUDIT_PURGED} marker is written afterwards (its timestamp is newer
+   * than the cutoff, so it survives) and carries the deleted count and cutoff in its details. Write
+   * transaction on purpose: the marker insert ({@code record}, {@code MANDATORY}) runs inside it,
+   * so a failed marker rolls the delete back.
+   *
+   * @param domain the area to purge (the selected tab)
+   * @param before the exclusive cutoff; rows older than this are removed
+   * @return the number of audit rows deleted (excludes the purge marker itself)
+   */
+  @Transactional
+  public int purgeBefore(@NotNull AuditDomain domain, @NotNull Instant before) {
+    int deleted = auditEventRepository.deleteByDomainAndOccurredAtBefore(domain, before);
+    record(purgeEventType(domain), null, null, null, "deleted=" + deleted + " before=" + before);
+    log.info("Purged {} audit events for domain {} older than {}", deleted, domain, before);
+    return deleted;
+  }
+
+  /**
+   * The {@code *_AUDIT_PURGED} marker event type for an area's retention purge.
+   *
+   * @param domain the purged area
+   * @return its purge marker event type
+   */
+  private static @NotNull AuditEventType purgeEventType(@NotNull AuditDomain domain) {
+    return switch (domain) {
+      case INVENTORY -> AuditEventType.INVENTORY_AUDIT_PURGED;
+      case JOB_ORDER -> AuditEventType.JOB_ORDER_AUDIT_PURGED;
+      case REFINERY -> AuditEventType.REFINERY_AUDIT_PURGED;
+      case PERSONAL_INVENTORY -> AuditEventType.PERSONAL_INVENTORY_AUDIT_PURGED;
+    };
+  }
+
+  /**
    * Clamps a subject label to the {@code subject_label} column width (255), guarding against an
    * over-long composed label (e.g. a very long material + location pair) blowing the insert.
    *

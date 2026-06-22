@@ -112,6 +112,16 @@ class AuditLogE2eTest {
             page.locator("[data-testid='audit-row']").count() >= 1,
             "the Bank tab lists at least one event");
 
+        // The admin retention-purge control is present (REQ-AUDIT-004); opening it surfaces the
+        // backup-recommended warning. Non-mutating on purpose — actually purging here would delete
+        // the seeded deposit row the rest of this run relies on.
+        assertThat(page.locator("[data-testid='audit-purge-open']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        page.locator("[data-testid='audit-purge-open']").click();
+        assertThat(page.locator("#audit-purge-modal .audit-purge-warning"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+        page.locator("#audit-purge-modal [data-trigger='close-modal-display']").first().click();
+
         // Mark the live document: a full navigation/reload wipes it. The filter swaps the results
         // in
         // place (REQ-FE-002), so there is no form-post navigation to await.

@@ -28,14 +28,17 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for the insert-only activity audit trail (REQ-AUDIT-001). Strictly
- * insert-and-read: audit rows are never updated, deleted or retention-swept — the trail is the
- * point. Read access is admin-only and enforced at the controller/URL layer, not here.
+ * Spring Data repository for the append-only activity audit trail (REQ-AUDIT-001). Rows are only
+ * ever inserted and read during normal operation; the single exception is the admin-triggered
+ * retention purge (REQ-AUDIT-004), a deliberate, itself-audited bulk delete of rows older than a
+ * chosen cutoff — there is no automatic retention sweep. Read and purge access are admin-only and
+ * enforced at the controller/URL layer, not here.
  */
 @Repository
 public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
@@ -83,4 +86,19 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
           + " ORDER BY e.occurredAt ASC")
   List<AuditEvent> findForExport(
       @Param("domain") AuditDomain domain, @Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Bulk-deletes one domain's audit rows strictly older than a cutoff — the admin retention purge
+   * (REQ-AUDIT-004). Scoped to the selected tab's domain so a purge of one area never touches
+   * another. The purge is itself audit-logged by the caller <em>after</em> this delete (its row is
+   * newer than the cutoff, so it survives).
+   *
+   * @param domain the area to purge (the selected tab)
+   * @param before the exclusive cutoff; rows with {@code occurredAt < before} are removed
+   * @return the number of rows deleted
+   */
+  @Modifying
+  @Query("DELETE FROM AuditEvent e WHERE e.domain = :domain AND e.occurredAt < :before")
+  int deleteByDomainAndOccurredAtBefore(
+      @Param("domain") AuditDomain domain, @Param("before") Instant before);
 }

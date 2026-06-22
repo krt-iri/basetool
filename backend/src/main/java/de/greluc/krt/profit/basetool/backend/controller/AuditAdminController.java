@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.AuditPurgeResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.AuditReportService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
@@ -40,6 +41,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -154,6 +156,23 @@ public class AuditAdminController {
     headers.setContentDispositionFormData(
         "attachment", "audit-" + domain.name().toLowerCase(java.util.Locale.ROOT) + ".json");
     return ResponseEntity.ok().headers(headers).body(events);
+  }
+
+  /**
+   * Purges one area's audit-log entries older than a cutoff — the admin retention delete
+   * (REQ-AUDIT-004). The deletion is itself audit-logged ({@code *_AUDIT_PURGED}). The UI warns the
+   * admin to export a PDF/JSON backup beforehand; the backend does not enforce a prior export.
+   *
+   * @param domain the area to purge (the selected tab)
+   * @param before the exclusive cutoff (ISO instant); entries older than this are removed
+   * @return the number of audit rows deleted
+   */
+  @Operation(summary = "Purge an activity audit log's entries older than a cutoff (admin)")
+  @DeleteMapping("/{domain}")
+  public AuditPurgeResultDto purgeAuditLog(
+      @PathVariable AuditDomain domain,
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
+    return new AuditPurgeResultDto(auditService.purgeBefore(domain, before));
   }
 
   /**

@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -141,6 +142,30 @@ class AuditAdminControllerSecurityTest {
             get("/api/v1/audit/JOB_ORDER/export.json")
                 .param("from", "2026-01-01T00:00:00Z")
                 .param("to", "2026-02-01T00:00:00Z")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void auditPurge_officer_isForbidden() throws Exception {
+    mockMvc
+        .perform(
+            delete("/api/v1/audit/INVENTORY")
+                .param("before", "2026-01-01T00:00:00Z")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void auditPurge_admin_isAllowed() throws Exception {
+    when(auditService.purgeBefore(any(), any())).thenReturn(0);
+    mockMvc
+        .perform(
+            delete("/api/v1/audit/INVENTORY")
+                .param("before", "2026-01-01T00:00:00Z")
                 .with(
                     jwt()
                         .jwt(j -> j.subject(UUID.randomUUID().toString()))

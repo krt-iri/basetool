@@ -48,7 +48,10 @@ layer through a shared `AuditLogPdfFormat` renderer; the bank export feeds the s
 - The audit table is **business data**, admin-only, insert-only; the log-stream PII rule
   (`observability.md`) is unaffected and user free text never enters the details payload.
 - The `audit_event` table grows unbounded (no retention) and the scheduled UEX sync writes a summary
-  event per run — accepted, matching the bank trail's "the trail is the point" stance.
+  event per run — accepted, matching the bank trail's "the trail is the point" stance. *(Amended by
+  [ADR-0038](0038-admin-retention-purge-of-audit-logs.md): admins may now purge a log's entries
+  older than a chosen cutoff — a manual, opt-in, itself-audited bounded-growth lever, not an
+  automatic sweep.)*
 - The audit PDF prints raw event codes (not localized labels) so the backend message bundle is not
   duplicated; the on-screen viewer carries the rich German/English labels.
 - The bank trail stays on its own table, so a query "everything that happened" spans two tables —

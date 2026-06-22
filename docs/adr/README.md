@@ -75,4 +75,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0035](0035-blueprint-craftability-from-own-stock.md)                     | Blueprint craftability computed server-side from the user's own "My Inventory" stock                       | Accepted                          |
 | [0036](0036-discord-link-recognised-from-federated-identity.md)           | Discord link recognised from the Keycloak federated identity, not the import-time attribute                | Accepted                          |
 | [0037](0037-shared-multi-domain-activity-audit-log.md)                    | One shared `audit_event` table (domain discriminator) for the four new area audit logs; bank keeps its own | Accepted                          |
+| [0038](0038-admin-retention-purge-of-audit-logs.md)                       | Admin-controlled retention purge: delete each audit log's entries older than a cutoff (amends ADR-0037)    | Accepted                          |
 

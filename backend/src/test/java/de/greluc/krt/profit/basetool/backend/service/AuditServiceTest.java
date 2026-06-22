@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -133,6 +134,32 @@ class AuditServiceTest {
     ArgumentCaptor<AuditEvent> saved = ArgumentCaptor.forClass(AuditEvent.class);
     verify(auditEventRepository).save(saved.capture());
     assertEquals(255, saved.getValue().getSubjectLabel().length());
+  }
+
+  @Test
+  void purgeBefore_deletesDomainRowsAndRecordsPurgeMarker() {
+    // Given — a scheduled-cutoff retention purge of one area (REQ-AUDIT-004).
+    Instant before = Instant.parse("2026-01-01T00:00:00Z");
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    when(auditEventRepository.deleteByDomainAndOccurredAtBefore(AuditDomain.REFINERY, before))
+        .thenReturn(7);
+    when(auditEventRepository.save(any(AuditEvent.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    // When
+    int deleted = auditService.purgeBefore(AuditDomain.REFINERY, before);
+
+    // Then — the bulk delete count is returned, and a purge marker for the same domain is recorded
+    // with the count + cutoff (the marker is newer than the cutoff, so it survives the purge).
+    assertEquals(7, deleted);
+    verify(auditEventRepository).deleteByDomainAndOccurredAtBefore(AuditDomain.REFINERY, before);
+    ArgumentCaptor<AuditEvent> saved = ArgumentCaptor.forClass(AuditEvent.class);
+    verify(auditEventRepository).save(saved.capture());
+    AuditEvent marker = saved.getValue();
+    assertEquals(AuditEventType.REFINERY_AUDIT_PURGED, marker.getEventType());
+    assertEquals(AuditDomain.REFINERY, marker.getDomain());
+    assertTrue(marker.getDetails().contains("deleted=7"), "details carry the deleted count");
+    assertTrue(marker.getDetails().contains("before="), "details carry the cutoff");
   }
 
   @Test

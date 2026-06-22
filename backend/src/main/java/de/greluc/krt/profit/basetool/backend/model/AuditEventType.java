@@ -73,6 +73,9 @@ public enum AuditEventType {
   /** The inventory audit log was exported as a PDF for a period. */
   INVENTORY_AUDIT_EXPORTED(AuditDomain.INVENTORY),
 
+  /** Inventory audit rows older than an admin-chosen cutoff were purged (retention). */
+  INVENTORY_AUDIT_PURGED(AuditDomain.INVENTORY),
+
   // ------------------------------------------------------------- JOB_ORDER (Aufträge) --
   /** A material job order was created. */
   JOB_ORDER_CREATED(AuditDomain.JOB_ORDER),
@@ -134,6 +137,9 @@ public enum AuditEventType {
   /** The job-order audit log was exported as a PDF for a period. */
   JOB_ORDER_AUDIT_EXPORTED(AuditDomain.JOB_ORDER),
 
+  /** Job-order audit rows older than an admin-chosen cutoff were purged (retention). */
+  JOB_ORDER_AUDIT_PURGED(AuditDomain.JOB_ORDER),
+
   // --------------------------------------------------------- REFINERY (Raffinerie) --
   /** A refinery order was created. */
   REFINERY_ORDER_CREATED(AuditDomain.REFINERY),
@@ -168,6 +174,9 @@ public enum AuditEventType {
   /** The refinery audit log was exported as a PDF for a period. */
   REFINERY_AUDIT_EXPORTED(AuditDomain.REFINERY),
 
+  /** Refinery audit rows older than an admin-chosen cutoff were purged (retention). */
+  REFINERY_AUDIT_PURGED(AuditDomain.REFINERY),
+
   // ------------------------------------------------- PERSONAL_INVENTORY (Mein Inventar) --
   /** A personal inventory item was created (admin-on-behalf sets the target user). */
   PERSONAL_INVENTORY_CREATED(AuditDomain.PERSONAL_INVENTORY),
@@ -179,7 +188,10 @@ public enum AuditEventType {
   PERSONAL_INVENTORY_DELETED(AuditDomain.PERSONAL_INVENTORY),
 
   /** The personal-inventory audit log was exported as a PDF for a period. */
-  PERSONAL_INVENTORY_AUDIT_EXPORTED(AuditDomain.PERSONAL_INVENTORY);
+  PERSONAL_INVENTORY_AUDIT_EXPORTED(AuditDomain.PERSONAL_INVENTORY),
+
+  /** Personal-inventory audit rows older than an admin-chosen cutoff were purged (retention). */
+  PERSONAL_INVENTORY_AUDIT_PURGED(AuditDomain.PERSONAL_INVENTORY);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final AuditDomain domain;

@@ -96,7 +96,8 @@ public class AdminAuditLogPageController {
               "BOOKING_REQUEST_CONFIRMED",
               "BOOKING_REQUEST_REJECTED",
               "BOOKING_REQUEST_CANCELLED",
-              "AUDIT_LOG_EXPORTED"),
+              "AUDIT_LOG_EXPORTED",
+              "AUDIT_LOG_PURGED"),
           "INVENTORY",
           List.of(
               "INVENTORY_ITEM_CREATED",
@@ -112,7 +113,8 @@ public class AdminAuditLogPageController {
               "INVENTORY_HANDED_OVER",
               "INVENTORY_ORG_RESTAMPED",
               "INVENTORY_OWNER_REASSIGNED",
-              "INVENTORY_AUDIT_EXPORTED"),
+              "INVENTORY_AUDIT_EXPORTED",
+              "INVENTORY_AUDIT_PURGED"),
           "JOB_ORDER",
           List.of(
               "JOB_ORDER_CREATED",
@@ -134,7 +136,8 @@ public class AdminAuditLogPageController {
               "JOB_ORDER_ITEM_HANDOVER_CREATED",
               "JOB_ORDER_CLAIM_UPSERTED",
               "JOB_ORDER_CLAIM_WITHDRAWN",
-              "JOB_ORDER_AUDIT_EXPORTED"),
+              "JOB_ORDER_AUDIT_EXPORTED",
+              "JOB_ORDER_AUDIT_PURGED"),
           "REFINERY",
           List.of(
               "REFINERY_ORDER_CREATED",
@@ -147,11 +150,15 @@ public class AdminAuditLogPageController {
               "REFINERY_METHODS_SYNCED",
               "REFINERY_YIELDS_SYNCED",
               "REFINERY_ORDERS_REASSIGNED",
-              "REFINERY_AUDIT_EXPORTED"),
+              "REFINERY_AUDIT_EXPORTED",
+              "REFINERY_AUDIT_PURGED"),
           "PERSONAL_INVENTORY",
           List.of(
-              "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED",
-              "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED"));
+              "PERSONAL_INVENTORY_CREATED",
+              "PERSONAL_INVENTORY_UPDATED",
+              "PERSONAL_INVENTORY_DELETED",
+              "PERSONAL_INVENTORY_AUDIT_EXPORTED",
+              "PERSONAL_INVENTORY_AUDIT_PURGED"));
 
   private final BackendApiClient backendApiClient;
 
@@ -225,6 +232,7 @@ public class AdminAuditLogPageController {
     model.addAttribute(
         "paginationBaseUrl", buildBaseUrl(activeDomain, from, to, actorUserId, eventType));
     model.addAttribute("exportEndpoint", "/api/proxy/audit/" + activeDomain + "/export");
+    model.addAttribute("purgeEndpoint", "/api/proxy/audit/" + activeDomain);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "admin/audit-log :: auditResults";
     }
