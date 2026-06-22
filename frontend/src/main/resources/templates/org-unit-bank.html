@@ -35,16 +35,25 @@
 
         <div class="bank-acc-grid mt-2" th:if="${!#lists.isEmpty(balances)}">
             <div th:each="b : ${balances}" class="kpi-card"
-                 th:classappend="${b.status() == 'CLOSED'} ? ' kpi-card--closed' : ''"
                  data-testid="org-unit-bank-card" th:attr="data-account-no=${b.accountNo()}">
                 <div class="kpi-card-top">
                     <div>
                         <div class="kpi-title" th:text="${b.accountName()}">Staffel IRIDIUM</div>
-                        <div class="kpi-sub" th:text="${b.accountNo()} + ' &middot; ' + ${b.orgUnitShorthand()}">KB-0001 &middot; IRI</div>
+                        <!-- Org-unit account: account no + its org-unit shorthand (or name). A special
+                             account (Sonderkonto, REQ-BANK-028) belongs to no org unit, so it is labelled
+                             by its account-type label instead. -->
+                        <div class="kpi-sub">
+                            <span th:text="${b.accountNo()}">KB-0001</span>
+                            <span> &middot; </span>
+                            <span th:if="${b.orgUnitId() != null}"
+                                  th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
+                            <span th:if="${b.orgUnitId() == null}"
+                                  th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
+                        </div>
                     </div>
+                    <!-- The page lists only ACTIVE accounts (REQ-BANK-028), so this always reads "active". -->
                     <span class="chip" style="font-size: 0.55rem;"
-                          th:classappend="${b.status() == 'CLOSED'} ? ' chip--muted' : ''"
-                          th:text="${b.status() == 'CLOSED'} ? #{bank.account.status.CLOSED} : #{bank.account.status.ACTIVE}">Aktiv</span>
+                          th:text="#{'bank.account.status.' + ${b.status()}}">Aktiv</span>
                 </div>
                 <div class="kpi-label" th:text="#{bank.orgUnit.balance}">Kontostand</div>
                 <div class="kpi-value"
@@ -54,7 +63,6 @@
                          request affordance. A subordinate account reached by the cascade is view-only
                          (epic #692 Phase 6, owner decision Q4). -->
                     <button th:if="${b.canRequest()}" type="button" class="btn btn--cta btn-sm"
-                            th:disabled="${b.status() == 'CLOSED'}"
                             data-trigger="open-modal-display" data-modal-id="org-unit-request-modal"
                             data-testid="org-unit-bank-request-btn"
                             th:attr="data-field-orgunitid=${b.orgUnitId()},data-field-orglabel=${b.accountName()} + ' (' + ${b.accountNo()} + ')'"

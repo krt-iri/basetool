@@ -48886,6 +48886,10 @@
             "type" : "string",
             "enum" : [ "ACTIVE", "CLOSED" ]
           },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "ORG_UNIT", "AREA", "CARTEL", "CARTEL_BANK", "SPECIAL" ]
+          },
           "orgUnitId" : {
             "type" : "string",
             "format" : "uuid"

@@ -24,34 +24,42 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend's org-unit bank balance payload (epic #666 F1, REQ-BANK-021).
- * Deliberately balance-only — it carries the account's identity (so the officer/lead page can label
- * the card and target a booking request at the org unit) and the compute-on-read balance, never the
- * transaction history, holders or audit. The status / org-unit kind arrive as enum names rendered
- * through i18n keys.
+ * Frontend mirror of the backend's org-unit bank balance payload (epic #666 F1,
+ * REQ-BANK-021/-027/-028). Deliberately balance-only — it carries the account's identity (so the
+ * officer/lead page can label the card and target a booking request at the org unit) and the
+ * compute-on-read balance, never the transaction history, holders or audit. The status / type /
+ * org-unit kind arrive as enum names rendered through i18n keys.
  *
- * @param accountId the org-unit account's id
+ * <p>An org-unit account populates the {@code orgUnit*} fields; a special account (Sonderkonto,
+ * REQ-BANK-028, only visible to Bereich/OL overseers and admins) carries {@code null} org-unit
+ * fields and {@code canRequest = false}, and the page labels its card by {@link #type}. Only active
+ * accounts are ever delivered.
+ *
+ * @param accountId the account's id
  * @param accountNo the server-generated display number ({@code KB-0042})
  * @param accountName the account's display name
- * @param status lifecycle enum name ({@code ACTIVE} / {@code CLOSED})
- * @param orgUnitId the owning org unit's id
- * @param orgUnitName the owning org unit's long-form name
+ * @param status lifecycle enum name (always {@code ACTIVE} here — closed accounts are filtered out)
+ * @param type account-type enum name ({@code ORG_UNIT} / {@code AREA} / {@code CARTEL} / {@code
+ *     SPECIAL}); used to label a special account that has no org-unit identity
+ * @param orgUnitId the owning org unit's id, or {@code null} for a special account
+ * @param orgUnitName the owning org unit's long-form name, or {@code null} for a special account
  * @param orgUnitShorthand the owning org unit's shorthand, or {@code null}
  * @param orgUnitKind kind enum name ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH} /
- *     {@code ORGANISATIONSLEITUNG})
+ *     {@code ORGANISATIONSLEITUNG}), or {@code null} for a special account
  * @param balance the current balance (signed whole aUEC)
- * @param canRequest {@code true} iff this is the caller's own-level account (the request button is
- *     shown); {@code false} for a view-only subordinate account reached by the cascade (epic #692
- *     Phase 6, owner decision Q4)
+ * @param canRequest {@code true} iff this is the caller's own-level org-unit account (the request
+ *     button is shown); {@code false} for a view-only subordinate account reached by the cascade
+ *     (epic #692 Phase 6, owner decision Q4) and for every special account
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
     String accountNo,
     String accountName,
     String status,
-    UUID orgUnitId,
-    String orgUnitName,
+    String type,
+    @Nullable UUID orgUnitId,
+    @Nullable String orgUnitName,
     @Nullable String orgUnitShorthand,
-    String orgUnitKind,
+    @Nullable String orgUnitKind,
     BigDecimal balance,
     boolean canRequest) {}
