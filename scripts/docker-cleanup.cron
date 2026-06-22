@@ -1,0 +1,24 @@
+# =============================================================================
+# Profit Basetool – woechentliches Docker-Aufraeumen (cron.d-Drop-in)
+#
+# Loescht jeden Samstag um 02:00 UTC ungenutzte Docker-Ressourcen (Images,
+# Build-Cache, gestoppte Container, Netzwerke und anonyme Volumes) ueber
+# scripts/docker-cleanup.sh.
+#
+# Installation auf dem Server:
+#   sudo cp /var/iri/code/scripts/docker-cleanup.cron /etc/cron.d/iri-docker-cleanup
+#   sudo chmod 0644 /etc/cron.d/iri-docker-cleanup
+#   sudo touch      /var/log/iri-docker-cleanup.log
+#   sudo chown root:adm /var/log/iri-docker-cleanup.log
+#   sudo chmod 0640     /var/log/iri-docker-cleanup.log
+#
+# Dieses Drop-in nutzt das /etc/cron.d-Format (mit Benutzerfeld) und erzwingt
+# UTC ueber CRON_TZ – unabhaengig von der lokalen Zeitzone des Servers. (Cronie
+# und Vixie-/ISC-Cron unterstuetzen CRON_TZ in /etc/cron.d.)
+# =============================================================================
+CRON_TZ=UTC
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Min  Std  Tag  Monat  Wochentag(6=Sa)  Benutzer  Befehl
+0      2    *    *      6                 root      /var/iri/code/scripts/docker-cleanup.sh >> /var/log/iri-docker-cleanup.log 2>&1
