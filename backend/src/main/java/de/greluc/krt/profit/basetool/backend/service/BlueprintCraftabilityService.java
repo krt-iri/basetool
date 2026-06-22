@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CraftabilityGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CraftabilityMaterialDto;
@@ -148,13 +149,23 @@ public class BlueprintCraftabilityService {
       if (material == null || material.getId() == null) {
         continue;
       }
-      double required = ingredient.getQuantityScu() == null ? 0.0d : ingredient.getQuantityScu();
+      double rawRequired = ingredient.getQuantityScu() == null ? 0.0d : ingredient.getQuantityScu();
+      if (rawRequired <= 0.0d) {
+        continue;
+      }
+      // A RESOURCE ingredient may resolve to a PIECE-quantity material; its per-craft requirement
+      // is then a whole piece count, rounded exactly as JobOrderItemService.roundForQuantityType
+      // does — so the recipe never demands a fractional piece and the craftable count stays in step
+      // with the rest of the app. SCU materials keep their fractional requirement.
+      QuantityType quantityType = material.getQuantityType();
+      double required = roundForQuantityType(rawRequired, quantityType);
       if (required <= 0.0d) {
         continue;
       }
       int floor = slotFloor(ingredient);
       requirements
-          .computeIfAbsent(material.getId(), id -> new MaterialRequirement(id, material.getName()))
+          .computeIfAbsent(
+              material.getId(), id -> new MaterialRequirement(id, material.getName(), quantityType))
           .add(required, floor);
     }
 
@@ -214,7 +225,8 @@ public class BlueprintCraftabilityService {
               round(result.inventory.missing),
               round(result.withRefinery.missing),
               (int) Math.floor(result.inventory.available / req.required),
-              (int) Math.floor(result.withRefinery.available / req.required)));
+              (int) Math.floor(result.withRefinery.available / req.required),
+              req.quantityType));
     }
 
     List<CraftabilityGroupDto> groups = buildGroups(recipe, flat, results);
@@ -382,16 +394,37 @@ public class BlueprintCraftabilityService {
     return value == null ? null : Math.round(value * 100.0d) / 100.0d;
   }
 
+  /**
+   * Rounds one slot's per-craft requirement to the precision its quantity type can express: a whole
+   * piece for a {@link QuantityType#PIECE} material, three decimals (the SCU input step) otherwise.
+   * Mirrors {@code JobOrderItemService.roundForQuantityType} so a blueprint's craftable count never
+   * diverges from the job-order requirement snapshot for the same PIECE material; a {@code null}
+   * type is treated as SCU (the {@link Material#getQuantityType()} default).
+   *
+   * @param quantity the raw per-craft requirement from {@code quantity_scu}
+   * @param quantityType the material's quantity type, or {@code null} (treated as SCU)
+   * @return the rounded requirement, in the material's own unit
+   */
+  private static double roundForQuantityType(double quantity, @Nullable QuantityType quantityType) {
+    if (quantityType == QuantityType.PIECE) {
+      return Math.round(quantity);
+    }
+    return Math.round(quantity * 1000.0d) / 1000.0d;
+  }
+
   /** Mutable accumulator for one material's pooled RESOURCE requirement across a recipe's slots. */
   private static final class MaterialRequirement {
     private final UUID materialId;
     private final String materialName;
+    private final QuantityType quantityType;
     private double required;
     private int floor;
 
-    private MaterialRequirement(UUID materialId, String materialName) {
+    private MaterialRequirement(
+        UUID materialId, String materialName, @Nullable QuantityType quantityType) {
       this.materialId = materialId;
       this.materialName = materialName;
+      this.quantityType = quantityType == null ? QuantityType.SCU : quantityType;
     }
 
     private void add(double requiredScu, int slotFloor) {

@@ -226,9 +226,17 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   above neutral for a `lower`-is-better stat. A modifier that worsens across its entire band imposes
   no floor (it is treated as inherently penalised and ignored) so a recipe never silently becomes
   uncraftable.
-- **Craftable count.** Per material the recipe's RESOURCE lines are aggregated into one required SCU
-  per craft; `N = floor( min over materials of ( qualifying available SCU / required SCU ) )`. The
+- **Craftable count.** Per material the recipe's RESOURCE lines are aggregated into one required
+  amount per craft; `N = floor( min over materials of ( qualifying available / required ) )`. The
   binding ("limiting") material is named.
+- **Quantity unit (SCU vs Stück).** A RESOURCE ingredient may resolve to a material whose
+  `QuantityType` is `PIECE` rather than `SCU`. The computation is done in the material's **own unit**
+  on both sides — `InventoryItem.amount` and the folded-in refinery yield are already piece counts
+  for a PIECE material, and the per-craft requirement is **rounded to a whole piece** (the same
+  rounding the job-order path applies, `JobOrderItemService.roundForQuantityType`), so a recipe never
+  demands a fractional piece and the count stays in step with the rest of the app. The breakdown
+  carries each material's `quantityType`, so the UI labels every amount "SCU" or "Stück" and formats
+  pieces as whole numbers (matching the inventory views); SCU materials keep their fractional amount.
 - **Effective quality & projected stats.** The effective ingredient quality is the **SCU-weighted
   average of the best-quality qualifying stock consumed first**, over one craft's requirement. Each
   build slot's stat slider in the detail pane **defaults to** that effective quality (instead of the
@@ -258,6 +266,9 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   stock does not count toward availability or the effective quality.
 - [ ] Given a not-fully-craftable blueprint, then the detail lists the short materials and the
   shortfall in SCU and the row shows "fehlt".
+- [ ] Given a RESOURCE ingredient that resolves to a `PIECE`-quantity material, then its required /
+  available / missing amounts are computed and displayed in whole pieces labelled "Stück" (the
+  per-craft requirement rounded to a whole piece), not as fractional SCU.
 - [ ] Given the refinery toggle is on, then the caller's `OPEN` + `IN_PROGRESS` refinery yield is
   added (quantity and quality), counts are recomputed, and a blueprint craftable only via refinery
   is marked `⟢`.

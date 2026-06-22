@@ -27,9 +27,19 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
  *
  * @param kind {@code "RESOURCE"} or {@code "ITEM"}
  * @param name display name of the ingredient (Wiki snapshot)
- * @param quantityScu SCU amount for a RESOURCE line, else {@code null}
+ * @param quantityScu amount for a RESOURCE line, else {@code null}; in the resolved material's
+ *     {@link de.greluc.krt.profit.basetool.backend.model.QuantityType} unit — fractional SCU for an
+ *     SCU material, a whole piece count for a PIECE material
  * @param quantityUnits whole-unit count for an ITEM line, else {@code null}
  * @param minQuality minimum quality tier required, or {@code null}
+ * @param quantityType the resolved material's quantity unit ({@code "SCU"} / {@code "PIECE"}) for a
+ *     RESOURCE line, so the UI labels {@code quantityScu} correctly; {@code null} for an ITEM line
+ *     or an unresolved RESOURCE line
  */
 public record BlueprintRequirementIngredientDto(
-    String kind, String name, Double quantityScu, Integer quantityUnits, Integer minQuality) {}
+    String kind,
+    String name,
+    Double quantityScu,
+    Integer quantityUnits,
+    Integer minQuality,
+    String quantityType) {}

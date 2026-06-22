@@ -237,7 +237,7 @@ class BlueprintProductServiceTest {
     List<BlueprintRequirementGroupDto> groups =
         List.of(new BlueprintRequirementGroupDto("Emitter", "EMITTER", 1, List.of(), List.of()));
     List<BlueprintRequirementIngredientDto> ingredients =
-        List.of(new BlueprintRequirementIngredientDto("RESOURCE", "Tin", 0.36, null, null));
+        List.of(new BlueprintRequirementIngredientDto("RESOURCE", "Tin", 0.36, null, null, "SCU"));
     when(blueprintMapper.toGroupDtos(any())).thenReturn(groups);
     when(blueprintMapper.toIngredientDtos(any())).thenReturn(ingredients);
 
