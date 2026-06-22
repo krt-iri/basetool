@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.8](https://github.com/krt-profit/basetool/releases/tag/v0.7.8) - 2026-06-22
+
 ### Fixed
 
 - **Die Blueprint-Craftbarkeit behandelt jetzt Materialien mit Mengentyp „Stück" korrekt.** Bei einem Material, das in Stück statt in SCU geführt wird, zeigt die Craftbarkeits-Aufschlüsselung Bedarf, Bestand und Fehlmenge in ganzen Stück mit der Einheit „Stück" an (statt fälschlich „SCU"), und der Bedarf pro Craft wird wie im Auftragswesen auf ganze Stück gerundet — die craftbare Anzahl bleibt dadurch konsistent.
