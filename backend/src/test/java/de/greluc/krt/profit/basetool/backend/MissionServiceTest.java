@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
@@ -81,6 +82,7 @@ class MissionServiceTest {
   private de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService
       orgUnitMembershipService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private MissionService missionService;
 
   // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions

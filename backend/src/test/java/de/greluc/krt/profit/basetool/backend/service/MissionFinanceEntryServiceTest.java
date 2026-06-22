@@ -76,6 +76,7 @@ class MissionFinanceEntryServiceTest {
   @Mock private MissionMapper missionMapper;
 
   // Constructor-injected but not exercised in these tests; declared so
+  @Mock private AuditService auditService;
   // @InjectMocks satisfies the constructor signature without an NPE.
 
   @InjectMocks private MissionFinanceEntryService service;

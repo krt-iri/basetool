@@ -42,7 +42,7 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Unit tests for {@link AdminAuditLogPageController}: the five-way tab routing (bank vs the four
+ * Unit tests for {@link AdminAuditLogPageController}: the seven-way tab routing (bank vs the six
  * generic areas), the adaptation of both DTO shapes into the uniform {@link AuditRowView}, the
  * per-tab export endpoint + event-type list, and the in-place fragment selector (REQ-AUDIT-002).
  */

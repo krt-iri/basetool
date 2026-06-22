@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
@@ -113,6 +114,7 @@ public class MissionService {
   private final de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository
       orgUnitRepository;
   private final GuestParticipantTokenService guestParticipantTokenService;
+  private final AuditService auditService;
 
   /**
    * <strong>Do not call from new code.</strong> Kept only because the wider service test suite
@@ -357,7 +359,14 @@ public class MissionService {
       ownerScopeService.currentOrgUnit().ifPresent(mission::setOwningOrgUnit);
     }
 
-    return missionRepository.save(mission);
+    Mission saved = missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_CREATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "status=" + mission.getStatus());
+    return saved;
   }
 
   /**
@@ -472,7 +481,14 @@ public class MissionService {
     bumpScheduleVersion(mission);
     bumpFlagsVersion(mission);
 
-    return missionRepository.save(mission);
+    Mission saved = missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "section=full status=" + mission.getStatus());
+    return saved;
   }
 
   /**
@@ -535,7 +551,14 @@ public class MissionService {
     }
 
     bumpCoreVersion(mission);
-    return missionRepository.save(mission);
+    Mission saved = missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "section=core status=" + mission.getStatus());
+    return saved;
   }
 
   /**
@@ -582,7 +605,14 @@ public class MissionService {
 
     validateMissionTimes(mission);
     bumpScheduleVersion(mission);
-    return missionRepository.save(mission);
+    Mission saved = missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "section=schedule");
+    return saved;
   }
 
   /**
@@ -602,7 +632,14 @@ public class MissionService {
     assertFlagsVersion(mission, expectedFlagsVersion, missionId);
     mission.setIsInternal(isInternal);
     bumpFlagsVersion(mission);
-    return missionRepository.save(mission);
+    Mission saved = missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "section=flags isInternal=" + isInternal);
+    return saved;
   }
 
   /**
@@ -691,6 +728,10 @@ public class MissionService {
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
 
+    // Snapshot the label/id BEFORE the delete so the audit row survives the removed aggregate.
+    final UUID deletedMissionId = mission.getId();
+    final String deletedMissionName = mission.getName();
+
     // Detach inventory items (so they are not deleted while still avoiding the FK violation)
     if (mission.getInventoryEntries() != null) {
       mission.getInventoryEntries().forEach(entry -> entry.setMission(null));
@@ -710,6 +751,8 @@ public class MissionService {
     }
 
     missionRepository.delete(mission);
+    auditService.record(
+        AuditEventType.MISSION_DELETED, deletedMissionId, deletedMissionName, null, null);
   }
 
   private void validateMissionTimes(Mission mission) {
@@ -897,6 +940,12 @@ public class MissionService {
 
     mission.getParticipants().add(participant);
     missionParticipantRepository.save(participant);
+    auditService.record(
+        AuditEventType.MISSION_PARTICIPANT_ADDED,
+        mission.getId(),
+        mission.getName(),
+        finalUserId,
+        "participant=" + participant.getId() + " type=" + (finalUserId != null ? "user" : "guest"));
     // NOTE: no explicit missionRepository.save(mission) here.
     // The collection is @OptimisticLock(excluded = true) so Hibernate's dirty-check
     // on commit persists the new participant (via cascade) without bumping the parent
@@ -985,6 +1034,12 @@ public class MissionService {
 
     // NOTE: no explicit missionRepository.save(mission). orphanRemoval + @OptimisticLock(excluded)
     // on participants/assignedUnits ensures dirty-flush on commit without bumping Mission.version.
+    auditService.record(
+        AuditEventType.MISSION_PARTICIPANT_REMOVED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "participant=" + participantId);
     return mission;
   }
 
@@ -1098,6 +1153,12 @@ public class MissionService {
 
     // Persist the participant explicitly; avoid save(mission) to keep Mission.version stable.
     missionParticipantRepository.save(participant);
+    auditService.record(
+        AuditEventType.MISSION_PARTICIPANT_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        participant.getUser() != null ? participant.getUser().getId() : null,
+        "participant=" + participantId);
     return mission;
   }
 
@@ -1118,6 +1179,12 @@ public class MissionService {
     }
     participant.setStartTime(Instant.now());
     missionParticipantRepository.save(participant);
+    auditService.record(
+        AuditEventType.MISSION_PARTICIPANT_CHECKED_IN,
+        mission.getId(),
+        mission.getName(),
+        participant.getUser() != null ? participant.getUser().getId() : null,
+        "participant=" + participantId);
     return mission;
   }
 
@@ -1143,6 +1210,12 @@ public class MissionService {
       participant.setEndTime(Instant.now());
     }
     missionParticipantRepository.save(participant);
+    auditService.record(
+        AuditEventType.MISSION_PARTICIPANT_CHECKED_OUT,
+        mission.getId(),
+        mission.getName(),
+        participant.getUser() != null ? participant.getUser().getId() : null,
+        "participant=" + participantId);
     return mission;
   }
 
@@ -1165,6 +1238,12 @@ public class MissionService {
       participant.setPayoutPreference(preference);
       missionParticipantRepository.save(participant);
       missionParticipantRepository.flush();
+      auditService.record(
+          AuditEventType.MISSION_PARTICIPANT_UPDATED,
+          mission.getId(),
+          mission.getName(),
+          participant.getUser() != null ? participant.getUser().getId() : null,
+          "participant=" + participantId + " field=payoutPreference");
     }
     return mission;
   }
@@ -1241,6 +1320,12 @@ public class MissionService {
 
     mission.getAssignedUnits().add(missionUnit);
     missionUnitRepository.save(missionUnit);
+    auditService.record(
+        AuditEventType.MISSION_UNIT_ADDED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "unit=" + missionUnit.getId());
     return mission;
   }
 
@@ -1384,6 +1469,12 @@ public class MissionService {
     }
 
     missionUnitRepository.save(missionUnit);
+    auditService.record(
+        AuditEventType.MISSION_UNIT_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "unit=" + unitId);
     return mission;
   }
 
@@ -1467,6 +1558,12 @@ public class MissionService {
       throw new NotFoundException("MissionUnit not found in this mission");
     }
 
+    auditService.record(
+        AuditEventType.MISSION_UNIT_REMOVED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "unit=" + unitId);
     return mission;
   }
 
@@ -1518,6 +1615,12 @@ public class MissionService {
 
     missionShip.getCrew().add(crew);
     missionCrewRepository.save(crew);
+    auditService.record(
+        AuditEventType.MISSION_CREW_ADDED,
+        mission.getId(),
+        mission.getName(),
+        participant.getUser() != null ? participant.getUser().getId() : null,
+        "unit=" + missionUnitId + " crew=" + crew.getId());
     return mission;
   }
 
@@ -1549,6 +1652,12 @@ public class MissionService {
     crew.setJobTypes(jobTypes);
 
     missionCrewRepository.save(crew);
+    auditService.record(
+        AuditEventType.MISSION_CREW_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "unit=" + missionUnitId + " crew=" + crewId);
     return mission;
   }
 
@@ -1576,6 +1685,12 @@ public class MissionService {
       throw new NotFoundException("Crew member not found in this unit");
     }
 
+    auditService.record(
+        AuditEventType.MISSION_CREW_REMOVED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "unit=" + missionUnitId + " crew=" + crewId);
     return mission;
   }
 
@@ -1623,7 +1738,14 @@ public class MissionService {
     subMission.setOwningOrgUnit(parent.getOwningOrgUnit());
 
     validateMissionTimes(subMission);
-    return missionRepository.save(subMission);
+    Mission saved = missionRepository.save(subMission);
+    auditService.record(
+        AuditEventType.MISSION_CREATED,
+        subMission.getId(),
+        subMission.getName(),
+        null,
+        "parent=" + parentMissionId);
+    return saved;
   }
 
   /**
@@ -1661,6 +1783,12 @@ public class MissionService {
       missionFrequencyRepository.save(newFreq);
     }
 
+    auditService.record(
+        AuditEventType.MISSION_FREQUENCY_CHANGED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "frequencyType=" + frequencyTypeId);
     return mission;
   }
 
@@ -1678,6 +1806,12 @@ public class MissionService {
       throw new NotFoundException("Frequency not found in this mission");
     }
 
+    auditService.record(
+        AuditEventType.MISSION_FREQUENCY_REMOVED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "frequency=" + frequencyId);
     return mission;
   }
 
@@ -1701,6 +1835,8 @@ public class MissionService {
     // Sub-level optimistic locking for ownership is provided by the dedicated MissionOwnership
     // aggregate; see updateMissionOwner(UUID,UUID,Long) below.
     upsertMissionOwnership(mission, user, null);
+    auditService.record(
+        AuditEventType.MISSION_OWNER_CHANGED, mission.getId(), mission.getName(), userId, null);
     return mission;
   }
 
@@ -1724,6 +1860,8 @@ public class MissionService {
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     mission.setOwner(user);
     upsertMissionOwnership(mission, user, expectedOwnershipVersion);
+    auditService.record(
+        AuditEventType.MISSION_OWNER_CHANGED, mission.getId(), mission.getName(), userId, null);
     return mission;
   }
 
@@ -1820,7 +1958,17 @@ public class MissionService {
     }
 
     bumpPartyLeadVersion(mission);
-    return missionRepository.save(mission);
+    Mission saved = missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_PARTY_LEAD_CHANGED,
+        mission.getId(),
+        mission.getName(),
+        userId,
+        "kind="
+            + (userId != null
+                ? "user"
+                : (guestName != null && !guestName.isBlank() ? "guest" : "cleared")));
+    return saved;
   }
 
   /**
@@ -1836,6 +1984,8 @@ public class MissionService {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     mission.getManagers().add(user);
+    auditService.record(
+        AuditEventType.MISSION_MANAGER_ADDED, mission.getId(), mission.getName(), userId, null);
     return mission;
   }
 
@@ -1850,6 +2000,8 @@ public class MissionService {
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
     mission.getManagers().removeIf(u -> u.getId().equals(userId));
+    auditService.record(
+        AuditEventType.MISSION_MANAGER_REMOVED, mission.getId(), mission.getName(), userId, null);
     return mission;
   }
 

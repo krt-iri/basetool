@@ -63,7 +63,14 @@ public class AuditReportProxyController {
    * also re-authorizes every path and rejects unknown {@code AuditDomain} enums with 400.
    */
   private static final Set<String> ALLOWED_DOMAINS =
-      Set.of("BANK", "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY");
+      Set.of(
+          "BANK",
+          "INVENTORY",
+          "JOB_ORDER",
+          "REFINERY",
+          "PERSONAL_INVENTORY",
+          "MISSION",
+          "OPERATION");
 
   private final WebClient webClient;
 

@@ -38,5 +38,13 @@ public enum AuditDomain {
   REFINERY,
 
   /** Per-user personal stash — the {@code PersonalInventoryItem} aggregate (Mein Inventar). */
-  PERSONAL_INVENTORY
+  PERSONAL_INVENTORY,
+
+  /**
+   * Missions — the {@code Mission} aggregate and its participants/units/crew/finance (Missionen).
+   */
+  MISSION,
+
+  /** Operations — the {@code Operation} aggregate and its payout toggles (Operationen). */
+  OPERATION
 }

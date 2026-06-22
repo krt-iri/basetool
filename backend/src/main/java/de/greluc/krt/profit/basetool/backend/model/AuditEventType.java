@@ -191,7 +191,102 @@ public enum AuditEventType {
   PERSONAL_INVENTORY_AUDIT_EXPORTED(AuditDomain.PERSONAL_INVENTORY),
 
   /** Personal-inventory audit rows older than an admin-chosen cutoff were purged (retention). */
-  PERSONAL_INVENTORY_AUDIT_PURGED(AuditDomain.PERSONAL_INVENTORY);
+  PERSONAL_INVENTORY_AUDIT_PURGED(AuditDomain.PERSONAL_INVENTORY),
+
+  // ---------------------------------------------------------------- MISSION (Missionen) --
+  /** A mission (or sub-mission) was created. */
+  MISSION_CREATED(AuditDomain.MISSION),
+
+  /** A mission's core / schedule / flags metadata was edited (details name the section). */
+  MISSION_UPDATED(AuditDomain.MISSION),
+
+  /** A mission was hard-deleted (its inventory/refinery links are detached, not deleted). */
+  MISSION_DELETED(AuditDomain.MISSION),
+
+  /** A participant (registered user or guest) joined or was added to a mission. */
+  MISSION_PARTICIPANT_ADDED(AuditDomain.MISSION),
+
+  /** A participant was removed from a mission. */
+  MISSION_PARTICIPANT_REMOVED(AuditDomain.MISSION),
+
+  /** A participant's attributes (job type, times, org units, payout preference) were edited. */
+  MISSION_PARTICIPANT_UPDATED(AuditDomain.MISSION),
+
+  /** A participant was checked in (start time stamped). */
+  MISSION_PARTICIPANT_CHECKED_IN(AuditDomain.MISSION),
+
+  /** A participant was checked out (end time stamped). */
+  MISSION_PARTICIPANT_CHECKED_OUT(AuditDomain.MISSION),
+
+  /** A unit (ship/team) was added to a mission. */
+  MISSION_UNIT_ADDED(AuditDomain.MISSION),
+
+  /** A mission unit was edited. */
+  MISSION_UNIT_UPDATED(AuditDomain.MISSION),
+
+  /** A mission unit was removed. */
+  MISSION_UNIT_REMOVED(AuditDomain.MISSION),
+
+  /** A participant was assigned as crew to a mission unit. */
+  MISSION_CREW_ADDED(AuditDomain.MISSION),
+
+  /** A crew assignment's roles were edited. */
+  MISSION_CREW_UPDATED(AuditDomain.MISSION),
+
+  /** A crew assignment was removed from a mission unit. */
+  MISSION_CREW_REMOVED(AuditDomain.MISSION),
+
+  /** A mission radio frequency was created or updated. */
+  MISSION_FREQUENCY_CHANGED(AuditDomain.MISSION),
+
+  /** A mission radio frequency was removed. */
+  MISSION_FREQUENCY_REMOVED(AuditDomain.MISSION),
+
+  /** A mission's owner was changed. */
+  MISSION_OWNER_CHANGED(AuditDomain.MISSION),
+
+  /** A mission's party lead (Veranstaltungsleiter) was set or cleared. */
+  MISSION_PARTY_LEAD_CHANGED(AuditDomain.MISSION),
+
+  /** A co-manager was added to a mission. */
+  MISSION_MANAGER_ADDED(AuditDomain.MISSION),
+
+  /** A co-manager was removed from a mission. */
+  MISSION_MANAGER_REMOVED(AuditDomain.MISSION),
+
+  /** A mission finance entry (income/expense) was created. */
+  MISSION_FINANCE_ENTRY_CREATED(AuditDomain.MISSION),
+
+  /** A mission finance entry was edited. */
+  MISSION_FINANCE_ENTRY_UPDATED(AuditDomain.MISSION),
+
+  /** A mission finance entry was deleted. */
+  MISSION_FINANCE_ENTRY_DELETED(AuditDomain.MISSION),
+
+  /** The mission audit log was exported as a PDF or JSON for a period. */
+  MISSION_AUDIT_EXPORTED(AuditDomain.MISSION),
+
+  /** Mission audit rows older than an admin-chosen cutoff were purged (retention). */
+  MISSION_AUDIT_PURGED(AuditDomain.MISSION),
+
+  // ------------------------------------------------------------ OPERATION (Operationen) --
+  /** An operation was created. */
+  OPERATION_CREATED(AuditDomain.OPERATION),
+
+  /** An operation was edited (name / description / status; details name a status change). */
+  OPERATION_UPDATED(AuditDomain.OPERATION),
+
+  /** An operation was hard-deleted (its missions are unlinked, not deleted). */
+  OPERATION_DELETED(AuditDomain.OPERATION),
+
+  /** A participant's payout status on an operation was toggled paid / unpaid. */
+  OPERATION_PAYOUT_TOGGLED(AuditDomain.OPERATION),
+
+  /** The operation audit log was exported as a PDF or JSON for a period. */
+  OPERATION_AUDIT_EXPORTED(AuditDomain.OPERATION),
+
+  /** Operation audit rows older than an admin-chosen cutoff were purged (retention). */
+  OPERATION_AUDIT_PURGED(AuditDomain.OPERATION);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final AuditDomain domain;

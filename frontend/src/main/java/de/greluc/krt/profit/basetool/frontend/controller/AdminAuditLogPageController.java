@@ -38,9 +38,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Spring MVC controller for the unified admin audit-log page ({@code /admin/audit-log},
- * REQ-AUDIT-001, ADR-0037). One page, a five-way tab switcher: the existing bank trail plus the
- * four generic areas (Lager / Aufträge / Raffinerie / Mein Inventar). The bank tab reads the
- * existing {@code /api/v1/bank/admin/audit} endpoint, the others read {@code
+ * REQ-AUDIT-001, ADR-0037). One page, a seven-way tab switcher: the existing bank trail plus the
+ * six generic areas (Lager / Aufträge / Raffinerie / Mein Inventar / Missionen / Operationen). The
+ * bank tab reads the existing {@code /api/v1/bank/admin/audit} endpoint, the others read {@code
  * /api/v1/audit/{domain}}; both DTO shapes are adapted into the uniform {@link AuditRowView} so a
  * single template renders every tab.
  *
@@ -59,9 +59,16 @@ public class AdminAuditLogPageController {
   /** The bank tab is the default landing tab (the old {@code /admin/bank-audit} redirects here). */
   private static final String DEFAULT_DOMAIN = "BANK";
 
-  /** The five tabs, in display order. */
+  /** The tabs, in display order. */
   private static final List<String> DOMAINS =
-      List.of("BANK", "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY");
+      List.of(
+          "BANK",
+          "INVENTORY",
+          "JOB_ORDER",
+          "REFINERY",
+          "PERSONAL_INVENTORY",
+          "MISSION",
+          "OPERATION");
 
   /** Message-bundle key prefix for the bank event-type labels (their own namespace). */
   private static final String BANK_EVENT_PREFIX = "admin.bank.audit.event.";
@@ -158,7 +165,42 @@ public class AdminAuditLogPageController {
               "PERSONAL_INVENTORY_UPDATED",
               "PERSONAL_INVENTORY_DELETED",
               "PERSONAL_INVENTORY_AUDIT_EXPORTED",
-              "PERSONAL_INVENTORY_AUDIT_PURGED"));
+              "PERSONAL_INVENTORY_AUDIT_PURGED"),
+          "MISSION",
+          List.of(
+              "MISSION_CREATED",
+              "MISSION_UPDATED",
+              "MISSION_DELETED",
+              "MISSION_PARTICIPANT_ADDED",
+              "MISSION_PARTICIPANT_REMOVED",
+              "MISSION_PARTICIPANT_UPDATED",
+              "MISSION_PARTICIPANT_CHECKED_IN",
+              "MISSION_PARTICIPANT_CHECKED_OUT",
+              "MISSION_UNIT_ADDED",
+              "MISSION_UNIT_UPDATED",
+              "MISSION_UNIT_REMOVED",
+              "MISSION_CREW_ADDED",
+              "MISSION_CREW_UPDATED",
+              "MISSION_CREW_REMOVED",
+              "MISSION_FREQUENCY_CHANGED",
+              "MISSION_FREQUENCY_REMOVED",
+              "MISSION_OWNER_CHANGED",
+              "MISSION_PARTY_LEAD_CHANGED",
+              "MISSION_MANAGER_ADDED",
+              "MISSION_MANAGER_REMOVED",
+              "MISSION_FINANCE_ENTRY_CREATED",
+              "MISSION_FINANCE_ENTRY_UPDATED",
+              "MISSION_FINANCE_ENTRY_DELETED",
+              "MISSION_AUDIT_EXPORTED",
+              "MISSION_AUDIT_PURGED"),
+          "OPERATION",
+          List.of(
+              "OPERATION_CREATED",
+              "OPERATION_UPDATED",
+              "OPERATION_DELETED",
+              "OPERATION_PAYOUT_TOGGLED",
+              "OPERATION_AUDIT_EXPORTED",
+              "OPERATION_AUDIT_PURGED"));
 
   private final BackendApiClient backendApiClient;
 

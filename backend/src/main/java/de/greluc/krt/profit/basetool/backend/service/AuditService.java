@@ -156,6 +156,8 @@ public class AuditService {
       case JOB_ORDER -> AuditEventType.JOB_ORDER_AUDIT_PURGED;
       case REFINERY -> AuditEventType.REFINERY_AUDIT_PURGED;
       case PERSONAL_INVENTORY -> AuditEventType.PERSONAL_INVENTORY_AUDIT_PURGED;
+      case MISSION -> AuditEventType.MISSION_AUDIT_PURGED;
+      case OPERATION -> AuditEventType.OPERATION_AUDIT_PURGED;
     };
   }
 

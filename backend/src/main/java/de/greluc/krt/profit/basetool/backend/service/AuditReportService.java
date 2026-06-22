@@ -173,6 +173,8 @@ public class AuditReportService {
       case JOB_ORDER -> AuditEventType.JOB_ORDER_AUDIT_EXPORTED;
       case REFINERY -> AuditEventType.REFINERY_AUDIT_EXPORTED;
       case PERSONAL_INVENTORY -> AuditEventType.PERSONAL_INVENTORY_AUDIT_EXPORTED;
+      case MISSION -> AuditEventType.MISSION_AUDIT_EXPORTED;
+      case OPERATION -> AuditEventType.OPERATION_AUDIT_EXPORTED;
     };
   }
 

@@ -97,6 +97,7 @@ class MissionServiceLifecycleTest {
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private AuthHelperService authHelperService;
 
+  @Mock private AuditService auditService;
   @InjectMocks private MissionService service;
 
   private static final UUID MISSION_ID = UUID.randomUUID();
@@ -137,6 +138,13 @@ class MissionServiceLifecycleTest {
       assertNull(inv2.getMission());
       assertTrue(mission.getInventoryEntries().isEmpty());
       verify(missionRepository).delete(mission);
+      verify(auditService)
+          .record(
+              eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.MISSION_DELETED),
+              any(),
+              any(),
+              isNull(),
+              isNull());
     }
 
     @Test
