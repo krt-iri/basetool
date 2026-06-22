@@ -88,6 +88,22 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
       @Param("domain") AuditDomain domain, @Param("from") Instant from, @Param("to") Instant to);
 
   /**
+   * Counts one domain's audit rows in a period — the export size guard. The export queries are
+   * unpaged (one document per period), so the report service checks this count first and rejects a
+   * period that would still load a pathologically large result set into memory.
+   *
+   * @param domain the area to count
+   * @param from period start (inclusive)
+   * @param to period end (inclusive)
+   * @return the number of events in the period
+   */
+  @Query(
+      "SELECT COUNT(e) FROM AuditEvent e WHERE e.domain = :domain"
+          + " AND e.occurredAt >= :from AND e.occurredAt <= :to")
+  long countForExport(
+      @Param("domain") AuditDomain domain, @Param("from") Instant from, @Param("to") Instant to);
+
+  /**
    * Bulk-deletes one domain's audit rows strictly older than a cutoff — the admin retention purge
    * (REQ-AUDIT-004). Scoped to the selected tab's domain so a purge of one area never touches
    * another. The purge is itself audit-logged by the caller <em>after</em> this delete (its row is

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import java.util.Locale;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -54,7 +55,30 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class AuditReportProxyController {
 
+  /**
+   * The known audit tabs — the bank plus the four generic areas (mirrors {@code
+   * AdminAuditLogPageController.DOMAINS}). The raw {@code domain} path segment is validated against
+   * this allowlist before it is concatenated into the backend URI, so an unknown or crafted value
+   * (e.g. one containing {@code ..}) never reaches the URI builder. Defense-in-depth: the backend
+   * also re-authorizes every path and rejects unknown {@code AuditDomain} enums with 400.
+   */
+  private static final Set<String> ALLOWED_DOMAINS =
+      Set.of("BANK", "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY");
+
   private final WebClient webClient;
+
+  /**
+   * Rejects any {@code domain} path segment that is not a known audit tab, so a crafted or unknown
+   * value never reaches the backend URI builder (defense-in-depth, REQ-AUDIT-002).
+   *
+   * @param domain the raw path segment
+   * @throws ResponseStatusException {@code 400 BAD_REQUEST} when the domain is not a known tab
+   */
+  private static void requireKnownDomain(@NotNull String domain) {
+    if (!ALLOWED_DOMAINS.contains(domain)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown audit domain: " + domain);
+    }
+  }
 
   /**
    * Proxies one area's audit-log PDF export for a caller-chosen period.
@@ -72,6 +96,7 @@ public class AuditReportProxyController {
       @RequestParam @NotNull String from,
       @RequestParam @NotNull String to,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
+    requireKnownDomain(domain);
     String backendBase =
         "BANK".equals(domain)
             ? "/api/v1/bank/admin/audit/export"
@@ -100,6 +125,7 @@ public class AuditReportProxyController {
       @PathVariable @NotNull String domain,
       @RequestParam @NotNull String from,
       @RequestParam @NotNull String to) {
+    requireKnownDomain(domain);
     String backendBase =
         "BANK".equals(domain)
             ? "/api/v1/bank/admin/audit/export.json"
@@ -126,6 +152,7 @@ public class AuditReportProxyController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> purgeAuditLog(
       @PathVariable @NotNull String domain, @RequestParam @NotNull String before) {
+    requireKnownDomain(domain);
     String backendBase =
         "BANK".equals(domain) ? "/api/v1/bank/admin/audit" : "/api/v1/audit/" + domain;
     String uri =

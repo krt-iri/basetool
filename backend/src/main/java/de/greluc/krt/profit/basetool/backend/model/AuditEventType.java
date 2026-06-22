@@ -70,7 +70,7 @@ public enum AuditEventType {
   /** A deleted user's inventory rows were bulk-reassigned to the fallback admin. */
   INVENTORY_OWNER_REASSIGNED(AuditDomain.INVENTORY),
 
-  /** The inventory audit log was exported as a PDF for a period. */
+  /** The inventory audit log was exported as a PDF or JSON for a period. */
   INVENTORY_AUDIT_EXPORTED(AuditDomain.INVENTORY),
 
   /** Inventory audit rows older than an admin-chosen cutoff were purged (retention). */
@@ -134,7 +134,7 @@ public enum AuditEventType {
   /** A squadron claim was withdrawn. */
   JOB_ORDER_CLAIM_WITHDRAWN(AuditDomain.JOB_ORDER),
 
-  /** The job-order audit log was exported as a PDF for a period. */
+  /** The job-order audit log was exported as a PDF or JSON for a period. */
   JOB_ORDER_AUDIT_EXPORTED(AuditDomain.JOB_ORDER),
 
   /** Job-order audit rows older than an admin-chosen cutoff were purged (retention). */
@@ -171,7 +171,7 @@ public enum AuditEventType {
   /** A deleted user's refinery orders were bulk-reassigned to the fallback admin. */
   REFINERY_ORDERS_REASSIGNED(AuditDomain.REFINERY),
 
-  /** The refinery audit log was exported as a PDF for a period. */
+  /** The refinery audit log was exported as a PDF or JSON for a period. */
   REFINERY_AUDIT_EXPORTED(AuditDomain.REFINERY),
 
   /** Refinery audit rows older than an admin-chosen cutoff were purged (retention). */
@@ -187,7 +187,7 @@ public enum AuditEventType {
   /** A personal inventory item was deleted. */
   PERSONAL_INVENTORY_DELETED(AuditDomain.PERSONAL_INVENTORY),
 
-  /** The personal-inventory audit log was exported as a PDF for a period. */
+  /** The personal-inventory audit log was exported as a PDF or JSON for a period. */
   PERSONAL_INVENTORY_AUDIT_EXPORTED(AuditDomain.PERSONAL_INVENTORY),
 
   /** Personal-inventory audit rows older than an admin-chosen cutoff were purged (retention). */

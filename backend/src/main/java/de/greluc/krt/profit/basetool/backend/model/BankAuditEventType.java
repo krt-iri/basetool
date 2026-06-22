@@ -81,7 +81,7 @@ public enum BankAuditEventType {
   MANAGEMENT_REPORT_EXPORTED,
 
   /**
-   * The bank audit log itself was exported as a PDF for a period (REQ-AUDIT-001 unified viewer).
+   * The bank audit log itself was exported as a PDF or JSON for a period (REQ-AUDIT-001 viewer).
    */
   AUDIT_LOG_EXPORTED,
 

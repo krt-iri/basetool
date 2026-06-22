@@ -94,6 +94,19 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
       @Param("from") Instant from, @Param("to") Instant to);
 
   /**
+   * Counts bank audit rows in a period — the export size guard. The export query is unpaged (one
+   * document per period), so the report service checks this count first and rejects a period that
+   * would still load a pathologically large result set into memory.
+   *
+   * @param from period start (inclusive)
+   * @param to period end (inclusive)
+   * @return the number of bank audit events in the period
+   */
+  @Query(
+      "SELECT COUNT(e) FROM BankAuditEvent e WHERE e.occurredAt >= :from AND e.occurredAt <= :to")
+  long countForExport(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
    * Bulk-deletes bank audit rows strictly older than a cutoff — the admin retention purge
    * (REQ-AUDIT-004). The purge is itself audit-logged by the caller <em>after</em> this delete (its
    * row is newer than the cutoff, so it survives).

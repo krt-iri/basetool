@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.Collections;
@@ -105,6 +106,50 @@ class UserServiceDeleteTest {
     verify(userApprovalEventRepository).clearDecidedBy(userId);
     verify(userRepository).clearApprovedBy(userId);
     verify(userRepository).delete(user);
+  }
+
+  @Test
+  void deleteUser_recordsReassignmentEventsWithRowCounts_whenRowsMoved() {
+    // Given the deleted user owns warehouse rows and refinery orders.
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+    when(inventoryItemRepository.updateOwner(user, admin)).thenReturn(3);
+    when(refineryOrderRepository.updateOwner(user, admin)).thenReturn(2);
+
+    // When
+    userService.deleteUser(userId);
+
+    // Then both summary events fire, carrying the affected-row count.
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_OWNER_REASSIGNED),
+            isNull(),
+            isNull(),
+            eq(userId),
+            contains("rows=3"));
+    verify(auditService)
+        .record(
+            eq(AuditEventType.REFINERY_ORDERS_REASSIGNED),
+            isNull(),
+            isNull(),
+            eq(userId),
+            contains("rows=2"));
+  }
+
+  @Test
+  void deleteUser_skipsReassignmentEvents_whenNoRowsMoved() {
+    // Given the deleted user owns nothing (the updateOwner mocks default to 0 rows).
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    // When
+    userService.deleteUser(userId);
+
+    // Then no inventory/refinery reassignment noise is recorded.
+    verify(auditService, never())
+        .record(eq(AuditEventType.INVENTORY_OWNER_REASSIGNED), any(), any(), any(), any());
+    verify(auditService, never())
+        .record(eq(AuditEventType.REFINERY_ORDERS_REASSIGNED), any(), any(), any(), any());
   }
 
   @Test

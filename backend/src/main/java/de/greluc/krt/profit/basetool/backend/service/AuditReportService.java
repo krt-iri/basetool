@@ -51,6 +51,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class AuditReportService {
 
+  /**
+   * Hard ceiling on a single export's row count. A larger period is rejected (not truncated) so the
+   * document stays renderable and one request cannot OOM; admins narrow the period or purge older
+   * entries (REQ-AUDIT-004). Generous on purpose — only a pathological span trips it.
+   */
+  private static final long MAX_EXPORT_ROWS = 100_000;
+
   private final AuditEventRepository auditEventRepository;
   private final AuditService auditService;
   private final AuditEventMapper auditEventMapper;
@@ -75,6 +82,7 @@ public class AuditReportService {
     if (from.isAfter(to)) {
       throw new BadRequestException("Audit export period start must not be after its end");
     }
+    ensureWithinExportCap(auditEventRepository.countForExport(domain, from, to), domain.name());
     List<AuditEvent> events = auditEventRepository.findForExport(domain, from, to);
     List<AuditLogPdfFormat.Row> rows =
         events.stream()
@@ -118,6 +126,7 @@ public class AuditReportService {
     if (from.isAfter(to)) {
       throw new BadRequestException("Audit export period start must not be after its end");
     }
+    ensureWithinExportCap(auditEventRepository.countForExport(domain, from, to), domain.name());
     List<AuditEventDto> dtos =
         auditEventRepository.findForExport(domain, from, to).stream()
             .map(auditEventMapper::toDto)
@@ -126,6 +135,30 @@ public class AuditReportService {
         exportEventType(domain), null, null, null, "format=json period=" + from + ".." + to);
     log.info("Audit log exported as JSON for domain {} ({} events)", domain, dtos.size());
     return dtos;
+  }
+
+  /**
+   * Rejects an export whose period would load more than {@link #MAX_EXPORT_ROWS} rows, guarding the
+   * unpaged export query against OOM / a pathologically large document.
+   *
+   * @param count the number of rows the period would load
+   * @param label the area label for the log/error message
+   * @throws BadRequestException when the period exceeds the cap
+   */
+  private void ensureWithinExportCap(long count, @NotNull String label) {
+    if (count > MAX_EXPORT_ROWS) {
+      log.warn(
+          "Audit export for {} would load {} rows (> cap {}); rejecting",
+          label,
+          count,
+          MAX_EXPORT_ROWS);
+      throw new BadRequestException(
+          "Audit export period is too large ("
+              + count
+              + " entries, max "
+              + MAX_EXPORT_ROWS
+              + "). Narrow the period or purge older entries.");
+    }
   }
 
   /**

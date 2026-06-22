@@ -56,6 +56,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BankAuditReportService {
 
+  /**
+   * Hard ceiling on a single bank-audit export's row count. A larger period is rejected (not
+   * truncated) so the document stays renderable and one request cannot OOM; admins narrow the
+   * period or purge older entries (REQ-AUDIT-004). Generous on purpose — only a pathological span
+   * trips it.
+   */
+  private static final long MAX_EXPORT_ROWS = 100_000;
+
   private final BankAuditEventRepository bankAuditEventRepository;
   private final BankAccountRepository bankAccountRepository;
   private final BankAuditService bankAuditService;
@@ -77,6 +85,7 @@ public class BankAuditReportService {
     if (from.isAfter(to)) {
       throw new BadRequestException("Audit export period start must not be after its end");
     }
+    ensureWithinExportCap(bankAuditEventRepository.countForExport(from, to));
     List<BankAuditEvent> events = bankAuditEventRepository.findForExport(from, to);
     Map<java.util.UUID, String> accountNos = resolveAccountNos(events);
 
@@ -124,6 +133,7 @@ public class BankAuditReportService {
     if (from.isAfter(to)) {
       throw new BadRequestException("Audit export period start must not be after its end");
     }
+    ensureWithinExportCap(bankAuditEventRepository.countForExport(from, to));
     List<BankAuditEvent> events = bankAuditEventRepository.findForExport(from, to);
     Map<java.util.UUID, String> accountNos = resolveAccountNos(events);
     List<BankAuditEventDto> dtos =
@@ -141,6 +151,26 @@ public class BankAuditReportService {
         "format=json period=" + from + ".." + to);
     log.info("Bank audit log exported as JSON ({} events)", events.size());
     return dtos;
+  }
+
+  /**
+   * Rejects an export whose period would load more than {@link #MAX_EXPORT_ROWS} rows, guarding the
+   * unpaged bank-audit export query against OOM / a pathologically large document.
+   *
+   * @param count the number of rows the period would load
+   * @throws BadRequestException when the period exceeds the cap
+   */
+  private void ensureWithinExportCap(long count) {
+    if (count > MAX_EXPORT_ROWS) {
+      log.warn(
+          "Bank audit export would load {} rows (> cap {}); rejecting", count, MAX_EXPORT_ROWS);
+      throw new BadRequestException(
+          "Audit export period is too large ("
+              + count
+              + " entries, max "
+              + MAX_EXPORT_ROWS
+              + "). Narrow the period or purge older entries.");
+    }
   }
 
   /**

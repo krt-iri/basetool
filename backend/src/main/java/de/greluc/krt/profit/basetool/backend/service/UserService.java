@@ -1093,25 +1093,40 @@ public class UserService {
                                 new IllegalStateException("No admin user found to reassign data")));
 
     // Reassign mandatory fields
-    inventoryItemRepository.updateOwner(user, admin);
+    int inventoryReassigned = inventoryItemRepository.updateOwner(user, admin);
     shipRepository.updateOwner(user, admin);
-    refineryOrderRepository.updateOwner(user, admin);
+    int refineryReassigned = refineryOrderRepository.updateOwner(user, admin);
     missionRepository.updateOwner(user, admin);
     // System/cascade audit: a deleted user's warehouse rows and refinery orders are bulk-reassigned
     // to the fallback admin. Summary events only (set-based UPDATEs expose no per-row ids); the
-    // deleted user is the target, the acting admin is the actor.
-    auditService.record(
-        AuditEventType.INVENTORY_OWNER_REASSIGNED,
-        null,
-        null,
-        userId,
-        "reason=user-deletion fromUser=" + userId + " toAdmin=" + admin.getId());
-    auditService.record(
-        AuditEventType.REFINERY_ORDERS_REASSIGNED,
-        null,
-        null,
-        userId,
-        "reason=user-deletion fromUser=" + userId + " toAdmin=" + admin.getId());
+    // deleted user is the target, the acting admin is the actor. Recorded only when rows actually
+    // moved and carrying the affected-row count, mirroring InventoryOrgUnitReconciler's >0 guard.
+    if (inventoryReassigned > 0) {
+      auditService.record(
+          AuditEventType.INVENTORY_OWNER_REASSIGNED,
+          null,
+          null,
+          userId,
+          "reason=user-deletion rows="
+              + inventoryReassigned
+              + " fromUser="
+              + userId
+              + " toAdmin="
+              + admin.getId());
+    }
+    if (refineryReassigned > 0) {
+      auditService.record(
+          AuditEventType.REFINERY_ORDERS_REASSIGNED,
+          null,
+          null,
+          userId,
+          "reason=user-deletion rows="
+              + refineryReassigned
+              + " fromUser="
+              + userId
+              + " toAdmin="
+              + admin.getId());
+    }
     // The mission_ownership companion (1:1 with mission, owner_id FK has no ON DELETE clause) must
     // be reassigned in lock-step with mission.owner above; otherwise its dangling owner_id FK-fails
     // (23503) on the final delete, because the parent mission survives so its mission_id cascade

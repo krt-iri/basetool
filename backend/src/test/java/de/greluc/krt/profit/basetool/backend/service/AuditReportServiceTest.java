@@ -146,6 +146,24 @@ class AuditReportServiceTest {
         () -> auditReportService.generateAuditLogJson(AuditDomain.REFINERY, from, to));
   }
 
+  @Test
+  void export_rejectsOversizedPeriod() {
+    // Given a period that would load more than the export cap (100k) into memory.
+    Instant from = Instant.now().minus(1, ChronoUnit.HOURS);
+    Instant to = Instant.now().plus(1, ChronoUnit.HOURS);
+
+    // Then both formats reject it before the unpaged fetch (guards against OOM).
+    when(auditEventRepository.countForExport(AuditDomain.INVENTORY, from, to)).thenReturn(100_001L);
+    assertThrows(
+        BadRequestException.class,
+        () -> auditReportService.generateAuditLogPdf(AuditDomain.INVENTORY, from, to, null));
+
+    when(auditEventRepository.countForExport(AuditDomain.JOB_ORDER, from, to)).thenReturn(100_001L);
+    assertThrows(
+        BadRequestException.class,
+        () -> auditReportService.generateAuditLogJson(AuditDomain.JOB_ORDER, from, to));
+  }
+
   private static String extractText(byte[] pdf) throws IOException {
     PdfReader reader = new PdfReader(pdf);
     try {

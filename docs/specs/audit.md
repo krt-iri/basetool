@@ -109,7 +109,11 @@ For each tab, an admin can export that log for a **user-selected period** (from/
 Both are admin-gated and delivered via the established `ResponseEntity<…>` + frontend-proxy +
 fetch/blob download pattern (no native dialogs; period validation + failures render inline). Each
 export is itself audit-logged (`*_AUDIT_EXPORTED`, and the bank's `AUDIT_LOG_EXPORTED`), with the
-chosen `format=pdf|json` in the details.
+chosen `format=pdf|json` in the details. The export queries are **unpaged** (one document per
+period), so a period whose row count would exceed a generous cap (100 000) is **rejected with 400**
+rather than risking an out-of-memory render — the admin narrows the period or purges older entries
+(REQ-AUDIT-004). The proxy validates the `domain` path segment against the known tabs before
+forwarding (defense-in-depth).
 
 **Acceptance**
 
