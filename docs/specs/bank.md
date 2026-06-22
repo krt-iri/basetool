@@ -270,13 +270,13 @@ an org unit is irrelevant (REQ-BANK-008).
 
 ### REQ-BANK-010 — Visibility matrix
 
-|                                         Actor                                          |                                               Sees                                               |                                          May change                                           |
-|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| Everyone without a bank role (anonymous, `GUEST`, members)                             | **nothing** (no bank surface at all)                                                             | nothing                                                                                       |
-| Officer / lead of an org unit (no bank role; via the org-unit seam, REQ-BANK-021/-022) | **balance only** of their overseen org unit's account + status of their **own** booking requests | raise / cancel own **booking requests** (off-ledger; book nothing)                            |
-| Bank employee (role + grants; org-unit membership irrelevant, REQ-BANK-008)            | accounts they hold a grant on                                                                    | bookings per their capability flags; confirm/reject requests on those accounts per capability |
-| Bank management (role; org-unit membership irrelevant)                                 | **all** accounts, holders, grants                                                                | all bookings, account lifecycle, holders, grants                                              |
-| Admin (`ROLE_ADMIN`)                                                                   | everything incl. the **audit log**                                                               | everything incl. wipe reset (REQ-BANK-013)                                                    |
+|                                         Actor                                          |                                                                                             Sees                                                                                             |                                          May change                                           |
+|----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| Everyone without a bank role (anonymous, `GUEST`, members)                             | **nothing** (no bank surface at all)                                                                                                                                                         | nothing                                                                                       |
+| Officer / lead of an org unit (no bank role; via the org-unit seam, REQ-BANK-021/-022) | **balance only** of their overseen org unit's account (active only; Bereich/OL also see the cartel-wide special accounts view-only, REQ-BANK-028) + status of their **own** booking requests | raise / cancel own **booking requests** (off-ledger; book nothing)                            |
+| Bank employee (role + grants; org-unit membership irrelevant, REQ-BANK-008)            | accounts they hold a grant on                                                                                                                                                                | bookings per their capability flags; confirm/reject requests on those accounts per capability |
+| Bank management (role; org-unit membership irrelevant)                                 | **all** accounts, holders, grants                                                                                                                                                            | all bookings, account lifecycle, holders, grants                                              |
+| Admin (`ROLE_ADMIN`)                                                                   | everything incl. the **audit log**                                                                                                                                                           | everything incl. wipe reset (REQ-BANK-013)                                                    |
 
 The audit log is **admin-only** — bank management does **not** see it. The bank area
 contributes nothing to the anonymous/guest surface (consistent with REQ-SEC-009). Bank
@@ -533,6 +533,10 @@ This is the sole, owner-approved relaxation of REQ-BANK-008's "members see nothi
 and it is mediated entirely by a non-`Bank*` seam so `BankSecurityService` stays
 org-unit-blind.
 
+> **Amendment (REQ-BANK-028):** the page lists **only active accounts** (a `CLOSED` account is
+> filtered out), and a Bereich/OL overseer (or admin) additionally sees the cartel-wide **special
+> accounts** (Sonderkonten) **view-only**.
+
 **Acceptance**
 
 - [x] An officer/lead sees only the balance of org units in their oversight scope; a plain
@@ -695,6 +699,9 @@ logic stays in the single non-`Bank*` seam `OrgUnitBankAccessService` (ADR-0020/
   `CARTEL`). Subordinate accounts reached by drill-down are **view-only**. The confirm-before-post flow,
   overdraft/holder checks and `ACCOUNT_GRANT` notifications are unchanged; bank staff still confirm.
 - The officer flow from REQ-BANK-021/022 is preserved exactly (no regression).
+- **Special accounts & active-only (REQ-BANK-028):** a Bereich/OL overseer additionally sees the
+  cartel-wide `SPECIAL` accounts (Sonderkonten) **view-only**, and the page lists only `ACTIVE`
+  accounts.
 
 **Acceptance**
 
@@ -727,6 +734,48 @@ creation + cardinality), `V168BankAreaCartelLinkageMigrationTest` (CHECK relax +
 `service/BankAccountService`, `db/migration/V168`, `controller/OrgUnitController#listActiveOrgUnitsAllKinds`,
 `templates/bank-manage.html` + `static/js/bank.js`, `templates/org-unit-bank.html` ·
 **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md) · **Issues:** #692, #699.
+
+### REQ-BANK-028 — Org-unit bank page: special-account view for Bereich/OL & active-only listing
+
+Two owner-approved refinements of the org-unit bank page (`/org-unit-bank`, REQ-BANK-021/-027),
+mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank stays org-unit-blind
+(REQ-BANK-008, ADR-0011) and both ArchUnit pins (`bankClassesMustNotConsultOrgUnitScope`,
+`orgUnitAwareBankSeamIsContainedToOneClass`) stay green:
+
+- **Special accounts (Sonderkonten) are visible to Bereich/OL overseers — view-only.** A caller who
+  holds a Bereich- or OL-level oversight seat (`is_bereichsleiter` / `is_bereichskoordinator` /
+  `is_bereichsoperator` / `is_ol_member`) — or an admin — additionally sees the balance of every
+  `SPECIAL` account on the page. Special accounts belong to no org unit, so they are matched by **type**
+  (not by the oversight cascade) and are strictly **view-only**: `canRequest` is always `false` and the
+  F2 create path rejects them (no owning org unit to scope). **Officers and SK leads do not** see
+  special accounts — only Bereich/OL/admin do (`OwnerScopeService.currentUserHasAreaOrOlOversight()`).
+  This widens the *view* only; it grants no deposit/withdrawal/booking-request capability on those
+  accounts.
+- **Only active accounts are listed.** The page lists `ACTIVE` accounts exclusively — a `CLOSED`
+  account (org-unit *or* special) is filtered out, so the org-unit bank page always shows live
+  accounts. Closing rules and the bank-staff view of closed accounts are unchanged (REQ-BANK-002/-010).
+
+**Acceptance**
+
+- [x] A Bereich/OL overseer (or admin) sees the active `SPECIAL` accounts, view-only (`canRequest`
+  false) and without an org-unit identity; an officer / SK lead does not see them
+  (`OrgUnitBankAccessServiceTest`, `OwnerScopeServiceTest.CurrentUserHasAreaOrOlOversightTests`).
+- [x] A `CLOSED` account (org-unit or special) never appears on the page; only `ACTIVE` accounts are
+  listed (`OrgUnitBankAccessServiceTest`).
+- [x] A booking request cannot target a special account (it carries no org unit; the F2 own-level
+  scope check never permits it) — REQ-BANK-022 is unchanged.
+- [x] The page renders a special-account card labelled by its account type with a "view only" marker
+  and no request button (frontend `OrgUnitBankPageControllerMvcTest`).
+- [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay
+  green; the bank stays org-unit-blind.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (special-account view-only + active-only filter),
+`OwnerScopeServiceTest` (`CurrentUserHasAreaOrOlOversightTests`), `OrgUnitBankControllerTest`, frontend
+`OrgUnitBankPageControllerMvcTest`, `ArchitectureTest` (both bank pins) · **Code:**
+`service/OrgUnitBankAccessService#listOverseenOrgUnitBalances`,
+`service/OwnerScopeService#currentUserHasAreaOrOlOversight`, `model/dto/OrgUnitBankBalanceDto`, frontend
+`templates/org-unit-bank.html` · **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md)
+(amendment) · **Issues:** #666, #692.
 
 ## Out of scope
 

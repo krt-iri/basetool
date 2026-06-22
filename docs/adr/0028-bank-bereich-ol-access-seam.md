@@ -3,7 +3,8 @@
 - **Status:** Accepted — implemented (epic #692 Phase 6, PR #699)
 - **Date:** 2026-06-19
 - **Deciders:** @greluc, Claude
-- **Related:** spec REQ-BANK-027 · REQ-BANK-008 · REQ-BANK-021 · REQ-BANK-022 · ADR-0011 · ADR-0020 · ADR-0026 · issue #692 · #699
+- **Related:** spec REQ-BANK-027 · REQ-BANK-028 · REQ-BANK-008 · REQ-BANK-021 · REQ-BANK-022 · ADR-0011 · ADR-0020 · ADR-0026 · issue #692 · #699
+- **Amended:** 2026-06-22 — special-account (Sonderkonto) view for Bereich/OL + active-only listing (REQ-BANK-028, see the Amendment section below)
 
 ## Context
 
@@ -74,4 +75,30 @@ We will **link `AREA` accounts to a Bereich and `CARTEL` to the OL**, and extend
 - **Put the admin-drill-down logic in a `Bank*` class** — rejected: it would violate
   `bankClassesMustNotConsultOrgUnitScope`; any new bridge must be non-`Bank*` and added to the
   containment pin.
+
+## Amendment (REQ-BANK-028) — special-account view for Bereich/OL & active-only listing
+
+- **Status:** Accepted — implemented
+- **Date:** 2026-06-22
+
+Two owner-approved refinements of the org-unit bank page, both realised **inside the same seam** so
+the org-unit-blindness of the bank and both ArchUnit pins are untouched:
+
+- **Bereich/OL (and admin) additionally see the cartel-wide `SPECIAL` accounts (Sonderkonten),
+  view-only.** Special accounts belong to no org unit, so they cannot be reached by the oversight
+  cascade; the seam admits them **by type** for callers who hold a Bereich-/OL-level oversight seat,
+  decided by a new membership-only predicate `OwnerScopeService.currentUserHasAreaOrOlOversight()`
+  (admin short-circuits to `true`; SK-leads and officers do **not** qualify — they oversee only their
+  own unit's account). The accounts are strictly view-only: `canRequest` stays `false` and the
+  own-level F2 create path rejects them (no owning org unit to scope), so this widens the *view* only
+  and adds no booking capability. The balance DTO's org-unit fields become nullable and it gains the
+  account `type` so the UI can label a Sonderkonto that carries no org-unit identity.
+- **The page lists only `ACTIVE` accounts.** `listOverseenOrgUnitBalances()` filters out `CLOSED`
+  accounts (org-unit and special alike), so the org-unit bank page always shows live accounts. The
+  bank-staff surface and the closing rules are unchanged.
+
+Consequence: zero bank-domain change again — the new predicate lives in `OwnerScopeService` (a
+non-`Bank*` class, already the seam's collaborator) and the seam consumes it; `BankSecurityService`,
+the ledger and the grant model stay org-unit-blind. The asymmetry from the base decision holds: the
+special-account view, like the subordinate drill-down, is view-only.
 
