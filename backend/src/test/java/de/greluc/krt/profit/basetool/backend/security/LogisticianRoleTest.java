@@ -336,7 +336,6 @@ class LogisticianRoleTest {
     membership.setKind(OrgUnitKind.SPECIAL_COMMAND);
     membership.setJoinedAt(java.time.Instant.now());
     membership.setLogistician(false);
-    membership.setLead(true);
     membership.setRole(MembershipRole.SK_LEAD);
     orgUnitMembershipRepository.save(membership);
     orgUnitMembershipRepository.flush();

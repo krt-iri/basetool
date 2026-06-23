@@ -18,11 +18,11 @@ this org unit" — so that other features (first the bank, in a later session) c
 these ranks. It is the anchor for the rank-related amendments in
 [`org-unit-tenancy.md`](org-unit-tenancy.md), [`security-and-access.md`](security-and-access.md) and
 [`org-chart.md`](org-chart.md), and for the role matrix in
-[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Tracked by epic #800 (Phases 1–3 shipped:
-the additive rank column + Kommandogruppe, the authorisation layer reads the rank with the
-squadron-rank baseline grant, and the delegated appointment ladder + Kommandogruppe CRUD + ROLE
+[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Tracked by epic #800, now complete
+(Phases 1–3: the additive rank column + Kommandogruppe, the authorisation layer reads the rank with
+the squadron-rank baseline grant, and the delegated appointment ladder + Kommandogruppe CRUD + ROLE
 audit; Phase 4 mirrors the ranks onto the org chart (REQ-ROLE-006) and adds the delegated Leitung UI;
-Phase 5 is the destructive boolean-column cleanup).
+Phase 5 (V187) drops the five legacy boolean leadership flags so `role` is the sole source of truth).
 
 Every role and membership mutation (assign / change / revoke a rank, grant / revoke a membership,
 toggle the Logistician / Mission-Manager capability flags) is recorded in a dedicated **`ROLE`
@@ -43,9 +43,10 @@ flags — they are NOT folded into the rank.
 
 The rank is kind-scoped by the DB CHECK `chk_org_unit_membership_role_kind`: squadron ranks only on
 `SQUADRON` rows, area ranks only on `BEREICH`, `OL_MEMBER` only on `ORGANISATIONSLEITUNG`, `SK_LEAD`
-only on `SPECIAL_COMMAND`; `MEMBER` on any kind. During the additive soak (Phase 1) the boolean
-columns remain authoritative and the rank is written in lockstep; the booleans drop in the Phase-5
-cleanup.
+only on `SPECIAL_COMMAND`; `MEMBER` on any kind. The additive soak (Phases 1-4) is over: the five
+boolean columns were dropped in the Phase-5 cleanup (V187) and `role` is now the **sole source of
+truth**. The few wire shapes that still expose a boolean (`OrgUnitMembershipDto.isLead`, the
+Bereich/OL appointment responses) derive it from `role` at the controller / mapper boundary.
 
 **Acceptance**
 
@@ -53,9 +54,11 @@ cleanup.
 - [x] The rank is backfilled 1:1 from the five booleans (mutually exclusive ⇒ unambiguous).
 - [x] The authorisation layer reads the rank instead of the booleans, behaviour-identical for every
   existing area/OL/SK row (Phase 2).
-- [ ](Phase 5) The five boolean columns are dropped once no code reads them.
+- [x] The five boolean columns + their three CHECK constraints are dropped (V187), the
+  `enforce_leader_excludes_squadron` trigger is rewritten onto `role` (squadron ranks exempt), and no
+  code reads a boolean flag.
 
-**Enforced by:** `OrgHierarchyMigrationTest` (V184), `MembershipRoleMigrationEquivalenceTest` · **Code:** `MembershipRole`, `OrgUnitMembership#role`, `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService`, `V184__add_org_unit_membership_role_and_backfill.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgHierarchyMigrationTest` (V184 + `v187DropsBooleanFlagsAndConstraints` + `v187LeaderExclusionTriggerReadsRole_squadronRanksExempt`), `MembershipRoleMigrationEquivalenceTest`, `SpecialCommandSecurityServiceTest`, `OrgUnitMembershipServiceTest` · **Code:** `MembershipRole`, `OrgUnitMembership#role`, `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService`, `SpecialCommandSecurityService`, `OrgHierarchyController`, `OrgUnitMembershipMapper`, `V184__add_org_unit_membership_role_and_backfill.sql`, `V187__drop_org_unit_membership_boolean_flags.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-002 — Baseline grant for squadron leadership ranks
 

@@ -19,6 +19,7 @@
 ### Changed
 
 - **Auszahlungen und Umbuchungen prüfen nur noch die Kontodeckung, nicht mehr den Halter.** Ein Konto kann weiterhin nie ins Minus gehen; der Halterbestand darf es (und wird später ausgeglichen). Die kontobezogene „Halter-Verteilung" entfällt: Konto-Detailseite, Kontoauszug-PDF und 3-Monats-Report zeigen sie nicht mehr — der 3-Monats-Report schließt stattdessen mit den bankweiten Halterbeständen.
+- **Intern: Die fünf alten Führungsrollen-Booleans der Mitgliedschaften wurden entfernt (Migration V187).** Der vereinheitlichte Rang ist jetzt die alleinige Quelle der Wahrheit; die DB-Regel „Führungskraft gehört keiner Staffel an" arbeitet darauf weiter (Staffelränge sind ausgenommen). Reine Aufräum-/Schema-Änderung ohne sichtbare Auswirkung — beim Deploy wird einmalig eine nicht umkehrbare Migration ausgeführt.
 
 ## [v0.7.9](https://github.com/krt-profit/basetool/releases/tag/v0.7.9) - 2026-06-22
 

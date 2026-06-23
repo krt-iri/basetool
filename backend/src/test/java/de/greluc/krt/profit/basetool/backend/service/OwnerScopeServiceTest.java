@@ -184,7 +184,6 @@ class OwnerScopeServiceTest {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setId(new OrgUnitMembershipId(userId, olId));
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
-    m.setOlMember(true);
     m.setRole(MembershipRole.OL_MEMBER);
     return m;
   }
@@ -1702,7 +1701,6 @@ class OwnerScopeServiceTest {
     void skLead_canAccess() {
       UUID skId = UUID.randomUUID();
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
-      lead.setLead(true);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
@@ -1740,7 +1738,6 @@ class OwnerScopeServiceTest {
     void bereichLeader_canAccess() {
       // Epic #692 Phase 6: a Bereichsleitung seat is an oversight seat — it unlocks the overview.
       OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      bereichSeat.setBereichsleiter(true);
       bereichSeat.setRole(MembershipRole.BEREICHSLEITER);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
@@ -1804,7 +1801,6 @@ class OwnerScopeServiceTest {
     void skLead_doesNotQualify() {
       // An SK-lead oversees only their own SK account, not the org-wide special accounts.
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, UUID.randomUUID());
-      lead.setLead(true);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1817,7 +1813,6 @@ class OwnerScopeServiceTest {
     @Test
     void bereichsleiter_qualifies() {
       OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      seat.setBereichsleiter(true);
       seat.setRole(MembershipRole.BEREICHSLEITER);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1829,7 +1824,6 @@ class OwnerScopeServiceTest {
     @Test
     void bereichskoordinator_qualifies() {
       OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      seat.setBereichskoordinator(true);
       seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1921,7 +1915,6 @@ class OwnerScopeServiceTest {
     void skLeadOnly_scopesToLedSkNotOwnStaffel() {
       UUID skId = UUID.randomUUID();
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
-      lead.setLead(true);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
@@ -1940,7 +1933,6 @@ class OwnerScopeServiceTest {
     void officerWhoAlsoLeadsSk_scopesToBoth() {
       UUID skId = UUID.randomUUID();
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
-      lead.setLead(true);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
@@ -2018,7 +2010,6 @@ class OwnerScopeServiceTest {
       UUID bereichId = UUID.randomUUID();
       UUID childStaffelId = UUID.randomUUID();
       OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
-      bereichSeat.setBereichsleiter(true);
       bereichSeat.setRole(MembershipRole.BEREICHSLEITER);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
@@ -2078,7 +2069,6 @@ class OwnerScopeServiceTest {
     void skLead_ownLevelIsLedSk() {
       UUID skId = UUID.randomUUID();
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
-      lead.setLead(true);
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
@@ -2096,7 +2086,6 @@ class OwnerScopeServiceTest {
     void bereichLeader_ownLevelIsBereichOnly_notChildrenAndNeverCascades() {
       UUID bereichId = UUID.randomUUID();
       OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
-      bereichSeat.setBereichsleiter(true);
       bereichSeat.setRole(MembershipRole.BEREICHSLEITER);
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
@@ -2221,7 +2210,6 @@ class OwnerScopeServiceTest {
       OrgUnitMembership m = new OrgUnitMembership();
       m.setId(new OrgUnitMembershipId(MEMBER_USER_ID, BEREICH_A_ID));
       m.setKind(OrgUnitKind.BEREICH);
-      m.setBereichsleiter(true);
       m.setRole(MembershipRole.BEREICHSLEITER);
       return m;
     }
@@ -2323,7 +2311,6 @@ class OwnerScopeServiceTest {
       OrgUnitMembership m = new OrgUnitMembership();
       m.setId(new OrgUnitMembershipId(userId, BEREICH_ID));
       m.setKind(OrgUnitKind.BEREICH);
-      m.setBereichsleiter(true);
       m.setRole(MembershipRole.BEREICHSLEITER);
       return m;
     }

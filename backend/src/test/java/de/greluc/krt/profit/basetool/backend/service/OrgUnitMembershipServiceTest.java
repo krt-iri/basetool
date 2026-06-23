@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -329,7 +328,6 @@ class OrgUnitMembershipServiceTest {
   void toggleLead_promotes() {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setVersion(0L);
-    m.setLead(false);
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
@@ -337,7 +335,7 @@ class OrgUnitMembershipServiceTest {
 
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
-    assertTrue(updated.isLead());
+    assertEquals(MembershipRole.SK_LEAD, updated.getRole());
     verify(orgChartService).mirrorSkLead(scId, userId, true);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(scId), any(), eq(userId), any());
@@ -347,7 +345,7 @@ class OrgUnitMembershipServiceTest {
   void toggleLead_demotes() {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setVersion(2L);
-    m.setLead(true);
+    m.setRole(MembershipRole.SK_LEAD);
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(false, 2L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
@@ -355,7 +353,7 @@ class OrgUnitMembershipServiceTest {
 
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
-    assertFalse(updated.isLead());
+    assertEquals(MembershipRole.MEMBER, updated.getRole());
     verify(orgChartService).mirrorSkLead(scId, userId, false);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_REVOKED), eq(scId), any(), eq(userId), any());
@@ -380,7 +378,6 @@ class OrgUnitMembershipServiceTest {
     // is rejected with a clean 400 (the V165 trigger is the DB backstop).
     OrgUnitMembership m = new OrgUnitMembership();
     m.setVersion(0L);
-    m.setLead(false);
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
@@ -400,7 +397,6 @@ class OrgUnitMembershipServiceTest {
     Squadron target = new Squadron();
     target.setId(UUID.randomUUID());
     OrgUnitMembership leadRow = new OrgUnitMembership();
-    leadRow.setLead(true);
     leadRow.setRole(MembershipRole.SK_LEAD);
     when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
@@ -431,9 +427,7 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership m =
         membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
 
-    assertTrue(m.isBereichskoordinator());
-    assertFalse(m.isBereichsleiter());
-    assertFalse(m.isBereichsoperator());
+    assertEquals(MembershipRole.BEREICHSKOORDINATOR, m.getRole());
     verify(orgChartService).mirrorBereichRole(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(bereichId), any(), eq(userId), any());
@@ -447,7 +441,6 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership existing = new OrgUnitMembership();
     existing.setId(new OrgUnitMembershipId(userId, bereichId));
     existing.setKind(OrgUnitKind.BEREICH);
-    existing.setBereichsleiter(true);
     existing.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -512,7 +505,7 @@ class OrgUnitMembershipServiceTest {
 
     OrgUnitMembership m = membershipService.addOlMember(olId, userId);
 
-    assertTrue(m.isOlMember());
+    assertEquals(MembershipRole.OL_MEMBER, m.getRole());
     verify(orgChartService).mirrorOlMember(olId, userId);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(olId), any(), eq(userId), any());
@@ -787,7 +780,6 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership bereichRow = new OrgUnitMembership();
     bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
     bereichRow.setKind(OrgUnitKind.BEREICH);
-    bereichRow.setBereichsleiter(true);
     bereichRow.setRole(MembershipRole.BEREICHSLEITER);
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(bereichRow));
     when(orgUnitCascadeService.expandWithDescendants(any()))

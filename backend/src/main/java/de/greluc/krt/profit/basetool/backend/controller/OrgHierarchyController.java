@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -269,12 +270,15 @@ public class OrgHierarchyController {
    * @return the response DTO.
    */
   private BereichMemberResponse toBereichMember(@NotNull OrgUnitMembership m) {
+    // The three Bereich booleans are derived from the unified rank (epic #800, REQ-ROLE-001) — the
+    // is_bereichs* columns were dropped in the Phase 5 cleanup (V187).
+    MembershipRole role = m.getRole();
     return new BereichMemberResponse(
         m.getId().getOrgUnitId(),
         m.getId().getUserId(),
-        m.isBereichsleiter(),
-        m.isBereichskoordinator(),
-        m.isBereichsoperator(),
+        role == MembershipRole.BEREICHSLEITER,
+        role == MembershipRole.BEREICHSKOORDINATOR,
+        role == MembershipRole.BEREICHSOPERATOR,
         m.getVersion());
   }
 
@@ -285,8 +289,14 @@ public class OrgHierarchyController {
    * @return the response DTO.
    */
   private OlMemberResponse toOlMember(@NotNull OrgUnitMembership m) {
+    // The OL-member boolean is derived from the unified rank (epic #800, REQ-ROLE-001) —
+    // is_ol_member
+    // was dropped in the Phase 5 cleanup (V187).
     return new OlMemberResponse(
-        m.getId().getOrgUnitId(), m.getId().getUserId(), m.isOlMember(), m.getVersion());
+        m.getId().getOrgUnitId(),
+        m.getId().getUserId(),
+        m.getRole() == MembershipRole.OL_MEMBER,
+        m.getVersion());
   }
 
   /**

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -98,7 +99,7 @@ class SpecialCommandSecurityServiceTest {
   @Test
   void nonAdmin_leadOfThisSc_passes() {
     OrgUnitMembership lead = new OrgUnitMembership();
-    lead.setLead(true);
+    lead.setRole(MembershipRole.SK_LEAD);
     lenient().when(authHelperService.isAdmin()).thenReturn(false);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
     when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))
@@ -110,7 +111,7 @@ class SpecialCommandSecurityServiceTest {
   @Test
   void nonAdmin_memberOfThisScButNotLead_returnsFalse() {
     OrgUnitMembership notLead = new OrgUnitMembership();
-    notLead.setLead(false);
+    notLead.setRole(MembershipRole.MEMBER);
     lenient().when(authHelperService.isAdmin()).thenReturn(false);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
     when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))

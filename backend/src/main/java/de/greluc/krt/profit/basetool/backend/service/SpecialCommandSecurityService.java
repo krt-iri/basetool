@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import java.util.UUID;
@@ -89,7 +89,9 @@ public class SpecialCommandSecurityService {
         .flatMap(
             userId ->
                 membershipRepository.findById(new OrgUnitMembershipId(userId, specialCommandId)))
-        .map(OrgUnitMembership::isLead)
+        // SK-Lead now lives on the unified rank (epic #800, REQ-ROLE-001); is_lead was dropped in
+        // the Phase 5 cleanup (V187).
+        .map(m -> m.getRole() == MembershipRole.SK_LEAD)
         .orElse(false);
   }
 }

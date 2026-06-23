@@ -438,12 +438,9 @@ public class OrgUnitMembershipService {
       m.setKind(OrgUnitKind.BEREICH);
       m.setJoinedAt(Instant.now());
     }
-    m.setBereichsleiter(role == BereichLeadershipRole.LEITER);
-    m.setBereichskoordinator(role == BereichLeadershipRole.KOORDINATOR);
-    m.setBereichsoperator(role == BereichLeadershipRole.OPERATOR);
-    // Dual-write the unified rank (epic #800 Phase 1, REQ-ROLE-001): the boolean flags stay
-    // authoritative during the soak, but role is kept in lockstep so Phase 2 can switch the
-    // authorisation layer onto it without a second backfill.
+    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); the legacy boolean
+    // leadership flags (is_bereichsleiter / -koordinator / -operator) were dropped in the Phase 5
+    // cleanup (V187).
     m.setRole(
         switch (role) {
           case LEITER -> MembershipRole.BEREICHSLEITER;
@@ -531,8 +528,8 @@ public class OrgUnitMembershipService {
     m.setUser(user);
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
-    m.setOlMember(true);
-    // Dual-write the unified rank (epic #800 Phase 1, REQ-ROLE-001) in lockstep with is_ol_member.
+    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_ol_member was
+    // dropped in the Phase 5 cleanup (V187).
     m.setRole(MembershipRole.OL_MEMBER);
     // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
     // in-transaction failure and keeps the flushed @Version in the response under the
@@ -826,8 +823,9 @@ public class OrgUnitMembershipService {
           "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel membership"
               + " first (REQ-ORG-017)");
     }
-    m.setLead(request.isLead());
-    // Dual-write the unified rank (epic #800 Phase 1, REQ-ROLE-001) in lockstep with is_lead.
+    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_lead was dropped
+    // in
+    // the Phase 5 cleanup (V187). The request's isLead boolean is the API verb (promote/demote).
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
     OrgUnitMembership saved = membershipRepository.save(m);
     // Mirror the SK-Leiter seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
@@ -848,8 +846,8 @@ public class OrgUnitMembershipService {
    * must be a squadron rank; the Kommandogruppe pairing and the cardinality caps (&le;1
    * Staffelleiter per squadron, &le;1 Kommandoleiter + &le;1 stellv. per group, &le;4 Ensigns per
    * squadron) are enforced here with clean 400s, complementing the V185 DB CHECK. Squadron ranks
-   * set no boolean leadership flag (so the V165 trigger leaves them alone) — only the {@code role}
-   * and the {@code kommandoGroup}.
+   * are exempt from the V165 {@code enforce_leader_excludes_squadron} trigger (they <em>are</em>
+   * Staffel members) — they set only the {@code role} and the {@code kommandoGroup}.
    *
    * @param squadronId the Staffel; must be a {@code SQUADRON} org unit.
    * @param userId the member to assign the rank to; must already be a member of this Staffel.

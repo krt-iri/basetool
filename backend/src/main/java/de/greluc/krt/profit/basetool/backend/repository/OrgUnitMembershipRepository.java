@@ -153,8 +153,8 @@ public interface OrgUnitMembershipRepository
    * @return the lead user ids; never {@code null}, possibly empty
    */
   @Query(
-      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.isLead ="
-          + " true")
+      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role ="
+          + " de.greluc.krt.profit.basetool.backend.model.MembershipRole.SK_LEAD")
   Set<UUID> findLeadUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**

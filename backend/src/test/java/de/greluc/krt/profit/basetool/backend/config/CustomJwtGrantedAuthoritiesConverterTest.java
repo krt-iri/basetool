@@ -102,7 +102,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void bereichsleiter_getsFlatRolesAndCascadedContextualAuthorities() {
     when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
-    lead.setBereichsleiter(true);
     lead.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
@@ -125,7 +124,6 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
     UUID olId = UUID.randomUUID();
     OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
-    ol.setOlMember(true);
     ol.setRole(MembershipRole.OL_MEMBER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(ol));
     // The cascade service resolves OL reach to the concrete union of every org unit.
