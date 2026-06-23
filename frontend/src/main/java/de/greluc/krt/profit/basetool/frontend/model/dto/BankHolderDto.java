@@ -24,15 +24,16 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of one holder-registry row (REQ-BANK-003) with the custody totals shown on the
- * management "Halter" tab.
+ * Frontend mirror of one holder-registry row (REQ-BANK-003, ADR-0039) with the holder's global
+ * custody total shown on the management "Halter" tab.
  *
  * @param id the holder row's id
  * @param userId the linked basetool user, or {@code null} after user deletion
  * @param handle the deletion-proof handle snapshot
- * @param active whether the holder accepts new postings
- * @param totalHeld signed sum the holder physically holds across all accounts
- * @param accountCount number of accounts with a non-zero sub-balance for this holder
+ * @param active whether the holder accepts new incoming postings
+ * @param totalHeld signed global sum the holder physically holds across the whole bank (may be
+ *     negative)
+ * @param roleManaged whether the holder was auto-created from a bank role (REQ-BANK-029)
  * @param version optimistic-locking version to echo on mutations
  */
 public record BankHolderDto(
@@ -41,5 +42,5 @@ public record BankHolderDto(
     String handle,
     boolean active,
     BigDecimal totalHeld,
-    long accountCount,
+    boolean roleManaged,
     Long version) {}

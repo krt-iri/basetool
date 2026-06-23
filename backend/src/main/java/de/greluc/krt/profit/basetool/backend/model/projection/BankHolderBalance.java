@@ -23,14 +23,15 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * JPQL constructor projection for one slice of an account's holder distribution (REQ-BANK-003): the
- * per-(account, holder) sub-balance computed as a grouped {@code SUM} over the postings. The
- * sub-balances of an account always sum exactly to its balance.
+ * JPQL constructor projection for one holder's <strong>global</strong> custody balance
+ * (REQ-BANK-003, ADR-0039): the grouped {@code SUM} over the holder ledger ({@code
+ * bank_holder_posting}) across the whole bank. Decoupled from accounts and may be negative
+ * (REQ-BANK-006).
  *
  * @param holderId the {@code bank_holder} id
  * @param handle the holder's deletion-proof handle snapshot, for display
- * @param holderActive whether the holder currently accepts new postings
- * @param amount the signed sub-balance the holder physically holds on the account
+ * @param holderActive whether the holder currently accepts new incoming postings
+ * @param amount the signed global amount the holder physically holds across the whole bank
  */
 public record BankHolderBalance(
     UUID holderId, String handle, boolean holderActive, BigDecimal amount) {}

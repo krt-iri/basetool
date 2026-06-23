@@ -43,10 +43,10 @@ import lombok.ToString;
  * {@code bank_posting} table created by Flyway V153.
  *
  * <p>Insert-only like its header — no {@code @Version}, never updated or deleted. The account
- * balance is {@code SUM(amount)} over its postings; the holder distribution is the same sum grouped
- * by {@link #holder} (REQ-BANK-003). Every leg names exactly one holder: the player whose physical
- * stash the leg changes. Amounts are signed whole-aUEC {@code NUMERIC(19,4)} values (ADR-0002) and
- * never zero (V153 CHECK).
+ * balance is {@code SUM(amount)} over its postings. Since ADR-0039 a posting carries
+ * <strong>only</strong> the account dimension — the holder dimension lives in its own ledger
+ * ({@link BankHolderPosting}); the legacy {@code holder_id} column was dropped in V181. Amounts are
+ * signed whole-aUEC {@code NUMERIC(19,4)} values (ADR-0002) and never zero (V153 CHECK).
  */
 @Entity
 @Table(name = "bank_posting")
@@ -74,15 +74,6 @@ public class BankPosting {
   @JoinColumn(name = "account_id", nullable = false, updatable = false)
   @ToString.Exclude
   private BankAccount account;
-
-  /**
-   * The player physically holding/moving the money (REQ-BANK-003); mandatory on every leg. The
-   * database restricts holder deletion while postings reference it ({@code ON DELETE RESTRICT}).
-   */
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "holder_id", nullable = false, updatable = false)
-  @ToString.Exclude
-  private BankHolder holder;
 
   /**
    * Signed whole-aUEC amount ({@code NUMERIC(19,4)}, ADR-0002): positive legs add to the

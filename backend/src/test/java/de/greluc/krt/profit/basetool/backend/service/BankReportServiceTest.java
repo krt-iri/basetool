@@ -75,12 +75,14 @@ class BankReportServiceTest {
   @BeforeEach
   void seed() {
     account = newAccount("Report Konto " + UUID.randomUUID());
-    holderHandle = "report-holder-" + UUID.randomUUID();
+    // A short, unique handle so it renders contiguously in the narrow booking-row holder column
+    // (the wide per-account distribution table that used to carry it was removed, ADR-0039).
+    holderHandle = "rh-" + UUID.randomUUID().toString().substring(0, 8);
     holder = newHolder(holderHandle);
   }
 
   @Test
-  void statement_containsBalancesRunningColumnAndDistribution() throws IOException {
+  void statement_containsBalancesRunningColumnAndPerBookingHolder() throws IOException {
     // Given
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     deposit("500");
@@ -101,8 +103,12 @@ class BankReportServiceTest {
     assertTrue(text.contains("-200"), "withdrawal amount present");
     assertTrue(text.contains("Einzahlung"), "deposit type label present");
     assertTrue(text.contains("Auszahlung"), "withdrawal type label present");
-    assertTrue(text.contains(holderHandle), "holder handle present");
-    assertTrue(text.contains("HALTER-VERTEILUNG ZUM STICHTAG"), "distribution section present");
+    // The per-booking holder annotation (derived from the holder ledger by amount sign, ADR-0039)
+    // is present; the per-account holder-distribution section was removed.
+    assertTrue(text.contains(holderHandle), "holder handle present on the booking rows");
+    assertFalse(
+        text.contains("HALTER-VERTEILUNG ZUM STICHTAG"),
+        "the per-account holder distribution section is gone (ADR-0039)");
     assertTrue(
         text.contains("Generiert von Profit Basetool am ") && text.contains(" UTC"),
         "footer carries the UTC generation timestamp");
@@ -203,7 +209,9 @@ class BankReportServiceTest {
     assertTrue(text.contains("Eingänge"), "summary inflow label present");
     assertTrue(text.contains("Endsaldo"), "summary closing label present");
     assertTrue(text.contains("+750"), "itemized booking present");
-    assertTrue(text.contains(holderHandle), "closing distribution names the holder");
+    assertTrue(
+        text.contains("HALTERBESTAND GESAMT"), "global holder-balance section present (ADR-0039)");
+    assertTrue(text.contains(holderHandle), "the global holder section names the holder");
     assertTrue(text.contains("Kontostandverlauf"), "per-account balance chart caption present");
     assertEquals(
         auditBefore + 1, auditEventRepository.count(), "exactly one MANAGEMENT_REPORT_EXPORTED");

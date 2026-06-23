@@ -46,8 +46,9 @@ public class BankConflictException extends RuntimeException {
   public static final String CODE_BANK_OVERDRAFT = "BANK_OVERDRAFT";
 
   /**
-   * Overdraft attempt at holder level: the booking would take the named holder's sub-balance on the
-   * account below zero, even though the account balance might suffice (REQ-BANK-006).
+   * Retired since ADR-0039: holder balances are now a global dimension allowed to go negative
+   * (REQ-BANK-006), so no booking path checks holder coverage. The constant is kept for backward
+   * reference; it is no longer thrown.
    */
   public static final String CODE_BANK_HOLDER_OVERDRAFT = "BANK_HOLDER_OVERDRAFT";
 
@@ -60,7 +61,11 @@ public class BankConflictException extends RuntimeException {
   /** Grant creation for a user who does not hold the Bank Employee role (REQ-BANK-009). */
   public static final String CODE_BANK_GRANTEE_MISSING_ROLE = "BANK_GRANTEE_MISSING_ROLE";
 
-  /** Transfer with identical source and destination (same account AND same holder). */
+  /**
+   * Transfer with identical source and destination: same source/destination account on an
+   * account-to-account transfer, or same source/destination holder on a holder Umbuchung
+   * (REQ-BANK-011/-031).
+   */
   public static final String CODE_BANK_SELF_TRANSFER = "BANK_SELF_TRANSFER";
 
   /** Reversal attempt on a transaction that has already been reversed (REQ-BANK-004). */

@@ -98,7 +98,6 @@ class BankLedgerIntegrityServiceTest {
         BankPosting.builder()
             .transaction(tx)
             .account(account)
-            .holder(holder)
             .amount(new BigDecimal("-1000"))
             .createdAt(Instant.now())
             .build());
@@ -127,7 +126,6 @@ class BankLedgerIntegrityServiceTest {
         BankPosting.builder()
             .transaction(tx)
             .account(account)
-            .holder(holder)
             .amount(new BigDecimal("250"))
             .createdAt(Instant.now())
             .build());

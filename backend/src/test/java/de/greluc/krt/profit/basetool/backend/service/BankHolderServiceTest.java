@@ -20,10 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -31,16 +31,25 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.BankHolderMapper;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.RegisterBankHolderRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankHolderRequest;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBookingRow;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +59,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
@@ -61,6 +72,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 class BankHolderServiceTest {
 
   @Mock private BankHolderRepository holderRepository;
+  @Mock private BankHolderPostingRepository holderPostingRepository;
   @Mock private BankPostingRepository postingRepository;
   @Mock private UserRepository userRepository;
   @Mock private BankHolderMapper bankHolderMapper;
@@ -73,7 +85,7 @@ class BankHolderServiceTest {
   @BeforeEach
   void quietMapper() {
     lenient()
-        .when(bankHolderMapper.toDto(any(BankHolder.class), any(BigDecimal.class), anyLong()))
+        .when(bankHolderMapper.toDto(any(BankHolder.class), any(BigDecimal.class)))
         .thenReturn(null);
   }
 
@@ -130,7 +142,7 @@ class BankHolderServiceTest {
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
     when(holderRepository.save(any(BankHolder.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
-    when(postingRepository.holderTotal(holderId)).thenReturn(BigDecimal.ZERO);
+    when(holderPostingRepository.holderTotal(holderId)).thenReturn(BigDecimal.ZERO);
 
     // When
     bankHolderService.updateHolder(holderId, new UpdateBankHolderRequest(false, 4L));
@@ -155,5 +167,115 @@ class BankHolderServiceTest {
         ObjectOptimisticLockingFailureException.class,
         () -> bankHolderService.updateHolder(holderId, new UpdateBankHolderRequest(false, 8L)));
     verify(holderRepository, never()).save(any());
+  }
+
+  @Test
+  void getHolder_pairsTheGlobalCustodyTotal() {
+    // Given (REQ-BANK-032): the holder header carries the global custody total
+    UUID holderId = UUID.randomUUID();
+    BankHolder holder = new BankHolder();
+    holder.setId(holderId);
+    holder.setHandle("greluc");
+    BigDecimal total = new BigDecimal("1000000");
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
+    when(holderPostingRepository.holderTotal(holderId)).thenReturn(total);
+
+    // When
+    bankHolderService.getHolder(holderId);
+
+    // Then: the externally computed total is paired into the mapper
+    verify(bankHolderMapper).toDto(holder, total);
+  }
+
+  @Test
+  void getHolder_missingHolder_throwsNotFound() {
+    // Given
+    UUID holderId = UUID.randomUUID();
+    when(holderRepository.findById(holderId)).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThrows(NotFoundException.class, () -> bankHolderService.getHolder(holderId));
+  }
+
+  @Test
+  void getHolderBookings_resolvesAccountForDepositAndCounterHolderForUmbuchung() {
+    // Given (REQ-BANK-032): a deposit leg annotated with the account it moved on, and a
+    // HOLDER_TRANSFER leg annotated with the counter holder (no account)
+    UUID holderId = UUID.randomUUID();
+    UUID tx1 = UUID.randomUUID();
+    UUID tx2 = UUID.randomUUID();
+    Instant now = Instant.parse("2026-06-10T18:30:00Z");
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(new BankHolder()));
+
+    BankHolderBookingRow deposit =
+        new BankHolderBookingRow(
+            UUID.randomUUID(),
+            tx1,
+            BankTransactionType.DEPOSIT,
+            new BigDecimal("1000"),
+            "Missionsertrag",
+            now,
+            null,
+            BigDecimal.ZERO);
+    BankHolderBookingRow umbuchung =
+        new BankHolderBookingRow(
+            UUID.randomUUID(),
+            tx2,
+            BankTransactionType.HOLDER_TRANSFER,
+            new BigDecimal("-500"),
+            "Ausgleich",
+            now,
+            null,
+            new BigDecimal("3"));
+    when(holderPostingRepository.findHolderBookings(eq(holderId), any()))
+        .thenReturn(new PageImpl<>(List.of(deposit, umbuchung)));
+
+    // The account leg of the deposit shares the holder leg's (positive) sign; the Umbuchung has
+    // none. The holder legs carry this holder's two legs plus the Umbuchung counterparty (+500).
+    when(postingRepository.findLegsByTransactionIds(any()))
+        .thenReturn(
+            List.of(
+                new BankCounterLeg(
+                    tx1,
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    "KB-0001",
+                    "Staffel IRIDIUM",
+                    new BigDecimal("1000"))));
+    when(holderPostingRepository.findHolderLegsByTransactionIds(any()))
+        .thenReturn(
+            List.of(
+                new BankHolderLeg(tx1, holderId, "greluc", new BigDecimal("1000")),
+                new BankHolderLeg(tx2, holderId, "greluc", new BigDecimal("-500")),
+                new BankHolderLeg(tx2, UUID.randomUUID(), "carol", new BigDecimal("500"))));
+
+    // When
+    List<BankHolderBookingDto> rows =
+        bankHolderService.getHolderBookings(holderId, PageRequest.of(0, 20)).getContent();
+
+    // Then
+    assertEquals(2, rows.size());
+    BankHolderBookingDto depositRow = rows.get(0);
+    assertEquals("KB-0001", depositRow.counterAccountNo());
+    assertEquals("Staffel IRIDIUM", depositRow.counterAccountName());
+    assertNull(depositRow.counterHolderHandle());
+    BankHolderBookingDto umbuchungRow = rows.get(1);
+    assertEquals("carol", umbuchungRow.counterHolderHandle());
+    assertNull(umbuchungRow.counterAccountNo());
+    assertEquals(
+        0, umbuchungRow.transferFee().compareTo(new BigDecimal("3")), "fee passes through");
+  }
+
+  @Test
+  void getHolderBookings_missingHolder_throwsNotFound() {
+    // Given
+    UUID holderId = UUID.randomUUID();
+    when(holderRepository.findById(holderId)).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThrows(
+        NotFoundException.class,
+        () -> bankHolderService.getHolderBookings(holderId, PageRequest.of(0, 20)));
+    verify(holderPostingRepository, never()).findHolderBookings(any(), any());
   }
 }

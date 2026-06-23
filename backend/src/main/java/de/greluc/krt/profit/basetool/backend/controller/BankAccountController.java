@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderBalanceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
@@ -38,7 +37,6 @@ import jakarta.validation.Valid;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -110,18 +108,22 @@ public class BankAccountController {
   }
 
   /**
-   * Creates an account of any type at runtime — including the two singletons (REQ-BANK-002).
+   * Creates an account at runtime (REQ-BANK-002/-030). Bank management (and admins) create any
+   * type; a bank employee may create <strong>only</strong> {@code SPECIAL} accounts and is
+   * auto-granted full capability on them (the service enforces both, ADR-0040). URL-gated to bank
+   * staff; the management-vs-employee distinction is the service's job.
    *
    * @param request validated creation payload
    * @return the created account
    */
-  @Operation(summary = "Create a bank account (management)")
+  @Operation(summary = "Create a bank account (management: any type; employee: SPECIAL only)")
   @PostMapping
-  @PreAuthorize("hasRole('BANK_MANAGEMENT')")
+  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankAccountDto createAccount(@RequestBody @Valid CreateBankAccountRequest request) {
-    return bankAccountService.createAccount(request);
+    return bankAccountService.createAccount(
+        request, bankSecurityService.isManagement(), currentUserId());
   }
 
   /**
@@ -193,20 +195,6 @@ public class BankAccountController {
   public BankAccountDto reopenAccount(
       @PathVariable @NotNull UUID id, @RequestBody @Valid BankAccountLifecycleRequest request) {
     return bankAccountService.reopenAccount(id, request);
-  }
-
-  /**
-   * Reads the account's per-holder sub-balances (REQ-BANK-003).
-   *
-   * @param id the account
-   * @return the holder distribution, largest stash first
-   */
-  @Operation(summary = "Read the holder distribution of a bank account")
-  @GetMapping("/{id}/holders")
-  @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
-  @Transactional(readOnly = true)
-  public List<BankHolderBalanceDto> getHolderDistribution(@PathVariable @NotNull UUID id) {
-    return bankAccountService.getHolderDistribution(id);
   }
 
   /**

@@ -20,23 +20,19 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 /**
- * Frontend mirror of the account detail aggregate (K1 page): account, facts-strip numbers, the
- * permanent holder distribution and the caller's capabilities.
+ * Frontend mirror of the account detail aggregate (K1 page): account, facts-strip numbers and the
+ * caller's capabilities. Since ADR-0039 holders are decoupled from accounts, so there is no
+ * per-account holder distribution any more (holder balances are global, shown in the holder menu).
  *
  * @param account the account incl. balance
  * @param delta30d net change over the last 30 days (signed whole aUEC)
- * @param bookingCount total number of ledger legs on the account
- * @param holderCount number of distinct holders that ever appeared on the account
- * @param holderDistribution per-holder sub-balances, largest first, summing to the balance
+ * @param bookingCount total number of account ledger legs on the account
  * @param capabilities the caller's evaluated capabilities on this account
  */
 public record BankAccountDetailDto(
     BankAccountDto account,
     BigDecimal delta30d,
     long bookingCount,
-    long holderCount,
-    List<BankHolderBalanceDto> holderDistribution,
     BankCapabilitiesDto capabilities) {}

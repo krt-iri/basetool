@@ -29,15 +29,16 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for booking a transfer (REQ-BANK-011): two ledger legs summing to zero. Covers both
- * variants — account-to-account (different accounts; custody may stay with the same player or
- * change hands) and the intra-account holder rebooking (same account, two different holders; the
- * balance is unchanged, only custody moves). Same account AND same holder on both sides is a
- * rejected self-transfer ({@code BANK_SELF_TRANSFER}).
+ * Write payload for booking an account-to-account transfer (REQ-BANK-011, ADR-0039): two account
+ * legs summing to zero and two holder legs summing to zero — value moves between two
+ * <strong>different</strong> accounts and physical custody moves with it. Identical source and
+ * destination account is a rejected self-transfer ({@code BANK_SELF_TRANSFER}); moving custody
+ * between holders without touching an account is a holder Umbuchung ({@code
+ * BankHolderTransferRequest}), not a transfer.
  *
  * @param sourceAccountId the account the value leaves
  * @param sourceHolderId the player whose stash shrinks
- * @param destinationAccountId the account the value enters (may equal the source for rebookings)
+ * @param destinationAccountId the account the value enters (must differ from the source)
  * @param destinationHolderId the player whose stash grows
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note for the booking history and statements

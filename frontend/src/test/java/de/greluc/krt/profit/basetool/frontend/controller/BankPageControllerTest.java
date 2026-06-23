@@ -39,15 +39,15 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardTotalsDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderBalanceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
@@ -183,7 +183,7 @@ class BankPageControllerTest {
   }
 
   @Test
-  void accountDetail_ShouldFilterTransferTargetsAndComputePercents() {
+  void accountDetail_ShouldFilterTransferTargetsToActiveAccountsAndActiveHolders() {
     // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
@@ -197,14 +197,7 @@ class BankPageControllerTest {
     BankAccountDto closedOther = account(UUID.randomUUID(), "KB-0003", "CLOSED", "0");
     BankAccountDetailDto detail =
         new BankAccountDetailDto(
-            self,
-            new BigDecimal("100"),
-            5,
-            2,
-            List.of(
-                new BankHolderBalanceDto(holderA, "alpha", true, new BigDecimal("600")),
-                new BankHolderBalanceDto(holderB, "bravo", true, new BigDecimal("400"))),
-            new BankCapabilitiesDto(true, true, true, false));
+            self, new BigDecimal("100"), 5, new BankCapabilitiesDto(true, true, true, false));
 
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
@@ -216,19 +209,23 @@ class BankPageControllerTest {
         .thenReturn(
             List.of(
                 new BankHolderDto(
-                    holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, 1, 0L),
+                    holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L),
                 new BankHolderDto(
-                    holderB, UUID.randomUUID(), "bravo", false, BigDecimal.ZERO, 1, 0L)));
+                    holderB, UUID.randomUUID(), "bravo", false, BigDecimal.ZERO, false, 0L)));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
         .thenReturn(
             new PageResponse<>(
                 List.of(self, activeOther, closedOther), 0, 500, 3, 1, Collections.emptyList()));
+    when(backendApiClient.get(
+            eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))
+        .thenReturn(new BankTransferFeeRateDto(new BigDecimal("0.005")));
 
     // When
     String view = controller.accountDetail(accountId, null, null, model);
 
-    // Then
+    // Then: transfer targets exclude self and the closed account; active holders exclude the
+    // deactivated one (ADR-0039: no per-account distribution any more)
     assertEquals("bank-account-detail", view);
     List<BankAccountDto> targets = (List<BankAccountDto>) model.getAttribute("transferTargets");
     assertNotNull(targets);
@@ -238,15 +235,16 @@ class BankPageControllerTest {
     assertNotNull(activeHolders);
     assertEquals(1, activeHolders.size());
     assertEquals("alpha", activeHolders.get(0).handle());
-    Map<UUID, Integer> percents = (Map<UUID, Integer>) model.getAttribute("distributionPercents");
-    assertNotNull(percents);
-    assertEquals(60, percents.get(holderA));
-    assertEquals(40, percents.get(holderB));
+    List<BankHolderDto> holders = (List<BankHolderDto>) model.getAttribute("holders");
+    assertNotNull(holders);
+    assertEquals(2, holders.size(), "the full registry is offered for the payer/source selects");
     assertEquals("/bank/accounts/" + accountId, model.getAttribute("paginationBaseUrl"));
+    // The transfer-fee rate feeds the withdraw/transfer modals' live fee preview (REQ-BANK-033).
+    assertEquals(new BigDecimal("0.005"), model.getAttribute("transferFeeRate"));
   }
 
   @Test
-  void accountDetail_ShouldSkipPercentsOnZeroBalance() {
+  void accountDetail_ShouldHandleEmptyListsOnZeroBalance() {
     // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
@@ -257,8 +255,6 @@ class BankPageControllerTest {
             account(accountId, "KB-0001", "ACTIVE", "0"),
             BigDecimal.ZERO,
             0,
-            0,
-            List.of(),
             new BankCapabilitiesDto(false, false, false, false));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
@@ -270,9 +266,6 @@ class BankPageControllerTest {
     controller.accountDetail(accountId, -3, null, model);
 
     // Then
-    Map<UUID, Integer> percents = (Map<UUID, Integer>) model.getAttribute("distributionPercents");
-    assertNotNull(percents);
-    assertTrue(percents.isEmpty());
     assertEquals(List.of(), model.getAttribute("transferTargets"));
     assertEquals(List.of(), model.getAttribute("activeHolders"));
   }
@@ -322,12 +315,7 @@ class BankPageControllerTest {
     BankAccountDto self = account(accountId, "KB-0001", "ACTIVE", "1000");
     BankAccountDetailDto detail =
         new BankAccountDetailDto(
-            self,
-            new BigDecimal("10"),
-            1,
-            1,
-            List.of(new BankHolderBalanceDto(holderA, "alpha", true, new BigDecimal("1000"))),
-            new BankCapabilitiesDto(true, true, true, false));
+            self, new BigDecimal("10"), 1, new BankCapabilitiesDto(true, true, true, false));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
         .thenReturn(detail);
@@ -338,7 +326,7 @@ class BankPageControllerTest {
         .thenReturn(
             List.of(
                 new BankHolderDto(
-                    holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, 1, 0L)));
+                    holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(self), 0, 500, 1, 1, Collections.emptyList()));
@@ -349,13 +337,68 @@ class BankPageControllerTest {
     // Then
     assertEquals("bank-account-detail :: accountBody", view);
     // The accountBody fragment needs the FULL model (unlike the bookings-only fragment): detail,
-    // the
-    // distribution-derived holder selects, transfer targets and percents must all be present.
+    // the holder registry for the modals' selects, transfer targets and bookings must all be
+    // present.
     assertNotNull(model.getAttribute("detail"));
     assertNotNull(model.getAttribute("activeHolders"));
+    assertNotNull(model.getAttribute("holders"));
     assertNotNull(model.getAttribute("transferTargets"));
-    assertNotNull(model.getAttribute("distributionPercents"));
     assertNotNull(model.getAttribute("bookings"));
+  }
+
+  // covers REQ-BANK-032 — the holder detail page loads the holder header and the first history
+  // page, exposing them plus the holder-scoped pagination base url to the template.
+  @Test
+  void holderDetail_ShouldLoadHolderAndFirstHistoryPage() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankPageController controller = new BankPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    UUID holderId = UUID.randomUUID();
+    BankHolderDto holder =
+        new BankHolderDto(
+            holderId, UUID.randomUUID(), "greluc", true, new BigDecimal("1000000"), false, 0L);
+    PageResponse<BankHolderBookingDto> bookings =
+        new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
+    when(backendApiClient.get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class)))
+        .thenReturn(holder);
+    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+        .thenReturn(bookings);
+
+    // When
+    String view = controller.holderDetail(holderId, null, null, model);
+
+    // Then
+    assertEquals("bank-holder-detail", view);
+    assertEquals(holder, model.getAttribute("holder"));
+    assertEquals(bookings, model.getAttribute("bookings"));
+    assertEquals("/bank/holders/" + holderId, model.getAttribute("paginationBaseUrl"));
+  }
+
+  // covers REQ-FE-002 — the holder-history pager swap (fragment=holderBookings) renders only the
+  // history fragment and fetches ONLY the transactions page; the holder header round-trip is
+  // skipped.
+  @Test
+  void holderDetail_fragmentHolderBookings_rendersOnlyFragment_andSkipsHeaderFetch() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankPageController controller = new BankPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    UUID holderId = UUID.randomUUID();
+    PageResponse<BankHolderBookingDto> bookings =
+        new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
+    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+        .thenReturn(bookings);
+
+    // When
+    String view = controller.holderDetail(holderId, 2, "holderBookings", model);
+
+    // Then
+    assertEquals("bank-holder-detail :: holderBookings", view);
+    assertEquals(bookings, model.getAttribute("bookings"));
+    assertEquals("/bank/holders/" + holderId, model.getAttribute("paginationBaseUrl"));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class));
   }
 
   private static BankAccountDto account(UUID id, String no, String status, String balance) {

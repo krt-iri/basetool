@@ -69,12 +69,17 @@ by partial unique indexes, not by application convention alone.
 **All** account types — org-unit, area, cartel, cartel-bank and special — are created at
 runtime by bank management (and admins) through the same endpoint; nothing is seeded by
 migration, including the two singletons. Accounts are thereby **dynamically creatable
-and closable** without a migration or restart. Closing an account requires a **zero
-balance** (transfer the remainder first); a closed account becomes read-only (no
-postings) but stays visible to authorized readers with its full history. Closed accounts
-can be reopened by bank management. Accounts are **never hard-deleted**; deactivating an
-org unit (soft delete, see `SquadronService.deleteSquadron`) does not touch its bank
-account.
+and closable** without a migration or restart.
+
+> **Amendment (REQ-BANK-030, ADR-0040):** bank **employees** may additionally create
+> `SPECIAL` accounts (Sonderkonten) — and only those — through the same endpoint, receiving
+> an auto-grant on the account they create. Every **other** account-relationship action
+> (creating any non-`SPECIAL` type, rename, close, reopen) stays bank-management-only. Closing an account requires a **zero
+> balance** (transfer the remainder first); a closed account becomes read-only (no
+> postings) but stays visible to authorized readers with its full history. Closed accounts
+> can be reopened by bank management. Accounts are **never hard-deleted**; deactivating an
+> org unit (soft delete, see `SquadronService.deleteSquadron`) does not touch its bank
+> account.
 
 **Acceptance**
 
@@ -84,64 +89,69 @@ account.
 
 **Enforced by:** `BankAccountServiceTest` (close requires zero balance, reopen) · **Code:** `service/BankAccountService`, `db/migration/V150` · **Issues:** #556
 
-### REQ-BANK-003 — Holder distribution: every account is partitioned across players
+### REQ-BANK-003 — Holder custody: a global dimension, decoupled from accounts
 
-aUEC physically exists only on Star Citizen **player accounts**, so for every bank
-account it must be determinable **which player holds which part** of the account's
-balance, and this distribution must be **visible and manageable** in the account and in
-the evaluations. The bank therefore maintains a bank-local **holder registry**
-(`bank_holder`): one row per player acting as custodian, created by bank staff via the
-user lookup, carrying an optional FK to `app_user` plus a denormalized handle snapshot
-(the ledger must survive user deletion). **Every posting references exactly one
-holder** — a deposit names the player who physically received the money, a withdrawal
-the player who paid it out, each transfer leg the player whose stash changes. The
-per-(account, holder) sub-balance is the sum of those postings; the sub-balances of an
-account always sum exactly to its balance. Moving money between holders **within the
-same account** is an intra-account holder rebooking (REQ-BANK-011) — the account balance
-is unchanged, only custody moves. Holders are never hard-deleted while postings
-reference them.
+aUEC physically exists only on Star Citizen **player accounts**, so the bank tracks —
+**separately from** the per-account balances — **how much each player physically holds**.
+It maintains a bank-local **holder registry** (`bank_holder`: one row per custodian,
+optional FK to `app_user` plus a denormalized handle snapshot so the ledger survives user
+deletion) **plus a holder ledger** (`bank_holder_posting`, ADR-0039) recording signed
+custody movements. A holder's balance is a single **global** figure — `SUM(amount)` over
+the holder ledger across the whole bank — and is **deliberately decoupled from the
+accounts**: the money booked on an account and the money a player physically holds are
+tracked in parallel and need not coincide per account (a custodian credited via Staffel A
+may pay out a request booked against Staffel B using the money he physically holds). A
+**deposit** and a **withdrawal** each co-record exactly **one account leg and one holder
+leg**; an **account↔account transfer** moves both dimensions (REQ-BANK-011); the
+**holder→holder Umbuchung** moves only custody, touching no account (REQ-BANK-031). A
+holder balance **may go negative** (a custodian fronts his own money) and is reconciled
+later by an Umbuchung — there is no holder-level overdraft (REQ-BANK-006). Holders are
+never hard-deleted while ledger rows reference them. Management may still **manually**
+register any tool user as a custodian; in addition, **all bank staff are auto-registered**
+as holders (REQ-BANK-029).
 
 **Acceptance**
 
-- [x] A posting without a holder reference is rejected (400) — on every account type.
-- [x] The account detail view, the statement PDF (REQ-BANK-014) and the management
-  export (REQ-BANK-015) show the per-holder sub-balances, summing exactly to the
-  account balance.
+- [x] A deposit/withdrawal records exactly one holder leg; an account↔account transfer two
+  holder legs; a holder→holder Umbuchung two holder legs and **no** account leg.
+- [x] A holder's displayed balance is the **global** sum across the whole bank, not a
+  per-account figure; the account-detail view and both PDFs no longer show a per-account
+  holder distribution.
 - [x] A holder row whose linked user is deleted keeps its handle snapshot and its ledger
   history.
 
-**Enforced by:** `BankLedgerServiceTest` (distribution sums to balance) · **Code:** `repository/BankPostingRepository#holderDistribution`, `service/BankAccountService` · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (account/holder legs per type, global holder balance), `BankHolderServiceTest` · **Code:** `model/BankHolder`, `model/BankHolderPosting`, `repository/BankHolderPostingRepository`, `service/BankHolderService`, `db/migration/V180`, `db/migration/V181` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-004 — Append-only double-entry ledger
 
-All value movements are recorded in an **append-only ledger**: a `bank_transaction`
-(type, initiator, note, timestamp) with 1..n `bank_posting` rows (account, signed
-amount, holder — REQ-BANK-003). Transaction types: `DEPOSIT` (one positive posting),
-`WITHDRAWAL` (one negative posting), `TRANSFER` (two postings summing to zero — covers
-account-to-account transfers and intra-account holder rebookings), `WIPE_RESET`
-(admin-only, REQ-BANK-013) and `REVERSAL` (corrections). A reversal's
-postings are the **negated mirror** of the reversed transaction's postings — its
-per-transaction sum is the negation of the original's sum (zero exactly when the
-original was a `TRANSFER`). Ledger rows are **never updated or deleted** — mistakes are
-corrected by a reversal transaction that references the original. A `WIPE_RESET` (a
-deliberate end-state) and a `REVERSAL` are themselves **not reversible** — a mistake is
-corrected by reversing the original transaction, not the wipe or the correction (stable
-code `BANK_NOT_REVERSIBLE`). The account balance is
-the SQL sum of its postings, computed on read (ADR-0010); per-account running-balance
-caching may be added later without changing this contract.
+All value movements are recorded on **two append-only ledgers** (ADR-0039) sharing one
+`bank_transaction` header (type, initiator, note, timestamp): `bank_posting` rows carry the
+**account** dimension (account, signed amount) and `bank_holder_posting` rows the **holder**
+dimension (holder, signed amount). Transaction types and the legs they co-record:
+`DEPOSIT` (one `+` account leg + one `+` holder leg), `WITHDRAWAL` (one `−` account leg +
+one `−` holder leg), `TRANSFER` (account↔account: two account legs summing to zero **and**
+two holder legs summing to zero, REQ-BANK-011), `HOLDER_TRANSFER` (holder→holder Umbuchung:
+two holder legs summing to zero, **no** account leg, REQ-BANK-031), `WIPE_RESET`
+(admin-only, REQ-BANK-013) and `REVERSAL` (corrections). A reversal's legs are the
+**negated mirror** of the reversed transaction's legs **on both ledgers**. Ledger rows are
+**never updated or deleted** — mistakes are corrected by a reversal transaction that
+references the original. A `WIPE_RESET` (a deliberate end-state) and a `REVERSAL` are
+themselves **not reversible** (stable code `BANK_NOT_REVERSIBLE`). Account balance is the
+SQL sum of its `bank_posting` rows and a holder's global balance the SQL sum of its
+`bank_holder_posting` rows, both computed on read (ADR-0010/0039).
 
 **Acceptance**
 
-- [x] No service or repository code path issues `UPDATE`/`DELETE` on
-  `bank_transaction`/`bank_posting` (test-pinned, mirroring REQ-INV-001 in
+- [x] No service or repository code path issues `UPDATE`/`DELETE` on `bank_transaction`,
+  `bank_posting` or `bank_holder_posting` (test-pinned, mirroring REQ-INV-001 in
   `inventory-lager.md`).
-- [x] `TRANSFER` postings sum to zero per transaction; `REVERSAL` postings are the
-  negated mirror of the reversed transaction's postings (service invariant +
-  DB-level guard where practical).
+- [x] `TRANSFER` account legs and holder legs each sum to zero per transaction;
+  `HOLDER_TRANSFER` holder legs sum to zero and book no account leg; `REVERSAL` legs are the
+  negated mirror of the reversed transaction's legs on **both** ledgers.
 - [x] A reversal stores a FK to the reversed transaction; reversing twice is rejected.
 - [x] Reversing a `WIPE_RESET` or a `REVERSAL` is rejected (409 `BANK_NOT_REVERSIBLE`).
 
-**Enforced by:** `BankLedgerServiceTest` (append-only, double-entry, reversal mirror, non-reversible targets), `ArchitectureTest` (`bankLedgerRepositoriesMustStayInsertOnly`) · **Code:** `model/BankTransaction`, `model/BankPosting`, `service/BankLedgerService`, `db/migration/V153` · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (append-only, two-ledger legs, reversal mirror, non-reversible targets), `ArchitectureTest` (`bankLedgerRepositoriesMustStayInsertOnly`) · **Code:** `model/BankTransaction`, `model/BankPosting`, `model/BankHolderPosting`, `service/BankLedgerService`, `db/migration/V153`, `db/migration/V180` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-005 — Whole-aUEC amounts
 
@@ -160,26 +170,29 @@ whole aUEC via the frontend `MoneyFormat` bean. Amount inputs use
 
 **Enforced by:** `BankControllerSecurityTest` (fractional amount rejected with 400) · **Code:** `@WholeNumber` on `model/dto/request/Bank*Request` · **Issues:** #556
 
-### REQ-BANK-006 — No overdraft
+### REQ-BANK-006 — No account overdraft (holders may go negative)
 
-No posting may take an account balance below zero — and no posting may take any
-**(account, holder) sub-balance** below zero either: a withdrawal, transfer leg or
-holder rebooking can only move money the named holder actually holds on that account
-(REQ-BANK-003). Withdrawals and transfers are validated against the current balances
-**inside the booking transaction** with an atomic/locked balance check so concurrent
-bookings cannot jointly overdraw an account or a holder stash. Violations surface as 409
-with a stable problem code (not 500).
+No posting may take an **account** balance below zero. A withdrawal or an account↔account
+transfer is validated against the current account balance **inside the booking transaction**
+with an atomic/locked check (the source account row is pessimistically locked) so concurrent
+bookings cannot jointly overdraw an account. Violations surface as 409 `BANK_OVERDRAFT` (not
+500).
+
+The **holder** dimension has **no overdraft** (ADR-0039): a holder balance **may go
+negative** — a custodian fronts his own aUEC to satisfy a payout, and the imbalance is
+reconciled later by a holder→holder Umbuchung (REQ-BANK-031). No booking path checks holder
+coverage; `BANK_HOLDER_OVERDRAFT` is retired.
 
 **Acceptance**
 
 - [x] Concurrent withdrawals that would jointly overdraw an account: exactly one
   succeeds (concurrency test).
-- [x] A booking exceeding the named holder's sub-balance on that account is rejected
-  (409), even when the account balance would suffice.
+- [x] A withdrawal/transfer whose named holder lacks coverage but whose **account** covers it
+  **succeeds**, driving the holder balance negative; the account overdraft is still rejected.
 - [x] The error response names the account and the available balance — without leaking
   data to callers who cannot see the account (403 takes precedence).
 
-**Enforced by:** `BankLedgerServiceTest` (overdraft codes + two CountDownLatch concurrency tests) · **Code:** `service/BankLedgerService` (pessimistic lock + account/holder coverage guard) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (account overdraft code + concurrency tests, holder-may-go-negative) · **Code:** `service/BankLedgerService` (pessimistic account lock + account-only coverage guard) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-007 — Keycloak roles & hierarchy
 
@@ -278,6 +291,13 @@ an org unit is irrelevant (REQ-BANK-008).
 | Bank management (role; org-unit membership irrelevant)                                 | **all** accounts, holders, grants                                                                                                                                                            | all bookings, account lifecycle, holders, grants                                              |
 | Admin (`ROLE_ADMIN`)                                                                   | everything incl. the **audit log**                                                                                                                                                           | everything incl. wipe reset (REQ-BANK-013)                                                    |
 
+> **Amendment (REQ-BANK-029/-030/-031, ADR-0040):** bank **employees** additionally reach the
+> bank-administration page to create `SPECIAL` accounts (only those) and to use the holder menu
+> incl. the holder→holder Umbuchung; all other account-lifecycle actions, manual holder
+> registration and grant management stay management-only. All bank staff are auto-registered as
+> holders. These widen the employee's "may change" cell only; the audit-log/admin rows below are
+> unchanged.
+
 The audit log is **admin-only** — bank management does **not** see it. The bank area
 contributes nothing to the anonymous/guest surface (consistent with REQ-SEC-009). Bank
 endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
@@ -292,31 +312,30 @@ endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
 
 **Enforced by:** `BankControllerSecurityTest` (member 403, employee/management/admin matrix, admin-only audit) · **Code:** `service/BankSecurityService`, `controller/BankAccountController` · **Issues:** #556
 
-### REQ-BANK-011 — Transfer semantics
+### REQ-BANK-011 — Account↔account transfer semantics
 
-A transfer (Umbuchung) moves value between two postings of one `TRANSFER` transaction;
-each leg names the holder whose stash changes (REQ-BANK-003). Variants, all audited:
-
-1. **Account → account** (e.g. Staffel → SK, area → cartel): employee needs
-   `can_transfer` on the **source** account; the **destination** must be an account the
-   employee can see (any grant row). Bank management and admins are unrestricted. The
-   physical custody may stay with the same player (same holder on both legs) or change
-   hands as part of the transfer.
-2. **Intra-account holder rebooking** (same account, two different holders): requires
-   `can_transfer` on that account; the account balance is unchanged — only custody
-   moves between the players.
-
-Self-transfers (same account, same holder on both legs) are rejected.
+A `TRANSFER` (Konto→Konto-Umbuchung, e.g. Staffel → SK, area → cartel) moves value between
+**two different accounts**: two account legs **and** two holder legs — the physical custody
+moves with the booked money (a source and a destination holder; they may be the same player).
+When the holder **changes**, the source physically sends the money in-game, so the **transfer
+fee is carved out** (REQ-BANK-033, ADR-0041): the source is debited the full gross, the
+destination credited the net, and both leg pairs net to `−fee`; a **same-holder** transfer is a
+fee-free re-label and nets to zero. The employee needs `can_transfer` on the **source**
+account; the **destination** must be an account the employee can see (any grant row). Bank
+management and admins are unrestricted. The source account is guarded against overdraft
+(REQ-BANK-006); the holder dimension is not. The **intra-account holder rebooking** of the
+old model is **removed** — custody is no longer per-account, so moving money between players
+is the global holder→holder Umbuchung (REQ-BANK-031), not a transfer.
 
 **Acceptance**
 
 - [x] An employee with `can_transfer` on A but no grant on B cannot transfer A → B (403).
-- [x] Intra-account holder rebooking changes the holder sub-balances, not the account
-  balance.
-- [x] All variants appear in the audit log and the statement PDF with both legs incl.
-  their holders.
+- [x] A transfer's account legs and holder legs each sum to zero; the source account may not
+  be overdrawn; same source/destination account is rejected (`BANK_SELF_TRANSFER`).
+- [x] The transfer appears in the audit log and the statement PDF with both account legs and
+  the involved holders.
 
-**Enforced by:** `BankLedgerServiceTest` (transfer legs sum zero, self-transfer reject, intra-account custody move) · **Code:** `service/BankLedgerService#bookTransfer` · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (account+holder legs sum zero, same-account reject, source overdraft) · **Code:** `service/BankLedgerService#bookTransfer` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-012 — Immutable, complete, admin-only audit log
 
@@ -346,11 +365,11 @@ The audit table is business data, not logging — the `docs/specs/observability.
 ### REQ-BANK-013 — Admin wipe reset
 
 A Star Citizen wipe erases in-game currency. The admin area gets **one button** that
-resets **all** account balances to zero: for every account with a non-zero balance the
-service books a `WIPE_RESET` transaction (one posting per holder with a non-zero
-sub-balance on that account) bringing the balance and every holder sub-balance to
-exactly zero. History, statements and audit trail are **preserved** — nothing is
-deleted. The action requires `ROLE_ADMIN` and a KRT-styled danger confirmation modal
+resets **both** dimensions to zero (ADR-0039): one `WIPE_RESET` transaction books one
+account leg per account with a non-zero balance **and** one holder leg per holder with a
+non-zero global balance, bringing every account balance **and** every holder balance to
+exactly zero (the two dimensions are zeroed independently). History, statements and audit
+trail are **preserved** — nothing is deleted. The action requires `ROLE_ADMIN` and a KRT-styled danger confirmation modal
 (no native dialogs) with an explicit consequence text **and a type-to-confirm hurdle**
 (the design system's `.confirm-input` pattern, reserved for wipe-reset-grade actions),
 and writes one summarizing audit event plus the individual transactions. The operation
@@ -358,7 +377,7 @@ is idempotent (a second click on an all-zero bank is a no-op with a notice).
 
 **Acceptance**
 
-- [x] After the reset every account balance and every holder sub-balance is zero;
+- [x] After the reset every account balance and every holder **global** balance is zero;
   pre-wipe statements still render correctly.
 - [x] The button sits in the admin area, is admin-only, and uses the danger-modal
   pattern with type-to-confirm (`btn-danger` + danger `.krt-modal` + `.confirm-input`),
@@ -373,8 +392,9 @@ For every account they can see, bank staff can export an **account statement PDF
 **user-selected period** (from/to, reusing the `datetime-split-group` filter pattern):
 header with account number/name/type/status, opening balance at period start, every
 booking in the period (timestamp, type, counter-account where applicable, holder, note,
-signed amount, running balance), closing balance, and the closing **holder
-distribution** (per-holder sub-balances). The PDF is generated backend-side with OpenPDF, follows
+signed amount, running balance) and the closing balance. The per-account **holder
+distribution** is **removed** (ADR-0039: custody is no longer per-account); each booking row
+keeps its holder annotation, derived from the transaction's holder leg. The PDF is generated backend-side with OpenPDF, follows
 the KRT design system (page background, KRT orange `#E77E23`, **embedded Lato** — the
 existing Helvetica-based reports predate the rule), and is delivered via the established
 `ResponseEntity<byte[]>` + frontend-proxy + fetch/blob download pattern with the
@@ -387,7 +407,7 @@ existing Helvetica-based reports predate the rule), and is delivered via the est
   test (existing test style).
 - [x] Statement access follows REQ-BANK-010 (employee: granted accounts only).
 - [x] PDF uses embedded Lato and the KRT page background; no PII beyond the account's
-  own data.
+  own data; **no** per-account holder distribution section.
 
 **Enforced by:** `BankReportServiceTest` (statement balances, period filter, distribution, one audit event) · **Code:** `service/BankStatementReportService`, `controller/BankAccountController#downloadStatement` · **Issues:** #556
 
@@ -395,10 +415,12 @@ existing Helvetica-based reports predate the rule), and is delivered via the est
 
 Bank management and admins can export a **single PDF over all accounts** covering the
 **last three months** (rolling window). Per account: a header line with opening balance
-(3 months ago), in/out totals, net change and closing balance, the closing **holder
-distribution**, **followed by the itemized bookings of the window** (the owner asked for
-the *changes*, not just totals); plus an overall summary section up front. Same design/delivery/audit rules as
-REQ-BANK-014. Employees cannot trigger this export.
+(3 months ago), in/out totals, net change and closing balance, **followed by the itemized
+bookings of the window** (the owner asked for the *changes*, not just totals); plus an
+overall summary section up front. The per-account holder distribution is **removed**
+(ADR-0039); instead the report closes with a single **global holder-balance section** — every
+holder's current global custody (which is bank-wide, not per-account). Same
+design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this export.
 
 **Acceptance**
 
@@ -502,12 +524,13 @@ PostgreSQL remains the **single datastore** for the bank (ADR-0009) — no addit
 database, cache layer or event store is introduced. Balance reads are SQL aggregates
 backed by a composite index on `bank_posting (account_id, created_at)`; the dashboard and
 statement queries are grouped single-statement reads. A scheduled integrity job (pattern:
-`task/UserSyncTask`) periodically verifies the ledger invariants (`TRANSFER` postings
-sum to zero; `REVERSAL` postings are the negated mirror of the reversed transaction's
-postings; no negative account balances or holder sub-balances; an audit row exists for
-every audited transaction — every type except `WIPE_RESET`, which is summarized by one
-event, not one per generated transaction) and reports violations as `ERROR` log events
-with `correlationId`.
+`task/UserSyncTask`) periodically verifies the ledger invariants (`TRANSFER` account legs and
+holder legs each sum to zero; `HOLDER_TRANSFER` holder legs sum to zero with no account leg;
+`REVERSAL` legs are the negated mirror on **both** ledgers; **no negative account
+balances** — the holder dimension is intentionally allowed to be negative (REQ-BANK-006), so
+it is **not** checked; an audit row exists for every audited transaction — every type except
+`WIPE_RESET`, which is summarized by one event, not one per generated transaction) and reports
+violations as `ERROR` log events with `correlationId`.
 
 **Acceptance**
 
@@ -786,6 +809,161 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 `service/OwnerScopeService#currentUserHasAreaOrOlOversight`, `model/dto/OrgUnitBankBalanceDto`, frontend
 `templates/org-unit-bank.html` · **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md)
 (amendment) · **Issues:** #666, #692.
+
+### REQ-BANK-029 — Bank staff are auto-registered as holders
+
+Every user holding `ROLE_BANK_EMPLOYEE` or `ROLE_BANK_MANAGEMENT` is automatically present as
+an **active** `bank_holder` row, reconciled idempotently at the existing role-sync points (on
+each login via `UserService.syncUser` and on the periodic `UserSyncTask`) over
+`UserRepository.findUserIdsByRoleCode` (ADR-0040). A `bank_holder.role_managed` flag marks
+role-derived holders. When a user loses **all** bank roles, their `role_managed` holder is
+**auto-deactivated** — it accepts no new incoming money, but its (possibly negative, ADR-0039)
+balance survives and must be reconciled to zero by a holder→holder Umbuchung (REQ-BANK-031).
+**Manually** registered holders (`role_managed = false`, REQ-BANK-003) are never touched by the
+reconcile; management may still register any tool user as a custodian.
+
+**Acceptance**
+
+- [x] Granting a bank role makes the user a holder (create if missing, reactivate a previously
+  auto-deactivated one); the reconcile is idempotent (no duplicate rows).
+- [x] Losing all bank roles auto-deactivates the `role_managed` holder while preserving its
+  balance and ledger history; a manually-registered holder is unaffected.
+- [x] The reconcile never hard-deletes a holder and never alters a manual holder's
+  `role_managed = false`.
+
+**Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `service/BankHolderReconciliationService`, `service/UserService` (sync hook), `task/UserSyncTask`, `repository/UserRepository#findUserIdsByRoleCode`, `model/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+
+### REQ-BANK-030 — Employee bank-administration access (Sonderkonten + holder menu)
+
+Bank **employees** reach the bank-administration page (`/bank/manage`) and its sidebar entry
+(previously management-only), with **action-level** gating (ADR-0040):
+
+- an employee may create **only `SPECIAL`** accounts (Sonderkonten) and is **auto-granted**
+  full capability (`can_deposit`/`can_withdraw`/`can_transfer`) on the account they create
+  (audited `GRANT_CREATED`); the `SPECIAL`-only rule is enforced **server-side**, not just in
+  the UI;
+- creating any **non-`SPECIAL`** type, and **rename / close / reopen**, stay
+  `ROLE_BANK_MANAGEMENT`;
+- the **holder menu** (view global balances + holder→holder Umbuchung, REQ-BANK-031, + the
+  per-holder custody history, REQ-BANK-032 — own holder for employees, any for management) opens to
+  `ROLE_BANK_EMPLOYEE`; **manual** holder register / (de)activate and grant management stay
+  `ROLE_BANK_MANAGEMENT`;
+- the audit log stays admin-only (REQ-BANK-012). Org-unit independence (REQ-BANK-008) is
+  untouched.
+
+**Acceptance**
+
+- [x] An employee creates a `SPECIAL` account and is immediately operational on it via the
+  auto-grant; an employee creating a non-`SPECIAL` type, renaming, closing or reopening is
+  rejected (403), even via a forged request.
+- [x] An employee reaches the holder menu and performs an Umbuchung; manual holder
+  registration / (de)activation and grant management remain 403 for employees.
+- [x] The sidebar shows the management entry to employees; the audit log stays admin-only.
+
+**Enforced by:** `BankControllerSecurityTest`, `BankAccountServiceTest` (employee SPECIAL-only + auto-grant), frontend `BankManagePageControllerMvcTest` · **Code:** `service/BankAccountService`, `service/BankSecurityService`, `controller/BankAccountController`, frontend `controller/BankManagePageController`, `templates/bank-manage.html` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+
+### REQ-BANK-031 — Holder→holder Umbuchung (reconciliation)
+
+The bank books a **`HOLDER_TRANSFER`** transaction that moves custody between two holders —
+two holder legs summing to zero, **no account leg** (ADR-0039) — so the bank staff can
+redistribute the physically-held money among themselves and bring negative custodians back to
+zero (REQ-BANK-006). It is gated `hasRole('BANK_EMPLOYEE')`, needs **no** per-account grant
+(it touches no account), and **ignores the holder `active` flag in both directions** so a
+deactivated holder's residual (positive or negative) can be reconciled. Source and destination
+holder must differ. Every Umbuchung is audited (`HOLDER_TRANSFER`, REQ-BANK-012) and recorded
+in the unified activity audit (REQ-AUDIT-001). Because the source holder physically sends the
+money in-game, the **in-game transfer fee is carved out** (REQ-BANK-033, ADR-0041): the source
+is debited the full gross, the destination credited the net, so the two holder legs net to
+`−fee`.
+
+**Acceptance**
+
+- [x] An Umbuchung books two holder legs summing to zero and **no** account leg; account
+  balances are unchanged; both holders' global balances move by ±amount.
+- [x] It works to/from a deactivated holder and may drive the source holder negative (no
+  holder overdraft); same source/destination holder is rejected.
+- [x] It is reachable by `BANK_EMPLOYEE` without an account grant; a member/anonymous caller is
+  403; it writes a `HOLDER_TRANSFER` audit event.
+
+**Enforced by:** `BankLedgerServiceTest` (holder legs sum zero, no account leg, deactivated/negative allowed), `BankHolderControllerTest`/`BankControllerSecurityTest` · **Code:** `service/BankLedgerService#bookHolderTransfer`, `controller/BankHolderController`, `model/dto/request/BankHolderTransferRequest`, `model/BankTransactionType`, `model/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+
+### REQ-BANK-032 — Holder custody history (own for employees, all for management)
+
+From the holder menu a bank staffer opens a holder's **custody history** — the paged list of
+**every** holder-ledger leg (ADR-0039) that touched that holder's global stash, newest first.
+Each row carries the booking type, the signed amount on the holder's stash (positive = received,
+negative = paid out), the note, and a context annotation derived from the sibling legs in the same
+transaction: for a deposit/withdrawal/transfer/reversal the **account** the money moved on (the
+account leg whose sign matches the holder leg), and for a **`HOLDER_TRANSFER`** the **counter
+holder** of the Umbuchung. A `WIPE_RESET` leg shows neither.
+
+**Visibility (read gate, REQ-BANK-008 preserved):** the gate is `canSeeHolder` — **bank management**
+(and admins via the hierarchy) may open **any** holder's history; a plain **bank employee** may open
+**only their own** holder row (the one linked to their user id). The custody history is a read view —
+it mutates nothing, so it logs no audit event. It stays org-unit-blind like every other bank gate.
+
+In the holder menu (`/bank/manage`, tab *Halter*) the handle links to the holder detail page
+(`/bank/holders/{id}`) when the caller may view it (their own row, or any row for management); other
+rows render the handle as plain text. The detail page is read-only (no booking actions).
+
+The detail page also carries a **balance-split calculator**: the holder enters their current
+in-game account balance and the page shows — **purely client-side, nothing is stored** — how much
+is **reserved for the bank** (= their global custody total `totalHeld`, server-rendered) and how
+much is their **own private money** (`balance − totalHeld`). A negative own value means they
+physically hold less than the bank's records say (a shortfall); a negative custody total means the
+bank owes them, so their own money exceeds the entered balance.
+
+**Acceptance**
+
+- [x] A bank employee opens their own holder's history and sees every leg with the correct account
+  / counter-holder annotation and signed amount; an employee requesting another holder's history is
+  rejected (403), even via a forged request.
+- [x] Bank management opens any holder's history; the page is paged newest-first and reuses the
+  shared pager (AJAX swap, no reload).
+- [x] The history is read-only and writes no audit event; the gate ignores org-unit scope and the
+  active-org-unit pin (REQ-BANK-008).
+- [x] The balance-split calculator shows, for an entered current balance, the bank-reserved amount
+  (= the custody total) and the own private money (= balance − custody total) live and client-side;
+  nothing is persisted.
+
+**Enforced by:** `BankSecurityServiceTest` (canSeeHolder: management-any / employee-own-only), `BankHolderServiceTest` (account & counter-holder annotation, 404), `BankControllerSecurityTest` (holder-history gate), frontend `BankPageControllerTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankHolderService#getHolder/#getHolderBookings`, `service/BankSecurityService#canSeeHolder`, `controller/BankHolderController`, `repository/BankHolderPostingRepository#findHolderBookings`, `model/projection/BankHolderBookingRow`, `model/dto/BankHolderBookingDto`, frontend `controller/BankPageController`, `templates/bank-holder-detail.html`, `templates/bank-manage.html`, `static/js/bank.js` (balance-split calculator) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+
+### REQ-BANK-033 — In-game transfer fee on holder-initiated transfers
+
+Star Citizen charges an in-game fee on every aUEC transfer a holder actively initiates, so the
+bank factors that fee in wherever a holder physically sends money — and **only** there — so the
+bank staff are never out of pocket (ADR-0041):
+
+- **Where it applies:** `WITHDRAWAL`, a `HOLDER_TRANSFER` (Umbuchung), and an account-to-account
+  `TRANSFER` **when the holder changes** (a same-holder transfer is a pure re-label and stays
+  fee-free). **`DEPOSIT` is exempt** — whoever pays money *in* bears their own fee.
+- **Semantics:** the entered amount is the **gross** the holder sends and is **debited in full**
+  from the source (account + holder stash). The fee `= round(gross × rate)` (whole aUEC, HALF_UP)
+  is **carved out** and recorded on `bank_transaction.transfer_fee`; the **destination is credited
+  the net** (`gross − fee`), so the amount that actually arrives is smaller. The fee and the
+  arriving amount are shown explicitly — a live preview in the booking modals (fed by `GET
+  /api/v1/bank/transfer-fee-rate`) and on every outgoing leg of the account/holder history.
+- **Rate:** the same runtime-editable setting the operation payout uses
+  (`operation.transfer_fee_rate`, default 0.5%, editable at `/admin/settings`) — one rate for the
+  whole org.
+- **Ledger consequence (amends REQ-BANK-020):** a fee-bearing `TRANSFER` / `HOLDER_TRANSFER` no
+  longer nets to zero across its legs — it nets to **`−transfer_fee`** (real money lost to the
+  game), so the integrity sweep expects `SUM(legs) = −transfer_fee` for those types. The
+  `REVERSAL` mirror invariant is unchanged (a reversal negates the actual recorded legs). The
+  no-overdraft guard stays **account-only** (REQ-BANK-006); the holder dimension may still go
+  negative.
+
+**Acceptance**
+
+- [x] A withdrawal of `G` debits the account and the holder `G`, records `fee = round(G × rate)`,
+  and the history shows the fee plus the arriving amount `G − fee`; the holder is not out of pocket.
+- [x] A holder→holder Umbuchung and a holder-changing account transfer credit the destination
+  `G − fee`; their legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer and
+  a deposit record no fee and net to zero / move the full amount.
+- [x] The booking modals show a live "Gebühr / kommt an" preview as the amount is typed; the rate
+  is the shared `operation.transfer_fee_rate`.
+
+**Enforced by:** `BankLedgerServiceTest` (fee carve-out, net to destination, same-holder fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService`, `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md) · **Issues:** #556
 
 ## Out of scope
 

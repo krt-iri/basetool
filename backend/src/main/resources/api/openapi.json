@@ -22169,7 +22169,7 @@
     "/api/v1/bank/transfers" : {
       "post" : {
         "tags" : [ "bank-booking-controller" ],
-        "summary" : "Book a transfer or intra-account holder rebooking",
+        "summary" : "Book an account-to-account transfer",
         "operationId" : "bookTransfer",
         "requestBody" : {
           "content" : {
@@ -22734,6 +22734,95 @@
         }
       }
     },
+    "/api/v1/bank/holders/transfer" : {
+      "post" : {
+        "tags" : [ "bank-holder-controller" ],
+        "summary" : "Book a holder-to-holder Umbuchung",
+        "operationId" : "transfer",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BankHolderTransferRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankTransactionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/bank/grants" : {
       "get" : {
         "tags" : [ "bank-grant-controller" ],
@@ -23226,7 +23315,7 @@
       },
       "post" : {
         "tags" : [ "bank-account-controller" ],
-        "summary" : "Create a bank account (management)",
+        "summary" : "Create a bank account (management: any type; employee: SPECIAL only)",
         "operationId" : "createAccount",
         "requestBody" : {
           "content" : {
@@ -27118,6 +27207,109 @@
       }
     },
     "/api/v1/bank/holders/{id}" : {
+      "get" : {
+        "tags" : [ "bank-holder-controller" ],
+        "summary" : "Read one bank holder incl. global custody total",
+        "operationId" : "getHolder",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankHolderDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch" : {
         "tags" : [ "bank-holder-controller" ],
         "summary" : "Activate or deactivate a bank holder (management)",
@@ -39281,6 +39473,102 @@
         } ]
       }
     },
+    "/api/v1/bank/transfer-fee-rate" : {
+      "get" : {
+        "tags" : [ "bank-booking-controller" ],
+        "summary" : "Read the current in-game transfer-fee rate",
+        "operationId" : "getTransferFeeRate",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankTransferFeeRateDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/bank/requests" : {
       "get" : {
         "tags" : [ "bank-request-controller" ],
@@ -39339,6 +39627,134 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/PageResponseBankBookingRequestDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bank/holders/{id}/transactions" : {
+      "get" : {
+        "tags" : [ "bank-holder-controller" ],
+        "summary" : "List the custody history of a bank holder (paged)",
+        "operationId" : "getHolderBookings",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseBankHolderBookingDto"
                 }
               }
             }
@@ -39653,7 +40069,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED" ]
           }
         }, {
           "name" : "page",
@@ -40280,114 +40696,6 @@
                 "schema" : {
                   "type" : "string",
                   "format" : "byte"
-                }
-              }
-            }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/bank/accounts/{id}/holders" : {
-      "get" : {
-        "tags" : [ "bank-account-controller" ],
-        "summary" : "Read the holder distribution of a bank account",
-        "operationId" : "getHolderDistribution",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "headers" : {
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            },
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/BankHolderBalanceDto"
-                  }
                 }
               }
             }
@@ -47594,7 +47902,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER", "WIPE_RESET", "REVERSAL" ]
+            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER", "HOLDER_TRANSFER", "WIPE_RESET", "REVERSAL" ]
           },
           "note" : {
             "type" : "string"
@@ -47706,15 +48014,38 @@
           "totalHeld" : {
             "type" : "number"
           },
-          "accountCount" : {
-            "type" : "integer",
-            "format" : "int64"
+          "roleManaged" : {
+            "type" : "boolean"
           },
           "version" : {
             "type" : "integer",
             "format" : "int64"
           }
         }
+      },
+      "BankHolderTransferRequest" : {
+        "type" : "object",
+        "properties" : {
+          "sourceHolderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "destinationHolderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "number",
+            "maximum" : 1.0E12,
+            "minimum" : 1
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "amount", "destinationHolderId", "sourceHolderId" ]
       },
       "CreateBankGrantRequest" : {
         "type" : "object",
@@ -51493,6 +51824,14 @@
           }
         }
       },
+      "BankTransferFeeRateDto" : {
+        "type" : "object",
+        "properties" : {
+          "rate" : {
+            "type" : "number"
+          }
+        }
+      },
       "PageResponseBankBookingRequestDto" : {
         "type" : "object",
         "properties" : {
@@ -51500,6 +51839,82 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/BankBookingRequestDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "BankHolderBookingDto" : {
+        "type" : "object",
+        "properties" : {
+          "postingId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "transactionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER", "HOLDER_TRANSFER", "WIPE_RESET", "REVERSAL" ]
+          },
+          "amount" : {
+            "type" : "number"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "reversedTransactionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterAccountNo" : {
+            "type" : "string"
+          },
+          "counterAccountName" : {
+            "type" : "string"
+          },
+          "counterHolderHandle" : {
+            "type" : "string"
+          },
+          "transferFee" : {
+            "type" : "number"
+          }
+        }
+      },
+      "PageResponseBankHolderBookingDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BankHolderBookingDto"
             }
           },
           "page" : {
@@ -51616,7 +52031,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED" ]
           },
           "accountId" : {
             "type" : "string",
@@ -51717,16 +52132,6 @@
             "type" : "integer",
             "format" : "int64"
           },
-          "holderCount" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "holderDistribution" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/BankHolderBalanceDto"
-            }
-          },
           "capabilities" : {
             "$ref" : "#/components/schemas/BankCapabilitiesDto"
           }
@@ -51749,24 +52154,6 @@
           }
         }
       },
-      "BankHolderBalanceDto" : {
-        "type" : "object",
-        "properties" : {
-          "holderId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "handle" : {
-            "type" : "string"
-          },
-          "active" : {
-            "type" : "boolean"
-          },
-          "amount" : {
-            "type" : "number"
-          }
-        }
-      },
       "BankBookingDto" : {
         "type" : "object",
         "properties" : {
@@ -51780,7 +52167,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER", "WIPE_RESET", "REVERSAL" ]
+            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER", "HOLDER_TRANSFER", "WIPE_RESET", "REVERSAL" ]
           },
           "amount" : {
             "type" : "number"
@@ -51810,6 +52197,9 @@
           },
           "intraAccount" : {
             "type" : "boolean"
+          },
+          "transferFee" : {
+            "type" : "number"
           }
         }
       },

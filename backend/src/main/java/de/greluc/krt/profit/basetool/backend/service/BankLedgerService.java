@@ -25,23 +25,28 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.BankHolderPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.BankHolderTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -55,21 +60,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The bank's booking engine (epic #556): books deposits, withdrawals, transfers (incl.
- * intra-account holder rebookings), reversals and the admin wipe reset onto the append-only
- * double-entry ledger (REQ-BANK-004, ADR-0010).
+ * The bank's booking engine (epic #556): books deposits, withdrawals, account-to-account transfers,
+ * holder→holder Umbuchungen, reversals and the admin wipe reset onto the <strong>two</strong>
+ * append-only ledgers (REQ-BANK-004, ADR-0010/0039) — account legs in {@code bank_posting}, holder
+ * legs in {@code bank_holder_posting}.
  *
- * <p><strong>Concurrency contract.</strong> Every booking first locks the affected account row(s)
- * via {@code findByIdForUpdate} — multi-account bookings in ascending id order so concurrent flows
- * cannot deadlock — and only then reads the balances it validates against. Because all value
- * movement on an account serializes on that lock, the no-overdraft invariant (REQ-BANK-006, account
- * level AND per-(account, holder) sub-balance) cannot be raced. The ledger rows themselves are
- * insert-only: no {@code @Version} churn, no {@code save()}-on-managed-entity traps (see the
- * CLAUDE.md concurrency section the design descends from).
+ * <p><strong>Concurrency &amp; overdraft contract.</strong> Every booking that touches an account
+ * first locks the affected account row(s) via {@code findByIdForUpdate} — multi-account bookings in
+ * ascending id order so concurrent flows cannot deadlock — and only then reads the balance it
+ * validates against. Because all value movement on an account serializes on that lock, the
+ * <strong>account</strong> no-overdraft invariant (REQ-BANK-006) cannot be raced. The
+ * <strong>holder</strong> dimension is deliberately <em>unconstrained</em> (ADR-0039): a holder
+ * balance may go negative — a custodian fronts his own money, reconciled later by a {@link
+ * #bookHolderTransfer} Umbuchung — so no booking path checks holder coverage. The ledger rows
+ * themselves are insert-only: no {@code @Version} churn, no {@code save()}-on-managed-entity traps.
  *
  * <p><strong>Holder activity.</strong> Postings that ADD money to a holder's stash require the
- * holder to be active; postings that REMOVE money are allowed on deactivated holders so a stash can
- * be wound down. Reversals are exempt — they restore a prior, already-audited state.
+ * holder to be active (deposit receiver, transfer destination); postings that REMOVE money are
+ * allowed on deactivated holders so a stash can be wound down. The holder→holder Umbuchung — the
+ * reconciliation tool — ignores the active flag in both directions so a deactivated holder can be
+ * brought back to zero. Reversals are exempt — they restore a prior, already-audited state.
  *
  * <p>Every booking appends exactly one audit row in the same transaction ({@link
  * BankAuditService}); an audit failure rolls the booking back (REQ-BANK-012).
@@ -84,12 +94,14 @@ public class BankLedgerService {
   private final BankHolderRepository holderRepository;
   private final BankTransactionRepository transactionRepository;
   private final BankPostingRepository postingRepository;
+  private final BankHolderPostingRepository holderPostingRepository;
   private final BankAuditService bankAuditService;
+  private final BankTransferFeeService transferFeeService;
   private final AuthHelperService authHelperService;
 
   /**
-   * Books a deposit (REQ-BANK-004): one positive posting on the receiving account naming the holder
-   * who physically received the money.
+   * Books a deposit (REQ-BANK-004): one positive account leg on the receiving account and one
+   * positive holder leg naming the holder who physically received the money.
    *
    * @param request validated deposit payload
    * @return acknowledgement of the created transaction
@@ -105,8 +117,12 @@ public class BankLedgerService {
     requireActiveHolder(holder);
 
     Instant now = Instant.now();
-    BankTransaction tx = persistTransaction(BankTransactionType.DEPOSIT, request.note(), null, now);
-    persistPosting(tx, account, holder, request.amount(), now);
+    // A deposit carries no bank-borne fee: whoever pays money IN bears their own in-game transfer
+    // fee, so the full amount lands on the account and the holder's stash (REQ-BANK-033).
+    BankTransaction tx =
+        persistTransaction(BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now);
+    persistAccountPosting(tx, account, request.amount(), now);
+    persistHolderPosting(tx, holder, request.amount(), now);
     bankAuditService.record(
         BankAuditEventType.DEPOSIT_BOOKED,
         account.getId(),
@@ -117,73 +133,84 @@ public class BankLedgerService {
   }
 
   /**
-   * Books a withdrawal (REQ-BANK-004): one negative posting on the paying account naming the holder
-   * who physically paid the money out, guarded by the no-overdraft rule at account and holder level
-   * (REQ-BANK-006).
+   * Books a withdrawal (REQ-BANK-004): one negative account leg on the paying account and one
+   * negative holder leg naming the holder who physically paid the money out. Guarded by the
+   * no-overdraft rule at <strong>account</strong> level only (REQ-BANK-006) — the holder may go
+   * negative.
+   *
+   * <p>The entered amount is the <strong>gross</strong> the holder sends and is debited in full
+   * from the account and the holder's stash; the in-game transfer fee (ADR-0041, REQ-BANK-033) is
+   * carved out and recorded on the header, so the external recipient receives the net (gross −
+   * fee). The holder is thus not out of pocket — the fee is borne by what is paid out, not by their
+   * private money.
    *
    * @param request validated withdrawal payload
    * @return acknowledgement of the created transaction
    * @throws NotFoundException when account or holder do not exist
-   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED}, {@code BANK_OVERDRAFT} or
-   *     {@code BANK_HOLDER_OVERDRAFT}
+   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} or {@code BANK_OVERDRAFT}
    */
   @Transactional
   public BankTransactionDto bookWithdrawal(@NotNull BankWithdrawalRequest request) {
     BankAccount account = lockAccount(request.accountId());
     requireActive(account);
     BankHolder holder = requireHolder(request.holderId());
-    requireCoverage(account, holder, request.amount());
+    requireAccountCoverage(account, request.amount());
 
+    BigDecimal fee = transferFeeService.feeOn(request.amount());
     Instant now = Instant.now();
     BankTransaction tx =
-        persistTransaction(BankTransactionType.WITHDRAWAL, request.note(), null, now);
-    persistPosting(tx, account, holder, request.amount().negate(), now);
+        persistTransaction(BankTransactionType.WITHDRAWAL, request.note(), null, fee, now);
+    persistAccountPosting(tx, account, request.amount().negate(), now);
+    persistHolderPosting(tx, holder, request.amount().negate(), now);
     bankAuditService.record(
         BankAuditEventType.WITHDRAWAL_BOOKED,
         account.getId(),
         tx.getId(),
         null,
-        "-" + request.amount().toPlainString() + " aUEC @" + holder.getHandle());
+        "-" + request.amount().toPlainString() + " aUEC @" + holder.getHandle() + feeDetail(fee));
     return toDto(tx);
   }
 
   /**
-   * Books a transfer (REQ-BANK-011): two postings summing to zero. Same source and destination
-   * account = intra-account holder rebooking (custody moves, the balance does not); different
-   * accounts = account-to-account transfer. The caller's {@code can_transfer} on the source is
-   * gated at the controller; the <em>destination visibility</em> rule (the employee must hold any
-   * grant on the destination account, REQ-BANK-011 variant 1) is enforced here via the supplied
-   * visibility check.
+   * Books an account-to-account transfer (REQ-BANK-011): two account legs and two holder legs —
+   * value moves between two <strong>different</strong> accounts and the physical custody moves with
+   * it. The caller's {@code can_transfer} on the source is gated at the controller; the
+   * <em>destination visibility</em> rule (the employee must hold any grant on the destination
+   * account) is enforced here via the supplied check. The source account is guarded against
+   * overdraft; the holder dimension is not (ADR-0039).
    *
-   * @param request validated transfer payload
+   * <p>When the custody actually changes hands (source holder ≠ destination holder), a real in-game
+   * transfer happens, so the in-game fee (ADR-0041, REQ-BANK-033) is carved out: the source account
+   * and holder are debited the full (gross) amount, while the destination account and holder are
+   * credited the net (gross − fee) — the money that actually arrives is smaller. A same-holder
+   * transfer moves no money in-game (the holder merely re-labels which account owns it), so it is
+   * fee-free and both legs net to zero as before.
+   *
+   * @param request validated transfer payload (source and destination accounts must differ)
    * @param destinationVisible whether the caller may see the destination account (pre-computed by
-   *     the controller from {@code BankSecurityService.canSee}); ignored for intra-account
-   *     rebookings where source visibility already implies it
+   *     the controller from {@code BankSecurityService.canSee})
    * @return acknowledgement of the created transaction
    * @throws NotFoundException when an account or holder does not exist
    * @throws AccessDeniedException when the destination is not visible to the caller
    * @throws BankConflictException with {@code BANK_SELF_TRANSFER}, {@code BANK_ACCOUNT_CLOSED},
-   *     {@code BANK_HOLDER_INACTIVE}, {@code BANK_OVERDRAFT} or {@code BANK_HOLDER_OVERDRAFT}
+   *     {@code BANK_HOLDER_INACTIVE} or {@code BANK_OVERDRAFT}
    */
   @Transactional
   public BankTransactionDto bookTransfer(
       @NotNull BankTransferRequest request, boolean destinationVisible) {
-    boolean intraAccount = request.sourceAccountId().equals(request.destinationAccountId());
-    if (intraAccount && request.sourceHolderId().equals(request.destinationHolderId())) {
+    if (request.sourceAccountId().equals(request.destinationAccountId())) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_SELF_TRANSFER,
-          "Source and destination of a transfer must differ");
+          "Source and destination account of a transfer must differ"
+              + " (use a holder Umbuchung to move custody between holders)");
     }
-    if (!intraAccount && !destinationVisible) {
+    if (!destinationVisible) {
       throw new AccessDeniedException("Destination account is not visible to the caller");
     }
 
     BankAccount source;
     BankAccount destination;
-    if (intraAccount) {
-      source = lockAccount(request.sourceAccountId());
-      destination = source;
-    } else if (request.sourceAccountId().compareTo(request.destinationAccountId()) < 0) {
+    if (request.sourceAccountId().compareTo(request.destinationAccountId()) < 0) {
       source = lockAccount(request.sourceAccountId());
       destination = lockAccount(request.destinationAccountId());
     } else {
@@ -193,60 +220,104 @@ public class BankLedgerService {
     requireActive(source);
     requireActive(destination);
 
-    BankHolder sourceHolder = requireHolder(request.sourceHolderId());
+    final BankHolder sourceHolder = requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = requireHolder(request.destinationHolderId());
     requireActiveHolder(destinationHolder);
-    requireCoverage(source, sourceHolder, request.amount());
+    requireAccountCoverage(source, request.amount());
+
+    // Custody only physically moves — and thus incurs the in-game fee — when source and destination
+    // holders differ; a same-holder transfer is a pure re-label (fee-free, net = gross). The
+    // destination side is credited the net so the money that actually arrives reflects the fee.
+    final boolean holderChanges = !sourceHolder.getId().equals(destinationHolder.getId());
+    BigDecimal fee = holderChanges ? transferFeeService.feeOn(request.amount()) : BigDecimal.ZERO;
+    BigDecimal netToDestination = request.amount().subtract(fee);
 
     Instant now = Instant.now();
     BankTransaction tx =
-        persistTransaction(BankTransactionType.TRANSFER, request.note(), null, now);
-    persistPosting(tx, source, sourceHolder, request.amount().negate(), now);
-    persistPosting(tx, destination, destinationHolder, request.amount(), now);
+        persistTransaction(BankTransactionType.TRANSFER, request.note(), null, fee, now);
+    persistAccountPosting(tx, source, request.amount().negate(), now);
+    persistAccountPosting(tx, destination, netToDestination, now);
+    persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
+    persistHolderPosting(tx, destinationHolder, netToDestination, now);
+    bankAuditService.record(
+        BankAuditEventType.TRANSFER_BOOKED,
+        source.getId(),
+        tx.getId(),
+        null,
+        request.amount().toPlainString()
+            + " aUEC -> "
+            + destination.getAccountNo()
+            + " ("
+            + sourceHolder.getHandle()
+            + " -> "
+            + destinationHolder.getHandle()
+            + ")"
+            + feeDetail(fee));
+    return toDto(tx);
+  }
 
-    if (intraAccount) {
-      bankAuditService.record(
-          BankAuditEventType.HOLDER_REBOOKED,
-          source.getId(),
-          tx.getId(),
-          null,
-          request.amount().toPlainString()
-              + " aUEC "
-              + sourceHolder.getHandle()
-              + " -> "
-              + destinationHolder.getHandle());
-    } else {
-      bankAuditService.record(
-          BankAuditEventType.TRANSFER_BOOKED,
-          source.getId(),
-          tx.getId(),
-          null,
-          request.amount().toPlainString()
-              + " aUEC -> "
-              + destination.getAccountNo()
-              + " ("
-              + sourceHolder.getHandle()
-              + " -> "
-              + destinationHolder.getHandle()
-              + ")");
+  /**
+   * Books a holder→holder Umbuchung (REQ-BANK-031, ADR-0039): two holder legs and
+   * <strong>no</strong> account leg — pure custody reconciliation between two players so the bank
+   * staff stay payout-capable. The source holder may go negative; the active flag is ignored in
+   * both directions so a deactivated holder's residual can be reconciled to zero.
+   *
+   * <p>Because a holder physically sends the money in-game, the in-game fee (ADR-0041,
+   * REQ-BANK-033) is carved out: the source holder is debited the full (gross) amount, the
+   * destination holder is credited the net (gross − fee). The fee is real money lost to the game,
+   * so the two holder legs net to {@code -fee} (REQ-BANK-020 integrity widened accordingly);
+   * neither holder is out of pocket since each books exactly what they physically sent / received.
+   *
+   * @param request validated holder-transfer payload (source and destination holders must differ)
+   * @return acknowledgement of the created transaction
+   * @throws NotFoundException when a holder does not exist
+   * @throws BankConflictException with {@code BANK_SELF_TRANSFER} when source equals destination
+   */
+  @Transactional
+  public BankTransactionDto bookHolderTransfer(@NotNull BankHolderTransferRequest request) {
+    if (request.sourceHolderId().equals(request.destinationHolderId())) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SELF_TRANSFER,
+          "Source and destination holder of an Umbuchung must differ");
     }
+    BankHolder sourceHolder = requireHolder(request.sourceHolderId());
+    BankHolder destinationHolder = requireHolder(request.destinationHolderId());
+
+    BigDecimal fee = transferFeeService.feeOn(request.amount());
+    BigDecimal netToDestination = request.amount().subtract(fee);
+    Instant now = Instant.now();
+    BankTransaction tx =
+        persistTransaction(BankTransactionType.HOLDER_TRANSFER, request.note(), null, fee, now);
+    persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
+    persistHolderPosting(tx, destinationHolder, netToDestination, now);
+    bankAuditService.record(
+        BankAuditEventType.HOLDER_TRANSFER,
+        null,
+        tx.getId(),
+        null,
+        request.amount().toPlainString()
+            + " aUEC "
+            + sourceHolder.getHandle()
+            + " -> "
+            + destinationHolder.getHandle()
+            + feeDetail(fee));
     return toDto(tx);
   }
 
   /**
    * Reverses a transaction (REQ-BANK-004): books a {@code REVERSAL} whose legs are the negated
-   * mirror of the original's legs (ADR-0010), referencing the original. A transaction can be
-   * reversed at most once; a {@code WIPE_RESET} (a deliberate end-state) and a {@code REVERSAL}
-   * itself are not reversible — a mistake is corrected by reversing the original, not the
-   * correction. The reversal itself must satisfy the no-overdraft rule (undoing a deposit whose
-   * money has meanwhile moved on is rejected, not forced negative).
+   * mirror of the original's legs on <strong>both</strong> ledgers (ADR-0039), referencing the
+   * original. A transaction can be reversed at most once; a {@code WIPE_RESET} and a {@code
+   * REVERSAL} itself are not reversible. Only the <strong>account</strong> legs are re-checked
+   * against overdraft (undoing a deposit whose account has meanwhile been drained is rejected); the
+   * holder dimension may go negative.
    *
    * @param transactionId the transaction to reverse
    * @param note optional correction note
    * @return acknowledgement of the created reversal
    * @throws NotFoundException when the transaction does not exist
    * @throws BankConflictException with {@code BANK_NOT_REVERSIBLE}, {@code BANK_ALREADY_REVERSED},
-   *     {@code BANK_ACCOUNT_CLOSED}, {@code BANK_OVERDRAFT} or {@code BANK_HOLDER_OVERDRAFT}
+   *     {@code BANK_ACCOUNT_CLOSED} or {@code BANK_OVERDRAFT}
    */
   @Transactional
   public BankTransactionDto reverseTransaction(@NotNull UUID transactionId, @Nullable String note) {
@@ -266,29 +337,28 @@ public class BankLedgerService {
           BankConflictException.CODE_BANK_ALREADY_REVERSED,
           "The transaction has already been reversed");
     }
-    List<BankCounterLeg> legs = postingRepository.findLegsByTransactionIds(List.of(transactionId));
+    List<BankCounterLeg> accountLegs =
+        postingRepository.findLegsByTransactionIds(List.of(transactionId));
+    final List<BankHolderLeg> holderLegs =
+        holderPostingRepository.findHolderLegsByTransactionIds(List.of(transactionId));
 
     Map<UUID, BankAccount> lockedAccounts =
-        legs.stream()
+        accountLegs.stream()
             .map(BankCounterLeg::accountId)
             .distinct()
             .sorted()
             .collect(
-                java.util.stream.Collectors.toMap(
-                    id -> id, this::lockAccount, (a, b) -> a, java.util.LinkedHashMap::new));
+                Collectors.toMap(id -> id, this::lockAccount, (a, b) -> a, LinkedHashMap::new));
     lockedAccounts.values().forEach(this::requireActive);
 
-    // Validate the negated mirror against the current balances: a leg that was positive becomes
-    // a removal and must still be covered at account and holder level (REQ-BANK-006).
-    for (BankCounterLeg leg : legs) {
+    // Validate the negated mirror against the current account balances: an account leg that was
+    // positive becomes a removal and must still be covered (REQ-BANK-006). Holder legs are not
+    // checked - the holder dimension may go negative (ADR-0039).
+    for (BankCounterLeg leg : accountLegs) {
       BigDecimal negated = leg.amount().negate();
       if (negated.signum() < 0) {
         BankAccount account = lockedAccounts.get(leg.accountId());
         BigDecimal removal = negated.negate();
-        BigDecimal holderSub = postingRepository.holderSubBalance(leg.accountId(), leg.holderId());
-        if (holderSub.compareTo(removal) < 0) {
-          throw holderOverdraft(account.getAccountNo(), leg.holderHandle(), holderSub);
-        }
         BigDecimal balance = postingRepository.accountBalance(leg.accountId());
         if (balance.compareTo(removal) < 0) {
           throw accountOverdraft(account.getAccountNo(), balance);
@@ -297,18 +367,24 @@ public class BankLedgerService {
     }
 
     Instant now = Instant.now();
+    // A reversal negates the original's actual recorded legs (the destination leg is already net),
+    // so the pair cancels exactly per account/holder and the reversal itself carries no new fee
+    // (ADR-0041): the in-game money was already moved; this is a bookkeeping correction.
     BankTransaction reversal =
-        persistTransaction(BankTransactionType.REVERSAL, note, original, now);
+        persistTransaction(BankTransactionType.REVERSAL, note, original, BigDecimal.ZERO, now);
+    for (BankCounterLeg leg : accountLegs) {
+      persistAccountPosting(
+          reversal, lockedAccounts.get(leg.accountId()), leg.amount().negate(), now);
+    }
     Map<UUID, BankHolder> reversalHolders =
-        loadHolders(legs.stream().map(BankCounterLeg::holderId).toList());
-    for (BankCounterLeg leg : legs) {
+        loadHolders(holderLegs.stream().map(BankHolderLeg::holderId).toList());
+    for (BankHolderLeg leg : holderLegs) {
       BankHolder holder = requireHolder(reversalHolders, leg.holderId());
-      persistPosting(
-          reversal, lockedAccounts.get(leg.accountId()), holder, leg.amount().negate(), now);
+      persistHolderPosting(reversal, holder, leg.amount().negate(), now);
     }
     bankAuditService.record(
         BankAuditEventType.TRANSACTION_REVERSED,
-        legs.isEmpty() ? null : legs.getFirst().accountId(),
+        accountLegs.isEmpty() ? null : accountLegs.getFirst().accountId(),
         reversal.getId(),
         null,
         "reversed " + original.getType() + " " + shortId(original.getId()));
@@ -316,11 +392,11 @@ public class BankLedgerService {
   }
 
   /**
-   * Executes the admin wipe reset (REQ-BANK-013): for every account with a non-zero balance one
-   * {@code WIPE_RESET} transaction with one negative posting per non-zero (account, holder)
-   * sub-balance, bringing balance and every sub-balance to exactly zero. History, statements and
-   * audit trail are preserved — nothing is deleted. Idempotent: on an all-zero bank nothing is
-   * booked and the result reports zero accounts.
+   * Executes the admin wipe reset (REQ-BANK-013, ADR-0039): one {@code WIPE_RESET} transaction that
+   * books a negative account leg for every account with a non-zero balance <strong>and</strong> a
+   * negative holder leg for every holder with a non-zero global balance, zeroing both dimensions
+   * independently. History, statements and audit trail are preserved — nothing is deleted.
+   * Idempotent: on an all-zero bank nothing is booked and the result reports zero.
    *
    * @return counts and total for the admin notice; one summarizing audit event is written when
    *     anything was zeroed
@@ -328,45 +404,54 @@ public class BankLedgerService {
   @Transactional
   public BankWipeResetResultDto resetAllBalances() {
     List<BankAccount> accounts = accountRepository.findAllForUpdateOrderById();
-    int accountsReset = 0;
-    int stashesZeroed = 0;
-    BigDecimal totalZeroed = BigDecimal.ZERO;
+    Map<UUID, BigDecimal> accountBalances =
+        accounts.stream()
+            .collect(
+                Collectors.toMap(
+                    BankAccount::getId, a -> postingRepository.accountBalance(a.getId())));
+    List<BankHolderBalance> holderBalances =
+        holderPostingRepository.holderTotals().stream()
+            .filter(h -> h.amount().signum() != 0)
+            .toList();
+
+    int accountsReset =
+        (int) accountBalances.values().stream().filter(b -> b.signum() != 0).count();
+    int stashesZeroed = holderBalances.size();
+    if (accountsReset == 0 && stashesZeroed == 0) {
+      log.info("Bank wipe reset executed: nothing to zero (idempotent no-op).");
+      return new BankWipeResetResultDto(0, 0, BigDecimal.ZERO);
+    }
+
     Instant now = Instant.now();
-
+    BankTransaction tx =
+        persistTransaction(
+            BankTransactionType.WIPE_RESET, "SC wipe reset", null, BigDecimal.ZERO, now);
+    BigDecimal totalZeroed = BigDecimal.ZERO;
     for (BankAccount account : accounts) {
-      List<BankHolderBalance> distribution =
-          postingRepository.holderDistribution(account.getId()).stream()
-              .filter(h -> h.amount().signum() != 0)
-              .toList();
-      if (distribution.isEmpty()) {
-        continue;
+      BigDecimal balance = accountBalances.get(account.getId());
+      if (balance.signum() != 0) {
+        persistAccountPosting(tx, account, balance.negate(), now);
+        totalZeroed = totalZeroed.add(balance);
       }
-      BankTransaction tx =
-          persistTransaction(BankTransactionType.WIPE_RESET, "SC wipe reset", null, now);
-      Map<UUID, BankHolder> holders =
-          loadHolders(distribution.stream().map(BankHolderBalance::holderId).toList());
-      for (BankHolderBalance slice : distribution) {
-        BankHolder holder = requireHolder(holders, slice.holderId());
-        persistPosting(tx, account, holder, slice.amount().negate(), now);
-        stashesZeroed++;
-        totalZeroed = totalZeroed.add(slice.amount());
-      }
-      accountsReset++;
+    }
+    Map<UUID, BankHolder> holders =
+        loadHolders(holderBalances.stream().map(BankHolderBalance::holderId).toList());
+    for (BankHolderBalance slice : holderBalances) {
+      BankHolder holder = requireHolder(holders, slice.holderId());
+      persistHolderPosting(tx, holder, slice.amount().negate(), now);
     }
 
-    if (accountsReset > 0) {
-      bankAuditService.record(
-          BankAuditEventType.WIPE_RESET_EXECUTED,
-          null,
-          null,
-          null,
-          "accounts="
-              + accountsReset
-              + ", stashes="
-              + stashesZeroed
-              + ", totalZeroed="
-              + totalZeroed.toPlainString());
-    }
+    bankAuditService.record(
+        BankAuditEventType.WIPE_RESET_EXECUTED,
+        null,
+        tx.getId(),
+        null,
+        "accounts="
+            + accountsReset
+            + ", stashes="
+            + stashesZeroed
+            + ", totalZeroed="
+            + totalZeroed.toPlainString());
     log.info(
         "Bank wipe reset executed: accounts={}, stashes={}, totalZeroed={}",
         accountsReset,
@@ -376,7 +461,7 @@ public class BankLedgerService {
   }
 
   /**
-   * Locks one account row for the surrounding transaction (the serialization point of every
+   * Locks one account row for the surrounding transaction (the serialization point of every account
    * booking).
    *
    * @param accountId the account to lock
@@ -447,7 +532,8 @@ public class BankLedgerService {
 
   /**
    * Rejects incoming postings naming a deactivated holder (REQ-BANK-003) — money may still be moved
-   * OUT of a deactivated holder's stash.
+   * OUT of a deactivated holder's stash, and a holder Umbuchung may reconcile it in either
+   * direction.
    *
    * @param holder the receiving holder
    */
@@ -461,20 +547,14 @@ public class BankLedgerService {
   }
 
   /**
-   * The no-overdraft guard (REQ-BANK-006): the named holder's sub-balance — and, defensively, the
-   * account balance — must cover the removal. Runs while the account row is locked, so concurrent
-   * bookings cannot jointly overdraw.
+   * The no-overdraft guard (REQ-BANK-006): the account balance must cover the removal. Runs while
+   * the account row is locked, so concurrent bookings cannot jointly overdraw. The holder dimension
+   * is intentionally not guarded — it may go negative (ADR-0039).
    *
    * @param account the locked source account
-   * @param holder the paying holder
    * @param amount the positive removal amount
    */
-  private void requireCoverage(
-      @NotNull BankAccount account, @NotNull BankHolder holder, @NotNull BigDecimal amount) {
-    BigDecimal holderSub = postingRepository.holderSubBalance(account.getId(), holder.getId());
-    if (holderSub.compareTo(amount) < 0) {
-      throw holderOverdraft(account.getAccountNo(), holder.getHandle(), holderSub);
-    }
+  private void requireAccountCoverage(@NotNull BankAccount account, @NotNull BigDecimal amount) {
     BigDecimal balance = postingRepository.accountBalance(account.getId());
     if (balance.compareTo(amount) < 0) {
       throw accountOverdraft(account.getAccountNo(), balance);
@@ -498,26 +578,6 @@ public class BankLedgerService {
   }
 
   /**
-   * Builds the holder-level overdraft conflict naming account, holder and the holder's available
-   * sub-balance (REQ-BANK-006 acceptance) as structured properties.
-   *
-   * @param accountNo the account's display number
-   * @param holderHandle the named holder's handle
-   * @param available the holder's current sub-balance on the account
-   * @return the 409 conflict to throw
-   */
-  private BankConflictException holderOverdraft(
-      @NotNull String accountNo, @NotNull String holderHandle, @NotNull BigDecimal available) {
-    return new BankConflictException(
-        BankConflictException.CODE_BANK_HOLDER_OVERDRAFT,
-        "The booking exceeds the holder's sub-balance on the account",
-        Map.of(
-            "accountNo", accountNo,
-            "holderHandle", holderHandle,
-            "available", plain(available)));
-  }
-
-  /**
    * Renders a ledger sum for client display: {@code NUMERIC(19,4)} sums come back as {@code
    * 300.0000} — bank amounts are whole aUEC, so trailing zeros are stripped (plain notation, no
    * scientific rendering).
@@ -530,11 +590,24 @@ public class BankLedgerService {
   }
 
   /**
+   * Renders the audit-detail suffix for a fee-bearing transaction (ADR-0041): {@code " (fee N
+   * aUEC)"} when the fee is positive, empty otherwise. No PII — only the numeric fee.
+   *
+   * @param fee the carved-out transfer fee
+   * @return the fee suffix, or an empty string when there is no fee
+   */
+  private static String feeDetail(@NotNull BigDecimal fee) {
+    return fee.signum() > 0 ? " (fee " + plain(fee) + " aUEC)" : "";
+  }
+
+  /**
    * Persists one transaction header stamped with the caller and the shared booking instant.
    *
    * @param type the transaction type
    * @param note optional free-text note
    * @param reversed the reversed original for {@code REVERSAL} rows, else {@code null}
+   * @param fee the in-game transfer fee carved out of the gross (ADR-0041); {@link BigDecimal#ZERO}
+   *     for non-fee transactions
    * @param now the shared booking instant
    * @return the persisted header
    */
@@ -542,6 +615,7 @@ public class BankLedgerService {
       @NotNull BankTransactionType type,
       @Nullable String note,
       @Nullable BankTransaction reversed,
+      @NotNull BigDecimal fee,
       @NotNull Instant now) {
     BankTransaction tx =
         BankTransaction.builder()
@@ -549,35 +623,56 @@ public class BankLedgerService {
             .initiatedBy(authHelperService.currentUserId().orElse(null))
             .note(note)
             .reversedTransaction(reversed)
+            .transferFee(fee)
             .createdAt(now)
             .build();
     return transactionRepository.save(tx);
   }
 
   /**
-   * Persists one signed ledger leg stamped with the shared booking instant.
+   * Persists one signed account leg stamped with the shared booking instant.
    *
    * @param tx the owning header
    * @param account the posted account
-   * @param holder the named holder
    * @param amount the signed amount (never zero — callers always pass validated non-zero values)
    * @param now the shared booking instant
    */
-  private void persistPosting(
+  private void persistAccountPosting(
       @NotNull BankTransaction tx,
       @NotNull BankAccount account,
-      @NotNull BankHolder holder,
       @NotNull BigDecimal amount,
       @NotNull Instant now) {
     BankPosting posting =
         BankPosting.builder()
             .transaction(tx)
             .account(account)
-            .holder(holder)
             .amount(amount)
             .createdAt(now)
             .build();
     postingRepository.save(posting);
+  }
+
+  /**
+   * Persists one signed holder leg stamped with the shared booking instant.
+   *
+   * @param tx the owning header
+   * @param holder the named holder
+   * @param amount the signed amount (never zero — callers always pass validated non-zero values)
+   * @param now the shared booking instant
+   */
+  private void persistHolderPosting(
+      @NotNull BankTransaction tx,
+      @NotNull BankHolder holder,
+      @NotNull BigDecimal amount,
+      @NotNull Instant now) {
+    BankHolderPosting posting =
+        BankHolderPosting.builder()
+            .transaction(tx)
+            .holder(holder)
+            .amount(amount)
+            .createdAt(now)
+            .build();
+    holderPostingRepository.save(posting);
   }
 
   /**

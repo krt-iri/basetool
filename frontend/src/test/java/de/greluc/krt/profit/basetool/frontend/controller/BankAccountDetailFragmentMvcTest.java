@@ -91,7 +91,8 @@ class BankAccountDetailFragmentMvcTest {
             null,
             null,
             null,
-            false);
+            false,
+            BigDecimal.ZERO);
     // Two pages so the embedded pager renders.
     when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(booking), 0, 20, 25L, 2, List.of()));

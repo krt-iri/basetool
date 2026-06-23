@@ -20,12 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.ReverseBankTransactionRequest;
 import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
+import de.greluc.krt.profit.basetool.backend.service.BankTransferFeeService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -35,6 +37,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,9 +47,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST surface for the booking flows (epic #556, REQ-BANK-004/-011): deposits, withdrawals,
- * transfers (incl. intra-account holder rebookings) and reversals. The capability gates evaluate
- * the caller's grant flags on the affected account via {@code BankSecurityService} — management and
- * admins pass unrestricted; reversals are management-only (spec open-question 3, v1 decision).
+ * account-to-account transfers and reversals (holder→holder Umbuchungen live on {@code
+ * BankHolderController}, REQ-BANK-031). The capability gates evaluate the caller's grant flags on
+ * the affected account via {@code BankSecurityService} — management and admins pass unrestricted;
+ * reversals are management-only (spec open-question 3, v1 decision).
  */
 @RestController
 @RequestMapping("/api/v1/bank")
@@ -55,6 +59,22 @@ public class BankBookingController {
 
   private final BankLedgerService bankLedgerService;
   private final BankSecurityService bankSecurityService;
+  private final BankTransferFeeService bankTransferFeeService;
+
+  /**
+   * Returns the current in-game transfer-fee rate (ADR-0041, REQ-BANK-033) so the booking modals
+   * can render a live "Gebühr / kommt an" preview as the staffer types the amount. Open to all bank
+   * staff (it reveals only the org-wide rate, no account data).
+   *
+   * @return the current fee rate (fraction in {@code [0, 1)})
+   */
+  @Operation(summary = "Read the current in-game transfer-fee rate")
+  @GetMapping("/transfer-fee-rate")
+  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @Transactional(readOnly = true)
+  public BankTransferFeeRateDto getTransferFeeRate() {
+    return new BankTransferFeeRateDto(bankTransferFeeService.resolveTransferFeeRate());
+  }
 
   /**
    * Books a deposit onto an account the caller may deposit to (REQ-BANK-009).
@@ -92,15 +112,15 @@ public class BankBookingController {
   }
 
   /**
-   * Books a transfer: {@code can_transfer} on the source account is the gate; the destination must
-   * be visible to the caller (REQ-BANK-011 v1 destination rule) — evaluated here and handed to the
-   * service.
+   * Books an account-to-account transfer: {@code can_transfer} on the source account is the gate;
+   * the destination must be visible to the caller (REQ-BANK-011 destination rule) — evaluated here
+   * and handed to the service.
    *
    * @param request validated transfer payload
    * @param authentication the caller's authentication (for the destination-visibility check)
    * @return acknowledgement of the created transaction
    */
-  @Operation(summary = "Book a transfer or intra-account holder rebooking")
+  @Operation(summary = "Book an account-to-account transfer")
   @PostMapping("/transfers")
   @PreAuthorize(
       "hasRole('BANK_EMPLOYEE') and @bankSecurityService.canTransfer(#request.sourceAccountId,"

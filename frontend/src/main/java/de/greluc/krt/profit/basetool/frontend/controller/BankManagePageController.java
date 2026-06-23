@@ -21,15 +21,20 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,8 +42,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * Renders the bank management page ({@code /bank/manage}, W1 mockup): the account-lifecycle tab and
- * the holder-registry tab, each with its creation modal. Management-only — admins pass via the role
- * hierarchy (REQ-BANK-010).
+ * the holder-registry tab. Open to bank employees (REQ-BANK-030, ADR-0040): employees may create
+ * {@code SPECIAL} accounts and use the holder menu incl. the holder→holder Umbuchung, while
+ * account-relationship lifecycle, manual holder registration and grants stay management-only —
+ * enforced per-action in the template (and server-side). Admins pass via the role hierarchy.
  */
 @Controller
 @RequiredArgsConstructor
@@ -57,15 +64,18 @@ public class BankManagePageController {
    *     an account/holder lifecycle write (REQ-FE-005), refreshing the row plus the tab-count
    *     aggregates in place; the creation-modal lookups (org-units, users) are then skipped because
    *     the modals live outside the swapped region
+   * @param authentication the caller's authentication, used to detect the management perspective
    * @param model Spring MVC model
    * @return the manage template, or its {@code manageBody} fragment for an AJAX swap
    */
   @GetMapping("/bank/manage")
-  @PreAuthorize("hasRole('BANK_MANAGEMENT')")
+  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
   public String manage(
       @RequestParam(required = false) String tab,
       @RequestParam(required = false) String fragment,
+      Authentication authentication,
       Model model) {
+    boolean management = hasRole(authentication, "ROLE_BANK_MANAGEMENT");
     PageResponse<BankAccountDto> accounts =
         backendApiClient.get(
             "/api/v1/bank/accounts?size=500", new ParameterizedTypeReference<>() {});
@@ -75,24 +85,59 @@ public class BankManagePageController {
     model.addAttribute(
         "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
+    model.addAttribute("management", management);
+    // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder
+    // row to its history; management links every row (REQ-BANK-032). The real per-holder gate is
+    // server-side (canSeeHolder) — this only governs which links the UI renders.
+    model.addAttribute("selfUserId", authentication != null ? authentication.getName() : null);
     model.addAttribute("activeTab", "halter".equalsIgnoreCase(tab) ? "halter" : "konten");
     if ("manageBody".equals(fragment)) {
       return "bank-manage :: manageBody";
     }
 
-    // Epic #692 Phase 6 (REQ-ORG-019): the create form links AREA accounts to a Bereich and the
-    // CARTEL account to the Organisationsleitung, so it needs the all-kinds option list (Staffel +
-    // SK + Bereich + OL), not the Staffel/SK-only /active list the public Job-Order form uses.
-    List<OrgUnitMembershipOptionDto> orgUnits =
-        backendApiClient.get(
-            "/api/v1/org-units/active-all-kinds",
-            new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {});
-    List<UserReferenceDto> users =
-        backendApiClient.get(
-            "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+    // The org-unit/user lookups feed management-only modals (non-special account creation links a
+    // Bereich/OL; manual holder registration picks a user). An employee may only create SPECIAL
+    // accounts (no org unit) and cannot register holders, so those backend reads — themselves
+    // management-gated — are skipped for a plain employee (REQ-BANK-030).
+    if (management) {
+      List<OrgUnitMembershipOptionDto> orgUnits =
+          backendApiClient.get(
+              "/api/v1/org-units/active-all-kinds",
+              new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {});
+      List<UserReferenceDto> users =
+          backendApiClient.get(
+              "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+      model.addAttribute(
+          "orgUnits", orgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : orgUnits);
+      model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
+    } else {
+      model.addAttribute("orgUnits", List.<OrgUnitMembershipOptionDto>of());
+      model.addAttribute("users", List.<UserReferenceDto>of());
+    }
+    // The in-game transfer-fee rate (ADR-0041, REQ-BANK-033) feeds the live "Gebühr / kommt an"
+    // preview in the holder→holder Umbuchung modal (open to every bank employee). Only the full
+    // page
+    // renders the modals, so it is fetched only here.
+    BankTransferFeeRateDto feeRate =
+        backendApiClient.get("/api/v1/bank/transfer-fee-rate", BankTransferFeeRateDto.class);
     model.addAttribute(
-        "orgUnits", orgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : orgUnits);
-    model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
+        "transferFeeRate",
+        feeRate == null || feeRate.rate() == null ? BigDecimal.ZERO : feeRate.rate());
     return "bank-manage";
+  }
+
+  /**
+   * Whether the caller holds the given authority — the management-vs-employee split for the
+   * data-fetch decisions (the template re-checks each action with {@code sec:authorize}).
+   *
+   * @param authentication the caller's authentication, possibly {@code null}
+   * @param authority the authority to look for (e.g. {@code ROLE_BANK_MANAGEMENT})
+   * @return {@code true} when the authority is present
+   */
+  private static boolean hasRole(@Nullable Authentication authentication, String authority) {
+    return authentication != null
+        && authentication.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch(authority::equals);
   }
 }

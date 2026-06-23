@@ -82,10 +82,19 @@ public class BankHolder extends AbstractEntity<UUID> {
   private String handle;
 
   /**
-   * {@code false} blocks new postings naming this holder (registration mistakes, players leaving
-   * custody duty); existing ledger history is never touched. Deactivation requires no zero
-   * sub-balance — the money record stays where it physically is.
+   * {@code false} blocks new incoming postings naming this holder (registration mistakes, players
+   * leaving custody duty); existing ledger history is never touched and money may still be moved
+   * out of (or reconciled into) the stash. Deactivation requires no zero balance — the money record
+   * stays where it physically is.
    */
   @Column(nullable = false)
   private boolean active = true;
+
+  /**
+   * {@code true} when this holder was auto-created from a bank role (REQ-BANK-029, ADR-0040): the
+   * reconcile auto-deactivates it when the user loses all bank roles. {@code false} marks a
+   * manually registered custodian, which the reconcile never touches. Persisted by V182.
+   */
+  @Column(name = "role_managed", nullable = false)
+  private boolean roleManaged = false;
 }

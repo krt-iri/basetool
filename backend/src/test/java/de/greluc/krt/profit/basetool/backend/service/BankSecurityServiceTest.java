@@ -30,7 +30,10 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
+import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +57,7 @@ class BankSecurityServiceTest {
 
   @Mock private AuthHelperService authHelperService;
   @Mock private BankAccountGrantRepository grantRepository;
+  @Mock private BankHolderRepository holderRepository;
   @Mock private Authentication authentication;
 
   @InjectMocks private BankSecurityService bankSecurityService;
@@ -168,6 +172,87 @@ class BankSecurityServiceTest {
     verify(authHelperService).hasReachableRole("ROLE_BANK_MANAGEMENT");
     verify(authHelperService).currentUserId();
     verify(grantRepository).findById(new BankAccountGrantId(userId, accountId));
+  }
+
+  @Test
+  void canSeeHolder_allowsManagementForAnyHolder() {
+    // Given: management — sees any holder, no holder lookup needed (REQ-BANK-032)
+    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
+    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
+
+    // When / Then
+    assertTrue(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
+    verifyNoInteractions(holderRepository);
+  }
+
+  @Test
+  void canSeeHolder_allowsEmployeeForTheirOwnHolder() {
+    // Given: a plain employee whose user id links the requested holder row
+    UUID holderId = UUID.randomUUID();
+    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
+    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holderLinkedTo(userId)));
+
+    // When / Then
+    assertTrue(bankSecurityService.canSeeHolder(holderId, authentication));
+  }
+
+  @Test
+  void canSeeHolder_deniesEmployeeForSomeoneElsesHolder() {
+    // Given: the holder belongs to a different user
+    UUID holderId = UUID.randomUUID();
+    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
+    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    when(holderRepository.findById(holderId))
+        .thenReturn(Optional.of(holderLinkedTo(UUID.randomUUID())));
+
+    // When / Then
+    assertFalse(bankSecurityService.canSeeHolder(holderId, authentication));
+  }
+
+  @Test
+  void canSeeHolder_deniesEmployeeWhenHolderMissing() {
+    // Given
+    UUID holderId = UUID.randomUUID();
+    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
+    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    when(holderRepository.findById(holderId)).thenReturn(Optional.empty());
+
+    // When / Then
+    assertFalse(bankSecurityService.canSeeHolder(holderId, authentication));
+  }
+
+  @Test
+  void canSeeHolder_deniesNonBankStaff_withoutAnyHolderLookup() {
+    // Given
+    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(false);
+
+    // When / Then
+    assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
+    verifyNoInteractions(holderRepository);
+  }
+
+  @Test
+  void canSeeHolder_deniesUnauthenticatedCaller() {
+    // Given
+    when(authentication.isAuthenticated()).thenReturn(false);
+
+    // When / Then
+    assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), null));
+    assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
+    verifyNoInteractions(holderRepository);
+  }
+
+  /** Builds a holder row linked to the given user id (the self-ownership input of canSeeHolder). */
+  private static BankHolder holderLinkedTo(UUID ownerUserId) {
+    User user = new User();
+    user.setId(ownerUserId);
+    BankHolder holder = new BankHolder();
+    holder.setUser(user);
+    return holder;
   }
 
   /** Stubs an authenticated employee (not management) holding a grant with the given flags. */

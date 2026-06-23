@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,4 +59,23 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
    * @return every holder row, ordered by handle
    */
   List<BankHolder> findAllByOrderByHandleAsc();
+
+  /**
+   * The holder rows linked to any of the given users — the batch lookup of the auto-registration
+   * reconcile (REQ-BANK-029) over the current bank-role roster, avoiding a per-user {@code
+   * findById}.
+   *
+   * @param userIds the linked users' ids
+   * @return the matching holder rows (those with a linked user in the set)
+   */
+  List<BankHolder> findByUserIdIn(Collection<UUID> userIds);
+
+  /**
+   * The active, role-managed holders — the candidates the reconcile may auto-deactivate when their
+   * user no longer holds any bank role (REQ-BANK-029). Manually registered holders ({@code
+   * role_managed = false}) are excluded by construction.
+   *
+   * @return the active holders auto-created from a bank role
+   */
+  List<BankHolder> findByRoleManagedTrueAndActiveTrue();
 }

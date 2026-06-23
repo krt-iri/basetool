@@ -30,6 +30,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -86,6 +87,21 @@ public class BankTransaction {
   @Nullable
   @Column(length = 500)
   private String note;
+
+  /**
+   * In-game aUEC transfer fee carved out of the gross sent amount (ADR-0041, REQ-BANK-033). Set by
+   * {@code BankLedgerService} on every transaction where a holder actively initiates an in-game
+   * transfer — {@link BankTransactionType#WITHDRAWAL}, an account-to-account {@link
+   * BankTransactionType#TRANSFER} with a holder change, and a {@link
+   * BankTransactionType#HOLDER_TRANSFER}; {@code 0} for {@link BankTransactionType#DEPOSIT} (the
+   * depositor bears their own fee), {@link BankTransactionType#WIPE_RESET}, {@link
+   * BankTransactionType#REVERSAL} and same-holder transfers. The destination leg is credited the
+   * net (gross − fee), so a fee-bearing TRANSFER/HOLDER_TRANSFER nets to {@code -transfer_fee}
+   * across its legs (REQ-BANK-020 integrity widened accordingly). Never negative (V183 CHECK).
+   */
+  @Column(name = "transfer_fee", nullable = false, precision = 19, scale = 4, updatable = false)
+  @Builder.Default
+  private BigDecimal transferFee = BigDecimal.ZERO;
 
   /**
    * The transaction this {@link BankTransactionType#REVERSAL} corrects; {@code null} for every

@@ -42,6 +42,9 @@ import org.jetbrains.annotations.Nullable;
  * @param counterHolderHandle for transfer legs the holder on the other leg
  * @param intraAccount {@code true} for intra-account holder rebookings (custody moved, the balance
  *     did not)
+ * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
+ *     REQ-BANK-033); {@code 0} for non-fee rows. On an outgoing leg the recipient received {@code
+ *     |amount| − transferFee}
  */
 public record BankBookingDto(
     UUID postingId,
@@ -55,4 +58,5 @@ public record BankBookingDto(
     @Nullable String counterAccountNo,
     @Nullable String counterAccountName,
     @Nullable String counterHolderHandle,
-    boolean intraAccount) {}
+    boolean intraAccount,
+    BigDecimal transferFee) {}

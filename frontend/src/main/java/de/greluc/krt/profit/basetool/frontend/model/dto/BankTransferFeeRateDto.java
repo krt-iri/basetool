@@ -17,19 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 /**
- * One slice of an account's holder distribution (REQ-BANK-003): which player physically holds which
- * part of the account's balance. The slices of an account always sum exactly to its balance.
+ * Frontend mirror of the current in-game transfer-fee rate (ADR-0041, REQ-BANK-033). The bank
+ * booking pages fetch it and expose it to {@code bank.js} so the withdraw / transfer / Umbuchung
+ * modals show a live "Gebühr / kommt an" preview as the staffer types the amount.
  *
- * @param holderId the holder row's id
- * @param handle the holder's handle snapshot, for display
- * @param active whether the holder accepts new postings (drives selectability in booking modals)
- * @param amount the signed sub-balance the holder holds on the account
+ * @param rate the fee rate as a fraction in {@code [0, 1)} (e.g. {@code 0.005} = 0.5%)
  */
-public record BankHolderBalanceDto(
-    UUID holderId, String handle, boolean active, BigDecimal amount) {}
+public record BankTransferFeeRateDto(BigDecimal rate) {}

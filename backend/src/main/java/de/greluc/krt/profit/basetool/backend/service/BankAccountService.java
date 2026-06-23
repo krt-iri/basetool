@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.BankAccountMapper;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -34,14 +35,16 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderBalanceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.RenameBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import java.math.BigDecimal;
@@ -54,9 +57,11 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,10 +81,12 @@ public class BankAccountService {
 
   private final BankAccountRepository accountRepository;
   private final BankPostingRepository postingRepository;
+  private final BankHolderPostingRepository holderPostingRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final BankAccountMapper bankAccountMapper;
   private final BankAuditService bankAuditService;
   private final BankBookingRequestService bankBookingRequestService;
+  private final BankGrantService bankGrantService;
 
   /**
    * Pages over the accounts the caller may see: management/admin get all accounts, employees get
@@ -106,10 +113,10 @@ public class BankAccountService {
 
   /**
    * Loads the detail aggregate of one account (K1 mockup): account + balance, 30-day delta,
-   * facts-strip counts, the permanent holder distribution (REQ-BANK-003) and the caller's
-   * capabilities. Visibility is gated at the controller via {@code BankSecurityService.canSee}; the
-   * controller also evaluates and passes the capability flags so this service stays free of
-   * authentication concerns.
+   * facts-strip booking count and the caller's capabilities. Since ADR-0039 an account carries no
+   * per-account holder distribution (holders are global). Visibility is gated at the controller via
+   * {@code BankSecurityService.canSee}; the controller also evaluates and passes the capability
+   * flags so this service stays free of authentication concerns.
    *
    * @param accountId the account
    * @param capabilities the caller's evaluated capabilities on the account
@@ -129,27 +136,13 @@ public class BankAccountService {
         bankAccountMapper.toDto(account, balance),
         delta,
         postingRepository.countByAccountId(accountId),
-        postingRepository.countDistinctHoldersByAccountId(accountId),
-        getHolderDistribution(accountId),
         capabilities);
   }
 
   /**
-   * The account's non-zero holder sub-balances (REQ-BANK-003), largest stash first.
-   *
-   * @param accountId the account
-   * @return the distribution slices
-   */
-  public List<BankHolderBalanceDto> getHolderDistribution(@NotNull UUID accountId) {
-    return postingRepository.holderDistribution(accountId).stream()
-        .filter(h -> h.amount().signum() != 0)
-        .map(h -> new BankHolderBalanceDto(h.holderId(), h.handle(), h.holderActive(), h.amount()))
-        .toList();
-  }
-
-  /**
-   * Pages over one account's booking history with the transfer counter-legs resolved in one batched
-   * IN-query (no per-row lookups, REQ-BANK-018).
+   * Pages over one account's booking history with the transfer counter-account resolved and the
+   * holder annotation derived from the holder ledger, both in batched IN-queries (no per-row
+   * lookups, REQ-BANK-018, ADR-0039).
    *
    * @param accountId the account
    * @param pageable page, size and whitelisted sort (default newest first)
@@ -158,34 +151,53 @@ public class BankAccountService {
   public Page<BankBookingDto> getBookings(@NotNull UUID accountId, @NotNull Pageable pageable) {
     requireAccount(accountId);
     Page<BankBookingRow> rows = postingRepository.findBookings(accountId, pageable);
+    List<UUID> txIds =
+        rows.getContent().stream().map(BankBookingRow::transactionId).distinct().toList();
     List<UUID> transferTxIds =
         rows.getContent().stream()
             .filter(r -> r.type() == BankTransactionType.TRANSFER)
             .map(BankBookingRow::transactionId)
             .distinct()
             .toList();
-    Map<UUID, List<BankCounterLeg>> legsByTx =
+    Map<UUID, List<BankCounterLeg>> accountLegsByTx =
         transferTxIds.isEmpty()
             ? Map.of()
             : postingRepository.findLegsByTransactionIds(transferTxIds).stream()
                 .collect(Collectors.groupingBy(BankCounterLeg::transactionId));
-    return rows.map(row -> toBookingDto(accountId, row, legsByTx));
+    Map<UUID, List<BankHolderLeg>> holderLegsByTx =
+        txIds.isEmpty()
+            ? Map.of()
+            : holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
+                .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
+    return rows.map(row -> toBookingDto(accountId, row, accountLegsByTx, holderLegsByTx));
   }
 
   /**
-   * Creates an account (REQ-BANK-001/-002): validates the type-specific owner reference, enforces
-   * the singleton/per-org-unit uniqueness with clean 409s, draws the next {@code KB-} number and
-   * audits the creation. All account types — including the two singletons — are created at runtime
-   * through this path; nothing is seeded by migration.
+   * Creates an account (REQ-BANK-001/-002/-030): validates the type-specific owner reference,
+   * enforces the singleton/per-org-unit uniqueness with clean 409s, draws the next {@code KB-}
+   * number and audits the creation. Bank management (and admins) create any type; a non-management
+   * bank employee may create <strong>only</strong> {@code SPECIAL} accounts and is auto-granted
+   * full capability on the account they create (ADR-0040) so it is immediately usable. Nothing is
+   * seeded by migration.
    *
    * @param request validated creation payload
+   * @param management whether the caller has the bank-management perspective (may create any type)
+   * @param creatorUserId the caller's user id, used to auto-grant an employee-created special
+   *     account; may be {@code null}
    * @return the created account incl. its (zero) balance
+   * @throws AccessDeniedException when a non-management employee creates a non-{@code SPECIAL} type
    * @throws BadRequestException when the owner reference does not match the type
    * @throws DuplicateEntityException when the singleton or per-org-unit uniqueness is violated
    * @throws NotFoundException when the referenced org unit does not exist
    */
   @Transactional
-  public BankAccountDto createAccount(@NotNull CreateBankAccountRequest request) {
+  public BankAccountDto createAccount(
+      @NotNull CreateBankAccountRequest request, boolean management, @Nullable UUID creatorUserId) {
+    if (request.type() != BankAccountType.SPECIAL && !management) {
+      throw new AccessDeniedException(
+          "Bank employees may only create special accounts; other account types are"
+              + " bank-management-only");
+    }
     BankAccount account = new BankAccount();
     account.setName(request.name().trim());
     account.setType(request.type());
@@ -284,6 +296,12 @@ public class BankAccountService {
         null,
         null,
         saved.getAccountNo() + " " + saved.getName() + " (" + saved.getType() + ")");
+    // An employee-created special account is auto-granted full capability to its creator so it is
+    // immediately usable (REQ-BANK-030, ADR-0040); management sees every account via its role.
+    if (!management && creatorUserId != null) {
+      bankGrantService.createGrant(
+          new CreateBankGrantRequest(creatorUserId, saved.getId(), true, true, true));
+    }
     return bankAccountMapper.toDto(saved, BigDecimal.ZERO);
   }
 
@@ -389,50 +407,74 @@ public class BankAccountService {
   }
 
   /**
-   * Resolves one booking row's transfer counter-leg from the batched legs and maps to the DTO.
+   * Resolves one booking row's holder annotation and — for transfers — the counter account/holder
+   * from the batched legs, and maps to the DTO. The holder annotation is the holder leg whose
+   * amount sign matches this account leg (deposit/withdrawal: the single leg; transfer/reversal:
+   * the matching leg of the pair); a {@code WIPE_RESET} row has no 1:1 holder leg and shows none
+   * (ADR-0039).
    *
    * @param accountId the account whose history is rendered
    * @param row the projected booking row
-   * @param legsByTx all legs of the page's transfer transactions, grouped by transaction
-   * @return the booking DTO with counter-side labels for transfers
+   * @param accountLegsByTx account legs of the page's transfer transactions, grouped by transaction
+   * @param holderLegsByTx holder legs of the page's transactions, grouped by transaction
+   * @return the booking DTO with holder annotation and counter-side labels for transfers
    */
   private BankBookingDto toBookingDto(
       @NotNull UUID accountId,
       @NotNull BankBookingRow row,
-      @NotNull Map<UUID, List<BankCounterLeg>> legsByTx) {
+      @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx,
+      @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx) {
+    List<BankHolderLeg> holderLegs = holderLegsByTx.getOrDefault(row.transactionId(), List.of());
+    String holderHandle =
+        row.type() == BankTransactionType.WIPE_RESET
+            ? null
+            : matchHolderHandle(holderLegs, row.amount().signum());
     String counterAccountNo = null;
     String counterAccountName = null;
     String counterHolderHandle = null;
-    boolean intraAccount = false;
     if (row.type() == BankTransactionType.TRANSFER) {
-      List<BankCounterLeg> legs = legsByTx.getOrDefault(row.transactionId(), List.of());
       BankCounterLeg counter =
-          legs.stream()
+          accountLegsByTx.getOrDefault(row.transactionId(), List.of()).stream()
               .filter(l -> !l.postingId().equals(row.postingId()))
               .findFirst()
               .orElse(null);
       if (counter != null) {
-        intraAccount = counter.accountId().equals(accountId);
-        counterHolderHandle = counter.holderHandle();
-        if (!intraAccount) {
-          counterAccountNo = counter.accountNo();
-          counterAccountName = counter.accountName();
-        }
+        counterAccountNo = counter.accountNo();
+        counterAccountName = counter.accountName();
       }
+      counterHolderHandle = matchHolderHandle(holderLegs, -row.amount().signum());
     }
     return new BankBookingDto(
         row.postingId(),
         row.transactionId(),
         row.type(),
         row.amount(),
-        row.holderHandle(),
+        holderHandle,
         row.note(),
         row.createdAt(),
         row.reversedTransactionId(),
         counterAccountNo,
         counterAccountName,
         counterHolderHandle,
-        intraAccount);
+        false,
+        row.transferFee());
+  }
+
+  /**
+   * Picks the handle of the holder leg whose amount sign matches the requested sign — the holder
+   * paired with an account leg of the same sign in the same transaction (ADR-0039). Returns {@code
+   * null} when no such leg exists (e.g. an account with no sibling holder leg).
+   *
+   * @param holderLegs the transaction's holder legs
+   * @param sign the wanted amount sign (+1, -1; 0 never matches a non-zero leg)
+   * @return the matching holder's handle, or {@code null}
+   */
+  private static String matchHolderHandle(@NotNull List<BankHolderLeg> holderLegs, int sign) {
+    return holderLegs.stream()
+        .filter(leg -> leg.amount().signum() == sign)
+        .map(BankHolderLeg::handle)
+        .findFirst()
+        .orElse(null);
   }
 
   /**

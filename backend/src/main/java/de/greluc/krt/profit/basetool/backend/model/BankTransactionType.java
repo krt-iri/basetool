@@ -20,34 +20,44 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * The kind of value movement a {@link BankTransaction} records (REQ-BANK-004, ADR-0010). The type
- * determines the posting shape invariant enforced by {@code BankLedgerService}; the V153 CHECK
- * constraint mirrors this set.
+ * The kind of value movement a {@link BankTransaction} records (REQ-BANK-004, ADR-0010/0039). The
+ * type determines the leg shape invariant enforced by {@code BankLedgerService} across the two
+ * append-only ledgers (account legs in {@code bank_posting}, holder legs in {@code
+ * bank_holder_posting}); the V180 CHECK constraint mirrors this set.
  */
 public enum BankTransactionType {
 
-  /** Money entered the bank: exactly one positive posting naming the receiving holder. */
+  /** Money entered the bank: one positive account leg and one positive holder leg (receiver). */
   DEPOSIT,
 
-  /** Money left the bank: exactly one negative posting naming the paying holder. */
+  /** Money left the bank: one negative account leg and one negative holder leg (payer). */
   WITHDRAWAL,
 
   /**
-   * Two postings summing to zero. Covers account-to-account transfers (different accounts, each leg
-   * naming the holder whose stash changes) and intra-account holder rebookings (same account, two
-   * different holders — custody moves, the balance does not; REQ-BANK-011).
+   * Account↔account transfer (REQ-BANK-011): two account legs summing to zero <strong>and</strong>
+   * two holder legs summing to zero — physical custody moves with the booked money. Source and
+   * destination accounts always differ (intra-account rebooking is replaced by {@link
+   * #HOLDER_TRANSFER} since ADR-0039).
    */
   TRANSFER,
 
   /**
-   * Admin-only reset after a Star Citizen wipe (REQ-BANK-013): one negative posting per non-zero
-   * (account, holder) sub-balance, bringing the account to exactly zero while history survives.
+   * Holder→holder Umbuchung (REQ-BANK-031, ADR-0039): two holder legs summing to zero and
+   * <strong>no</strong> account leg — pure custody reconciliation between players. The source
+   * holder may go negative (REQ-BANK-006).
+   */
+  HOLDER_TRANSFER,
+
+  /**
+   * Admin-only reset after a Star Citizen wipe (REQ-BANK-013): one negative account leg per
+   * non-zero account balance and one negative holder leg per non-zero global holder balance,
+   * zeroing both dimensions independently while history survives.
    */
   WIPE_RESET,
 
   /**
-   * Correction booking: its postings are the negated mirror of the reversed transaction's postings
-   * and it references the original via {@link BankTransaction#getReversedTransaction()}. A
+   * Correction booking: its legs are the negated mirror of the reversed transaction's legs on both
+   * ledgers, and it references the original via {@link BankTransaction#getReversedTransaction()}. A
    * transaction can be reversed at most once (V153 unique constraint).
    */
   REVERSAL

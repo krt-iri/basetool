@@ -113,10 +113,13 @@ class DatabaseIndexMigrationTest {
     assertIndexExists(jdbc, "bank_account", "uq_bank_account_singleton_cartel_bank");
     // V152 (REQ-BANK-009): reverse lookup powering the per-account grants matrix.
     assertIndexExists(jdbc, "bank_account_grant", "idx_bank_account_grant_account");
-    // V153 (REQ-BANK-020): the compute-on-read balance, statement and holder-distribution paths.
+    // V153 (REQ-BANK-020): the compute-on-read account-balance and statement paths.
     assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_account_created");
     assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_transaction");
-    assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_account_holder");
+    // V180/V181 (ADR-0039): the holder dimension moved to its own ledger; the per-(account, holder)
+    // composite index idx_bank_posting_account_holder was dropped with the holder column.
+    assertIndexExists(jdbc, "bank_holder_posting", "idx_bank_holder_posting_holder_created");
+    assertIndexExists(jdbc, "bank_holder_posting", "idx_bank_holder_posting_transaction");
     // V154 (REQ-BANK-012): the admin audit viewer (newest-first plus per-account filter).
     assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_occurred");
     assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_account");
@@ -127,7 +130,8 @@ class DatabaseIndexMigrationTest {
     // leading-column composites could not serve, plus two partial indexes for the pending-approval
     // queue and the active job-order board.
     assertIndexExists(jdbc, "job_order_assignees", "idx_job_order_assignees_user_id");
-    assertIndexExists(jdbc, "bank_posting", "idx_bank_posting_holder_id");
+    // idx_bank_posting_holder_id (V175) was auto-dropped with the bank_posting.holder_id column
+    // (V181, ADR-0039); the holder ledger carries its own (holder_id, created_at) index instead.
     assertIndexExists(jdbc, "bank_transaction", "idx_bank_transaction_initiated_by");
     assertIndexExists(jdbc, "app_user", "idx_app_user_approved_by_id");
     assertIndexExists(jdbc, "app_user", "idx_app_user_pending_approval");

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.RenameBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
@@ -54,6 +56,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Unit tests for {@link BankAccountService}: the type-specific owner-reference validation, the
@@ -69,6 +72,7 @@ class BankAccountServiceTest {
   @Mock private BankAccountMapper bankAccountMapper;
   @Mock private BankAuditService bankAuditService;
   @Mock private BankBookingRequestService bankBookingRequestService;
+  @Mock private BankGrantService bankGrantService;
 
   @InjectMocks private BankAccountService bankAccountService;
 
@@ -85,7 +89,7 @@ class BankAccountServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     // When
-    bankAccountService.createAccount(
+    createAsManagement(
         new CreateBankAccountRequest("Staffel IRIDIUM", BankAccountType.ORG_UNIT, orgUnitId, null));
 
     // Then
@@ -103,7 +107,7 @@ class BankAccountServiceTest {
     assertThrows(
         BadRequestException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest("X", BankAccountType.ORG_UNIT, null, null)));
     verify(accountRepository, never()).save(any());
   }
@@ -122,7 +126,7 @@ class BankAccountServiceTest {
     assertThrows(
         BadRequestException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest("X", BankAccountType.ORG_UNIT, bereichId, null)));
     verify(accountRepository, never()).save(any());
   }
@@ -140,7 +144,7 @@ class BankAccountServiceTest {
     assertThrows(
         DuplicateEntityException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest("X", BankAccountType.ORG_UNIT, orgUnitId, null)));
   }
 
@@ -153,7 +157,7 @@ class BankAccountServiceTest {
     assertThrows(
         DuplicateEntityException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest("DAS KARTELL", BankAccountType.CARTEL, null, null)));
   }
 
@@ -164,13 +168,13 @@ class BankAccountServiceTest {
     assertThrows(
         BadRequestException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest("Bereich Profit", BankAccountType.AREA, null, null)));
     // A free-form area name is no longer accepted on creation → 400 (checked before the FK lookup).
     assertThrows(
         BadRequestException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest(
                     "Bereich Profit", BankAccountType.AREA, UUID.randomUUID(), "Profit")));
     // The referenced org unit must be a Bereich, not a Staffel/SK → 400.
@@ -181,7 +185,7 @@ class BankAccountServiceTest {
     assertThrows(
         BadRequestException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest(
                     "Bereich Profit", BankAccountType.AREA, staffelId, null)));
     verify(accountRepository, never()).save(any());
@@ -200,7 +204,7 @@ class BankAccountServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     // When
-    bankAccountService.createAccount(
+    createAsManagement(
         new CreateBankAccountRequest("Bereich Profit", BankAccountType.AREA, bereichId, null));
 
     // Then the account is linked to the Bereich via the org_unit FK (not the area name)
@@ -214,7 +218,7 @@ class BankAccountServiceTest {
     assertThrows(
         DuplicateEntityException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest(
                     "Bereich Profit 2", BankAccountType.AREA, bereichId, null)));
   }
@@ -232,7 +236,7 @@ class BankAccountServiceTest {
     when(accountRepository.save(any(BankAccount.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    bankAccountService.createAccount(
+    createAsManagement(
         new CreateBankAccountRequest("DAS KARTELL", BankAccountType.CARTEL, olId, null));
 
     ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
@@ -248,7 +252,7 @@ class BankAccountServiceTest {
     assertThrows(
         BadRequestException.class,
         () ->
-            bankAccountService.createAccount(
+            createAsManagement(
                 new CreateBankAccountRequest(
                     "DAS KARTELL", BankAccountType.CARTEL, staffelId, null)));
   }
@@ -365,6 +369,54 @@ class BankAccountServiceTest {
         ObjectOptimisticLockingFailureException.class,
         () -> bankAccountService.reopenAccount(accountId, new BankAccountLifecycleRequest(4L)));
     verify(accountRepository, never()).save(any());
+  }
+
+  @Test
+  void createAccount_employeeMayCreateSpecialAndIsAutoGranted() {
+    // Given: a bank employee (management = false) with a creator id
+    UUID creatorId = UUID.randomUUID();
+    when(accountRepository.nextAccountNoValue()).thenReturn(42L);
+    when(accountRepository.save(any(BankAccount.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    // When: the employee creates a SPECIAL account
+    bankAccountService.createAccount(
+        new CreateBankAccountRequest("Sonderkonto Logistik", BankAccountType.SPECIAL, null, null),
+        false,
+        creatorId);
+
+    // Then: the account is created and the creator is auto-granted full capability (REQ-BANK-030)
+    verify(accountRepository).save(any(BankAccount.class));
+    ArgumentCaptor<CreateBankGrantRequest> grant =
+        ArgumentCaptor.forClass(CreateBankGrantRequest.class);
+    verify(bankGrantService).createGrant(grant.capture());
+    assertEquals(creatorId, grant.getValue().userId());
+    assertTrue(
+        grant.getValue().canDeposit()
+            && grant.getValue().canWithdraw()
+            && grant.getValue().canTransfer(),
+        "the creator gets full capability on their special account");
+  }
+
+  @Test
+  void createAccount_employeeMayNotCreateNonSpecialType() {
+    // When / Then: a bank employee creating any non-SPECIAL type is denied (REQ-BANK-030, ADR-0040)
+    UUID creatorId = UUID.randomUUID();
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            bankAccountService.createAccount(
+                new CreateBankAccountRequest(
+                    "Staffel X", BankAccountType.ORG_UNIT, UUID.randomUUID(), null),
+                false,
+                creatorId));
+    verify(accountRepository, never()).save(any());
+    verify(bankGrantService, never()).createGrant(any());
+  }
+
+  /** Creates an account in the management perspective (any type, no auto-grant). */
+  private void createAsManagement(CreateBankAccountRequest request) {
+    bankAccountService.createAccount(request, true, null);
   }
 
   /** Builds a SPECIAL account stub with a given version (reflection-free, via setters). */

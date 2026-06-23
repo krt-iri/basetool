@@ -261,8 +261,8 @@ public class BankBookingRequestService {
    * @throws NotFoundException when the request does not exist
    * @throws AccessDeniedException when the employee lacks the matching per-account capability
    * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING}, or a ledger conflict
-   *     ({@code BANK_ACCOUNT_CLOSED}, {@code BANK_HOLDER_INACTIVE}, {@code BANK_OVERDRAFT}, {@code
-   *     BANK_HOLDER_OVERDRAFT})
+   *     ({@code BANK_ACCOUNT_CLOSED}, {@code BANK_OVERDRAFT}); the holder may go negative
+   *     (REQ-BANK-006, ADR-0039)
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
   @Transactional
