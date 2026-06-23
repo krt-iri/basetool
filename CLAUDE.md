@@ -46,6 +46,19 @@ visual source of truth is the design skill at
 [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md)
 (README.md = Quelle der Wahrheit für Farben, Typografie, Komponenten).
 
+**Live update is a binding requirement: every part of the frontend must support live update to
+the current standard.** Every create / update / delete / toggle / reorder / filter / paginate
+interaction updates the DOM **in place** through the shared `krtFetch` / `krtCsrf` / fragment-swap
+foundation — **no full-page reload on success** (the only two sanctioned reloads are the
+optimistic-lock conflict confirm and the bfcache history-restore of `REQ-FE-008`) — derived UI
+outside the swapped fragment is refreshed too, and on any surface where several users can see the
+same state a peer's change propagates to the others without a manual reload. The current standard,
+its full `krtFetch`/fragment-swap contract and the live multi-user sync live in
+[`docs/specs/frontend-ajax-mutations.md`](docs/specs/frontend-ajax-mutations.md)
+(`REQ-FE-001…010`, ADR-0012/0013/0031). A new or changed frontend surface that reloads the page on
+success, leaves a sibling/peer view stale, or hand-rolls a `fetch`/CSRF write outside `krtFetch` is
+incomplete — extend the standard to cover it, don't fall back to a reload.
+
 ## Build, run, test
 
 Always use the Gradle wrapper. **Never** use the IDE test runner or the harness `run_test` tool — Gradle is the only sanctioned test path. This is a hard project rule and applies even when iterating on a single test.
@@ -117,6 +130,7 @@ Moved to [`docs/specs/data-persistence.md`](docs/specs/data-persistence.md) (`RE
 The codebase has been bitten by optimistic-locking traps several times. The rules below exist because of real bugs that shipped.
 
 - **Optimistic locking via `@Version`** — every write DTO carries the `version` field; the frontend echoes it back; concurrent modifications surface as `ObjectOptimisticLockingFailureException` → HTTP 409. Don't strip the version from DTOs to "make it simpler."
+- **Lock as fine-grained as the data allows.** Every part of the frontend must be locked as narrowly as possible: an edit to one part of a screen must **not** 409 a concurrent edit to an unrelated part. Prefer the smallest optimistic-lock scope an aggregate's parts can carry — split a large aggregate's single coarse lock into **independent per-section version counters**, each bumped and echoed on its own, so editing one section never collides with a concurrent edit of another. The canonical precedent is `Mission`'s manual in-memory `coreVersion` / `scheduleVersion` / `flagsVersion` / `partyLeadVersion` counters layered on top of the row's Hibernate `@Version` (note: these manual counters are NOT `@Version`, so the `saveAndFlush` writeback caveat of `REQ-FE-003` does **not** apply to them). Each form / fragment should write the smallest entity that owns the data it touches rather than re-saving the whole aggregate. A coarse, screen-wide lock that forces unrelated concurrent edits to collide is a defect, not a simplification.
 - **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. If targeted updates are too tangled, just `window.location.reload()` on success.
 - **Pessimistic locking for bulk reorders** — use `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL) for priority shifts and reorder operations to avoid races.
 - **Intra-transaction service calls — `…WithinTransaction` pattern.** When a `@Transactional` service method modifies an entity (directly or via cascaded `repository.save()`) and then calls another service that operates on the **same entity**, the inner method's own `findById()` + `save()` + `flush()` will collide with the already-incremented `@Version` field, causing 409. Fix: expose a dedicated `completeSomethingWithinTransaction(Entity entity)` method annotated `@Transactional(propagation = MANDATORY)` that operates on the already-managed entity and relies on dirty-checking — no `save()`/`flush()` of its own. Canonical example: `JobOrderService.completeJobOrderWithinTransaction()`. Apply this consistently to handover, booking, transfer, and any similar flow.
