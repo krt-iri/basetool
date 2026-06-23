@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -48,17 +49,19 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * chain one level higher in the tree:
  *
  * <ul>
- *   <li>A <b>Bereichsleitung</b> membership (any of {@code is_bereichsleiter} / {@code
- *       is_bereichskoordinator} / {@code is_bereichsoperator}) reaches the Bereich itself plus
- *       every direct child (its Staffeln + SKs). The three-level hierarchy (OL &gt; Bereich &gt;
- *       Staffel/SK) means the direct children are the whole subtree below a Bereich.
- *   <li>An <b>Organisationsleitung</b> membership ({@code is_ol_member}) reaches <em>every</em> org
- *       unit — OL is the only level that crosses Bereiche.
+ *   <li>A <b>Bereichsleitung</b> membership (any area rank — {@link MembershipRole#isAreaRank()}:
+ *       {@code BEREICHSLEITER} / {@code BEREICHSKOORDINATOR} / {@code BEREICHSOPERATOR}) reaches
+ *       the Bereich itself plus every direct child (its Staffeln + SKs). The three-level hierarchy
+ *       (OL &gt; Bereich &gt; Staffel/SK) means the direct children are the whole subtree below a
+ *       Bereich.
+ *   <li>An <b>Organisationsleitung</b> membership ({@link MembershipRole#OL_MEMBER}) reaches
+ *       <em>every</em> org unit — OL is the only level that crosses Bereiche.
  *   <li>Every other membership (a plain Staffel/SK membership, a per-membership Logistician /
- *       MissionManager / SK-Lead flag, or a flag-less Bereich/OL seat) confers reach over its own
- *       org unit only — exactly today's behaviour. A flag-less Bereich seat is the organisational,
- *       chart-only Bereichsleitung membership an SK-Leiter would hold; it must NOT widen reach
- *       (REQ-ORG-017, owner decision Q1: SK-Leiter = SK-only reach).
+ *       MissionManager flag, an {@code SK_LEAD}, a squadron rank, or a rank-less {@code MEMBER}
+ *       seat) confers reach over its own org unit only — exactly today's behaviour. A squadron rank
+ *       and an SK-Lead are own-unit only by design (REQ-ROLE-002, REQ-ORG-017, owner decision Q1:
+ *       SK-Leiter = SK-only reach); their own unit's reach is contributed by the per-row authority
+ *       loop / direct-membership union, not by this cascade.
  * </ul>
  *
  * <p><b>HARD INVARIANT (REQ-ORG-015).</b> The expansion is always a concrete, materialised set of
@@ -184,14 +187,16 @@ public class OrgUnitCascadeService {
   @NotNull
   private Set<UUID> computeCascadedOfficerReach(
       @NotNull Collection<OrgUnitMembership> memberships) {
-    boolean olReach = memberships.stream().anyMatch(OrgUnitMembership::isOlMember);
+    boolean olReach = memberships.stream().anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER);
     if (olReach) {
       // OL reach is the literal union of every org unit — materialised, never an admin-all marker.
       return new LinkedHashSet<>(orgUnitRepository.findAllOrgUnitIds());
     }
     Set<UUID> reach = new LinkedHashSet<>();
     for (OrgUnitMembership m : memberships) {
-      if (m.isBereichsleiter() || m.isBereichskoordinator() || m.isBereichsoperator()) {
+      // Only the three area ranks cascade (Bereich → its Staffeln/SKs). Squadron ranks and SK_LEAD
+      // confer own-unit reach only (REQ-ROLE-002) and fall through here.
+      if (m.getRole().isAreaRank()) {
         UUID bereichId = m.getId().getOrgUnitId();
         reach.add(bereichId);
         reach.addAll(orgUnitRepository.findChildOrgUnitIds(bereichId));

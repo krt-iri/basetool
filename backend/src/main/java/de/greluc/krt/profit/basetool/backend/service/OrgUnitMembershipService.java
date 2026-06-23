@@ -838,22 +838,17 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * {@code true} iff the user holds any leadership flag on any membership — SK-Leiter ({@code
-   * is_lead}), Bereichsleitung ({@code is_bereichsleiter} / {@code is_bereichskoordinator} / {@code
-   * is_bereichsoperator}) or OL ({@code is_ol_member}). Backs the REQ-ORG-017 guard that such a
-   * leader is never assigned to a Staffel.
+   * {@code true} iff the user holds a <em>silo-leader</em> rank on any membership — an SK-Leiter
+   * ({@link MembershipRole#SK_LEAD}), a Bereichsleitung rank, or the OL ({@link
+   * MembershipRole#isAreaOrOl()}). The four squadron ranks are deliberately <b>exempt</b>: they are
+   * held by Staffel members, so they must not trip this guard. Backs the REQ-ORG-017 guard that a
+   * silo leader is never (also) assigned to a Staffel.
    *
    * @param userId the user to check; never {@code null}.
-   * @return {@code true} when any of the user's membership rows carries a leadership flag.
+   * @return {@code true} when any of the user's membership rows carries a silo-leader rank.
    */
   private boolean userHoldsLeadershipRole(@NotNull UUID userId) {
     return membershipRepository.findAllByIdUserId(userId).stream()
-        .anyMatch(
-            m ->
-                m.isLead()
-                    || m.isBereichsleiter()
-                    || m.isBereichskoordinator()
-                    || m.isBereichsoperator()
-                    || m.isOlMember());
+        .anyMatch(m -> m.getRole() == MembershipRole.SK_LEAD || m.getRole().isAreaOrOl());
   }
 }

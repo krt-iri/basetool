@@ -18,9 +18,10 @@ this org unit" — so that other features (first the bank, in a later session) c
 these ranks. It is the anchor for the rank-related amendments in
 [`org-unit-tenancy.md`](org-unit-tenancy.md), [`security-and-access.md`](security-and-access.md) and
 [`org-chart.md`](org-chart.md), and for the role matrix in
-[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Tracked by epic #800 (Phase 1 shipped:
-the additive rank column + Kommandogruppe; Phases 2–5 wire authority, delegated assignment, UI and
-the destructive cleanup).
+[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Tracked by epic #800 (Phases 1–2
+shipped: the additive rank column + Kommandogruppe, and the authorisation layer now reads the rank
+with the squadron-rank baseline grant; Phases 3–5 wire delegated assignment, UI and the destructive
+cleanup).
 
 ## Requirements
 
@@ -44,11 +45,11 @@ cleanup.
 
 - [x] `org_unit_membership.role` exists, defaults `MEMBER`, and is kind-scoped by CHECK (V184).
 - [x] The rank is backfilled 1:1 from the five booleans (mutually exclusive ⇒ unambiguous).
-- [ ](Phase 2) The authorisation layer reads the rank instead of the booleans, behaviour-identical
-  for every existing area/OL/SK row.
+- [x] The authorisation layer reads the rank instead of the booleans, behaviour-identical for every
+  existing area/OL/SK row (Phase 2).
 - [ ](Phase 5) The five boolean columns are dropped once no code reads them.
 
-**Enforced by:** `OrgHierarchyMigrationTest` (V184), `MembershipRoleMigrationEquivalenceTest` _(planned, Phase 2)_ · **Code:** `MembershipRole`, `OrgUnitMembership#role`, `V184__add_org_unit_membership_role_and_backfill.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgHierarchyMigrationTest` (V184), `MembershipRoleMigrationEquivalenceTest` · **Code:** `MembershipRole`, `OrgUnitMembership#role`, `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService`, `V184__add_org_unit_membership_role_and_backfill.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-002 — Baseline grant for squadron leadership ranks
 
@@ -62,10 +63,10 @@ differentiation (including the bank) is deferred to later work.
 
 **Acceptance**
 
-- [ ](Phase 2) A squadron leadership rank mints own-squadron logistician + mission-manager
-  authorities and nothing else; area/OL/SK grants are byte-identical to before the migration.
+- [x] A squadron leadership rank mints own-squadron logistician + mission-manager authorities and
+  nothing else; area/OL/SK grants are byte-identical to before the migration (Phase 2).
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest`, `OwnerScopeServiceTest` _(planned, Phase 2)_ · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest`, `OwnerScopeServiceTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-003 — Kommandogruppe entity
 
@@ -119,10 +120,10 @@ widened for a Bereichsleiter.
 
 **Acceptance**
 
-- [ ](Phase 2) A Bereichsleiter's reach is its Bereich + children, never org-wide; a pure OL member
-  reaches every org unit.
+- [x] A Bereichsleiter's reach is its Bereich + children, never org-wide; a pure OL member reaches
+  every org unit (Phase 2).
 
-**Enforced by:** `OrgUnitCascadeServiceTest`, `OwnerScopeServiceTest` _(planned, Phase 2)_ · **Code:** `OrgUnitCascadeService` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgUnitCascadeServiceTest`, `OwnerScopeServiceTest` · **Code:** `OrgUnitCascadeService` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-006 — Roles are the source of truth; the org chart mirrors
 

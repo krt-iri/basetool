@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -379,6 +380,7 @@ class OrgUnitMembershipServiceTest {
     target.setId(UUID.randomUUID());
     OrgUnitMembership leadRow = new OrgUnitMembership();
     leadRow.setLead(true);
+    leadRow.setRole(MembershipRole.SK_LEAD);
     when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
@@ -585,6 +587,7 @@ class OrgUnitMembershipServiceTest {
     bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
     bereichRow.setKind(OrgUnitKind.BEREICH);
     bereichRow.setBereichsleiter(true);
+    bereichRow.setRole(MembershipRole.BEREICHSLEITER);
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(bereichRow));
     when(orgUnitCascadeService.expandWithDescendants(any()))
         .thenReturn(new java.util.LinkedHashSet<>(List.of(bereichId, staffelId)));

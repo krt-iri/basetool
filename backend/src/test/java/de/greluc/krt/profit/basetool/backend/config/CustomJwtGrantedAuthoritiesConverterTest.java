@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -102,6 +103,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     lead.setBereichsleiter(true);
+    lead.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
         .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID, DESCENDANT_SK_ID));
@@ -124,6 +126,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     UUID olId = UUID.randomUUID();
     OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
     ol.setOlMember(true);
+    ol.setRole(MembershipRole.OL_MEMBER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(ol));
     // The cascade service resolves OL reach to the concrete union of every org unit.
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
