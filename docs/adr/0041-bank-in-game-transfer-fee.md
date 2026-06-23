@@ -66,6 +66,11 @@ Record the carved-out fee on the transaction header and credit the destination t
   `SUM(legs) = −transfer_fee`. The **REVERSAL mirror** invariant is **unaffected**: a reversal
   negates the actual recorded legs (the destination leg is already net), so the original +
   reversal still cancel exactly per account/holder.
+- **A reversal carries `transfer_fee = 0` and restores the full gross** to the source account and
+  holder — it deliberately does **not** model a second real in-game transfer (which would itself
+  cost a fee). A reversal is a bookkeeping correction of an already-recorded movement, not a new
+  send; if the money must physically move back in-game that is a fresh withdrawal/transfer (which
+  carries its own fee), not the reversal.
 - **The ADR-0039 invariant `Σ account balances = Σ holder balances` now holds for every type
   except `HOLDER_TRANSFER`.** A holder→holder Umbuchung reduces the holder total by the fee
   without touching any account, so after internal reconciliations the **account total exceeds

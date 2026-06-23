@@ -94,6 +94,7 @@ public class AdminAuditLogPageController {
               "DEPOSIT_BOOKED",
               "WITHDRAWAL_BOOKED",
               "TRANSFER_BOOKED",
+              "HOLDER_TRANSFER",
               "HOLDER_REBOOKED",
               "TRANSACTION_REVERSED",
               "WIPE_RESET_EXECUTED",

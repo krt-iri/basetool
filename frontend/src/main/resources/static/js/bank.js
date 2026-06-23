@@ -449,7 +449,7 @@
         const valueEl = preview.querySelector('[data-fee-value]');
         const netEl = preview.querySelector('[data-fee-net]');
         if (valueEl) {
-            valueEl.textContent = Math.round(fee).toLocaleString('de-DE');
+            valueEl.textContent = fee.toLocaleString('de-DE');
         }
         if (netEl) {
             netEl.textContent = Math.round(gross - fee).toLocaleString('de-DE');
@@ -463,13 +463,6 @@
             updateFeePreview(form);
         }
     }
-
-    document.addEventListener('input', function (event) {
-        recomputeFeePreviewFrom(event.target);
-    });
-    document.addEventListener('change', function (event) {
-        recomputeFeePreviewFrom(event.target);
-    });
 
     /**
      * Live balance-split calculator on the holder detail page (REQ-BANK-032): given the holder's
@@ -503,11 +496,26 @@
         result.hidden = false;
     }
 
-    document.addEventListener('input', function (event) {
-        const target = event.target;
+    /**
+     * Dispatches one field edit to both client-side helpers — the live transfer-fee preview
+     * (REQ-BANK-033) and the balance-split calculator (REQ-BANK-032). Registered once for `input`
+     * and once for `change`, so a select change (the holder pickers in the transfer modal) refreshes
+     * the fee preview too.
+     *
+     * @param {EventTarget} target the field that fired the event
+     */
+    function onBankFieldEdit(target) {
+        recomputeFeePreviewFrom(target);
         if (target && target.matches && target.matches('[data-balance-input]')) {
             updateBalanceCalc(target);
         }
+    }
+
+    document.addEventListener('input', function (event) {
+        onBankFieldEdit(event.target);
+    });
+    document.addEventListener('change', function (event) {
+        onBankFieldEdit(event.target);
     });
 
     /**

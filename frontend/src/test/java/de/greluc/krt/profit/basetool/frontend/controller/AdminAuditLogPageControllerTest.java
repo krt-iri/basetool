@@ -32,14 +32,23 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.AuditRowView;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Unit tests for {@link AdminAuditLogPageController}: the seven-way tab routing (bank vs the six
@@ -153,6 +162,92 @@ class AdminAuditLogPageControllerTest {
 
     // Then
     assertEquals("admin/audit-log :: auditResults", view);
+  }
+
+  // Guard against the recurrence the review caught (a new event type produced at runtime but not
+  // wired into the viewer): every bank audit event type the backend can emit — the openapi enum of
+  // BankAuditEventDto.eventType, the cross-module contract — must appear in the BANK filter list
+  // AND
+  // carry an i18n label, or it would render as a raw key (CLAUDE.md audited-area rule).
+  @Test
+  void everyProducedBankAuditEventType_isFilterableAndLabelled() throws Exception {
+    // Given: the produced set (from openapi) and the viewer's BANK filter list + the label bundle
+    Set<String> produced = bankAuditEventTypesFromOpenApi();
+    assertTrue(produced.contains("HOLDER_TRANSFER"), "sanity: openapi should list HOLDER_TRANSFER");
+
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    controller.auditLog("BANK", null, null, null, null, 0, null, model);
+    List<String> filterTypes = (List<String>) model.getAttribute("eventTypes");
+    assertNotNull(filterTypes);
+    Properties labels = loadDefaultBundle();
+
+    // Then: each produced type is both filterable and labelled
+    for (String type : produced) {
+      assertTrue(
+          filterTypes.contains(type),
+          "BANK audit filter list (AdminAuditLogPageController) is missing produced event type "
+              + type);
+      assertTrue(
+          labels.containsKey("admin.bank.audit.event." + type),
+          "Missing i18n label admin.bank.audit.event." + type);
+    }
+  }
+
+  /**
+   * The bank audit event types the backend can emit, read from the {@code BankAuditEventDto
+   * .eventType} enum in the committed openapi document — the cross-module contract between the
+   * (backend) enum and the (frontend) viewer.
+   *
+   * @return the produced bank audit event-type names
+   * @throws Exception when the spec cannot be located or parsed
+   */
+  private static Set<String> bankAuditEventTypesFromOpenApi() throws Exception {
+    Path relative = Paths.get("backend", "src", "main", "resources", "api", "openapi.json");
+    Path spec = null;
+    for (Path dir = Paths.get("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
+      Path candidate = dir.resolve(relative);
+      if (Files.isRegularFile(candidate)) {
+        spec = candidate;
+        break;
+      }
+    }
+    assertNotNull(spec, "Could not locate backend/src/main/resources/api/openapi.json");
+    JsonNode root = JsonMapper.builder().build().readTree(Files.readString(spec));
+    JsonNode enumNode =
+        root.path("components")
+            .path("schemas")
+            .path("BankAuditEventDto")
+            .path("properties")
+            .path("eventType")
+            .path("enum");
+    assertTrue(
+        enumNode.isArray() && !enumNode.isEmpty(),
+        "BankAuditEventDto.eventType enum not found in openapi.json");
+    Set<String> types = new HashSet<>();
+    for (JsonNode value : enumNode) {
+      types.add(value.asString());
+    }
+    return types;
+  }
+
+  /**
+   * Loads the default {@code messages.properties} bundle (where {@code Properties.load} decodes the
+   * {@code \\uXXXX} escapes); the de/en bundles mirror its keys (pinned by {@code
+   * MessageBundleConsistencyTest}).
+   *
+   * @return the default message bundle
+   * @throws Exception when the bundle cannot be read
+   */
+  private static Properties loadDefaultBundle() throws Exception {
+    Properties bundle = new Properties();
+    try (InputStream in =
+        AdminAuditLogPageControllerTest.class.getResourceAsStream("/messages.properties")) {
+      assertNotNull(in, "messages.properties not on the test classpath");
+      bundle.load(in);
+    }
+    return bundle;
   }
 
   @Test

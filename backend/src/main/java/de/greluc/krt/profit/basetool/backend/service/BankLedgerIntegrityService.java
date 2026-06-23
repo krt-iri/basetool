@@ -31,15 +31,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Verifies the bank's two append-only ledgers' invariants (REQ-BANK-020, ADR-0039): no negative
- * account balance (the holder dimension is intentionally allowed to be negative, REQ-BANK-006, so
- * it is <strong>not</strong> checked), every {@code TRANSFER} account leg pair and every {@code
- * TRANSFER}/{@code HOLDER_TRANSFER} holder leg pair nets to zero, every {@code REVERSAL} is the
- * negated mirror of its original on both ledgers (ADR-0010/0039), and every audited transaction
- * carries its audit row (REQ-BANK-012; {@code WIPE_RESET} is summarized once, not per row). Pure
- * reads — it never mutates the ledger. Violations are reported as {@code ERROR} log lines (carrying
- * the correlation id of the run) so monitoring can alert; the returned {@link IntegrityReport} lets
- * tests and callers inspect the findings.
+ * Verifies the bank's two append-only ledgers' invariants (REQ-BANK-020, ADR-0039/0041): no
+ * negative account balance (the holder dimension is intentionally allowed to be negative,
+ * REQ-BANK-006, so it is <strong>not</strong> checked), every {@code TRANSFER} account leg pair and
+ * every {@code TRANSFER}/{@code HOLDER_TRANSFER} holder leg pair nets to {@code -transfer_fee}
+ * (zero when fee-free; the in-game transfer fee is real money lost to the game, ADR-0041), every
+ * {@code REVERSAL} is the negated mirror of its original on both ledgers (ADR-0010/0039), and every
+ * audited transaction carries its audit row (REQ-BANK-012; {@code WIPE_RESET} is summarized once,
+ * not per row). Pure reads — it never mutates the ledger. Violations are reported as {@code ERROR}
+ * log lines (carrying the correlation id of the run) so monitoring can alert; the returned {@link
+ * IntegrityReport} lets tests and callers inspect the findings.
  */
 @Service
 @RequiredArgsConstructor
@@ -54,9 +55,10 @@ public class BankLedgerIntegrityService {
    * The outcome of one integrity sweep: the violating ids per invariant.
    *
    * @param negativeAccountBalances account ids whose total balance is negative
-   * @param unbalancedTransfers transfer transaction ids whose account legs do not sum to zero
+   * @param unbalancedTransfers transfer transaction ids whose account legs do not sum to {@code
+   *     -transfer_fee} (zero when fee-free; ADR-0041)
    * @param unbalancedHolderMovements transfer/holder-transfer transaction ids whose holder legs do
-   *     not sum to zero
+   *     not sum to {@code -transfer_fee} (zero when fee-free; ADR-0041)
    * @param brokenReversals reversal transaction ids that are not the negated account-side mirror of
    *     their original
    * @param brokenHolderReversals reversal transaction ids that are not the negated holder-side

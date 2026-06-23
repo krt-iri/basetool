@@ -409,6 +409,12 @@ public class BankLedgerService {
             .collect(
                 Collectors.toMap(
                     BankAccount::getId, a -> postingRepository.accountBalance(a.getId())));
+    // The holder dimension is lock-free by design (no overdraft invariant to protect, ADR-0039), so
+    // the holder zeroing is NOT serialized against a concurrent bookHolderTransfer. This is only
+    // reachable via the admin post-SC-wipe operation, which runs on a quiescent bank; any residual
+    // a
+    // racing Umbuchung might leave is reconcilable by a follow-up Umbuchung. Account legs ARE
+    // serialized (the accounts are locked above).
     List<BankHolderBalance> holderBalances =
         holderPostingRepository.holderTotals().stream()
             .filter(h -> h.amount().signum() != 0)
