@@ -54,13 +54,16 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   never written to the details payload — only ids and the non-personal mission name snapshot.
 - **Operationen** — create / edit (incl. status change) / delete (missions are unlinked, not
   deleted); per-participant payout toggle.
-- **Rollen & Mitglieder** (`org_unit_membership`, epic #800) — every org-unit membership / role
-  mutation: membership grant + revoke (SK join/leave, Staffel assign/move/remove);
-  leadership-rank grant / change / revoke (Bereichsleitung, OL, SK-Lead and, from Phase 3, the
-  squadron ranks); and Logistician / Mission-Manager capability-flag changes. The subject is the
-  org unit (its shorthand/name snapshot), the affected user is the target reference; the details
-  payload carries only the rank/kind enum names and the two flag booleans — never a user handle or
-  free text.
+- **Rollen & Mitglieder** (`org_unit_membership` + `kommando_group`, epic #800) — every org-unit
+  membership / role mutation: membership grant + revoke (SK join/leave, Staffel assign/move/remove);
+  leadership-rank grant / change / revoke (Bereichsleitung, OL, SK-Lead and the squadron ranks
+  Staffelleiter / Kommandoleiter / stellv. / Ensign); Logistician / Mission-Manager capability-flag
+  changes; and Kommandogruppe create / rename+reorder / delete. For membership/rank events the
+  subject is the org unit (its shorthand/name snapshot) and the affected user is the target
+  reference; for Kommandogruppe events the subject is the group (its name snapshot). The details
+  payload carries only the rank/kind enum names, the two flag booleans and the squadron label —
+  never a user handle or free text (the group name is a non-personal structure label, like an order
+  title).
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User

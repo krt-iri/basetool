@@ -86,10 +86,10 @@ der Staffelleitung"); every other rank must have a null group. A group's parent 
 - [x] `kommando_group` exists, caps at four per squadron, and rejects a non-`SQUADRON` parent (V185).
 - [x] `chk_org_unit_membership_kommando_group_role` confines `kommando_group_id` to the in-group
   squadron ranks (V185).
-- [ ](Phase 3) Kommandogruppe CRUD + member assignment honour ≤1 KL and ≤1 stellv. per group and ≤4
-  Ensigns per squadron.
+- [x] Kommandogruppe CRUD + member assignment honour ≤1 KL and ≤1 stellv. per group and ≤4 Ensigns
+  per squadron (Phase 3).
 
-**Enforced by:** `OrgHierarchyMigrationTest` (V185), `KommandoGroupServiceTest` _(planned, Phase 3)_ · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `V185__create_kommando_group.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgHierarchyMigrationTest` (V185), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRoleController`, `V185__create_kommando_group.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-004 — Delegated appointment ladder, no self-promotion
 
@@ -111,10 +111,10 @@ layer.
 
 **Acceptance**
 
-- [ ](Phase 3) Each tier can appoint exactly the rung below it, within its own scope; a foreign-unit
-  or same-tier appointment is denied; the verdict never satisfies `isAdmin()`.
+- [x] Each tier can appoint exactly the rung below it, within its own scope; a foreign-unit or
+  same-tier appointment is denied; the verdict never satisfies `isAdmin()` (Phase 3).
 
-**Enforced by:** `OrgRoleManagementSecurityServiceTest`, `DelegatedAppointmentControllerSecurityTest` _(planned, Phase 3)_ · **Code:** `OrgRoleManagementSecurityService` _(planned)_ · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgRoleManagementSecurityServiceTest`, `DelegatedAppointmentControllerSecurityTest`, `ArchitectureTest` (`delegatedRoleAuthoriserMustNotConsultOwnerScope`) · **Code:** `OrgRoleManagementSecurityService`, `SquadronRoleController`, `KommandoGroupController`, `OrgHierarchyController` (Bereich gates), `SpecialCommandMembershipController` (SK-lead gate) · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-005 — Bereichsleiter auto-OL membership is organisational only
 

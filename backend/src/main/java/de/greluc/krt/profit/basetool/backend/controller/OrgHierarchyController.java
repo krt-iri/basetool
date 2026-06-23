@@ -194,10 +194,15 @@ public class OrgHierarchyController {
    * @return the member's resulting role flags + version.
    */
   @PostMapping("/bereiche/{id}/members")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canAppointBereichRole(#id,"
+          + " #request.role(), authentication)")
   @Operation(
       summary = "Add a Bereichsleitung member",
-      description = "Grants a Leiter/Koordinator/Operator role on the Bereich. ADMIN-only.")
+      description =
+          "Grants a Leiter/Koordinator/Operator role on the Bereich. Admin, or — delegated"
+              + " (REQ-ROLE-004) — a pure OL member for the Leiter rung and the Bereich's"
+              + " Bereichsleiter for the Koordinator/Operator rungs.")
   public BereichMemberResponse addBereichLeader(
       @PathVariable @NotNull UUID id, @RequestBody @Valid AddBereichLeaderRequest request) {
     return toBereichMember(
@@ -211,10 +216,15 @@ public class OrgHierarchyController {
    * @param userId the user to remove.
    */
   @DeleteMapping("/bereiche/{id}/members/{userId}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canRemoveBereichRole(#id, #userId,"
+          + " authentication)")
   @Operation(
       summary = "Remove a Bereichsleitung member",
-      description = "Removes the user's Bereichsleitung membership. ADMIN-only.")
+      description =
+          "Removes the user's Bereichsleitung membership. Admin, or — delegated (REQ-ROLE-004) — a"
+              + " pure OL member when removing a Bereichsleiter and the Bereich's Bereichsleiter"
+              + " when removing a Koordinator/Operator.")
   public void removeBereichLeader(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
     orgUnitMembershipService.removeBereichLeader(id, userId);
