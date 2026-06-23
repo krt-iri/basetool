@@ -122,6 +122,18 @@ public interface OrgUnitMembershipRepository
   boolean existsByIdUserIdAndIdOrgUnitId(UUID userId, UUID orgUnitId);
 
   /**
+   * {@code true} iff any membership row currently references the given Kommandogruppe (epic #800,
+   * REQ-ROLE-003). Backs the Kommandogruppe-delete guard: a group still bound to a Kommandoleiter /
+   * stellv. Kommandoleiter / Ensign must not be deleted (the V185 group-link CHECK would otherwise
+   * be violated, or the members silently orphaned), so the service rejects the delete with a clean
+   * 400 until the members are reassigned.
+   *
+   * @param kommandoGroupId the Kommandogruppe to check; never {@code null}.
+   * @return {@code true} iff at least one membership is assigned to that group.
+   */
+  boolean existsByKommandoGroupId(UUID kommandoGroupId);
+
+  /**
    * Returns the distinct ids of every user who is a member of any of the given org units. Backs the
    * scoped branches of the blueprint availability overview (#364) — the pinned single org unit and
    * the non-admin oversight union — by resolving the in-scope org units to their member users.

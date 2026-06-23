@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -35,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
@@ -83,6 +85,7 @@ public class OrgUnitMembershipService {
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
   private final OrgUnitRepository orgUnitRepository;
+  private final KommandoGroupRepository kommandoGroupRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
   private final InventoryOrgUnitReconciler inventoryReconciler;
   private final AuditService auditService;
@@ -816,6 +819,192 @@ public class OrgUnitMembershipService {
         userId,
         "role=SK_LEAD");
     return saved;
+  }
+
+  /**
+   * Assigns (or changes) a squadron leadership rank on an existing Staffel member (epic #800,
+   * REQ-ROLE-003/004): Staffelleiter / Kommandoleiter / stellv. Kommandoleiter / Ensign, optionally
+   * bound to a Kommandogruppe. The target user must already be a member of the Staffel; the rank
+   * must be a squadron rank; the Kommandogruppe pairing and the cardinality caps (&le;1
+   * Staffelleiter per squadron, &le;1 Kommandoleiter + &le;1 stellv. per group, &le;4 Ensigns per
+   * squadron) are enforced here with clean 400s, complementing the V185 DB CHECK. Squadron ranks
+   * set no boolean leadership flag (so the V165 trigger leaves them alone) — only the {@code role}
+   * and the {@code kommandoGroup}.
+   *
+   * @param squadronId the Staffel; must be a {@code SQUADRON} org unit.
+   * @param userId the member to assign the rank to; must already be a member of this Staffel.
+   * @param rank the squadron rank to set; must be a squadron rank.
+   * @param kommandoGroupId the Kommandogruppe to bind, or {@code null}; constrained per the rank.
+   * @param version the optimistic-lock version of the member's row, or {@code null} to skip it.
+   * @return the persisted membership row with the bumped version.
+   * @throws NotFoundException if the user is not a member of this Staffel, or the group is unknown.
+   * @throws BadRequestException on a non-squadron rank, a bad group pairing, or a cardinality
+   *     breach.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembership assignSquadronRank(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @NotNull MembershipRole rank,
+      @org.jetbrains.annotations.Nullable UUID kommandoGroupId,
+      @org.jetbrains.annotations.Nullable Long version) {
+    if (!rank.isSquadronRank()) {
+      throw new BadRequestException("Rank " + rank + " is not a squadron rank");
+    }
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(new OrgUnitMembershipId(userId, squadronId))
+            .orElseThrow(() -> new NotFoundException("User is not a member of this Staffel"));
+    if (m.getKind() != OrgUnitKind.SQUADRON) {
+      throw new BadRequestException("Org unit " + squadronId + " is not a Staffel");
+    }
+    assertVersionMatches(m, version);
+
+    KommandoGroup group = resolveKommandoGroupForRank(squadronId, rank, kommandoGroupId);
+    assertSquadronRankCardinality(squadronId, userId, rank, group);
+
+    final MembershipRole previousRole = m.getRole();
+    m.setRole(rank);
+    m.setKommandoGroup(group);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+
+    final boolean firstGrant = previousRole == MembershipRole.MEMBER;
+    auditService.record(
+        firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
+        squadronId,
+        orgUnitLabelById(squadronId),
+        userId,
+        firstGrant ? "role=" + rank : "from=" + previousRole + " to=" + rank);
+    return saved;
+  }
+
+  /**
+   * Clears a member's squadron leadership rank back to plain {@link MembershipRole#MEMBER} (and
+   * unbinds any Kommandogruppe) without removing the Staffel membership itself (epic #800,
+   * REQ-ROLE-004).
+   *
+   * @param squadronId the Staffel; never {@code null}.
+   * @param userId the member whose rank to clear; never {@code null}.
+   * @param version the optimistic-lock version of the member's row, or {@code null} to skip it.
+   * @return the persisted membership row with the bumped version.
+   * @throws NotFoundException if the user is not a member of this Staffel.
+   * @throws BadRequestException if the member holds no squadron rank.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembership removeSquadronRank(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @org.jetbrains.annotations.Nullable Long version) {
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(new OrgUnitMembershipId(userId, squadronId))
+            .orElseThrow(() -> new NotFoundException("User is not a member of this Staffel"));
+    assertVersionMatches(m, version);
+    final MembershipRole previousRole = m.getRole();
+    if (!previousRole.isSquadronRank()) {
+      throw new BadRequestException("Member holds no squadron rank to remove");
+    }
+    m.setRole(MembershipRole.MEMBER);
+    m.setKommandoGroup(null);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    auditService.record(
+        AuditEventType.ROLE_REVOKED,
+        squadronId,
+        orgUnitLabelById(squadronId),
+        userId,
+        "role=" + previousRole);
+    return saved;
+  }
+
+  /**
+   * Resolves and validates the Kommandogruppe binding for a squadron rank against the V185 pairing
+   * CHECK: Kommandoleiter / stellv. Kommandoleiter MUST reference a group; Ensign MAY;
+   * Staffelleiter MUST NOT. A referenced group must exist and belong to the same squadron.
+   *
+   * @param squadronId the Staffel the rank is on; never {@code null}.
+   * @param rank the squadron rank being assigned; never {@code null}.
+   * @param kommandoGroupId the requested group id, or {@code null}.
+   * @return the resolved group, or {@code null} when the rank carries no group.
+   * @throws NotFoundException if a referenced group does not exist.
+   * @throws BadRequestException on a group pairing that violates the rank's contract.
+   */
+  @org.jetbrains.annotations.Nullable
+  private KommandoGroup resolveKommandoGroupForRank(
+      @NotNull UUID squadronId,
+      @NotNull MembershipRole rank,
+      @org.jetbrains.annotations.Nullable UUID kommandoGroupId) {
+    boolean groupRequired =
+        rank == MembershipRole.KOMMANDOLEITER || rank == MembershipRole.STELLV_KOMMANDOLEITER;
+    boolean groupAllowed = groupRequired || rank == MembershipRole.ENSIGN;
+    if (kommandoGroupId == null) {
+      if (groupRequired) {
+        throw new BadRequestException(rank + " must be assigned to a Kommandogruppe");
+      }
+      return null;
+    }
+    if (!groupAllowed) {
+      throw new BadRequestException(rank + " must not be assigned to a Kommandogruppe");
+    }
+    KommandoGroup group =
+        kommandoGroupRepository
+            .findById(kommandoGroupId)
+            .orElseThrow(() -> new NotFoundException("Kommandogruppe not found"));
+    if (!group.getSquadron().getId().equals(squadronId)) {
+      throw new BadRequestException("Kommandogruppe does not belong to this Staffel");
+    }
+    return group;
+  }
+
+  /**
+   * Enforces the squadron-rank cardinality caps against the current roster, excluding the target
+   * user so re-assigning the same user is idempotent: &le;1 Staffelleiter per squadron, &le;1
+   * Kommandoleiter + &le;1 stellv. Kommandoleiter per group, &le;4 Ensigns per squadron.
+   *
+   * @param squadronId the Staffel; never {@code null}.
+   * @param userId the user being (re)assigned, excluded from the roster scan; never {@code null}.
+   * @param rank the squadron rank being assigned; never {@code null}.
+   * @param group the resolved Kommandogruppe (non-null for Kommandoleiter / stellv.); may be {@code
+   *     null}.
+   * @throws BadRequestException when the assignment would breach a cardinality cap.
+   */
+  private void assertSquadronRankCardinality(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @NotNull MembershipRole rank,
+      @org.jetbrains.annotations.Nullable KommandoGroup group) {
+    List<OrgUnitMembership> roster =
+        membershipRepository.findAllByIdOrgUnitId(squadronId).stream()
+            .filter(m -> !m.getId().getUserId().equals(userId))
+            .toList();
+    switch (rank) {
+      case STAFFELLEITER -> {
+        if (roster.stream().anyMatch(m -> m.getRole() == MembershipRole.STAFFELLEITER)) {
+          throw new BadRequestException("This Staffel already has a Staffelleiter");
+        }
+      }
+      case KOMMANDOLEITER, STELLV_KOMMANDOLEITER -> {
+        UUID groupId = group.getId();
+        boolean taken =
+            roster.stream()
+                .anyMatch(
+                    m ->
+                        m.getRole() == rank
+                            && m.getKommandoGroup() != null
+                            && groupId.equals(m.getKommandoGroup().getId()));
+        if (taken) {
+          throw new BadRequestException("This Kommandogruppe already has a " + rank);
+        }
+      }
+      case ENSIGN -> {
+        long ensigns = roster.stream().filter(m -> m.getRole() == MembershipRole.ENSIGN).count();
+        if (ensigns >= 4) {
+          throw new BadRequestException("This Staffel already has the maximum of 4 Ensigns");
+        }
+      }
+      default -> throw new BadRequestException("Rank " + rank + " is not a squadron rank");
+    }
   }
 
   /**

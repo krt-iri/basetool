@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -48,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
@@ -79,6 +81,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private SpecialCommandRepository specialCommandRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
+  @Mock private KommandoGroupRepository kommandoGroupRepository;
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private InventoryOrgUnitReconciler inventoryReconciler;
   @Mock private AuditService auditService;
@@ -520,6 +523,147 @@ class OrgUnitMembershipServiceTest {
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(true);
 
     assertThrows(DuplicateEntityException.class, () -> membershipService.addOlMember(olId, userId));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  // --- assign/remove squadron rank (epic #800 Phase 3) ----------------------
+
+  /** A Staffel membership row for {@link #userId} on the given squadron with the given rank. */
+  private OrgUnitMembership squadronMember(UUID squadronId, MembershipRole role) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, squadronId));
+    m.setKind(OrgUnitKind.SQUADRON);
+    m.setRole(role);
+    m.setVersion(0L);
+    return m;
+  }
+
+  @Test
+  void assignSquadronRank_staffelleiter_grantsAndAudits() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership saved =
+        membershipService.assignSquadronRank(
+            squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L);
+
+    assertEquals(MembershipRole.STAFFELLEITER, saved.getRole());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
+  }
+
+  @Test
+  void assignSquadronRank_nonSquadronRank_throwsBadRequest() {
+    UUID squadronId = UUID.randomUUID();
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.BEREICHSLEITER, null, 0L));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void assignSquadronRank_notMember_throwsNotFound() {
+    UUID squadronId = UUID.randomUUID();
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
+        .thenReturn(Optional.empty());
+    assertThrows(
+        NotFoundException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L));
+  }
+
+  @Test
+  void assignSquadronRank_kommandoleiterWithoutGroup_throwsBadRequest() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.KOMMANDOLEITER, null, 0L));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void assignSquadronRank_kommandoleiterWithGroup_grants() {
+    UUID squadronId = UUID.randomUUID();
+    UUID groupId = UUID.randomUUID();
+    Squadron squadron = new Squadron();
+    squadron.setId(squadronId);
+    KommandoGroup group =
+        KommandoGroup.builder().squadron(squadron).name("Alpha").sortIndex(0).build();
+    group.setId(groupId);
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(kommandoGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership saved =
+        membershipService.assignSquadronRank(
+            squadronId, userId, MembershipRole.KOMMANDOLEITER, groupId, 0L);
+
+    assertEquals(MembershipRole.KOMMANDOLEITER, saved.getRole());
+    assertSame(group, saved.getKommandoGroup());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
+  }
+
+  @Test
+  void assignSquadronRank_secondStaffelleiter_throwsBadRequest() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership target = squadronMember(squadronId, MembershipRole.MEMBER);
+    OrgUnitMembership existingLead = new OrgUnitMembership();
+    existingLead.setId(new OrgUnitMembershipId(UUID.randomUUID(), squadronId));
+    existingLead.setKind(OrgUnitKind.SQUADRON);
+    existingLead.setRole(MembershipRole.STAFFELLEITER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
+        .thenReturn(Optional.of(target));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId))
+        .thenReturn(List.of(target, existingLead));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void removeSquadronRank_clearsAndAudits() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.STAFFELLEITER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership saved = membershipService.removeSquadronRank(squadronId, userId, 0L);
+
+    assertEquals(MembershipRole.MEMBER, saved.getRole());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_REVOKED), eq(squadronId), any(), eq(userId), any());
+  }
+
+  @Test
+  void removeSquadronRank_noRank_throwsBadRequest() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> membershipService.removeSquadronRank(squadronId, userId, 0L));
     verify(membershipRepository, never()).saveAndFlush(any());
   }
 

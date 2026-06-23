@@ -307,6 +307,15 @@ public enum AuditEventType {
   /** The Logistician / Mission-Manager capability flags on a membership were changed. */
   CAPABILITY_FLAGS_CHANGED(AuditDomain.ROLE),
 
+  /** A Kommandogruppe was created within a squadron. */
+  KOMMANDO_GROUP_CREATED(AuditDomain.ROLE),
+
+  /** A Kommandogruppe was renamed or reordered. */
+  KOMMANDO_GROUP_UPDATED(AuditDomain.ROLE),
+
+  /** A Kommandogruppe was deleted (its squadron-rank member links are cleared first). */
+  KOMMANDO_GROUP_DELETED(AuditDomain.ROLE),
+
   /** The role &amp; membership audit log was exported as a PDF or JSON for a period. */
   ROLE_AUDIT_EXPORTED(AuditDomain.ROLE),
 
