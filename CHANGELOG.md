@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.12](https://github.com/krt-profit/basetool/releases/tag/v0.7.12) - 2026-06-23
+
 ### Fixed
 
 - **Leitung-Seite: Das Zuweisen eines Kommandoleiters oder Stellvertreters meldete „Aktion fehlgeschlagen", obwohl der Rang gespeichert wurde** (erst nach Neuladen sichtbar). Die Antwort lief wegen einer fehlenden Transaktionsgrenze in einen 500; die Rang-Endpunkte sind jetzt wie die übrigen Mitglieds-Endpunkte transaktional.
