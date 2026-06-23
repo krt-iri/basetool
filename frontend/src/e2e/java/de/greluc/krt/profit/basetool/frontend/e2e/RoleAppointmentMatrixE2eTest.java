@@ -38,11 +38,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li><b>Own-Bereich ladder:</b> a Bereichsleiter may appoint a Koordinator <em>in their own
  *       Bereich</em> (one rung below them).
  *   <li><b>No foreign reach (cross-Bereich silo):</b> the same Bereichsleiter is denied an
- *       appointment in a foreign Bereich, and a squadron-rank assignment in a squadron not under
- *       their Bereich.
+ *       appointment in a foreign Bereich.
  *   <li><b>No self / superior tier:</b> a Bereichsleiter may not appoint another Bereichsleiter
  *       (only the OL appoints that tier) — the structurally-impossible self-promotion.
- *   <li><b>Plain members appoint nothing.</b>
+ *   <li><b>Plain members appoint nothing</b> on either the Bereich endpoint or the squadron-rank
+ *       endpoint.
  *   <li><b>REQ-ORG-017 silo:</b> even an admin cannot give a Staffel member a silo-leadership rank
  *       (the service guard rejects it before the V165/V187 trigger would).
  *   <li><b>Mirror (REQ-ROLE-006):</b> a successful appointment projects the account-linked seat
@@ -136,21 +136,20 @@ class RoleAppointmentMatrixE2eTest {
   }
 
   /**
-   * Cross-squadron silo: a Bereichsleiter cannot assign a squadron rank in a squadron that is not
-   * under their Bereich (IRIDIUM has no Bereich parent).
+   * Squadron-rank gate denial: a plain Staffel member holds no rung on the squadron-rank endpoint
+   * either (they are neither the parent Bereichsleiter for a Staffelleiter appointment nor the
+   * squadron's Staffelleiter for a Kommando rank), so the delegated gate denies with 403 — a
+   * topology-independent denial that does not depend on which Bereich a squadron sits under.
    */
   @Test
-  void bereichsleiterCannotAssignSquadronRankInForeignSquadron() {
+  void plainMemberCannotAssignSquadronRank() {
     int status =
         seeder.putForStatus(
-            BL_USER,
-            BL_PASSWORD,
+            MEMBER_USER,
+            MEMBER_PASSWORD,
             "/api/v1/squadrons/" + IRIDIUM_SQUADRON_ID + "/ranks/" + tgtUserId,
             "{\"role\":\"STAFFELLEITER\"}");
-    assertEquals(
-        403,
-        status,
-        "a Bereichsleiter must not assign a squadron rank in a squadron outside their Bereich");
+    assertEquals(403, status, "a plain Staffel member must not assign a squadron leadership rank");
   }
 
   /** A plain Staffel member holds no appointment rung at all. */
