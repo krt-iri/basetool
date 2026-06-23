@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapperImpl;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Department;
+import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -43,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
@@ -57,6 +61,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -1349,7 +1354,354 @@ class OrgChartServiceTest {
     verify(positionRepository, never()).save(any());
   }
 
+  // ----------------------------------------------- role-model mirror (REQ-ROLE-006) --
+
+  @Test
+  void mirrorBereichRole_leiter_reassignsExistingSingletonWithoutSave() {
+    UUID bereichId = UUID.randomUUID();
+    UUID newUserId = UUID.randomUUID();
+    User newUser = user(newUserId, "new-leiter");
+    OrgChartPosition existing =
+        pos(OrgChartPositionType.BEREICHSLEITER, bereich(bereichId, "Profit", "PRF"), null);
+    existing.setDisplayName("Old Free Text");
+    when(positionRepository.findByOrgUnitIdAndUserId(bereichId, newUserId)).thenReturn(List.of());
+    when(positionRepository.findFirstByOrgUnitIdAndPositionTypeOrderBySortIndexAscCreatedAtAsc(
+            bereichId, OrgChartPositionType.BEREICHSLEITER))
+        .thenReturn(Optional.of(existing));
+    when(userRepository.getReferenceById(newUserId)).thenReturn(newUser);
+
+    service().mirrorBereichRole(bereichId, newUserId, BereichLeadershipRole.LEITER);
+
+    assertSame(newUser, existing.getUser(), "the single Bereichsleiter seat is reassigned");
+    assertNull(existing.getDisplayName(), "a free-text holder is cleared on reassign");
+    // Reassign mutates the managed entity; no save() (so no second @Version bump).
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void mirrorBereichRole_koordinator_createsSeatAppendedAfterExisting() {
+    UUID bereichId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Bereich b = bereich(bereichId, "Profit", "PRF");
+    User u = user(userId, "koord");
+    when(positionRepository.findByOrgUnitIdAndUserId(bereichId, userId)).thenReturn(List.of());
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            bereichId, OrgChartPositionType.BEREICHSKOORDINATOR))
+        .thenReturn(2L);
+    when(orgUnitRepository.getReferenceById(bereichId)).thenReturn(b);
+    when(userRepository.getReferenceById(userId)).thenReturn(u);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorBereichRole(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.BEREICHSKOORDINATOR, saved.getPositionType());
+    assertSame(u, saved.getUser());
+    assertSame(b, saved.getOrgUnit());
+    assertNull(saved.getParent());
+    assertEquals(2, saved.getSortIndex(), "appended after the two existing coordinators");
+  }
+
+  @Test
+  void mirrorBereichRole_changingRole_deletesPriorSeatThenCreatesNew() {
+    UUID bereichId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Bereich b = bereich(bereichId, "Profit", "PRF");
+    OrgChartPosition priorKoord = pos(OrgChartPositionType.BEREICHSKOORDINATOR, b, null);
+    when(positionRepository.findByOrgUnitIdAndUserId(bereichId, userId))
+        .thenReturn(List.of(priorKoord));
+    when(positionRepository.findFirstByOrgUnitIdAndPositionTypeOrderBySortIndexAscCreatedAtAsc(
+            bereichId, OrgChartPositionType.BEREICHSLEITER))
+        .thenReturn(Optional.empty());
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            bereichId, OrgChartPositionType.BEREICHSLEITER))
+        .thenReturn(0L);
+    when(orgUnitRepository.getReferenceById(bereichId)).thenReturn(b);
+    when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "u"));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorBereichRole(bereichId, userId, BereichLeadershipRole.LEITER);
+
+    verify(positionRepository).delete(priorKoord);
+    assertEquals(OrgChartPositionType.BEREICHSLEITER, captureSaved().getPositionType());
+  }
+
+  @Test
+  void mirrorSquadronRank_staffelleiter_createsSquadronLeadWhenNone() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
+    when(positionRepository.findFirstByOrgUnitIdAndPositionTypeOrderBySortIndexAscCreatedAtAsc(
+            squadronId, OrgChartPositionType.SQUADRON_LEAD))
+        .thenReturn(Optional.empty());
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            squadronId, OrgChartPositionType.SQUADRON_LEAD))
+        .thenReturn(0L);
+    when(orgUnitRepository.getReferenceById(squadronId)).thenReturn(s);
+    when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "lead"));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorSquadronRank(squadronId, userId, MembershipRole.STAFFELLEITER, null);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.SQUADRON_LEAD, saved.getPositionType());
+    assertNull(saved.getParent());
+  }
+
+  @Test
+  void mirrorSquadronRank_kommandoleiter_fillsExistingGroupNodeWithoutSave() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    KommandoGroup group = group(s, "Alpha", 0);
+    User u = user(userId, "kl");
+    OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, s, null, null);
+    command.setKommandoGroup(group);
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
+    when(positionRepository.findByKommandoGroupId(group.getId())).thenReturn(Optional.of(command));
+    when(userRepository.getReferenceById(userId)).thenReturn(u);
+
+    service().mirrorSquadronRank(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
+
+    assertSame(u, command.getUser(), "the group's Kommando node now carries the Kommandoleiter");
+    assertNull(command.getDisplayName());
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void mirrorSquadronRank_kommandoleiter_createsGroupNodeWhenMissing() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    KommandoGroup group = group(s, "Alpha", 1);
+    User u = user(userId, "kl");
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
+    when(positionRepository.findByKommandoGroupId(group.getId())).thenReturn(Optional.empty());
+    when(orgUnitRepository.getReferenceById(squadronId)).thenReturn(s);
+    when(userRepository.getReferenceById(userId)).thenReturn(u);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorSquadronRank(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.COMMAND_LEAD, saved.getPositionType());
+    assertSame(group, saved.getKommandoGroup());
+    assertEquals("Alpha", saved.getName());
+    assertSame(u, saved.getUser(), "the freshly-created node is filled with the Kommandoleiter");
+  }
+
+  @Test
+  void mirrorSquadronRank_stellv_createsDeputyUnderGroupNode() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    KommandoGroup group = group(s, "Alpha", 0);
+    OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, s, null, null);
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
+    when(positionRepository.findByKommandoGroupId(group.getId())).thenReturn(Optional.of(command));
+    when(positionRepository.findByParentIdAndPositionType(
+            command.getId(), OrgChartPositionType.DEPUTY_COMMAND_LEAD))
+        .thenReturn(Optional.empty());
+    when(orgUnitRepository.getReferenceById(squadronId)).thenReturn(s);
+    when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "stellv"));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorSquadronRank(squadronId, userId, MembershipRole.STELLV_KOMMANDOLEITER, group);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.DEPUTY_COMMAND_LEAD, saved.getPositionType());
+    assertSame(command, saved.getParent());
+  }
+
+  @Test
+  void mirrorSquadronRank_ensignWithGroup_createsEnsignUnderGroupNode() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    KommandoGroup group = group(s, "Alpha", 0);
+    OrgChartPosition command = pos(OrgChartPositionType.COMMAND_LEAD, s, null, null);
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
+    when(positionRepository.findByKommandoGroupId(group.getId())).thenReturn(Optional.of(command));
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            squadronId, OrgChartPositionType.ENSIGN))
+        .thenReturn(3L);
+    when(orgUnitRepository.getReferenceById(squadronId)).thenReturn(s);
+    when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "ens"));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorSquadronRank(squadronId, userId, MembershipRole.ENSIGN, group);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.ENSIGN, saved.getPositionType());
+    assertSame(command, saved.getParent());
+    assertEquals(3, saved.getSortIndex());
+  }
+
+  @Test
+  void mirrorSquadronRank_generalEnsign_createsParentlessEnsign() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)).thenReturn(List.of());
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            squadronId, OrgChartPositionType.ENSIGN))
+        .thenReturn(0L);
+    when(orgUnitRepository.getReferenceById(squadronId)).thenReturn(s);
+    when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "ens"));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorSquadronRank(squadronId, userId, MembershipRole.ENSIGN, null);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.ENSIGN, saved.getPositionType());
+    assertNull(saved.getParent(), "a group-less Ensign reports straight to the Staffelleiter");
+  }
+
+  @Test
+  void mirrorSquadronRank_reassignFromKommandoleiter_vacatesPriorNodeNotDeletes() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Squadron s = squadron(squadronId, "IRIDIUM", "IRI");
+    OrgChartPosition priorCommand =
+        pos(OrgChartPositionType.COMMAND_LEAD, s, null, user(userId, "kl"));
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId))
+        .thenReturn(List.of(priorCommand));
+    when(positionRepository.findFirstByOrgUnitIdAndPositionTypeOrderBySortIndexAscCreatedAtAsc(
+            squadronId, OrgChartPositionType.SQUADRON_LEAD))
+        .thenReturn(Optional.empty());
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            squadronId, OrgChartPositionType.SQUADRON_LEAD))
+        .thenReturn(0L);
+    when(orgUnitRepository.getReferenceById(squadronId)).thenReturn(s);
+    when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "lead"));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorSquadronRank(squadronId, userId, MembershipRole.STAFFELLEITER, null);
+
+    assertNull(priorCommand.getUser(), "the former Kommando node is vacated, not removed");
+    verify(positionRepository, never()).delete(priorCommand);
+  }
+
+  @Test
+  void mirrorRemoveSquadronRank_deletesEnsignSeat() {
+    UUID squadronId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    OrgChartPosition ensign =
+        pos(OrgChartPositionType.ENSIGN, squadron(squadronId, "IRIDIUM", "IRI"), null);
+    when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId))
+        .thenReturn(List.of(ensign));
+
+    service().mirrorRemoveSquadronRank(squadronId, userId);
+
+    verify(positionRepository).delete(ensign);
+  }
+
+  @Test
+  void mirrorOlMember_idempotentWhenSeatExists() {
+    UUID olId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    OrgChartPosition existing =
+        pos(OrgChartPositionType.OL_MEMBER, organisationsleitung(olId, "OL", "OL"), null);
+    when(positionRepository.findByOrgUnitIdAndUserId(olId, userId)).thenReturn(List.of(existing));
+
+    service().mirrorOlMember(olId, userId);
+
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void mirrorSkLead_true_createsCommanderSeat() {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    SpecialCommand sk = specialCommand(skId, "Alpha SK", "ASK");
+    when(positionRepository.findByOrgUnitIdAndUserId(skId, userId)).thenReturn(List.of());
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            skId, OrgChartPositionType.SK_COMMANDER))
+        .thenReturn(1L);
+    when(orgUnitRepository.getReferenceById(skId)).thenReturn(sk);
+    when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "skl"));
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorSkLead(skId, userId, true);
+
+    assertEquals(OrgChartPositionType.SK_COMMANDER, captureSaved().getPositionType());
+  }
+
+  @Test
+  void mirrorSkLead_false_removesSeat() {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    OrgChartPosition seat =
+        pos(OrgChartPositionType.SK_COMMANDER, specialCommand(skId, "Alpha SK", "ASK"), null);
+    when(positionRepository.findByOrgUnitIdAndUserId(skId, userId)).thenReturn(List.of(seat));
+
+    service().mirrorSkLead(skId, userId, false);
+
+    verify(positionRepository).delete(seat);
+  }
+
+  @Test
+  void mirrorCreateKommandoGroup_addsLeaderlessKommandoNode() {
+    Squadron s = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    KommandoGroup group = group(s, "Alpha", 2);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    service().mirrorCreateKommandoGroup(group);
+
+    OrgChartPosition saved = captureSaved();
+    assertEquals(OrgChartPositionType.COMMAND_LEAD, saved.getPositionType());
+    assertSame(s, saved.getOrgUnit());
+    assertSame(group, saved.getKommandoGroup());
+    assertEquals("Alpha", saved.getName());
+    assertNull(saved.getUser(), "a freshly-mirrored Kommando node is leaderless");
+    assertNull(saved.getDisplayName());
+    assertEquals(2, saved.getSortIndex());
+  }
+
+  @Test
+  void mirrorUpdateKommandoGroup_updatesNodeNameAndSortWithoutSave() {
+    Squadron s = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    KommandoGroup group = group(s, "Bravo", 3);
+    OrgChartPosition node = pos(OrgChartPositionType.COMMAND_LEAD, s, null, null);
+    node.setName("Alpha");
+    node.setSortIndex(0);
+    when(positionRepository.findByKommandoGroupId(group.getId())).thenReturn(Optional.of(node));
+
+    service().mirrorUpdateKommandoGroup(group);
+
+    assertEquals("Bravo", node.getName());
+    assertEquals(3, node.getSortIndex());
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void mirrorDeleteKommandoGroup_removesNode() {
+    UUID groupId = UUID.randomUUID();
+    OrgChartPosition node =
+        pos(OrgChartPositionType.COMMAND_LEAD, squadron(UUID.randomUUID(), "IRIDIUM", "IRI"), null);
+    when(positionRepository.findByKommandoGroupId(groupId)).thenReturn(Optional.of(node));
+
+    service().mirrorDeleteKommandoGroup(groupId);
+
+    verify(positionRepository).delete(node);
+  }
+
+  /** Captures the single position handed to {@code positionRepository.save(...)}. */
+  private OrgChartPosition captureSaved() {
+    ArgumentCaptor<OrgChartPosition> captor = ArgumentCaptor.forClass(OrgChartPosition.class);
+    verify(positionRepository).save(captor.capture());
+    return captor.getValue();
+  }
+
   // --------------------------------------------------------------------- fixtures --
+
+  private static KommandoGroup group(Squadron squadron, String name, int sortIndex) {
+    KommandoGroup group =
+        KommandoGroup.builder().squadron(squadron).name(name).sortIndex(sortIndex).build();
+    group.setId(UUID.randomUUID());
+    return group;
+  }
 
   private static User user(UUID id, String username) {
     User user = new User();

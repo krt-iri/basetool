@@ -51,6 +51,12 @@ import org.springframework.transaction.annotation.Transactional;
  * Kommandoleiter / stellv. Kommandoleiter / Ensign cannot be deleted. Every mutation is recorded in
  * the {@code ROLE} activity audit log (REQ-AUDIT-001) in the same transaction.
  *
+ * <p>Each group mutation also mirrors onto the descriptive org chart (epic #800, REQ-ROLE-006): a
+ * create adds a leaderless {@code COMMAND_LEAD} Kommando node tied to the group, a rename / reorder
+ * updates it, and a delete removes it — all in the same transaction via {@link OrgChartService}.
+ * The chart stays descriptive (grants nothing); the rank-bearing authority remains on the
+ * membership row.
+ *
  * <p>Class-level {@code @Transactional(readOnly = true)}; the mutating methods override it.
  */
 @Service
@@ -66,6 +72,7 @@ public class KommandoGroupService {
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipRepository membershipRepository;
   private final AuditService auditService;
+  private final OrgChartService orgChartService;
 
   /**
    * Lists the Kommandogruppen of a Staffel in display order.
@@ -111,6 +118,8 @@ public class KommandoGroupService {
             .sortIndex((int) existing)
             .build();
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
+    // Mirror the group onto the descriptive chart as a leaderless Kommando node (REQ-ROLE-006).
+    orgChartService.mirrorCreateKommandoGroup(saved);
     auditService.record(
         AuditEventType.KOMMANDO_GROUP_CREATED,
         saved.getId(),
@@ -142,6 +151,8 @@ public class KommandoGroupService {
     group.setName(request.name().strip());
     group.setSortIndex(request.sortIndex());
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
+    // Mirror the rename / reorder onto the Kommando node (REQ-ROLE-006).
+    orgChartService.mirrorUpdateKommandoGroup(saved);
     auditService.record(
         AuditEventType.KOMMANDO_GROUP_UPDATED, saved.getId(), saved.getName(), null, null);
     return toDto(saved);
@@ -167,6 +178,8 @@ public class KommandoGroupService {
           "Kommandogruppe still has assigned members — reassign them before deleting it");
     }
     String name = group.getName();
+    // Remove the mirrored Kommando node first, then the group (REQ-ROLE-006).
+    orgChartService.mirrorDeleteKommandoGroup(groupId);
     kommandoGroupRepository.delete(group);
     auditService.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);
   }

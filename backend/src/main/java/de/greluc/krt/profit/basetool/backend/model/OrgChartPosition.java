@@ -161,4 +161,19 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
    */
   @Column(name = "sort_index", nullable = false)
   private int sortIndex;
+
+  /**
+   * The {@link KommandoGroup} this Kommando node mirrors (epic #800, REQ-ROLE-006). Only ever set
+   * on a {@link OrgChartPositionType#COMMAND_LEAD} row — the {@code
+   * chk_org_chart_kommando_group_type} CHECK (migration {@code V186}) forces it {@code null} for
+   * every other rank, and {@code uq_org_chart_one_command_per_group} ties at most one Kommando node
+   * to a group. A non-null link marks a node that is the descriptive mirror of a functional rank
+   * (written solely by {@code OrgChartService.mirror*}); {@code null} marks a legacy,
+   * admin-authored Kommando. {@code ON DELETE CASCADE} removes the node when its group is deleted.
+   * Lazy because the chart assembly does not dereference it per row.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "kommando_group_id")
+  @ToString.Exclude
+  private KommandoGroup kommandoGroup;
 }

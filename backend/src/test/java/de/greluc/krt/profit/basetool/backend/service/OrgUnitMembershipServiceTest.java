@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -85,6 +86,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private InventoryOrgUnitReconciler inventoryReconciler;
   @Mock private AuditService auditService;
+  @Mock private OrgChartService orgChartService;
 
   @InjectMocks private OrgUnitMembershipService membershipService;
 
@@ -223,6 +225,7 @@ class OrgUnitMembershipServiceTest {
     membershipService.removeMember(scId, userId);
 
     verify(membershipRepository).deleteById(id);
+    verify(orgChartService).mirrorRemoveUnitSeat(scId, userId);
     verify(auditService)
         .record(eq(AuditEventType.MEMBERSHIP_REVOKED), eq(scId), any(), eq(userId), any());
   }
@@ -335,6 +338,7 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
     assertTrue(updated.isLead());
+    verify(orgChartService).mirrorSkLead(scId, userId, true);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(scId), any(), eq(userId), any());
   }
@@ -352,6 +356,7 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
     assertFalse(updated.isLead());
+    verify(orgChartService).mirrorSkLead(scId, userId, false);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_REVOKED), eq(scId), any(), eq(userId), any());
   }
@@ -429,6 +434,7 @@ class OrgUnitMembershipServiceTest {
     assertTrue(m.isBereichskoordinator());
     assertFalse(m.isBereichsleiter());
     assertFalse(m.isBereichsoperator());
+    verify(orgChartService).mirrorBereichRole(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(bereichId), any(), eq(userId), any());
   }
@@ -507,6 +513,7 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership m = membershipService.addOlMember(olId, userId);
 
     assertTrue(m.isOlMember());
+    verify(orgChartService).mirrorOlMember(olId, userId);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(olId), any(), eq(userId), any());
   }
@@ -552,6 +559,8 @@ class OrgUnitMembershipServiceTest {
             squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L);
 
     assertEquals(MembershipRole.STAFFELLEITER, saved.getRole());
+    verify(orgChartService)
+        .mirrorSquadronRank(eq(squadronId), eq(userId), eq(MembershipRole.STAFFELLEITER), isNull());
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
   }
@@ -615,6 +624,8 @@ class OrgUnitMembershipServiceTest {
 
     assertEquals(MembershipRole.KOMMANDOLEITER, saved.getRole());
     assertSame(group, saved.getKommandoGroup());
+    verify(orgChartService)
+        .mirrorSquadronRank(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
   }
@@ -651,6 +662,7 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership saved = membershipService.removeSquadronRank(squadronId, userId, 0L);
 
     assertEquals(MembershipRole.MEMBER, saved.getRole());
+    verify(orgChartService).mirrorRemoveSquadronRank(squadronId, userId);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_REVOKED), eq(squadronId), any(), eq(userId), any());
   }

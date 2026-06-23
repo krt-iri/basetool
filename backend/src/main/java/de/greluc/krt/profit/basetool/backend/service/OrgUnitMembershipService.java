@@ -89,6 +89,7 @@ public class OrgUnitMembershipService {
   private final OrgUnitCascadeService orgUnitCascadeService;
   private final InventoryOrgUnitReconciler inventoryReconciler;
   private final AuditService auditService;
+  private final OrgChartService orgChartService;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
@@ -373,6 +374,9 @@ public class OrgUnitMembershipService {
       throw new NotFoundException("Membership not found");
     }
     membershipRepository.deleteById(id);
+    // Drop any mirrored SK chart seat (an SK-Leiter losing the membership) in the same transaction
+    // so no stale seat lingers (REQ-ROLE-006).
+    orgChartService.mirrorRemoveUnitSeat(sc.getId(), userId);
 
     // Last org-unit membership removed → the user's org-stamped inventory falls back to
     // ownerless-personal (the auto-demote lifecycle policy). The count query auto-flushes the
@@ -451,6 +455,9 @@ public class OrgUnitMembershipService {
     // and the caller would get a stale version. Flushing also surfaces the V165 trigger as a clean
     // in-transaction failure rather than at commit.
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    // Mirror the account-linked seat onto the descriptive chart in the same transaction
+    // (REQ-ROLE-006); the chart still grants nothing.
+    orgChartService.mirrorBereichRole(bereich.getId(), userId, role);
     final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
     auditService.record(
         firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
@@ -477,6 +484,8 @@ public class OrgUnitMembershipService {
             .orElseThrow(() -> new NotFoundException("Bereichsleitung membership not found"));
     final MembershipRole previousRole = m.getRole();
     membershipRepository.delete(m);
+    // Remove the mirrored chart seat in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorRemoveUnitSeat(bereichId, userId);
     auditService.record(
         AuditEventType.ROLE_REVOKED,
         bereichId,
@@ -529,6 +538,8 @@ public class OrgUnitMembershipService {
     // in-transaction failure and keeps the flushed @Version in the response under the
     // class-@Transactional controller.
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    // Mirror the OL seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorOlMember(ol.getId(), userId);
     auditService.record(
         AuditEventType.ROLE_GRANTED, ol.getId(), orgUnitLabel(ol), userId, "role=OL_MEMBER");
     return saved;
@@ -550,6 +561,8 @@ public class OrgUnitMembershipService {
             .orElseThrow(() -> new NotFoundException("Organisationsleitung membership not found"));
     final MembershipRole previousRole = m.getRole();
     membershipRepository.delete(m);
+    // Remove the mirrored OL chart seat in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
     auditService.record(
         AuditEventType.ROLE_REVOKED,
         organisationsleitungId,
@@ -718,6 +731,9 @@ public class OrgUnitMembershipService {
         membershipRepository.deleteAll(existing);
         for (OrgUnitMembership removed : existing) {
           recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
+          // A squadron rank held on the removed row leaves a stale chart seat — clear it
+          // (REQ-ROLE-006).
+          orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
         }
         // Removing the Staffel may have been the user's last org-unit membership (no SK left) →
         // demote their org-stamped inventory to ownerless-personal.
@@ -754,6 +770,8 @@ public class OrgUnitMembershipService {
       membershipRepository.flush();
       for (OrgUnitMembership removed : stale) {
         recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
+        // Clear any stale chart seat the moved-away squadron rank left behind (REQ-ROLE-006).
+        orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
       }
     }
 
@@ -812,6 +830,8 @@ public class OrgUnitMembershipService {
     // Dual-write the unified rank (epic #800 Phase 1, REQ-ROLE-001) in lockstep with is_lead.
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
     OrgUnitMembership saved = membershipRepository.save(m);
+    // Mirror the SK-Leiter seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
     auditService.record(
         request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
         specialCommandId,
@@ -868,6 +888,9 @@ public class OrgUnitMembershipService {
     m.setRole(rank);
     m.setKommandoGroup(group);
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    // Mirror the squadron seat onto the descriptive chart in the same transaction (REQ-ROLE-006):
+    // Staffelleiter / Kommandoleiter (vacates+fills the group node) / stellv. / Ensign.
+    orgChartService.mirrorSquadronRank(squadronId, userId, rank, group);
 
     final boolean firstGrant = previousRole == MembershipRole.MEMBER;
     auditService.record(
@@ -909,6 +932,8 @@ public class OrgUnitMembershipService {
     m.setRole(MembershipRole.MEMBER);
     m.setKommandoGroup(null);
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    // Clear the mirrored squadron chart seat in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorRemoveSquadronRank(squadronId, userId);
     auditService.record(
         AuditEventType.ROLE_REVOKED,
         squadronId,

@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapper;
+import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartScope;
@@ -30,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AreaLeadershipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OlChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
@@ -53,6 +56,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -447,6 +451,383 @@ public class OrgChartService {
             .findById(id)
             .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
     positionRepository.delete(position);
+  }
+
+  // ------------------------------------------------- role-model mirror (REQ-ROLE-006) --
+  // The functional rank on org_unit_membership is the source of truth; these methods keep the
+  // descriptive account-linked chart seats in lockstep with it (epic #800, REQ-ROLE-006). They run
+  // with MANDATORY propagation: the appointment that triggered them (OrgUnitMembershipService /
+  // KommandoGroupService) has already opened a read-write transaction, opened the delegated-authz
+  // gate and persisted the membership row, so the mirror joins that very transaction (same-tx
+  // requirement) and never starts one of its own — calling a mirror method outside a transaction is
+  // a programming error and fails fast. The mirror only ever writes the chart; the authority
+  // cascade
+  // still never reads it (the chart grants nothing), so the ArchUnit chart invariants stay green.
+
+  /**
+   * Mirrors a Bereich leadership appointment onto the chart: ensures the appointee holds exactly
+   * the matching descriptive seat ({@code BEREICHSLEITER} / {@code BEREICHSKOORDINATOR} / {@code
+   * BEREICHSOPERATOR}) in the Bereich, replacing whatever Bereich seat they held before. The
+   * single-Bereichsleiter chart slot is reassigned rather than duplicated so the {@code
+   * uq_org_chart_one_bereichsleiter_per_bereich} index is never tripped.
+   *
+   * @param bereichId the Bereich the appointment is on; never {@code null}.
+   * @param userId the appointed account; never {@code null}.
+   * @param role the Bereich leadership role granted; never {@code null}.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorBereichRole(
+      @NotNull UUID bereichId, @NotNull UUID userId, @NotNull BereichLeadershipRole role) {
+    clearUnitSeatsForUser(bereichId, userId);
+    OrgChartPositionType type =
+        switch (role) {
+          case LEITER -> OrgChartPositionType.BEREICHSLEITER;
+          case KOORDINATOR -> OrgChartPositionType.BEREICHSKOORDINATOR;
+          case OPERATOR -> OrgChartPositionType.BEREICHSOPERATOR;
+        };
+    // The single Bereichsleiter slot is reassigned (so the partial unique index holds); the
+    // unbounded Koordinator / Operator ranks just append a fresh seat.
+    if (type == OrgChartPositionType.BEREICHSLEITER) {
+      upsertSingletonSeat(bereichId, type, userId);
+    } else {
+      createUserSeat(bereichId, type, userId, null);
+    }
+  }
+
+  /**
+   * Mirrors an Organisationsleitung membership onto the chart: ensures the member holds an {@code
+   * OL_MEMBER} seat on the OL. Idempotent — a member who already has the seat keeps it.
+   *
+   * @param organisationsleitungId the OL the membership is on; never {@code null}.
+   * @param userId the OL member's account; never {@code null}.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
+    if (positionRepository.findByOrgUnitIdAndUserId(organisationsleitungId, userId).isEmpty()) {
+      createUserSeat(organisationsleitungId, OrgChartPositionType.OL_MEMBER, userId, null);
+    }
+  }
+
+  /**
+   * Mirrors an SK-Leiter toggle onto the chart: creates an {@code SK_COMMANDER} seat for the user
+   * on the SK when the lead flag is set, or removes their SK seat when it is cleared.
+   *
+   * @param specialCommandId the Spezialkommando the toggle is on; never {@code null}.
+   * @param userId the toggled account; never {@code null}.
+   * @param isLead the new lead state.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorSkLead(@NotNull UUID specialCommandId, @NotNull UUID userId, boolean isLead) {
+    if (isLead) {
+      if (positionRepository.findByOrgUnitIdAndUserId(specialCommandId, userId).isEmpty()) {
+        createUserSeat(specialCommandId, OrgChartPositionType.SK_COMMANDER, userId, null);
+      }
+    } else {
+      clearUnitSeatsForUser(specialCommandId, userId);
+    }
+  }
+
+  /**
+   * Mirrors a squadron-rank assignment onto the chart, reconciling the appointee's single squadron
+   * seat to match the freshly-assigned rank (epic #800, REQ-ROLE-006):
+   *
+   * <ul>
+   *   <li>{@code STAFFELLEITER} → the squadron's single {@code SQUADRON_LEAD} seat (reassigned, not
+   *       duplicated);
+   *   <li>{@code KOMMANDOLEITER} → the holder of the group's {@code COMMAND_LEAD} Kommando node;
+   *   <li>{@code STELLV_KOMMANDOLEITER} → the {@code DEPUTY_COMMAND_LEAD} hanging off that node;
+   *   <li>{@code ENSIGN} → an {@code ENSIGN} under that node, or a Staffelleiter-direct Ensign when
+   *       the rank carries no group.
+   * </ul>
+   *
+   * <p>Any prior squadron seat of the appointee is first cleared: a led Kommando is
+   * <em>vacated</em> (the node survives, REQ-ORG-011), every other prior seat is removed, so the
+   * one-user-per-unit chart invariant holds.
+   *
+   * @param squadronId the Staffel the rank is on; never {@code null}.
+   * @param userId the appointed member's account; never {@code null}.
+   * @param rank the squadron rank assigned; must be a squadron rank.
+   * @param group the bound Kommandogruppe, or {@code null} for a Staffelleiter / general Ensign.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorSquadronRank(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @NotNull MembershipRole rank,
+      KommandoGroup group) {
+    clearSquadronSeatForUser(squadronId, userId);
+    switch (rank) {
+      case STAFFELLEITER ->
+          upsertSingletonSeat(squadronId, OrgChartPositionType.SQUADRON_LEAD, userId);
+      case KOMMANDOLEITER -> {
+        OrgChartPosition command = commandLeadForGroup(squadronId, group);
+        command.setUser(userReference(userId));
+        command.setDisplayName(null);
+      }
+      case STELLV_KOMMANDOLEITER ->
+          upsertDeputySeat(squadronId, commandLeadForGroup(squadronId, group), userId);
+      case ENSIGN ->
+          createEnsignSeat(
+              squadronId, group == null ? null : commandLeadForGroup(squadronId, group), userId);
+      default -> throw new IllegalArgumentException("Not a squadron rank: " + rank);
+    }
+  }
+
+  /**
+   * Mirrors the clearing of a member's squadron rank: removes the appointee's squadron chart seat
+   * (a led Kommando is vacated, every other seat removed), back to a plain member with no chart
+   * seat.
+   *
+   * @param squadronId the Staffel; never {@code null}.
+   * @param userId the member whose squadron seat to clear; never {@code null}.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorRemoveSquadronRank(@NotNull UUID squadronId, @NotNull UUID userId) {
+    clearSquadronSeatForUser(squadronId, userId);
+  }
+
+  /**
+   * Mirrors the removal of a member's leadership seat in a flat-scoped unit (Bereich / OL / SK):
+   * deletes any chart position the user holds in that unit. Used when a membership row is dropped
+   * (revoke, member removal, Staffel switch off a leadership unit) so no stale seat lingers.
+   *
+   * @param orgUnitId the org unit the membership pointed at; never {@code null}.
+   * @param userId the user whose seat to remove; never {@code null}.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorRemoveUnitSeat(@NotNull UUID orgUnitId, @NotNull UUID userId) {
+    clearUnitSeatsForUser(orgUnitId, userId);
+  }
+
+  /**
+   * Mirrors the creation of a Kommandogruppe: adds a still-leaderless {@code COMMAND_LEAD} Kommando
+   * node tied to the group, ready for a Kommandoleiter / stellv. / Ensigns to be hung off it.
+   *
+   * @param group the freshly-created Kommandogruppe; never {@code null}.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorCreateKommandoGroup(@NotNull KommandoGroup group) {
+    OrgChartPosition command = new OrgChartPosition();
+    command.setPositionType(OrgChartPositionType.COMMAND_LEAD);
+    command.setOrgUnit(group.getSquadron());
+    command.setKommandoGroup(group);
+    command.setName(group.getName());
+    command.setSortIndex(group.getSortIndex());
+    positionRepository.save(command);
+  }
+
+  /**
+   * Mirrors a Kommandogruppe rename / reorder onto its {@code COMMAND_LEAD} node (name + sort
+   * index). A no-op when no mirror node exists yet (a legacy group never assigned a leader).
+   *
+   * @param group the updated Kommandogruppe; never {@code null}.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorUpdateKommandoGroup(@NotNull KommandoGroup group) {
+    positionRepository
+        .findByKommandoGroupId(group.getId())
+        .ifPresent(
+            command -> {
+              command.setName(group.getName());
+              command.setSortIndex(group.getSortIndex());
+            });
+  }
+
+  /**
+   * Mirrors a Kommandogruppe deletion: removes its {@code COMMAND_LEAD} node (and, via the {@code
+   * parent_id} cascade, any stellv. / Ensigns under it — though the group delete already requires
+   * an empty group). A no-op when no mirror node exists.
+   *
+   * @param kommandoGroupId the deleted group's id; never {@code null}.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void mirrorDeleteKommandoGroup(@NotNull UUID kommandoGroupId) {
+    positionRepository.findByKommandoGroupId(kommandoGroupId).ifPresent(positionRepository::delete);
+  }
+
+  /**
+   * Removes every chart seat the user holds in a flat-scoped unit (Bereich / OL / SK). The {@code
+   * uq_org_chart_user_per_unit} index caps this at one, but the loop is robust to a legacy
+   * duplicate.
+   *
+   * @param orgUnitId the org unit; never {@code null}.
+   * @param userId the user; never {@code null}.
+   */
+  private void clearUnitSeatsForUser(@NotNull UUID orgUnitId, @NotNull UUID userId) {
+    positionRepository
+        .findByOrgUnitIdAndUserId(orgUnitId, userId)
+        .forEach(positionRepository::delete);
+  }
+
+  /**
+   * Clears the appointee's single squadron chart seat: a led Kommando ({@code COMMAND_LEAD}) is
+   * vacated so the Kommando survives (REQ-ORG-011), while a {@code SQUADRON_LEAD} / {@code
+   * DEPUTY_COMMAND_LEAD} / {@code ENSIGN} seat is deleted outright.
+   *
+   * @param squadronId the Staffel; never {@code null}.
+   * @param userId the member; never {@code null}.
+   */
+  private void clearSquadronSeatForUser(@NotNull UUID squadronId, @NotNull UUID userId) {
+    for (OrgChartPosition seat : positionRepository.findByOrgUnitIdAndUserId(squadronId, userId)) {
+      if (seat.getPositionType() == OrgChartPositionType.COMMAND_LEAD) {
+        seat.setUser(null);
+        seat.setDisplayName(null);
+      } else {
+        positionRepository.delete(seat);
+      }
+    }
+  }
+
+  /**
+   * Reassigns the single existing seat of the given type in the org unit to the appointee, or
+   * creates it when none exists yet. Used for the singleton ranks ({@code SQUADRON_LEAD} / {@code
+   * BEREICHSLEITER}) so the partial unique index is never tripped by a second row.
+   *
+   * @param orgUnitId the org unit; never {@code null}.
+   * @param type the singleton rank; never {@code null}.
+   * @param userId the appointee; never {@code null}.
+   */
+  private void upsertSingletonSeat(
+      @NotNull UUID orgUnitId, @NotNull OrgChartPositionType type, @NotNull UUID userId) {
+    OrgChartPosition existing =
+        positionRepository
+            .findFirstByOrgUnitIdAndPositionTypeOrderBySortIndexAscCreatedAtAsc(orgUnitId, type)
+            .orElse(null);
+    if (existing == null) {
+      createUserSeat(orgUnitId, type, userId, null);
+    } else {
+      existing.setUser(userReference(userId));
+      existing.setDisplayName(null);
+    }
+  }
+
+  /**
+   * Reassigns the single {@code DEPUTY_COMMAND_LEAD} under the given Kommando node to the
+   * appointee, or creates it when the Kommando has no deputy yet.
+   *
+   * @param squadronId the Staffel the deputy belongs to; never {@code null}.
+   * @param command the parent {@code COMMAND_LEAD} node; never {@code null}.
+   * @param userId the appointee; never {@code null}.
+   */
+  private void upsertDeputySeat(
+      @NotNull UUID squadronId, @NotNull OrgChartPosition command, @NotNull UUID userId) {
+    OrgChartPosition existing =
+        positionRepository
+            .findByParentIdAndPositionType(
+                command.getId(), OrgChartPositionType.DEPUTY_COMMAND_LEAD)
+            .orElse(null);
+    if (existing == null) {
+      createSeat(squadronId, OrgChartPositionType.DEPUTY_COMMAND_LEAD, userId, command, 0);
+    } else {
+      existing.setUser(userReference(userId));
+      existing.setDisplayName(null);
+    }
+  }
+
+  /**
+   * Creates an {@code ENSIGN} seat for the appointee, appended after the squadron's existing
+   * Ensigns, optionally reporting into a Kommando node (a {@code null} parent is a
+   * Staffelleiter-direct Ensign).
+   *
+   * @param squadronId the Staffel; never {@code null}.
+   * @param parent the Kommando node to report into, or {@code null} for a direct Ensign.
+   * @param userId the appointee; never {@code null}.
+   */
+  private void createEnsignSeat(
+      @NotNull UUID squadronId, OrgChartPosition parent, @NotNull UUID userId) {
+    int sortIndex =
+        (int)
+            positionRepository.countByOrgUnitIdAndPositionType(
+                squadronId, OrgChartPositionType.ENSIGN);
+    createSeat(squadronId, OrgChartPositionType.ENSIGN, userId, parent, sortIndex);
+  }
+
+  /**
+   * Creates an account-held seat of the given type, appended after the existing siblings of that
+   * type in the org unit. For the multi-holder flat ranks (Koordinator / Operator / OL member /
+   * SK-Leiter) and the singleton ranks when none exists yet.
+   *
+   * @param orgUnitId the org unit; never {@code null}.
+   * @param type the rank; never {@code null}.
+   * @param userId the appointee; never {@code null}.
+   * @param parent the parent position, or {@code null}.
+   */
+  private void createUserSeat(
+      @NotNull UUID orgUnitId,
+      @NotNull OrgChartPositionType type,
+      @NotNull UUID userId,
+      OrgChartPosition parent) {
+    int sortIndex = (int) positionRepository.countByOrgUnitIdAndPositionType(orgUnitId, type);
+    createSeat(orgUnitId, type, userId, parent, sortIndex);
+  }
+
+  /**
+   * Persists a fresh account-held chart position. Common tail of the create helpers.
+   *
+   * @param orgUnitId the org unit; never {@code null}.
+   * @param type the rank; never {@code null}.
+   * @param userId the appointee; never {@code null}.
+   * @param parent the parent position, or {@code null}.
+   * @param sortIndex the display order to stamp.
+   */
+  private void createSeat(
+      @NotNull UUID orgUnitId,
+      @NotNull OrgChartPositionType type,
+      @NotNull UUID userId,
+      OrgChartPosition parent,
+      int sortIndex) {
+    OrgChartPosition position = new OrgChartPosition();
+    position.setPositionType(type);
+    position.setOrgUnit(orgUnitReference(orgUnitId));
+    position.setUser(userReference(userId));
+    position.setParent(parent);
+    position.setSortIndex(sortIndex);
+    positionRepository.save(position);
+  }
+
+  /**
+   * Loads the Kommando node ({@code COMMAND_LEAD}) mirroring the given group, creating a leaderless
+   * one on the fly for a legacy group that never had its node mirrored yet.
+   *
+   * @param squadronId the Staffel the group belongs to; never {@code null}.
+   * @param group the Kommandogruppe; never {@code null}.
+   * @return the (managed) mirroring {@code COMMAND_LEAD} node.
+   */
+  private OrgChartPosition commandLeadForGroup(
+      @NotNull UUID squadronId, @NotNull KommandoGroup group) {
+    return positionRepository
+        .findByKommandoGroupId(group.getId())
+        .orElseGet(
+            () -> {
+              OrgChartPosition command = new OrgChartPosition();
+              command.setPositionType(OrgChartPositionType.COMMAND_LEAD);
+              command.setOrgUnit(orgUnitReference(squadronId));
+              command.setKommandoGroup(group);
+              command.setName(group.getName());
+              command.setSortIndex(group.getSortIndex());
+              return positionRepository.save(command);
+            });
+  }
+
+  /**
+   * Returns a lazy {@link User} reference (no SELECT) for stamping a position's holder FK; the
+   * appointing flow has already proven the user exists (the membership row references it).
+   *
+   * @param userId the user id; never {@code null}.
+   * @return a managed {@link User} reference.
+   */
+  private User userReference(@NotNull UUID userId) {
+    return userRepository.getReferenceById(userId);
+  }
+
+  /**
+   * Returns a lazy {@link OrgUnit} reference (no SELECT) for stamping a position's org-unit FK.
+   *
+   * @param orgUnitId the org unit id; never {@code null}.
+   * @return a managed {@link OrgUnit} reference.
+   */
+  private OrgUnit orgUnitReference(@NotNull UUID orgUnitId) {
+    return orgUnitRepository.getReferenceById(orgUnitId);
   }
 
   // ---------------------------------------------------------------- read assembly --

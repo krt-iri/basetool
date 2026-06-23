@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -113,4 +114,54 @@ public interface OrgChartPositionRepository extends JpaRepository<OrgChartPositi
    * @return {@code true} iff the user already has an area-leadership position.
    */
   boolean existsByOrgUnitIsNullAndUserId(UUID userId);
+
+  /**
+   * Returns the (at most one, per the {@code uq_org_chart_user_per_unit} index) positions the given
+   * user holds in the given OrgUnit. Backs the chart-mirror reconcile (epic #800, REQ-ROLE-006):
+   * the appointment service clears the user's current seat before (re)creating the one matching the
+   * freshly-assigned rank.
+   *
+   * @param orgUnitId the OrgUnit to look within; never {@code null}.
+   * @param userId the holding user; never {@code null}.
+   * @return the user's positions in that OrgUnit; never {@code null}, possibly empty.
+   */
+  List<OrgChartPosition> findByOrgUnitIdAndUserId(UUID orgUnitId, UUID userId);
+
+  /**
+   * Returns the Kommando node ({@code COMMAND_LEAD}) that mirrors the given Kommandogruppe, if any.
+   * Unique by {@code uq_org_chart_one_command_per_group}. Backs the squadron-rank mirror (epic
+   * #800, REQ-ROLE-006): a Kommandoleiter fills this node's holder, a stellv. Kommandoleiter /
+   * Ensign hangs off it via {@code parent_id}.
+   *
+   * @param kommandoGroupId the Kommandogruppe whose mirror node to load; never {@code null}.
+   * @return the mirroring {@code COMMAND_LEAD} position, or empty when none exists yet.
+   */
+  Optional<OrgChartPosition> findByKommandoGroupId(UUID kommandoGroupId);
+
+  /**
+   * Returns the first position of the given type in the given OrgUnit, ordered by sort index then
+   * creation time. Backs the singleton-seat reassign in the chart mirror (epic #800, REQ-ROLE-006)
+   * for {@code SQUADRON_LEAD} / {@code BEREICHSLEITER}, where re-appointing a new holder reuses the
+   * single existing chart row rather than creating a second one that the partial unique index would
+   * reject.
+   *
+   * @param orgUnitId the OrgUnit to look within; never {@code null}.
+   * @param positionType the singleton rank to find; never {@code null}.
+   * @return the existing singleton position, or empty when none exists yet.
+   */
+  Optional<OrgChartPosition> findFirstByOrgUnitIdAndPositionTypeOrderBySortIndexAscCreatedAtAsc(
+      UUID orgUnitId, OrgChartPositionType positionType);
+
+  /**
+   * Returns the child position of the given type hanging off the given parent, if any. Backs the
+   * stellv.-Kommandoleiter reassign in the chart mirror (epic #800, REQ-ROLE-006): a Kommando has
+   * at most one {@code DEPUTY_COMMAND_LEAD}, so re-appointing reuses that single child row.
+   *
+   * @param parentId the parent Kommando position id; never {@code null}.
+   * @param positionType the child rank to find (typically {@code DEPUTY_COMMAND_LEAD}); never
+   *     {@code null}.
+   * @return the existing child position, or empty when none exists yet.
+   */
+  Optional<OrgChartPosition> findByParentIdAndPositionType(
+      UUID parentId, OrgChartPositionType positionType);
 }

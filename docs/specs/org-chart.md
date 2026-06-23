@@ -19,6 +19,14 @@ and [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/base
 > (REQ-ORG-010): a position grants no permission — authorization lives in the role model and
 > `org_unit_membership` flags. The authoritative hierarchy and the descriptive chart are kept
 > consistent by the admin who maintains both.
+>
+> **Mirrored from the functional ranks (epic #800, REQ-ROLE-006):** the account-linked chart seats are
+> a descriptive **mirror** of the `org_unit_membership` ranks — written in the same transaction as the
+> rank change by `OrgChartService.mirror*` (called from the appointment flow), never the reverse. A
+> `COMMAND_LEAD` Kommando node tied to a Kommandogruppe carries the `kommando_group_id` link (Flyway
+> `V186`); legacy admin-authored Kommandos keep a `null` link and stay chart-only. Free-text holders
+> remain admin-edited. The chart still grants nothing (REQ-ORG-010): the mirror only writes the chart,
+> the authority cascade never reads it.
 
 ## Requirements
 

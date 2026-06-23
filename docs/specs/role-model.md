@@ -18,10 +18,11 @@ this org unit" — so that other features (first the bank, in a later session) c
 these ranks. It is the anchor for the rank-related amendments in
 [`org-unit-tenancy.md`](org-unit-tenancy.md), [`security-and-access.md`](security-and-access.md) and
 [`org-chart.md`](org-chart.md), and for the role matrix in
-[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Tracked by epic #800 (Phases 1–2
-shipped: the additive rank column + Kommandogruppe, and the authorisation layer now reads the rank
-with the squadron-rank baseline grant; Phases 3–5 wire delegated assignment, UI and the destructive
-cleanup).
+[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Tracked by epic #800 (Phases 1–3 shipped:
+the additive rank column + Kommandogruppe, the authorisation layer reads the rank with the
+squadron-rank baseline grant, and the delegated appointment ladder + Kommandogruppe CRUD + ROLE
+audit; Phase 4 mirrors the ranks onto the org chart (REQ-ROLE-006) and adds the delegated Leitung UI;
+Phase 5 is the destructive boolean-column cleanup).
 
 Every role and membership mutation (assign / change / revoke a rank, grant / revoke a membership,
 toggle the Logistician / Mission-Manager capability flags) is recorded in a dedicated **`ROLE`
@@ -137,12 +138,22 @@ The functional rank on `org_unit_membership` is the source of truth. The org cha
 (REQ-ORG-010); free-text / account-less chart holders stay chart-only. Account-linked chart seats are
 derived from the ranks; the authority cascade never reads the chart.
 
+The mirror is written in the same transaction as the rank change, by `OrgChartService.mirror*`
+called from the appointment flow (never by giving the chart scope awareness): the flat seats
+(Bereichsleiter / -koordinator / -operator, OL member, SK-Leiter, Staffelleiter) map 1:1 onto a
+chart position keyed by org unit (singletons are reassigned, not duplicated, so the partial unique
+indexes hold), while the in-Kommando ranks project onto the Kommando sub-tree — a `COMMAND_LEAD`
+node tied to its Kommandogruppe via the V186 `kommando_group_id` link carries the Kommandoleiter, and
+the stellv. Kommandoleiter / Ensigns hang off it. A Kommandogruppe create / rename / delete mirrors
+the leaderless node, and revoking a rank vacates a led Kommando (keeping the node, REQ-ORG-011) or
+removes the other seats. Legacy admin-authored Kommandos (no `kommando_group_id`) stay chart-only.
+
 **Acceptance**
 
-- [ ](Phase 4) Granting / revoking a rank updates the account-linked chart seat in the same
-  transaction; the chart still grants nothing and the ArchUnit chart pins stay green.
+- [x] Granting / revoking a rank updates the account-linked chart seat in the same transaction; the
+  chart still grants nothing and the ArchUnit chart pins stay green.
 
-**Enforced by:** `ArchitectureTest`, `OrgChartServiceTest` _(planned, Phase 4)_ · **Code:** `OrgChartService` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases), `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ## Out of scope
 
