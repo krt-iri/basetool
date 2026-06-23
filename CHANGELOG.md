@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Seite „Leitung" (Organisation → Leitung) lädt wieder.** Für Admins und alle, die Bereiche oder die Organisationsleitung sehen, schlug der Aufruf mit „Die Leitungsübersicht konnte nicht geladen werden" fehl, sobald eine Bereichs- oder Organisationsleitungs-Einheit anzuzeigen war. Ursache war ein unvollständiger Frontend-Spiegel der Einheitsarten (die Hierarchie-Arten Bereich und Organisationsleitung fehlten), an dem die gesamte Antwort scheiterte. Ein neuer Vertragstest erzwingt künftig, dass der Frontend-Spiegel jeden vom Backend gelieferten Enum-Wert kennt.
+
 ## [v0.7.10](https://github.com/krt-profit/basetool/releases/tag/v0.7.10) - 2026-06-23
 
 ### Added

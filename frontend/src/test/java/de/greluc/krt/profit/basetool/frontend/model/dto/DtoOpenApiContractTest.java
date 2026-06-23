@@ -31,10 +31,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -71,6 +73,13 @@ class DtoOpenApiContractTest {
    * entirely, which would otherwise make the whole test pass vacuously.
    */
   private static final int MIN_MATCHED_RECORDS = 40;
+
+  /**
+   * Minimum number of mirror enums that must match a schema carrying an {@code enum} array. A floor
+   * of one keeps the enum-coverage check from passing vacuously if class scanning or spec loading
+   * breaks (today {@code OrgUnitKind} alone satisfies it).
+   */
+  private static final int MIN_MATCHED_ENUMS = 1;
 
   /**
    * Known PRE-EXISTING mirror drifts: a frontend record component the backend OpenAPI schema does
@@ -131,6 +140,69 @@ class DtoOpenApiContractTest {
   }
 
   /**
+   * Builds one dynamic test per matched frontend mirror enum, asserting the mirror declares every
+   * constant the backend OpenAPI schema can emit for that enum.
+   *
+   * <p>This complements {@link #frontendDtoComponentsExistInOpenApiSchema()} (which only checks
+   * record <em>field names</em> and deliberately skips enum schemas): an enum value the backend can
+   * send but the frontend mirror lacks is strictly worse than a missing field — Jackson rejects the
+   * unknown constant and the <em>entire</em> response fails to deserialise (a hard {@code 500}, not
+   * a silent {@code null}). This is exactly the {@code OrgUnitKind} drift that broke {@code
+   * /organisation/leitung} once the Leitung view began emitting {@code BEREICH} / {@code
+   * ORGANISATIONSLEITUNG}.
+   *
+   * <p>Direction is {@code schema.enum ⊆ mirror constants}: a value the API emits but the mirror
+   * lacks fails the build; a mirror-only extra constant is harmless and ignored.
+   *
+   * @return the per-enum coverage checks followed by the match-count guard
+   * @throws IOException never (wrapped); see {@link #loadSchemas()}
+   */
+  @TestFactory
+  List<DynamicTest> frontendEnumConstantsCoverOpenApiEnum() throws IOException {
+    List<Set<String>> backendEnums = collectStringEnums(loadRoot());
+
+    List<DynamicTest> tests = new ArrayList<>();
+    int matched = 0;
+
+    for (Class<?> type : frontendDtoEnums()) {
+      Set<String> mirror = enumConstantNames(type);
+      // SpringDoc inlines enum types into each using property (no shared component schema), so
+      // match
+      // by value rather than by name: the backend enum this mirror reflects is the largest inline
+      // enum set that contains every mirror constant. No superset ⇒ the mirror reflects no emitted
+      // enum (request-only / frontend-only view model) ⇒ nothing to assert against.
+      Set<String> backend =
+          backendEnums.stream()
+              .filter(candidate -> candidate.containsAll(mirror))
+              .max(Comparator.comparingInt(Set::size))
+              .orElse(null);
+      if (backend == null) {
+        continue;
+      }
+      matched++;
+      tests.add(
+          DynamicTest.dynamicTest(
+              type.getSimpleName() + " mirror covers every OpenAPI enum value",
+              () -> assertEnumCoversSchema(type, mirror, backend)));
+    }
+
+    int matchedFinal = matched;
+    tests.add(
+        DynamicTest.dynamicTest(
+            "matched at least " + MIN_MATCHED_ENUMS + " DTO enum(s) against the spec",
+            () ->
+                assertTrue(
+                    matchedFinal >= MIN_MATCHED_ENUMS,
+                    "Only "
+                        + matchedFinal
+                        + " frontend DTO enum(s) matched an OpenAPI enum schema (expected >= "
+                        + MIN_MATCHED_ENUMS
+                        + "). Class scanning or openapi.json loading is likely broken, which would"
+                        + " make this enum-coverage check pass without checking anything.")));
+    return tests;
+  }
+
+  /**
    * Asserts every component of {@code record} appears as a property of {@code schemaProperties},
    * collecting all misses into a single message rather than failing on the first.
    *
@@ -156,6 +228,82 @@ class DtoOpenApiContractTest {
                 + " that the backend OpenAPI schema no longer declares. Either the backend DTO"
                 + " changed (update the frontend mirror + its template), or a @JsonProperty name"
                 + " drifted.");
+  }
+
+  /**
+   * Asserts the frontend mirror enum {@code type} declares a constant for every value the matched
+   * backend enum can emit, collecting all misses into a single message.
+   *
+   * @param type the frontend mirror enum under test
+   * @param mirror the mirror's own constant names
+   * @param backend the value set of the backend inline enum the mirror reflects
+   */
+  private static void assertEnumCoversSchema(
+      Class<?> type, Set<String> mirror, Set<String> backend) {
+    Set<String> missing = new TreeSet<>(backend);
+    missing.removeAll(mirror);
+    assertTrue(
+        missing.isEmpty(),
+        () ->
+            "Frontend mirror enum "
+                + type.getSimpleName()
+                + " is missing constant(s) "
+                + missing
+                + " that the backend OpenAPI schema can emit. A response carrying such a value"
+                + " fails JSON deserialisation outright (the whole payload 500s) — add the missing"
+                + " constant(s) to the frontend mirror.");
+  }
+
+  /**
+   * Collects the value set of every constant of a frontend mirror enum.
+   *
+   * @param type the enum class
+   * @return its constant names
+   */
+  private static Set<String> enumConstantNames(Class<?> type) {
+    Set<String> names = new TreeSet<>();
+    for (Object constant : type.getEnumConstants()) {
+      names.add(((Enum<?>) constant).name());
+    }
+    return names;
+  }
+
+  /**
+   * Walks the whole OpenAPI document and collects the value set of every inline string {@code enum}
+   * array — SpringDoc inlines enum types into each using property rather than emitting a shared
+   * component schema, so this is how a mirror enum is matched to the backend enum it reflects.
+   *
+   * @param root the OpenAPI document root
+   * @return one set per inline string enum found (duplicates retained; matching dedupes by
+   *     superset)
+   */
+  private static List<Set<String>> collectStringEnums(JsonNode root) {
+    List<Set<String>> sink = new ArrayList<>();
+    collectStringEnums(root, sink);
+    return sink;
+  }
+
+  /**
+   * Recursive worker for {@link #collectStringEnums(JsonNode)}: records this node's {@code enum}
+   * array (when it is a non-empty string array) then recurses into every child value.
+   *
+   * @param node the current node
+   * @param sink the accumulator of discovered string-enum value sets
+   */
+  private static void collectStringEnums(JsonNode node, List<Set<String>> sink) {
+    JsonNode enumNode = node.path("enum");
+    if (enumNode.isArray()) {
+      Set<String> values = new TreeSet<>();
+      for (JsonNode value : enumNode) {
+        if (value.isString()) {
+          values.add(value.asString());
+        }
+      }
+      if (!values.isEmpty()) {
+        sink.add(values);
+      }
+    }
+    node.forEach(child -> collectStringEnums(child, sink));
   }
 
   /**
@@ -193,25 +341,46 @@ class DtoOpenApiContractTest {
    * @return the frontend DTO record classes
    */
   private static List<Class<?>> frontendDtoRecords() {
+    return frontendDtoTypes(Class::isRecord);
+  }
+
+  /**
+   * Scans {@link #DTO_PACKAGE} for enum classes, so the enum-coverage check discovers new mirror
+   * enums automatically instead of being hand-listed.
+   *
+   * @return the frontend DTO enum classes
+   */
+  private static List<Class<?>> frontendDtoEnums() {
+    return frontendDtoTypes(Class::isEnum);
+  }
+
+  /**
+   * Scans {@link #DTO_PACKAGE} via a Spring classpath scan (accept-all filter, default filters off)
+   * and returns the loaded classes the given filter accepts.
+   *
+   * @param filter the predicate selecting which scanned classes to keep (records, enums, …)
+   * @return the matching frontend DTO classes
+   */
+  private static List<Class<?>> frontendDtoTypes(Predicate<Class<?>> filter) {
     ClassPathScanningCandidateComponentProvider scanner =
         new ClassPathScanningCandidateComponentProvider(false);
     scanner.addIncludeFilter((metadataReader, metadataReaderFactory) -> true);
-    List<Class<?>> records = new ArrayList<>();
+    List<Class<?>> types = new ArrayList<>();
     scanner
         .findCandidateComponents(DTO_PACKAGE)
         .forEach(
             beanDefinition -> {
               try {
                 Class<?> type = Class.forName(beanDefinition.getBeanClassName());
-                if (type.isRecord()) {
-                  records.add(type);
+                if (filter.test(type)) {
+                  types.add(type);
                 }
               } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(
                     "Scanned DTO class not loadable: " + beanDefinition.getBeanClassName(), e);
               }
             });
-    return records;
+    return types;
   }
 
   /**
@@ -223,13 +392,21 @@ class DtoOpenApiContractTest {
    * @throws IOException if the spec cannot be read
    */
   private static JsonNode loadSchemas() throws IOException {
-    Path spec = locateOpenApiSpec();
-    JsonNode root = JsonMapper.builder().build().readTree(Files.readString(spec));
-    JsonNode schemas = root.path("components").path("schemas");
+    JsonNode schemas = loadRoot().path("components").path("schemas");
     assertFalse(
         schemas.isMissingNode() || !schemas.isObject(),
-        "components.schemas missing in " + spec.toAbsolutePath());
+        "components.schemas missing in " + locateOpenApiSpec().toAbsolutePath());
     return schemas;
+  }
+
+  /**
+   * Reads and parses the committed OpenAPI document into its root node.
+   *
+   * @return the parsed OpenAPI document root
+   * @throws IOException if the spec cannot be read
+   */
+  private static JsonNode loadRoot() throws IOException {
+    return JsonMapper.builder().build().readTree(Files.readString(locateOpenApiSpec()));
   }
 
   /**
