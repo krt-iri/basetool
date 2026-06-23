@@ -2,24 +2,38 @@
 
 ## [Unreleased]
 
+## [v0.7.10](https://github.com/krt-profit/basetool/releases/tag/v0.7.10) - 2026-06-23
+
 ### Added
 
 - **Halter-Gelder sind von den Konten entkoppelt; Bankmitarbeiter können intern zwischen Haltern umbuchen.** Der Bestand eines Halters ist jetzt eine bankweite Gesamtgröße statt pro Konto und darf ins Minus gehen — ein Halter streckt notfalls eigenes Geld für eine Auszahlung vor. Im Haltermenü der Bankverwaltung gleichen Bankmitarbeiter solche Salden per Halter-zu-Halter-Umbuchung wieder aus (ohne ein Konto zu berühren).
+
 - **Bankmitarbeiter erreichen jetzt die Bankverwaltung.** Sie dürfen Sonderkonten anlegen (und erhalten darauf automatisch Vollzugriff) sowie das Haltermenü inklusive Umbuchung nutzen. Konten umbenennen, schließen, wiedereröffnen, andere Kontotypen anlegen, die manuelle Halter-Registry und Berechtigungen bleiben der Bankleitung vorbehalten; das Audit-Log bleibt Admin-only.
+
 - **Alle Bankmitarbeiter und Bankleitungsmitglieder werden automatisch als Halter registriert.** Verliert jemand alle Bankrollen, wird sein Halter automatisch deaktiviert — der Restbestand bleibt erhalten und muss per Umbuchung auf andere Halter verteilt werden. Manuell angelegte Halter bleiben davon unberührt.
+
 - **Halter-Buchungshistorie im Haltermenü.** Ein Klick auf einen Halter-Namen öffnet dessen Verwahrungs-Historie — alle Buchungen, die den bankweiten Bestand dieses Halters verändert haben, jeweils mit Konto- bzw. Gegenhalter-Bezug, Datum und Betrag. Ein Bankmitarbeiter sieht nur den eigenen Halter, die Bankleitung jeden.
+
 - **Überweisungsgebühren werden bei Auszahlungen, Halter-Umbuchungen und Halter-wechselnden Transfers automatisch berücksichtigt.** Der eingegebene Betrag ist der Sendebetrag, der voll vom Konto/Halterbestand abgebucht wird; die In-Game-Gebühr (gleicher Satz wie bei Operationen, 0,5 %) wird daraus herausgerechnet und ausgewiesen, sodass beim Ziel der Nettobetrag ankommt und kein Bankmitarbeiter die Gebühr aus dem Privatvermögen trägt. Die Buchungsdialoge zeigen Gebühr und Ankunftsbetrag live, die Historie weist sie pro Buchung aus. Einzahlungen und Transfers mit gleichem Halter bleiben gebührenfrei.
+
 - **Kontostand-Aufteilung auf der Halter-Seite.** Ein Halter trägt auf seiner Halter-Seite seinen aktuellen In-Game-Kontostand ein und sieht sofort, wie viel davon für die Bank reserviert ist (sein Halterbestand) und wie viel privat ihm gehört (Kontostand minus Halterbestand). Reiner Rechner — es wird nichts gespeichert.
+
 - **Neues Audit-Log „Rollen & Mitglieder".** Das Zuweisen, Ändern und Entfernen von Rollen und Mitgliedschaften — Bereichs-/Organisationsleitung, SK-Leitung, Logistiker-/Missionsleiter-Rechte sowie Staffel-/SK-Mitgliedschaften — wird jetzt lückenlos und unveränderbar protokolliert. Sichtbar nur für Admins als achter Tab der Seite „Audit-Logs", filterbar nach Zeitraum/Akteur/Ereignistyp und als PDF/JSON exportierbar.
+
 - **Delegierte Vergabe von Führungsrängen und Kommandogruppen.** Führungsränge müssen nicht mehr ausschließlich von Admins gesetzt werden: Die Organisationsleitung ernennt Bereichsleiter, Bereichsleiter ernennen Staffelleiter/SK-Leiter/Koordinatoren/Operatoren ihres Bereichs, und Staffelleiter verwalten die Kommandoleiter/Stellvertreter/Ensigns sowie die Kommandogruppen ihrer Staffel — entlang einer festen Leiter, in der sich niemand selbst befördern kann. Kommandogruppen lassen sich anlegen, umbenennen und löschen (höchstens vier je Staffel). Jede dieser Aktionen wird im Audit-Log „Rollen & Mitglieder" protokolliert.
+
 - **Neue Seite „Leitung" (Organisation → Leitung).** Bereichsleiter, Staffelleiter, die Organisationsleitung und Admins vergeben hier die ihnen zustehenden Führungsränge: Staffelleiter verwalten die Kommandoleiter/Stellvertreter/Ensigns und die Kommandogruppen ihrer Staffel, Bereichsleiter ihre Koordinatoren/Operatoren sowie die Staffel- und SK-Leitungen ihres Bereichs, die Organisationsleitung die Bereichsleiter, Admins alles. Die Seite zeigt jeweils nur die Einheiten, die man selbst verwalten darf. Das Organigramm verweist für kontogebundene Sitze jetzt auf diese Seite.
+
 - **Führungsrang-Vergaben spiegeln sich automatisch ins Organigramm.** Wird ein Bereichs-, Staffel-, Kommando- oder SK-Führungsrang vergeben, geändert oder entzogen, aktualisiert sich der zugehörige kontogebundene Sitz im Organigramm in derselben Aktion — inklusive der Kommandogruppen-Knoten. Das Organigramm bleibt rein beschreibend und vergibt weiterhin keine Rechte; frei eingetragene Halter ohne Account bleiben unberührt.
+
 - **Kontogebundene Sitze werden im Organigramm nicht mehr von Hand gesetzt.** Der Organigramm-Editor vergibt keine Accounts mehr — kontogebundene Sitze entstehen ausschließlich über die Seite „Leitung" und werden von dort gespiegelt (so kann es keine Abweichung zwischen Rang und Organigramm geben). Im Organigramm erscheinen solche Sitze nur lesend mit dem Hinweis „Leitung"; weiterhin frei pflegbar bleiben dort ausschließlich Freitext-Namen für Mitglieder ohne Account. Eine über die Seite „Leitung" angelegte Kommandogruppe ist im Organigramm komplett schreibgeschützt — kein Umbenennen, Entfernen, Leiter-Zuweisen oder Hinzufügen von Stellvertreter/Ensign; ihre Mitglieder werden ausschließlich dort verwaltet. Frei (ohne Kommandogruppe) angelegte Kommandos bleiben im Organigramm voll bearbeitbar.
 
 ### Changed
 
 - **Auszahlungen und Umbuchungen prüfen nur noch die Kontodeckung, nicht mehr den Halter.** Ein Konto kann weiterhin nie ins Minus gehen; der Halterbestand darf es (und wird später ausgeglichen). Die kontobezogene „Halter-Verteilung" entfällt: Konto-Detailseite, Kontoauszug-PDF und 3-Monats-Report zeigen sie nicht mehr — der 3-Monats-Report schließt stattdessen mit den bankweiten Halterbeständen.
+
 - **Intern: Die fünf alten Führungsrollen-Booleans der Mitgliedschaften wurden entfernt (Migration V187).** Der vereinheitlichte Rang ist jetzt die alleinige Quelle der Wahrheit; die DB-Regel „Führungskraft gehört keiner Staffel an" arbeitet darauf weiter (Staffelränge sind ausgenommen). Reine Aufräum-/Schema-Änderung ohne sichtbare Auswirkung — beim Deploy wird einmalig eine nicht umkehrbare Migration ausgeführt.
+
 - **Raffinerie-Aufträge anderer Nutzer sind jetzt auf den eigenen Org-Einheits-Bereich beschränkt.** Das Ansehen und Anlegen von Raffinerie-Aufträgen für andere Nutzer (`/refinery-orders/users/{userId}`) ist für Logistiker nun auf Nutzer der eigenen Org-Einheiten begrenzt (Admins und der eigene Account ausgenommen) — wie schon bei den einzelnen Auftrags-Aktionen. Vorher konnte jeder Logistiker (inkl. der neuen Staffelränge) das organisationsweit. Sicherheits-Härtung aus dem PR-Review.
 
 ## [v0.7.9](https://github.com/krt-profit/basetool/releases/tag/v0.7.9) - 2026-06-22
