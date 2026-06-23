@@ -184,6 +184,38 @@ class OrgChartServiceTest {
   }
 
   @Test
+  void getOrgChart_groupLinkedCommand_projectsKommandoGroupId() {
+    // A Kommando that mirrors a kommando_group (epic #800, REQ-ROLE-006): buildCommand must surface
+    // the link so the chart editor can render the whole subtree read-only (managed under Leitung).
+    // A
+    // legacy chart-only Kommando carries a null link.
+    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
+    when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
+        .thenReturn(List.of());
+
+    KommandoGroup linked = group(squadron, "Alpha", 0);
+    OrgChartPosition grouped =
+        pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "kl"));
+    grouped.setKommandoGroup(linked);
+    grouped.setSortIndex(0);
+    OrgChartPosition legacy = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
+    legacy.setName("Legacy");
+    legacy.setSortIndex(1);
+    when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
+        .thenReturn(List.of(grouped, legacy));
+
+    List<CommandChartDto> commands = service().getOrgChart().squadrons().getFirst().commands();
+
+    assertEquals(
+        linked.getId(),
+        commands.getFirst().kommandoGroupId(),
+        "the group-linked Kommando projects its kommando_group id");
+    assertNull(
+        commands.get(1).kommandoGroupId(), "a legacy chart-only Kommando projects a null link");
+  }
+
+  @Test
   void getOrgChart_noActiveUnits_skipsUnitPositionQuery() {
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of());
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -428,6 +460,42 @@ class OrgChartServiceTest {
 
     assertEquals(OrgChartPositionType.DEPUTY_COMMAND_LEAD, dto.positionType());
     assertEquals("Max", dto.displayName());
+  }
+
+  @Test
+  void createPosition_childUnderGroupLinkedKommando_isRejected() {
+    // A kommando_group-linked Kommando mirrors a functional rank (epic #800, REQ-ROLE-006): its
+    // Stv.
+    // / Ensigns are appointed under Organisation -> Leitung, so the chart editor may not bolt a
+    // child onto it — even a free-text one. The mirror itself writes through OrgChartService, not
+    // this admin-facing create.
+    UUID unitId = UUID.randomUUID();
+    UUID parentId = UUID.randomUUID();
+    Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
+    OrgChartPosition groupedKommando =
+        pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "kl"));
+    groupedKommando.setId(parentId);
+    groupedKommando.setKommandoGroup(group(squadron, "Alpha", 0));
+    when(orgUnitRepository.findById(unitId)).thenReturn(Optional.of(squadron));
+    when(positionRepository.findById(parentId)).thenReturn(Optional.of(groupedKommando));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.DEPUTY_COMMAND_LEAD,
+                            unitId,
+                            null,
+                            parentId,
+                            null,
+                            null,
+                            "Max")));
+
+    assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
+    verify(positionRepository, never()).save(any());
   }
 
   @Test

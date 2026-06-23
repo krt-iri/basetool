@@ -173,7 +173,7 @@ class OrgChartPageRenderTest {
         new OrgChartNodeDto(UUID.randomUUID(), "ENSIGN", UUID.randomUUID(), "Ensign", null, 0, 0L);
     CommandChartDto command =
         new CommandChartDto(
-            UUID.randomUUID(), "Alpha", 0L, 0, null, null, null, deputy, List.of(ensign));
+            UUID.randomUUID(), "Alpha", 0L, 0, null, null, null, null, deputy, List.of(ensign));
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
@@ -211,6 +211,74 @@ class OrgChartPageRenderTest {
     assertThat(html).as("command head is a level-4 treeitem").contains("aria-level=\"4\"");
     assertThat(html).as("vacant Kommandoleiter sits at level 5").contains("aria-level=\"5\"");
     assertThat(html).as("child Stv./Ensign nodes sit at level 6").contains("aria-level=\"6\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances() throws Exception {
+    // Given: a Kommando that mirrors a kommando_group (kommandoGroupId set, epic #800 /
+    // REQ-ROLE-006) with its Kommandoleiter appointed under Organisation -> Leitung (an account).
+    // The whole Kommando subtree is Leitung-managed, so the chart renders it read-only: the head
+    // carries the "managed under Leitung" marker and NONE of the rename / remove / vacate /
+    // add-child controls render, even for an admin — those would 400 at the backend.
+    CommandChartDto command =
+        new CommandChartDto(
+            UUID.randomUUID(),
+            "Alpha",
+            0L,
+            0,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "Cmd",
+            null,
+            null,
+            List.of());
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                null,
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(
+                    new SquadronChartDto(
+                        UUID.randomUUID(),
+                        "IRIDIUM",
+                        "IRI",
+                        null,
+                        List.of(command),
+                        List.of(),
+                        false,
+                        false)),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("the Kommando still renders").contains("oc-command-head");
+    assertThat(html).as("the Kommando name renders").contains("Alpha");
+    assertThat(html).as("the appointed Kommandoleiter renders").contains("Cmd");
+    assertThat(html)
+        .as("the head carries the managed-in-Leitung marker")
+        .contains("oc-node-managed");
+    assertThat(html)
+        .as("no rename control on a group-linked Kommando head")
+        .doesNotContain("data-trigger=\"oc-rename\"");
+    assertThat(html)
+        .as("no remove control on a group-linked Kommando head")
+        .doesNotContain("data-trigger=\"oc-remove\"");
+    assertThat(html)
+        .as("no vacate control on a Leitung-managed Kommandoleiter")
+        .doesNotContain("data-trigger=\"oc-vacate\"");
+    assertThat(html)
+        .as("no add-Stv. affordance on a group-linked Kommando")
+        .doesNotContain("data-position-type=\"DEPUTY_COMMAND_LEAD\"");
   }
 
   @Test
@@ -352,7 +420,7 @@ class OrgChartPageRenderTest {
     // placeholder), and its reassign control carries the typed name for a later account swap.
     CommandChartDto command =
         new CommandChartDto(
-            UUID.randomUUID(), "Alpha", 0L, 0, null, null, "Max Mustermann", null, List.of());
+            UUID.randomUUID(), "Alpha", 0L, 0, null, null, null, "Max Mustermann", null, List.of());
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(

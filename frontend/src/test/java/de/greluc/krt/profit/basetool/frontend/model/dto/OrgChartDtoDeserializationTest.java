@@ -61,6 +61,7 @@ class OrgChartDtoDeserializationTest {
             "commands":[
               {
                 "positionId":"00000000-0000-0000-0000-0000000000a4","name":"Alpha","version":2,"sortIndex":0,
+                "kommandoGroupId":"00000000-0000-0000-0000-0000000000c4",
                 "leaderUserId":"00000000-0000-0000-0000-0000000000b4","leaderUserName":"Cmd",
                 "deputy":null,
                 "ensigns":[
@@ -112,12 +113,19 @@ class OrgChartDtoDeserializationTest {
     CommandChartDto command = squadron.commands().getFirst();
     assertEquals("Alpha", command.name());
     assertEquals("Cmd", command.leaderUserName());
+    assertEquals(
+        java.util.UUID.fromString("00000000-0000-0000-0000-0000000000c4"),
+        command.kommandoGroupId(),
+        "a group-linked Kommando decodes its kommando_group id (drives the read-only chart"
+            + " render)");
     assertNull(command.deputy());
     assertEquals(1, command.ensigns().size());
     assertEquals("ENSIGN", command.ensigns().getFirst().positionType());
     CommandChartDto leaderless = squadron.commands().get(1);
     assertNull(leaderless.name(), "an unnamed Kommando decodes a null name");
     assertNull(leaderless.leaderUserId(), "a leaderless Kommando decodes a null holder");
+    assertNull(
+        leaderless.kommandoGroupId(), "a legacy chart-only Kommando decodes a null group link");
 
     assertEquals(1, chart.specialCommands().size());
     assertEquals(

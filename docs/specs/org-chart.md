@@ -53,6 +53,15 @@ the inline editor as an admin) · **Code:** `OrgChartController` · **Issues:** 
 > therefore edits **free-text holders + structure only** (no account picker); account seats render
 > read-only with a "managed under Leitung" marker. The `OrgChartPositionCrudE2eTest` account-assign
 > path is retired with this change (free-text CRUD remains).
+>
+> A **`kommando_group`-linked Kommando is read-only as a whole subtree.** `CommandChartDto`
+> carries the `kommandoGroupId` link, so the chart renders a group-linked Kommando with **no**
+> rename / remove / assign-lead / add-child affordance — only the "managed under Leitung" marker; its
+> Kommandoleiter, Stv. and Ensigns are appointed under Organisation → Leitung. Beyond the head edits
+> already rejected above, the backend also **rejects creating a child** (Stv. / Ensign) under a
+> `kommando_group`-linked parent (`problem.org_chart.account_managed_in_leitung`), so no chart-only
+> seat can be bolted onto a mirror-managed Kommando. A legacy chart-only Kommando (`kommandoGroupId`
+> = `null`) keeps the full structural CRUD.
 
 ### REQ-ORG-011 — A Kommando(gruppe) carries an independently fillable *and* vacatable Kommandoleiter
 

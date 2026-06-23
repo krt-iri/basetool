@@ -41,6 +41,10 @@ import java.util.UUID;
  *     fallback label).
  * @param version optimistic-lock version of the Kommando row, echoed back on rename / assign-lead.
  * @param sortIndex stable display order among the Staffel's Kommandos.
+ * @param kommandoGroupId id of the {@code kommando_group} this Kommando mirrors, or {@code null}
+ *     for a legacy chart-only Kommando. When non-{@code null} the whole Kommando subtree is managed
+ *     under Organisation -&gt; Leitung (epic #800, REQ-ROLE-006) and the chart editor renders it
+ *     read-only — no rename, remove, leader-assign or add-child affordances.
  * @param leaderUserId id of the Kommandoleiter account, or {@code null} for a free-text leader or a
  *     vacant seat.
  * @param leaderUserName the Kommandoleiter account's effective display name, or {@code null} for a
@@ -57,6 +61,7 @@ public record CommandChartDto(
     String name,
     Long version,
     int sortIndex,
+    UUID kommandoGroupId,
     UUID leaderUserId,
     String leaderUserName,
     String leaderDisplayName,

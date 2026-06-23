@@ -301,6 +301,14 @@ public class OrgChartService {
 
     OrgUnit orgUnit = resolveScopeOrgUnit(scope, request.orgUnitId());
     final OrgChartPosition parent = resolveAndValidateParent(type, orgUnit, request.parentId());
+    // A kommando_group-linked Kommando mirrors a functional rank: its whole subtree (Stv. /
+    // Ensigns)
+    // is managed under Organisation -> Leitung (epic #800, REQ-ROLE-006), so the chart editor may
+    // not
+    // bolt children onto it — the seat is read-only here, mirror-writes go through OrgChartService.
+    if (parent != null && parent.getKommandoGroup() != null) {
+      throw new BadRequestException(ERR_ACCOUNT_MANAGED);
+    }
     validateCardinality(type, orgUnit);
     final String name = validateAndNormalizeName(type, request.name());
     if (user != null) {
@@ -922,7 +930,9 @@ public class OrgChartService {
   /**
    * Projects one Kommando row plus its children into a {@link CommandChartDto}. The Kommandoleiter
    * lives on the Kommando row itself, so it is carried inline ({@code null} while vacant); the Stv.
-   * and Ensigns are the rows whose {@code parent_id} points back at this Kommando.
+   * and Ensigns are the rows whose {@code parent_id} points back at this Kommando. The row's {@code
+   * kommando_group} link is projected so the chart editor can render a group-linked Kommando
+   * read-only (epic #800, REQ-ROLE-006) — it is managed under Organisation -&gt; Leitung.
    *
    * @param command the Kommando ({@code COMMAND_LEAD}) row, with its user fetched.
    * @param siblings every position of the owning Staffel, used to find this Kommando's children.
@@ -948,6 +958,7 @@ public class OrgChartService {
         command.getName(),
         command.getVersion(),
         command.getSortIndex(),
+        command.getKommandoGroup() != null ? command.getKommandoGroup().getId() : null,
         leader != null ? leader.getId() : null,
         leader != null ? leader.getEffectiveName() : null,
         command.getDisplayName(),

@@ -153,14 +153,21 @@ account-free — its write API rejects setting an account holder, and editing / 
 mirror-managed seat (account-held or `kommando_group`-linked), with
 `problem.org_chart.account_managed_in_leitung`. So an admin can no longer manually set an
 account-linked seat on the chart (no drift); only free-text holders stay editable there
-(org-chart.md REQ-ORG-010 / -011 / -020 amendments).
+(org-chart.md REQ-ORG-010 / -011 / -020 amendments). A `kommando_group`-linked Kommando is read-only
+as a whole subtree: `CommandChartDto.kommandoGroupId` drives the editor to suppress every affordance
+on it (rename / remove / assign-lead / add-child) and the backend additionally **rejects creating a
+child** (Stv. / Ensign) under a `kommando_group`-linked parent — so no chart-only seat can be bolted
+onto a Leitung-managed Kommando.
 
 **Acceptance**
 
 - [x] Granting / revoking a rank updates the account-linked chart seat in the same transaction; the
   chart still grants nothing and the ArchUnit chart pins stay green.
+- [x] A `kommando_group`-linked Kommando renders read-only in the chart (no rename / remove /
+  assign-lead / add-child), and creating a child under it is rejected with
+  `problem.org_chart.account_managed_in_leitung`.
 
-**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases), `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartService#buildCommand` / `#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ## Out of scope
 

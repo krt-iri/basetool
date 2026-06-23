@@ -50948,6 +50948,10 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "kommandoGroupId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "leaderUserId" : {
             "type" : "string",
             "format" : "uuid"
