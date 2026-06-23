@@ -758,6 +758,26 @@ public final class BackendSeeder {
   }
 
   /**
+   * Issues an authenticated {@code PUT} as the given user and returns only the HTTP status (the
+   * {@code PUT} counterpart of {@link #postForStatus}), so the role-appointment matrix can assert a
+   * delegated squadron-rank {@code @PreAuthorize} verdict (2xx allowed / 403 denied) on {@code PUT
+   * /api/v1/squadrons/{id}/ranks/{userId}} without the 2xx-or-throw behaviour.
+   *
+   * @param username the Keycloak username to authenticate as
+   * @param password the Keycloak password
+   * @param path the backend path beginning with {@code /}
+   * @param jsonBody the JSON request body
+   * @return the HTTP status code
+   */
+  public int putForStatus(String username, String password, String path, String jsonBody) {
+    try {
+      return put(passwordGrant(username, password), path, jsonBody);
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.putForStatus(" + path + ") failed", e);
+    }
+  }
+
+  /**
    * Creates a bank account as a management user via {@code POST /api/v1/bank/accounts} and returns
    * its id.
    *

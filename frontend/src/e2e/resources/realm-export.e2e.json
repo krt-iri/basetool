@@ -202,6 +202,26 @@
         { "type": "password", "value": "test-bank-member-pw", "temporary": false }
       ],
       "realmRoles": ["Bank Employee", "Squadron Member"]
+    },
+    {
+      "username": "test-appoint-bl",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-appoint-bl@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-appoint-bl-pw", "temporary": false }
+      ],
+      "realmRoles": ["Squadron Member"]
+    },
+    {
+      "username": "test-appoint-tgt",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-appoint-tgt@example.test",
+      "credentials": [
+        { "type": "password", "value": "test-appoint-tgt-pw", "temporary": false }
+      ],
+      "realmRoles": ["Squadron Member"]
     }
   ]
 }
