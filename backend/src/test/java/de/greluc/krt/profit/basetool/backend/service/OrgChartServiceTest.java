@@ -294,10 +294,8 @@ class OrgChartServiceTest {
   // ----------------------------------------------------------------- create guards --
 
   @Test
-  void createPosition_areaCoordinator_persistsAndReturnsDto() {
-    UUID userId = UUID.randomUUID();
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "coordinator")));
-    when(positionRepository.existsByOrgUnitIsNullAndUserId(userId)).thenReturn(false);
+  void createPosition_areaCoordinatorFreeText_persistsAndReturnsDto() {
+    // Chart creates place a free-text holder; account holders are mirror-only now (REQ-ROLE-006).
     when(positionRepository.save(any()))
         .thenAnswer(
             inv -> {
@@ -310,10 +308,10 @@ class OrgChartServiceTest {
         service()
             .createPosition(
                 new OrgChartPositionCreateRequest(
-                    OrgChartPositionType.AREA_COORDINATOR, null, userId, null, null, null, null));
+                    OrgChartPositionType.AREA_COORDINATOR, null, null, null, null, null, "Max"));
 
     assertEquals(OrgChartPositionType.AREA_COORDINATOR, dto.positionType());
-    assertEquals(userId, dto.userId());
+    assertEquals("Max", dto.displayName());
     assertNull(dto.orgUnitId());
   }
 
@@ -403,20 +401,17 @@ class OrgChartServiceTest {
 
   @Test
   void createPosition_deputyUnderLeaderlessKommando_persists() {
-    UUID userId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     UUID parentId = UUID.randomUUID();
     Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
     OrgChartPosition leaderlessKommando =
         pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
     leaderlessKommando.setId(parentId);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "deputy")));
     when(orgUnitRepository.findById(unitId)).thenReturn(Optional.of(squadron));
     when(positionRepository.findById(parentId)).thenReturn(Optional.of(leaderlessKommando));
     when(positionRepository.existsByParentIdAndPositionType(
             parentId, OrgChartPositionType.DEPUTY_COMMAND_LEAD))
         .thenReturn(false);
-    when(positionRepository.existsByOrgUnitIdAndUserId(unitId, userId)).thenReturn(false);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     OrgChartPositionDto dto =
@@ -425,14 +420,14 @@ class OrgChartServiceTest {
                 new OrgChartPositionCreateRequest(
                     OrgChartPositionType.DEPUTY_COMMAND_LEAD,
                     unitId,
-                    userId,
+                    null,
                     parentId,
                     null,
                     null,
-                    null));
+                    "Max"));
 
     assertEquals(OrgChartPositionType.DEPUTY_COMMAND_LEAD, dto.positionType());
-    assertEquals(userId, dto.userId());
+    assertEquals("Max", dto.displayName());
   }
 
   @Test
@@ -531,12 +526,10 @@ class OrgChartServiceTest {
   @Test
   void createPosition_nonProfitEligibleUnit_isStaffed() {
     // Chart visibility is decoupled from is_profit_eligible (ADR-0029): a non-Profit but active
-    // Staffel may hold functional ranks, so staffing it succeeds rather than 400-ing.
-    UUID userId = UUID.randomUUID();
+    // Staffel may hold functional ranks, so staffing it (free-text) succeeds rather than 400-ing.
     UUID unitId = UUID.randomUUID();
     Squadron squadron = squadron(unitId, "ORION", "ORI");
     squadron.setProfitEligible(false);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "lead")));
     when(orgUnitRepository.findById(unitId)).thenReturn(Optional.of(squadron));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -544,11 +537,11 @@ class OrgChartServiceTest {
         service()
             .createPosition(
                 new OrgChartPositionCreateRequest(
-                    OrgChartPositionType.SQUADRON_LEAD, unitId, userId, null, null, null, null));
+                    OrgChartPositionType.SQUADRON_LEAD, unitId, null, null, null, null, "Max"));
 
     assertEquals(OrgChartPositionType.SQUADRON_LEAD, dto.positionType());
     assertEquals(unitId, dto.orgUnitId());
-    assertEquals(userId, dto.userId());
+    assertEquals("Max", dto.displayName());
   }
 
   @Test
@@ -818,7 +811,36 @@ class OrgChartServiceTest {
   // -------------------------------------------- Bereich / OL scopes (REQ-ORG-018) --
 
   @Test
-  void createPosition_bereichsleiter_persists() {
+  void createPosition_bereichsleiterFreeText_persists() {
+    // Account-linked seats are mirror-only now (REQ-ROLE-006); the chart create only places a
+    // free-text holder (a member without a Basetool account).
+    UUID bereichId = UUID.randomUUID();
+    when(orgUnitRepository.findById(bereichId))
+        .thenReturn(Optional.of(bereich(bereichId, "Profit", "PRF")));
+    when(positionRepository.countByOrgUnitIdAndPositionType(
+            bereichId, OrgChartPositionType.BEREICHSLEITER))
+        .thenReturn(0L);
+    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    OrgChartPositionDto dto =
+        service()
+            .createPosition(
+                new OrgChartPositionCreateRequest(
+                    OrgChartPositionType.BEREICHSLEITER,
+                    bereichId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "Max Mustermann"));
+
+    assertEquals(OrgChartPositionType.BEREICHSLEITER, dto.positionType());
+    assertEquals("Max Mustermann", dto.displayName());
+  }
+
+  @Test
+  void createPosition_withAccount_isRejected() {
+    // The chart editor may not place an account holder — appoint it under Leitung (REQ-ROLE-006).
     UUID userId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "blead")));
@@ -828,22 +850,24 @@ class OrgChartServiceTest {
             bereichId, OrgChartPositionType.BEREICHSLEITER))
         .thenReturn(0L);
     when(positionRepository.existsByOrgUnitIdAndUserId(bereichId, userId)).thenReturn(false);
-    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    OrgChartPositionDto dto =
-        service()
-            .createPosition(
-                new OrgChartPositionCreateRequest(
-                    OrgChartPositionType.BEREICHSLEITER,
-                    bereichId,
-                    userId,
-                    null,
-                    null,
-                    null,
-                    null));
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .createPosition(
+                        new OrgChartPositionCreateRequest(
+                            OrgChartPositionType.BEREICHSLEITER,
+                            bereichId,
+                            userId,
+                            null,
+                            null,
+                            null,
+                            null)));
 
-    assertEquals(OrgChartPositionType.BEREICHSLEITER, dto.positionType());
-    assertEquals(bereichId, dto.orgUnitId());
+    assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
+    verify(positionRepository, never()).save(any());
   }
 
   @Test
@@ -906,12 +930,9 @@ class OrgChartServiceTest {
   void createPosition_bereichDoesNotRequireProfitEligible() {
     // A Bereich is never profit-eligible; the org-chart create must NOT reject it for that
     // (unlike a Staffel/SK). Only its active flag is checked.
-    UUID userId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
     Bereich notProfit = bereich(bereichId, "Sub-Radar", "SUB"); // isProfitEligible() == false
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "k")));
     when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(notProfit));
-    when(positionRepository.existsByOrgUnitIdAndUserId(bereichId, userId)).thenReturn(false);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     OrgChartPositionDto dto =
@@ -920,11 +941,11 @@ class OrgChartServiceTest {
                 new OrgChartPositionCreateRequest(
                     OrgChartPositionType.BEREICHSKOORDINATOR,
                     bereichId,
-                    userId,
                     null,
                     null,
                     null,
-                    null));
+                    null,
+                    "Max Mustermann"));
 
     assertEquals(OrgChartPositionType.BEREICHSKOORDINATOR, dto.positionType());
   }
@@ -961,19 +982,22 @@ class OrgChartServiceTest {
 
   @Test
   void createPosition_olMember_persists() {
-    UUID userId = UUID.randomUUID();
     UUID olId = UUID.randomUUID();
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "olm")));
     when(orgUnitRepository.findById(olId))
         .thenReturn(Optional.of(organisationsleitung(olId, "Organisationsleitung", "OL")));
-    when(positionRepository.existsByOrgUnitIdAndUserId(olId, userId)).thenReturn(false);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     OrgChartPositionDto dto =
         service()
             .createPosition(
                 new OrgChartPositionCreateRequest(
-                    OrgChartPositionType.OL_MEMBER, olId, userId, null, null, null, null));
+                    OrgChartPositionType.OL_MEMBER,
+                    olId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "Max Mustermann"));
 
     assertEquals(OrgChartPositionType.OL_MEMBER, dto.positionType());
     assertEquals(olId, dto.orgUnitId());
@@ -998,16 +1022,15 @@ class OrgChartServiceTest {
   }
 
   @Test
-  void updatePosition_reassignToUserAlreadyInScope_isRejected() {
+  void updatePosition_reassignToAccount_isRejected() {
+    // The chart editor may not assign an account holder — that moved to Leitung (REQ-ROLE-006).
     UUID id = UUID.randomUUID();
     UUID newUserId = UUID.randomUUID();
-    OrgChartPosition position =
-        pos(OrgChartPositionType.AREA_COORDINATOR, null, null, user(UUID.randomUUID(), "old"));
+    OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
+    position.setDisplayName("Free Text");
     position.setId(id);
     position.setVersion(0L);
     when(positionRepository.findById(id)).thenReturn(Optional.of(position));
-    when(userRepository.findById(newUserId)).thenReturn(Optional.of(user(newUserId, "new")));
-    when(positionRepository.existsByOrgUnitIsNullAndUserId(newUserId)).thenReturn(true);
 
     BadRequestException ex =
         assertThrows(
@@ -1017,56 +1040,73 @@ class OrgChartServiceTest {
                     .updatePosition(
                         id, new OrgChartPositionUpdateRequest(newUserId, null, null, 0L, null)));
 
-    assertTrue(ex.getMessage().contains("user_already_assigned"));
+    assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
     verify(positionRepository, never()).save(any());
   }
 
   @Test
-  void updatePosition_reassignToFreeUser_persists() {
+  void updatePosition_reassignFreeTextHolder_persists() {
+    // Renaming a free-text holder to another free-text name stays a chart function.
     UUID id = UUID.randomUUID();
-    UUID newUserId = UUID.randomUUID();
-    OrgChartPosition position =
-        pos(OrgChartPositionType.AREA_COORDINATOR, null, null, user(UUID.randomUUID(), "old"));
+    OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
+    position.setDisplayName("Old Name");
     position.setId(id);
     position.setVersion(0L);
     when(positionRepository.findById(id)).thenReturn(Optional.of(position));
-    when(userRepository.findById(newUserId)).thenReturn(Optional.of(user(newUserId, "new")));
-    when(positionRepository.existsByOrgUnitIsNullAndUserId(newUserId)).thenReturn(false);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     OrgChartPositionDto dto =
         service()
-            .updatePosition(id, new OrgChartPositionUpdateRequest(newUserId, null, null, 0L, null));
+            .updatePosition(
+                id, new OrgChartPositionUpdateRequest(null, null, null, 0L, "New Name"));
 
-    assertEquals(newUserId, dto.userId());
+    assertEquals("New Name", dto.displayName());
   }
 
   @Test
-  void updatePosition_assignLeaderToLeaderlessKommando_persists() {
+  void updatePosition_mirrorManagedAccountSeat_isRejected() {
+    // An account-held seat reflects a functional rank and is read-only in the chart (REQ-ROLE-006).
     UUID id = UUID.randomUUID();
-    UUID newUserId = UUID.randomUUID();
+    OrgChartPosition position =
+        pos(OrgChartPositionType.AREA_COORDINATOR, null, null, user(UUID.randomUUID(), "acct"));
+    position.setId(id);
+    position.setVersion(0L);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(position));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .updatePosition(
+                        id, new OrgChartPositionUpdateRequest(null, null, null, 0L, "Max")));
+
+    assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void updatePosition_assignFreeTextLeaderToLeaderlessKommando_persists() {
+    UUID id = UUID.randomUUID();
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     OrgChartPosition kommando = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
     kommando.setId(id);
     kommando.setVersion(0L);
     when(positionRepository.findById(id)).thenReturn(Optional.of(kommando));
-    when(userRepository.findById(newUserId)).thenReturn(Optional.of(user(newUserId, "lead")));
-    when(positionRepository.existsByOrgUnitIdAndUserId(squadron.getId(), newUserId))
-        .thenReturn(false);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     OrgChartPositionDto dto =
         service()
-            .updatePosition(id, new OrgChartPositionUpdateRequest(newUserId, null, null, 0L, null));
+            .updatePosition(id, new OrgChartPositionUpdateRequest(null, null, null, 0L, "Max"));
 
-    assertEquals(newUserId, dto.userId());
+    assertEquals("Max", dto.displayName());
   }
 
   @Test
-  void updatePosition_renameCommand_persists() {
+  void updatePosition_renameLeaderlessCommand_persists() {
     UUID id = UUID.randomUUID();
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
-    OrgChartPosition kommando = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null);
+    OrgChartPosition kommando = pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, null);
     kommando.setId(id);
     kommando.setVersion(0L);
     when(positionRepository.findById(id)).thenReturn(Optional.of(kommando));
@@ -1082,7 +1122,8 @@ class OrgChartServiceTest {
   @Test
   void updatePosition_nameOnNonCommandRank_isRejected() {
     UUID id = UUID.randomUUID();
-    OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null);
+    OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
+    position.setDisplayName("Free Text");
     position.setId(id);
     position.setVersion(0L);
     when(positionRepository.findById(id)).thenReturn(Optional.of(position));
@@ -1163,9 +1204,9 @@ class OrgChartServiceTest {
   }
 
   @Test
-  void updatePosition_replaceFreeTextWithAccount_clearsDisplayName() {
-    // The headline no-regression swap: a free-text member finally gets an account. The seat keeps
-    // its place in the tree (sortIndex) and the typed name is cleared in the same transaction.
+  void updatePosition_replaceFreeTextWithAccount_isRejected() {
+    // The free-text -> account swap moved to Leitung (REQ-ROLE-006); the chart no longer assigns an
+    // account, so a free-text holder is never swapped for an account here.
     UUID id = UUID.randomUUID();
     UUID newUserId = UUID.randomUUID();
     OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
@@ -1174,35 +1215,17 @@ class OrgChartServiceTest {
     position.setVersion(0L);
     position.setSortIndex(7);
     when(positionRepository.findById(id)).thenReturn(Optional.of(position));
-    when(userRepository.findById(newUserId)).thenReturn(Optional.of(user(newUserId, "max")));
-    when(positionRepository.existsByOrgUnitIsNullAndUserId(newUserId)).thenReturn(false);
-    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    OrgChartPositionDto dto =
-        service()
-            .updatePosition(id, new OrgChartPositionUpdateRequest(newUserId, null, null, 0L, null));
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service()
+                    .updatePosition(
+                        id, new OrgChartPositionUpdateRequest(newUserId, null, null, 0L, null)));
 
-    assertEquals(newUserId, dto.userId(), "the account now holds the seat");
-    assertNull(dto.displayName(), "the free-text name is cleared by the swap");
-    assertEquals(7, dto.sortIndex(), "the position keeps its place in the tree");
-  }
-
-  @Test
-  void updatePosition_setFreeTextName_clearsAccount() {
-    UUID id = UUID.randomUUID();
-    OrgChartPosition position =
-        pos(OrgChartPositionType.AREA_COORDINATOR, null, null, user(UUID.randomUUID(), "old"));
-    position.setId(id);
-    position.setVersion(0L);
-    when(positionRepository.findById(id)).thenReturn(Optional.of(position));
-    when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-    OrgChartPositionDto dto =
-        service()
-            .updatePosition(id, new OrgChartPositionUpdateRequest(null, null, null, 0L, "  Max  "));
-
-    assertNull(dto.userId(), "the account holder is replaced by the typed name");
-    assertEquals("Max", dto.displayName());
+    assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
+    verify(positionRepository, never()).save(any());
   }
 
   @Test
@@ -1266,21 +1289,41 @@ class OrgChartServiceTest {
                     .updatePosition(
                         id, new OrgChartPositionUpdateRequest(userId, null, null, 0L, "Max")));
 
-    assertTrue(ex.getMessage().contains("holder_ambiguous"));
+    // A userId on a chart update is now rejected outright (account assignment moved to Leitung),
+    // before the holder-ambiguity check is even reached.
+    assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
     verify(positionRepository, never()).save(any());
     verify(userRepository, never()).findById(any());
   }
 
   @Test
   void deletePosition_present_deletes() {
+    // A leaderless / free-text position (no account, no group link) stays removable from the chart.
     UUID id = UUID.randomUUID();
-    OrgChartPosition position = pos(OrgChartPositionType.COMMAND_LEAD, null, null);
+    OrgChartPosition position = pos(OrgChartPositionType.COMMAND_LEAD, null, null, null);
     position.setId(id);
     when(positionRepository.findById(id)).thenReturn(Optional.of(position));
 
     service().deletePosition(id);
 
     verify(positionRepository).delete(position);
+  }
+
+  @Test
+  void deletePosition_accountHeld_isRejected() {
+    // A mirror-managed seat (account holder) is removed by clearing the rank under Leitung, not
+    // here.
+    UUID id = UUID.randomUUID();
+    OrgChartPosition position =
+        pos(OrgChartPositionType.BEREICHSKOORDINATOR, null, null, user(UUID.randomUUID(), "acct"));
+    position.setId(id);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(position));
+
+    BadRequestException ex =
+        assertThrows(BadRequestException.class, () -> service().deletePosition(id));
+
+    assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
+    verify(positionRepository, never()).delete(any());
   }
 
   @Test
@@ -1351,6 +1394,26 @@ class OrgChartServiceTest {
     when(positionRepository.findById(id)).thenReturn(Optional.empty());
 
     assertThrows(NotFoundException.class, () -> service().vacateCommandLeader(id, 0L));
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
+  void vacateCommandLeader_groupLinked_isRejected() {
+    // A kommando_group-linked Kommando mirrors a functional rank — its Kommandoleiter is vacated by
+    // removing the rank under Leitung (REQ-ROLE-006), not from the chart.
+    UUID id = UUID.randomUUID();
+    Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
+    OrgChartPosition kommando =
+        pos(OrgChartPositionType.COMMAND_LEAD, squadron, null, user(UUID.randomUUID(), "kl"));
+    kommando.setKommandoGroup(group(squadron, "Alpha", 0));
+    kommando.setId(id);
+    kommando.setVersion(2L);
+    when(positionRepository.findById(id)).thenReturn(Optional.of(kommando));
+
+    BadRequestException ex =
+        assertThrows(BadRequestException.class, () -> service().vacateCommandLeader(id, 2L));
+
+    assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
     verify(positionRepository, never()).save(any());
   }
 

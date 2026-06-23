@@ -20,23 +20,16 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -69,28 +62,26 @@ public class OrgChartPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the org-chart page. Loads the assembled chart for everyone; additionally preloads the
-   * user-lookup list for admins so the inline editor's assign picker has its options without a
-   * second round-trip. Non-admins get an empty {@code allUsers} list (they never see the editor).
+   * Renders the org-chart page (read-only for everyone; admins edit free-text holders inline).
+   * Since epic #800 (REQ-ROLE-006) account-linked seats are a mirror of the functional ranks
+   * appointed under Organisation → Leitung, so the chart editor no longer offers an account picker
+   * and the page needs no user-lookup preload.
    *
    * <p>When {@code fragment=chartBody} the controller returns only the {@code chartBody} fragment
    * so the page re-renders the whole tree in place after an edit instead of a full reload (epic
    * #571 / REQ-FE-005). The chart is a flat, CSS-connected pre-order tree whose add affordances and
    * vacant/filled transitions are derived aggregate state, so a per-node DOM patch would desync the
    * "+" buttons and the ARIA roving-tabindex order — a full fragment swap re-stamps every {@code
-   * data-version} and rebuilds the tree atomically. The assign picker's {@code allUsers} list lives
-   * in the modal (outside the swapped region), so the fragment path skips that lookup.
+   * data-version} and rebuilds the tree atomically.
    *
    * @param fragment when {@code "chartBody"}, only the chart-body fragment is rendered for an
    *     in-place AJAX swap; otherwise the full page.
-   * @param model Thymeleaf model populated with {@code orgChart} and {@code allUsers}.
-   * @param authentication the current authentication, used to decide whether to preload the picker.
+   * @param model Thymeleaf model populated with {@code orgChart}.
    * @return the {@code org-chart} view name, or its {@code chartBody} selector for the fragment
    *     path.
    */
   @GetMapping
-  public String orgChart(
-      @RequestParam(required = false) String fragment, Model model, Authentication authentication) {
+  public String orgChart(@RequestParam(required = false) String fragment, Model model) {
     try {
       model.addAttribute("orgChart", backendApiClient.get("/api/v1/org-chart", OrgChartDto.class));
     } catch (Exception e) {
@@ -100,7 +91,6 @@ public class OrgChartPageController {
     if ("chartBody".equals(fragment)) {
       return "org-chart :: chartBody";
     }
-    model.addAttribute("allUsers", isAdmin(authentication) ? fetchUserLookup() : List.of());
     return "org-chart";
   }
 
@@ -193,12 +183,6 @@ public class OrgChartPageController {
     }
   }
 
-  private static boolean isAdmin(Authentication authentication) {
-    return authentication != null
-        && authentication.getAuthorities().stream()
-            .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
-  }
-
   private ResponseEntity<Object> relayError(String logMessage, BackendServiceException e) {
     log.warn("{}: status={}, code={}", logMessage, e.getStatusCode(), e.getProblemCode());
     Map<String, Object> payload = new HashMap<>();
@@ -213,66 +197,5 @@ public class OrgChartPageController {
     Map<String, Object> payload = new HashMap<>();
     payload.put("code", "INTERNAL_ERROR");
     return ResponseEntity.status(500).body(payload);
-  }
-
-  /**
-   * Fetches the slim user-lookup list from the backend for the assign picker, sorted
-   * case-insensitively by effective name. Mirrors the parsing path in {@link
-   * AdminSpecialCommandsPageController}.
-   *
-   * @return the users; never {@code null}, possibly empty.
-   */
-  private List<UserReferenceDto> fetchUserLookup() {
-    List<Map<String, Object>> raw =
-        backendApiClient.get(
-            "/api/v1/users/lookup", new ParameterizedTypeReference<List<Map<String, Object>>>() {});
-    if (raw == null) {
-      return List.of();
-    }
-    List<UserReferenceDto> users =
-        raw.stream()
-            .map(
-                m ->
-                    new UserReferenceDto(
-                        parseUuid(m.get("id")),
-                        parseString(m.get("username")),
-                        parseString(m.get("displayName")),
-                        parseString(m.get("effectiveName")),
-                        parseInt(m.get("rank"))))
-            .collect(Collectors.toCollection(ArrayList::new));
-    users.sort(
-        Comparator.comparing(
-            u -> u.effectiveName() == null ? "" : u.effectiveName(),
-            String.CASE_INSENSITIVE_ORDER));
-    return users;
-  }
-
-  private static String parseString(Object o) {
-    return o == null ? null : String.valueOf(o);
-  }
-
-  private static UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(String.valueOf(o));
-    } catch (IllegalArgumentException ignored) {
-      return null;
-    }
-  }
-
-  private static Integer parseInt(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Number n) {
-      return n.intValue();
-    }
-    try {
-      return Integer.parseInt(String.valueOf(o));
-    } catch (NumberFormatException ignored) {
-      return null;
-    }
   }
 }

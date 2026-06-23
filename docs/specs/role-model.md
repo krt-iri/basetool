@@ -148,6 +148,13 @@ the stellv. Kommandoleiter / Ensigns hang off it. A Kommandogruppe create / rena
 the leaderless node, and revoking a rank vacates a led Kommando (keeping the node, REQ-ORG-011) or
 removes the other seats. Legacy admin-authored Kommandos (no `kommando_group_id`) stay chart-only.
 
+The mirror is the **single writer** of account-linked chart seats: the chart editor itself is
+account-free — its write API rejects setting an account holder, and editing / vacating / deleting a
+mirror-managed seat (account-held or `kommando_group`-linked), with
+`problem.org_chart.account_managed_in_leitung`. So an admin can no longer manually set an
+account-linked seat on the chart (no drift); only free-text holders stay editable there
+(org-chart.md REQ-ORG-010 / -011 / -020 amendments).
+
 **Acceptance**
 
 - [x] Granting / revoking a rank updates the account-linked chart seat in the same transaction; the

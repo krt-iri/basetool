@@ -42,8 +42,17 @@ rename / vacate / remove) is gated to `ROLE_ADMIN` at the controller.
 - [ ] Every write endpoint under `/api/v1/org-chart/positions` requires `ROLE_ADMIN`.
 
 **Enforced by:** `OrgChartControllerTest`, `SecurityTest`, and the e2e spec
-`OrgChartPositionCrudE2eTest` (drives create / rename / assign / reassign / vacate / remove through
+`OrgChartPositionCrudE2eTest` (drives create / rename / vacate / remove of free-text holders through
 the inline editor as an admin) · **Code:** `OrgChartController` · **Issues:** —
+
+> **Amended by epic #800 (REQ-ROLE-006):** account-linked seats are no longer ADMIN-edited here —
+> they are a mirror of the functional ranks, written only by `OrgChartService.mirror*` from the
+> Leitung appointment flow. The chart write API now **rejects** setting an account holder (a
+> `userId` on create / update) and any edit / vacate / delete of a mirror-managed seat (account-held
+> or `kommando_group`-linked) with `problem.org_chart.account_managed_in_leitung`. The inline editor
+> therefore edits **free-text holders + structure only** (no account picker); account seats render
+> read-only with a "managed under Leitung" marker. The `OrgChartPositionCrudE2eTest` account-assign
+> path is retired with this change (free-text CRUD remains).
 
 ### REQ-ORG-011 — A Kommando(gruppe) carries an independently fillable *and* vacatable Kommandoleiter
 
@@ -71,6 +80,12 @@ person-centric position is REQ-ORG-012 instead.
 `OrgChartPositionCrudE2eTest#createsAssignsVacatesAndRemovesACommandLeader` (drives assign → vacate
 through the UI and asserts the Kommandogruppe survives) · **Code:**
 `OrgChartService#vacateCommandLeader`, `OrgChartController#vacateCommandLeader` · **Issues:** —
+
+> **Amended by epic #800 (REQ-ROLE-006):** vacating applies only to a chart-only (free-text / legacy)
+> Kommando. A `kommando_group`-linked Kommando mirrors a functional rank, so vacating its
+> Kommandoleiter (and removing the Kommando) happens under Organisation → Leitung; the chart's
+> `vacateCommandLeader` / `deletePosition` reject a mirror-managed node with
+> `problem.org_chart.account_managed_in_leitung`.
 
 ### REQ-ORG-012 — Removing a Kommando cascades; vacating its leader does not
 
@@ -227,9 +242,16 @@ descriptive label).
 `freeTextCommandLeader_admin_rendersTypedNameAndNoAccountMarker_notVacant`), migration `V171`
 (`display_name` + `chk_org_chart_holder` + widened `chk_org_chart_user`) · **Code:**
 `OrgChartService#createPosition`/`#updatePosition`/`#vacateCommandLeader`,
-`OrgChartPosition#displayName`, `org-chart.html` (holder-mode modal),
+`OrgChartPosition#displayName`, `org-chart.html` (free-text holder modal),
 `fragments/org-chart-node.html` (`ocNode` free-text branch + inline Kommandoleiter branch) ·
 **Issues:** —
+
+> **Amended by epic #800 (REQ-ROLE-006):** the free-text ⇄ account swap is removed — the chart
+> editor sets **only** a free-text holder, and the backend rejects a `userId` on create / update
+> with `problem.org_chart.account_managed_in_leitung`. A member who gets a Basetool account is given
+> their rank under Organisation → Leitung, which mirrors the account-linked seat into the chart (the
+> free-text placeholder is no longer swapped in place by an admin). Free-text holders (members
+> without an account) remain fully editable here and still grant nothing.
 
 ## Out of scope
 

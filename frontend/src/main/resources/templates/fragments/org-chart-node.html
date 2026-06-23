@@ -25,7 +25,9 @@
     <span class="oc-node-name" th:text="${nm}">Name</span>
     <span class="oc-node-flag" th:if="${freeText}" th:text="${noAcc}"
           th:title="#{orgChart.noAccount.hint}">Kein Account</span>
-    <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+    <!-- Account-held seats mirror a functional rank (epic #800, REQ-ROLE-006) and are read-only
+         here — managed under Organisation -> Leitung. Only free-text holders keep edit/remove. -->
+    <div class="oc-actions" sec:authorize="hasRole('ADMIN')" th:if="${node.userId() == null}">
         <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                 th:data-position-id="${node.positionId()}"
                 th:data-version="${node.version()}"
@@ -46,6 +48,8 @@
             </svg>
         </button>
     </div>
+    <span class="oc-node-managed" sec:authorize="hasRole('ADMIN')" th:if="${node.userId() != null}"
+          th:text="#{orgChart.managedInLeitung}" th:title="#{orgChart.managedInLeitung.hint}">Leitung</span>
 </div>
 
 <!--
@@ -209,7 +213,10 @@
                                 <span class="oc-node-name" th:text="${cmdNm}">Name</span>
                                 <span class="oc-node-flag" th:if="${cmdFreeText}" th:text="${cmdNoAcc}"
                                       th:title="#{orgChart.noAccount.hint}">Kein Account</span>
-                                <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+                                <!-- An account Kommandoleiter mirrors a functional rank (REQ-ROLE-006)
+                                     and is read-only here; only a free-text leader stays editable. -->
+                                <div class="oc-actions" sec:authorize="hasRole('ADMIN')"
+                                     th:if="${cmd.leaderUserId() == null}">
                                     <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                                             th:data-position-id="${cmd.positionId()}"
                                             th:data-version="${cmd.version()}"
@@ -231,6 +238,10 @@
                                         </svg>
                                     </button>
                                 </div>
+                                <span class="oc-node-managed" sec:authorize="hasRole('ADMIN')"
+                                      th:if="${cmd.leaderUserId() != null}"
+                                      th:text="#{orgChart.managedInLeitung}"
+                                      th:title="#{orgChart.managedInLeitung.hint}">Leitung</span>
                             </div>
                         </th:block>
                         <div th:if="${cmd.leaderUserId() == null and cmd.leaderDisplayName() == null}"

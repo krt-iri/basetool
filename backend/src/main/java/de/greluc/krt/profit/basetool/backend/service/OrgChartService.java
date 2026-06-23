@@ -123,6 +123,7 @@ public class OrgChartService {
   private static final String ERR_HOLDER_AMBIGUOUS = "problem.org_chart.holder_ambiguous";
   private static final String ERR_NAME_NOT_ALLOWED = "problem.org_chart.name_not_allowed";
   private static final String ERR_VACATE_NOT_COMMAND = "problem.org_chart.vacate_not_command";
+  private static final String ERR_ACCOUNT_MANAGED = "problem.org_chart.account_managed_in_leitung";
 
   private final OrgChartPositionRepository positionRepository;
   private final OrgUnitRepository orgUnitRepository;
@@ -305,6 +306,14 @@ public class OrgChartService {
     if (user != null) {
       validateUserUnique(scope, orgUnit, request.userId());
     }
+    // Account-linked seats are a mirror of the functional ranks (epic #800, REQ-ROLE-006): the
+    // chart editor may only place a free-text holder or leave a Kommando leaderless — an account is
+    // appointed under Organisation -> Leitung and projected here by OrgChartService.mirror*. The
+    // create is still fully validated above (scope / parent / cardinality / uniqueness) so a
+    // free-text create hits the same guards; only the account-holder persist is refused.
+    if (user != null) {
+      throw new BadRequestException(ERR_ACCOUNT_MANAGED);
+    }
 
     OrgChartPosition position = new OrgChartPosition();
     position.setPositionType(type);
@@ -354,6 +363,13 @@ public class OrgChartService {
             .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
     if (position.getVersion() != null && !position.getVersion().equals(request.version())) {
       throw new ObjectOptimisticLockingFailureException(OrgChartPosition.class, id);
+    }
+    // The chart editor may not assign an account, nor touch a seat the rank mirror manages — an
+    // account-held or kommando_group-linked position reflects the functional ranks and is edited
+    // under Organisation -> Leitung (epic #800, REQ-ROLE-006). Free-text holders and leaderless /
+    // legacy Kommandos stay editable here.
+    if (request.userId() != null || isMirrorManaged(position)) {
+      throw new BadRequestException(ERR_ACCOUNT_MANAGED);
     }
     // Symmetric with createPosition: a position is held by an account OR a free-text name, never
     // both, so a single update may not set both at once. A bare userId still clears any existing
@@ -429,6 +445,11 @@ public class OrgChartService {
     if (position.getVersion() != null && !position.getVersion().equals(version)) {
       throw new ObjectOptimisticLockingFailureException(OrgChartPosition.class, id);
     }
+    // A kommando_group-linked Kommando mirrors a functional rank — its Kommandoleiter is vacated by
+    // removing the rank under Organisation -> Leitung (epic #800, REQ-ROLE-006), not here.
+    if (position.getKommandoGroup() != null) {
+      throw new BadRequestException(ERR_ACCOUNT_MANAGED);
+    }
     // A vacated Kommando is fully empty: drop both an account and any free-text leader name.
     position.setUser(null);
     position.setDisplayName(null);
@@ -450,7 +471,27 @@ public class OrgChartService {
         positionRepository
             .findById(id)
             .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
+    // A mirror-managed seat (account-held, or a kommando_group-linked Kommando) reflects a
+    // functional rank — it is removed by clearing the rank / deleting the Kommandogruppe under
+    // Organisation -> Leitung (epic #800, REQ-ROLE-006), not from the chart. Free-text holders and
+    // leaderless / legacy positions stay removable here.
+    if (isMirrorManaged(position)) {
+      throw new BadRequestException(ERR_ACCOUNT_MANAGED);
+    }
     positionRepository.delete(position);
+  }
+
+  /**
+   * Whether the position is managed by the rank mirror (epic #800, REQ-ROLE-006) and therefore
+   * read-only in the chart editor: an account-held seat (its holder is a Basetool account,
+   * projected from a functional rank) or a kommando_group-linked Kommando node. Free-text holders
+   * and leaderless / legacy positions (no account, no group link) are not mirror-managed.
+   *
+   * @param position the position to classify; never {@code null}.
+   * @return {@code true} iff the chart editor must not mutate the position.
+   */
+  private static boolean isMirrorManaged(@NotNull OrgChartPosition position) {
+    return position.getUser() != null || position.getKommandoGroup() != null;
   }
 
   // ------------------------------------------------- role-model mirror (REQ-ROLE-006) --
