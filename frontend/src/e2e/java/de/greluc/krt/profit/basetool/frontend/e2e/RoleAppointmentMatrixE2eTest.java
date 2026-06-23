@@ -71,7 +71,7 @@ class RoleAppointmentMatrixE2eTest {
   private static final String MEMBER_USER = "test-member";
   private static final String MEMBER_PASSWORD = "test-member-pw";
 
-  /** The canonical seeded squadron, which has no Bereich parent (so it is "foreign" to any BL). */
+  /** The canonical seeded squadron, used as the target of the squadron-rank endpoint. */
   private static final String IRIDIUM_SQUADRON_ID = "00000000-0000-0000-0000-000000000001";
 
   private static BackendSeeder seeder;
@@ -139,7 +139,10 @@ class RoleAppointmentMatrixE2eTest {
    * Squadron-rank gate denial: a plain Staffel member holds no rung on the squadron-rank endpoint
    * either (they are neither the parent Bereichsleiter for a Staffelleiter appointment nor the
    * squadron's Staffelleiter for a Kommando rank), so the delegated gate denies with 403 — a
-   * topology-independent denial that does not depend on which Bereich a squadron sits under.
+   * topology-independent denial that does not depend on which Bereich a squadron sits under. The
+   * body carries a {@code version} because {@code AssignSquadronRankRequest} requires it
+   * ({@code @NotNull}); any value reaches the {@code @PreAuthorize} gate, which denies before the
+   * service (and thus before the optimistic-lock check) ever runs.
    */
   @Test
   void plainMemberCannotAssignSquadronRank() {
@@ -148,7 +151,7 @@ class RoleAppointmentMatrixE2eTest {
             MEMBER_USER,
             MEMBER_PASSWORD,
             "/api/v1/squadrons/" + IRIDIUM_SQUADRON_ID + "/ranks/" + tgtUserId,
-            "{\"role\":\"STAFFELLEITER\"}");
+            "{\"role\":\"STAFFELLEITER\",\"version\":0}");
     assertEquals(403, status, "a plain Staffel member must not assign a squadron leadership rank");
   }
 
