@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -79,6 +81,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private InventoryOrgUnitReconciler inventoryReconciler;
+  @Mock private AuditService auditService;
 
   @InjectMocks private OrgUnitMembershipService membershipService;
 
@@ -146,6 +149,8 @@ class OrgUnitMembershipServiceTest {
     assertEquals(userId, saved.getId().getUserId());
     assertEquals(scId, saved.getId().getOrgUnitId());
     verify(membershipRepository).save(any(OrgUnitMembership.class));
+    verify(auditService)
+        .record(eq(AuditEventType.MEMBERSHIP_GRANTED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -215,6 +220,8 @@ class OrgUnitMembershipServiceTest {
     membershipService.removeMember(scId, userId);
 
     verify(membershipRepository).deleteById(id);
+    verify(auditService)
+        .record(eq(AuditEventType.MEMBERSHIP_REVOKED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -265,6 +272,8 @@ class OrgUnitMembershipServiceTest {
 
     assertTrue(updated.isLogistician());
     assertTrue(updated.isMissionManager());
+    verify(auditService)
+        .record(eq(AuditEventType.CAPABILITY_FLAGS_CHANGED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -323,6 +332,8 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
     assertTrue(updated.isLead());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -338,6 +349,8 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
     assertFalse(updated.isLead());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_REVOKED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -413,6 +426,34 @@ class OrgUnitMembershipServiceTest {
     assertTrue(m.isBereichskoordinator());
     assertFalse(m.isBereichsleiter());
     assertFalse(m.isBereichsoperator());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(bereichId), any(), eq(userId), any());
+  }
+
+  @Test
+  void addBereichLeader_existingRank_recordsRoleChanged() {
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    OrgUnitMembership existing = new OrgUnitMembership();
+    existing.setId(new OrgUnitMembershipId(userId, bereichId));
+    existing.setKind(OrgUnitKind.BEREICH);
+    existing.setBereichsleiter(true);
+    existing.setRole(MembershipRole.BEREICHSLEITER);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
+        .thenReturn(Optional.of(existing));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
+
+    // An existing leadership rank changed (BEREICHSLEITER -> BEREICHSKOORDINATOR) records CHANGED.
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_CHANGED), eq(bereichId), any(), eq(userId), any());
   }
 
   @Test
@@ -429,6 +470,8 @@ class OrgUnitMembershipServiceTest {
         BadRequestException.class,
         () -> membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.LEITER));
     verify(membershipRepository, never()).saveAndFlush(any());
+    // A rejected assignment must not write an audit event.
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -461,6 +504,8 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership m = membershipService.addOlMember(olId, userId);
 
     assertTrue(m.isOlMember());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(olId), any(), eq(userId), any());
   }
 
   @Test

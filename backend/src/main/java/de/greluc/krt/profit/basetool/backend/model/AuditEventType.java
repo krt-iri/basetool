@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Classifies an {@link AuditEvent} row across the four audited areas (REQ-AUDIT-001). Each constant
+ * Classifies an {@link AuditEvent} row across the audited areas (REQ-AUDIT-001). Each constant
  * carries the {@link AuditDomain} it belongs to, so the persisted {@code domain} column and the
  * event type can never disagree and the admin viewer's per-tab event filter is derived from the
  * enum itself. Like {@link BankAuditEventType} this is the source of truth and is deliberately NOT
@@ -286,7 +286,32 @@ public enum AuditEventType {
   OPERATION_AUDIT_EXPORTED(AuditDomain.OPERATION),
 
   /** Operation audit rows older than an admin-chosen cutoff were purged (retention). */
-  OPERATION_AUDIT_PURGED(AuditDomain.OPERATION);
+  OPERATION_AUDIT_PURGED(AuditDomain.OPERATION),
+
+  // -------------------------------------------------------- ROLE (Rollen & Mitglieder) --
+  /** A user was added as a member of an org unit (Staffel / Spezialkommando). */
+  MEMBERSHIP_GRANTED(AuditDomain.ROLE),
+
+  /** A user's membership of an org unit was removed (incl. a Staffel move's old row). */
+  MEMBERSHIP_REVOKED(AuditDomain.ROLE),
+
+  /** A leadership rank was assigned to a membership that previously held none. */
+  ROLE_GRANTED(AuditDomain.ROLE),
+
+  /** A membership's existing leadership rank was changed to a different rank. */
+  ROLE_CHANGED(AuditDomain.ROLE),
+
+  /** A membership's leadership rank was revoked (back to a plain member, or the row deleted). */
+  ROLE_REVOKED(AuditDomain.ROLE),
+
+  /** The Logistician / Mission-Manager capability flags on a membership were changed. */
+  CAPABILITY_FLAGS_CHANGED(AuditDomain.ROLE),
+
+  /** The role &amp; membership audit log was exported as a PDF or JSON for a period. */
+  ROLE_AUDIT_EXPORTED(AuditDomain.ROLE),
+
+  /** Role &amp; membership audit rows older than an admin-chosen cutoff were purged (retention). */
+  ROLE_AUDIT_PURGED(AuditDomain.ROLE);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final AuditDomain domain;

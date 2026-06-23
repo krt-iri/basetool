@@ -1,6 +1,6 @@
 # Activity audit logs — Lager, Aufträge, Raffinerie, Mein Inventar
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-23.
 
 Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-BANK-012),
 [`observability.md`](observability.md) (the log-stream PII rule), [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -8,14 +8,14 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 ## Context
 
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
-guarantee is extended to six more areas — **Lagerverwaltung** (`InventoryItem`),
+guarantee is extended to seven more areas — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
-Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`) and **Operationen** (`Operation`).
-Every activity in each area is captured into a separate, admin-only log; all seven logs (the six
-here plus the bank's) are read on one page with a tab switcher, and each can be exported as a PDF or
-JSON for a chosen period.
+Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`) and
+**Rollen & Mitglieder** (`org_unit_membership`, epic #800). Every activity in each area is captured
+into a separate, admin-only log; all eight logs (the seven here plus the bank's) are read on one page
+with a tab switcher, and each can be exported as a PDF or JSON for a chosen period.
 
-The six new areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
+The seven new areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
 bank keeps its own `bank_audit_event` table (it has bank-specific reference columns and shipped
 first). The storage choice and the unified-viewer architecture are recorded in
 [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -24,7 +24,7 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
-Every state-mutating activity in the six areas writes exactly **one** row to an **append-only**
+Every state-mutating activity in the seven areas writes exactly **one** row to an **append-only**
 audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated; the
 sole deletion path is the explicit admin retention purge, REQ-AUDIT-004) **in the same transaction
 as the business write**. An audit-insert failure rolls the mutation back, so the trail has **no
@@ -54,6 +54,13 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   never written to the details payload — only ids and the non-personal mission name snapshot.
 - **Operationen** — create / edit (incl. status change) / delete (missions are unlinked, not
   deleted); per-participant payout toggle.
+- **Rollen & Mitglieder** (`org_unit_membership`, epic #800) — every org-unit membership / role
+  mutation: membership grant + revoke (SK join/leave, Staffel assign/move/remove);
+  leadership-rank grant / change / revoke (Bereichsleitung, OL, SK-Lead and, from Phase 3, the
+  squadron ranks); and Logistician / Mission-Manager capability-flag changes. The subject is the
+  org unit (its shorthand/name snapshot), the affected user is the target reference; the details
+  payload carries only the rank/kind enum names and the two flag booleans — never a user handle or
+  free text.
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User
@@ -84,10 +91,10 @@ per-domain emission assertions in the service tests · **Code:** `service/AuditS
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
-All seven logs are read on **one** admin page (`/admin/audit-log`) with a **seven-way tab switcher**
-(Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen) built from the
-design-system `.tab-nav` component. The bank tab reads the existing `/api/v1/bank/admin/audit`
-endpoint; the six area tabs read `/api/v1/audit/{domain}`; both DTO shapes are adapted into one
+All eight logs are read on **one** admin page (`/admin/audit-log`) with an **eight-way tab switcher**
+(Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen · Rollen) built from
+the design-system `.tab-nav` component. The bank tab reads the existing `/api/v1/bank/admin/audit`
+endpoint; the seven area tabs read `/api/v1/audit/{domain}`; both DTO shapes are adapted into one
 uniform row view so a single
 template renders every tab. Each tab is paginated and filterable by **period** (the
 `datetime-split-group` picker), **actor** and **event type** (the per-area type list). Filtering and
@@ -96,7 +103,7 @@ redirects here with the bank tab preselected.
 
 **Acceptance**
 
-- [ ] An admin sees seven tabs; switching a tab loads that area's log; filtering/paging stays in place.
+- [ ] An admin sees eight tabs; switching a tab loads that area's log; filtering/paging stays in place.
 - [ ] `/admin/bank-audit` redirects to `/admin/audit-log?domain=BANK`.
 
 **Enforced by:** `AdminAuditLogPageControllerTest`, `AuditLogE2eTest` · **Code:**

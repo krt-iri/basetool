@@ -175,6 +175,7 @@ public class AuditReportService {
       case PERSONAL_INVENTORY -> AuditEventType.PERSONAL_INVENTORY_AUDIT_EXPORTED;
       case MISSION -> AuditEventType.MISSION_AUDIT_EXPORTED;
       case OPERATION -> AuditEventType.OPERATION_AUDIT_EXPORTED;
+      case ROLE -> AuditEventType.ROLE_AUDIT_EXPORTED;
     };
   }
 

@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 /**
  * The functional area an {@link AuditEvent} belongs to (REQ-AUDIT-001). The shared {@code
- * audit_event} table is one physical store; this discriminator keeps the four logs
+ * audit_event} table is one physical store; this discriminator keeps the per-area logs
  * <em>logically</em> separate so the admin viewer can switch between them and each can be exported
  * on its own (ADR-0037). The bank audit trail is deliberately <strong>not</strong> a value here —
- * it keeps its own {@code bank_audit_event} table and is surfaced on the same page as a fifth tab.
+ * it keeps its own {@code bank_audit_event} table and is surfaced on the same page as its own tab.
  */
 public enum AuditDomain {
 
@@ -46,5 +46,13 @@ public enum AuditDomain {
   MISSION,
 
   /** Operations — the {@code Operation} aggregate and its payout toggles (Operationen). */
-  OPERATION
+  OPERATION,
+
+  /**
+   * Org-unit role &amp; membership management — the {@code org_unit_membership} aggregate (epic
+   * #800): who is a member of which org unit, the leadership ranks granted/changed/revoked
+   * (Bereichsleitung, OL, SK-Lead and, from Phase 3, the squadron ranks) and the Logistician /
+   * Mission-Manager capability flags (Rollen &amp; Mitglieder).
+   */
+  ROLE
 }

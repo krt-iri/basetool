@@ -23,6 +23,11 @@ shipped: the additive rank column + Kommandogruppe, and the authorisation layer 
 with the squadron-rank baseline grant; Phases 3–5 wire delegated assignment, UI and the destructive
 cleanup).
 
+Every role and membership mutation (assign / change / revoke a rank, grant / revoke a membership,
+toggle the Logistician / Mission-Manager capability flags) is recorded in a dedicated **`ROLE`
+activity audit log** — the "Rollen & Mitglieder" tab of the unified admin viewer — per
+[`audit.md`](audit.md) (REQ-AUDIT-001).
+
 ## Requirements
 
 ### REQ-ROLE-001 — Unified membership rank enum

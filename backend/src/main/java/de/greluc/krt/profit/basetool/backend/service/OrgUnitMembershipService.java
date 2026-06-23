@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -84,6 +85,7 @@ public class OrgUnitMembershipService {
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
   private final InventoryOrgUnitReconciler inventoryReconciler;
+  private final AuditService auditService;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
@@ -342,6 +344,12 @@ public class OrgUnitMembershipService {
     if (wasMembershipless) {
       inventoryReconciler.onUserGainedFirstOrgUnit(userId, sc);
     }
+    auditService.record(
+        AuditEventType.MEMBERSHIP_GRANTED,
+        sc.getId(),
+        orgUnitLabel(sc),
+        userId,
+        "kind=SPECIAL_COMMAND");
     return saved;
   }
 
@@ -369,6 +377,12 @@ public class OrgUnitMembershipService {
     if (membershipRepository.countByIdUserId(userId) == 0) {
       inventoryReconciler.onUserLostLastOrgUnit(userId);
     }
+    auditService.record(
+        AuditEventType.MEMBERSHIP_REVOKED,
+        sc.getId(),
+        orgUnitLabel(sc),
+        userId,
+        "kind=SPECIAL_COMMAND");
   }
 
   /**
@@ -408,6 +422,7 @@ public class OrgUnitMembershipService {
     }
     OrgUnitMembership m =
         membershipRepository.findById(new OrgUnitMembershipId(userId, bereichId)).orElse(null);
+    final MembershipRole previousRole = m != null ? m.getRole() : null;
     if (m == null) {
       m = new OrgUnitMembership();
       m.setId(new OrgUnitMembershipId(userId, bereichId));
@@ -432,7 +447,15 @@ public class OrgUnitMembershipService {
     // an explicit flush the @Version increment would land after the controller maps the response
     // and the caller would get a stale version. Flushing also surfaces the V165 trigger as a clean
     // in-transaction failure rather than at commit.
-    return membershipRepository.saveAndFlush(m);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
+    auditService.record(
+        firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
+        bereich.getId(),
+        orgUnitLabel(bereich),
+        userId,
+        firstGrant ? "role=" + saved.getRole() : "from=" + previousRole + " to=" + saved.getRole());
+    return saved;
   }
 
   /**
@@ -445,10 +468,18 @@ public class OrgUnitMembershipService {
   @Transactional
   public void removeBereichLeader(@NotNull UUID bereichId, @NotNull UUID userId) {
     OrgUnitMembershipId id = new OrgUnitMembershipId(userId, bereichId);
-    if (!membershipRepository.existsById(id)) {
-      throw new NotFoundException("Bereichsleitung membership not found");
-    }
-    membershipRepository.deleteById(id);
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("Bereichsleitung membership not found"));
+    final MembershipRole previousRole = m.getRole();
+    membershipRepository.delete(m);
+    auditService.record(
+        AuditEventType.ROLE_REVOKED,
+        bereichId,
+        orgUnitLabelById(bereichId),
+        userId,
+        "role=" + previousRole);
   }
 
   /**
@@ -494,7 +525,10 @@ public class OrgUnitMembershipService {
     // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
     // in-transaction failure and keeps the flushed @Version in the response under the
     // class-@Transactional controller.
-    return membershipRepository.saveAndFlush(m);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    auditService.record(
+        AuditEventType.ROLE_GRANTED, ol.getId(), orgUnitLabel(ol), userId, "role=OL_MEMBER");
+    return saved;
   }
 
   /**
@@ -507,10 +541,18 @@ public class OrgUnitMembershipService {
   @Transactional
   public void removeOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     OrgUnitMembershipId id = new OrgUnitMembershipId(userId, organisationsleitungId);
-    if (!membershipRepository.existsById(id)) {
-      throw new NotFoundException("Organisationsleitung membership not found");
-    }
-    membershipRepository.deleteById(id);
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("Organisationsleitung membership not found"));
+    final MembershipRole previousRole = m.getRole();
+    membershipRepository.delete(m);
+    auditService.record(
+        AuditEventType.ROLE_REVOKED,
+        organisationsleitungId,
+        orgUnitLabelById(organisationsleitungId),
+        userId,
+        "role=" + previousRole);
   }
 
   /**
@@ -539,7 +581,9 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    return membershipRepository.save(m);
+    OrgUnitMembership saved = membershipRepository.save(m);
+    recordCapabilityFlagsChanged(specialCommandId, userId, saved);
+    return saved;
   }
 
   /**
@@ -580,7 +624,14 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    return membershipRepository.save(m);
+    OrgUnitMembership saved = membershipRepository.save(m);
+    auditService.record(
+        AuditEventType.CAPABILITY_FLAGS_CHANGED,
+        squadron.getId(),
+        orgUnitLabel(squadron),
+        userId,
+        "logistician=" + saved.isLogistician() + " missionManager=" + saved.isMissionManager());
+    return saved;
   }
 
   /**
@@ -622,7 +673,8 @@ public class OrgUnitMembershipService {
     if (isMissionManager != null) {
       m.setMissionManager(isMissionManager);
     }
-    membershipRepository.saveAndFlush(m);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    recordCapabilityFlagsChanged(saved.getId().getOrgUnitId(), userId, saved);
   }
 
   /**
@@ -661,6 +713,9 @@ public class OrgUnitMembershipService {
     if (newSquadron == null) {
       if (!existing.isEmpty()) {
         membershipRepository.deleteAll(existing);
+        for (OrgUnitMembership removed : existing) {
+          recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
+        }
         // Removing the Staffel may have been the user's last org-unit membership (no SK left) →
         // demote their org-stamped inventory to ownerless-personal.
         if (membershipRepository.countByIdUserId(user.getId()) == 0) {
@@ -694,6 +749,9 @@ public class OrgUnitMembershipService {
     if (!stale.isEmpty()) {
       membershipRepository.deleteAll(stale);
       membershipRepository.flush();
+      for (OrgUnitMembership removed : stale) {
+        recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
+      }
     }
 
     if (!alreadyMember) {
@@ -705,6 +763,12 @@ public class OrgUnitMembershipService {
       // app_user.is_logistician / app_user.is_mission_manager columns are gone. Admins re-grant
       // the flags via the membership-PATCH endpoint after the Staffel switch.
       membershipRepository.save(fresh);
+      auditService.record(
+          AuditEventType.MEMBERSHIP_GRANTED,
+          newSquadron.getId(),
+          orgUnitLabel(newSquadron),
+          user.getId(),
+          "kind=SQUADRON");
 
       // If this Staffel was the user's first-ever org-unit membership, their ownerless-personal
       // inventory adopts it (the auto-promote lifecycle policy). A Staffel switch or a second
@@ -744,7 +808,14 @@ public class OrgUnitMembershipService {
     m.setLead(request.isLead());
     // Dual-write the unified rank (epic #800 Phase 1, REQ-ROLE-001) in lockstep with is_lead.
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
-    return membershipRepository.save(m);
+    OrgUnitMembership saved = membershipRepository.save(m);
+    auditService.record(
+        request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
+        specialCommandId,
+        orgUnitLabelById(specialCommandId),
+        userId,
+        "role=SK_LEAD");
+    return saved;
   }
 
   /**
@@ -850,5 +921,73 @@ public class OrgUnitMembershipService {
   private boolean userHoldsLeadershipRole(@NotNull UUID userId) {
     return membershipRepository.findAllByIdUserId(userId).stream()
         .anyMatch(m -> m.getRole() == MembershipRole.SK_LEAD || m.getRole().isAreaOrOl());
+  }
+
+  /**
+   * Records a {@link AuditEventType#MEMBERSHIP_REVOKED} event for a removed Staffel membership
+   * (epic #800, REQ-AUDIT-001). Extracted so the {@link #syncStaffelMembership} delete branches
+   * stay readable; the details payload carries only the org-unit kind (no PII).
+   *
+   * @param squadronOrgUnitId the Staffel the removed membership pointed at; never {@code null}.
+   * @param userId the user whose Staffel membership was removed; never {@code null}.
+   */
+  private void recordStaffelMembershipRevoked(
+      @NotNull UUID squadronOrgUnitId, @NotNull UUID userId) {
+    auditService.record(
+        AuditEventType.MEMBERSHIP_REVOKED,
+        squadronOrgUnitId,
+        orgUnitLabelById(squadronOrgUnitId),
+        userId,
+        "kind=SQUADRON");
+  }
+
+  /**
+   * Records a {@link AuditEventType#CAPABILITY_FLAGS_CHANGED} event capturing the resulting
+   * Logistician / Mission-Manager flag values on a membership (epic #800, REQ-AUDIT-001). The
+   * details payload holds only the two boolean values (no PII / no free text).
+   *
+   * @param orgUnitId the org unit the membership belongs to; never {@code null}.
+   * @param userId the affected user; never {@code null}.
+   * @param saved the persisted membership row whose flags were changed; never {@code null}.
+   */
+  private void recordCapabilityFlagsChanged(
+      @NotNull UUID orgUnitId, @NotNull UUID userId, @NotNull OrgUnitMembership saved) {
+    auditService.record(
+        AuditEventType.CAPABILITY_FLAGS_CHANGED,
+        orgUnitId,
+        orgUnitLabelById(orgUnitId),
+        userId,
+        "logistician=" + saved.isLogistician() + " missionManager=" + saved.isMissionManager());
+  }
+
+  /**
+   * Loads an org unit by id and resolves its audit {@code subjectLabel} via {@link
+   * #orgUnitLabel(OrgUnit)}, or {@code null} when the org unit cannot be resolved (e.g. already
+   * deleted). Used by the delete / patch audit paths that hold only the org-unit id.
+   *
+   * @param orgUnitId the org unit id; never {@code null}.
+   * @return the org unit's shorthand/name label, or {@code null}.
+   */
+  private @org.jetbrains.annotations.Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
+    return orgUnitRepository
+        .findById(orgUnitId)
+        .map(OrgUnitMembershipService::orgUnitLabel)
+        .orElse(null);
+  }
+
+  /**
+   * Resolves a compact, non-personal audit label for an org unit: its shorthand, falling back to
+   * its name. Used as the {@code subjectLabel} on role / membership audit events.
+   *
+   * @param unit the org unit, or {@code null}.
+   * @return the shorthand if set, otherwise the name, otherwise {@code null}.
+   */
+  private static @org.jetbrains.annotations.Nullable String orgUnitLabel(
+      @org.jetbrains.annotations.Nullable OrgUnit unit) {
+    if (unit == null) {
+      return null;
+    }
+    String shorthand = unit.getShorthand();
+    return shorthand != null && !shorthand.isBlank() ? shorthand : unit.getName();
   }
 }
