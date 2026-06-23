@@ -217,6 +217,92 @@ class OrgHierarchyMigrationTest {
         jdbc, "org_unit_membership", "trg_org_unit_membership_leader_excl_squadron_upd");
   }
 
+  /**
+   * V184 (epic #800, REQ-ROLE-001): the unified {@code role} rank column exists, is kind-scoped by
+   * {@code chk_org_unit_membership_role_kind}, defaults to {@code MEMBER}, and rejects a rank that
+   * does not match the membership's org-unit kind. Uses throwaway rows cleaned up in a finally
+   * block.
+   */
+  @Test
+  void v184AddsKindScopedRoleColumn() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    assertColumnExists(jdbc, "org_unit_membership", "role");
+    assertConstraintExists(jdbc, "chk_org_unit_membership_role_kind");
+
+    UUID userId = UUID.fromString("ffffff00-0000-0000-0000-0000000000c0");
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000c1");
+    cleanupMemberships(jdbc, userId);
+    cleanup(jdbc, squadronId);
+    cleanupUser(jdbc, userId);
+    try {
+      insertUser(jdbc, userId);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_RM_SQ", "TRMS", false, null);
+
+      // A fresh squadron membership defaults to MEMBER.
+      insertMembership(jdbc, userId, squadronId);
+      assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("MEMBER");
+
+      // A squadron rank is accepted on a SQUADRON membership.
+      updateMembershipRole(jdbc, userId, squadronId, "STAFFELLEITER");
+      assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("STAFFELLEITER");
+
+      // An area rank on a SQUADRON membership is rejected by the kind-scoped CHECK.
+      assertThatThrownBy(() -> updateMembershipRole(jdbc, userId, squadronId, "BEREICHSLEITER"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("chk_org_unit_membership_role_kind");
+    } finally {
+      cleanupMemberships(jdbc, userId);
+      cleanup(jdbc, squadronId);
+      cleanupUser(jdbc, userId);
+    }
+  }
+
+  /**
+   * V185 (epic #800, REQ-ROLE-003): the {@code kommando_group} table + the membership group link
+   * exist; a group must belong to a SQUADRON; a squadron holds at most four groups; and the
+   * group-link CHECK confines {@code kommando_group_id} to the in-group squadron ranks.
+   */
+  @Test
+  void v185CreatesKommandoGroupWithSquadronAndCardinalityRules() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    assertColumnExists(jdbc, "kommando_group", "squadron_org_unit_id");
+    assertColumnExists(jdbc, "org_unit_membership", "kommando_group_id");
+    assertConstraintExists(jdbc, "chk_org_unit_membership_kommando_group_role");
+    assertTriggerExists(jdbc, "kommando_group", "trg_kommando_group_squadron_ins");
+    assertTriggerExists(jdbc, "kommando_group", "trg_kommando_group_max_four_ins");
+
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000d0");
+    UUID skId = UUID.fromString("ffffff00-0000-0000-0000-0000000000d1");
+    UUID g1 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e1");
+    UUID g2 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e2");
+    UUID g3 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e3");
+    UUID g4 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e4");
+    UUID g5 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e5");
+    cleanupKommandoGroups(jdbc, squadronId, skId);
+    cleanup(jdbc, squadronId, skId);
+    try {
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_KG_SQ", "TKGS", false, null);
+      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_KG_SK", "TKGK", false, null);
+
+      // A group must belong to a SQUADRON — an SK parent is rejected by the validation trigger.
+      assertThatThrownBy(() -> insertKommandoGroup(jdbc, g1, skId, "Bad"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("must belong to a SQUADRON");
+
+      // Four groups are fine; the fifth trips the counting trigger.
+      insertKommandoGroup(jdbc, g1, squadronId, "Alpha");
+      insertKommandoGroup(jdbc, g2, squadronId, "Bravo");
+      insertKommandoGroup(jdbc, g3, squadronId, "Charlie");
+      insertKommandoGroup(jdbc, g4, squadronId, "Delta");
+      assertThatThrownBy(() -> insertKommandoGroup(jdbc, g5, squadronId, "Echo"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("at most four Kommandogruppen");
+    } finally {
+      cleanupKommandoGroups(jdbc, squadronId, skId);
+      cleanup(jdbc, squadronId, skId);
+    }
+  }
+
   private static void insertOrgUnit(
       JdbcTemplate jdbc,
       UUID id,
@@ -281,6 +367,44 @@ class OrgHierarchyMigrationTest {
             userId,
             orgUnitId);
     return count != null && count > 0;
+  }
+
+  /** Reads the unified rank ({@code role}) of a single membership row (V184). */
+  private static String membershipRole(JdbcTemplate jdbc, UUID userId, UUID orgUnitId) {
+    return jdbc.queryForObject(
+        "SELECT role FROM org_unit_membership WHERE user_id = ? AND org_unit_id = ?",
+        String.class,
+        userId,
+        orgUnitId);
+  }
+
+  /** Sets the unified rank on a membership row, exercising the V184 kind-scoped CHECK. */
+  private static void updateMembershipRole(
+      JdbcTemplate jdbc, UUID userId, UUID orgUnitId, String role) {
+    jdbc.update(
+        "UPDATE org_unit_membership SET role = ? WHERE user_id = ? AND org_unit_id = ?",
+        role,
+        userId,
+        orgUnitId);
+  }
+
+  /**
+   * Inserts a Kommandogruppe (V185); {@code version} defaults and timestamps are left to defaults.
+   */
+  private static void insertKommandoGroup(
+      JdbcTemplate jdbc, UUID id, UUID squadronOrgUnitId, String name) {
+    jdbc.update(
+        "INSERT INTO kommando_group (id, squadron_org_unit_id, name) VALUES (?, ?, ?)",
+        id,
+        squadronOrgUnitId,
+        name);
+  }
+
+  /** Removes every Kommandogruppe of the given org units before the org-unit rows are deleted. */
+  private static void cleanupKommandoGroups(JdbcTemplate jdbc, UUID... squadronIds) {
+    for (UUID id : squadronIds) {
+      jdbc.update("DELETE FROM kommando_group WHERE squadron_org_unit_id = ?", id);
+    }
   }
 
   private static int squadronMembershipCount(JdbcTemplate jdbc, UUID userId) {

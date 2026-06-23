@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -418,6 +419,15 @@ public class OrgUnitMembershipService {
     m.setBereichsleiter(role == BereichLeadershipRole.LEITER);
     m.setBereichskoordinator(role == BereichLeadershipRole.KOORDINATOR);
     m.setBereichsoperator(role == BereichLeadershipRole.OPERATOR);
+    // Dual-write the unified rank (epic #800 Phase 1, REQ-ROLE-001): the boolean flags stay
+    // authoritative during the soak, but role is kept in lockstep so Phase 2 can switch the
+    // authorisation layer onto it without a second backfill.
+    m.setRole(
+        switch (role) {
+          case LEITER -> MembershipRole.BEREICHSLEITER;
+          case KOORDINATOR -> MembershipRole.BEREICHSKOORDINATOR;
+          case OPERATOR -> MembershipRole.BEREICHSOPERATOR;
+        });
     // saveAndFlush (not save): on the upsert-onto-existing-row branch this is an UPDATE, so without
     // an explicit flush the @Version increment would land after the controller maps the response
     // and the caller would get a stale version. Flushing also surfaces the V165 trigger as a clean
@@ -479,6 +489,8 @@ public class OrgUnitMembershipService {
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
     m.setOlMember(true);
+    // Dual-write the unified rank (epic #800 Phase 1, REQ-ROLE-001) in lockstep with is_ol_member.
+    m.setRole(MembershipRole.OL_MEMBER);
     // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
     // in-transaction failure and keeps the flushed @Version in the response under the
     // class-@Transactional controller.
@@ -730,6 +742,8 @@ public class OrgUnitMembershipService {
               + " first (REQ-ORG-017)");
     }
     m.setLead(request.isLead());
+    // Dual-write the unified rank (epic #800 Phase 1, REQ-ROLE-001) in lockstep with is_lead.
+    m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
     return membershipRepository.save(m);
   }
 

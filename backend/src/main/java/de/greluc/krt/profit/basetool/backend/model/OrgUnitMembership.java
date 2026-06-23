@@ -191,6 +191,33 @@ public class OrgUnitMembership {
   private boolean isOlMember = false;
 
   /**
+   * Unified leadership rank of this membership (epic #800, REQ-ROLE-001) — the eventual single
+   * source of truth that supersedes the five mutually-exclusive boolean flags above. Kind-scoped by
+   * the V184 {@code chk_org_unit_membership_role_kind} CHECK (squadron ranks only on {@code
+   * SQUADRON}, area ranks only on {@code BEREICH}, {@link MembershipRole#OL_MEMBER} only on {@code
+   * ORGANISATIONSLEITUNG}, {@link MembershipRole#SK_LEAD} only on {@code SPECIAL_COMMAND}).
+   *
+   * <p>During the additive soak (epic #800 Phase 1) the boolean flags remain authoritative and this
+   * column is written in lockstep by {@code OrgUnitMembershipService}; it is consumed by the
+   * authorisation layer only from Phase 2 onward. Defaults to {@link MembershipRole#MEMBER}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "role", nullable = false, length = 40)
+  private MembershipRole role = MembershipRole.MEMBER;
+
+  /**
+   * The Kommandogruppe this membership is assigned to (epic #800, REQ-ROLE-003), or {@code null}.
+   * Non-null only for the squadron ranks {@link MembershipRole#KOMMANDOLEITER} / {@link
+   * MembershipRole#STELLV_KOMMANDOLEITER} / {@link MembershipRole#ENSIGN}; an Ensign with a {@code
+   * null} group is "allgemein der Staffelleitung". The {@code
+   * chk_org_unit_membership_kommando_group_role} CHECK (V185) enforces this pairing. Lazy-fetched.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "kommando_group_id")
+  @ToString.Exclude
+  private KommandoGroup kommandoGroup;
+
+  /**
    * Timestamp when the membership was granted. Backfilled by V95 from {@link User#getJoinDate()}
    * for pre-existing Staffel memberships; defaults to {@code now()} for new memberships at the DB
    * layer (the V95 column carries {@code DEFAULT NOW()}). Stored as {@link Instant} (UTC) per the
