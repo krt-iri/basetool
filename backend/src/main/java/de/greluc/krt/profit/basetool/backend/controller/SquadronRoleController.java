@@ -29,6 +29,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -44,10 +45,19 @@ import org.springframework.web.bind.annotation.RestController;
  * short-circuit: a Staffelleiter appointment needs the Bereichsleiter of the squadron's parent
  * Bereich, while the lower ranks (and their Kommandogruppe binding) are appointed by the squadron's
  * own Staffelleiter — never by the appointee themselves (no self-promotion).
+ *
+ * <p>Class-level {@link Transactional} keeps the persistence session open across the {@code
+ * OrgUnitMembershipMapper#toDto} call that builds each response: the mapper reads {@code
+ * user.effectiveName} through the LAZY {@code user} association, which would otherwise throw {@code
+ * LazyInitializationException} once the service transaction has already committed (the write would
+ * succeed but the response would 500). Every other controller wiring that mapper is transactional
+ * for the same reason, pinned by {@code
+ * ArchitectureTest#controllersUsingTheLazyMembershipMapperMustBeTransactional}.
  */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/squadrons/{squadronId}/ranks")
+@Transactional
 public class SquadronRoleController {
 
   private final OrgUnitMembershipService membershipService;
