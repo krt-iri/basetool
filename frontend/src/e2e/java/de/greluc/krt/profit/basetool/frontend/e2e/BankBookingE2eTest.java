@@ -132,10 +132,10 @@ class BankBookingE2eTest {
   }
 
   /**
-   * A transfer between two accounts AND two different holders moves money and carves out the in-game
-   * fee (REQ-BANK-033, ADR-0041): the source is debited the full gross while the destination is
-   * credited the net (gross − fee). With the seeded 0.5% rate, 200 aUEC carries a 1 aUEC fee, so the
-   * destination gains 199.
+   * A transfer between two accounts AND two different holders moves money and carves out the
+   * in-game fee (REQ-BANK-033, ADR-0041): the source is debited the full gross while the
+   * destination is credited the net (gross − fee). With the seeded 0.5% rate, 200 aUEC carries a 1
+   * aUEC fee, so the destination gains 199.
    */
   @Test
   void transferBetweenAccountsMovesMoney() {
