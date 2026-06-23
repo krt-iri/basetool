@@ -125,8 +125,9 @@ It is reversible via the activate endpoint, and `includeInactive=true` (ADMIN-on
 deactivated rows with a reactivate control. The list page's per-row trash button confirms
 through a KRT modal (no native `confirm()`, per [`ui-design-system.md`](ui-design-system.md))
 before POSTing the deactivate. SK **member management** is open to ADMIN
-or an `is_lead` user of that SK (`SpecialCommandSecurityService.canManageMembers`); the
-Lead-toggle stays ADMIN-only (no self-escalation). **Promotion-system maintenance** is
+or a `role = SK_LEAD` member of that SK (`SpecialCommandSecurityService.canManageMembers`; epic #800
+replaced the legacy `is_lead` flag with the unified rank, V187); the Lead-toggle stays ADMIN-only (no
+self-escalation). **Promotion-system maintenance** is
 re-opened to OFFICER under an org-unit-scope gate (`canEditSquadron(topic.owningSquadron.id)`).
 Admins can toggle the promotion subsystem per Squadron
 (`PATCH /api/v1/squadrons/{id}/promotion-enabled`); `OwnerScopeService.isPromotionFeatureEnabledForCurrentScope()`
@@ -482,3 +483,16 @@ must not be able to violate them. `membership.kind` and the trigger-synced flags
 (the ≤2-Staffel counting triggers on INSERT+UPDATE, the leader-excludes-Staffel trigger, and the
 `chk_org_unit_membership_bereich_flags_only_on_bereich` / `chk_org_unit_membership_ol_flag_only_on_ol`
 CHECKs — DB-side defence in depth) · **Issues:** #692, #695.
+
+> **Amended by epic #800 (REQ-ROLE-001, role-model.md):** the five boolean leadership flags
+> (`is_lead` / `is_bereichsleiter` / `is_bereichskoordinator` / `is_bereichsoperator` / `is_ol_member`)
+> were replaced by the unified `role` enum and **dropped** in the Phase-5 cleanup (V187), so every
+> rule above now reads `role`: "SK-lead" is `role = SK_LEAD`, "Bereichsleitung member" is a Bereich
+> rank, "OL member" is `OL_MEMBER`. The leader-excludes-Staffel trigger
+> (`enforce_leader_excludes_squadron`) was rewritten onto `role` with the silo set
+> `{SK_LEAD, BEREICHSLEITER, BEREICHSKOORDINATOR, BEREICHSOPERATOR, OL_MEMBER}`; the new **squadron
+> ranks** (Staffelleiter / Kommandoleiter / stellv. / Ensign) are EXEMPT — they ARE Staffel members.
+> The trigger now pre-empts the kind CHECK for a silo-rank-on-Staffel write (both reject; only the
+> message differs). The kind pairing is now the single `chk_org_unit_membership_role_kind` CHECK
+> (V184). Proven by `OrgHierarchyMigrationTest#v187LeaderExclusionTriggerReadsRole_squadronRanksExempt`.
+

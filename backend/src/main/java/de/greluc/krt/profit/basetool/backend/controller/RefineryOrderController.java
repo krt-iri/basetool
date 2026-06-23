@@ -296,13 +296,16 @@ public class RefineryOrderController {
   }
 
   /**
-   * Lists a specific user's refinery orders. Logistician-only.
+   * Lists a specific user's refinery orders. Logistician scoped to the caller's org units: an
+   * admin, the target user themselves, or a logistician whose strict org-unit scope covers a unit
+   * the target user belongs to (epic #800 / PR #808 security review — the flat {@code
+   * ROLE_LOGISTICIAN} is no longer org-wide here, matching the per-order refinery scope).
    *
    * @param userId target user id
    * @return paged refinery-order list DTOs
    */
   @GetMapping("/users/{userId}")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canViewUserRefineryOrders(#userId)")
   @Transactional(readOnly = true)
   public PageResponse<RefineryOrderListDto> getUserRefineryOrders(
       @PathVariable @NotNull UUID userId,
@@ -328,12 +331,16 @@ public class RefineryOrderController {
   }
 
   /**
-   * Logistician-only: creates a refinery order on behalf of a target user.
+   * Creates a refinery order on behalf of a target user. Logistician scoped to the caller's org
+   * units: an admin, the target user themselves, or a logistician whose strict org-unit scope
+   * covers a unit the target user belongs to (epic #800 / PR #808 security review — no longer
+   * org-wide).
    *
    * @return the persisted DTO
    */
   @PostMapping("/users/{userId}")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize(
+      "hasRole('LOGISTICIAN') and @ownerScopeService.canManageUserRefineryOrders(#userId)")
   public RefineryOrderDto createUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
     RefineryOrder saved =

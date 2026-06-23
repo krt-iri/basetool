@@ -51,7 +51,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Unit tests for {@link AdminAuditLogPageController}: the seven-way tab routing (bank vs the six
+ * Unit tests for {@link AdminAuditLogPageController}: the eight-way tab routing (bank vs the seven
  * generic areas), the adaptation of both DTO shapes into the uniform {@link AuditRowView}, the
  * per-tab export endpoint + event-type list, and the in-place fragment selector (REQ-AUDIT-002).
  */

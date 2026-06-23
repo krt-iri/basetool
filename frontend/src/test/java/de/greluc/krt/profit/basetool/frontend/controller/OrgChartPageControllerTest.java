@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -41,17 +40,14 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
  * Pure-method unit tests for {@link OrgChartPageController}. Verifies the read page loads the chart
- * for everyone but only preloads the user picker for admins, and that the AJAX write proxies relay
- * the backend's status + {@code {code, detail}} body on failure (so the page JS can toast the right
- * message).
+ * (without preloading any user list — account seats are mirror-only since REQ-ROLE-006) and that
+ * the AJAX write proxies relay the backend's status + {@code {code, detail}} body on failure (so
+ * the page JS can toast the right message).
  */
 @SuppressWarnings("unchecked")
 class OrgChartPageControllerTest {
@@ -65,44 +61,22 @@ class OrgChartPageControllerTest {
         List.of());
   }
 
-  private static Authentication auth(String role) {
-    return new UsernamePasswordAuthenticationToken(
-        "u", null, List.of(new SimpleGrantedAuthority(role)));
-  }
-
   @Test
-  void orgChart_nonAdmin_loadsChartWithoutPreloadingUsers() {
+  void orgChart_loadsChartWithoutPreloadingUsers() {
+    // Account-linked seats are mirror-only now (epic #800, REQ-ROLE-006): the chart editor offers
+    // no
+    // account picker, so the page no longer preloads the user-lookup list.
     BackendApiClient backend = mock(BackendApiClient.class);
     OrgChartPageController controller = new OrgChartPageController(backend);
     OrgChartDto chart = emptyChart();
     when(backend.get("/api/v1/org-chart", OrgChartDto.class)).thenReturn(chart);
     Model model = new ConcurrentModel();
 
-    String view = controller.orgChart(null, model, auth("ROLE_SQUADRON_MEMBER"));
+    String view = controller.orgChart(null, model);
 
     assertEquals("org-chart", view);
     assertSame(chart, model.getAttribute("orgChart"));
-    assertTrue(((List<?>) model.getAttribute("allUsers")).isEmpty());
     verify(backend, never()).get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
-  }
-
-  @Test
-  void orgChart_admin_preloadsUserLookup() {
-    BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
-    when(backend.get("/api/v1/org-chart", OrgChartDto.class)).thenReturn(emptyChart());
-    when(backend.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
-        .thenReturn(
-            List.of(
-                Map.of(
-                    "id", UUID.randomUUID().toString(),
-                    "username", "pilot",
-                    "effectiveName", "Pilot")));
-    Model model = new ConcurrentModel();
-
-    controller.orgChart(null, model, auth("ROLE_ADMIN"));
-
-    assertEquals(1, ((List<?>) model.getAttribute("allUsers")).size());
   }
 
   @Test
@@ -113,28 +87,25 @@ class OrgChartPageControllerTest {
         .thenThrow(new BackendServiceException("boom", null, 503));
     Model model = new ConcurrentModel();
 
-    String view = controller.orgChart(null, model, auth("ROLE_SQUADRON_MEMBER"));
+    String view = controller.orgChart(null, model);
 
     assertEquals("org-chart", view);
     assertEquals("error.orgChart.load", model.getAttribute("error"));
   }
 
   @Test
-  void orgChart_fragmentChartBody_returnsChartBodySelectorAndSkipsUserLookup() {
-    // The in-place chart refresh (epic #571 / REQ-FE-005) re-renders only the chartBody fragment;
-    // the assign picker's allUsers list lives in the modal (outside the swap), so the fragment path
-    // must skip the user-lookup round-trip even for an admin.
+  void orgChart_fragmentChartBody_returnsChartBodySelector() {
+    // The in-place chart refresh (epic #571 / REQ-FE-005) re-renders only the chartBody fragment.
     BackendApiClient backend = mock(BackendApiClient.class);
     OrgChartPageController controller = new OrgChartPageController(backend);
     OrgChartDto chart = emptyChart();
     when(backend.get("/api/v1/org-chart", OrgChartDto.class)).thenReturn(chart);
     Model model = new ConcurrentModel();
 
-    String view = controller.orgChart("chartBody", model, auth("ROLE_ADMIN"));
+    String view = controller.orgChart("chartBody", model);
 
     assertEquals("org-chart :: chartBody", view);
     assertSame(chart, model.getAttribute("orgChart"));
-    verify(backend, never()).get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
   }
 
   @Test

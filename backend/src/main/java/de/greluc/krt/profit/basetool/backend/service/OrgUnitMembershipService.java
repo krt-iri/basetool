@@ -22,6 +22,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -33,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
@@ -81,8 +85,11 @@ public class OrgUnitMembershipService {
   private final SquadronRepository squadronRepository;
   private final SpecialCommandRepository specialCommandRepository;
   private final OrgUnitRepository orgUnitRepository;
+  private final KommandoGroupRepository kommandoGroupRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
   private final InventoryOrgUnitReconciler inventoryReconciler;
+  private final AuditService auditService;
+  private final OrgChartService orgChartService;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
@@ -341,6 +348,12 @@ public class OrgUnitMembershipService {
     if (wasMembershipless) {
       inventoryReconciler.onUserGainedFirstOrgUnit(userId, sc);
     }
+    auditService.record(
+        AuditEventType.MEMBERSHIP_GRANTED,
+        sc.getId(),
+        orgUnitLabel(sc),
+        userId,
+        "kind=SPECIAL_COMMAND");
     return saved;
   }
 
@@ -361,6 +374,9 @@ public class OrgUnitMembershipService {
       throw new NotFoundException("Membership not found");
     }
     membershipRepository.deleteById(id);
+    // Drop any mirrored SK chart seat (an SK-Leiter losing the membership) in the same transaction
+    // so no stale seat lingers (REQ-ROLE-006).
+    orgChartService.mirrorRemoveUnitSeat(sc.getId(), userId);
 
     // Last org-unit membership removed → the user's org-stamped inventory falls back to
     // ownerless-personal (the auto-demote lifecycle policy). The count query auto-flushes the
@@ -368,6 +384,12 @@ public class OrgUnitMembershipService {
     if (membershipRepository.countByIdUserId(userId) == 0) {
       inventoryReconciler.onUserLostLastOrgUnit(userId);
     }
+    auditService.record(
+        AuditEventType.MEMBERSHIP_REVOKED,
+        sc.getId(),
+        orgUnitLabel(sc),
+        userId,
+        "kind=SPECIAL_COMMAND");
   }
 
   /**
@@ -407,6 +429,7 @@ public class OrgUnitMembershipService {
     }
     OrgUnitMembership m =
         membershipRepository.findById(new OrgUnitMembershipId(userId, bereichId)).orElse(null);
+    final MembershipRole previousRole = m != null ? m.getRole() : null;
     if (m == null) {
       m = new OrgUnitMembership();
       m.setId(new OrgUnitMembershipId(userId, bereichId));
@@ -415,14 +438,31 @@ public class OrgUnitMembershipService {
       m.setKind(OrgUnitKind.BEREICH);
       m.setJoinedAt(Instant.now());
     }
-    m.setBereichsleiter(role == BereichLeadershipRole.LEITER);
-    m.setBereichskoordinator(role == BereichLeadershipRole.KOORDINATOR);
-    m.setBereichsoperator(role == BereichLeadershipRole.OPERATOR);
+    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); the legacy boolean
+    // leadership flags (is_bereichsleiter / -koordinator / -operator) were dropped in the Phase 5
+    // cleanup (V187).
+    m.setRole(
+        switch (role) {
+          case LEITER -> MembershipRole.BEREICHSLEITER;
+          case KOORDINATOR -> MembershipRole.BEREICHSKOORDINATOR;
+          case OPERATOR -> MembershipRole.BEREICHSOPERATOR;
+        });
     // saveAndFlush (not save): on the upsert-onto-existing-row branch this is an UPDATE, so without
     // an explicit flush the @Version increment would land after the controller maps the response
     // and the caller would get a stale version. Flushing also surfaces the V165 trigger as a clean
     // in-transaction failure rather than at commit.
-    return membershipRepository.saveAndFlush(m);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    // Mirror the account-linked seat onto the descriptive chart in the same transaction
+    // (REQ-ROLE-006); the chart still grants nothing.
+    orgChartService.mirrorBereichRole(bereich.getId(), userId, role);
+    final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
+    auditService.record(
+        firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
+        bereich.getId(),
+        orgUnitLabel(bereich),
+        userId,
+        firstGrant ? "role=" + saved.getRole() : "from=" + previousRole + " to=" + saved.getRole());
+    return saved;
   }
 
   /**
@@ -435,10 +475,20 @@ public class OrgUnitMembershipService {
   @Transactional
   public void removeBereichLeader(@NotNull UUID bereichId, @NotNull UUID userId) {
     OrgUnitMembershipId id = new OrgUnitMembershipId(userId, bereichId);
-    if (!membershipRepository.existsById(id)) {
-      throw new NotFoundException("Bereichsleitung membership not found");
-    }
-    membershipRepository.deleteById(id);
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("Bereichsleitung membership not found"));
+    final MembershipRole previousRole = m.getRole();
+    membershipRepository.delete(m);
+    // Remove the mirrored chart seat in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorRemoveUnitSeat(bereichId, userId);
+    auditService.record(
+        AuditEventType.ROLE_REVOKED,
+        bereichId,
+        orgUnitLabelById(bereichId),
+        userId,
+        "role=" + previousRole);
   }
 
   /**
@@ -478,11 +528,18 @@ public class OrgUnitMembershipService {
     m.setUser(user);
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
-    m.setOlMember(true);
+    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_ol_member was
+    // dropped in the Phase 5 cleanup (V187).
+    m.setRole(MembershipRole.OL_MEMBER);
     // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
     // in-transaction failure and keeps the flushed @Version in the response under the
     // class-@Transactional controller.
-    return membershipRepository.saveAndFlush(m);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    // Mirror the OL seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorOlMember(ol.getId(), userId);
+    auditService.record(
+        AuditEventType.ROLE_GRANTED, ol.getId(), orgUnitLabel(ol), userId, "role=OL_MEMBER");
+    return saved;
   }
 
   /**
@@ -495,10 +552,20 @@ public class OrgUnitMembershipService {
   @Transactional
   public void removeOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     OrgUnitMembershipId id = new OrgUnitMembershipId(userId, organisationsleitungId);
-    if (!membershipRepository.existsById(id)) {
-      throw new NotFoundException("Organisationsleitung membership not found");
-    }
-    membershipRepository.deleteById(id);
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("Organisationsleitung membership not found"));
+    final MembershipRole previousRole = m.getRole();
+    membershipRepository.delete(m);
+    // Remove the mirrored OL chart seat in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
+    auditService.record(
+        AuditEventType.ROLE_REVOKED,
+        organisationsleitungId,
+        orgUnitLabelById(organisationsleitungId),
+        userId,
+        "role=" + previousRole);
   }
 
   /**
@@ -527,7 +594,9 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    return membershipRepository.save(m);
+    OrgUnitMembership saved = membershipRepository.save(m);
+    recordCapabilityFlagsChanged(specialCommandId, userId, saved);
+    return saved;
   }
 
   /**
@@ -568,7 +637,14 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    return membershipRepository.save(m);
+    OrgUnitMembership saved = membershipRepository.save(m);
+    auditService.record(
+        AuditEventType.CAPABILITY_FLAGS_CHANGED,
+        squadron.getId(),
+        orgUnitLabel(squadron),
+        userId,
+        "logistician=" + saved.isLogistician() + " missionManager=" + saved.isMissionManager());
+    return saved;
   }
 
   /**
@@ -610,7 +686,8 @@ public class OrgUnitMembershipService {
     if (isMissionManager != null) {
       m.setMissionManager(isMissionManager);
     }
-    membershipRepository.saveAndFlush(m);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    recordCapabilityFlagsChanged(saved.getId().getOrgUnitId(), userId, saved);
   }
 
   /**
@@ -649,6 +726,12 @@ public class OrgUnitMembershipService {
     if (newSquadron == null) {
       if (!existing.isEmpty()) {
         membershipRepository.deleteAll(existing);
+        for (OrgUnitMembership removed : existing) {
+          recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
+          // A squadron rank held on the removed row leaves a stale chart seat — clear it
+          // (REQ-ROLE-006).
+          orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
+        }
         // Removing the Staffel may have been the user's last org-unit membership (no SK left) →
         // demote their org-stamped inventory to ownerless-personal.
         if (membershipRepository.countByIdUserId(user.getId()) == 0) {
@@ -682,6 +765,11 @@ public class OrgUnitMembershipService {
     if (!stale.isEmpty()) {
       membershipRepository.deleteAll(stale);
       membershipRepository.flush();
+      for (OrgUnitMembership removed : stale) {
+        recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
+        // Clear any stale chart seat the moved-away squadron rank left behind (REQ-ROLE-006).
+        orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
+      }
     }
 
     if (!alreadyMember) {
@@ -693,6 +781,12 @@ public class OrgUnitMembershipService {
       // app_user.is_logistician / app_user.is_mission_manager columns are gone. Admins re-grant
       // the flags via the membership-PATCH endpoint after the Staffel switch.
       membershipRepository.save(fresh);
+      auditService.record(
+          AuditEventType.MEMBERSHIP_GRANTED,
+          newSquadron.getId(),
+          orgUnitLabel(newSquadron),
+          user.getId(),
+          "kind=SQUADRON");
 
       // If this Staffel was the user's first-ever org-unit membership, their ownerless-personal
       // inventory adopts it (the auto-promote lifecycle policy). A Staffel switch or a second
@@ -729,8 +823,218 @@ public class OrgUnitMembershipService {
           "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel membership"
               + " first (REQ-ORG-017)");
     }
-    m.setLead(request.isLead());
-    return membershipRepository.save(m);
+    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_lead was dropped
+    // in
+    // the Phase 5 cleanup (V187). The request's isLead boolean is the API verb (promote/demote).
+    m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
+    OrgUnitMembership saved = membershipRepository.save(m);
+    // Mirror the SK-Leiter seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
+    auditService.record(
+        request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
+        specialCommandId,
+        orgUnitLabelById(specialCommandId),
+        userId,
+        "role=SK_LEAD");
+    return saved;
+  }
+
+  /**
+   * Assigns (or changes) a squadron leadership rank on an existing Staffel member (epic #800,
+   * REQ-ROLE-003/004): Staffelleiter / Kommandoleiter / stellv. Kommandoleiter / Ensign, optionally
+   * bound to a Kommandogruppe. The target user must already be a member of the Staffel; the rank
+   * must be a squadron rank; the Kommandogruppe pairing and the cardinality caps (&le;1
+   * Staffelleiter per squadron, &le;1 Kommandoleiter + &le;1 stellv. per group, &le;4 Ensigns per
+   * squadron) are enforced here with clean 400s, complementing the V185 DB CHECK. Squadron ranks
+   * are exempt from the V165 {@code enforce_leader_excludes_squadron} trigger (they <em>are</em>
+   * Staffel members) — they set only the {@code role} and the {@code kommandoGroup}.
+   *
+   * @param squadronId the Staffel; must be a {@code SQUADRON} org unit.
+   * @param userId the member to assign the rank to; must already be a member of this Staffel.
+   * @param rank the squadron rank to set; must be a squadron rank.
+   * @param kommandoGroupId the Kommandogruppe to bind, or {@code null}; constrained per the rank.
+   * @param version the optimistic-lock version of the member's row, or {@code null} to skip it.
+   * @return the persisted membership row with the bumped version.
+   * @throws NotFoundException if the user is not a member of this Staffel, or the group is unknown.
+   * @throws BadRequestException on a non-squadron rank, a bad group pairing, or a cardinality
+   *     breach.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembership assignSquadronRank(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @NotNull MembershipRole rank,
+      @org.jetbrains.annotations.Nullable UUID kommandoGroupId,
+      @org.jetbrains.annotations.Nullable Long version) {
+    if (!rank.isSquadronRank()) {
+      throw new BadRequestException("Rank " + rank + " is not a squadron rank");
+    }
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(new OrgUnitMembershipId(userId, squadronId))
+            .orElseThrow(() -> new NotFoundException("User is not a member of this Staffel"));
+    if (m.getKind() != OrgUnitKind.SQUADRON) {
+      throw new BadRequestException("Org unit " + squadronId + " is not a Staffel");
+    }
+    assertVersionMatches(m, version);
+
+    KommandoGroup group = resolveKommandoGroupForRank(squadronId, rank, kommandoGroupId);
+    assertSquadronRankCardinality(squadronId, userId, rank, group);
+
+    final MembershipRole previousRole = m.getRole();
+    m.setRole(rank);
+    m.setKommandoGroup(group);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    // Mirror the squadron seat onto the descriptive chart in the same transaction (REQ-ROLE-006):
+    // Staffelleiter / Kommandoleiter (vacates+fills the group node) / stellv. / Ensign.
+    orgChartService.mirrorSquadronRank(squadronId, userId, rank, group);
+
+    final boolean firstGrant = previousRole == MembershipRole.MEMBER;
+    auditService.record(
+        firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
+        squadronId,
+        orgUnitLabelById(squadronId),
+        userId,
+        firstGrant ? "role=" + rank : "from=" + previousRole + " to=" + rank);
+    return saved;
+  }
+
+  /**
+   * Clears a member's squadron leadership rank back to plain {@link MembershipRole#MEMBER} (and
+   * unbinds any Kommandogruppe) without removing the Staffel membership itself (epic #800,
+   * REQ-ROLE-004).
+   *
+   * @param squadronId the Staffel; never {@code null}.
+   * @param userId the member whose rank to clear; never {@code null}.
+   * @param version the optimistic-lock version of the member's row, or {@code null} to skip it.
+   * @return the persisted membership row with the bumped version.
+   * @throws NotFoundException if the user is not a member of this Staffel.
+   * @throws BadRequestException if the member holds no squadron rank.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembership removeSquadronRank(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @org.jetbrains.annotations.Nullable Long version) {
+    OrgUnitMembership m =
+        membershipRepository
+            .findById(new OrgUnitMembershipId(userId, squadronId))
+            .orElseThrow(() -> new NotFoundException("User is not a member of this Staffel"));
+    assertVersionMatches(m, version);
+    final MembershipRole previousRole = m.getRole();
+    if (!previousRole.isSquadronRank()) {
+      throw new BadRequestException("Member holds no squadron rank to remove");
+    }
+    m.setRole(MembershipRole.MEMBER);
+    m.setKommandoGroup(null);
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    // Clear the mirrored squadron chart seat in the same transaction (REQ-ROLE-006).
+    orgChartService.mirrorRemoveSquadronRank(squadronId, userId);
+    auditService.record(
+        AuditEventType.ROLE_REVOKED,
+        squadronId,
+        orgUnitLabelById(squadronId),
+        userId,
+        "role=" + previousRole);
+    return saved;
+  }
+
+  /**
+   * Resolves and validates the Kommandogruppe binding for a squadron rank against the V185 pairing
+   * CHECK: Kommandoleiter / stellv. Kommandoleiter MUST reference a group; Ensign MAY;
+   * Staffelleiter MUST NOT. A referenced group must exist and belong to the same squadron.
+   *
+   * @param squadronId the Staffel the rank is on; never {@code null}.
+   * @param rank the squadron rank being assigned; never {@code null}.
+   * @param kommandoGroupId the requested group id, or {@code null}.
+   * @return the resolved group, or {@code null} when the rank carries no group.
+   * @throws NotFoundException if a referenced group does not exist.
+   * @throws BadRequestException on a group pairing that violates the rank's contract.
+   */
+  @org.jetbrains.annotations.Nullable
+  private KommandoGroup resolveKommandoGroupForRank(
+      @NotNull UUID squadronId,
+      @NotNull MembershipRole rank,
+      @org.jetbrains.annotations.Nullable UUID kommandoGroupId) {
+    boolean groupRequired =
+        rank == MembershipRole.KOMMANDOLEITER || rank == MembershipRole.STELLV_KOMMANDOLEITER;
+    boolean groupAllowed = groupRequired || rank == MembershipRole.ENSIGN;
+    if (kommandoGroupId == null) {
+      if (groupRequired) {
+        throw new BadRequestException(rank + " must be assigned to a Kommandogruppe");
+      }
+      return null;
+    }
+    if (!groupAllowed) {
+      throw new BadRequestException(rank + " must not be assigned to a Kommandogruppe");
+    }
+    KommandoGroup group =
+        kommandoGroupRepository
+            .findById(kommandoGroupId)
+            .orElseThrow(() -> new NotFoundException("Kommandogruppe not found"));
+    if (!group.getSquadron().getId().equals(squadronId)) {
+      throw new BadRequestException("Kommandogruppe does not belong to this Staffel");
+    }
+    return group;
+  }
+
+  /**
+   * Enforces the squadron-rank cardinality caps against the current roster, excluding the target
+   * user so re-assigning the same user is idempotent: &le;1 Staffelleiter per squadron, &le;1
+   * Kommandoleiter + &le;1 stellv. Kommandoleiter per group, &le;4 Ensigns per squadron.
+   *
+   * <p>This in-memory check gives a clean 4xx for the common case; the three singleton caps are
+   * additionally backstopped by the {@code V188} partial unique indexes ({@code
+   * uq_org_unit_membership_one_staffelleiter} / {@code _one_kommandoleiter_per_group} / {@code
+   * _one_stellv_per_group}), so a concurrent double-assign that slips past the roster scan fails on
+   * the constraint rather than committing a duplicate. The &le;4 Ensign cap stays
+   * service-layer-only (a count, not a uniqueness rule), like the org chart's own &le;4 ENSIGN cap.
+   *
+   * @param squadronId the Staffel; never {@code null}.
+   * @param userId the user being (re)assigned, excluded from the roster scan; never {@code null}.
+   * @param rank the squadron rank being assigned; never {@code null}.
+   * @param group the resolved Kommandogruppe (non-null for Kommandoleiter / stellv.); may be {@code
+   *     null}.
+   * @throws BadRequestException when the assignment would breach a cardinality cap.
+   */
+  private void assertSquadronRankCardinality(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @NotNull MembershipRole rank,
+      @org.jetbrains.annotations.Nullable KommandoGroup group) {
+    List<OrgUnitMembership> roster =
+        membershipRepository.findAllByIdOrgUnitId(squadronId).stream()
+            .filter(m -> !m.getId().getUserId().equals(userId))
+            .toList();
+    switch (rank) {
+      case STAFFELLEITER -> {
+        if (roster.stream().anyMatch(m -> m.getRole() == MembershipRole.STAFFELLEITER)) {
+          throw new BadRequestException("This Staffel already has a Staffelleiter");
+        }
+      }
+      case KOMMANDOLEITER, STELLV_KOMMANDOLEITER -> {
+        UUID groupId = group.getId();
+        boolean taken =
+            roster.stream()
+                .anyMatch(
+                    m ->
+                        m.getRole() == rank
+                            && m.getKommandoGroup() != null
+                            && groupId.equals(m.getKommandoGroup().getId()));
+        if (taken) {
+          throw new BadRequestException("This Kommandogruppe already has a " + rank);
+        }
+      }
+      case ENSIGN -> {
+        long ensigns = roster.stream().filter(m -> m.getRole() == MembershipRole.ENSIGN).count();
+        if (ensigns >= 4) {
+          throw new BadRequestException("This Staffel already has the maximum of 4 Ensigns");
+        }
+      }
+      default -> throw new BadRequestException("Rank " + rank + " is not a squadron rank");
+    }
   }
 
   /**
@@ -824,22 +1128,85 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * {@code true} iff the user holds any leadership flag on any membership — SK-Leiter ({@code
-   * is_lead}), Bereichsleitung ({@code is_bereichsleiter} / {@code is_bereichskoordinator} / {@code
-   * is_bereichsoperator}) or OL ({@code is_ol_member}). Backs the REQ-ORG-017 guard that such a
-   * leader is never assigned to a Staffel.
+   * {@code true} iff the user holds a <em>silo-leader</em> rank on any membership — an SK-Leiter
+   * ({@link MembershipRole#SK_LEAD}), a Bereichsleitung rank, or the OL ({@link
+   * MembershipRole#isAreaOrOl()}). The four squadron ranks are deliberately <b>exempt</b>: they are
+   * held by Staffel members, so they must not trip this guard. Backs the REQ-ORG-017 guard that a
+   * silo leader is never (also) assigned to a Staffel.
    *
    * @param userId the user to check; never {@code null}.
-   * @return {@code true} when any of the user's membership rows carries a leadership flag.
+   * @return {@code true} when any of the user's membership rows carries a silo-leader rank.
    */
   private boolean userHoldsLeadershipRole(@NotNull UUID userId) {
     return membershipRepository.findAllByIdUserId(userId).stream()
-        .anyMatch(
-            m ->
-                m.isLead()
-                    || m.isBereichsleiter()
-                    || m.isBereichskoordinator()
-                    || m.isBereichsoperator()
-                    || m.isOlMember());
+        .anyMatch(m -> m.getRole() == MembershipRole.SK_LEAD || m.getRole().isAreaOrOl());
+  }
+
+  /**
+   * Records a {@link AuditEventType#MEMBERSHIP_REVOKED} event for a removed Staffel membership
+   * (epic #800, REQ-AUDIT-001). Extracted so the {@link #syncStaffelMembership} delete branches
+   * stay readable; the details payload carries only the org-unit kind (no PII).
+   *
+   * @param squadronOrgUnitId the Staffel the removed membership pointed at; never {@code null}.
+   * @param userId the user whose Staffel membership was removed; never {@code null}.
+   */
+  private void recordStaffelMembershipRevoked(
+      @NotNull UUID squadronOrgUnitId, @NotNull UUID userId) {
+    auditService.record(
+        AuditEventType.MEMBERSHIP_REVOKED,
+        squadronOrgUnitId,
+        orgUnitLabelById(squadronOrgUnitId),
+        userId,
+        "kind=SQUADRON");
+  }
+
+  /**
+   * Records a {@link AuditEventType#CAPABILITY_FLAGS_CHANGED} event capturing the resulting
+   * Logistician / Mission-Manager flag values on a membership (epic #800, REQ-AUDIT-001). The
+   * details payload holds only the two boolean values (no PII / no free text).
+   *
+   * @param orgUnitId the org unit the membership belongs to; never {@code null}.
+   * @param userId the affected user; never {@code null}.
+   * @param saved the persisted membership row whose flags were changed; never {@code null}.
+   */
+  private void recordCapabilityFlagsChanged(
+      @NotNull UUID orgUnitId, @NotNull UUID userId, @NotNull OrgUnitMembership saved) {
+    auditService.record(
+        AuditEventType.CAPABILITY_FLAGS_CHANGED,
+        orgUnitId,
+        orgUnitLabelById(orgUnitId),
+        userId,
+        "logistician=" + saved.isLogistician() + " missionManager=" + saved.isMissionManager());
+  }
+
+  /**
+   * Loads an org unit by id and resolves its audit {@code subjectLabel} via {@link
+   * #orgUnitLabel(OrgUnit)}, or {@code null} when the org unit cannot be resolved (e.g. already
+   * deleted). Used by the delete / patch audit paths that hold only the org-unit id.
+   *
+   * @param orgUnitId the org unit id; never {@code null}.
+   * @return the org unit's shorthand/name label, or {@code null}.
+   */
+  private @org.jetbrains.annotations.Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
+    return orgUnitRepository
+        .findById(orgUnitId)
+        .map(OrgUnitMembershipService::orgUnitLabel)
+        .orElse(null);
+  }
+
+  /**
+   * Resolves a compact, non-personal audit label for an org unit: its shorthand, falling back to
+   * its name. Used as the {@code subjectLabel} on role / membership audit events.
+   *
+   * @param unit the org unit, or {@code null}.
+   * @return the shorthand if set, otherwise the name, otherwise {@code null}.
+   */
+  private static @org.jetbrains.annotations.Nullable String orgUnitLabel(
+      @org.jetbrains.annotations.Nullable OrgUnit unit) {
+    if (unit == null) {
+      return null;
+    }
+    String shorthand = unit.getShorthand();
+    return shorthand != null && !shorthand.isBlank() ? shorthand : unit.getName();
   }
 }

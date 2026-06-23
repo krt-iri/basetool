@@ -44,11 +44,11 @@ import org.hibernate.annotations.UpdateTimestamp;
  * org_unit_membership} table created by Flyway migration V95.
  *
  * <p>Why a dedicated entity rather than a plain {@code @ManyToMany} on {@link User}: the membership
- * carries its own per-link state (the role flags {@code is_logistician}, {@code
- * is_mission_manager}, {@code is_lead}, plus the {@code joined_at} timestamp and an optimistic-
- * lock {@code @Version} counter) that a pure join table cannot express. Once R2.b switches the
- * scoped-role authorisation onto these flags, the membership row becomes the source of truth for
- * "what may this user do in this org unit" — far more expressive than a flat {@code Set<OrgUnit>}.
+ * carries its own per-link state (the capability flags {@code is_logistician} / {@code
+ * is_mission_manager}, the unified {@link #role} leadership rank, plus the {@code joined_at}
+ * timestamp and an optimistic-lock {@code @Version} counter) that a pure join table cannot express.
+ * The membership row is the source of truth for "what may this user do in this org unit" — far more
+ * expressive than a flat {@code Set<OrgUnit>}.
  *
  * <p>Composite-key pattern: the primary key is the {@code (user_id, org_unit_id)} pair, expressed
  * via the {@link OrgUnitMembershipId} embeddable. The {@code @ManyToOne user} reference uses
@@ -64,13 +64,12 @@ import org.hibernate.annotations.UpdateTimestamp;
  *
  * <p>The denormalised {@link #kind} column mirrors {@code org_unit.kind} so the partial unique
  * index "at most one Staffel membership per user" (V95: {@code uq_org_unit_membership_one_squadron}
- * on {@code (user_id) WHERE kind = 'SQUADRON'}) and the CHECK constraint "{@code is_lead} only on
- * SK memberships" (V95: {@code chk_org_unit_membership_lead_only_on_special_command}) can be
- * expressed without crossing tables. The BEFORE INSERT/UPDATE trigger {@code
- * sync_org_unit_membership_kind} keeps the value aligned with the referenced {@code org_unit.kind}
- * — application code MUST NOT write to this column directly, so it is mapped as {@code insertable =
- * false, updatable = false}. Hibernate reads it back from the trigger output via the RETURNING
- * clause Spring Data emits on insert.
+ * on {@code (user_id) WHERE kind = 'SQUADRON'}) and the rank kind-scoping CHECK "{@code role} only
+ * on the matching kind" (V184: {@code chk_org_unit_membership_role_kind}) can be expressed without
+ * crossing tables. The BEFORE INSERT/UPDATE trigger {@code sync_org_unit_membership_kind} keeps the
+ * value aligned with the referenced {@code org_unit.kind} — application code MUST NOT write to this
+ * column directly, so it is mapped as {@code insertable = false, updatable = false}. Hibernate
+ * reads it back from the trigger output via the RETURNING clause Spring Data emits on insert.
  *
  * <p>This entity does not extend {@link AbstractEntity} because it owns a composite key rather than
  * a single UUID surrogate: {@link AbstractEntity}'s {@code @Id} contract is fundamentally
@@ -141,54 +140,36 @@ public class OrgUnitMembership {
   private boolean isMissionManager = false;
 
   /**
-   * {@code true} when the membership grants the Spezialkommando Lead capability (managing the SK's
-   * member list without requiring global ADMIN). The V95 CHECK constraint {@code
-   * chk_org_unit_membership_lead_only_on_special_command} forbids this flag on a Squadron
-   * membership — Staffeln already use the global {@code OFFICER} / {@code ADMIN} roles for member
-   * administration, so a separate per-Staffel Lead would be redundant. Always {@code false} for
-   * {@code kind = 'SQUADRON'} memberships.
+   * Unified leadership rank of this membership (epic #800, REQ-ROLE-001) — the <strong>single
+   * source of truth</strong> for the user's standing in this org unit. It superseded the five
+   * mutually-exclusive boolean leadership flags ({@code is_lead}, {@code is_bereichsleiter}, {@code
+   * is_bereichskoordinator}, {@code is_bereichsoperator}, {@code is_ol_member}), which were dropped
+   * in the epic #800 Phase 5 cleanup ({@code V187}); the SK-Lead and Bereichsleitung wire shapes
+   * now derive their booleans from this rank. Kind-scoped by the V184 {@code
+   * chk_org_unit_membership_role_kind} CHECK (squadron ranks only on {@code SQUADRON}, area ranks
+   * only on {@code BEREICH}, {@link MembershipRole#OL_MEMBER} only on {@code ORGANISATIONSLEITUNG},
+   * {@link MembershipRole#SK_LEAD} only on {@code SPECIAL_COMMAND}).
+   *
+   * <p>The whole authorisation layer ({@code CustomJwtGrantedAuthoritiesConverter}, {@code
+   * OrgUnitCascadeService}, {@code OwnerScopeService}) and the V165 {@code
+   * enforce_leader_excludes_squadron} trigger read this column. Defaults to {@link
+   * MembershipRole#MEMBER}.
    */
-  @Column(name = "is_lead", nullable = false)
-  private boolean isLead = false;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "role", nullable = false, length = 40)
+  private MembershipRole role = MembershipRole.MEMBER;
 
   /**
-   * {@code true} when this membership makes the user the <em>Bereichsleiter</em> (area lead) of the
-   * referenced Bereich (epic #692, REQ-ORG-017). Valid only on a {@code kind = 'BEREICH'}
-   * membership (V164 CHECK {@code chk_org_unit_membership_bereich_flags_only_on_bereich}). Together
-   * with {@link #isBereichskoordinator} / {@link #isBereichsoperator} it confers
-   * officer-equivalent, cascading reach over every Staffel/SK of that Bereich (REQ-ORG-015) — never
-   * admin rights. Always {@code false} for non-Bereich memberships.
+   * The Kommandogruppe this membership is assigned to (epic #800, REQ-ROLE-003), or {@code null}.
+   * Non-null only for the squadron ranks {@link MembershipRole#KOMMANDOLEITER} / {@link
+   * MembershipRole#STELLV_KOMMANDOLEITER} / {@link MembershipRole#ENSIGN}; an Ensign with a {@code
+   * null} group is "allgemein der Staffelleitung". The {@code
+   * chk_org_unit_membership_kommando_group_role} CHECK (V185) enforces this pairing. Lazy-fetched.
    */
-  @Column(name = "is_bereichsleiter", nullable = false)
-  private boolean isBereichsleiter = false;
-
-  /**
-   * {@code true} when this membership makes the user a <em>Bereichskoordinator</em> of the
-   * referenced Bereich (epic #692, REQ-ORG-017). Same Bereich-only CHECK and same cascading,
-   * officer-equivalent reach over the Bereich's Staffeln/SKs as {@link #isBereichsleiter}. Always
-   * {@code false} for non-Bereich memberships.
-   */
-  @Column(name = "is_bereichskoordinator", nullable = false)
-  private boolean isBereichskoordinator = false;
-
-  /**
-   * {@code true} when this membership makes the user a <em>Bereichsoperator</em> of the referenced
-   * Bereich (epic #692, REQ-ORG-017). Same Bereich-only CHECK and same cascading,
-   * officer-equivalent reach over the Bereich's Staffeln/SKs as {@link #isBereichsleiter}. Always
-   * {@code false} for non-Bereich memberships.
-   */
-  @Column(name = "is_bereichsoperator", nullable = false)
-  private boolean isBereichsoperator = false;
-
-  /**
-   * {@code true} when this membership makes the user a member of the <em>Organisationsleitung</em>
-   * (epic #692, REQ-ORG-017). Valid only on a {@code kind = 'ORGANISATIONSLEITUNG'} membership
-   * (V164 CHECK {@code chk_org_unit_membership_ol_flag_only_on_ol}). Confers officer-equivalent,
-   * cascading reach over <em>every</em> org unit (REQ-ORG-015) — never admin rights. Always {@code
-   * false} for non-OL memberships.
-   */
-  @Column(name = "is_ol_member", nullable = false)
-  private boolean isOlMember = false;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "kommando_group_id")
+  @ToString.Exclude
+  private KommandoGroup kommandoGroup;
 
   /**
    * Timestamp when the membership was granted. Backfilled by V95 from {@link User#getJoinDate()}

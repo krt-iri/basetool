@@ -70,7 +70,8 @@ public class AuditReportProxyController {
           "REFINERY",
           "PERSONAL_INVENTORY",
           "MISSION",
-          "OPERATION");
+          "OPERATION",
+          "ROLE");
 
   private final WebClient webClient;
 

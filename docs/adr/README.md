@@ -79,4 +79,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0039](0039-bank-holder-ledger-decoupled-from-accounts.md)                | Bank: holder custody decoupled from accounts via a second append-only ledger (global, may go negative)         | Accepted                                          |
 | [0040](0040-bank-staff-are-holders-and-employee-administration-access.md) | Bank staff are holders (auto-registration from bank roles) + employee bank-administration access               | Accepted                                          |
 | [0041](0041-bank-in-game-transfer-fee.md)                                 | Bank: factor the in-game transfer fee into holder-initiated transfers (carve out, credit net, amends ADR-0039) | Accepted                                          |
+| [0042](0042-unified-membership-rank-with-delegated-appointment.md)        | Unified membership rank enum + delegated appointment ladder + baseline squadron-leadership grant               | Accepted — Phases 1-2 implemented                 |
 

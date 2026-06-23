@@ -874,11 +874,16 @@ class ArchitectureTest {
                 boolean hasOwnerScope = value.contains("ownerScopeService");
                 boolean hasMissionSecurity = value.contains("missionSecurityService");
                 boolean hasSpecialCommandSecurity = value.contains("specialCommandSecurityService");
+                // Epic #800 (REQ-ROLE-004): the delegated appointment authoriser is a per-org-unit
+                // gate (it keys the verdict on the caller's rank on the exact unit in the path), so
+                // it is an accepted scope gate exactly like the specialCommandSecurity bean.
+                boolean hasOrgRoleManagement = value.contains("orgRoleManagementSecurityService");
                 boolean hasAdminOnly =
                     value.contains("hasRole('ADMIN')") && !value.contains("hasAnyRole(");
                 if (!hasOwnerScope
                     && !hasMissionSecurity
                     && !hasSpecialCommandSecurity
+                    && !hasOrgRoleManagement
                     && !hasAdminOnly) {
                   events.add(
                       SimpleConditionEvent.violated(
@@ -1670,6 +1675,32 @@ class ArchitectureTest {
             "the cascading-scope expansion must be a pure function of memberships + hierarchy and"
                 + " must never branch on admin status, so it can never route an OL/Bereich"
                 + " principal through adminAllScope / isAdmin (epic #692, REQ-ORG-015 hard"
+                + " invariant)")
+        .check(CLASSES);
+  }
+
+  /**
+   * Epic #800 / REQ-ROLE-004: the delegated-appointment authoriser ({@code
+   * OrgRoleManagementSecurityService}) must compute its verdict purely from the caller's own
+   * membership ranks plus the persisted hierarchy. It must NEVER depend on {@code
+   * OwnerScopeService} — that bean folds in the admin-pin header, the admin-all scope and the
+   * cascading reach, none of which may leak into a delegated appointment verdict (a Bereichsleiter
+   * pinned to a subordinate unit must not thereby gain appointment rights there). The "no
+   * SecurityContextHolder" half of the invariant is already covered globally by {@link
+   * #serviceLayerShouldNotReachIntoSecurityContext()}.
+   */
+  @Test
+  void delegatedRoleAuthoriserMustNotConsultOwnerScope() {
+    noClasses()
+        .that()
+        .haveSimpleName("OrgRoleManagementSecurityService")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName("de.greluc.krt.profit.basetool.backend.service.OwnerScopeService")
+        .because(
+            "the delegated appointment verdict must read only the caller's own membership ranks +"
+                + " the persisted hierarchy, never the admin-pin / admin-all / cascading scope that"
+                + " OwnerScopeService carries (epic #800, REQ-ROLE-004 no-self-promotion / no-admin"
                 + " invariant)")
         .check(CLASSES);
   }

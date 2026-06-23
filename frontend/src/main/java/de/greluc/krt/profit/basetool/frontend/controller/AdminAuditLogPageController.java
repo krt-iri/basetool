@@ -68,7 +68,8 @@ public class AdminAuditLogPageController {
           "REFINERY",
           "PERSONAL_INVENTORY",
           "MISSION",
-          "OPERATION");
+          "OPERATION",
+          "ROLE");
 
   /** Message-bundle key prefix for the bank event-type labels (their own namespace). */
   private static final String BANK_EVENT_PREFIX = "admin.bank.audit.event.";
@@ -201,7 +202,20 @@ public class AdminAuditLogPageController {
               "OPERATION_DELETED",
               "OPERATION_PAYOUT_TOGGLED",
               "OPERATION_AUDIT_EXPORTED",
-              "OPERATION_AUDIT_PURGED"));
+              "OPERATION_AUDIT_PURGED"),
+          "ROLE",
+          List.of(
+              "MEMBERSHIP_GRANTED",
+              "MEMBERSHIP_REVOKED",
+              "ROLE_GRANTED",
+              "ROLE_CHANGED",
+              "ROLE_REVOKED",
+              "CAPABILITY_FLAGS_CHANGED",
+              "KOMMANDO_GROUP_CREATED",
+              "KOMMANDO_GROUP_UPDATED",
+              "KOMMANDO_GROUP_DELETED",
+              "ROLE_AUDIT_EXPORTED",
+              "ROLE_AUDIT_PURGED"));
 
   private final BackendApiClient backendApiClient;
 

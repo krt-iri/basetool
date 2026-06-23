@@ -20,12 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,7 +34,10 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -45,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
@@ -76,8 +81,11 @@ class OrgUnitMembershipServiceTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private SpecialCommandRepository specialCommandRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
+  @Mock private KommandoGroupRepository kommandoGroupRepository;
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private InventoryOrgUnitReconciler inventoryReconciler;
+  @Mock private AuditService auditService;
+  @Mock private OrgChartService orgChartService;
 
   @InjectMocks private OrgUnitMembershipService membershipService;
 
@@ -145,6 +153,8 @@ class OrgUnitMembershipServiceTest {
     assertEquals(userId, saved.getId().getUserId());
     assertEquals(scId, saved.getId().getOrgUnitId());
     verify(membershipRepository).save(any(OrgUnitMembership.class));
+    verify(auditService)
+        .record(eq(AuditEventType.MEMBERSHIP_GRANTED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -214,6 +224,9 @@ class OrgUnitMembershipServiceTest {
     membershipService.removeMember(scId, userId);
 
     verify(membershipRepository).deleteById(id);
+    verify(orgChartService).mirrorRemoveUnitSeat(scId, userId);
+    verify(auditService)
+        .record(eq(AuditEventType.MEMBERSHIP_REVOKED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -264,6 +277,8 @@ class OrgUnitMembershipServiceTest {
 
     assertTrue(updated.isLogistician());
     assertTrue(updated.isMissionManager());
+    verify(auditService)
+        .record(eq(AuditEventType.CAPABILITY_FLAGS_CHANGED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -313,7 +328,6 @@ class OrgUnitMembershipServiceTest {
   void toggleLead_promotes() {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setVersion(0L);
-    m.setLead(false);
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
@@ -321,14 +335,17 @@ class OrgUnitMembershipServiceTest {
 
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
-    assertTrue(updated.isLead());
+    assertEquals(MembershipRole.SK_LEAD, updated.getRole());
+    verify(orgChartService).mirrorSkLead(scId, userId, true);
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
   void toggleLead_demotes() {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setVersion(2L);
-    m.setLead(true);
+    m.setRole(MembershipRole.SK_LEAD);
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(false, 2L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
@@ -336,7 +353,10 @@ class OrgUnitMembershipServiceTest {
 
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
-    assertFalse(updated.isLead());
+    assertEquals(MembershipRole.MEMBER, updated.getRole());
+    verify(orgChartService).mirrorSkLead(scId, userId, false);
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_REVOKED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
@@ -358,7 +378,6 @@ class OrgUnitMembershipServiceTest {
     // is rejected with a clean 400 (the V165 trigger is the DB backstop).
     OrgUnitMembership m = new OrgUnitMembership();
     m.setVersion(0L);
-    m.setLead(false);
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
@@ -378,7 +397,7 @@ class OrgUnitMembershipServiceTest {
     Squadron target = new Squadron();
     target.setId(UUID.randomUUID());
     OrgUnitMembership leadRow = new OrgUnitMembership();
-    leadRow.setLead(true);
+    leadRow.setRole(MembershipRole.SK_LEAD);
     when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
@@ -408,9 +427,35 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership m =
         membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
 
-    assertTrue(m.isBereichskoordinator());
-    assertFalse(m.isBereichsleiter());
-    assertFalse(m.isBereichsoperator());
+    assertEquals(MembershipRole.BEREICHSKOORDINATOR, m.getRole());
+    verify(orgChartService).mirrorBereichRole(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(bereichId), any(), eq(userId), any());
+  }
+
+  @Test
+  void addBereichLeader_existingRank_recordsRoleChanged() {
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    OrgUnitMembership existing = new OrgUnitMembership();
+    existing.setId(new OrgUnitMembershipId(userId, bereichId));
+    existing.setKind(OrgUnitKind.BEREICH);
+    existing.setRole(MembershipRole.BEREICHSLEITER);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
+        .thenReturn(Optional.of(existing));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
+
+    // An existing leadership rank changed (BEREICHSLEITER -> BEREICHSKOORDINATOR) records CHANGED.
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_CHANGED), eq(bereichId), any(), eq(userId), any());
   }
 
   @Test
@@ -427,6 +472,8 @@ class OrgUnitMembershipServiceTest {
         BadRequestException.class,
         () -> membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.LEITER));
     verify(membershipRepository, never()).saveAndFlush(any());
+    // A rejected assignment must not write an audit event.
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -458,7 +505,10 @@ class OrgUnitMembershipServiceTest {
 
     OrgUnitMembership m = membershipService.addOlMember(olId, userId);
 
-    assertTrue(m.isOlMember());
+    assertEquals(MembershipRole.OL_MEMBER, m.getRole());
+    verify(orgChartService).mirrorOlMember(olId, userId);
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(olId), any(), eq(userId), any());
   }
 
   @Test
@@ -473,6 +523,152 @@ class OrgUnitMembershipServiceTest {
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(true);
 
     assertThrows(DuplicateEntityException.class, () -> membershipService.addOlMember(olId, userId));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  // --- assign/remove squadron rank (epic #800 Phase 3) ----------------------
+
+  /** A Staffel membership row for {@link #userId} on the given squadron with the given rank. */
+  private OrgUnitMembership squadronMember(UUID squadronId, MembershipRole role) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, squadronId));
+    m.setKind(OrgUnitKind.SQUADRON);
+    m.setRole(role);
+    m.setVersion(0L);
+    return m;
+  }
+
+  @Test
+  void assignSquadronRank_staffelleiter_grantsAndAudits() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership saved =
+        membershipService.assignSquadronRank(
+            squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L);
+
+    assertEquals(MembershipRole.STAFFELLEITER, saved.getRole());
+    verify(orgChartService)
+        .mirrorSquadronRank(eq(squadronId), eq(userId), eq(MembershipRole.STAFFELLEITER), isNull());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
+  }
+
+  @Test
+  void assignSquadronRank_nonSquadronRank_throwsBadRequest() {
+    UUID squadronId = UUID.randomUUID();
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.BEREICHSLEITER, null, 0L));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void assignSquadronRank_notMember_throwsNotFound() {
+    UUID squadronId = UUID.randomUUID();
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
+        .thenReturn(Optional.empty());
+    assertThrows(
+        NotFoundException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L));
+  }
+
+  @Test
+  void assignSquadronRank_kommandoleiterWithoutGroup_throwsBadRequest() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.KOMMANDOLEITER, null, 0L));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void assignSquadronRank_kommandoleiterWithGroup_grants() {
+    UUID squadronId = UUID.randomUUID();
+    UUID groupId = UUID.randomUUID();
+    Squadron squadron = new Squadron();
+    squadron.setId(squadronId);
+    KommandoGroup group =
+        KommandoGroup.builder().squadron(squadron).name("Alpha").sortIndex(0).build();
+    group.setId(groupId);
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(kommandoGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership saved =
+        membershipService.assignSquadronRank(
+            squadronId, userId, MembershipRole.KOMMANDOLEITER, groupId, 0L);
+
+    assertEquals(MembershipRole.KOMMANDOLEITER, saved.getRole());
+    assertSame(group, saved.getKommandoGroup());
+    verify(orgChartService)
+        .mirrorSquadronRank(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
+  }
+
+  @Test
+  void assignSquadronRank_secondStaffelleiter_throwsBadRequest() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership target = squadronMember(squadronId, MembershipRole.MEMBER);
+    OrgUnitMembership existingLead = new OrgUnitMembership();
+    existingLead.setId(new OrgUnitMembershipId(UUID.randomUUID(), squadronId));
+    existingLead.setKind(OrgUnitKind.SQUADRON);
+    existingLead.setRole(MembershipRole.STAFFELLEITER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
+        .thenReturn(Optional.of(target));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId))
+        .thenReturn(List.of(target, existingLead));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.assignSquadronRank(
+                squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void removeSquadronRank_clearsAndAudits() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.STAFFELLEITER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembership saved = membershipService.removeSquadronRank(squadronId, userId, 0L);
+
+    assertEquals(MembershipRole.MEMBER, saved.getRole());
+    verify(orgChartService).mirrorRemoveSquadronRank(squadronId, userId);
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_REVOKED), eq(squadronId), any(), eq(userId), any());
+  }
+
+  @Test
+  void removeSquadronRank_noRank_throwsBadRequest() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> membershipService.removeSquadronRank(squadronId, userId, 0L));
     verify(membershipRepository, never()).saveAndFlush(any());
   }
 
@@ -584,7 +780,7 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership bereichRow = new OrgUnitMembership();
     bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
     bereichRow.setKind(OrgUnitKind.BEREICH);
-    bereichRow.setBereichsleiter(true);
+    bereichRow.setRole(MembershipRole.BEREICHSLEITER);
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(bereichRow));
     when(orgUnitCascadeService.expandWithDescendants(any()))
         .thenReturn(new java.util.LinkedHashSet<>(List.of(bereichId, staffelId)));

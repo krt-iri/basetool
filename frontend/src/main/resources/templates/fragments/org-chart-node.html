@@ -25,7 +25,9 @@
     <span class="oc-node-name" th:text="${nm}">Name</span>
     <span class="oc-node-flag" th:if="${freeText}" th:text="${noAcc}"
           th:title="#{orgChart.noAccount.hint}">Kein Account</span>
-    <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+    <!-- Account-held seats mirror a functional rank (epic #800, REQ-ROLE-006) and are read-only
+         here — managed under Organisation -> Leitung. Only free-text holders keep edit/remove. -->
+    <div class="oc-actions" sec:authorize="hasRole('ADMIN')" th:if="${node.userId() == null}">
         <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                 th:data-position-id="${node.positionId()}"
                 th:data-version="${node.version()}"
@@ -46,6 +48,8 @@
             </svg>
         </button>
     </div>
+    <span class="oc-node-managed" sec:authorize="hasRole('ADMIN')" th:if="${node.userId() != null}"
+          th:text="#{orgChart.managedInLeitung}" th:title="#{orgChart.managedInLeitung.hint}">Leitung</span>
 </div>
 
 <!--
@@ -174,7 +178,12 @@
                             <span class="oc-command-name oc-command-name--unnamed"
                                   th:if="${cmd.name() == null}"
                                   th:text="#{orgChart.command.unnamed}">Ohne Namen</span>
-                            <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+                            <!-- A kommando_group-linked Kommando mirrors a functional rank (epic
+                                 #800, REQ-ROLE-006) and is read-only here — managed under
+                                 Organisation -> Leitung. Only legacy chart-only Kommandos
+                                 (kommandoGroupId null) keep the rename / remove controls. -->
+                            <div class="oc-actions" sec:authorize="hasRole('ADMIN')"
+                                 th:if="${cmd.kommandoGroupId() == null}">
                                 <button type="button" class="oc-icon-btn" data-trigger="oc-rename"
                                         th:data-position-id="${cmd.positionId()}"
                                         th:data-version="${cmd.version()}"
@@ -195,6 +204,10 @@
                                     </svg>
                                 </button>
                             </div>
+                            <span class="oc-node-managed" sec:authorize="hasRole('ADMIN')"
+                                  th:if="${cmd.kommandoGroupId() != null}"
+                                  th:text="#{orgChart.managedInLeitung}"
+                                  th:title="#{orgChart.managedInLeitung.hint}">Leitung</span>
                         </div>
                         <div class="oc-v"></div>
 
@@ -209,7 +222,10 @@
                                 <span class="oc-node-name" th:text="${cmdNm}">Name</span>
                                 <span class="oc-node-flag" th:if="${cmdFreeText}" th:text="${cmdNoAcc}"
                                       th:title="#{orgChart.noAccount.hint}">Kein Account</span>
-                                <div class="oc-actions" sec:authorize="hasRole('ADMIN')">
+                                <!-- An account Kommandoleiter mirrors a functional rank (REQ-ROLE-006)
+                                     and is read-only here; only a free-text leader stays editable. -->
+                                <div class="oc-actions" sec:authorize="hasRole('ADMIN')"
+                                     th:if="${cmd.leaderUserId() == null}">
                                     <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                                             th:data-position-id="${cmd.positionId()}"
                                             th:data-version="${cmd.version()}"
@@ -231,6 +247,10 @@
                                         </svg>
                                     </button>
                                 </div>
+                                <span class="oc-node-managed" sec:authorize="hasRole('ADMIN')"
+                                      th:if="${cmd.leaderUserId() != null}"
+                                      th:text="#{orgChart.managedInLeitung}"
+                                      th:title="#{orgChart.managedInLeitung.hint}">Leitung</span>
                             </div>
                         </th:block>
                         <div th:if="${cmd.leaderUserId() == null and cmd.leaderDisplayName() == null}"
@@ -240,7 +260,7 @@
                             <span class="oc-node-rank" th:text="#{orgChart.rank.COMMAND_LEAD}">Kommandoleiter</span>
                             <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
                         </div>
-                        <button th:if="${cmd.leaderUserId() == null and cmd.leaderDisplayName() == null}"
+                        <button th:if="${cmd.kommandoGroupId() == null and cmd.leaderUserId() == null and cmd.leaderDisplayName() == null}"
                                 type="button" class="oc-add"
                                 sec:authorize="hasRole('ADMIN')" data-trigger="oc-reassign"
                                 th:data-position-id="${cmd.positionId()}"
@@ -258,14 +278,19 @@
                             <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e}, 6)}"></th:block>
                         </th:block>
 
-                        <button th:if="${cmd.deputy() == null}" type="button" class="oc-add"
+                        <!-- A group-linked Kommando's Stv. / Ensigns are managed under Organisation
+                             -> Leitung (epic #800, REQ-ROLE-006), so the chart offers no add-child
+                             affordance on it; only a legacy chart-only Kommando keeps them. -->
+                        <button th:if="${cmd.kommandoGroupId() == null and cmd.deputy() == null}"
+                                type="button" class="oc-add"
                                 sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
                                 data-position-type="DEPUTY_COMMAND_LEAD"
                                 th:data-org-unit-id="${sq.orgUnitId()}"
                                 th:data-parent-id="${cmd.positionId()}"
                                 th:data-rank-label="#{orgChart.rank.DEPUTY_COMMAND_LEAD}"
                                 th:text="#{orgChart.add.deputy}">Stv. zuweisen</button>
-                        <button th:if="${sq.canAddEnsign()}" type="button" class="oc-add"
+                        <button th:if="${cmd.kommandoGroupId() == null and sq.canAddEnsign()}"
+                                type="button" class="oc-add"
                                 sec:authorize="hasRole('ADMIN')" data-trigger="oc-add"
                                 data-position-type="ENSIGN" th:data-org-unit-id="${sq.orgUnitId()}"
                                 th:data-parent-id="${cmd.positionId()}"

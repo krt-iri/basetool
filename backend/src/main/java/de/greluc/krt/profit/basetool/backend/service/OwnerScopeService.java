@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -449,7 +450,9 @@ public class OwnerScopeService {
     }
     List<OrgUnitMembership> memberships = currentCallerMemberships();
     for (OrgUnitMembership m : memberships) {
-      if (m.isLead()) {
+      // SK leads oversee their own SK; from epic #800 (REQ-ROLE-002) the four squadron ranks
+      // oversee their own squadron the same way (officer-equivalent, own-unit only, no cascade).
+      if (m.getRole() == MembershipRole.SK_LEAD || m.getRole().isSquadronRank()) {
         oversightOrgUnitIds.add(m.getId().getOrgUnitId());
       }
     }
@@ -515,8 +518,10 @@ public class OwnerScopeService {
   /**
    * {@code true} iff the membership is an <em>oversight seat</em> — one that confers
    * officer-equivalent oversight over its own org unit (and, for Bereich/OL, cascading reach below
-   * it). These are the SK-lead seat ({@code is_lead}) and the Bereichsleitung / OL seats (epic #692
-   * Phase 6, REQ-ORG-015). A plain Staffel/SK membership or a flag-less Bereich/OL seat is not an
+   * it). These are every membership carrying a functional rank ({@link
+   * MembershipRole#confersOwnLevelOversight()}, i.e. {@code role != MEMBER}): the SK-lead seat, the
+   * Bereichsleitung / OL seats (epic #692 Phase 6, REQ-ORG-015) and, from epic #800 (REQ-ROLE-002),
+   * the four squadron ranks. A rank-less ({@code MEMBER}) Staffel/SK/Bereich/OL seat is not an
    * oversight seat. Shared by {@link #canAccessBlueprintOverview()} and {@link
    * #currentOwnLevelOversightScope()} so the gate and the own-level scope agree on what "oversight"
    * means.
@@ -525,11 +530,7 @@ public class OwnerScopeService {
    * @return {@code true} iff the membership grants own-level oversight over its org unit.
    */
   private static boolean isOversightSeat(@NotNull OrgUnitMembership m) {
-    return m.isLead()
-        || m.isBereichsleiter()
-        || m.isBereichskoordinator()
-        || m.isBereichsoperator()
-        || m.isOlMember();
+    return m.getRole().confersOwnLevelOversight();
   }
 
   /**
@@ -540,9 +541,9 @@ public class OwnerScopeService {
    * deliberately <em>excludes</em> the SK-lead seat and the officer role: an officer or SK lead
    * oversees only their own unit's account, so they do not get the org-wide special-account view.
    * The seats that qualify are the Bereichsleitung flags ({@code is_bereichsleiter}/{@code
-   * is_bereichskoordinator}/{@code is_bereichsoperator}) and the OL flag ({@code is_ol_member}); a
-   * flag-less (chart-only) Bereich/OL membership does not qualify. Admins always qualify — they see
-   * every account anyway.
+   * is_bereichskoordinator}/{@code is_bereichsoperator}) and the OL flag ({@code is_ol_member}) —
+   * now read through {@link MembershipRole#isAreaOrOl()}; a rank-less (chart-only) Bereich/OL
+   * membership does not qualify. Admins always qualify — they see every account anyway.
    *
    * <p>This is consulted only by the org-unit-aware bank seam ({@link OrgUnitBankAccessService});
    * it adds no org-unit logic to the bank itself, which stays org-unit-blind (REQ-BANK-008,
@@ -559,17 +560,16 @@ public class OwnerScopeService {
 
   /**
    * {@code true} iff the membership is a Bereich- or OL-level oversight seat — the subset of {@link
-   * #isOversightSeat(OrgUnitMembership)} that excludes the SK-lead seat. Backs {@link
+   * #isOversightSeat(OrgUnitMembership)} that excludes the SK-lead and squadron-rank seats, read
+   * through {@link MembershipRole#isAreaOrOl()} ({@code BEREICHSLEITER} / {@code
+   * BEREICHSKOORDINATOR} / {@code BEREICHSOPERATOR} / {@code OL_MEMBER}). Backs {@link
    * #currentUserHasAreaOrOlOversight()}.
    *
    * @param m the membership row to classify; never {@code null}.
    * @return {@code true} iff the membership is a Bereichsleitung or OL seat.
    */
   private static boolean isAreaOrOlSeat(@NotNull OrgUnitMembership m) {
-    return m.isBereichsleiter()
-        || m.isBereichskoordinator()
-        || m.isBereichsoperator()
-        || m.isOlMember();
+    return m.getRole().isAreaOrOl();
   }
 
   /**
@@ -1425,6 +1425,61 @@ public class OwnerScopeService {
                         ? canAccessOwnerlessPersonalRow(o.getOwner())
                         : canEditSquadron(o.getOwningOrgUnit().getId())))
         .orElse(false);
+  }
+
+  /**
+   * {@code true} iff the caller may read the target user's refinery orders through the per-user
+   * list endpoint {@code GET /api/v1/refinery-orders/users/{userId}}. Scopes the flat-{@code
+   * ROLE_LOGISTICIAN} gate at the user level: an admin, the target user themselves, or a caller
+   * whose strict org-unit scope ({@link #canSeeSquadron(UUID)}) covers one of the target user's
+   * memberships. This mirrors the per-order {@link #canSeeRefineryOrder(RefineryOrder)} reach (also
+   * strict-staffel), making the whole refinery surface consistent and closing the org-wide gap
+   * where any oversight rank's flat {@code ROLE_LOGISTICIAN} could read every user's orders (PR
+   * #808 security review). A non-existent / membership-less target yields {@code false} for
+   * non-admins.
+   *
+   * @param targetUserId the user whose refinery orders the caller wants to read; never {@code
+   *     null}.
+   * @return {@code true} iff the caller may read that user's refinery orders.
+   */
+  public boolean canViewUserRefineryOrders(@NotNull UUID targetUserId) {
+    return canActOnUserRefineryOrders(targetUserId, this::canSeeSquadron);
+  }
+
+  /**
+   * Write analogue of {@link #canViewUserRefineryOrders(UUID)} for the create-on-behalf endpoint
+   * {@code POST /api/v1/refinery-orders/users/{userId}}; scopes on {@link #canEditSquadron(UUID)}
+   * exactly as the per-order {@link #canEditRefineryOrder(UUID)} does.
+   *
+   * @param targetUserId the user the caller wants to create a refinery order for; never {@code
+   *     null}.
+   * @return {@code true} iff the caller may create a refinery order on that user's behalf.
+   */
+  public boolean canManageUserRefineryOrders(@NotNull UUID targetUserId) {
+    return canActOnUserRefineryOrders(targetUserId, this::canEditSquadron);
+  }
+
+  /**
+   * Shared resolution for the per-user refinery endpoints: admin all-access, then the self escape,
+   * then the strict org-unit scope check against the target user's memberships (read straight from
+   * {@code org_unit_membership}, never a lazy association). The {@code unitScope} predicate is
+   * {@link #canSeeSquadron(UUID)} for reads / {@link #canEditSquadron(UUID)} for writes.
+   *
+   * @param targetUserId the user being acted upon; never {@code null}.
+   * @param unitScope the per-unit scope check to apply; never {@code null}.
+   * @return {@code true} iff the caller is in scope for the target user's refinery orders.
+   */
+  private boolean canActOnUserRefineryOrders(
+      @NotNull UUID targetUserId, @NotNull java.util.function.Predicate<UUID> unitScope) {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    if (authHelper.currentUserId().map(targetUserId::equals).orElse(false)) {
+      return true;
+    }
+    return orgUnitMembershipRepository.findAllByIdUserId(targetUserId).stream()
+        .map(m -> m.getId().getOrgUnitId())
+        .anyMatch(unitScope);
   }
 
   /**

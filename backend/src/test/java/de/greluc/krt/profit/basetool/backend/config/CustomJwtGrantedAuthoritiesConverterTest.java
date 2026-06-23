@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -101,7 +102,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void bereichsleiter_getsFlatRolesAndCascadedContextualAuthorities() {
     when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
-    lead.setBereichsleiter(true);
+    lead.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
         .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID, DESCENDANT_SK_ID));
@@ -123,7 +124,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
     UUID olId = UUID.randomUUID();
     OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
-    ol.setOlMember(true);
+    ol.setRole(MembershipRole.OL_MEMBER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(ol));
     // The cascade service resolves OL reach to the concrete union of every org unit.
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
@@ -135,6 +136,36 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
     assertTrue(
         authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", DESCENDANT_STAFFEL_ID)));
+  }
+
+  @Test
+  void staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade() {
+    // REQ-ROLE-002: a squadron leadership rank confers officer-equivalent reach over its OWN
+    // squadron only, exactly as SK_LEAD does — the flat back-compat roles plus the own-unit
+    // contextual authorities, but NO downward cascade and no contextual authority for any foreign
+    // unit. The cascade service yields nothing for a squadron rank (verified in
+    // OrgUnitCascadeService
+    // tests), so the only reach is the own-squadron contextual minted by the per-row loop.
+    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership lead = membership(squadronId, OrgUnitKind.SQUADRON);
+    lead.setRole(MembershipRole.STAFFELLEITER);
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
+    when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    // Officer-equivalent flat roles, exactly as SK_LEAD (back-compat for role-only @PreAuthorize).
+    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    // Own-squadron contextual authorities (minted by the per-row loop, not the cascade).
+    assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", squadronId)));
+    assertTrue(authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", squadronId)));
+    // ...and NOTHING for any other unit — no downward cascade, no cross-unit contextual reach.
+    UUID foreignUnit = UUID.randomUUID();
+    assertFalse(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", foreignUnit)));
+    assertFalse(
+        authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", foreignUnit)));
   }
 
   @Test

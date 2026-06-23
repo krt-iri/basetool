@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -202,18 +203,19 @@ public class CustomJwtGrantedAuthoritiesConverter
       return;
     }
 
-    // An SK lead (is_lead = true) is automatically BOTH a logistician AND a mission manager of that
-    // SK — the lead role sits above both within its org unit, mirroring how admin outranks every
-    // role and an Officer is logistician + mission manager of their own squadron (#344). is_lead
-    // only exists on SK memberships (DB CHECK), so this never widens a Staffel membership.
+    // Any functional rank (MembershipRole != MEMBER) is automatically BOTH a logistician AND a
+    // mission manager of its org unit — the rank sits above both within that unit, mirroring how
+    // admin outranks every role and an Officer is logistician + mission manager of their own
+    // squadron (#344). The rank is kind-scoped by the V184 chk_org_unit_membership_role_kind CHECK,
+    // so a squadron rank only ever widens its own Staffel, an SK_LEAD its own SK, and so on.
     //
-    // Epic #692 / REQ-ORG-015 extends the same "leadership ⊇ logistician + mission manager"
-    // principle one level up: a Bereichsleitung membership (is_bereichsleiter /
-    // is_bereichskoordinator / is_bereichsoperator) and an OL membership (is_ol_member) confer
-    // officer-equivalent reach — never admin — so they promote the caller to the flat
-    // ROLE_LOGISTICIAN / ROLE_MISSION_MANAGER just like an SK lead does. The flat role is the
-    // back-compat surface for role-only @PreAuthorize gates; the cascade's org-unit scoping is
-    // applied separately (contextual authorities below + OwnerScopeService's scope predicate).
+    // Epic #800 / REQ-ROLE-001/002 unifies the former five boolean leadership flags into the rank
+    // enum and extends the "leadership ⊇ logistician + mission manager" principle to the squadron
+    // ranks: a Staffelleiter / Kommandoleiter / stellv. Kommandoleiter / Ensign confers
+    // officer-equivalent reach over its own squadron — never admin — exactly as an SK_LEAD does for
+    // its SK and a Bereichsleitung / OL membership does for its subtree. The flat role is the
+    // back-compat surface for role-only @PreAuthorize gates; the per-unit scoping is applied
+    // separately (contextual authorities below + OwnerScopeService's scope predicate).
     boolean anyLogistician =
         memberships.stream().anyMatch(m -> m.isLogistician() || confersFlatOfficerRole(m));
     boolean anyMissionManager =
@@ -226,18 +228,22 @@ public class CustomJwtGrantedAuthoritiesConverter
       authorities.add(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"));
     }
 
-    // §6.1 — one contextual authority per (membership, flag=true) pair. The per-row evaluation
-    // here is what differentiates this from the flat OR-union above: a user with the
+    // §6.1 — one contextual authority per (membership, own-unit-officer reach) pair. The per-row
+    // evaluation here is what differentiates this from the flat OR-union above: a user with the
     // Logistician flag on Staffel A but not on SK B gets a contextual authority for A only,
     // even though the flat ROLE_LOGISTICIAN was granted by either of them. That distinction is
-    // what callers using @ownerScopeService.hasRoleInOrgUnit(...) need to know about. A lead of an
-    // SK gets the SK's contextual LOGISTICIAN and MISSION_MANAGER authorities here too
-    // (lead ⊇ logistician + mission manager).
+    // what callers using @ownerScopeService.hasRoleInOrgUnit(...) need to know about. An SK_LEAD —
+    // and, from epic #800, every squadron rank (Staffelleiter / Kommandoleiter / stellv. / Ensign)
+    // — gets its own unit's contextual LOGISTICIAN + MISSION_MANAGER authorities here too
+    // (own-unit officer ⊇ logistician + mission manager, no cascade). Bereich/OL seats are NOT
+    // minted here: their own-seat contextual authority comes from the cascade below, which already
+    // includes the seat itself.
     for (OrgUnitMembership m : memberships) {
-      if (m.isLogistician() || m.isLead()) {
+      boolean ownUnitOfficer = confersOwnUnitOfficerReach(m);
+      if (m.isLogistician() || ownUnitOfficer) {
         authorities.add(new OrgUnitContextualAuthority("LOGISTICIAN", m.getId().getOrgUnitId()));
       }
-      if (m.isMissionManager() || m.isLead()) {
+      if (m.isMissionManager() || ownUnitOfficer) {
         authorities.add(
             new OrgUnitContextualAuthority("MISSION_MANAGER", m.getId().getOrgUnitId()));
       }
@@ -258,33 +264,52 @@ public class CustomJwtGrantedAuthoritiesConverter
 
   /**
    * {@code true} iff holding {@code m} promotes the caller to the flat, officer-equivalent {@code
-   * ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} (epic #692, REQ-ORG-015). A membership
-   * qualifies when it ranks at or above logistician + mission manager on its own unit: an SK-Lead
-   * ({@code is_lead}, which is logistician + mission manager of its SK, #344), a Bereichsleitung
-   * ({@code is_bereichsleiter} / {@code is_bereichskoordinator} / {@code is_bereichsoperator}), or
-   * the OL ({@code is_ol_member}). The flat role is the back-compat surface for role-only
+   * ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} (epic #800, REQ-ROLE-001/002). A membership
+   * qualifies when it carries any functional rank — i.e. {@link
+   * MembershipRole#confersOwnLevelOversight()} ({@code role != MEMBER}): an SK-Lead, a
+   * Bereichsleitung rank, the OL, <em>or</em> a squadron rank (Staffelleiter / Kommandoleiter /
+   * stellv. Kommandoleiter / Ensign), each of which ranks at or above logistician + mission manager
+   * on its own unit (#344). The flat role is the back-compat surface for role-only
    * {@code @PreAuthorize} gates.
    *
    * <p>This is deliberately <b>not</b> the cascade-reach predicate. Which org units a leader
    * reaches downward — and thus which contextual authorities are minted — is computed separately by
    * {@link OrgUnitCascadeService#cascadedOfficerReach(Collection)}, which, unlike this method,
-   * <em>excludes</em> {@code is_lead}: an SK-Lead keeps SK-only reach (REQ-ORG-017, owner decision
-   * Q1) and receives their SK's contextual authority from the per-row loop above, not from the
-   * cascade.
+   * cascades only area / OL ranks: an SK-Lead and a squadron rank keep own-unit-only reach
+   * (REQ-ROLE-002, REQ-ORG-017) and receive their unit's contextual authority from the per-row loop
+   * above (see {@link #confersOwnUnitOfficerReach(OrgUnitMembership)}), not from the cascade.
    *
    * <p>A per-membership Logistician / MissionManager flag is handled by the explicit {@code
    * m.isLogistician()} / {@code m.isMissionManager()} terms at the call sites (a plain logistician
-   * confers only the logistician flat role, not mission manager), and a flag-less Bereich/OL seat
-   * confers nothing — so both return {@code false} here.
+   * confers only the logistician flat role, not mission manager), and a rank-less ({@link
+   * MembershipRole#MEMBER}) seat confers nothing — so both return {@code false} here.
    *
    * @param m the membership row to classify; never {@code null}.
-   * @return {@code true} iff {@code m} is an SK-Lead, Bereichsleitung, or OL leadership membership.
+   * @return {@code true} iff {@code m} carries any functional rank other than {@link
+   *     MembershipRole#MEMBER}.
    */
   private static boolean confersFlatOfficerRole(@NonNull OrgUnitMembership m) {
-    return m.isLead()
-        || m.isBereichsleiter()
-        || m.isBereichskoordinator()
-        || m.isBereichsoperator()
-        || m.isOlMember();
+    return m.getRole().confersOwnLevelOversight();
+  }
+
+  /**
+   * {@code true} iff holding {@code m} mints its <em>own</em> org unit's contextual {@code
+   * LOGISTICIAN@<id>} + {@code MISSION_MANAGER@<id>} authorities in the per-row loop, without any
+   * downward cascade (epic #800, REQ-ROLE-002). This is the own-unit-officer set: an {@link
+   * MembershipRole#SK_LEAD} (logistician + mission manager of its SK, #344) and the four squadron
+   * ranks ({@link MembershipRole#isSquadronRank()}), which the baseline grant treats as
+   * officer-equivalent over their own squadron only.
+   *
+   * <p>Area ranks ({@link MembershipRole#isAreaRank()}) and {@link MembershipRole#OL_MEMBER} are
+   * deliberately excluded here: their own-seat contextual authority is contributed by {@link
+   * OrgUnitCascadeService#cascadedOfficerReach(Collection)}, which includes the Bereich/OL seat
+   * itself alongside its descendants. Including them here too would double-mint the seat's
+   * authority. {@link MembershipRole#MEMBER} confers nothing.
+   *
+   * @param m the membership row to classify; never {@code null}.
+   * @return {@code true} iff {@code m} is an SK-Lead or one of the four squadron ranks.
+   */
+  private static boolean confersOwnUnitOfficerReach(@NonNull OrgUnitMembership m) {
+    return m.getRole() == MembershipRole.SK_LEAD || m.getRole().isSquadronRank();
   }
 }

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import org.mapstruct.Mapper;
@@ -38,7 +39,7 @@ import org.mapstruct.Mapping;
  * de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest} payloads which apply
  * to an already-loaded entity. There is no inbound DTO → entity flow that needs a mapper.
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", imports = MembershipRole.class)
 public interface OrgUnitMembershipMapper {
 
   /**
@@ -60,6 +61,8 @@ public interface OrgUnitMembershipMapper {
   @Mapping(target = "userDisplayName", source = "user.effectiveName")
   @Mapping(target = "isLogistician", source = "logistician")
   @Mapping(target = "isMissionManager", source = "missionManager")
-  @Mapping(target = "isLead", source = "lead")
+  // is_lead was dropped in the epic #800 Phase 5 cleanup (V187); the wire flag is now derived from
+  // the unified rank (role == SK_LEAD), keeping role the single source of truth.
+  @Mapping(target = "isLead", expression = "java(entity.getRole() == MembershipRole.SK_LEAD)")
   OrgUnitMembershipDto toDto(OrgUnitMembership entity);
 }

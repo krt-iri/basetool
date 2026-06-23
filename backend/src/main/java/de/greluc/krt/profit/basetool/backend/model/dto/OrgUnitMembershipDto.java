@@ -48,9 +48,11 @@ import java.util.UUID;
  *     unit. Once R5.c migrates the scoped-role authorisation onto the membership row, this is the
  *     authoritative source for "may this user perform a Logistician action in this org unit?".
  * @param isMissionManager Same as {@link #isLogistician} for the Mission Manager role.
- * @param isLead Whether the membership grants the Spezialkommando Lead capability. Permanently
- *     {@code false} on Squadron memberships by the V95 CHECK constraint {@code
- *     chk_org_unit_membership_lead_only_on_special_command}.
+ * @param isLead Whether the membership grants the Spezialkommando Lead capability. Derived from the
+ *     unified rank ({@code role == SK_LEAD}) since the epic #800 Phase 5 cleanup dropped the {@code
+ *     is_lead} column ({@code V187}); only ever {@code true} on a Spezialkommando membership (the
+ *     {@code chk_org_unit_membership_role_kind} CHECK confines {@code SK_LEAD} to {@code
+ *     SPECIAL_COMMAND}).
  * @param joinedAt Timestamp when the membership was granted. Surfaced as {@link Instant} (UTC) per
  *     the project's "all times in UTC" rule.
  * @param version Optimistic-lock counter; required on patch requests so concurrent admin edits do

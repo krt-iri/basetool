@@ -35,6 +35,13 @@
 
     <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
+    <!-- Account-linked seats are now a mirror of the functional ranks (epic #800, REQ-ROLE-006):
+         appoint them under Organisation -> Leitung; free-text holders stay editable here. -->
+    <div class="hud-box mt-2 oc-mirror-hint" role="note" th:if="${orgChart != null}">
+        <span th:text="#{orgChart.mirrorHint}">Kontogebundene Sitze werden unter Leitung verwaltet.</span>
+        <a th:href="@{/organisation/leitung}" sec:authorize="hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER')" data-testid="oc-leitung-link" th:text="#{nav.leitung}">Leitung</a>
+    </div>
+
     <div class="oc-toolbar" sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}">
         <button type="button" class="btn btn-outline" data-trigger="oc-toggle-edit"
                 aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
@@ -194,30 +201,14 @@
             <input type="text" id="oc-name" maxlength="120"
                    th:placeholder="#{orgChart.modal.commandNamePlaceholder}">
         </div>
+        <!-- Account-linked seats are mirror-only now (epic #800, REQ-ROLE-006): the chart editor
+             places only a free-text holder (a member without a Basetool account). Accounts are
+             appointed under Organisation -> Leitung. -->
         <div class="form-group" id="oc-user-group">
-            <div class="oc-holder-mode" role="radiogroup" th:aria-label="#{orgChart.modal.holderMode}">
-                <label class="oc-radio">
-                    <input type="radio" name="oc-holder-mode" value="account" id="oc-holder-account" checked>
-                    <span th:text="#{orgChart.modal.holderMode.account}">Account wählen</span>
-                </label>
-                <label class="oc-radio">
-                    <input type="radio" name="oc-holder-mode" value="freeText" id="oc-holder-freetext">
-                    <span th:text="#{orgChart.modal.holderMode.freeText}">Name eintragen (noch kein Account)</span>
-                </label>
-            </div>
-            <div id="oc-account-field">
-                <label for="oc-user" id="oc-user-label" th:text="#{orgChart.modal.user}">Nutzer</label>
-                <select id="oc-user">
-                    <option value="" th:text="#{orgChart.modal.userPlaceholder}">-- Bitte wählen --</option>
-                    <option th:each="u : ${allUsers}" th:value="${u.id()}"
-                            th:text="${u.effectiveName() != null ? u.effectiveName() : u.username()}">User</option>
-                </select>
-            </div>
-            <div id="oc-display-name-field">
-                <label for="oc-display-name" th:text="#{orgChart.modal.displayName}">Name</label>
-                <input type="text" id="oc-display-name" maxlength="120"
-                       th:placeholder="#{orgChart.modal.displayNamePlaceholder}">
-            </div>
+            <label for="oc-display-name" th:text="#{orgChart.modal.displayName}">Name</label>
+            <input type="text" id="oc-display-name" maxlength="120"
+                   th:placeholder="#{orgChart.modal.displayNamePlaceholder}">
+            <p class="oc-modal-hint" th:text="#{orgChart.modal.accountHint}">Konten werden unter Leitung verwaltet.</p>
         </div>
         <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem;">
             <button type="button" class="btn btn-ghost" data-trigger="oc-modal-cancel"
@@ -327,20 +318,6 @@
             }
         }
 
-        // Which holder the modal will submit: an account (the user picker) or a free-text name for a
-        // Kartell member who has no Basetool account yet. Defaults to "account".
-        function holderMode() {
-            const ft = document.getElementById('oc-holder-freetext');
-            return (ft && ft.checked) ? 'freeText' : 'account';
-        }
-
-        // Show the account picker or the free-text name input to match the selected holder mode.
-        function applyHolderMode() {
-            const freeText = holderMode() === 'freeText';
-            setHidden('oc-account-field', freeText);
-            setHidden('oc-display-name-field', !freeText);
-        }
-
         // While the dialog is open, take the page chrome (header, sidebar, and the
         // chart itself inside <main>) out of the tab order and hide it from assistive
         // tech, so Tab and the screen-reader cursor stay inside the dialog.
@@ -399,29 +376,9 @@
             setHidden('oc-name-group', !needsName);
             setHidden('oc-user-group', !needsUser);
 
-            const userSel = document.getElementById('oc-user');
-            if (userSel) {
-                userSel.value = (mode === 'reassign' && ctx.userId) ? ctx.userId : '';
-            }
-            // Holder mode: reassigning a free-text node (a holder with a name but no account) opens
-            // in free-text mode with the typed name loaded; everything else opens in account mode.
-            const startFreeText = !!ctx.displayName && !ctx.userId;
+            // The chart editor only ever sets a free-text holder now (accounts are mirror-only,
+            // REQ-ROLE-006), so the modal loads the current typed name and offers nothing else.
             setField('oc-display-name', ctx.displayName);
-            const accountRadio = document.getElementById('oc-holder-account');
-            const freeTextRadio = document.getElementById('oc-holder-freetext');
-            if (accountRadio) {
-                accountRadio.checked = !startFreeText;
-            }
-            if (freeTextRadio) {
-                freeTextRadio.checked = startFreeText;
-            }
-            applyHolderMode();
-            const userLabel = document.getElementById('oc-user-label');
-            if (userLabel) {
-                userLabel.textContent = ctx.userOptional
-                    ? /*[[#{orgChart.modal.leaderOptional}]]*/ 'Kommandoleiter (optional)'
-                    : /*[[#{orgChart.modal.user}]]*/ 'User';
-            }
 
             const titleEl = document.getElementById('oc-modal-title');
             if (titleEl) {
@@ -450,10 +407,8 @@
                 focusEl = document.getElementById('oc-stafftype');
             } else if (needsName) {
                 focusEl = document.getElementById('oc-name');
-            } else if (holderMode() === 'freeText') {
-                focusEl = document.getElementById('oc-display-name');
             } else {
-                focusEl = userSel;
+                focusEl = document.getElementById('oc-display-name');
             }
             if (focusEl) {
                 focusEl.focus();
@@ -521,29 +476,18 @@
                 return;
             }
 
-            const userId = field('oc-user');
+            // The chart editor only ever sets a free-text holder now (accounts are mirror-only,
+            // REQ-ROLE-006); a backend reject is the backstop if a userId ever reaches it.
             const userOptional = field('oc-user-optional') === '1';
-            const freeText = holderMode() === 'freeText';
             const displayName = field('oc-display-name').trim();
 
             if (mode === 'reassign') {
-                if (freeText) {
-                    if (!displayName) {
-                        window.showFrontendErrorToast(/*[[#{orgChart.modal.displayNameRequired}]]*/ 'Please enter a name.');
-                        return;
-                    }
-                    // displayName replaces an account; the backend clears the account in the same tx.
-                    send('PUT', '/org-chart/positions/' + positionId + '/ajax',
-                        {displayName: displayName, version: version});
+                if (!displayName) {
+                    window.showFrontendErrorToast(/*[[#{orgChart.modal.displayNameRequired}]]*/ 'Please enter a name.');
                     return;
                 }
-                if (!userId) {
-                    window.showFrontendErrorToast(/*[[#{orgChart.modal.userPlaceholder}]]*/ 'Please select a user.');
-                    return;
-                }
-                // userId replaces a free-text name; the backend clears the typed name in the same tx.
                 send('PUT', '/org-chart/positions/' + positionId + '/ajax',
-                    {userId: userId, version: version});
+                    {displayName: displayName, version: version});
                 return;
             }
 
@@ -551,23 +495,14 @@
             // create carries a fixed position type from its add button.
             const staffChoice = field('oc-staff-choice') === '1';
             const positionType = staffChoice ? field('oc-stafftype') : field('oc-position-type');
-            if (freeText) {
-                if (!displayName && !userOptional) {
-                    window.showFrontendErrorToast(/*[[#{orgChart.modal.displayNameRequired}]]*/ 'Please enter a name.');
-                    return;
-                }
-            } else if (!userId && !userOptional) {
-                window.showFrontendErrorToast(/*[[#{orgChart.modal.userPlaceholder}]]*/ 'Please select a user.');
+            if (!displayName && !userOptional) {
+                window.showFrontendErrorToast(/*[[#{orgChart.modal.displayNameRequired}]]*/ 'Please enter a name.');
                 return;
             }
             const body = {positionType: positionType};
-            if (freeText) {
-                // An empty name on an optional (COMMAND_LEAD) holder stays a leaderless Kommando.
-                if (displayName) {
-                    body.displayName = displayName;
-                }
-            } else if (userId) {
-                body.userId = userId;
+            // An empty name on an optional (COMMAND_LEAD) holder stays a leaderless Kommando.
+            if (displayName) {
+                body.displayName = displayName;
             }
             if (positionType === 'COMMAND_LEAD') {
                 body.name = field('oc-name');
@@ -623,23 +558,6 @@
                     userId: btn.getAttribute('data-user-id'),
                     displayName: btn.getAttribute('data-display-name'),
                     rankLabel: btn.getAttribute('data-rank-label')
-                });
-            });
-
-            // Toggle the account picker vs. the free-text name input as the holder mode changes,
-            // moving focus to the field that just became active.
-            ['oc-holder-account', 'oc-holder-freetext'].forEach(function (id) {
-                const radio = document.getElementById(id);
-                if (!radio) {
-                    return;
-                }
-                radio.addEventListener('change', function () {
-                    applyHolderMode();
-                    const focusId = holderMode() === 'freeText' ? 'oc-display-name' : 'oc-user';
-                    const fld = document.getElementById(focusId);
-                    if (fld) {
-                        fld.focus();
-                    }
                 });
             });
 

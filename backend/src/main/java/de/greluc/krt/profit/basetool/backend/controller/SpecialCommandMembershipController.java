@@ -182,8 +182,10 @@ public class SpecialCommandMembershipController {
   }
 
   /**
-   * Flips the {@code is_lead} flag on the membership row. **ADMIN-only** — a Lead cannot promote
-   * themselves or someone else to Lead.
+   * Flips the {@code is_lead} flag on the membership row. Admin, or — from epic #800 (REQ-ROLE-004)
+   * — the Bereichsleiter of the SK's parent Bereich (delegated appointment). A Lead can never
+   * promote themselves or another member to Lead: the SK-Lead rung is appointed strictly from the
+   * tier above (the parent Bereich), never from within the SK.
    *
    * @param id Spezialkommando id.
    * @param userId user whose membership to update.
@@ -191,16 +193,20 @@ public class SpecialCommandMembershipController {
    * @return the persisted membership DTO with the bumped version.
    */
   @PatchMapping("/{userId}/lead")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canAppointSkLead(#id, authentication)")
   @Operation(
       summary = "Toggle the SK-Lead flag on a membership",
       description =
-          "Promotes or demotes a Spezialkommando member to / from Lead. ADMIN-only so a Lead"
-              + " cannot promote themselves or another member.")
+          "Promotes or demotes a Spezialkommando member to / from Lead. Admin or the Bereichsleiter"
+              + " of the SK's parent Bereich; a Lead can never promote themselves or another"
+              + " member.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Lead flag toggled."),
     @ApiResponse(responseCode = "400", description = "Validation error on the inbound payload."),
-    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Caller is neither admin nor the Bereichsleiter of the SK's parent Bereich."),
     @ApiResponse(
         responseCode = "404",
         description =

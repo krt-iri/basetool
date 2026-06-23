@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -335,7 +336,7 @@ class LogisticianRoleTest {
     membership.setKind(OrgUnitKind.SPECIAL_COMMAND);
     membership.setJoinedAt(java.time.Instant.now());
     membership.setLogistician(false);
-    membership.setLead(true);
+    membership.setRole(MembershipRole.SK_LEAD);
     orgUnitMembershipRepository.save(membership);
     orgUnitMembershipRepository.flush();
     return sk.getId();

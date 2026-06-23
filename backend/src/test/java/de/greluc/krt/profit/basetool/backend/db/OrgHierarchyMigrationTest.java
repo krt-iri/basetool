@@ -68,11 +68,9 @@ class OrgHierarchyMigrationTest {
     assertColumnExists(jdbc, "org_unit", "parent_org_unit_id");
     assertIndexExists(jdbc, "org_unit", "idx_org_unit_parent");
 
-    // The leadership flags landed on org_unit_membership.
-    assertColumnExists(jdbc, "org_unit_membership", "is_bereichsleiter");
-    assertColumnExists(jdbc, "org_unit_membership", "is_bereichskoordinator");
-    assertColumnExists(jdbc, "org_unit_membership", "is_bereichsoperator");
-    assertColumnExists(jdbc, "org_unit_membership", "is_ol_member");
+    // V164 added the four Bereich/OL boolean leadership flags; epic #800 Phase 5 (V187) dropped
+    // them
+    // in favour of the unified `role` column — their removal is verified by v187DropsBooleanFlags*.
 
     // The "at most one Staffel" partial unique index is replaced by the ≤2 counting triggers,
     // which fire on BOTH INSERT and UPDATE to match the dropped index's full write coverage.
@@ -82,10 +80,10 @@ class OrgHierarchyMigrationTest {
     assertTriggerExists(
         jdbc, "org_unit_membership", "trg_org_unit_membership_max_two_squadron_upd");
 
-    // New CHECK constraints and the parent-validation trigger are present.
+    // New CHECK constraints and the parent-validation trigger are present. (The two boolean-flag
+    // CHECKs chk_org_unit_membership_bereich_flags_only_on_bereich / _ol_flag_only_on_ol were
+    // dropped by V187 with the columns — see v187DropsBooleanFlagsAndConstraints.)
     assertConstraintExists(jdbc, "chk_org_unit_ol_has_no_parent");
-    assertConstraintExists(jdbc, "chk_org_unit_membership_bereich_flags_only_on_bereich");
-    assertConstraintExists(jdbc, "chk_org_unit_membership_ol_flag_only_on_ol");
     assertTriggerExists(jdbc, "org_unit", "trg_org_unit_parent_ins");
   }
 
@@ -217,6 +215,271 @@ class OrgHierarchyMigrationTest {
         jdbc, "org_unit_membership", "trg_org_unit_membership_leader_excl_squadron_upd");
   }
 
+  /**
+   * V184 (epic #800, REQ-ROLE-001): the unified {@code role} rank column exists, is kind-scoped by
+   * {@code chk_org_unit_membership_role_kind}, defaults to {@code MEMBER}, and rejects a rank that
+   * does not match the membership's org-unit kind. Uses throwaway rows cleaned up in a finally
+   * block.
+   */
+  @Test
+  void v184AddsKindScopedRoleColumn() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    assertColumnExists(jdbc, "org_unit_membership", "role");
+    assertConstraintExists(jdbc, "chk_org_unit_membership_role_kind");
+
+    UUID userId = UUID.fromString("ffffff00-0000-0000-0000-0000000000c0");
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000c1");
+    UUID skId = UUID.fromString("ffffff00-0000-0000-0000-0000000000c2");
+    cleanupMemberships(jdbc, userId);
+    cleanup(jdbc, squadronId, skId);
+    cleanupUser(jdbc, userId);
+    try {
+      insertUser(jdbc, userId);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_RM_SQ", "TRMS", false, null);
+      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_RM_SK", "TRMK", false, null);
+
+      // A fresh squadron membership defaults to MEMBER.
+      insertMembership(jdbc, userId, squadronId);
+      assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("MEMBER");
+
+      // A squadron rank is accepted on a SQUADRON membership.
+      updateMembershipRole(jdbc, userId, squadronId, "STAFFELLEITER");
+      assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("STAFFELLEITER");
+
+      // A squadron rank on a SPECIAL_COMMAND membership is rejected by the kind-scoped CHECK. This
+      // path is trigger-neutral (a squadron rank does not engage the V165/V187
+      // enforce_leader_excludes_squadron trigger), so the kind CHECK is the guard that fires — a
+      // silo rank here would instead trip the cross-row trigger first (proven separately in
+      // v187LeaderExclusionTriggerReadsRole_squadronRanksExempt).
+      insertMembership(jdbc, userId, skId);
+      assertThatThrownBy(() -> updateMembershipRole(jdbc, userId, skId, "STAFFELLEITER"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("chk_org_unit_membership_role_kind");
+    } finally {
+      cleanupMemberships(jdbc, userId);
+      cleanup(jdbc, squadronId, skId);
+      cleanupUser(jdbc, userId);
+    }
+  }
+
+  /**
+   * V185 (epic #800, REQ-ROLE-003): the {@code kommando_group} table + the membership group link
+   * exist; a group must belong to a SQUADRON; a squadron holds at most four groups; and the
+   * group-link CHECK confines {@code kommando_group_id} to the in-group squadron ranks.
+   */
+  @Test
+  void v185CreatesKommandoGroupWithSquadronAndCardinalityRules() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    assertColumnExists(jdbc, "kommando_group", "squadron_org_unit_id");
+    assertColumnExists(jdbc, "org_unit_membership", "kommando_group_id");
+    assertConstraintExists(jdbc, "chk_org_unit_membership_kommando_group_role");
+    assertTriggerExists(jdbc, "kommando_group", "trg_kommando_group_squadron_ins");
+    assertTriggerExists(jdbc, "kommando_group", "trg_kommando_group_max_four_ins");
+
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000d0");
+    UUID skId = UUID.fromString("ffffff00-0000-0000-0000-0000000000d1");
+    UUID g1 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e1");
+    UUID g2 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e2");
+    UUID g3 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e3");
+    UUID g4 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e4");
+    UUID g5 = UUID.fromString("ffffff00-0000-0000-0000-0000000000e5");
+    cleanupKommandoGroups(jdbc, squadronId, skId);
+    cleanup(jdbc, squadronId, skId);
+    try {
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_KG_SQ", "TKGS", false, null);
+      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_KG_SK", "TKGK", false, null);
+
+      // A group must belong to a SQUADRON — an SK parent is rejected by the validation trigger.
+      assertThatThrownBy(() -> insertKommandoGroup(jdbc, g1, skId, "Bad"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("must belong to a SQUADRON");
+
+      // Four groups are fine; the fifth trips the counting trigger.
+      insertKommandoGroup(jdbc, g1, squadronId, "Alpha");
+      insertKommandoGroup(jdbc, g2, squadronId, "Bravo");
+      insertKommandoGroup(jdbc, g3, squadronId, "Charlie");
+      insertKommandoGroup(jdbc, g4, squadronId, "Delta");
+      assertThatThrownBy(() -> insertKommandoGroup(jdbc, g5, squadronId, "Echo"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("at most four Kommandogruppen");
+    } finally {
+      cleanupKommandoGroups(jdbc, squadronId, skId);
+      cleanup(jdbc, squadronId, skId);
+    }
+  }
+
+  /**
+   * V186 (epic #800, REQ-ROLE-006): the org-chart Kommando node ({@code COMMAND_LEAD}) carries a
+   * nullable {@code kommando_group_id} link. A leaderless linked node is accepted (exactly what the
+   * chart mirror writes); a second node for the same group is rejected by {@code
+   * uq_org_chart_one_command_per_group}; and a group link on any non-{@code COMMAND_LEAD} rank is
+   * rejected by {@code chk_org_chart_kommando_group_type}.
+   */
+  @Test
+  void v186LinksOrgChartCommandNodeToKommandoGroup() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    assertColumnExists(jdbc, "org_chart_position", "kommando_group_id");
+    assertConstraintExists(jdbc, "chk_org_chart_kommando_group_type");
+    assertConstraintExists(jdbc, "fk_org_chart_position_kommando_group");
+    assertIndexExists(jdbc, "org_chart_position", "uq_org_chart_one_command_per_group");
+
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000f0");
+    UUID userId = UUID.fromString("ffffff00-0000-0000-0000-0000000000f1");
+    UUID groupId = UUID.fromString("ffffff00-0000-0000-0000-0000000000f2");
+    UUID cmd1 = UUID.fromString("ffffff00-0000-0000-0000-0000000000f3");
+    UUID cmd2 = UUID.fromString("ffffff00-0000-0000-0000-0000000000f4");
+    UUID lead = UUID.fromString("ffffff00-0000-0000-0000-0000000000f5");
+    cleanupOrgChartPositions(jdbc, cmd1, cmd2, lead);
+    cleanupKommandoGroups(jdbc, squadronId);
+    cleanupMemberships(jdbc, userId);
+    cleanup(jdbc, squadronId);
+    cleanupUser(jdbc, userId);
+    try {
+      insertUser(jdbc, userId);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_OC_SQ", "TOCS", false, null);
+      insertKommandoGroup(jdbc, groupId, squadronId, "Alpha");
+
+      // A leaderless COMMAND_LEAD tied to the group is accepted (exactly what the mirror writes).
+      insertOrgChartPosition(jdbc, cmd1, "COMMAND_LEAD", squadronId, null, "Alpha", groupId);
+      assertThat(orgChartPositionCount(jdbc, cmd1)).isOne();
+
+      // A second COMMAND_LEAD for the same group trips uq_org_chart_one_command_per_group.
+      assertThatThrownBy(
+              () ->
+                  insertOrgChartPosition(
+                      jdbc, cmd2, "COMMAND_LEAD", squadronId, null, "Alpha2", groupId))
+          .isInstanceOf(DataAccessException.class);
+
+      // A group link on a non-COMMAND_LEAD rank is rejected by chk_org_chart_kommando_group_type.
+      assertThatThrownBy(
+              () ->
+                  insertOrgChartPosition(
+                      jdbc, lead, "SQUADRON_LEAD", squadronId, userId, null, groupId))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("chk_org_chart_kommando_group_type");
+    } finally {
+      cleanupOrgChartPositions(jdbc, cmd1, cmd2, lead);
+      cleanupKommandoGroups(jdbc, squadronId);
+      cleanupMemberships(jdbc, userId);
+      cleanup(jdbc, squadronId);
+      cleanupUser(jdbc, userId);
+    }
+  }
+
+  /**
+   * V187 (epic #800, REQ-ROLE-001 Phase 5 cleanup): the five legacy boolean leadership columns and
+   * their three CHECK constraints are gone, while the unified {@code role} column and the rewritten
+   * {@code enforce_leader_excludes_squadron} trigger remain.
+   */
+  @Test
+  void v187DropsBooleanFlagsAndConstraints() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+
+    assertColumnAbsent(jdbc, "org_unit_membership", "is_lead");
+    assertColumnAbsent(jdbc, "org_unit_membership", "is_bereichsleiter");
+    assertColumnAbsent(jdbc, "org_unit_membership", "is_bereichskoordinator");
+    assertColumnAbsent(jdbc, "org_unit_membership", "is_bereichsoperator");
+    assertColumnAbsent(jdbc, "org_unit_membership", "is_ol_member");
+
+    assertConstraintAbsent(jdbc, "chk_org_unit_membership_lead_only_on_special_command");
+    assertConstraintAbsent(jdbc, "chk_org_unit_membership_bereich_flags_only_on_bereich");
+    assertConstraintAbsent(jdbc, "chk_org_unit_membership_ol_flag_only_on_ol");
+
+    // The unified rank column and the rewritten cross-row silo trigger survive.
+    assertColumnExists(jdbc, "org_unit_membership", "role");
+    assertConstraintExists(jdbc, "chk_org_unit_membership_role_kind");
+    assertTriggerExists(
+        jdbc, "org_unit_membership", "trg_org_unit_membership_leader_excl_squadron_ins");
+    assertTriggerExists(
+        jdbc, "org_unit_membership", "trg_org_unit_membership_leader_excl_squadron_upd");
+  }
+
+  /**
+   * V187 behavioural proof that the rewritten {@code enforce_leader_excludes_squadron} trigger
+   * reads the unified {@code role} (not the dropped booleans): a squadron rank is EXEMPT (a
+   * Staffelleiter IS a Staffel member), while a silo-leadership rank (here {@code SK_LEAD}) is
+   * still rejected for a user who holds a Staffel membership (REQ-ORG-017). Uses throwaway rows
+   * cleaned up in a finally block.
+   */
+  @Test
+  void v187LeaderExclusionTriggerReadsRole_squadronRanksExempt() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    UUID userId = UUID.fromString("ffffff00-0000-0000-0000-0000000000d0");
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000d1");
+    UUID skId = UUID.fromString("ffffff00-0000-0000-0000-0000000000d2");
+    cleanupMemberships(jdbc, userId);
+    cleanup(jdbc, squadronId, skId);
+    cleanupUser(jdbc, userId);
+    try {
+      insertUser(jdbc, userId);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V187_SQ", "TV87S", false, null);
+      insertOrgUnit(jdbc, skId, "SPECIAL_COMMAND", "TEST_V187_SK", "TV87K", false, null);
+
+      // A Staffel member promoted to STAFFELLEITER is EXEMPT — a squadron rank does not trip the
+      // silo trigger (it would have, were the trigger still keyed on a boolean leadership flag).
+      insertMembership(jdbc, userId, squadronId);
+      updateMembershipRole(jdbc, userId, squadronId, "STAFFELLEITER");
+      assertThat(membershipRole(jdbc, userId, squadronId)).isEqualTo("STAFFELLEITER");
+
+      // A plain SK membership coexists, but promoting it to SK_LEAD while the user still holds a
+      // Staffel membership is rejected by the role-based trigger.
+      insertMembership(jdbc, userId, skId);
+      assertThatThrownBy(() -> updateMembershipRole(jdbc, userId, skId, "SK_LEAD"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("may not belong to a Staffel");
+    } finally {
+      cleanupMemberships(jdbc, userId);
+      cleanup(jdbc, squadronId, skId);
+      cleanupUser(jdbc, userId);
+    }
+  }
+
+  /**
+   * V188 (epic #800, REQ-ROLE-003): the squadron-rank singleton caps are backstopped by partial
+   * unique indexes. A second STAFFELLEITER on the same Staffel is rejected at the DB layer — the
+   * airtight backstop behind the service-layer roster check for the concurrent-double-assign
+   * window. Uses throwaway rows cleaned up in a finally block.
+   */
+  @Test
+  void v188SquadronRankSingletonIndexes() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    assertIndexExists(jdbc, "org_unit_membership", "uq_org_unit_membership_one_staffelleiter");
+    assertIndexExists(
+        jdbc, "org_unit_membership", "uq_org_unit_membership_one_kommandoleiter_per_group");
+    assertIndexExists(jdbc, "org_unit_membership", "uq_org_unit_membership_one_stellv_per_group");
+
+    UUID userA = UUID.fromString("ffffff00-0000-0000-0000-0000000000e0");
+    UUID userB = UUID.fromString("ffffff00-0000-0000-0000-0000000000e1");
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000e2");
+    cleanupMemberships(jdbc, userA);
+    cleanupMemberships(jdbc, userB);
+    cleanup(jdbc, squadronId);
+    cleanupUser(jdbc, userA);
+    cleanupUser(jdbc, userB);
+    try {
+      insertUser(jdbc, userA);
+      insertUser(jdbc, userB);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V188_SQ", "TV88S", false, null);
+
+      insertMembership(jdbc, userA, squadronId);
+      updateMembershipRole(jdbc, userA, squadronId, "STAFFELLEITER");
+      assertThat(membershipRole(jdbc, userA, squadronId)).isEqualTo("STAFFELLEITER");
+
+      // A second Staffelleiter on the SAME Staffel trips the partial unique index, even though the
+      // silo trigger exempts the squadron rank.
+      insertMembership(jdbc, userB, squadronId);
+      assertThatThrownBy(() -> updateMembershipRole(jdbc, userB, squadronId, "STAFFELLEITER"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("uq_org_unit_membership_one_staffelleiter");
+    } finally {
+      cleanupMemberships(jdbc, userA);
+      cleanupMemberships(jdbc, userB);
+      cleanup(jdbc, squadronId);
+      cleanupUser(jdbc, userA);
+      cleanupUser(jdbc, userB);
+    }
+  }
+
   private static void insertOrgUnit(
       JdbcTemplate jdbc,
       UUID id,
@@ -283,6 +546,78 @@ class OrgHierarchyMigrationTest {
     return count != null && count > 0;
   }
 
+  /** Reads the unified rank ({@code role}) of a single membership row (V184). */
+  private static String membershipRole(JdbcTemplate jdbc, UUID userId, UUID orgUnitId) {
+    return jdbc.queryForObject(
+        "SELECT role FROM org_unit_membership WHERE user_id = ? AND org_unit_id = ?",
+        String.class,
+        userId,
+        orgUnitId);
+  }
+
+  /** Sets the unified rank on a membership row, exercising the V184 kind-scoped CHECK. */
+  private static void updateMembershipRole(
+      JdbcTemplate jdbc, UUID userId, UUID orgUnitId, String role) {
+    jdbc.update(
+        "UPDATE org_unit_membership SET role = ? WHERE user_id = ? AND org_unit_id = ?",
+        role,
+        userId,
+        orgUnitId);
+  }
+
+  /**
+   * Inserts a Kommandogruppe (V185); {@code version} defaults and timestamps are left to defaults.
+   */
+  private static void insertKommandoGroup(
+      JdbcTemplate jdbc, UUID id, UUID squadronOrgUnitId, String name) {
+    jdbc.update(
+        "INSERT INTO kommando_group (id, squadron_org_unit_id, name) VALUES (?, ?, ?)",
+        id,
+        squadronOrgUnitId,
+        name);
+  }
+
+  /** Removes every Kommandogruppe of the given org units before the org-unit rows are deleted. */
+  private static void cleanupKommandoGroups(JdbcTemplate jdbc, UUID... squadronIds) {
+    for (UUID id : squadronIds) {
+      jdbc.update("DELETE FROM kommando_group WHERE squadron_org_unit_id = ?", id);
+    }
+  }
+
+  /** Inserts an org-chart position (V186); version / sort_index / timestamps fall to defaults. */
+  private static void insertOrgChartPosition(
+      JdbcTemplate jdbc,
+      UUID id,
+      String positionType,
+      UUID orgUnitId,
+      UUID userId,
+      String name,
+      UUID kommandoGroupId) {
+    jdbc.update(
+        "INSERT INTO org_chart_position (id, position_type, org_unit_id, user_id, name,"
+            + " kommando_group_id) VALUES (?, ?, ?, ?, ?, ?)",
+        id,
+        positionType,
+        orgUnitId,
+        userId,
+        name,
+        kommandoGroupId);
+  }
+
+  private static int orgChartPositionCount(JdbcTemplate jdbc, UUID id) {
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM org_chart_position WHERE id = ?", Integer.class, id);
+    return count == null ? 0 : count;
+  }
+
+  /** Removes throwaway org-chart positions before their group / org-unit rows are deleted. */
+  private static void cleanupOrgChartPositions(JdbcTemplate jdbc, UUID... ids) {
+    for (UUID id : ids) {
+      jdbc.update("DELETE FROM org_chart_position WHERE id = ?", id);
+    }
+  }
+
   private static int squadronMembershipCount(JdbcTemplate jdbc, UUID userId) {
     Integer count =
         jdbc.queryForObject(
@@ -335,6 +670,24 @@ class OrgHierarchyMigrationTest {
         jdbc.queryForList(
             "SELECT conname FROM pg_constraint WHERE conname = ?", String.class, constraintName);
     assertThat(rows).as("Expected constraint %s to exist", constraintName).isNotEmpty();
+  }
+
+  private static void assertColumnAbsent(JdbcTemplate jdbc, String table, String column) {
+    List<String> rows =
+        jdbc.queryForList(
+            "SELECT column_name FROM information_schema.columns"
+                + " WHERE table_name = ? AND column_name = ?",
+            String.class,
+            table,
+            column);
+    assertThat(rows).as("Expected column %s.%s to have been dropped", table, column).isEmpty();
+  }
+
+  private static void assertConstraintAbsent(JdbcTemplate jdbc, String constraintName) {
+    List<String> rows =
+        jdbc.queryForList(
+            "SELECT conname FROM pg_constraint WHERE conname = ?", String.class, constraintName);
+    assertThat(rows).as("Expected constraint %s to have been dropped", constraintName).isEmpty();
   }
 
   private static void assertTriggerExists(JdbcTemplate jdbc, String table, String triggerName) {

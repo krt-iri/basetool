@@ -1196,6 +1196,214 @@
         }
       }
     },
+    "/api/v1/squadrons/{squadronId}/ranks/{userId}" : {
+      "put" : {
+        "tags" : [ "squadron-role-controller" ],
+        "summary" : "Assign a squadron leadership rank to a Staffel member",
+        "operationId" : "assignRank",
+        "parameters" : [ {
+          "name" : "squadronId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AssignSquadronRankRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitMembershipDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "squadron-role-controller" ],
+        "summary" : "Clear a Staffel member's squadron leadership rank",
+        "operationId" : "removeRank",
+        "parameters" : [ {
+          "name" : "squadronId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "version",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitMembershipDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/squadrons/{id}" : {
       "put" : {
         "tags" : [ "squadron-controller" ],
@@ -9290,6 +9498,183 @@
         }
       }
     },
+    "/api/v1/kommando-groups/{groupId}" : {
+      "put" : {
+        "tags" : [ "kommando-group-controller" ],
+        "summary" : "Rename / reorder a Kommandogruppe (admin or the squadron's Staffelleiter)",
+        "operationId" : "update_8",
+        "parameters" : [ {
+          "name" : "groupId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateKommandoGroupRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/KommandoGroupDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "kommando-group-controller" ],
+        "summary" : "Delete a Kommandogruppe (admin or the squadron's Staffelleiter)",
+        "operationId" : "delete_8",
+        "parameters" : [ {
+          "name" : "groupId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/job-types/{id}" : {
       "put" : {
         "tags" : [ "job-type-controller" ],
@@ -11804,6 +12189,210 @@
         }
       }
     },
+    "/api/v1/squadrons/{squadronId}/kommando-groups" : {
+      "get" : {
+        "tags" : [ "kommando-group-controller" ],
+        "summary" : "List a squadron's Kommandogruppen",
+        "operationId" : "list",
+        "parameters" : [ {
+          "name" : "squadronId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/KommandoGroupDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "kommando-group-controller" ],
+        "summary" : "Create a Kommandogruppe (admin or the squadron's Staffelleiter)",
+        "operationId" : "create",
+        "parameters" : [ {
+          "name" : "squadronId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateKommandoGroupRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/KommandoGroupDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/squadrons/{id}/activate" : {
       "post" : {
         "tags" : [ "squadron-controller" ],
@@ -13171,7 +13760,7 @@
       "get" : {
         "tags" : [ "Promotion Topics" ],
         "summary" : "List all promotion topics (paginated).",
-        "operationId" : "list",
+        "operationId" : "list_1",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -13292,7 +13881,7 @@
       "post" : {
         "tags" : [ "Promotion Topics" ],
         "summary" : "Create a new promotion topic. Requires ADMIN or OFFICER role.",
-        "operationId" : "create",
+        "operationId" : "create_1",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -13384,7 +13973,7 @@
       "get" : {
         "tags" : [ "Rank Requirements" ],
         "summary" : "List all rank requirements (paginated).",
-        "operationId" : "list_1",
+        "operationId" : "list_2",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -13505,7 +14094,7 @@
       "post" : {
         "tags" : [ "Rank Requirements" ],
         "summary" : "Create a new rank requirement. Requires ADMIN or OFFICER role.",
-        "operationId" : "create_1",
+        "operationId" : "create_2",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -13597,7 +14186,7 @@
       "get" : {
         "tags" : [ "Promotion Level Contents" ],
         "summary" : "List all level contents (paginated).",
-        "operationId" : "list_2",
+        "operationId" : "list_3",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -13718,7 +14307,7 @@
       "post" : {
         "tags" : [ "Promotion Level Contents" ],
         "summary" : "Create a new level content. Requires ADMIN or OFFICER role.",
-        "operationId" : "create_2",
+        "operationId" : "create_3",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -13810,7 +14399,7 @@
       "get" : {
         "tags" : [ "Promotion Categories" ],
         "summary" : "List all promotion categories (paginated).",
-        "operationId" : "list_3",
+        "operationId" : "list_4",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -13931,7 +14520,7 @@
       "post" : {
         "tags" : [ "Promotion Categories" ],
         "summary" : "Create a new promotion category. Requires ADMIN or OFFICER role.",
-        "operationId" : "create_3",
+        "operationId" : "create_4",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -14023,7 +14612,7 @@
       "get" : {
         "tags" : [ "Personal Inventory" ],
         "summary" : "List own personal inventory entries (paginated, sortable, optional name filter).",
-        "operationId" : "list_4",
+        "operationId" : "list_5",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -14151,7 +14740,7 @@
       "post" : {
         "tags" : [ "Personal Inventory" ],
         "summary" : "Create a new personal inventory entry for the caller.",
-        "operationId" : "create_4",
+        "operationId" : "create_5",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -14243,7 +14832,7 @@
       "get" : {
         "tags" : [ "Personal Blueprints" ],
         "summary" : "List the caller's owned blueprints (paginated, sortable, name filter).",
-        "operationId" : "list_5",
+        "operationId" : "list_6",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -15523,7 +16112,7 @@
       "post" : {
         "tags" : [ "org-hierarchy-controller" ],
         "summary" : "Add a Bereichsleitung member",
-        "description" : "Grants a Leiter/Koordinator/Operator role on the Bereich. ADMIN-only.",
+        "description" : "Grants a Leiter/Koordinator/Operator role on the Bereich. Admin, or — delegated (REQ-ROLE-004) — a pure OL member for the Leiter rung and the Bereich's Bereichsleiter for the Koordinator/Operator rungs.",
         "operationId" : "addBereichLeader",
         "parameters" : [ {
           "name" : "id",
@@ -17113,7 +17702,7 @@
       "get" : {
         "tags" : [ "Notification Rules" ],
         "summary" : "List all notification rules.",
-        "operationId" : "list_6",
+        "operationId" : "list_7",
         "responses" : {
           "200" : {
             "description" : "All rules.",
@@ -17213,7 +17802,7 @@
       "post" : {
         "tags" : [ "Notification Rules" ],
         "summary" : "Create a notification rule.",
-        "operationId" : "create_5",
+        "operationId" : "create_6",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -19896,7 +20485,7 @@
       },
       "post" : {
         "tags" : [ "material-category-controller" ],
-        "operationId" : "create_6",
+        "operationId" : "create_7",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -24866,7 +25455,7 @@
       "get" : {
         "tags" : [ "Admin – Default Blueprints" ],
         "summary" : "List the auto-granted default blueprints.",
-        "operationId" : "list_7",
+        "operationId" : "list_8",
         "responses" : {
           "200" : {
             "description" : "The default set.",
@@ -26133,7 +26722,7 @@
       "patch" : {
         "tags" : [ "special-command-membership-controller" ],
         "summary" : "Toggle the SK-Lead flag on a membership",
-        "description" : "Promotes or demotes a Spezialkommando member to / from Lead. ADMIN-only so a Lead cannot promote themselves or another member.",
+        "description" : "Promotes or demotes a Spezialkommando member to / from Lead. Admin or the Bereichsleiter of the SK's parent Bereich; a Lead can never promote themselves or another member.",
         "operationId" : "toggleLead",
         "parameters" : [ {
           "name" : "id",
@@ -34784,7 +35373,7 @@
       "get" : {
         "tags" : [ "Notifications" ],
         "summary" : "List the caller's notifications (paginated, sortable).",
-        "operationId" : "list_8",
+        "operationId" : "list_9",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -37483,6 +38072,102 @@
           },
           "400" : {
             "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/leitung/view" : {
+      "get" : {
+        "tags" : [ "leitung-controller" ],
+        "summary" : "The org units the caller may appoint leadership ranks into, by tier",
+        "operationId" : "view",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LeitungViewDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -40777,7 +41462,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE" ]
           }
         }, {
           "name" : "from",
@@ -40809,7 +41494,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_HANDED_OVER", "INVENTORY_ORG_RESTAMPED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_HANDED_OVER", "INVENTORY_ORG_RESTAMPED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED" ]
           }
         }, {
           "name" : "page",
@@ -40935,7 +41620,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE" ]
           }
         }, {
           "name" : "before",
@@ -41031,7 +41716,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE" ]
           }
         }, {
           "name" : "from",
@@ -41160,7 +41845,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE" ]
           }
         }, {
           "name" : "from",
@@ -41958,7 +42643,7 @@
       "delete" : {
         "tags" : [ "Member Evaluations" ],
         "summary" : "Delete a member evaluation. ADMIN or OFFICER of the category's owning squadron.",
-        "operationId" : "delete_8",
+        "operationId" : "delete_9",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -42306,7 +42991,7 @@
       "delete" : {
         "tags" : [ "org-hierarchy-controller" ],
         "summary" : "Remove a Bereichsleitung member",
-        "description" : "Removes the user's Bereichsleitung membership. ADMIN-only.",
+        "description" : "Removes the user's Bereichsleitung membership. Admin, or — delegated (REQ-ROLE-004) — a pure OL member when removing a Bereichsleiter and the Bereich's Bereichsleiter when removing a Koordinator/Operator.",
         "operationId" : "removeBereichLeader",
         "parameters" : [ {
           "name" : "id",
@@ -42763,7 +43448,7 @@
       "delete" : {
         "tags" : [ "Notifications" ],
         "summary" : "Delete one of the caller's notifications (read or unread).",
-        "operationId" : "delete_9",
+        "operationId" : "delete_10",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -43551,6 +44236,61 @@
           },
           "factionName" : {
             "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "AssignSquadronRankRequest" : {
+        "type" : "object",
+        "properties" : {
+          "role" : {
+            "type" : "string",
+            "enum" : [ "MEMBER", "STAFFELLEITER", "KOMMANDOLEITER", "STELLV_KOMMANDOLEITER", "ENSIGN", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER", "SK_LEAD" ]
+          },
+          "kommandoGroupId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "role", "version" ]
+      },
+      "OrgUnitMembershipDto" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "userDisplayName" : {
+            "type" : "string"
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
+          },
+          "isLogistician" : {
+            "type" : "boolean"
+          },
+          "isMissionManager" : {
+            "type" : "boolean"
+          },
+          "isLead" : {
+            "type" : "boolean"
+          },
+          "joinedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           },
           "version" : {
             "type" : "integer",
@@ -46098,6 +46838,49 @@
           }
         }
       },
+      "UpdateKommandoGroupRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
+          },
+          "sortIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "KommandoGroupDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "squadronId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "sortIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "InventoryItemUpdateDto" : {
         "type" : "object",
         "properties" : {
@@ -46323,42 +47106,16 @@
           }
         }
       },
-      "OrgUnitMembershipDto" : {
+      "CreateKommandoGroupRequest" : {
         "type" : "object",
         "properties" : {
-          "userId" : {
+          "name" : {
             "type" : "string",
-            "format" : "uuid"
-          },
-          "userDisplayName" : {
-            "type" : "string"
-          },
-          "orgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "kind" : {
-            "type" : "string",
-            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
-          },
-          "isLogistician" : {
-            "type" : "boolean"
-          },
-          "isMissionManager" : {
-            "type" : "boolean"
-          },
-          "isLead" : {
-            "type" : "boolean"
-          },
-          "joinedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
+            "maxLength" : 120,
+            "minLength" : 0
           }
-        }
+        },
+        "required" : [ "name" ]
       },
       "RefineryOrderStoreDto" : {
         "type" : "object",
@@ -50191,6 +50948,10 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "kommandoGroupId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "leaderUserId" : {
             "type" : "string",
             "format" : "uuid"
@@ -51303,6 +52064,99 @@
           }
         }
       },
+      "LeitungMemberDto" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "userDisplayName" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string",
+            "enum" : [ "MEMBER", "STAFFELLEITER", "KOMMANDOLEITER", "STELLV_KOMMANDOLEITER", "ENSIGN", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER", "SK_LEAD" ]
+          },
+          "kommandoGroupId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "LeitungUnitDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
+          },
+          "canAppointLead" : {
+            "type" : "boolean"
+          },
+          "canManageRoster" : {
+            "type" : "boolean"
+          },
+          "members" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungMemberDto"
+            }
+          },
+          "groups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/KommandoGroupDto"
+            }
+          }
+        }
+      },
+      "LeitungViewDto" : {
+        "type" : "object",
+        "properties" : {
+          "admin" : {
+            "type" : "boolean"
+          },
+          "organisationsleitungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungUnitDto"
+            }
+          },
+          "bereiche" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungUnitDto"
+            }
+          },
+          "squadrons" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungUnitDto"
+            }
+          },
+          "specialCommands" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungUnitDto"
+            }
+          }
+        }
+      },
       "PageResponseJobTypeDto" : {
         "type" : "object",
         "properties" : {
@@ -52249,11 +53103,11 @@
           },
           "domain" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE" ]
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_HANDED_OVER", "INVENTORY_ORG_RESTAMPED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_HANDED_OVER", "INVENTORY_ORG_RESTAMPED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED" ]
           },
           "actorHandle" : {
             "type" : "string"
