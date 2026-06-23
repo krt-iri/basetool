@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -28,7 +27,6 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Path;
-import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -46,18 +44,18 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <ol>
  *   <li>{@link #createsRenamesAndDeletesAKommando()} — create a leaderless Kommando(gruppe), rename
  *       it, then remove it; no holder needed.
- *   <li>{@link #createsAssignsVacatesAndRemovesACommandLeader()} — create a Kommando, assign (and,
- *       when a second user exists, reassign) its Kommandoleiter, vacate the seat (the group must
- *       survive), then remove the whole group.
+ *   <li>{@link #createsAssignsVacatesAndRemovesACommandLeader()} — create a Kommando, assign and
+ *       reassign a free-text Kommandoleiter, vacate the seat (the group must survive), then remove
+ *       the whole group.
  * </ol>
  *
  * <p>Both tests are <strong>hermetic against the per-Staffel Kommando cap</strong>: each first
  * deletes any pre-existing Kommando on the IRIDIUM Staffel (a sibling test — the scroll case in the
  * a11y suite — may leave up to the cap of four), so a create never trips {@code
- * problem.org_chart.command_limit}. They assert holder changes by <em>structure</em> (the vacate
- * affordance's presence, the reassign control's {@code data-user-id}) rather than by the holder's
- * rendered display name, which need not resolve to a stable string; the Kommando <em>name</em> is a
- * test-supplied literal and so is asserted directly.
+ * problem.org_chart.command_limit}. Holder changes are asserted by the typed free-text name the
+ * chart editor places (the reassign control's {@code data-display-name}) plus the vacate
+ * affordance's presence; the Kommando <em>name</em> is likewise a test-supplied literal asserted
+ * directly.
  *
  * <p>Tagged {@code @Tag("e2e")} (not {@code smoke}): these mutate org-chart data, so they must run
  * only against the ephemeral, disposable stack.
@@ -149,10 +147,11 @@ class OrgChartPositionCrudE2eTest {
   }
 
   /**
-   * Creates a Kommando, assigns its Kommandoleiter (and reassigns it when a second user is
-   * available), vacates the seat — asserting the Kommando(gruppe) survives the vacate, per
-   * REQ-ORG-011 — then removes the whole group. Holder changes are asserted structurally (the
-   * vacate affordance and the reassign control's {@code data-user-id}), not by display name.
+   * Creates a Kommando, assigns then reassigns a free-text Kommandoleiter, vacates the seat —
+   * asserting the Kommando(gruppe) survives the vacate, per REQ-ORG-011 — then removes the whole
+   * group. Account-linked seats are managed under Organisation -&gt; Leitung since REQ-ROLE-006, so
+   * the chart editor places only a typed name; holder changes are asserted by the reassign
+   * control's {@code data-display-name} and the vacate affordance's presence.
    */
   @Test
   void createsAssignsVacatesAndRemovesACommandLeader() {
@@ -168,32 +167,28 @@ class OrgChartPositionCrudE2eTest {
         assertThat(page.locator(ASSIGN_LEAD_BUTTON)).isVisible();
         assertThat(page.locator(VACATE_LEAD_BUTTON)).hasCount(0);
 
-        List<String> userIds = assignableUserIds(page);
-        assertTrue(!userIds.isEmpty(), "the editor's user picker must offer at least one user");
-
-        // EDIT — assign a Kommandoleiter (assigning a holder to a leaderless Kommando is a
-        // reassign).
+        // EDIT — assign a free-text Kommandoleiter. Account-linked seats are managed under
+        // Organisation -> Leitung now (epic #800, REQ-ROLE-006); the chart editor places only a
+        // free-text holder, so the dialog offers a typed name, not an account picker.
         page.locator(ASSIGN_LEAD_BUTTON).first().click();
         assertThat(page.locator("#oc-modal")).isVisible();
-        page.locator("#oc-user").selectOption(userIds.get(0));
+        page.locator("#oc-display-name").fill("E2E Leiter Eins");
         submitModalAndAwaitRefresh(page);
         enterEditMode(page);
         // The seat is now filled: a vacate affordance appears and the reassign control carries the
-        // assigned user's id.
+        // typed holder name.
         assertThat(page.locator(VACATE_LEAD_BUTTON)).isVisible();
         assertThat(page.locator(REASSIGN_LEAD_ICON).first())
-            .hasAttribute("data-user-id", userIds.get(0));
+            .hasAttribute("data-display-name", "E2E Leiter Eins");
 
-        // EDIT — reassign to a different user, when the realm provides a second one.
-        if (userIds.size() >= 2) {
-          page.locator(REASSIGN_LEAD_ICON).first().click();
-          assertThat(page.locator("#oc-modal")).isVisible();
-          page.locator("#oc-user").selectOption(userIds.get(1));
-          submitModalAndAwaitRefresh(page);
-          enterEditMode(page);
-          assertThat(page.locator(REASSIGN_LEAD_ICON).first())
-              .hasAttribute("data-user-id", userIds.get(1));
-        }
+        // EDIT — reassign to a different typed name.
+        page.locator(REASSIGN_LEAD_ICON).first().click();
+        assertThat(page.locator("#oc-modal")).isVisible();
+        page.locator("#oc-display-name").fill("E2E Leiter Zwei");
+        submitModalAndAwaitRefresh(page);
+        enterEditMode(page);
+        assertThat(page.locator(REASSIGN_LEAD_ICON).first())
+            .hasAttribute("data-display-name", "E2E Leiter Zwei");
 
         // EDIT — vacate the Kommandoleiter: the holder is cleared but the Kommando(gruppe) stays.
         confirmAndAwaitRefresh(page, page.locator(VACATE_LEAD_BUTTON).first());
@@ -338,22 +333,6 @@ class OrgChartPositionCrudE2eTest {
         "() => window.__ocSwapped === true",
         null,
         new Page.WaitForFunctionOptions().setTimeout(30_000));
-  }
-
-  /**
-   * The user ids the editor's holder picker offers (every {@code #oc-user} option with a non-empty
-   * value, i.e. excluding the "-- please choose --" placeholder). Read straight from the DOM, which
-   * the server renders at page load, so it needs no open dialog.
-   *
-   * @param page the page showing the org chart
-   * @return the assignable user ids, in document order; possibly empty
-   */
-  @SuppressWarnings("unchecked")
-  private static List<String> assignableUserIds(Page page) {
-    return (List<String>)
-        page.evaluate(
-            "() => Array.from(document.querySelectorAll('#oc-user option'))"
-                + ".map(o => o.value).filter(v => v)");
   }
 
   /**
