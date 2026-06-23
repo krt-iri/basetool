@@ -92,8 +92,12 @@ der Staffelleitung"); every other rank must have a null group. A group's parent 
   squadron ranks (V185).
 - [x] Kommandogruppe CRUD + member assignment honour ≤1 KL and ≤1 stellv. per group and ≤4 Ensigns
   per squadron (Phase 3).
+- [x] The three singleton caps (≤1 Staffelleiter/squadron, ≤1 KL + ≤1 stellv./group) are
+  DB-backstopped by partial unique indexes (V188), so a concurrent double-assign fails on the
+  constraint rather than committing a duplicate; the ≤4 Ensign cap stays service-layer-only (a count,
+  like the org chart's own ≤4 ENSIGN cap).
 
-**Enforced by:** `OrgHierarchyMigrationTest` (V185), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRoleController`, `V185__create_kommando_group.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgHierarchyMigrationTest` (V185, `v188SquadronRankSingletonIndexes`), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRoleController`, `V185__create_kommando_group.sql`, `V188__squadron_rank_singleton_indexes.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-004 — Delegated appointment ladder, no self-promotion
 

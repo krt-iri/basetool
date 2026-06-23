@@ -434,6 +434,52 @@ class OrgHierarchyMigrationTest {
     }
   }
 
+  /**
+   * V188 (epic #800, REQ-ROLE-003): the squadron-rank singleton caps are backstopped by partial
+   * unique indexes. A second STAFFELLEITER on the same Staffel is rejected at the DB layer — the
+   * airtight backstop behind the service-layer roster check for the concurrent-double-assign
+   * window. Uses throwaway rows cleaned up in a finally block.
+   */
+  @Test
+  void v188SquadronRankSingletonIndexes() {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    assertIndexExists(jdbc, "org_unit_membership", "uq_org_unit_membership_one_staffelleiter");
+    assertIndexExists(
+        jdbc, "org_unit_membership", "uq_org_unit_membership_one_kommandoleiter_per_group");
+    assertIndexExists(jdbc, "org_unit_membership", "uq_org_unit_membership_one_stellv_per_group");
+
+    UUID userA = UUID.fromString("ffffff00-0000-0000-0000-0000000000e0");
+    UUID userB = UUID.fromString("ffffff00-0000-0000-0000-0000000000e1");
+    UUID squadronId = UUID.fromString("ffffff00-0000-0000-0000-0000000000e2");
+    cleanupMemberships(jdbc, userA);
+    cleanupMemberships(jdbc, userB);
+    cleanup(jdbc, squadronId);
+    cleanupUser(jdbc, userA);
+    cleanupUser(jdbc, userB);
+    try {
+      insertUser(jdbc, userA);
+      insertUser(jdbc, userB);
+      insertOrgUnit(jdbc, squadronId, "SQUADRON", "TEST_V188_SQ", "TV88S", false, null);
+
+      insertMembership(jdbc, userA, squadronId);
+      updateMembershipRole(jdbc, userA, squadronId, "STAFFELLEITER");
+      assertThat(membershipRole(jdbc, userA, squadronId)).isEqualTo("STAFFELLEITER");
+
+      // A second Staffelleiter on the SAME Staffel trips the partial unique index, even though the
+      // silo trigger exempts the squadron rank.
+      insertMembership(jdbc, userB, squadronId);
+      assertThatThrownBy(() -> updateMembershipRole(jdbc, userB, squadronId, "STAFFELLEITER"))
+          .isInstanceOf(DataAccessException.class)
+          .hasMessageContaining("uq_org_unit_membership_one_staffelleiter");
+    } finally {
+      cleanupMemberships(jdbc, userA);
+      cleanupMemberships(jdbc, userB);
+      cleanup(jdbc, squadronId);
+      cleanupUser(jdbc, userA);
+      cleanupUser(jdbc, userB);
+    }
+  }
+
   private static void insertOrgUnit(
       JdbcTemplate jdbc,
       UUID id,

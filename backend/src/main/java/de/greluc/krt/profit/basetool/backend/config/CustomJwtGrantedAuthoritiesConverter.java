@@ -206,8 +206,8 @@ public class CustomJwtGrantedAuthoritiesConverter
     // Any functional rank (MembershipRole != MEMBER) is automatically BOTH a logistician AND a
     // mission manager of its org unit — the rank sits above both within that unit, mirroring how
     // admin outranks every role and an Officer is logistician + mission manager of their own
-    // squadron (#344). The rank is kind-scoped by the V183 CHECK, so a squadron rank only ever
-    // widens its own Staffel, an SK_LEAD its own SK, and so on.
+    // squadron (#344). The rank is kind-scoped by the V184 chk_org_unit_membership_role_kind CHECK,
+    // so a squadron rank only ever widens its own Staffel, an SK_LEAD its own SK, and so on.
     //
     // Epic #800 / REQ-ROLE-001/002 unifies the former five boolean leadership flags into the rank
     // enum and extends the "leadership ⊇ logistician + mission manager" principle to the squadron

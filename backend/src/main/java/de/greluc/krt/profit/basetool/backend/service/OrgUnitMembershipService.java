@@ -985,6 +985,13 @@ public class OrgUnitMembershipService {
    * user so re-assigning the same user is idempotent: &le;1 Staffelleiter per squadron, &le;1
    * Kommandoleiter + &le;1 stellv. Kommandoleiter per group, &le;4 Ensigns per squadron.
    *
+   * <p>This in-memory check gives a clean 4xx for the common case; the three singleton caps are
+   * additionally backstopped by the {@code V188} partial unique indexes ({@code
+   * uq_org_unit_membership_one_staffelleiter} / {@code _one_kommandoleiter_per_group} / {@code
+   * _one_stellv_per_group}), so a concurrent double-assign that slips past the roster scan fails on
+   * the constraint rather than committing a duplicate. The &le;4 Ensign cap stays
+   * service-layer-only (a count, not a uniqueness rule), like the org chart's own &le;4 ENSIGN cap.
+   *
    * @param squadronId the Staffel; never {@code null}.
    * @param userId the user being (re)assigned, excluded from the roster scan; never {@code null}.
    * @param rank the squadron rank being assigned; never {@code null}.

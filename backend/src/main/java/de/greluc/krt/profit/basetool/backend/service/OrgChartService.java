@@ -311,15 +311,18 @@ public class OrgChartService {
     }
     validateCardinality(type, orgUnit);
     final String name = validateAndNormalizeName(type, request.name());
+    // Account-linked seats are a mirror of the functional ranks (epic #800, REQ-ROLE-006): the
+    // chart
+    // editor may only place a free-text holder or leave a Kommando leaderless — an account is
+    // appointed under Organisation -> Leitung and projected here by OrgChartService.mirror*. The
+    // create is still fully validated above (scope / parent / cardinality / name) so a free-text
+    // create hits the same guards; an account-holder create is always refused. We run
+    // validateUserUnique first even though the account is rejected so a duplicate-in-scope account
+    // still surfaces its own specific error before the generic refusal — preserving the error
+    // precedence the pre-demotion contract (and createPosition_userAlreadyInScope_isRejected)
+    // expects.
     if (user != null) {
       validateUserUnique(scope, orgUnit, request.userId());
-    }
-    // Account-linked seats are a mirror of the functional ranks (epic #800, REQ-ROLE-006): the
-    // chart editor may only place a free-text holder or leave a Kommando leaderless — an account is
-    // appointed under Organisation -> Leitung and projected here by OrgChartService.mirror*. The
-    // create is still fully validated above (scope / parent / cardinality / uniqueness) so a
-    // free-text create hits the same guards; only the account-holder persist is refused.
-    if (user != null) {
       throw new BadRequestException(ERR_ACCOUNT_MANAGED);
     }
 
