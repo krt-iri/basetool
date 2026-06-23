@@ -24,11 +24,17 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.BankHolderMapper;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.RegisterBankHolderRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankHolderRequest;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBookingRow;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -40,6 +46,8 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,32 +64,165 @@ import org.springframework.transaction.annotation.Transactional;
 public class BankHolderService {
 
   private final BankHolderRepository holderRepository;
+  private final BankHolderPostingRepository holderPostingRepository;
   private final BankPostingRepository postingRepository;
   private final UserRepository userRepository;
   private final BankHolderMapper bankHolderMapper;
   private final BankAuditService bankAuditService;
 
   /**
-   * The full registry, ordered by handle, with the cross-account custody totals and account counts
-   * joined in from two grouped statements (W1 "Halter" tab, no N+1).
+   * The full registry, ordered by handle, with the global custody totals joined in from one grouped
+   * statement over the holder ledger (W1 "Halter" tab, no N+1, ADR-0039).
    *
    * @return every holder row as DTO
    */
   public List<BankHolderDto> getHolders() {
     Map<UUID, BigDecimal> totals =
-        postingRepository.holderTotals().stream()
+        holderPostingRepository.holderTotals().stream()
             .collect(Collectors.toMap(BankHolderBalance::holderId, BankHolderBalance::amount));
-    Map<UUID, Long> accountCounts =
-        postingRepository.holderAccountCounts().stream()
-            .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
     return holderRepository.findAllByOrderByHandleAsc().stream()
         .map(
             holder ->
                 bankHolderMapper.toDto(
-                    holder,
-                    totals.getOrDefault(holder.getId(), BigDecimal.ZERO),
-                    accountCounts.getOrDefault(holder.getId(), 0L)))
+                    holder, totals.getOrDefault(holder.getId(), BigDecimal.ZERO)))
         .toList();
+  }
+
+  /**
+   * Loads one holder row with its global custody total (REQ-BANK-032) — the header of the holder
+   * detail page. Visibility is gated at the controller via {@code
+   * BankSecurityService.canSeeHolder}; an employee reaches only their own holder, management any.
+   *
+   * @param holderId the holder
+   * @return the holder DTO incl. its global custody total
+   * @throws NotFoundException when the holder does not exist
+   */
+  public BankHolderDto getHolder(@NotNull UUID holderId) {
+    BankHolder holder = requireHolder(holderId);
+    return bankHolderMapper.toDto(holder, holderPostingRepository.holderTotal(holderId));
+  }
+
+  /**
+   * Pages over one holder's custody history (REQ-BANK-032, ADR-0039): each holder ledger leg with
+   * the account it moved on resolved from the account ledger and — for a {@code HOLDER_TRANSFER} —
+   * the counter holder resolved from the holder ledger, both in batched IN-queries (no per-row
+   * lookups). Symmetric to {@code BankAccountService.getBookings}, which annotates the account
+   * history with the holder.
+   *
+   * @param holderId the holder
+   * @param pageable page, size and whitelisted sort (default newest first)
+   * @return one page of the holder's booking rows
+   * @throws NotFoundException when the holder does not exist
+   */
+  public Page<BankHolderBookingDto> getHolderBookings(
+      @NotNull UUID holderId, @NotNull Pageable pageable) {
+    requireHolder(holderId);
+    Page<BankHolderBookingRow> rows =
+        holderPostingRepository.findHolderBookings(holderId, pageable);
+    List<UUID> txIds =
+        rows.getContent().stream().map(BankHolderBookingRow::transactionId).distinct().toList();
+    Map<UUID, List<BankCounterLeg>> accountLegsByTx =
+        txIds.isEmpty()
+            ? Map.of()
+            : postingRepository.findLegsByTransactionIds(txIds).stream()
+                .collect(Collectors.groupingBy(BankCounterLeg::transactionId));
+    Map<UUID, List<BankHolderLeg>> holderLegsByTx =
+        txIds.isEmpty()
+            ? Map.of()
+            : holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
+                .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
+    return rows.map(row -> toHolderBookingDto(row, accountLegsByTx, holderLegsByTx));
+  }
+
+  /**
+   * Maps one holder booking row to the DTO, resolving its context from the batched legs: for a
+   * {@code HOLDER_TRANSFER} the counter holder (the opposite-sign holder leg), for every other
+   * account-touching type the account this leg moved on (the account leg whose amount sign matches
+   * this holder leg). A {@code WIPE_RESET} leg has no 1:1 account pairing and shows neither
+   * (ADR-0039).
+   *
+   * @param row the projected holder booking row
+   * @param accountLegsByTx account legs of the page's transactions, grouped by transaction
+   * @param holderLegsByTx holder legs of the page's transactions, grouped by transaction
+   * @return the holder booking DTO with its account/holder context resolved
+   */
+  private BankHolderBookingDto toHolderBookingDto(
+      @NotNull BankHolderBookingRow row,
+      @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx,
+      @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx) {
+    int sign = row.amount().signum();
+    String counterAccountNo = null;
+    String counterAccountName = null;
+    String counterHolderHandle = null;
+    if (row.type() == BankTransactionType.HOLDER_TRANSFER) {
+      counterHolderHandle =
+          matchHolderHandle(holderLegsByTx.getOrDefault(row.transactionId(), List.of()), -sign);
+    } else if (row.type() != BankTransactionType.WIPE_RESET) {
+      BankCounterLeg account =
+          matchAccountLeg(accountLegsByTx.getOrDefault(row.transactionId(), List.of()), sign);
+      if (account != null) {
+        counterAccountNo = account.accountNo();
+        counterAccountName = account.accountName();
+      }
+    }
+    return new BankHolderBookingDto(
+        row.postingId(),
+        row.transactionId(),
+        row.type(),
+        row.amount(),
+        row.note(),
+        row.createdAt(),
+        row.reversedTransactionId(),
+        counterAccountNo,
+        counterAccountName,
+        counterHolderHandle,
+        row.transferFee());
+  }
+
+  /**
+   * Picks the account leg whose amount sign matches the requested sign — the account paired with a
+   * holder leg of the same sign in the same transaction (ADR-0039: deposit/withdrawal have the one
+   * leg, a transfer the leg on the holder's side). Returns {@code null} when none matches.
+   *
+   * @param accountLegs the transaction's account legs
+   * @param sign the wanted amount sign (+1, -1)
+   * @return the matching account leg, or {@code null}
+   */
+  private static BankCounterLeg matchAccountLeg(
+      @NotNull List<BankCounterLeg> accountLegs, int sign) {
+    return accountLegs.stream()
+        .filter(leg -> leg.amount().signum() == sign)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Picks the handle of the holder leg whose amount sign matches the requested sign — the counter
+   * holder of a {@code HOLDER_TRANSFER} (the opposite-sign leg of the pair). Returns {@code null}
+   * when none matches.
+   *
+   * @param holderLegs the transaction's holder legs
+   * @param sign the wanted amount sign (+1, -1)
+   * @return the matching holder's handle, or {@code null}
+   */
+  private static String matchHolderHandle(@NotNull List<BankHolderLeg> holderLegs, int sign) {
+    return holderLegs.stream()
+        .filter(leg -> leg.amount().signum() == sign)
+        .map(BankHolderLeg::handle)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Loads a holder or fails with 404.
+   *
+   * @param holderId the holder id
+   * @return the holder entity
+   */
+  private BankHolder requireHolder(@NotNull UUID holderId) {
+    return holderRepository
+        .findById(holderId)
+        .orElseThrow(() -> new NotFoundException("Bank holder not found"));
   }
 
   /**
@@ -106,10 +247,11 @@ public class BankHolderService {
     holder.setUser(user);
     holder.setHandle(user.getEffectiveName());
     holder.setActive(true);
+    holder.setRoleManaged(false);
     BankHolder saved = holderRepository.save(holder);
     bankAuditService.record(
         BankAuditEventType.HOLDER_REGISTERED, null, null, user.getId(), saved.getHandle());
-    return bankHolderMapper.toDto(saved, BigDecimal.ZERO, 0L);
+    return bankHolderMapper.toDto(saved, BigDecimal.ZERO);
   }
 
   /**
@@ -145,7 +287,7 @@ public class BankHolderService {
           saved.getUser() != null ? saved.getUser().getId() : null,
           saved.getHandle());
     }
-    BigDecimal total = postingRepository.holderTotal(holderId);
-    return bankHolderMapper.toDto(saved, total, 0L);
+    BigDecimal total = holderPostingRepository.holderTotal(holderId);
+    return bankHolderMapper.toDto(saved, total);
   }
 }

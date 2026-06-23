@@ -24,9 +24,11 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
 import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
@@ -39,7 +41,9 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -52,10 +56,11 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Renders the bank account statement PDF (REQ-BANK-014, epic #556 Phase 3): for a caller-chosen
  * period it shows the opening balance, every posting of the account in chronological order with a
- * running balance and the booking holder, the closing balance and the holder distribution as of the
- * period end. Statements are computed on demand from the append-only ledger and never persisted
- * (owner decision on spec question 4); each export writes one {@code STATEMENT_EXPORTED} audit
- * event carrying the period (REQ-BANK-012).
+ * running balance and the booking holder (derived from the holder ledger by amount sign, ADR-0039),
+ * and the closing balance. Since holders are decoupled from accounts there is no per-account
+ * closing holder distribution any more (REQ-BANK-003). Statements are computed on demand from the
+ * append-only ledger and never persisted (owner decision on spec question 4); each export writes
+ * one {@code STATEMENT_EXPORTED} audit event carrying the period (REQ-BANK-012).
  *
  * <p>Labels come from the backend message bundle and are German by design — the documents are
  * org-internal DAS KARTELL paperwork. The visual layer (Lato, dark background, orange accents) is
@@ -72,6 +77,7 @@ public class BankStatementReportService {
 
   private final BankAccountRepository bankAccountRepository;
   private final BankPostingRepository bankPostingRepository;
+  private final BankHolderPostingRepository bankHolderPostingRepository;
   private final BankAuditService bankAuditService;
   private final MessageSource messageSource;
 
@@ -103,10 +109,14 @@ public class BankStatementReportService {
 
     BigDecimal opening = bankPostingRepository.accountBalanceBefore(accountId, from);
     List<BankBookingRow> rows = bankPostingRepository.findBookingsInPeriod(accountId, from, to);
-    List<BankHolderBalance> distribution =
-        bankPostingRepository.holderDistributionUntil(accountId, to);
+    List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
+    Map<UUID, List<BankHolderLeg>> holderLegsByTx =
+        txIds.isEmpty()
+            ? Map.of()
+            : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
+                .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
 
-    byte[] pdf = buildPdf(account, from, to, opening, rows, distribution, userZone);
+    byte[] pdf = buildPdf(account, from, to, opening, rows, holderLegsByTx, userZone);
     bankAuditService.record(
         BankAuditEventType.STATEMENT_EXPORTED, accountId, null, null, "period=" + from + ".." + to);
     log.info(
@@ -120,7 +130,7 @@ public class BankStatementReportService {
       @NotNull Instant to,
       @NotNull BigDecimal opening,
       @NotNull List<BankBookingRow> rows,
-      @NotNull List<BankHolderBalance> distribution,
+      @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx,
       @Nullable ZoneId userZone) {
     ZoneId zone = userZone != null ? userZone : ZoneOffset.UTC;
     DateTimeFormatter stamp = DATE_TIME_PATTERN.withZone(zone);
@@ -165,9 +175,15 @@ public class BankStatementReportService {
       for (BankBookingRow row : rows) {
         running = running.add(row.amount());
         Color bg = KrtPdfSupport.rowBackground(alt);
+        String holder =
+            row.type() == BankTransactionType.WIPE_RESET
+                ? ""
+                : matchHolderHandle(
+                    holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
+                    row.amount().signum());
         KrtPdfSupport.addTableCell(table, stamp.format(row.createdAt()), bg, false);
         KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
-        KrtPdfSupport.addTableCell(table, row.holderHandle(), bg, false);
+        KrtPdfSupport.addTableCell(table, holder, bg, false);
         KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running), bg, true);
@@ -178,10 +194,6 @@ public class BankStatementReportService {
       }
       krt.document().add(table);
 
-      krt.document().add(new org.openpdf.text.Paragraph(" "));
-      KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.distribution.title"));
-      krt.document().add(BankPdfFormat.distributionTable(distribution, this::label));
-
       KrtPdfSupport.addFooter(krt);
       krt.document().close();
       return baos.toByteArray();
@@ -190,6 +202,23 @@ public class BankStatementReportService {
     } catch (Exception e) {
       throw new ReportGenerationException("PDF generation failed", e);
     }
+  }
+
+  /**
+   * Picks the handle of the holder leg whose amount sign matches a posting row's sign — the holder
+   * paired with that account leg in the same transaction (ADR-0039); empty when none exists.
+   *
+   * @param holderLegs the transaction's holder legs
+   * @param sign the wanted amount sign (+1 / -1)
+   * @return the matching holder's handle, or an empty string
+   */
+  private static @NotNull String matchHolderHandle(
+      @NotNull List<BankHolderLeg> holderLegs, int sign) {
+    return holderLegs.stream()
+        .filter(leg -> leg.amount().signum() == sign)
+        .map(BankHolderLeg::handle)
+        .findFirst()
+        .orElse("");
   }
 
   /**

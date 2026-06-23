@@ -34,21 +34,20 @@ import org.mapstruct.Mapping;
 public interface BankHolderMapper {
 
   /**
-   * Maps one holder row plus its externally computed custody numbers to the response DTO. The
+   * Maps one holder row plus its externally computed global custody total to the response DTO. The
    * {@code userId} resolves through the lazy {@code user} proxy without initialising it (id-only
-   * access).
+   * access); {@code roleManaged} comes straight off the entity.
    *
    * @param holder the holder entity
-   * @param totalHeld signed sum the holder physically holds across all accounts
-   * @param accountCount number of accounts with a non-zero sub-balance for this holder
+   * @param totalHeld signed global sum the holder physically holds across the whole bank
    * @return the response DTO
    */
   @Mapping(target = "id", source = "holder.id")
   @Mapping(target = "userId", source = "holder.user.id")
   @Mapping(target = "handle", source = "holder.handle")
   @Mapping(target = "active", source = "holder.active")
+  @Mapping(target = "roleManaged", source = "holder.roleManaged")
   @Mapping(target = "version", source = "holder.version")
   @Mapping(target = "totalHeld", source = "totalHeld")
-  @Mapping(target = "accountCount", source = "accountCount")
-  BankHolderDto toDto(BankHolder holder, BigDecimal totalHeld, long accountCount);
+  BankHolderDto toDto(BankHolder holder, BigDecimal totalHeld);
 }

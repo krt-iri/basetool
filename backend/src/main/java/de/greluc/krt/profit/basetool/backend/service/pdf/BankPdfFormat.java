@@ -33,8 +33,8 @@ import org.openpdf.text.pdf.PdfPTable;
 /**
  * Bank-specific PDF formatting shared by the statement (REQ-BANK-014) and the three-month report
  * (REQ-BANK-015): German-grouped whole-aUEC amounts (the ledger only accepts whole amounts,
- * REQ-BANK-005) and the closing holder-distribution table both documents end an account section
- * with.
+ * REQ-BANK-005) and the holder-balance table the three-month report ends with (the global holder
+ * custody totals since ADR-0039 decoupled holders from accounts).
  */
 public final class BankPdfFormat {
 
@@ -74,10 +74,11 @@ public final class BankPdfFormat {
   }
 
   /**
-   * Builds the closing holder-distribution table (HALTER / BETRAG): one row per holder with a
-   * non-zero stash, largest first (repository order), or the localized empty row.
+   * Builds the holder-balance table (HALTER / BETRAG): one row per holder with a non-zero balance,
+   * in the supplied order, or the localized empty row. Since ADR-0039 this renders the global
+   * holder custody totals (not a per-account distribution).
    *
-   * @param distribution the per-holder sub-balances as of the period end
+   * @param distribution the per-holder balances to render
    * @param label the message-bundle resolver of the calling service
    * @return the ready-to-add table
    */

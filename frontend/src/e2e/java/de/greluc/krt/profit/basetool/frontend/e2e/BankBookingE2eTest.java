@@ -131,7 +131,12 @@ class BankBookingE2eTest {
     assertEquals(0, balance(account).compareTo(before), "balance is unchanged after the rejection");
   }
 
-  /** A transfer between two accounts moves money and nets the ledger to zero across both legs. */
+  /**
+   * A transfer between two accounts AND two different holders moves money and carves out the
+   * in-game fee (REQ-BANK-033, ADR-0041): the source is debited the full gross while the
+   * destination is credited the net (gross − fee). With the seeded 0.5% rate, 200 aUEC carries a 1
+   * aUEC fee, so the destination gains 199.
+   */
   @Test
   void transferBetweenAccountsMovesMoney() {
     String source = freshAccount("E2E Booking Source");
@@ -156,11 +161,11 @@ class BankBookingE2eTest {
     assertEquals(
         0,
         balance(source).compareTo(sourceBefore.subtract(new BigDecimal("200"))),
-        "the source lost 200");
+        "the source lost the full gross (200)");
     assertEquals(
         0,
-        balance(dest).compareTo(destBefore.add(new BigDecimal("200"))),
-        "the destination gained 200");
+        balance(dest).compareTo(destBefore.add(new BigDecimal("199"))),
+        "the destination gained the net (200 - 1 aUEC in-game fee)");
   }
 
   /** A transfer to the same account AND the same holder is a no-op booking — rejected with 409. */

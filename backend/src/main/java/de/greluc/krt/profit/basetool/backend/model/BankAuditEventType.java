@@ -62,10 +62,19 @@ public enum BankAuditEventType {
   /** A {@code WITHDRAWAL} transaction was booked. */
   WITHDRAWAL_BOOKED,
 
-  /** An account-to-account {@code TRANSFER} transaction was booked (REQ-BANK-011 variant 1). */
+  /** An account-to-account {@code TRANSFER} transaction was booked (REQ-BANK-011). */
   TRANSFER_BOOKED,
 
-  /** An intra-account holder rebooking was booked (REQ-BANK-011 variant 2 — custody move). */
+  /**
+   * A holder→holder Umbuchung ({@code HOLDER_TRANSFER}) moved custody between two holders without
+   * touching any account (REQ-BANK-031, ADR-0039).
+   */
+  HOLDER_TRANSFER,
+
+  /**
+   * Legacy: an intra-account holder rebooking (the pre-ADR-0039 model, REQ-BANK-011 variant 2). No
+   * longer produced — kept so historical audit rows still render.
+   */
   HOLDER_REBOOKED,
 
   /** A transaction was corrected by a {@code REVERSAL} transaction. */

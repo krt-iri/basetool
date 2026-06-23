@@ -462,21 +462,33 @@ Rollen und der Admin-Pin haben keinerlei Einfluss, in beide Richtungen.
 Spalten hier: **Member** = beliebige Org-Rolle ohne Bankrolle · **Bank-MA** =
 `Bank Employee` (mit Grants) · **Bankleitung** = `Bank Management`.
 
-| Funktion (Gate)                                                                                                             | Anonym | Member |  Bank-MA  | Bankleitung | Admin |
-|:----------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:-----------:|:-----:|
-| Bankbereich betreten, Dashboard, Konten **mit Grant-Zeile** sehen (`hasRole('BANK_EMPLOYEE')` + Grant)                      |   ❌    |   ❌    |     ✅     |      ✅      |   ✅   |
-| **Alle** Konten/Halter/Grants sehen (`hasRole('BANK_MANAGEMENT')`)                                                          |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Einzahlen / Auszahlen / Transfer (`@bankSecurityService.canDeposit/Withdraw/Transfer`, je Konto-Flag)                       |   ❌    |   ❌    | ✅ je Flag |      ✅      |   ✅   |
-| Konten anlegen/umbenennen/schließen/wiedereröffnen, Halter-Registry, Grants verwalten                                       |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Storno (`POST /bank/transactions/{id}/reversal`, `hasRole('BANK_MANAGEMENT')`)                                              |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Kontoauszug-PDF (gesehene Konten) / 3-Monats-Report (`BANK_MANAGEMENT`)                                                     |   ❌    |   ❌    |   ✅ / ❌   |      ✅      |   ✅   |
-| **Audit-Log** lesen + Aufbewahrungs-Bereinigung (`/api/v1/bank/admin/audit`, URL- **und** Methoden-Gate `hasRole('ADMIN')`) |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
-| **Wipe-Reset** (`/api/v1/bank/admin/wipe-reset`, `hasRole('ADMIN')`)                                                        |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
+| Funktion (Gate)                                                                                                                                                              | Anonym | Member |  Bank-MA  | Bankleitung | Admin |
+|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:-----------:|:-----:|
+| Bankbereich betreten, Dashboard, Konten **mit Grant-Zeile** sehen (`hasRole('BANK_EMPLOYEE')` + Grant)                                                                       |   ❌    |   ❌    |     ✅     |      ✅      |   ✅   |
+| **Alle** Konten/Halter/Grants sehen (`hasRole('BANK_MANAGEMENT')`)                                                                                                           |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Einzahlen / Auszahlen / Transfer (`@bankSecurityService.canDeposit/Withdraw/Transfer`, je Konto-Flag)                                                                        |   ❌    |   ❌    | ✅ je Flag |      ✅      |   ✅   |
+| Bankverwaltung betreten, **Sonderkonto** (`SPECIAL`) anlegen (+ Auto-Grant), Haltermenü + **Halter→Halter-Umbuchung** (`HOLDER_TRANSFER`, `BANK_EMPLOYEE`, kein Konto-Grant) |   ❌    |   ❌    |     ✅     |      ✅      |   ✅   |
+| Konten **(außer Sonderkonto)** anlegen / umbenennen / schließen / wiedereröffnen, **manuelle** Halter-Registry, Grants verwalten                                             |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Storno (`POST /bank/transactions/{id}/reversal`, `hasRole('BANK_MANAGEMENT')`)                                                                                               |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
+| Kontoauszug-PDF (gesehene Konten) / 3-Monats-Report (`BANK_MANAGEMENT`)                                                                                                      |   ❌    |   ❌    |   ✅ / ❌   |      ✅      |   ✅   |
+| **Audit-Log** lesen + Aufbewahrungs-Bereinigung (`/api/v1/bank/admin/audit`, URL- **und** Methoden-Gate `hasRole('ADMIN')`)                                                  |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
+| **Wipe-Reset** (`/api/v1/bank/admin/wipe-reset`, `hasRole('ADMIN')`)                                                                                                         |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
 
 Die Bankleitung sieht das Audit-Log **nicht** — es ist bewusst Admin-only
 (REQ-BANK-012). Grants können nur an Nutzer mit der Rolle `Bank Employee`
 vergeben werden (409 `BANK_GRANTEE_MISSING_ROLE`); ob die Person zusätzlich in
 einer Staffel/einem SK ist, spielt keine Rolle.
+
+**Halter sind von den Konten entkoppelt** (ADR-0039, REQ-BANK-003/-006): Der
+Halterbestand ist eine **globale** Größe in einem eigenen Ledger
+(`bank_holder_posting`), nicht kontobezogen, und **darf negativ** werden — ein
+Halter streckt notfalls eigenes Geld vor und wird später per **Halter→Halter-Umbuchung**
+(`HOLDER_TRANSFER`, REQ-BANK-031) ausgeglichen. Nur **Konten** sind hart gegen
+Überziehung geschützt. **Alle Bankmitarbeiter und Bankleitungsmitglieder werden
+automatisch als Halter registriert** (REQ-BANK-029, ADR-0040); verliert jemand alle
+Bankrollen, wird sein rollengetriebener Halter automatisch deaktiviert (Restbestand
+bleibt, muss ausgeglichen werden). Manuell registrierte (Nicht-Staff-)Halter bleiben
+davon unberührt.
 
 #### 3.11.1 Org-Einheits-Zugang für Offiziere/Leads (epic #666)
 

@@ -151,14 +151,32 @@ class BankControllerSecurityTest {
   }
 
   @Test
-  void accountCreate_employee_isForbidden() throws Exception {
+  void accountCreate_member_isForbidden() throws Exception {
+    // A user without any bank role cannot reach the create endpoint (URL/method gate).
     mockMvc
         .perform(
             post("/api/v1/bank/accounts")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"X\",\"type\":\"SPECIAL\"}")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void accountCreate_employee_reachesEndpoint() throws Exception {
+    // REQ-BANK-030: the create gate is now BANK_EMPLOYEE (an employee may create SPECIAL accounts);
+    // the SPECIAL-only restriction is enforced in the service (see BankAccountServiceTest). The
+    // service is mocked here, so reaching it yields 201.
+    mockMvc
+        .perform(
+            post("/api/v1/bank/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"X\",\"type\":\"SPECIAL\"}")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isCreated());
   }
 
   @Test
@@ -168,7 +186,10 @@ class BankControllerSecurityTest {
             post("/api/v1/bank/accounts")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"X\",\"type\":\"SPECIAL\"}")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
         .andExpect(status().isCreated());
   }
 
@@ -338,6 +359,30 @@ class BankControllerSecurityTest {
             get("/api/v1/bank/accounts/{id}/statement", UUID.randomUUID())
                 .param("from", "2026-01-01T00:00:00Z")
                 .param("to", "2026-02-01T00:00:00Z")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void holderHistory_withoutVisibility_isForbidden() throws Exception {
+    // REQ-BANK-032: a bank employee may read only their own holder's history; the canSeeHolder
+    // gate denies someone else's holder, even though the URL role gate (BANK_EMPLOYEE) passes.
+    when(bankSecurityService.canSeeHolder(any(UUID.class), any())).thenReturn(false);
+    mockMvc
+        .perform(
+            get("/api/v1/bank/holders/{id}/transactions", UUID.randomUUID())
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void holderHistory_withVisibility_isAllowed() throws Exception {
+    when(bankSecurityService.canSeeHolder(any(UUID.class), any())).thenReturn(true);
+    when(bankHolderService.getHolderBookings(any(), any()))
+        .thenReturn(org.springframework.data.domain.Page.empty());
+    mockMvc
+        .perform(
+            get("/api/v1/bank/holders/{id}/transactions", UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
         .andExpect(status().isOk());
   }

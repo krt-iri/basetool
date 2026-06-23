@@ -24,11 +24,12 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -99,18 +100,19 @@ public class BankPageController {
   }
 
   /**
-   * Renders the account detail page (K1): facts strip, paged booking history, the permanent holder
-   * distribution and the booking modals. The modal selects need the holder registry and the
-   * caller's visible accounts (transfer destinations) — both fetched here so the page works without
-   * follow-up AJAX reads.
+   * Renders the account detail page (K1): facts strip, paged booking history and the booking
+   * modals. Since ADR-0039 holders are decoupled from accounts, so the page shows no per-account
+   * holder distribution; the booking modals' holder selects list the bank-wide holder registry. The
+   * modal selects need the holder registry and the caller's visible accounts (transfer
+   * destinations) — both fetched here so the page works without follow-up AJAX reads.
    *
    * @param id the account id
    * @param page zero-based booking page
    * @param fragment when {@code "bookings"} only the paged booking-history fragment is rendered
    *     (AJAX pager swap, REQ-FE-002); when {@code "accountBody"} the whole account body (facts,
-   *     distribution, bookings and the booking modals) is re-rendered in place after a money write
-   *     (REQ-FE-005) so the balance, holder distribution and the modals' distribution-derived
-   *     holder selects refresh without a reload; otherwise the full page is returned
+   *     bookings and the booking modals) is re-rendered in place after a money write (REQ-FE-005)
+   *     so the balance and booking history refresh without a reload; otherwise the full page is
+   *     returned
    * @param model Spring MVC model
    * @return the detail template, or its {@code bookings} / {@code accountBody} fragment for an AJAX
    *     swap
@@ -136,7 +138,6 @@ public class BankPageController {
         backendApiClient.get(
             "/api/v1/bank/accounts?size=500", new ParameterizedTypeReference<>() {});
 
-    BigDecimal balance = detail != null ? detail.account().balance() : BigDecimal.ZERO;
     model.addAttribute("detail", detail);
     model.addAttribute("bookings", bookings);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
@@ -153,8 +154,11 @@ public class BankPageController {
                 .filter(a -> !a.id().equals(id))
                 .filter(a -> "ACTIVE".equals(a.status()))
                 .toList());
-    model.addAttribute("distributionPercents", distributionPercents(detail, balance));
     model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
+    // The in-game transfer-fee rate (ADR-0041, REQ-BANK-033) drives the live "Gebühr / kommt an"
+    // preview in the withdraw/transfer modals (bank.js). It rides on <main>, which survives the
+    // accountBody swap, so it is fetched once on the full-page render.
+    model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     if ("accountBody".equals(fragment)) {
       return "bank-account-detail :: accountBody";
     }
@@ -207,25 +211,94 @@ public class BankPageController {
   }
 
   /**
-   * Pre-computes the integer percentage per holder slice for the bars and the stack segments —
-   * Thymeleaf should not carry BigDecimal division logic.
+   * Renders the holder detail page (REQ-BANK-032): the holder's header (handle, status, global
+   * custody total) plus the paged custody history — every booking that touched the holder's stash.
+   * A bank employee reaches only their own holder, management any (the backend {@code canSeeHolder}
+   * gate enforces it; a forbidden id surfaces as the backend error). The page is read-only — no
+   * modals, no money writes.
    *
-   * @param detail the loaded detail payload
-   * @param balance the account balance (the 100% base)
-   * @return holder id to integer percentage (0..100)
+   * @param id the holder id
+   * @param page zero-based history page
+   * @param fragment when {@code "holderBookings"} only the paged history fragment is rendered (AJAX
+   *     pager swap, REQ-FE-002); otherwise the full page is returned
+   * @param model Spring MVC model
+   * @return the holder-detail template, or its {@code holderBookings} fragment for an AJAX swap
    */
-  private static java.util.Map<UUID, Integer> distributionPercents(
-      BankAccountDetailDto detail, @NotNull BigDecimal balance) {
-    java.util.Map<UUID, Integer> percents = new java.util.LinkedHashMap<>();
-    if (detail == null || balance.signum() == 0) {
-      return percents;
+  @GetMapping("/bank/holders/{id}")
+  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  public String holderDetail(
+      @PathVariable @NotNull UUID id,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    if ("holderBookings".equals(fragment)) {
+      return holderBookingsFragment(id, page, model);
     }
-    for (var slice : detail.holderDistribution()) {
-      BigDecimal pct =
-          slice.amount().multiply(BigDecimal.valueOf(100)).divide(balance, 0, RoundingMode.HALF_UP);
-      percents.put(slice.holderId(), Math.max(0, Math.min(100, pct.intValue())));
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    BankHolderDto holder = backendApiClient.get("/api/v1/bank/holders/" + id, BankHolderDto.class);
+    PageResponse<BankHolderBookingDto> bookings = fetchHolderBookings(id, effectivePage);
+    model.addAttribute("holder", holder);
+    model.addAttribute("bookings", bookings);
+    model.addAttribute("paginationBaseUrl", "/bank/holders/" + id);
+    return "bank-holder-detail";
+  }
+
+  /**
+   * Renders just the paged custody-history block for an AJAX pager swap (REQ-FE-002). Fetches only
+   * the requested history page — the holder header the full page loads is skipped. A backend
+   * failure degrades to an empty page so the swapped-in fragment shows its empty state rather than
+   * injecting an error page into the sub-table; the {@code .utc-time} localiser (re-run on {@code
+   * krt:swapped}) keeps the swapped-in rows live.
+   *
+   * @param id the holder id
+   * @param page zero-based history page (clamped to 0)
+   * @param model Spring MVC model populated with {@code bookings} and {@code paginationBaseUrl}
+   * @return the {@code bank-holder-detail :: holderBookings} fragment view
+   */
+  private String holderBookingsFragment(UUID id, Integer page, Model model) {
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    PageResponse<BankHolderBookingDto> bookings;
+    try {
+      bookings = fetchHolderBookings(id, effectivePage);
+    } catch (Exception e) {
+      log.error("Error loading holder bookings fragment for holder {}", id, e);
+      bookings = null;
     }
-    return percents;
+    model.addAttribute("bookings", bookings);
+    model.addAttribute("paginationBaseUrl", "/bank/holders/" + id);
+    return "bank-holder-detail :: holderBookings";
+  }
+
+  /**
+   * Fetches one page of a holder's custody history (page size 20) from the backend holder
+   * transactions endpoint — the single source of the history query shared by the full-page render
+   * and the {@link #holderBookingsFragment} AJAX swap.
+   *
+   * @param id the holder id whose history to page through
+   * @param page zero-based, already-clamped page index
+   * @return the requested history page envelope
+   */
+  private PageResponse<BankHolderBookingDto> fetchHolderBookings(UUID id, int page) {
+    return backendApiClient.get(
+        UriComponentsBuilder.fromPath("/api/v1/bank/holders/" + id + "/transactions")
+            .queryParam("page", page)
+            .queryParam("size", 20)
+            .toUriString(),
+        new ParameterizedTypeReference<>() {});
+  }
+
+  /**
+   * Fetches the current in-game transfer-fee rate for the booking-modal preview (ADR-0041,
+   * REQ-BANK-033); a backend failure or absent rate degrades to {@link BigDecimal#ZERO} so the page
+   * still renders (the preview then simply shows no fee). The authoritative fee is always computed
+   * server-side at booking time.
+   *
+   * @return the fee rate as a fraction, never {@code null}
+   */
+  private BigDecimal fetchTransferFeeRate() {
+    BankTransferFeeRateDto rate =
+        backendApiClient.get("/api/v1/bank/transfer-fee-rate", BankTransferFeeRateDto.class);
+    return rate == null || rate.rate() == null ? BigDecimal.ZERO : rate.rate();
   }
 
   /**

@@ -97,7 +97,7 @@
                     <summary th:text="#{nav.section.bank}">Bank</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/bank}" data-testid="nav-bank" th:text="#{nav.bank.dashboard}">Bank-Dashboard</a>
-                        <a th:href="@{/bank/manage}" sec:authorize="hasRole('BANK_MANAGEMENT')" data-testid="nav-bank-manage" th:text="#{nav.bank.manage}">Bankverwaltung</a>
+                        <a th:href="@{/bank/manage}" sec:authorize="hasRole('BANK_EMPLOYEE')" data-testid="nav-bank-manage" th:text="#{nav.bank.manage}">Bankverwaltung</a>
                         <a th:href="@{/bank/grants}" sec:authorize="hasRole('BANK_MANAGEMENT')" data-testid="nav-bank-grants" th:text="#{nav.bank.grants}">Berechtigungen</a>
                         <a th:href="@{/bank/requests}" data-testid="nav-bank-requests" th:text="#{nav.bank.requests}">Antr&auml;ge</a>
                     </div>

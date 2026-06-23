@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.task;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import de.greluc.krt.profit.basetool.backend.service.BankHolderReconciliationService;
 import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.List;
@@ -47,6 +48,7 @@ public class UserSyncTask {
 
   private final KeycloakService keycloakService;
   private final UserService userService;
+  private final BankHolderReconciliationService bankHolderReconciliationService;
 
   /**
    * Fetches the current Keycloak user list and reconciles it into the local table.
@@ -80,5 +82,15 @@ public class UserSyncTask {
     }
     userService.markMissingUsers(keycloakUserIds);
     log.info("User sync finished. Synced {} users.", count);
+
+    // After the roster is reconciled, keep the bank-holder registry in sync (REQ-BANK-029): every
+    // bank-role user becomes an active holder; a role-managed holder whose user lost the role is
+    // auto-deactivated. Isolated in its own transaction and swallowed on failure so a bank-side
+    // hiccup never aborts the core user sync.
+    try {
+      bankHolderReconciliationService.reconcileAll();
+    } catch (Exception e) {
+      log.error("Bank holder reconcile failed; will retry on the next sync run.", e);
+    }
   }
 }

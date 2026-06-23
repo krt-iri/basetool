@@ -30,8 +30,9 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Write payload for booking a withdrawal (REQ-BANK-004/-005): money left the bank, paid out by the
- * named holder. Guarded by the no-overdraft rule at account AND holder level (REQ-BANK-006); the
- * amount is whole-aUEC and strictly positive — the sign comes from the transaction type.
+ * named holder. Guarded by the no-overdraft rule at <strong>account</strong> level only
+ * (REQ-BANK-006, ADR-0039) — the holder may go negative; the amount is whole-aUEC and strictly
+ * positive — the sign comes from the transaction type.
  *
  * @param accountId the paying account
  * @param holderId the player who physically paid the money out (REQ-BANK-003)

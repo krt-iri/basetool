@@ -24,16 +24,18 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Response payload for one holder-registry row (epic #556, REQ-BANK-003), enriched with the
- * cross-account custody totals the management "Halter" tab shows (W1 mockup).
+ * Response payload for one holder-registry row (epic #556, REQ-BANK-003, ADR-0039), enriched with
+ * the holder's global custody total the management "Halter" tab shows (W1 mockup).
  *
  * @param id the holder row's id
  * @param userId the linked basetool user, or {@code null} after user deletion (handle snapshot
  *     remains)
  * @param handle the deletion-proof handle snapshot
- * @param active whether the holder accepts new postings
- * @param totalHeld signed sum the holder physically holds across all accounts
- * @param accountCount number of accounts with a non-zero sub-balance for this holder
+ * @param active whether the holder accepts new incoming postings
+ * @param totalHeld signed global sum the holder physically holds across the whole bank (may be
+ *     negative, REQ-BANK-006)
+ * @param roleManaged whether the holder was auto-created from a bank role (REQ-BANK-029); manual
+ *     custodians are {@code false}
  * @param version optimistic-locking version the client must echo on mutations
  */
 public record BankHolderDto(
@@ -42,5 +44,5 @@ public record BankHolderDto(
     String handle,
     boolean active,
     BigDecimal totalHeld,
-    long accountCount,
+    boolean roleManaged,
     Long version) {}

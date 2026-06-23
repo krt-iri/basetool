@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
@@ -39,11 +40,19 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 @SuppressWarnings("unchecked")
 class BankManagePageControllerTest {
+
+  /** A bank-management authentication so the controller takes the full (any-type) perspective. */
+  private static Authentication management() {
+    return new TestingAuthenticationToken(
+        "mgmt", "pw", "ROLE_BANK_EMPLOYEE", "ROLE_BANK_MANAGEMENT");
+  }
 
   @Test
   void manage_ShouldDefaultToAccountsTabAndFillModel() {
@@ -65,7 +74,7 @@ class BankManagePageControllerTest {
             Instant.parse("2026-01-15T10:00:00Z"));
     BankHolderDto holder =
         new BankHolderDto(
-            UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, 0, 0L);
+            UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, false, 0L);
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(account), 0, 500, 1, 1, Collections.emptyList()));
@@ -76,13 +85,18 @@ class BankManagePageControllerTest {
         .thenReturn(List.of());
     when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))
+        .thenReturn(new BankTransferFeeRateDto(new BigDecimal("0.005")));
 
     // When
-    String view = controller.manage(null, null, model);
+    String view = controller.manage(null, null, management(), model);
 
     // Then
     assertEquals("bank-manage", view);
     assertEquals("konten", model.getAttribute("activeTab"));
+    // The transfer-fee rate feeds the holder→holder Umbuchung modal's live preview (REQ-BANK-033).
+    assertEquals(new BigDecimal("0.005"), model.getAttribute("transferFeeRate"));
     List<BankAccountDto> accounts = (List<BankAccountDto>) model.getAttribute("accounts");
     assertNotNull(accounts);
     assertEquals(1, accounts.size());
@@ -101,7 +115,7 @@ class BankManagePageControllerTest {
         .thenReturn(null);
 
     // When
-    String view = controller.manage("HALTER", null, model);
+    String view = controller.manage("HALTER", null, management(), model);
 
     // Then
     assertEquals("bank-manage", view);
@@ -128,7 +142,7 @@ class BankManagePageControllerTest {
         .thenReturn(List.of());
 
     // When
-    String view = controller.manage("halter", "manageBody", model);
+    String view = controller.manage("halter", "manageBody", management(), model);
 
     // Then
     assertEquals("bank-manage :: manageBody", view);

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="${holder != null ? holder.handle() : ''} + ' - ' + ${appTitle}">Halter - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main th:if="${holder != null}">
+    <!-- Holder header: handle + status pill + auto/manual source chip; the global custody total and
+         the back link to the holder menu (REQ-BANK-032). The page is read-only — a holder sees only
+         their own history, bank management sees everyone's (gated server-side via canSeeHolder). -->
+    <div class="greeting hud-box flex-between">
+        <div>
+            <h1 th:text="${holder.handle()}" data-testid="bank-holder-handle">greluc</h1>
+            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;">
+                <span class="status-pill"
+                      th:classappend="${holder.active()} ? ' status-active' : ' status-completed'"
+                      th:text="${holder.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}"
+                      data-testid="bank-holder-status">Aktiv</span>
+                <span class="chip" style="font-size: 0.55rem;"
+                      th:text="${holder.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
+            </p>
+        </div>
+        <div class="bank-head-actions">
+            <a th:href="@{/bank/manage(tab='halter')}" class="btn btn-ghost" data-testid="bank-holder-back-link"
+               th:text="#{bank.holder.detail.back}">Zur Bank-Verwaltung</a>
+        </div>
+    </div>
+
+    <!-- Facts strip: global custody total + total booking count. -->
+    <div class="bank-facts mt-2">
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</div>
+            <div class="kpi-value" data-testid="bank-holder-total"
+                 th:classappend="${holder.totalHeld().signum() < 0} ? ' bank-amount--neg' : ''"
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
+            <div class="kpi-value" th:text="${bookings != null ? bookings.totalElements() : 0}">42</div>
+        </div>
+    </div>
+
+    <!-- Balance-split calculator (REQ-BANK-032): the holder enters their current in-game account
+         balance and the page works out — purely client-side, nothing stored — how much of it is
+         reserved for the bank (= their global custody total, server-rendered below) and how much is
+         their own private money (balance − reserved). A negative result means they physically hold
+         less than the bank's records say (a shortfall); a negative reserved means the bank owes them. -->
+    <div class="bank-panel mt-2" data-testid="bank-holder-balance-calc"
+         th:attr="data-reserved=${holder.totalHeld()}">
+        <div class="bank-panel-head">
+            <h2 th:text="#{bank.holder.calc.title}">Kontostand-Aufteilung</h2>
+        </div>
+        <div class="bank-panel-body">
+            <p class="text-muted" style="margin: 0 0 0.75rem; font-size: 0.8rem;"
+               th:text="#{bank.holder.calc.hint}">Trag deinen aktuellen Kontostand ein.</p>
+            <div class="bank-form-row" style="max-width: 22rem;">
+                <label for="bank-holder-balance-input" th:text="#{bank.holder.calc.balance}">Aktueller Kontostand (aUEC)</label>
+                <input type="number" id="bank-holder-balance-input" min="0" step="1" inputmode="numeric"
+                       data-balance-input data-testid="bank-holder-balance-input">
+            </div>
+            <div class="bank-facts" data-balance-result hidden>
+                <div class="kpi-total">
+                    <div class="kpi-label" th:text="#{bank.holder.calc.reserved}">Bank-reserviert</div>
+                    <div class="kpi-value"
+                         th:classappend="${holder.totalHeld().signum() < 0} ? ' bank-amount--neg' : ''"
+                         th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</div>
+                </div>
+                <div class="kpi-total">
+                    <div class="kpi-label" th:text="#{bank.holder.calc.own}">Privat (eigenes Geld)</div>
+                    <div class="kpi-value" data-balance-own data-testid="bank-holder-balance-own">0 aUEC</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bank-panel mt-2" data-testid="bank-holder-bookings-panel">
+        <div class="bank-panel-head">
+            <h2 th:text="#{bank.holder.detail.history}">Halter-Buchungen</h2>
+        </div>
+        <div class="bank-panel-body">
+            <!-- AJAX swap target (REQ-FE-002): the history pager re-renders only this block via
+                 krtFetch (fragment=holderBookings). The .utc-time cells are re-localised on
+                 krt:swapped, so swapped-in rows stay live. The no-JS page-btn links still reload
+                 the whole page. -->
+            <div id="bank-holder-bookings-results">
+            <th:block th:fragment="holderBookings">
+            <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{bank.booking.date}">Datum</th>
+                        <th th:text="#{bank.booking.type}">Typ</th>
+                        <th th:text="#{bank.holder.booking.reference}">Bezug</th>
+                        <th th:text="#{bank.booking.note}">Notiz</th>
+                        <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="b : ${bookings.content()}" data-testid="bank-holder-booking-row"
+                        th:attr="data-transaction-id=${b.transactionId()}">
+                        <td><span class="utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span></td>
+                        <td th:switch="${b.type()}">
+                            <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
+                            <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
+                            <span th:case="'TRANSFER'" class="chip" th:text="#{bank.type.TRANSFER}">Transfer</span>
+                            <span th:case="'HOLDER_TRANSFER'" class="chip" th:text="#{bank.type.HOLDER_TRANSFER}">Umbuchung</span>
+                            <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
+                            <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
+                            <span th:case="*" class="chip" th:text="${b.type()}">?</span>
+                        </td>
+                        <td>
+                            <!-- Umbuchung: the counter holder with a direction arrow (paid out vs received);
+                                 every account-touching type: the account this leg moved on. -->
+                            <span th:if="${b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() != null}"
+                                  th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${b.counterHolderHandle()}">&#8594; carol</span>
+                            <span th:if="${b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() != null}"
+                                  th:text="${b.counterAccountNo()} + ' &#8212; ' + ${b.counterAccountName()}">KB-0001 &#8212; Staffel IRIDIUM</span>
+                            <span th:if="${(b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() == null) or (b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() == null)}"
+                                  class="text-muted">&mdash;</span>
+                        </td>
+                        <td class="bank-note-cell" th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</td>
+                        <td class="text-right">
+                            <span class="bank-amount"
+                                  th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
+                                  th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
+                            <!-- In-game fee carved out of an outgoing leg (REQ-BANK-033): the
+                                 destination received amount - fee. -->
+                            <span class="bank-fee-note text-muted" data-testid="bank-holder-booking-fee"
+                                  th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
+                                  th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
+               data-testid="bank-holder-bookings-empty" th:text="#{bank.holder.detail.history.empty}">Dieser Halter hat noch keine Buchungen.</p>
+            <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+            </th:block>
+            </div>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:attr="nonce=${cspNonce}">
+    // History pager -> in-place swap (REQ-FE-002), same pattern as the account-detail bookings
+    // pager: the page-btn links inside #bank-holder-bookings-results point at
+    // /bank/holders/{id}?page=N; krtFetch intercepts them and re-renders only that block via
+    // fragment=holderBookings. The .utc-time cells re-localise on krt:swapped. No-JS fallback
+    // reloads the page.
+    function bindBankHolderBookingsPager() {
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({
+                container: '#bank-holder-bookings-results',
+                fragmentValue: 'holderBookings',
+                history: true
+            });
+        }
+    }
+    bindBankHolderBookingsPager();
+    document.addEventListener('krt:swapped', bindBankHolderBookingsPager);
+</script>
+</body>
+</html>

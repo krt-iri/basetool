@@ -32,14 +32,15 @@ import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.BankHolderTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
@@ -59,10 +60,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Integration tests for {@link BankLedgerService} against the real Testcontainers PostgreSQL:
- * double-entry invariants, the no-overdraft guard under real concurrent contention (account AND
- * holder level, REQ-BANK-006), the negated-mirror reversal (ADR-0010), the wipe reset
- * (REQ-BANK-013), append-only behavior and the one-audit-row-per-booking rule (REQ-BANK-012).
+ * Integration tests for {@link BankLedgerService} against the real Testcontainers PostgreSQL, on
+ * the decoupled two-ledger model (ADR-0039): account and holder legs per booking, the
+ * <strong>account-only</strong> no-overdraft guard under real concurrent contention (REQ-BANK-006 —
+ * holders may go negative), the holder→holder Umbuchung (REQ-BANK-031), the negated-mirror reversal
+ * across both ledgers (ADR-0010/0039), the wipe reset (REQ-BANK-013), append-only behavior and the
+ * one-audit-row-per-booking rule (REQ-BANK-012).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -77,6 +80,7 @@ class BankLedgerServiceTest {
   @Autowired private BankHolderRepository holderRepository;
   @Autowired private BankTransactionRepository transactionRepository;
   @Autowired private BankPostingRepository postingRepository;
+  @Autowired private BankHolderPostingRepository holderPostingRepository;
   @Autowired private BankAuditEventRepository auditEventRepository;
 
   private BankAccount account;
@@ -94,7 +98,7 @@ class BankLedgerServiceTest {
   }
 
   @Test
-  void bookDeposit_createsPositivePostingAndExactlyOneAuditRow() {
+  void bookDeposit_createsAccountAndHolderLegAndExactlyOneAuditRow() {
     // Given
     long auditBefore = auditEventRepository.count();
 
@@ -104,24 +108,22 @@ class BankLedgerServiceTest {
             new BankDepositRequest(
                 account.getId(), holderA.getId(), new BigDecimal("500"), "seed"));
 
-    // Then
+    // Then: one account leg (+500) and one holder leg (+500 global)
     assertEquals(BankTransactionType.DEPOSIT, tx.type());
     assertEquals(0, balance(account).compareTo(new BigDecimal("500")));
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("500")));
     assertEquals(
-        0,
-        postingRepository
-            .holderSubBalance(account.getId(), holderA.getId())
-            .compareTo(new BigDecimal("500")));
+        1, holderPostingRepository.findHolderLegsByTransactionIds(List.of(tx.id())).size());
     assertEquals(auditBefore + 1, auditEventRepository.count(), "exactly one audit row");
     assertTrue(auditEventRepository.existsByTransactionId(tx.id()));
   }
 
   @Test
-  void bookWithdrawal_rejectsOverdraftWithStableCode() {
-    // Given
+  void bookWithdrawal_rejectsAccountOverdraftWithStableCode() {
+    // Given: the account holds 100
     deposit(account, holderA, "100");
 
-    // When
+    // When: withdraw 250 — the account cannot cover it
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -131,36 +133,62 @@ class BankLedgerServiceTest {
                         account.getId(), holderA.getId(), new BigDecimal("250"), null)));
 
     // Then
-    assertEquals(BankConflictException.CODE_BANK_HOLDER_OVERDRAFT, ex.getCode());
+    assertEquals(BankConflictException.CODE_BANK_OVERDRAFT, ex.getCode());
+    assertEquals("100", ex.getProperties().get("available"));
     assertEquals(0, balance(account).compareTo(new BigDecimal("100")), "balance unchanged");
   }
 
   @Test
-  void bookWithdrawal_rejectsHolderOverdraftEvenWhenAccountBalanceSuffices() {
-    // Given: account holds 1000, but only 300 with holder A
+  void bookWithdrawal_allowsHolderToGoNegativeWhenAccountCovers() {
+    // Given: account holds 1000 (A:300, B:700) — the account covers a 400 payout, holder A does not
     deposit(account, holderA, "300");
     deposit(account, holderB, "700");
 
-    // When
-    BankConflictException ex =
-        assertThrows(
-            BankConflictException.class,
-            () ->
-                bankLedgerService.bookWithdrawal(
-                    new BankWithdrawalRequest(
-                        account.getId(), holderA.getId(), new BigDecimal("400"), null)));
+    // When: A pays out 400 — A fronts the missing 100 (no holder overdraft, ADR-0039)
+    bankLedgerService.bookWithdrawal(
+        new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("400"), null));
 
-    // Then
-    assertEquals(BankConflictException.CODE_BANK_HOLDER_OVERDRAFT, ex.getCode());
-    assertEquals("300", ex.getProperties().get("available"));
+    // Then: the account drops by 400, holder A's GLOBAL balance goes negative
+    assertEquals(0, balance(account).compareTo(new BigDecimal("600")));
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-100")));
   }
 
   @Test
-  void bookTransfer_betweenAccounts_legsSumToZeroAndDistributionsMatch() {
-    // Given
+  void bookTransfer_sameHolder_isFeeFreeAndLegsSumToZero() {
+    // Given (REQ-BANK-033): a same-holder transfer moves no money in-game (the holder just
+    // re-labels which account owns it), so it carries no fee and both legs net to zero.
     deposit(account, holderA, "1000");
 
-    // When
+    // When: move 400 to another account, but custody stays with holder A
+    BankTransactionDto tx =
+        bankLedgerService.bookTransfer(
+            new BankTransferRequest(
+                account.getId(),
+                holderA.getId(),
+                otherAccount.getId(),
+                holderA.getId(),
+                new BigDecimal("400"),
+                "Umschichtung"),
+            true);
+
+    // Then: two account legs summing to zero AND two holder legs summing to zero; no fee recorded
+    List<BankCounterLeg> accountLegs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
+    assertEquals(2, accountLegs.size());
+    assertEquals(0, sum(accountLegs.stream().map(BankCounterLeg::amount).toList()).signum());
+    assertEquals(0, storedFee(tx).signum(), "same-holder transfer is fee-free");
+    assertEquals(0, balance(account).compareTo(new BigDecimal("600")));
+    assertEquals(0, balance(otherAccount).compareTo(new BigDecimal("400")));
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("1000")), "custody unchanged");
+  }
+
+  @Test
+  void bookTransfer_holderChange_carvesOutFeeAndCreditsNetToDestination() {
+    // Given (REQ-BANK-033, ADR-0041): a transfer that changes the holder is a real in-game send, so
+    // the 0.5% fee (seeded operation.transfer_fee_rate) is carved out — the source is debited the
+    // full gross, the destination credited the net, and the two legs net to -fee.
+    deposit(account, holderA, "1000");
+
+    // When: move the whole 1000 to another account AND another holder
     BankTransactionDto tx =
         bankLedgerService.bookTransfer(
             new BankTransferRequest(
@@ -168,57 +196,35 @@ class BankLedgerServiceTest {
                 holderA.getId(),
                 otherAccount.getId(),
                 holderB.getId(),
-                new BigDecimal("400"),
+                new BigDecimal("1000"),
                 "Bereichsanteil"),
             true);
 
-    // Then
-    List<BankCounterLeg> legs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
-    assertEquals(2, legs.size());
-    BigDecimal sum =
-        legs.stream().map(BankCounterLeg::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
-    assertEquals(0, sum.signum(), "TRANSFER legs must sum to zero");
-    assertEquals(0, balance(account).compareTo(new BigDecimal("600")));
-    assertEquals(0, balance(otherAccount).compareTo(new BigDecimal("400")));
+    // Then: fee = round(1000 * 0.005) = 5; the destination receives 995, the legs net to -5
+    assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
+    List<BankCounterLeg> accountLegs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
+    assertEquals(
+        0,
+        sum(accountLegs.stream().map(BankCounterLeg::amount).toList())
+            .compareTo(new BigDecimal("-5")));
+    List<BankHolderLeg> holderLegs =
+        holderPostingRepository.findHolderLegsByTransactionIds(List.of(tx.id()));
+    assertEquals(
+        0,
+        sum(holderLegs.stream().map(BankHolderLeg::amount).toList())
+            .compareTo(new BigDecimal("-5")));
+    assertEquals(0, balance(account).signum(), "source debited the full gross");
+    assertEquals(0, balance(otherAccount).compareTo(new BigDecimal("995")), "destination gets net");
+    assertEquals(0, holderTotal(holderA).signum());
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("995")));
   }
 
   @Test
-  void bookTransfer_intraAccountRebooking_movesCustodyNotBalance() {
-    // Given
-    deposit(account, holderA, "800");
-    BigDecimal balanceBefore = balance(account);
-
-    // When
-    bankLedgerService.bookTransfer(
-        new BankTransferRequest(
-            account.getId(),
-            holderA.getId(),
-            account.getId(),
-            holderB.getId(),
-            new BigDecimal("300"),
-            "Uebergabe"),
-        true);
-
-    // Then
-    assertEquals(0, balance(account).compareTo(balanceBefore), "balance unchanged");
-    assertEquals(
-        0,
-        postingRepository
-            .holderSubBalance(account.getId(), holderA.getId())
-            .compareTo(new BigDecimal("500")));
-    assertEquals(
-        0,
-        postingRepository
-            .holderSubBalance(account.getId(), holderB.getId())
-            .compareTo(new BigDecimal("300")));
-  }
-
-  @Test
-  void bookTransfer_rejectsSelfTransfer() {
+  void bookTransfer_rejectsSameAccount() {
     // Given
     deposit(account, holderA, "100");
 
-    // When / Then
+    // When / Then: an account-to-account transfer must target a DIFFERENT account
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -228,11 +234,73 @@ class BankLedgerServiceTest {
                         account.getId(),
                         holderA.getId(),
                         account.getId(),
-                        holderA.getId(),
+                        holderB.getId(),
                         new BigDecimal("50"),
                         null),
                     true));
     assertEquals(BankConflictException.CODE_BANK_SELF_TRANSFER, ex.getCode());
+  }
+
+  @Test
+  void bookHolderTransfer_movesGlobalCustodyWithNoAccountLegAndCarvesOutFee() {
+    // Given: holder A holds 800 (via a deposit onto the account)
+    deposit(account, holderA, "800");
+    BigDecimal accountBefore = balance(account);
+    long auditBefore = auditEventRepository.count();
+
+    // When: A hands 400 of physical custody to B — no account is touched. Because A physically
+    // sends the money in-game, the 0.5% fee applies: fee = round(400 * 0.005) = 2, B receives 398.
+    BankTransactionDto tx =
+        bankLedgerService.bookHolderTransfer(
+            new BankHolderTransferRequest(
+                holderA.getId(), holderB.getId(), new BigDecimal("400"), "Schichtwechsel"));
+
+    // Then: only holder balances move; the account is untouched and the tx books no account leg;
+    // the source is debited the full gross, the destination credited the net, legs net to -fee.
+    assertEquals(BankTransactionType.HOLDER_TRANSFER, tx.type());
+    assertEquals(0, storedFee(tx).compareTo(new BigDecimal("2")));
+    assertEquals(0, balance(account).compareTo(accountBefore), "account balance unchanged");
+    assertTrue(postingRepository.findLegsByTransactionIds(List.of(tx.id())).isEmpty());
+    List<BankHolderLeg> holderLegs =
+        holderPostingRepository.findHolderLegsByTransactionIds(List.of(tx.id()));
+    assertEquals(2, holderLegs.size());
+    assertEquals(
+        0,
+        sum(holderLegs.stream().map(BankHolderLeg::amount).toList())
+            .compareTo(new BigDecimal("-2")));
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("400")), "source debited gross");
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("398")), "destination gets net");
+    assertEquals(auditBefore + 1, auditEventRepository.count());
+    assertTrue(auditEventRepository.existsByTransactionId(tx.id()));
+  }
+
+  @Test
+  void bookHolderTransfer_rejectsSameHolder() {
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () ->
+                bankLedgerService.bookHolderTransfer(
+                    new BankHolderTransferRequest(
+                        holderA.getId(), holderA.getId(), new BigDecimal("10"), null)));
+    assertEquals(BankConflictException.CODE_BANK_SELF_TRANSFER, ex.getCode());
+  }
+
+  @Test
+  void bookHolderTransfer_allowsNegativeSourceAndDeactivatedHolders() {
+    // Given: B is deactivated and holds nothing; A holds nothing either
+    holderB.setActive(false);
+    holderRepository.save(holderB);
+
+    // When: reconcile B's stash even though it is deactivated; A goes negative (no holder
+    // overdraft). The fee applies (A sends in-game): fee = round(200 * 0.005) = 1, B receives 199.
+    bankLedgerService.bookHolderTransfer(
+        new BankHolderTransferRequest(
+            holderA.getId(), holderB.getId(), new BigDecimal("200"), null));
+
+    // Then: source debited the full gross (goes negative), destination credited the net
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-200")));
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("199")));
   }
 
   @Test
@@ -270,7 +338,7 @@ class BankLedgerServiceTest {
   }
 
   @Test
-  void reverseTransaction_createsNegatedMirrorAndKeepsOriginalUntouched() {
+  void reverseTransaction_createsNegatedMirrorOnBothLedgersAndKeepsOriginalUntouched() {
     // Given
     deposit(account, holderA, "1000");
     BankTransactionDto transfer =
@@ -283,35 +351,38 @@ class BankLedgerServiceTest {
                 new BigDecimal("400"),
                 null),
             true);
-    List<BankCounterLeg> originalLegs =
+    List<BankCounterLeg> originalAccountLegs =
         postingRepository.findLegsByTransactionIds(List.of(transfer.id()));
     long postingsBefore = postingRepository.count();
+    long holderPostingsBefore = holderPostingRepository.count();
 
     // When
     BankTransactionDto reversal =
         bankLedgerService.reverseTransaction(transfer.id(), "Tippfehler korrigiert");
 
-    // Then: negated mirror, original untouched, nothing deleted (append-only)
-    List<BankCounterLeg> reversalLegs =
+    // Then: account legs are a negated mirror; original survives; balances restored
+    List<BankCounterLeg> reversalAccountLegs =
         postingRepository.findLegsByTransactionIds(List.of(reversal.id()));
-    assertEquals(originalLegs.size(), reversalLegs.size());
-    for (BankCounterLeg original : originalLegs) {
+    assertEquals(originalAccountLegs.size(), reversalAccountLegs.size());
+    for (BankCounterLeg original : originalAccountLegs) {
       assertTrue(
-          reversalLegs.stream()
+          reversalAccountLegs.stream()
               .anyMatch(
                   mirrored ->
                       mirrored.accountId().equals(original.accountId())
-                          && mirrored.holderId().equals(original.holderId())
                           && mirrored.amount().compareTo(original.amount().negate()) == 0),
-          "every original leg must have a negated mirror");
+          "every original account leg must have a negated mirror");
     }
-    assertEquals(postingsBefore + reversalLegs.size(), postingRepository.count());
+    assertEquals(postingsBefore + reversalAccountLegs.size(), postingRepository.count());
+    assertEquals(holderPostingsBefore + 2, holderPostingRepository.count(), "holder legs mirrored");
     assertEquals(
-        originalLegs.size(),
+        originalAccountLegs.size(),
         postingRepository.findLegsByTransactionIds(List.of(transfer.id())).size(),
         "original legs survive unchanged");
     assertEquals(0, balance(account).compareTo(new BigDecimal("1000")), "balances restored");
     assertEquals(0, balance(otherAccount).signum());
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("1000")));
+    assertEquals(0, holderTotal(holderB).signum());
   }
 
   @Test
@@ -329,18 +400,20 @@ class BankLedgerServiceTest {
   }
 
   @Test
-  void reverseTransaction_rejectsWhenMoneyAlreadyMovedOn() {
-    // Given: deposit 100 to A, then A pays everything out — undoing the deposit would overdraw
+  void reverseTransaction_rejectsWhenAccountWouldGoNegative() {
+    // Given: deposit 100 to A, then pay it all out — the account is back to zero
     BankTransactionDto deposit = deposit(account, holderA, "100");
     bankLedgerService.bookWithdrawal(
         new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("100"), null));
 
-    // When / Then
+    // When / Then: undoing the deposit would drive the ACCOUNT negative (the holder may go
+    // negative,
+    // but the account may not) — rejected with the account overdraft code
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
             () -> bankLedgerService.reverseTransaction(deposit.id(), null));
-    assertEquals(BankConflictException.CODE_BANK_HOLDER_OVERDRAFT, ex.getCode());
+    assertEquals(BankConflictException.CODE_BANK_OVERDRAFT, ex.getCode());
   }
 
   @Test
@@ -376,59 +449,33 @@ class BankLedgerServiceTest {
   }
 
   @Test
-  void resetAllBalances_zeroesEveryStashKeepsHistoryAndIsIdempotent() {
-    // Given (the shared test database may hold residue from sibling tests, so all assertions
-    // are relative to THIS test's accounts or pin the global all-zero end state)
+  void resetAllBalances_zeroesAccountsAndHoldersKeepsHistoryAndIsIdempotent() {
+    // Given: this test's accounts and holders hold money before the wipe. The wipe is bank-WIDE and
+    // the test DB is shared, so global result counts are not concurrency-safe — every assertion
+    // therefore pins THIS test's own entities (their end state is robust regardless of any
+    // concurrent wipe by a sibling test).
     deposit(account, holderA, "300");
     deposit(account, holderB, "700");
     deposit(otherAccount, holderB, "250");
     long postingsBefore = postingRepository.count();
 
     // When
-    BankWipeResetResultDto result = bankLedgerService.resetAllBalances();
+    bankLedgerService.resetAllBalances();
 
-    // Then
-    assertTrue(result.accountsReset() >= 2, "both seeded accounts were reset");
-    assertTrue(result.holderStashesZeroed() >= 3, "all three seeded stashes were zeroed");
-    assertTrue(
-        result.totalZeroed().compareTo(new BigDecimal("1250")) >= 0,
-        "the total covers at least this test's 1250 aUEC");
+    // Then: both account balances AND both holder globals (the two decoupled dimensions, ADR-0039)
+    // are zero; the ledger only grew (append-only — history preserved, nothing deleted).
     assertEquals(0, balance(account).signum());
     assertEquals(0, balance(otherAccount).signum());
-    for (BankHolderBalance slice : postingRepository.holderDistribution(account.getId())) {
-      assertEquals(0, slice.amount().signum(), "every sub-balance is zero");
-    }
+    assertEquals(0, holderTotal(holderA).signum());
+    assertEquals(0, holderTotal(holderB).signum());
     assertTrue(postingRepository.count() > postingsBefore, "history preserved, postings added");
 
-    // And: a second run is a global no-op (the first run zeroed the entire bank)
-    BankWipeResetResultDto second = bankLedgerService.resetAllBalances();
-    assertEquals(0, second.accountsReset());
-    assertEquals(0, second.totalZeroed().signum());
-  }
-
-  @Test
-  void holderDistribution_alwaysSumsToAccountBalance() {
-    // Given
-    deposit(account, holderA, "321");
-    deposit(account, holderB, "679");
-    bankLedgerService.bookTransfer(
-        new BankTransferRequest(
-            account.getId(),
-            holderB.getId(),
-            account.getId(),
-            holderA.getId(),
-            new BigDecimal("79"),
-            null),
-        true);
-
-    // When
-    BigDecimal distributionSum =
-        postingRepository.holderDistribution(account.getId()).stream()
-            .map(BankHolderBalance::amount)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-    // Then
-    assertEquals(0, distributionSum.compareTo(balance(account)));
+    // And: a second run is idempotent — this test's entities stay at zero and nothing throws.
+    bankLedgerService.resetAllBalances();
+    assertEquals(0, balance(account).signum());
+    assertEquals(0, balance(otherAccount).signum());
+    assertEquals(0, holderTotal(holderA).signum());
+    assertEquals(0, holderTotal(holderB).signum());
   }
 
   @Test
@@ -469,60 +516,10 @@ class BankLedgerServiceTest {
       pool.shutdownNow();
     }
 
-    // Then: exactly 2 succeed (2 x 200 = 400 <= 500; a third would overdraw)
+    // Then: exactly 2 succeed (2 x 200 = 400 <= 500; a third would overdraw the account)
     assertEquals(2, success.get(), "exactly two withdrawals fit into the balance");
     assertEquals(THREADS - 2, conflict.get());
     assertEquals(0, balance(account).compareTo(new BigDecimal("100")));
-  }
-
-  @Test
-  void concurrentHolderWithdrawals_cannotJointlyOverdrawTheStash() throws Exception {
-    // Given: holder A holds 300, holder B 700 — the ACCOUNT could cover both 250-withdrawals,
-    // the STASH of A covers only one (REQ-BANK-006 holder level)
-    deposit(account, holderA, "300");
-    deposit(account, holderB, "700");
-    CountDownLatch ready = new CountDownLatch(2);
-    CountDownLatch go = new CountDownLatch(1);
-    AtomicInteger success = new AtomicInteger();
-    AtomicInteger conflict = new AtomicInteger();
-
-    ExecutorService pool = Executors.newFixedThreadPool(2);
-    try {
-      for (int i = 0; i < 2; i++) {
-        pool.submit(
-            () -> {
-              ready.countDown();
-              try {
-                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                  return;
-                }
-                bankLedgerService.bookWithdrawal(
-                    new BankWithdrawalRequest(
-                        account.getId(), holderA.getId(), new BigDecimal("250"), null));
-                success.incrementAndGet();
-              } catch (BankConflictException expected) {
-                conflict.incrementAndGet();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
-            });
-      }
-      assertTrue(ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-      go.countDown();
-      pool.shutdown();
-      assertTrue(pool.awaitTermination(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-    } finally {
-      pool.shutdownNow();
-    }
-
-    // Then
-    assertEquals(1, success.get(), "only one withdrawal fits into holder A's stash");
-    assertEquals(1, conflict.get());
-    assertEquals(
-        0,
-        postingRepository
-            .holderSubBalance(account.getId(), holderA.getId())
-            .compareTo(new BigDecimal("50")));
   }
 
   @Test
@@ -530,8 +527,9 @@ class BankLedgerServiceTest {
     // Given
     long before = auditEventRepository.count();
 
-    // When: deposit + withdrawal + transfer + rebooking succeed (4 mutations); the reversal of
-    // the deposit is rejected (holder A no longer covers the original 1000) and must NOT audit
+    // When: deposit + withdrawal + account-transfer + holder-transfer succeed (4 mutations); the
+    // reversal of the deposit is rejected (the account no longer covers the original 1000) and must
+    // NOT audit.
     BankTransactionDto deposit = deposit(account, holderA, "1000");
     bankLedgerService.bookWithdrawal(
         new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("100"), null));
@@ -544,15 +542,9 @@ class BankLedgerServiceTest {
             new BigDecimal("200"),
             null),
         true);
-    bankLedgerService.bookTransfer(
-        new BankTransferRequest(
-            account.getId(),
-            holderA.getId(),
-            account.getId(),
-            holderB.getId(),
-            new BigDecimal("50"),
-            null),
-        true);
+    bankLedgerService.bookHolderTransfer(
+        new BankHolderTransferRequest(
+            holderA.getId(), holderB.getId(), new BigDecimal("50"), null));
     assertThrows(
         BankConflictException.class,
         () -> bankLedgerService.reverseTransaction(deposit.id(), null));
@@ -569,6 +561,19 @@ class BankLedgerServiceTest {
 
   private BigDecimal balance(BankAccount target) {
     return postingRepository.accountBalance(target.getId());
+  }
+
+  private BigDecimal holderTotal(BankHolder holder) {
+    return holderPostingRepository.holderTotal(holder.getId());
+  }
+
+  /** Reads the in-game transfer fee recorded on a persisted transaction (ADR-0041). */
+  private BigDecimal storedFee(BankTransactionDto tx) {
+    return transactionRepository.findById(tx.id()).orElseThrow().getTransferFee();
+  }
+
+  private static BigDecimal sum(List<BigDecimal> amounts) {
+    return amounts.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   private BankAccount newAccount(String name) {

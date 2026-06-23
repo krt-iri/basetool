@@ -102,7 +102,7 @@ class BankRequestQueuePageControllerMvcTest {
         new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of());
     BankHolderDto holder =
         new BankHolderDto(
-            UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, 0L, 0L);
+            UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, false, 0L);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
     when(backendApiClient.get(
             startsWith("/api/v1/bank/requests"), any(ParameterizedTypeReference.class)))

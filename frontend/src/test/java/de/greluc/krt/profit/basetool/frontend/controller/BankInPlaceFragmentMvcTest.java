@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankGrantDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderBalanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -136,12 +135,7 @@ class BankInPlaceFragmentMvcTest {
     BankAccountDto self = account(accountId, "KB-0001", "ACTIVE", "1000");
     BankAccountDetailDto detail =
         new BankAccountDetailDto(
-            self,
-            new BigDecimal("10"),
-            1,
-            1,
-            List.of(new BankHolderBalanceDto(holderId, "alpha", true, new BigDecimal("1000"))),
-            new BankCapabilitiesDto(true, true, true, false));
+            self, new BigDecimal("10"), 1, new BankCapabilitiesDto(true, true, true, false));
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
@@ -153,7 +147,7 @@ class BankInPlaceFragmentMvcTest {
         .thenReturn(
             List.of(
                 new BankHolderDto(
-                    holderId, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, 1, 0L)));
+                    holderId, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
         .thenReturn(new PageResponse<>(List.of(self), 0, 500, 1, 1, Collections.emptyList()));

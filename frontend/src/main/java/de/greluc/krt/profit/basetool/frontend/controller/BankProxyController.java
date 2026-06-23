@@ -40,10 +40,10 @@ import org.springframework.web.bind.annotation.RestController;
  * Thin AJAX proxy for every bank mutation ({@code /api/proxy/bank/**}, epic #556). Browser-side JS
  * posts here with the CSRF header; the proxy forwards the raw JSON body to the corresponding {@code
  * /api/v1/bank/**} backend endpoint with the OAuth2 bearer attached by {@link BackendApiClient}.
- * Backend errors (RFC 7807, incl. the stable bank 409 codes like {@code BANK_HOLDER_OVERDRAFT})
- * propagate as {@code BackendServiceException} and reach the browser as the localized JSON body
- * built by the frontend {@code GlobalExceptionHandler} — bank.js renders them as inline field
- * errors (K1 mockup: 409 never toast-only).
+ * Backend errors (RFC 7807, incl. the stable bank 409 codes like {@code BANK_OVERDRAFT}) propagate
+ * as {@code BackendServiceException} and reach the browser as the localized JSON body built by the
+ * frontend {@code GlobalExceptionHandler} — bank.js renders them as inline field errors (K1 mockup:
+ * 409 never toast-only).
  *
  * <p>Authentication is enforced at this seam; every real authorization decision (roles, capability
  * flags) lives in the backend gates.
@@ -83,7 +83,7 @@ public class BankProxyController {
   }
 
   /**
-   * Forwards a transfer / intra-account holder rebooking.
+   * Forwards an account-to-account transfer.
    *
    * @param body the raw booking payload
    * @return the backend acknowledgement
@@ -93,6 +93,20 @@ public class BankProxyController {
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> bookTransfer(@RequestBody @NotNull Map<String, Object> body) {
     return postMap("/api/v1/bank/transfers", body);
+  }
+
+  /**
+   * Forwards a holder→holder Umbuchung (REQ-BANK-031): moves custody between two holders, touching
+   * no account. Open to bank employees on the backend.
+   *
+   * @param body the raw Umbuchung payload (source/destination holder, amount, note)
+   * @return the backend acknowledgement
+   */
+  @PostMapping("/holders/transfer")
+  @PreAuthorize("isAuthenticated()")
+  @ResponseStatus(HttpStatus.CREATED)
+  public Map<String, Object> bookHolderTransfer(@RequestBody @NotNull Map<String, Object> body) {
+    return postMap("/api/v1/bank/holders/transfer", body);
   }
 
   /**
@@ -142,7 +156,8 @@ public class BankProxyController {
   }
 
   /**
-   * Forwards an account creation (management-only on the backend; singleton 409s surface inline).
+   * Forwards an account creation (the backend lets management create any type and employees create
+   * SPECIAL only, REQ-BANK-030; singleton 409s surface inline).
    *
    * @param body the raw creation payload
    * @return the created account

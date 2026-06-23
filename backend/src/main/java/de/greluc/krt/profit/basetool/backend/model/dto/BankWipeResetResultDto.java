@@ -26,9 +26,9 @@ import java.math.BigDecimal;
  * all-zero bank nothing is booked and {@code accountsReset} is {@code 0} — the UI renders the no-op
  * notice from exactly this payload.
  *
- * @param accountsReset number of accounts that received a {@code WIPE_RESET} transaction
- * @param holderStashesZeroed number of (account, holder) sub-balances brought to zero
- * @param totalZeroed sum of all zeroed balances (whole aUEC, non-negative)
+ * @param accountsReset number of accounts whose balance was brought to zero
+ * @param holderStashesZeroed number of holders whose global balance was brought to zero (ADR-0039)
+ * @param totalZeroed sum of all zeroed account balances (whole aUEC)
  */
 public record BankWipeResetResultDto(
     int accountsReset, int holderStashesZeroed, BigDecimal totalZeroed) {}

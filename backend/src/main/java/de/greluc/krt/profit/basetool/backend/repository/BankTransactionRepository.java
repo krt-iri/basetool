@@ -44,23 +44,27 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
   boolean existsByReversedTransactionId(UUID reversedTransactionId);
 
   /**
-   * Integrity check (REQ-BANK-020): ids of {@code TRANSFER} transactions whose postings do not sum
-   * to zero — a balanced double-entry transfer (incl. an intra-account holder rebooking) must net
-   * to zero across its legs.
+   * Integrity check (REQ-BANK-020, ADR-0041): ids of {@code TRANSFER} transactions whose account
+   * legs do not net to {@code -transfer_fee}. A fee-free (same-holder) transfer nets to zero; a
+   * fee-bearing transfer debits the source the gross and credits the destination the net, so its
+   * two account legs net to {@code -transfer_fee} (real money lost to the in-game fee). The holder
+   * side is checked by {@code
+   * BankHolderPostingRepository.findHolderMovementTransactionsWithNonZeroSum}.
    *
    * @return the violating transfer transaction ids (empty when sound)
    */
   @Query(
       "SELECT t.id FROM BankPosting p JOIN p.transaction t WHERE t.type ="
           + " de.greluc.krt.profit.basetool.backend.model.BankTransactionType.TRANSFER"
-          + " GROUP BY t.id HAVING SUM(p.amount) <> 0")
+          + " GROUP BY t.id, t.transferFee HAVING SUM(p.amount) + t.transferFee <> 0")
   List<UUID> findTransferTransactionsWithNonZeroSum();
 
   /**
-   * Integrity check (REQ-BANK-020): ids of {@code REVERSAL} transactions whose combined postings
-   * with the reversed transaction do not cancel per {@code (account, holder)} — a reversal must be
-   * the negated mirror of the original (ADR-0010), so the union of both transactions' postings nets
-   * to zero for every account/holder pair they touch.
+   * Integrity check (REQ-BANK-020): ids of {@code REVERSAL} transactions whose combined account
+   * legs with the reversed transaction do not cancel per account — the account-side negated mirror
+   * (ADR-0010/0039), so the union of both transactions' account legs nets to zero for every account
+   * they touch. The holder-side mirror is checked by {@code
+   * BankHolderPostingRepository.findReversalTransactionsNotMirroredOnHolderLedger}.
    *
    * @return the violating reversal transaction ids (empty when sound)
    */
@@ -70,7 +74,7 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
               + " WHERE rt.type = 'REVERSAL' AND EXISTS ("
               + "   SELECT 1 FROM bank_posting p"
               + "   WHERE p.transaction_id IN (rt.id, rt.reversed_transaction_id)"
-              + "   GROUP BY p.account_id, p.holder_id HAVING SUM(p.amount) <> 0)",
+              + "   GROUP BY p.account_id HAVING SUM(p.amount) <> 0)",
       nativeQuery = true)
   List<UUID> findReversalTransactionsNotMirrored();
 

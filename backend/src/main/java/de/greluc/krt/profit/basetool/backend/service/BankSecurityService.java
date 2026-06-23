@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -52,6 +53,7 @@ public class BankSecurityService {
 
   private final AuthHelperService authHelperService;
   private final BankAccountGrantRepository grantRepository;
+  private final BankHolderRepository holderRepository;
 
   /**
    * Whether the current caller is bank staff at all — holds {@code ROLE_BANK_EMPLOYEE} directly or
@@ -86,6 +88,37 @@ public class BankSecurityService {
    */
   public boolean canSee(@NotNull UUID accountId, Authentication authentication) {
     return hasCapability(accountId, authentication, g -> true);
+  }
+
+  /**
+   * Answers the SpEL-level question whether the caller may see a holder's custody history
+   * (REQ-BANK-032): bank management/admin may inspect <em>any</em> holder, while a plain bank
+   * employee may inspect <strong>only their own</strong> holder row (the one linked to their user
+   * id). A non-existent holder id or a holder whose linked user is gone is denied for
+   * non-management callers. Stays org-unit-blind like every other bank gate (REQ-BANK-008): it
+   * reads only bank roles and the holder→user link, never org-unit scope.
+   *
+   * @param holderId the holder whose history is requested; never {@code null}
+   * @param authentication current Spring Security authentication; may be {@code null} for anonymous
+   *     calls (defensive — bank URLs already require authentication)
+   * @return {@code true} iff the caller may read the holder's history
+   */
+  public boolean canSeeHolder(@NotNull UUID holderId, Authentication authentication) {
+    if (authentication == null || !authentication.isAuthenticated() || !isBankStaff()) {
+      return false;
+    }
+    if (isManagement()) {
+      return true;
+    }
+    return authHelperService
+        .currentUserId()
+        .flatMap(
+            uid ->
+                holderRepository
+                    .findById(holderId)
+                    .map(
+                        holder -> holder.getUser() != null && uid.equals(holder.getUser().getId())))
+        .orElse(false);
   }
 
   /**

@@ -203,6 +203,11 @@
                 }
             });
         }
+        // Reset/refresh the live transfer-fee preview to match the (re)opened modal's amount
+        // (REQ-BANK-033); updateFeePreview hides it when there is nothing to show.
+        if (form && form.querySelector('[data-fee-preview]')) {
+            updateFeePreview(form);
+        }
     }
 
     document.addEventListener('click', function (event) {
@@ -402,6 +407,115 @@
         }
         event.preventDefault();
         submitBankForm(form);
+    });
+
+    /**
+     * Reads the org-wide in-game transfer-fee rate from `<main data-transfer-fee-rate>`
+     * (REQ-BANK-033). Returns 0 (no preview) when absent or out of the sane [0, 1) range.
+     *
+     * @returns {number} the fee rate as a fraction
+     */
+    function transferFeeRate() {
+        const main = document.querySelector('main[data-transfer-fee-rate]');
+        const raw = main ? Number(main.getAttribute('data-transfer-fee-rate')) : 0;
+        return Number.isFinite(raw) && raw > 0 && raw < 1 ? raw : 0;
+    }
+
+    /**
+     * Live transfer-fee preview (REQ-BANK-033, ADR-0041): the entered amount is the GROSS the holder
+     * sends, so this fills the carved-out fee (`round(gross * rate)`) and what actually arrives
+     * (`gross - fee`). Hidden when the amount is non-positive, the rate is zero, or — for an
+     * account transfer — the source and destination holder match (a same-holder transfer is
+     * fee-free). Guidance only; the authoritative fee is computed server-side at booking time.
+     *
+     * @param {HTMLFormElement} form the booking form carrying a `[data-fee-preview]` block
+     */
+    function updateFeePreview(form) {
+        const preview = form.querySelector('[data-fee-preview]');
+        const amountEl = form.querySelector('input[name="amount"]');
+        if (!preview || !amountEl) {
+            return;
+        }
+        const rate = transferFeeRate();
+        const gross = Number(amountEl.value);
+        const src = form.querySelector('[name="sourceHolderId"]');
+        const dst = form.querySelector('[name="destinationHolderId"]');
+        const sameHolder = !!(src && dst && src.value && src.value === dst.value);
+        if (!Number.isFinite(gross) || gross <= 0 || rate <= 0 || sameHolder) {
+            preview.hidden = true;
+            return;
+        }
+        const fee = Math.round(gross * rate);
+        const valueEl = preview.querySelector('[data-fee-value]');
+        const netEl = preview.querySelector('[data-fee-net]');
+        if (valueEl) {
+            valueEl.textContent = fee.toLocaleString('de-DE');
+        }
+        if (netEl) {
+            netEl.textContent = Math.round(gross - fee).toLocaleString('de-DE');
+        }
+        preview.hidden = false;
+    }
+
+    function recomputeFeePreviewFrom(target) {
+        const form = target && target.closest ? target.closest('form') : null;
+        if (form && form.querySelector('[data-fee-preview]')) {
+            updateFeePreview(form);
+        }
+    }
+
+    /**
+     * Live balance-split calculator on the holder detail page (REQ-BANK-032): given the holder's
+     * entered current in-game balance and their server-rendered global custody total
+     * (`data-reserved`), shows how much is the holder's own private money (`balance − reserved`).
+     * Purely client-side — nothing is stored. A negative own value (physically less than the bank's
+     * records say) is flagged; a negative reserved means the bank owes the holder.
+     *
+     * @param {HTMLInputElement} input the balance input that fired
+     */
+    function updateBalanceCalc(input) {
+        const panel = input.closest('[data-reserved]');
+        if (!panel) {
+            return;
+        }
+        const result = panel.querySelector('[data-balance-result]');
+        const ownEl = panel.querySelector('[data-balance-own]');
+        if (!result || !ownEl) {
+            return;
+        }
+        const balance = Number(input.value);
+        if (input.value === '' || !Number.isFinite(balance)) {
+            result.hidden = true;
+            return;
+        }
+        const reserved = Number(panel.getAttribute('data-reserved'));
+        const own = balance - (Number.isFinite(reserved) ? reserved : 0);
+        ownEl.textContent = Math.round(own).toLocaleString('de-DE') + ' aUEC';
+        ownEl.classList.toggle('bank-amount--neg', own < 0);
+        ownEl.classList.toggle('bank-amount--pos', own > 0);
+        result.hidden = false;
+    }
+
+    /**
+     * Dispatches one field edit to both client-side helpers — the live transfer-fee preview
+     * (REQ-BANK-033) and the balance-split calculator (REQ-BANK-032). Registered once for `input`
+     * and once for `change`, so a select change (the holder pickers in the transfer modal) refreshes
+     * the fee preview too.
+     *
+     * @param {EventTarget} target the field that fired the event
+     */
+    function onBankFieldEdit(target) {
+        recomputeFeePreviewFrom(target);
+        if (target && target.matches && target.matches('[data-balance-input]')) {
+            updateBalanceCalc(target);
+        }
+    }
+
+    document.addEventListener('input', function (event) {
+        onBankFieldEdit(event.target);
+    });
+    document.addEventListener('change', function (event) {
+        onBankFieldEdit(event.target);
     });
 
     /**

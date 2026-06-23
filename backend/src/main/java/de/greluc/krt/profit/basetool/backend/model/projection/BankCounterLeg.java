@@ -23,18 +23,17 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * JPQL constructor projection of one ledger leg with its account and holder labels, fetched batched
- * by transaction ids. Used to resolve the counter side of {@code TRANSFER} rows for the booking
- * history (one IN-query per page instead of per-row lookups) and to mirror legs when building a
- * {@code REVERSAL} (ADR-0010).
+ * JPQL constructor projection of one <strong>account</strong> ledger leg with its account labels,
+ * fetched batched by transaction ids. Used to resolve the counter account of {@code TRANSFER} rows
+ * for the booking history (one IN-query per page instead of per-row lookups) and to mirror the
+ * account legs when building a {@code REVERSAL} (ADR-0010/0039). The holder dimension is mirrored
+ * separately via {@link BankHolderLeg}.
  *
  * @param transactionId the owning transaction's id (the batch key)
  * @param postingId the leg's id, used to exclude the row's own leg when picking the counter leg
  * @param accountId the account the leg posts to
  * @param accountNo the account's display number (e.g. {@code KB-0003})
  * @param accountName the account's display name
- * @param holderId the holder whose stash the leg changes
- * @param holderHandle the holder's handle snapshot
  * @param amount the leg's signed amount
  */
 public record BankCounterLeg(
@@ -43,6 +42,4 @@ public record BankCounterLeg(
     UUID accountId,
     String accountNo,
     String accountName,
-    UUID holderId,
-    String holderHandle,
     BigDecimal amount) {}

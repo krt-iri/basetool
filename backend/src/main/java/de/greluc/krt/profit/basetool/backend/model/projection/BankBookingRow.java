@@ -25,27 +25,29 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * JPQL constructor projection of one booking-history row on the account detail page: the posting
- * joined with its transaction header and holder in a single statement (no N+1, REQ-BANK-018). For
- * {@code TRANSFER} rows the counter leg (other account / other holder) is resolved by a second
- * batched IN-query over the page's transaction ids — see {@code BankAccountService}.
+ * JPQL constructor projection of one booking-history row on the account detail page: the account
+ * posting joined with its transaction header in a single statement (no N+1, REQ-BANK-018). Since
+ * ADR-0039 the posting carries no holder; the holder annotation and — for {@code TRANSFER} rows —
+ * the counter account/holder are resolved by batched IN-queries over the page's transaction ids
+ * (see {@code BankAccountService}).
  *
  * @param postingId the leg's id (stable row identity for the page)
  * @param transactionId the owning transaction's id (reversal target, counter-leg lookup key)
  * @param type the transaction type driving the row's chip rendering
  * @param amount the signed amount of THIS account's leg
- * @param holderHandle the handle snapshot of the holder whose stash this leg changed
  * @param note the transaction's free-text note, may be {@code null}
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for {@code REVERSAL} rows the corrected transaction's id, else
  *     {@code null}
+ * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
+ *     REQ-BANK-033); {@code 0} for non-fee transactions and same-holder transfers
  */
 public record BankBookingRow(
     UUID postingId,
     UUID transactionId,
     BankTransactionType type,
     BigDecimal amount,
-    String holderHandle,
     String note,
     Instant createdAt,
-    UUID reversedTransactionId) {}
+    UUID reversedTransactionId,
+    BigDecimal transferFee) {}

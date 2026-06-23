@@ -22,9 +22,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankBalanceChart;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
@@ -37,8 +40,12 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -52,8 +59,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Renders the management three-month report PDF (REQ-BANK-015, epic #556 Phase 3): every bank
  * account over the rolling three-month window ending now, each with a summary block (opening
- * balance, inflow, outflow, closing balance), the itemized bookings of the window and the closing
- * holder distribution. Management-only at the endpoint gate; each export writes one {@code
+ * balance, inflow, outflow, closing balance) and the itemized bookings of the window, followed by a
+ * single <strong>global holder-balance section</strong> (ADR-0039 — holders are decoupled from
+ * accounts, so the report ends with each holder's bank-wide custody, not a per-account
+ * distribution). Management-only at the endpoint gate; each export writes one {@code
  * MANAGEMENT_REPORT_EXPORTED} audit event (REQ-BANK-012).
  *
  * <p>Labels are German from the backend message bundle; the visual layer is the shared {@link
@@ -74,6 +83,7 @@ public class BankManagementReportService {
 
   private final BankAccountRepository bankAccountRepository;
   private final BankPostingRepository bankPostingRepository;
+  private final BankHolderPostingRepository bankHolderPostingRepository;
   private final BankAuditService bankAuditService;
   private final MessageSource messageSource;
 
@@ -141,6 +151,8 @@ public class BankManagementReportService {
         firstAccount = false;
       }
 
+      addGlobalHolderSection(krt, accounts.isEmpty());
+
       KrtPdfSupport.addFooter(krt);
       krt.document().close();
       return baos.toByteArray();
@@ -150,8 +162,10 @@ public class BankManagementReportService {
   }
 
   /**
-   * Adds one account's report section: header, summary block, itemized bookings and the closing
-   * holder distribution.
+   * Adds one account's report section: header, summary block, balance chart and the itemized
+   * bookings of the window (with the per-booking holder derived from the holder ledger). The
+   * closing holder distribution is gone (ADR-0039) — the report's single global holder section
+   * replaces it.
    *
    * @param krt the open document handle
    * @param account the account to render
@@ -170,6 +184,12 @@ public class BankManagementReportService {
     BigDecimal opening = bankPostingRepository.accountBalanceBefore(account.getId(), from);
     List<BankBookingRow> rows =
         bankPostingRepository.findBookingsInPeriod(account.getId(), from, to);
+    List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
+    final Map<UUID, List<BankHolderLeg>> holderLegsByTx =
+        txIds.isEmpty()
+            ? Map.of()
+            : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
+                .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
 
     BigDecimal inflow = BigDecimal.ZERO;
     BigDecimal outflow = BigDecimal.ZERO;
@@ -221,9 +241,15 @@ public class BankManagementReportService {
     boolean alt = false;
     for (BankBookingRow row : rows) {
       Color bg = KrtPdfSupport.rowBackground(alt);
+      String holder =
+          row.type() == BankTransactionType.WIPE_RESET
+              ? ""
+              : matchHolderHandle(
+                  holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
+                  row.amount().signum());
       KrtPdfSupport.addTableCell(table, stamp.format(row.createdAt()), bg, false);
       KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
-      KrtPdfSupport.addTableCell(table, row.holderHandle(), bg, false);
+      KrtPdfSupport.addTableCell(table, holder, bg, false);
       KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
       KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
       alt = !alt;
@@ -232,12 +258,47 @@ public class BankManagementReportService {
       KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), 5);
     }
     krt.document().add(table);
+  }
 
-    krt.document().add(new Paragraph(" "));
-    KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.distribution.title"));
-    List<BankHolderBalance> distribution =
-        bankPostingRepository.holderDistributionUntil(account.getId(), to);
-    krt.document().add(BankPdfFormat.distributionTable(distribution, this::label));
+  /**
+   * Adds the report's single global holder-balance section (ADR-0039): each holder's bank-wide
+   * custody total, largest first, on its own page. Replaces the old per-account distribution.
+   *
+   * @param krt the open document handle
+   * @param noAccounts whether the report had no accounts (then the section is appended inline
+   *     rather than on a fresh page)
+   */
+  private void addGlobalHolderSection(@NotNull KrtPdfSupport.KrtDocument krt, boolean noAccounts) {
+    if (!noAccounts) {
+      krt.document().newPage();
+    }
+    KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.report.holders"));
+    List<BankHolderBalance> totals =
+        bankHolderPostingRepository.holderTotals().stream()
+            .filter(h -> h.amount().signum() != 0)
+            .sorted(
+                Comparator.comparing(BankHolderBalance::amount)
+                    .reversed()
+                    .thenComparing(BankHolderBalance::handle))
+            .toList();
+    krt.document().add(BankPdfFormat.distributionTable(totals, this::label));
+  }
+
+  /**
+   * Picks the handle of the holder leg whose amount sign matches a posting row's sign — the holder
+   * paired with that account leg in the same transaction (ADR-0039); empty when none exists.
+   *
+   * @param holderLegs the transaction's holder legs
+   * @param sign the wanted amount sign (+1 / -1)
+   * @return the matching holder's handle, or an empty string
+   */
+  private static @NotNull String matchHolderHandle(
+      @NotNull List<BankHolderLeg> holderLegs, int sign) {
+    return holderLegs.stream()
+        .filter(leg -> leg.amount().signum() == sign)
+        .map(BankHolderLeg::handle)
+        .findFirst()
+        .orElse("");
   }
 
   /**

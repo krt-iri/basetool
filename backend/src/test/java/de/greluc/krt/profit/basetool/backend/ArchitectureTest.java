@@ -1718,18 +1718,20 @@ class ArchitectureTest {
   }
 
   /**
-   * REQ-BANK-004 / ADR-0010 (append-only ledger): {@code bank_transaction} and {@code bank_posting}
-   * rows are never updated or deleted — corrections are {@code REVERSAL} transactions. Two static
-   * pins: the ledger repositories declare no {@code @Modifying} methods, and no production class
-   * calls a {@code delete*} method on them (the inherited {@code JpaRepository} deleters exist but
-   * must stay unused).
+   * REQ-BANK-004 / ADR-0010/0039 (append-only ledgers): {@code bank_transaction}, {@code
+   * bank_posting} and the holder ledger {@code bank_holder_posting} rows are never updated or
+   * deleted — corrections are {@code REVERSAL} transactions. Two static pins: the ledger
+   * repositories declare no {@code @Modifying} methods, and no production class calls a {@code
+   * delete*} method on them (the inherited {@code JpaRepository} deleters exist but must stay
+   * unused).
    */
   @Test
   void bankLedgerRepositoriesMustStayInsertOnly() {
     Set<String> ledgerRepositories =
         Set.of(
             "de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository",
-            "de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository");
+            "de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository",
+            "de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository");
     noMethods()
         .that()
         .areDeclaredInClassesThat(

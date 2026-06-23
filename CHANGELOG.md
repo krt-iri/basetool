@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Halter-Gelder sind von den Konten entkoppelt; Bankmitarbeiter können intern zwischen Haltern umbuchen.** Der Bestand eines Halters ist jetzt eine bankweite Gesamtgröße statt pro Konto und darf ins Minus gehen — ein Halter streckt notfalls eigenes Geld für eine Auszahlung vor. Im Haltermenü der Bankverwaltung gleichen Bankmitarbeiter solche Salden per Halter-zu-Halter-Umbuchung wieder aus (ohne ein Konto zu berühren).
+- **Bankmitarbeiter erreichen jetzt die Bankverwaltung.** Sie dürfen Sonderkonten anlegen (und erhalten darauf automatisch Vollzugriff) sowie das Haltermenü inklusive Umbuchung nutzen. Konten umbenennen, schließen, wiedereröffnen, andere Kontotypen anlegen, die manuelle Halter-Registry und Berechtigungen bleiben der Bankleitung vorbehalten; das Audit-Log bleibt Admin-only.
+- **Alle Bankmitarbeiter und Bankleitungsmitglieder werden automatisch als Halter registriert.** Verliert jemand alle Bankrollen, wird sein Halter automatisch deaktiviert — der Restbestand bleibt erhalten und muss per Umbuchung auf andere Halter verteilt werden. Manuell angelegte Halter bleiben davon unberührt.
+- **Halter-Buchungshistorie im Haltermenü.** Ein Klick auf einen Halter-Namen öffnet dessen Verwahrungs-Historie — alle Buchungen, die den bankweiten Bestand dieses Halters verändert haben, jeweils mit Konto- bzw. Gegenhalter-Bezug, Datum und Betrag. Ein Bankmitarbeiter sieht nur den eigenen Halter, die Bankleitung jeden.
+- **Überweisungsgebühren werden bei Auszahlungen, Halter-Umbuchungen und Halter-wechselnden Transfers automatisch berücksichtigt.** Der eingegebene Betrag ist der Sendebetrag, der voll vom Konto/Halterbestand abgebucht wird; die In-Game-Gebühr (gleicher Satz wie bei Operationen, 0,5 %) wird daraus herausgerechnet und ausgewiesen, sodass beim Ziel der Nettobetrag ankommt und kein Bankmitarbeiter die Gebühr aus dem Privatvermögen trägt. Die Buchungsdialoge zeigen Gebühr und Ankunftsbetrag live, die Historie weist sie pro Buchung aus. Einzahlungen und Transfers mit gleichem Halter bleiben gebührenfrei.
+- **Kontostand-Aufteilung auf der Halter-Seite.** Ein Halter trägt auf seiner Halter-Seite seinen aktuellen In-Game-Kontostand ein und sieht sofort, wie viel davon für die Bank reserviert ist (sein Halterbestand) und wie viel privat ihm gehört (Kontostand minus Halterbestand). Reiner Rechner — es wird nichts gespeichert.
+
+### Changed
+
+- **Auszahlungen und Umbuchungen prüfen nur noch die Kontodeckung, nicht mehr den Halter.** Ein Konto kann weiterhin nie ins Minus gehen; der Halterbestand darf es (und wird später ausgeglichen). Die kontobezogene „Halter-Verteilung" entfällt: Konto-Detailseite, Kontoauszug-PDF und 3-Monats-Report zeigen sie nicht mehr — der 3-Monats-Report schließt stattdessen mit den bankweiten Halterbeständen.
+
 ## [v0.7.9](https://github.com/krt-profit/basetool/releases/tag/v0.7.9) - 2026-06-22
 
 ### Added
