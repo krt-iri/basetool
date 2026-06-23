@@ -38123,6 +38123,102 @@
         }
       }
     },
+    "/api/v1/leitung/view" : {
+      "get" : {
+        "tags" : [ "leitung-controller" ],
+        "summary" : "The org units the caller may appoint leadership ranks into, by tier",
+        "operationId" : "view",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LeitungViewDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inventory/my-inventory" : {
       "get" : {
         "tags" : [ "inventory-item-controller" ],
@@ -51960,6 +52056,99 @@
             "type" : "array",
             "items" : {
               "type" : "string"
+            }
+          }
+        }
+      },
+      "LeitungMemberDto" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "userDisplayName" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string",
+            "enum" : [ "MEMBER", "STAFFELLEITER", "KOMMANDOLEITER", "STELLV_KOMMANDOLEITER", "ENSIGN", "BEREICHSLEITER", "BEREICHSKOORDINATOR", "BEREICHSOPERATOR", "OL_MEMBER", "SK_LEAD" ]
+          },
+          "kommandoGroupId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "LeitungUnitDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
+          },
+          "canAppointLead" : {
+            "type" : "boolean"
+          },
+          "canManageRoster" : {
+            "type" : "boolean"
+          },
+          "members" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungMemberDto"
+            }
+          },
+          "groups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/KommandoGroupDto"
+            }
+          }
+        }
+      },
+      "LeitungViewDto" : {
+        "type" : "object",
+        "properties" : {
+          "admin" : {
+            "type" : "boolean"
+          },
+          "organisationsleitungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungUnitDto"
+            }
+          },
+          "bereiche" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungUnitDto"
+            }
+          },
+          "squadrons" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungUnitDto"
+            }
+          },
+          "specialCommands" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LeitungUnitDto"
             }
           }
         }
