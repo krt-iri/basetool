@@ -35,6 +35,13 @@
 
     <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
+    <!-- Account-linked seats are now a mirror of the functional ranks (epic #800, REQ-ROLE-006):
+         appoint them under Organisation -> Leitung; free-text holders stay editable here. -->
+    <div class="hud-box mt-2 oc-mirror-hint" role="note" th:if="${orgChart != null}">
+        <span th:text="#{orgChart.mirrorHint}">Kontogebundene Sitze werden unter Leitung verwaltet.</span>
+        <a th:href="@{/organisation/leitung}" sec:authorize="hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER')" data-testid="oc-leitung-link" th:text="#{nav.leitung}">Leitung</a>
+    </div>
+
     <div class="oc-toolbar" sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}">
         <button type="button" class="btn btn-outline" data-trigger="oc-toggle-edit"
                 aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>

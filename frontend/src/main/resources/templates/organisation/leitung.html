@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{leitung.title} + ' - ' + ${appTitle}">Leitung - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <meta name="_csrf" th:content="${_csrf.token}"/>
+        <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+        <link rel="stylesheet" th:href="@{/css/leitung.css}"/>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}"/>
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50"/>
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{leitung.title}">Leitung</h1>
+        <p class="leitung-intro" th:text="#{leitung.intro}">Vergabe der Führungsränge entlang der delegierten Leiter.</p>
+    </div>
+
+    <div th:if="${error != null}" class="hud-box mt-2 leitung-error" th:text="#{${error}}">Fehler beim Laden.</div>
+
+    <div id="leitung-sections">
+    <th:block th:fragment="leitungSections">
+        <th:block th:if="${leitung != null}">
+
+            <!-- ============================ Organisationsleitung ============================ -->
+            <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.organisationsleitungen())}">
+                <h2 class="section-title" th:text="#{leitung.tier.ol}">Organisationsleitung</h2>
+                <div class="hud-box mt-2 leitung-unit" th:each="ol : ${leitung.organisationsleitungen()}" th:data-unit-id="${ol.id()}">
+                    <div class="leitung-unit-head">
+                        <h3 class="leitung-unit-title" th:text="${ol.name()}">OL</h3>
+                        <button type="button" class="btn btn--cta" th:if="${ol.canAppointLead()}"
+                                data-leitung-open="add-ol" th:data-unit-id="${ol.id()}" th:data-unit-name="${ol.name()}"
+                                th:text="#{leitung.ol.add}">OL-Mitglied hinzufügen</button>
+                    </div>
+                    <p class="leitung-empty" th:if="${#lists.isEmpty(ol.members())}" th:text="#{leitung.empty.members}">Keine Mitglieder.</p>
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(ol.members())}">
+                        <table class="krt-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{leitung.column.name}">Name</th>
+                                    <th th:text="#{leitung.column.rank}">Rang</th>
+                                    <th class="leitung-col-action" th:text="#{leitung.column.action}">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="m : ${ol.members()}">
+                                    <td th:text="${m.userDisplayName()}">Name</td>
+                                    <td><span class="chip chip--primary" th:text="#{'leitung.rank.' + ${m.role()}}">OL-Mitglied</span></td>
+                                    <td class="leitung-col-action">
+                                        <button type="button" class="btn btn-quiet-danger btn-icon" th:if="${ol.canAppointLead()}"
+                                                data-leitung-action="remove-ol-member" th:data-unit-id="${ol.id()}" th:data-user-id="${m.userId()}"
+                                                th:title="#{leitung.action.remove}" th:aria-label="#{leitung.action.remove}">
+                                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================ Bereiche ============================ -->
+            <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.bereiche())}">
+                <h2 class="section-title" th:text="#{leitung.tier.bereiche}">Bereiche</h2>
+                <div class="hud-box mt-2 leitung-unit" th:each="b : ${leitung.bereiche()}" th:data-unit-id="${b.id()}">
+                    <div class="leitung-unit-head">
+                        <h3 class="leitung-unit-title" th:text="${b.name()}">Bereich</h3>
+                        <button type="button" class="btn btn--cta"
+                                data-leitung-open="add-bereich" th:data-unit-id="${b.id()}" th:data-unit-name="${b.name()}"
+                                th:data-can-lead="${b.canAppointLead()}" th:data-can-roster="${b.canManageRoster()}"
+                                th:text="#{leitung.bereich.add}">Mitglied hinzufügen</button>
+                    </div>
+                    <p class="leitung-empty" th:if="${#lists.isEmpty(b.members())}" th:text="#{leitung.empty.members}">Keine Mitglieder.</p>
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(b.members())}">
+                        <table class="krt-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{leitung.column.name}">Name</th>
+                                    <th th:text="#{leitung.column.rank}">Rang</th>
+                                    <th class="leitung-col-action" th:text="#{leitung.column.action}">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="m : ${b.members()}">
+                                    <td th:text="${m.userDisplayName()}">Name</td>
+                                    <td><span class="chip chip--primary" th:text="#{'leitung.rank.' + ${m.role()}}">Bereichsleiter</span></td>
+                                    <td class="leitung-col-action">
+                                        <button type="button" class="btn btn-quiet-danger btn-icon"
+                                                data-leitung-action="remove-bereich-role" th:data-unit-id="${b.id()}" th:data-user-id="${m.userId()}"
+                                                th:title="#{leitung.action.remove}" th:aria-label="#{leitung.action.remove}">
+                                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================ Staffeln ============================ -->
+            <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.squadrons())}">
+                <h2 class="section-title" th:text="#{leitung.tier.squadrons}">Staffeln</h2>
+                <div class="hud-box mt-2 leitung-unit" th:each="s : ${leitung.squadrons()}"
+                     th:data-unit-id="${s.id()}" th:data-can-lead="${s.canAppointLead()}" th:data-can-roster="${s.canManageRoster()}">
+                    <div class="leitung-unit-head">
+                        <h3 class="leitung-unit-title" th:text="${s.name()}">Staffel</h3>
+                    </div>
+
+                    <!-- Kommandogruppen (Staffelleiter only) -->
+                    <div th:if="${s.canManageRoster()}">
+                        <h4 class="leitung-subhead" th:text="#{leitung.groups.title}">Kommandogruppen</h4>
+                        <div class="leitung-group-grid">
+                            <div class="card card--accent leitung-group" th:each="g : ${s.groups()}" th:data-group-id="${g.id()}" th:data-group-version="${g.version()}" th:data-group-sort="${g.sortIndex()}">
+                                <input type="text" class="leitung-group-name" th:value="${g.name()}" th:aria-label="#{leitung.groups.name}"/>
+                                <div class="leitung-group-actions">
+                                    <button type="button" class="btn btn-ghost btn-icon" data-leitung-action="rename-group"
+                                            th:title="#{leitung.action.save}" th:aria-label="#{leitung.action.save}">
+                                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>
+                                    </button>
+                                    <button type="button" class="btn btn-quiet-danger btn-icon" data-leitung-action="delete-group"
+                                            th:title="#{leitung.action.delete}" th:aria-label="#{leitung.action.delete}">
+                                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card card--inset leitung-group-add" th:if="${#lists.size(s.groups()) < 4}">
+                                <input type="text" class="leitung-new-group-name" th:placeholder="#{leitung.groups.name}" th:aria-label="#{leitung.groups.name}"/>
+                                <button type="button" class="btn btn-outline" data-leitung-action="create-group" th:data-unit-id="${s.id()}"
+                                        th:text="#{leitung.groups.add}">+ Gruppe</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Member roster + rank assignment -->
+                    <h4 class="leitung-subhead" th:text="#{leitung.members.title}">Mitglieder</h4>
+                    <p class="leitung-empty" th:if="${#lists.isEmpty(s.members())}" th:text="#{leitung.empty.squadronMembers}">Keine Mitglieder.</p>
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(s.members())}">
+                        <table class="krt-table leitung-rank-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{leitung.column.name}">Name</th>
+                                    <th th:text="#{leitung.column.rank}">Rang</th>
+                                    <th th:text="#{leitung.column.group}">Kommandogruppe</th>
+                                    <th class="leitung-col-action" th:text="#{leitung.column.action}">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="m : ${s.members()}" class="leitung-rank-row" th:data-user-id="${m.userId()}" th:data-version="${m.version()}">
+                                    <td th:text="${m.userDisplayName()}">Name</td>
+                                    <td>
+                                        <select class="leitung-rank-select" th:aria-label="#{leitung.column.rank}">
+                                            <option value="MEMBER" th:selected="${m.role() == 'MEMBER'}" th:text="#{leitung.rank.MEMBER}">Mitglied</option>
+                                            <option value="STAFFELLEITER" th:if="${s.canAppointLead()}" th:selected="${m.role() == 'STAFFELLEITER'}" th:text="#{leitung.rank.STAFFELLEITER}">Staffelleiter</option>
+                                            <option value="KOMMANDOLEITER" th:if="${s.canManageRoster()}" th:selected="${m.role() == 'KOMMANDOLEITER'}" th:text="#{leitung.rank.KOMMANDOLEITER}">Kommandoleiter</option>
+                                            <option value="STELLV_KOMMANDOLEITER" th:if="${s.canManageRoster()}" th:selected="${m.role() == 'STELLV_KOMMANDOLEITER'}" th:text="#{leitung.rank.STELLV_KOMMANDOLEITER}">Stv. Kommandoleiter</option>
+                                            <option value="ENSIGN" th:if="${s.canManageRoster()}" th:selected="${m.role() == 'ENSIGN'}" th:text="#{leitung.rank.ENSIGN}">Ensign</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="leitung-group-select" th:aria-label="#{leitung.column.group}">
+                                            <option value="" th:text="#{leitung.group.none}">— allgemein —</option>
+                                            <option th:each="g : ${s.groups()}" th:value="${g.id()}" th:selected="${g.id().toString() == (m.kommandoGroupId() != null ? m.kommandoGroupId().toString() : '')}" th:text="${g.name()}">Gruppe</option>
+                                        </select>
+                                    </td>
+                                    <td class="leitung-col-action">
+                                        <button type="button" class="btn btn-ghost btn-icon" data-leitung-action="save-rank" th:data-unit-id="${s.id()}"
+                                                th:title="#{leitung.action.save}" th:aria-label="#{leitung.action.save}">
+                                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================ Spezialkommandos ============================ -->
+            <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.specialCommands())}">
+                <h2 class="section-title" th:text="#{leitung.tier.specialCommands}">Spezialkommandos</h2>
+                <div class="hud-box mt-2 leitung-unit" th:each="sk : ${leitung.specialCommands()}" th:data-unit-id="${sk.id()}">
+                    <div class="leitung-unit-head">
+                        <h3 class="leitung-unit-title" th:text="${sk.name()}">Spezialkommando</h3>
+                    </div>
+                    <p class="leitung-empty" th:if="${#lists.isEmpty(sk.members())}" th:text="#{leitung.empty.squadronMembers}">Keine Mitglieder.</p>
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(sk.members())}">
+                        <table class="krt-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{leitung.column.name}">Name</th>
+                                    <th th:text="#{leitung.column.rank}">Rang</th>
+                                    <th class="leitung-col-action" th:text="#{leitung.column.action}">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="m : ${sk.members()}" th:data-user-id="${m.userId()}" th:data-version="${m.version()}">
+                                    <td th:text="${m.userDisplayName()}">Name</td>
+                                    <td>
+                                        <span th:if="${m.role() == 'SK_LEAD'}" class="chip chip--primary" th:text="#{leitung.rank.SK_LEAD}">SK-Leiter</span>
+                                        <span th:unless="${m.role() == 'SK_LEAD'}" class="chip chip--muted" th:text="#{leitung.rank.MEMBER}">Mitglied</span>
+                                    </td>
+                                    <td class="leitung-col-action">
+                                        <button type="button" class="btn btn-ghost" data-leitung-action="toggle-sk-lead" th:data-unit-id="${sk.id()}"
+                                                th:data-lead="${m.role() == 'SK_LEAD'}"
+                                                th:text="${m.role() == 'SK_LEAD'} ? #{leitung.sk.demote} : #{leitung.sk.promote}">Leiter umschalten</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <div class="hud-box mt-2 leitung-empty-all"
+                 th:if="${#lists.isEmpty(leitung.organisationsleitungen()) and #lists.isEmpty(leitung.bereiche()) and #lists.isEmpty(leitung.squadrons()) and #lists.isEmpty(leitung.specialCommands())}"
+                 th:text="#{leitung.empty.all}">Sie verwalten derzeit keine Einheiten.</div>
+        </th:block>
+    </th:block>
+    </div>
+</main>
+
+<!-- Shared add-member modal (Bereich / OL): user picker + optional role -->
+<div id="leitung-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="leitung-modal-title" style="display: none;">
+    <div class="modal-content hud-box">
+        <button type="button" class="close-modal" data-leitung-cancel th:aria-label="#{leitung.action.cancel}">&times;</button>
+        <h2 id="leitung-modal-title" th:text="#{leitung.modal.title}">Mitglied hinzufügen</h2>
+        <p class="leitung-modal-unit" id="leitung-modal-unit"></p>
+        <div class="form-group">
+            <label for="leitung-modal-user" th:text="#{leitung.modal.user}">Nutzer</label>
+            <select id="leitung-modal-user">
+                <option value="" th:text="#{leitung.modal.user.placeholder}">-- Bitte wählen --</option>
+                <option th:each="u : ${allUsers}" th:value="${u.id()}" th:text="${u.effectiveName() ?: u.username()}">User</option>
+            </select>
+        </div>
+        <div class="form-group" id="leitung-modal-role-group">
+            <label for="leitung-modal-role" th:text="#{leitung.modal.role}">Rang</label>
+            <select id="leitung-modal-role"></select>
+        </div>
+        <div class="leitung-modal-actions">
+            <button type="button" class="btn btn-ghost" data-leitung-cancel th:text="#{leitung.action.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" id="leitung-modal-submit" th:text="#{leitung.action.assign}">Zuweisen</button>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/toast :: toast}"/>
+
+<!-- i18n + rank-label dictionary for the page JS -->
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    window.leitungI18n = {
+        saved: /*[[#{notification.success.save}]]*/ 'Gespeichert.',
+        deleted: /*[[#{notification.success.delete}]]*/ 'Entfernt.',
+        error: /*[[#{notification.error.save}]]*/ 'Fehler.',
+        rankLeiter: /*[[#{leitung.rank.BEREICHSLEITER}]]*/ 'Bereichsleiter',
+        rankKoordinator: /*[[#{leitung.rank.BEREICHSKOORDINATOR}]]*/ 'Bereichskoordinator',
+        rankOperator: /*[[#{leitung.rank.BEREICHSOPERATOR}]]*/ 'Bereichsoperator',
+        conflict: {
+            title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+            reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
+            reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
+            dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+            reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
+        }
+    };
+</script>
+<script th:src="@{/js/leitung.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

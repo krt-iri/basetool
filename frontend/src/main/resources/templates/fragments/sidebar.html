@@ -90,6 +90,7 @@
                     <summary th:text="#{nav.section.organisation}">Organisation</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
+                        <a th:href="@{/organisation/leitung}" sec:authorize="hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER')" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
                         <a th:href="@{/org-unit-bank}" sec:authorize="hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER')" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
                     </div>
                 </details>
