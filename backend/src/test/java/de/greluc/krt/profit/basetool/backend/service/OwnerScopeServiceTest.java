@@ -1097,6 +1097,64 @@ class OwnerScopeServiceTest {
     }
   }
 
+  @Nested
+  class CanActOnUserRefineryOrdersTests {
+
+    @Test
+    void admin_canViewAndManageAnyUsersRefineryOrders() {
+      UUID targetUserId = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertTrue(service.canViewUserRefineryOrders(targetUserId));
+      assertTrue(service.canManageUserRefineryOrders(targetUserId));
+    }
+
+    @Test
+    void self_canViewOwnRefineryOrders_withoutScopeCheck() {
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+
+      assertTrue(service.canViewUserRefineryOrders(MEMBER_USER_ID));
+      assertTrue(service.canManageUserRefineryOrders(MEMBER_USER_ID));
+    }
+
+    @Test
+    void logisticianInTargetsSquadron_canViewAndManage() {
+      UUID targetUserId = UUID.randomUUID();
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(targetUserId))
+          .thenReturn(List.of(staffelMembership(targetUserId, SQUADRON_A_ID)));
+
+      assertTrue(service.canViewUserRefineryOrders(targetUserId));
+      assertTrue(service.canManageUserRefineryOrders(targetUserId));
+    }
+
+    @Test
+    void logisticianOutsideTargetsScope_isDenied() {
+      // The fix (PR #808 security review): a logistician whose strict scope does not cover any of
+      // the target user's units can no longer reach that user's refinery orders via the flat
+      // ROLE_LOGISTICIAN. This is the org-wide gap closed for every oversight rank, squadron ranks
+      // included.
+      UUID targetUserId = UUID.randomUUID();
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(targetUserId))
+          .thenReturn(List.of(staffelMembership(targetUserId, SQUADRON_B_ID)));
+
+      assertFalse(service.canViewUserRefineryOrders(targetUserId));
+      assertFalse(service.canManageUserRefineryOrders(targetUserId));
+    }
+  }
+
   /**
    * Null-owner gate behaviour for the three ownerless-personal-aggregate roots (ship, refinery
    * order, inventory item). A row with {@code owningOrgUnit == null} is reachable only by its own

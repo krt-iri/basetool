@@ -70,12 +70,24 @@ ranks keep their current cascading reach (Bereich + children, identical across t
 for now). The Keycloak `OFFICER` realm role is left untouched. Per-rank / per-feature
 differentiation (including the bank) is deferred to later work.
 
+Like `SK_LEAD` and the area/OL ranks, a squadron rank also carries the flat back-compat
+`ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER` (the `confersFlatOfficerRole` surface) so existing
+`hasRole('LOGISTICIAN')` gates keep working. Every such gate is **owner-scoped**, so the effective
+reach stays own-squadron: the two previously-unscoped per-user refinery endpoints (`GET` / `POST
+/api/v1/refinery-orders/users/{userId}`) were scoped with `@ownerScopeService.canViewUserRefineryOrders`
+/ `canManageUserRefineryOrders` (PR #808 security review) so the flat role can no longer act org-wide
+there — matching the strict-staffel reach the per-order refinery checks already used.
+
 **Acceptance**
 
-- [x] A squadron leadership rank mints own-squadron logistician + mission-manager authorities and
-  nothing else; area/OL/SK grants are byte-identical to before the migration (Phase 2).
+- [x] A squadron leadership rank mints own-squadron logistician + mission-manager authorities (plus
+  the flat back-compat roles, exactly as `SK_LEAD`); area/OL/SK grants are byte-identical to before
+  the migration (Phase 2).
+- [x] The flat `ROLE_LOGISTICIAN` does not grant org-wide reach: the per-user refinery endpoints are
+  owner-scoped to the caller's strict org-unit scope (admin / self / a unit the target user belongs
+  to), for every oversight rank — squadron ranks included.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest`, `OwnerScopeServiceTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `OwnerScopeServiceTest` (`CanActOnUserRefineryOrdersTests`), `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-003 — Kommandogruppe entity
 

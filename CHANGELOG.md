@@ -20,6 +20,7 @@
 
 - **Auszahlungen und Umbuchungen prüfen nur noch die Kontodeckung, nicht mehr den Halter.** Ein Konto kann weiterhin nie ins Minus gehen; der Halterbestand darf es (und wird später ausgeglichen). Die kontobezogene „Halter-Verteilung" entfällt: Konto-Detailseite, Kontoauszug-PDF und 3-Monats-Report zeigen sie nicht mehr — der 3-Monats-Report schließt stattdessen mit den bankweiten Halterbeständen.
 - **Intern: Die fünf alten Führungsrollen-Booleans der Mitgliedschaften wurden entfernt (Migration V187).** Der vereinheitlichte Rang ist jetzt die alleinige Quelle der Wahrheit; die DB-Regel „Führungskraft gehört keiner Staffel an" arbeitet darauf weiter (Staffelränge sind ausgenommen). Reine Aufräum-/Schema-Änderung ohne sichtbare Auswirkung — beim Deploy wird einmalig eine nicht umkehrbare Migration ausgeführt.
+- **Raffinerie-Aufträge anderer Nutzer sind jetzt auf den eigenen Org-Einheits-Bereich beschränkt.** Das Ansehen und Anlegen von Raffinerie-Aufträgen für andere Nutzer (`/refinery-orders/users/{userId}`) ist für Logistiker nun auf Nutzer der eigenen Org-Einheiten begrenzt (Admins und der eigene Account ausgenommen) — wie schon bei den einzelnen Auftrags-Aktionen. Vorher konnte jeder Logistiker (inkl. der neuen Staffelränge) das organisationsweit. Sicherheits-Härtung aus dem PR-Review.
 
 ## [v0.7.9](https://github.com/krt-profit/basetool/releases/tag/v0.7.9) - 2026-06-22
 

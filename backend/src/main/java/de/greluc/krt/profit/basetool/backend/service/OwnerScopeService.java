@@ -1428,6 +1428,61 @@ public class OwnerScopeService {
   }
 
   /**
+   * {@code true} iff the caller may read the target user's refinery orders through the per-user
+   * list endpoint {@code GET /api/v1/refinery-orders/users/{userId}}. Scopes the flat-{@code
+   * ROLE_LOGISTICIAN} gate at the user level: an admin, the target user themselves, or a caller
+   * whose strict org-unit scope ({@link #canSeeSquadron(UUID)}) covers one of the target user's
+   * memberships. This mirrors the per-order {@link #canSeeRefineryOrder(RefineryOrder)} reach (also
+   * strict-staffel), making the whole refinery surface consistent and closing the org-wide gap
+   * where any oversight rank's flat {@code ROLE_LOGISTICIAN} could read every user's orders (PR
+   * #808 security review). A non-existent / membership-less target yields {@code false} for
+   * non-admins.
+   *
+   * @param targetUserId the user whose refinery orders the caller wants to read; never {@code
+   *     null}.
+   * @return {@code true} iff the caller may read that user's refinery orders.
+   */
+  public boolean canViewUserRefineryOrders(@NotNull UUID targetUserId) {
+    return canActOnUserRefineryOrders(targetUserId, this::canSeeSquadron);
+  }
+
+  /**
+   * Write analogue of {@link #canViewUserRefineryOrders(UUID)} for the create-on-behalf endpoint
+   * {@code POST /api/v1/refinery-orders/users/{userId}}; scopes on {@link #canEditSquadron(UUID)}
+   * exactly as the per-order {@link #canEditRefineryOrder(UUID)} does.
+   *
+   * @param targetUserId the user the caller wants to create a refinery order for; never {@code
+   *     null}.
+   * @return {@code true} iff the caller may create a refinery order on that user's behalf.
+   */
+  public boolean canManageUserRefineryOrders(@NotNull UUID targetUserId) {
+    return canActOnUserRefineryOrders(targetUserId, this::canEditSquadron);
+  }
+
+  /**
+   * Shared resolution for the per-user refinery endpoints: admin all-access, then the self escape,
+   * then the strict org-unit scope check against the target user's memberships (read straight from
+   * {@code org_unit_membership}, never a lazy association). The {@code unitScope} predicate is
+   * {@link #canSeeSquadron(UUID)} for reads / {@link #canEditSquadron(UUID)} for writes.
+   *
+   * @param targetUserId the user being acted upon; never {@code null}.
+   * @param unitScope the per-unit scope check to apply; never {@code null}.
+   * @return {@code true} iff the caller is in scope for the target user's refinery orders.
+   */
+  private boolean canActOnUserRefineryOrders(
+      @NotNull UUID targetUserId, @NotNull java.util.function.Predicate<UUID> unitScope) {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    if (authHelper.currentUserId().map(targetUserId::equals).orElse(false)) {
+      return true;
+    }
+    return orgUnitMembershipRepository.findAllByIdUserId(targetUserId).stream()
+        .map(m -> m.getId().getOrgUnitId())
+        .anyMatch(unitScope);
+  }
+
+  /**
    * {@code true} iff the current principal may read operation {@code operationId}. Visible when
    * <em>any</em> of these holds:
    *
