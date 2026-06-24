@@ -46,6 +46,7 @@ public interface BankAccountMapper {
   @Mapping(target = "name", source = "account.name")
   @Mapping(target = "version", source = "account.version")
   @Mapping(target = "createdAt", source = "account.createdAt")
+  @Mapping(target = "balanceTarget", source = "account.balanceTarget")
   @Mapping(target = "balance", source = "balance")
   BankAccountDto toDto(BankAccount account, BigDecimal balance);
 

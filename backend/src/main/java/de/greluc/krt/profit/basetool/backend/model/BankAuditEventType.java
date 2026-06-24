@@ -123,5 +123,24 @@ public enum BankAuditEventType {
    * The requesting officer/lead cancelled their own pending booking request; no ledger effect
    * (REQ-BANK-022).
    */
-  BOOKING_REQUEST_CANCELLED
+  BOOKING_REQUEST_CANCELLED,
+
+  /**
+   * An account's balance target ("Kontostandsziel") was set or changed (REQ-BANK-036); the details
+   * payload carries the new target amount.
+   */
+  BALANCE_TARGET_SET,
+
+  /** An account's balance target was cleared (REQ-BANK-036). */
+  BALANCE_TARGET_CLEARED,
+
+  /**
+   * A balance-visibility grant was added to an account (REQ-BANK-035): a role bucket, an
+   * all-members toggle, or an individual user (then {@code targetUserId} is set). The details
+   * payload carries the grantee kind and role code — never any free text or PII.
+   */
+  BALANCE_VISIBILITY_GRANTED,
+
+  /** A balance-visibility grant was removed from an account (REQ-BANK-035). */
+  BALANCE_VISIBILITY_REVOKED
 }

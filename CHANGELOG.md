@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Kontoverantwortung & konfigurierbare Sichtbarkeit für Org-Einheits-Konten.** Jedes Org-Einheits-Bankkonto hat eine/n abgeleitete/n Kontoverantwortliche/n (Staffelkonto → Staffelleiter, Bereichskonto → Bereichsleiter, OL-Konto → OL-Mitglieder, Kartellbankkonto → Bereichsleiter Profit). Diese/r kann freigeben, wer den Kontostand zusätzlich sehen darf — je Unter-Rolle (z. B. Kommandoleiter/Ensigns bzw. Bereichskoordinatoren/-operatoren), alle Mitglieder der Einheit oder einzelne Nutzer. Das KRT-Konto ist immer für alle Mitglieder sichtbar; Sonderkonten sehen automatisch alle OL-Mitglieder und Bereichsleiter (zusätzlich von OL/Bankleitung freigebbar an globale Rollen, alle Mitglieder oder einzelne Nutzer).
+
+- **Read-only-Detailansicht mit Verlauf und Kontoauszug.** Klickt man auf der Org-Einheits-Bankseite auf ein Konto, das man sehen darf, öffnet sich die Detailansicht wie für Bankmitarbeiter — inklusive Buchungshistorie — schreibgeschützt: keine Ein-/Aus-/Umbuchung, nur der Abruf eines Kontoauszugs (PDF). Die „Halter"-Spalte (welcher Spieler das Geld physisch hält) ist dabei ausgeblendet; Bankmitarbeiter behalten die vollständige Ansicht.
+
+- **Kontostandsziel je Konto.** Verantwortliche und zugriffsberechtigte Bankmitarbeiter können ein Zielkontostand setzen; allen, die das Konto sehen, wird das Ziel samt Fortschritt angezeigt.
+
 ## [v0.7.12](https://github.com/krt-profit/basetool/releases/tag/v0.7.12) - 2026-06-23
 
 ### Fixed

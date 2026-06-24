@@ -414,6 +414,57 @@ class BankAccountServiceTest {
     verify(bankGrantService, never()).createGrant(any());
   }
 
+  @Test
+  void setBalanceTarget_setsTargetAndAuditsSet() {
+    // REQ-BANK-036: bank staff with access set the balance target; audited as SET.
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = accountWithVersion(accountId, 2L);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(accountRepository.save(any(BankAccount.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(postingRepository.accountBalance(accountId)).thenReturn(BigDecimal.ZERO);
+
+    bankAccountService.setBalanceTarget(accountId, new BigDecimal("5000"), 2L);
+
+    ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
+    verify(accountRepository).save(saved.capture());
+    assertEquals(0, new BigDecimal("5000").compareTo(saved.getValue().getBalanceTarget()));
+    verify(bankAuditService)
+        .record(eq(BankAuditEventType.BALANCE_TARGET_SET), eq(accountId), any(), any(), any());
+  }
+
+  @Test
+  void setBalanceTarget_nullClearsTargetAndAuditsCleared() {
+    // REQ-BANK-036: a null target clears the goal; audited as CLEARED.
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = accountWithVersion(accountId, 1L);
+    account.setBalanceTarget(new BigDecimal("9000"));
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(accountRepository.save(any(BankAccount.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(postingRepository.accountBalance(accountId)).thenReturn(BigDecimal.ZERO);
+
+    bankAccountService.setBalanceTarget(accountId, null, 1L);
+
+    ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
+    verify(accountRepository).save(saved.capture());
+    assertEquals(null, saved.getValue().getBalanceTarget());
+    verify(bankAuditService)
+        .record(eq(BankAuditEventType.BALANCE_TARGET_CLEARED), eq(accountId), any(), any(), any());
+  }
+
+  @Test
+  void setBalanceTarget_staleVersionFailsFastWith409() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = accountWithVersion(accountId, 5L);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> bankAccountService.setBalanceTarget(accountId, new BigDecimal("1"), 4L));
+    verify(accountRepository, never()).save(any());
+  }
+
   /** Creates an account in the management perspective (any type, no auto-grant). */
   private void createAsManagement(CreateBankAccountRequest request) {
     bankAccountService.createAccount(request, true, null);

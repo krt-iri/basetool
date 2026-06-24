@@ -30,6 +30,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -116,4 +117,16 @@ public class BankAccount extends AbstractEntity<UUID> {
   @Nullable
   @Column(name = "area_name", updatable = false)
   private String areaName;
+
+  /**
+   * Optional aspirational balance goal ("Kontostandsziel", REQ-BANK-036, V189) — a target up to
+   * which the account should be filled, shown with progress to everyone who may view the balance.
+   * {@code null} means no target is set. Settable by the account's derived responsible holder and
+   * by bank staff with access; persisted as {@code NUMERIC(19,4)} per ADR-0002. Editing it bumps
+   * this row's {@code @Version} (shared with rename/close, both infrequent), so a concurrent edit
+   * surfaces a 409.
+   */
+  @Nullable
+  @Column(name = "balance_target", precision = 19, scale = 4)
+  private BigDecimal balanceTarget;
 }

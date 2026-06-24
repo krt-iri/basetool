@@ -56,6 +56,10 @@ import org.jetbrains.annotations.Nullable;
  * @param sparkline the end-of-day balances of the last 30 days, oldest first, last entry = current
  *     balance; scaled into the card's inline SVG sparkline by {@link
  *     de.greluc.krt.profit.basetool.frontend.controller.BankSparkline}
+ * @param balanceTarget the aspirational balance goal (REQ-BANK-036), or {@code null} when none is
+ *     set; the card shows progress towards it
+ * @param canManageSettings {@code true} iff the caller may open the account's settings (set the
+ *     target and/or configure who else may view it); drives the per-card settings affordance
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
@@ -70,4 +74,6 @@ public record OrgUnitBankBalanceDto(
     BigDecimal balance,
     boolean canRequest,
     BigDecimal delta30d,
-    List<BigDecimal> sparkline) {}
+    List<BigDecimal> sparkline,
+    @Nullable BigDecimal balanceTarget,
+    boolean canManageSettings) {}

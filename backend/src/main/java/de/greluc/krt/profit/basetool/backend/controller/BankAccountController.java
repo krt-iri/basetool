@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.RenameBankAccountRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.SetBankBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.BankAccountService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
@@ -163,6 +164,23 @@ public class BankAccountController {
   public BankAccountDto renameAccount(
       @PathVariable @NotNull UUID id, @RequestBody @Valid RenameBankAccountRequest request) {
     return bankAccountService.renameAccount(id, request);
+  }
+
+  /**
+   * Sets or clears an account's balance target (REQ-BANK-036). Gated to bank staff with access to
+   * the account ({@code canSee}); the org-unit responsible holder uses the org-unit endpoint.
+   *
+   * @param id the account
+   * @param request the new target (or {@code null} to clear) plus the echoed version
+   * @return the updated account
+   */
+  @Operation(summary = "Set or clear a bank account's balance target (bank staff with access)")
+  @PatchMapping("/{id}/balance-target")
+  @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
+  @Transactional
+  public BankAccountDto setBalanceTarget(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid SetBankBalanceTargetRequest request) {
+    return bankAccountService.setBalanceTarget(id, request.target(), request.version());
   }
 
   /**

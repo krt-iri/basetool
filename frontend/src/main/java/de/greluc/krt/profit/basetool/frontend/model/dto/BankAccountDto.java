@@ -38,6 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * @param orgUnit owning org unit reference for org-unit accounts, else {@code null}
  * @param areaName free-form Bereich name for area accounts, else {@code null}
  * @param balance current balance (signed whole aUEC)
+ * @param balanceTarget aspirational balance goal (REQ-BANK-036), or {@code null} when none is set
  * @param version optimistic-locking version to echo on mutations
  * @param createdAt creation instant (UTC)
  */
@@ -50,5 +51,6 @@ public record BankAccountDto(
     @Nullable OrgUnitReferenceDto orgUnit,
     @Nullable String areaName,
     BigDecimal balance,
+    @Nullable BigDecimal balanceTarget,
     Long version,
     Instant createdAt) {}

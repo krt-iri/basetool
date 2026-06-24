@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="${detail != null ? detail.detail().account().name() : ''} + ' - ' + ${appTitle}">Konto - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main th:if="${detail == null}">
+    <div class="hud-box">
+        <p class="text-center" data-testid="org-unit-bank-detail-missing"
+           th:text="#{bank.orgUnit.detail.notFound}">Konto nicht gefunden oder kein Zugriff.</p>
+        <p class="text-center"><a th:href="@{/org-unit-bank}" th:text="#{bank.orgUnit.detail.back}">Zur&uuml;ck zur &Uuml;bersicht</a></p>
+    </div>
+</main>
+
+<main th:if="${detail != null}" th:with="d=${detail.detail()}, acct=${detail.detail().account()}"
+      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
+
+    <!-- Read-only account drill-in for org-unit viewers (REQ-BANK-038): history + Halter-redacted
+         Kontoauszug; no deposit/withdraw/transfer. The responsible holder / OL additionally manages
+         the balance target and configurable visibility (REQ-BANK-035/-036). -->
+    <div class="greeting hud-box flex-between">
+        <div>
+            <p style="margin: 0 0 0.25rem;"><a th:href="@{/org-unit-bank}" class="text-muted"
+                  style="font-size: 0.75rem;" th:text="'&#8592; ' + #{bank.orgUnit.detail.back}">&#8592; Zur&uuml;ck zur &Uuml;bersicht</a></p>
+            <h1 th:text="${acct.name()}">Staffel IRIDIUM</h1>
+            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;">
+                <span class="chip" style="font-size: 0.55rem;"
+                      th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
+                <span class="status-pill"
+                      th:classappend="${acct.status() == 'ACTIVE'} ? ' status-active' : ' status-completed'"
+                      th:text="#{'bank.account.status.' + ${acct.status()}}">Aktiv</span>
+                <span th:text="${acct.accountNo()}" data-testid="org-unit-bank-detail-no">KB-0001</span>
+            </p>
+        </div>
+        <div class="bank-head-actions">
+            <button type="button" class="btn btn-ghost" th:if="${detail.canExportStatement()}"
+                    data-trigger="open-modal-display" data-modal-id="org-unit-statement-modal"
+                    data-testid="org-unit-statement-open" th:text="#{bank.action.statement}">Kontoauszug</button>
+        </div>
+    </div>
+
+    <!-- Facts + responsibility settings; re-rendered in place after a target/visibility write. -->
+    <div id="org-unit-bank-settings-results">
+    <th:block th:fragment="orgUnitBankSettings" th:with="d=${detail.detail()}, acct=${detail.detail().account()}">
+        <div class="bank-facts mt-2"
+             th:with="hasTarget=${acct.balanceTarget() != null and acct.balanceTarget().signum() > 0},
+                      pct=${(acct.balanceTarget() != null and acct.balanceTarget().signum() > 0) ? (acct.balance().doubleValue() / acct.balanceTarget().doubleValue() * 100.0) : 0.0}">
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{bank.detail.balance}">Kontosaldo</div>
+                <div class="kpi-value" data-testid="org-unit-bank-detail-balance"
+                     th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
+            </div>
+            <div class="kpi-total" th:if="${hasTarget}" data-testid="org-unit-bank-detail-target">
+                <div class="kpi-label" th:text="#{bank.orgUnit.balanceTarget}">Zielkontostand</div>
+                <div class="kpi-value"
+                     th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balanceTarget()), 1, 'POINT')} + ' aUEC'">10.000.000 aUEC</div>
+                <div class="bank-target-bar" aria-hidden="true">
+                    <div class="bank-target-bar-fill"
+                         th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
+                </div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{bank.detail.delta30}">&#177; 30 Tage</div>
+                <div class="kpi-value"
+                     th:classappend="${d.delta30d().signum() > 0} ? ' bank-amount--pos' : (${d.delta30d().signum() < 0} ? ' bank-amount--neg' : '')"
+                     th:text="${d.delta30d().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(d.delta30d()), 1, 'POINT')}">+420.000</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
+                <div class="kpi-value" th:text="${d.bookingCount()}">128</div>
+            </div>
+        </div>
+
+        <!-- Responsibility settings (REQ-BANK-035/-036): only for the holder / OL. -->
+        <div class="hud-box mt-2" th:if="${settings != null}" data-testid="org-unit-bank-settings">
+            <h2 th:text="#{bank.orgUnit.settings.title}">Verantwortung &amp; Sichtbarkeit</h2>
+
+            <!-- Balance target -->
+            <div th:if="${settings.canSetTarget()}" class="mt-2" data-testid="org-unit-bank-target-settings">
+                <h3 th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
+                <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.target.hint}">
+                    Ziel, bis zu dem das Konto gef&uuml;llt werden soll. Wird allen Berechtigten angezeigt.</p>
+                <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                      data-endpoint="/api/proxy/org-units/bank/accounts/{id}/balance-target" data-method="PUT">
+                    <input type="hidden" name="_id" th:value="${acct.id()}">
+                    <input type="hidden" name="version" th:value="${settings.version()}">
+                    <div class="bank-form-row">
+                        <label for="org-unit-target-amount" th:text="#{bank.orgUnit.field.target}">Zielkontostand (aUEC)</label>
+                        <input type="number" id="org-unit-target-amount" name="target" min="1" step="1"
+                               th:value="${settings.balanceTarget() != null ? @moneyFormat.round(settings.balanceTarget()) : ''}"
+                               data-testid="org-unit-target-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                        <span class="bank-field-hint" th:text="#{bank.orgUnit.settings.target.clearHint}">Leer lassen und speichern entfernt das Ziel.</span>
+                        <span class="bank-field-error" data-error-for="target"></span>
+                        <span class="bank-field-error" data-error-for="_global"></span>
+                    </div>
+                    <button type="submit" class="btn btn--cta btn-sm" data-testid="org-unit-target-submit"
+                            th:text="#{bank.orgUnit.settings.target.save}">Ziel speichern</button>
+                </form>
+            </div>
+
+            <!-- Configurable visibility -->
+            <div th:if="${settings.canConfigureVisibility() and settings.visibilityConfigurable()}" class="mt-2"
+                 data-testid="org-unit-bank-visibility-settings">
+                <h3 th:text="#{bank.orgUnit.settings.visibility.title}">Sichtbarkeit</h3>
+                <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.visibility.hint}">
+                    Lege fest, wer den Kontostand und die Detailansicht zus&auml;tzlich sehen darf.</p>
+
+                <!-- Role buckets -->
+                <div th:if="${!#lists.isEmpty(settings.availableRoleCodes())}" class="bank-vis-group">
+                    <span class="bank-kv-key" th:text="#{bank.orgUnit.settings.visibility.roles}">Nach Rolle</span>
+                    <div class="bank-vis-chips">
+                        <span th:each="role : ${settings.availableRoleCodes()}" class="bank-vis-chip"
+                              th:with="granted=${settings.grantedRoleCodes().contains(role)}">
+                            <span th:text="#{'bank.orgUnit.visibility.role.' + ${role}}">Rolle</span>
+                            <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                                  th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/role/' + ${role},data-method=${granted ? 'DELETE' : 'POST'}"
+                                  style="display:inline;">
+                                <input type="hidden" name="_id" th:value="${acct.id()}">
+                                <button type="submit" class="btn btn-sm"
+                                        th:classappend="${granted} ? ' btn-outline' : ' btn--cta'"
+                                        th:attr="data-testid='org-unit-vis-role-' + ${role}"
+                                        th:text="${granted} ? #{bank.orgUnit.settings.visibility.revoke} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
+                            </form>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- All members -->
+                <div th:if="${settings.allMembersSupported()}" class="bank-vis-group">
+                    <span class="bank-kv-key" th:text="#{bank.orgUnit.settings.visibility.allMembers}">Alle Mitglieder</span>
+                    <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                          th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/all-members/' + ${!settings.allMembersGranted()}"
+                          data-method="PUT" style="display:inline;">
+                        <input type="hidden" name="_id" th:value="${acct.id()}">
+                        <button type="submit" class="btn btn-sm"
+                                th:classappend="${settings.allMembersGranted()} ? ' btn-outline' : ' btn--cta'"
+                                data-testid="org-unit-vis-all-members"
+                                th:text="${settings.allMembersGranted()} ? #{bank.orgUnit.settings.visibility.revoke} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
+                    </form>
+                </div>
+
+                <!-- Individual users -->
+                <div class="bank-vis-group">
+                    <span class="bank-kv-key" th:text="#{bank.orgUnit.settings.visibility.users}">Einzelne Nutzer</span>
+                    <ul class="bank-vis-users" th:if="${!#lists.isEmpty(settings.grantedUsers())}">
+                        <li th:each="u : ${settings.grantedUsers()}" data-testid="org-unit-vis-user-row">
+                            <span th:text="${u.displayName()}">greluc</span>
+                            <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                                  th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/user/' + ${u.userId()}"
+                                  data-method="DELETE" style="display:inline;">
+                                <input type="hidden" name="_id" th:value="${acct.id()}">
+                                <button type="submit" class="btn btn-ghost btn-sm"
+                                        th:text="#{bank.orgUnit.settings.visibility.user.remove}">Entfernen</button>
+                            </form>
+                        </li>
+                    </ul>
+                    <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                          data-endpoint="/api/proxy/org-units/bank/accounts/{id}/visibility/user/{userId}" data-method="POST">
+                        <input type="hidden" name="_id" th:value="${acct.id()}">
+                        <div class="bank-form-row">
+                            <label for="org-unit-vis-user-select" th:text="#{bank.orgUnit.settings.visibility.user.add}">Nutzer freigeben</label>
+                            <select id="org-unit-vis-user-select" name="_userId" required data-testid="org-unit-vis-user-select">
+                                <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
+                                <option th:each="usr : ${users}" th:value="${usr.id()}"
+                                        th:text="${usr.effectiveName() != null ? usr.effectiveName() : usr.username()}">greluc</option>
+                            </select>
+                            <span class="bank-field-error" data-error-for="_global"></span>
+                        </div>
+                        <button type="submit" class="btn btn--cta btn-sm" data-testid="org-unit-vis-user-add"
+                                th:text="#{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </th:block>
+    </div>
+
+    <!-- Booking history (Halter redacted, REQ-BANK-038). Paginated in place via krtFetch. -->
+    <div class="bank-panel mt-2" data-testid="org-unit-bank-bookings-panel">
+        <div class="bank-panel-head">
+            <h2 th:text="#{bank.detail.history}">Buchungshistorie</h2>
+        </div>
+        <div class="bank-panel-body">
+            <div id="org-unit-bank-bookings-results">
+            <th:block th:fragment="orgUnitBankBookings">
+            <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{bank.booking.date}">Datum</th>
+                        <th th:text="#{bank.booking.type}">Typ</th>
+                        <th th:text="#{bank.booking.note}">Notiz</th>
+                        <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="b : ${bookings.content()}" data-testid="org-unit-bank-booking-row">
+                        <td><span class="utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span></td>
+                        <td th:switch="${b.type()}">
+                            <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
+                            <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
+                            <span th:case="'TRANSFER'" class="chip"
+                                  th:text="#{bank.type.TRANSFER} + (${b.counterAccountNo() != null} ? (${b.amount().signum() < 0} ? ' &#8594; ' : ' &#8592; ') + ${b.counterAccountNo()} : '')">Transfer</span>
+                            <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
+                            <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
+                            <span th:case="*" class="chip" th:text="${b.type()}">?</span>
+                        </td>
+                        <td class="bank-note-cell" th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</td>
+                        <td class="text-right">
+                            <span class="bank-amount"
+                                  th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
+                                  th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
+                            <span class="bank-fee-note text-muted"
+                                  th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
+                                  th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr</span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
+               data-testid="org-unit-bank-bookings-empty" th:text="#{bank.detail.history.empty}">Noch keine Buchungen.</p>
+            <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+            </th:block>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statement export (REQ-BANK-038): period picker -> Halter-redacted PDF via the org-unit proxy. -->
+    <div class="krt-modal-overlay" id="org-unit-statement-modal" th:if="${detail.canExportStatement()}">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.statement.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.statement.title}">Kontoauszug exportieren</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="org-unit-statement-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-download-form no-track"
+                  th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/' + ${acct.id()} + '/statement',data-filename='kontoauszug-' + ${acct.accountNo()} + '.pdf',data-period-required=#{bank.error.periodRequired}">
+                <div class="krt-modal-body">
+                    <p class="bank-field-hint" th:text="#{bank.modal.statement.hint}">Zeitraum in deiner Lokalzeit.</p>
+                    <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
+                        <label for="org-unit-statement-from-date" th:text="#{bank.field.period.from}">Von</label>
+                        <input type="hidden" name="from">
+                        <div class="bank-datetime-row">
+                            <input type="date" id="org-unit-statement-from-date" class="date-part"
+                                   data-testid="org-unit-statement-from-date">
+                            <input type="time" id="org-unit-statement-from-time" class="time-part"
+                                   th:aria-label="#{bank.field.period.from}">
+                        </div>
+                        <span class="bank-field-error" data-error-for="from"></span>
+                    </div>
+                    <div class="bank-form-row datetime-split-group" data-datetime-filter-role="end">
+                        <label for="org-unit-statement-to-date" th:text="#{bank.field.period.to}">Bis</label>
+                        <input type="hidden" name="to">
+                        <div class="bank-datetime-row">
+                            <input type="date" id="org-unit-statement-to-date" class="date-part"
+                                   data-testid="org-unit-statement-to-date">
+                            <input type="time" id="org-unit-statement-to-time" class="time-part"
+                                   th:aria-label="#{bank.field.period.to}">
+                        </div>
+                        <span class="bank-field-error" data-error-for="to"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="org-unit-statement-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="org-unit-statement-submit"
+                            th:text="#{bank.modal.statement.submit}">PDF herunterladen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:attr="nonce=${cspNonce}">
+    // Booking-history pager -> in-place swap (REQ-FE-002): the page-btn links point at
+    // /org-unit-bank/accounts/{id}?page=N; krtFetch re-renders only #org-unit-bank-bookings-results
+    // via fragment=orgUnitBankBookings, re-localising .utc-time cells on krt:swapped.
+    function bindOrgUnitBankBookingsPager() {
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({
+                container: '#org-unit-bank-bookings-results',
+                fragmentValue: 'orgUnitBankBookings',
+                history: true
+            });
+        }
+    }
+    bindOrgUnitBankBookingsPager();
+    document.addEventListener('krt:swapped', bindOrgUnitBankBookingsPager);
+</script>
+</body>
+</html>

@@ -108,6 +108,10 @@
                                     th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-name=${a.name()}"
                                     data-testid="bank-rename-open" th:text="#{bank.manage.account.rename}">Umbenennen</button>
                             <button type="button" class="btn btn-ghost btn-sm"
+                                    data-trigger="open-modal-display" data-modal-id="bank-target-modal"
+                                    th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-target=${a.balanceTarget() != null ? a.balanceTarget().toBigInteger() : ''}"
+                                    data-testid="bank-target-open" th:text="#{bank.manage.account.target}">Zielkontostand</button>
+                            <button type="button" class="btn btn-ghost btn-sm"
                                     th:if="${a.status() == 'ACTIVE' and a.balance().signum() == 0}"
                                     data-trigger="open-modal-display" data-modal-id="bank-close-modal"
                                     th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
@@ -281,6 +285,38 @@
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
                             data-modal-id="bank-rename-modal" th:text="#{general.cancel}">Abbrechen</button>
                     <button type="submit" class="btn btn--cta" data-testid="bank-rename-submit"
+                            th:text="#{general.save}">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Set / clear balance target (REQ-BANK-036): bank staff with access to the account. -->
+    <div class="krt-modal-overlay" id="bank-target-modal">
+        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.target.title}">
+            <div class="krt-modal-head">
+                <h3 th:text="#{bank.modal.target.title}">Zielkontostand</h3>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="bank-target-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+            </div>
+            <form class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/accounts/{id}/balance-target" data-method="PATCH">
+                <input type="hidden" name="_id">
+                <input type="hidden" name="version">
+                <div class="krt-modal-body">
+                    <div class="bank-form-row">
+                        <label for="bank-target-amount" th:text="#{bank.orgUnit.field.target}">Zielkontostand (aUEC)</label>
+                        <input type="number" id="bank-target-amount" name="target" min="1" step="1"
+                               data-testid="bank-target-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                        <span class="bank-field-hint" th:text="#{bank.orgUnit.settings.target.clearHint}">Leer lassen und speichern entfernt das Ziel.</span>
+                        <span class="bank-field-error" data-error-for="target"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-target-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-target-submit"
                             th:text="#{general.save}">Speichern</button>
                 </div>
             </form>

@@ -411,6 +411,7 @@ class BankPageControllerTest {
         null,
         null,
         new BigDecimal(balance),
+        null,
         0L,
         Instant.parse("2026-01-15T10:00:00Z"));
   }

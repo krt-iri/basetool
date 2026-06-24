@@ -303,6 +303,14 @@ contributes nothing to the anonymous/guest surface (consistent with REQ-SEC-009)
 endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
 `/api/v1/bank/admin/**` additionally gets a `hasRole('ADMIN')` URL gate.
 
+> **Amendment (REQ-BANK-034..038):** the "members see nothing" rule is further relaxed on the
+> **org-unit** surface only (never the bank-staff surface, which stays grant/role-driven and
+> org-unit-blind). A KRT member now sees, on the org-unit bank page, the accounts they are entitled to
+> view — the cartel/KRT account (all members), an account their responsible holder has granted them,
+> and (for OL/Bereichsleiter) Sonderkonten — including a **read-only detail with the transaction
+> history and a Halter-redacted Kontoauszug** (REQ-BANK-035/-037/-038). They still cannot book; player
+> custody is redacted from their view.
+
 **Acceptance**
 
 - [x] A role/permission matrix test (mirroring `RolePermissionsE2eTest`) proves every
@@ -342,8 +350,12 @@ is the global holder→holder Umbuchung (REQ-BANK-031), not a transfer.
 Every bank mutation writes exactly one row to an **insert-only** audit table
 (`bank_audit_event`, modeled after `external_sync_report` — no `@Version`, no updates):
 bookings of every type, reversals, account lifecycle (create/close/reopen), holder
-registry changes, every grant change, the wipe reset, and **PDF exports** (statement and
-management export, with parameters). Each event stores: timestamp, actor user id (FK
+registry changes, every grant change, the wipe reset, **PDF exports** (statement and
+management export, with parameters), and — since REQ-BANK-035/-036 — **balance-target**
+changes (`BALANCE_TARGET_SET` / `BALANCE_TARGET_CLEARED`) and **balance-visibility** grants
+(`BALANCE_VISIBILITY_GRANTED` / `BALANCE_VISIBILITY_REVOKED`, with the grantee kind/role code in
+the details payload and the target user id for individual-user grants — no free text, no PII).
+Each event stores: timestamp, actor user id (FK
 `ON DELETE SET NULL`) **plus** a denormalized actor handle snapshot (the trail must
 survive user deletion), event type, affected account/transaction/target-user references,
 and a compact details payload. The audit log is readable **only by admins**
@@ -566,6 +578,14 @@ org-unit-blind.
 > windowed posting-slice query (no per-account N+1) via the shared `BankTrendCalculator` /
 > `BankSparkline` helpers, so both surfaces stay identical. This stays balance-/aggregate-only — it
 > still exposes no transaction history, holders or audit.
+>
+> **Amendment (REQ-BANK-035/-037/-038):** the page is no longer balance-only. The visible set now also
+> includes accounts the responsible holder has **granted** the caller (REQ-BANK-035) and the
+> all-members cartel account (REQ-BANK-037), so the page is reachable by any KRT member (not just
+> officers/leads). Clicking a visible card opens a **read-only account detail with the transaction
+> history and a Halter-redacted Kontoauszug** (REQ-BANK-038) — booking actions stay out; the history
+> and statement are no longer a bank-staff-only surface for these viewers, but player custody is
+> redacted.
 
 **Acceptance**
 
@@ -788,6 +808,14 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
   account (org-unit *or* special) is filtered out, so the org-unit bank page always shows live
   accounts. Closing rules and the bank-staff view of closed accounts are unchanged (REQ-BANK-002/-010).
 
+> **Amendment (REQ-BANK-037, owner-approved tightening):** the Sonderkonto auto-view is narrowed from
+> "any Bereich/OL oversight seat" to **OL members and `BEREICHSLEITER` only** (plus bank staff/admin) —
+> Bereichskoordinatoren and Bereichsoperatoren no longer auto-see Sonderkonten. On top of that, OL
+> members or bank management may **grant** further Sonderkonto visibility (global roles / all members /
+> individual users, REQ-BANK-035), and a Sonderkonto now supports the read-only drill-in + statement
+> (REQ-BANK-038), not just a balance card. The seam helper is `currentUserIsOlMember()` /
+> `currentUserIsBereichsleiter()` (not the broader `currentUserHasAreaOrOlOversight()`).
+
 **Acceptance**
 
 - [x] A Bereich/OL overseer (or admin) sees the active `SPECIAL` accounts, view-only (`canRequest`
@@ -964,6 +992,97 @@ bank staff are never out of pocket (ADR-0041):
   is the shared `operation.transfer_fee_rate`.
 
 **Enforced by:** `BankLedgerServiceTest` (fee carve-out, net to destination, same-holder fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService`, `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md) · **Issues:** #556
+
+### REQ-BANK-034 — Per-account responsible holder (derived, "Kontoverantwortliche/r")
+
+Every org-unit bank account has a **derived responsible holder** — never a free assignment, always a
+function of org-unit leadership, so it follows the role automatically (epic #800, REQ-ROLE-002):
+
+|         Account (type / owner)          |                   Responsible holder                    |
+|-----------------------------------------|---------------------------------------------------------|
+| Staffelkonto (`ORG_UNIT` / Squadron)    | the `STAFFELLEITER` of that Staffel                     |
+| SK-Konto (`ORG_UNIT` / Spezialkommando) | the `SK_LEAD` of that Spezialkommando                   |
+| Bereichskonto (`AREA` / Bereich)        | the `BEREICHSLEITER` of that Bereich                    |
+| OL/KRT-Konto (`CARTEL` / OL)            | **all** `OL_MEMBER`s collegially                        |
+| Kartellbankkonto (`CARTEL_BANK`)        | the `BEREICHSLEITER` of any `Department.PROFIT` Bereich |
+| Sonderkonto (`SPECIAL`)                 | none                                                    |
+
+The responsible holder may set the account's balance target (REQ-BANK-036) and configure who else may
+view it (REQ-BANK-035). Resolution stays inside the `OrgUnitBankAccessService` seam (org-unit-aware);
+the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the code calls this
+*responsible* (never "holder"/"Halter"), to avoid colliding with the aUEC-custody `BankHolder`
+(ADR-0039); the German UI uses "Kontoverantwortliche/r".
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial) · **Code:** `service/OrgUnitBankAccessService`, `repository/BereichRepository#findByDepartment`, `service/OwnerScopeService` (membership helpers) · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+
+### REQ-BANK-035 — Configurable balance visibility
+
+The responsible holder may open up an account's balance **and** read-only detail (REQ-BANK-038) to
+users who would not otherwise see it, via additive `bank_account_view_grant` rows (V189). The grant
+*audiences* depend on the account's owning org unit:
+
+- **Staffelkonto:** the squadron sub-ranks `KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` / `ENSIGN` (each
+  separately), all Staffel members, or named individual users.
+- **SK-Konto:** all SK members, or named individual users (no sub-ranks).
+- **Bereichskonto:** `BEREICHSKOORDINATOR` / `BEREICHSOPERATOR` (each separately), all Bereich members,
+  or named individuals.
+- **Sonderkonto (`SPECIAL`):** global roles (e.g. all officers), all KRT members, or named individuals;
+  configured by **OL members or bank management** (REQ-BANK-037).
+- **OL/KRT-Konto (`CARTEL`)** and **`CARTEL_BANK`** carry no configurable visibility (their audiences are
+  fixed by REQ-BANK-037).
+
+A grant grants *view* only — booking stays a bank-staff surface (REQ-BANK-008/-010). View grants are
+distinct from the bank-staff capability `bank_account_grant`. Toggling a grant is an idempotent
+insert/delete and is audited (REQ-BANK-012). The org-unit bank page is reachable by any KRT member; the
+seam scopes the visible accounts per caller.
+
+**Admin override:** an admin may configure the visibility of **every** account whose visibility is
+configurable (Staffel/SK/Bereich/Sonderkonto), without being the responsible holder. The fixed `CARTEL`
+(always all-members) and `CARTEL_BANK` (internal) audiences stay fixed (REQ-BANK-037) — there is nothing
+to configure there, not even for an admin.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / global-role for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest` · **Code:** `model/BankAccountViewGrant`, `repository/BankAccountViewGrantRepository`, `service/OrgUnitBankAccessService`, `controller/OrgUnitBankController`, `db/migration/V189`, frontend `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+
+### REQ-BANK-036 — Balance target ("Kontostandsziel")
+
+An account may carry an optional **balance target** (`bank_account.balance_target`, V189) — an
+aspirational fill goal shown with progress to everyone who may view the balance. It is settable by the
+account's responsible holder (REQ-BANK-034) **and** by bank staff with access to the account (and by an
+admin on any account); for a Sonderkonto the target is bank-staff-only for non-admins. Setting/clearing
+it echoes the account's `@Version` (the
+target shares the row's optimistic lock with rename/close — both infrequent) and is audited
+(`BALANCE_TARGET_SET` / `BALANCE_TARGET_CLEARED`). The target enforces nothing; it is a display goal.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (holder-only set, version check), `BankAccountServiceTest` (bank-staff set/clear + audit) · **Code:** `model/BankAccount#balanceTarget`, `service/OrgUnitBankAccessService#setBalanceTarget`, `service/BankAccountService#setBalanceTarget`, `controller/OrgUnitBankController` / `BankAccountController`, `db/migration/V189` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+
+### REQ-BANK-037 — Fixed cartel/special visibility (KRT account & Sonderkonten)
+
+Two account groups have **fixed** (non-holder-configurable) visibility on the org-unit bank page:
+
+- **OL/KRT-Konto (`CARTEL`):** its balance and read-only detail are **always visible to every KRT
+  member** (`isMemberOrAbove`); the OL collegially holds it (REQ-BANK-034) and sets its target.
+- **Kartellbankkonto (`CARTEL_BANK`):** visible only to its responsible holder (the Profit-Bereichsleiter)
+  and to bank staff via the bank surface; not broadcast to members.
+- **Sonderkonten (`SPECIAL`):** auto-visible to bank staff/admin **and** every `OL_MEMBER` **and** every
+  `BEREICHSLEITER`; additionally configurable by OL members or bank management (REQ-BANK-035). This
+  **tightens** the prior REQ-BANK-028 rule (which granted SPECIAL to all Bereich oversight ranks):
+  Bereichskoordinatoren/-operatoren and officers no longer auto-see Sonderkonten.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `service/OrgUnitBankAccessService#canView`, `service/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+
+### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
+
+A caller who may view an account (REQ-BANK-035/-037) may open a **read-only copy of the bank-staff
+account detail** from the org-unit bank page: the account header, the balance + target, the 30-day
+delta, the booking count and the **paginated transaction history** — plus a **Kontoauszug (PDF)**
+export. No deposit/withdrawal/transfer/reversal is possible (capabilities are all-false; only the
+own-level booking *request* of REQ-BANK-022 remains). The **player-custody ("Halter") column is
+redacted**: the backend nulls the holder/counter-holder handles on the booking rows before they cross
+the wire, and the statement PDF is rendered without the Halter column. Bank staff keep the full,
+non-redacted detail and statement (REQ-BANK-014). Authorization is enforced in the seam, which then
+reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankStatementReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ## Out of scope
 

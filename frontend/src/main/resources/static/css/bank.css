@@ -673,3 +673,54 @@ tr.is-inert td {
         grid-template-columns: repeat(4, 1fr);
     }
 }
+
+/* Balance-target progress (REQ-BANK-036) and org-unit visibility settings (REQ-BANK-035). */
+.bank-target-bar {
+    width: 100%;
+    height: 6px;
+    margin-top: 0.35rem;
+    overflow: hidden;
+    background: var(--color-surface-input);
+    border: var(--border-hairline);
+    border-radius: 2px;
+}
+
+.bank-target-bar-fill {
+    height: 100%;
+    background: var(--color-primary);
+}
+
+.bank-vis-group {
+    margin-top: 0.75rem;
+}
+
+.bank-vis-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+}
+
+.bank-vis-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+}
+
+.bank-vis-users {
+    margin: 0.35rem 0;
+    padding: 0;
+    list-style: none;
+}
+
+.bank-vis-users li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    border-bottom: var(--border-hairline);
+}

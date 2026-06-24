@@ -332,6 +332,38 @@ public class BankAccountService {
   }
 
   /**
+   * Sets or clears an account's balance target ("Kontostandsziel", REQ-BANK-036) from the bank
+   * surface. A {@code null} target clears the goal. Gated at the controller to bank staff with
+   * access to the account ({@code BankSecurityService.canSee}); the org-unit responsible holder
+   * sets the target through the {@code OrgUnitBankAccessService} seam instead. Audited either way.
+   *
+   * @param accountId the account
+   * @param target the new target, or {@code null} to clear it (a present target is a positive whole
+   *     amount, validated on the request)
+   * @param version the echoed optimistic-locking version
+   * @return the updated account incl. its balance
+   * @throws NotFoundException when the account does not exist
+   * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
+   */
+  @Transactional
+  public BankAccountDto setBalanceTarget(
+      @NotNull UUID accountId, @Nullable BigDecimal target, @NotNull Long version) {
+    BankAccount account = requireAccount(accountId);
+    requireVersionMatch(account, version);
+    account.setBalanceTarget(target);
+    BankAccount saved = accountRepository.save(account);
+    bankAuditService.record(
+        target == null
+            ? BankAuditEventType.BALANCE_TARGET_CLEARED
+            : BankAuditEventType.BALANCE_TARGET_SET,
+        saved.getId(),
+        null,
+        null,
+        target == null ? null : "target=" + target.stripTrailingZeros().toPlainString());
+    return bankAccountMapper.toDto(saved, postingRepository.accountBalance(accountId));
+  }
+
+  /**
    * Closes an account (REQ-BANK-002): requires a zero balance — transfer the remainder first. The
    * closed account stays fully readable with its history; only postings are rejected.
    *

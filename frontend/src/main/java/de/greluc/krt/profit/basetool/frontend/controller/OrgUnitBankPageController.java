@@ -19,8 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountDetailDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,34 +38,41 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Renders the org-unit officer/lead bank view (epic #666 F1/F2): the balance-only cards of the
- * accounts the caller oversees, the request form to raise a confirm-before-post deposit/withdrawal,
- * and the caller's own request list with a cancel action. This is the org-unit-facing surface —
- * gated to leadership roles, deliberately <em>not</em> {@code BANK_EMPLOYEE}; the backend's
- * oversight scope decides the actual data (a caller who oversees nothing sees an empty page). The
- * booking actions are AJAX writes via {@code /api/proxy/org-units/bank/**} that swap the {@code
- * orgUnitBank} fragment in place (no reload, REQ-FE-005).
+ * Renders the org-unit bank view (epic #666 + REQ-BANK-034..038): the balance cards of every
+ * account the caller may view, the read-only account drill-in (history + Halter-redacted
+ * statement), the responsible-holder/OL settings (balance target + configurable visibility), and
+ * the officer/lead booking-request flow. This is the org-unit-facing surface — reachable by any KRT
+ * member (the cartel account is visible to all, REQ-BANK-037, and a member may have been granted
+ * access to other accounts), deliberately <em>not</em> {@code BANK_EMPLOYEE}; the backend seam
+ * decides the actual data per account. Booking/settings writes are AJAX swaps via {@code
+ * /api/proxy/org-units/bank/**} (no reload, REQ-FE-005).
  */
 @Controller
 @RequiredArgsConstructor
 @Slf4j
 public class OrgUnitBankPageController {
 
+  /** Any KRT member (or above) may reach the page; the backend seam scopes the data per account. */
+  private static final String MEMBER_OR_ABOVE =
+      "hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','SQUADRON_MEMBER','MEMBER')";
+
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the page (or its {@code orgUnitBank} fragment for an in-place swap after a write).
+   * Renders the overview page (or its {@code orgUnitBank} fragment for an in-place swap after a
+   * booking write).
    *
    * @param fragment when {@code "orgUnitBank"} only the balances + own-request region is
-   *     re-rendered (AJAX swap after create/cancel); otherwise the full page is returned
+   *     re-rendered
    * @param model Spring MVC model
    * @return the template, or its {@code orgUnitBank} fragment view
    */
   @GetMapping("/org-unit-bank")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'LOGISTICIAN', 'MISSION_MANAGER')")
+  @PreAuthorize(MEMBER_OR_ABOVE)
   public String orgUnitBank(@RequestParam(required = false) String fragment, Model model) {
     List<OrgUnitBankBalanceDto> balances =
         backendApiClient.get(
@@ -83,10 +95,70 @@ public class OrgUnitBankPageController {
   }
 
   /**
+   * Renders the read-only account drill-in (REQ-BANK-038) — history (Halter redacted) + the
+   * Kontoauszug export — plus, for the responsible holder / OL, the settings region (balance target
+   * + configurable visibility). The {@code orgUnitBankBookings} fragment re-renders the paginated
+   * history in place; the {@code orgUnitBankSettings} fragment re-renders the facts + settings
+   * region after a target/visibility write.
+   *
+   * @param id the account id
+   * @param page zero-based booking-history page index
+   * @param fragment {@code "orgUnitBankBookings"} (pager swap) or {@code "orgUnitBankSettings"}
+   *     (settings swap), else the full page
+   * @param model Spring MVC model
+   * @return the template, or one of its fragment views
+   */
+  @GetMapping("/org-unit-bank/accounts/{id}")
+  @PreAuthorize(MEMBER_OR_ABOVE)
+  public String orgUnitBankAccount(
+      @PathVariable UUID id,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    OrgUnitBankAccountDetailDto detail =
+        backendApiClient.get(
+            "/api/v1/org-units/bank/accounts/" + id, OrgUnitBankAccountDetailDto.class);
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    PageResponse<BankBookingDto> bookings =
+        backendApiClient.get(
+            "/api/v1/org-units/bank/accounts/" + id + "/transactions?page=" + effectivePage,
+            new ParameterizedTypeReference<PageResponse<BankBookingDto>>() {});
+    model.addAttribute("detail", detail);
+    model.addAttribute("bookings", bookings);
+    model.addAttribute("paginationBaseUrl", "/org-unit-bank/accounts/" + id);
+
+    boolean canManage =
+        detail != null && (detail.canSetTarget() || detail.canConfigureVisibility());
+    OrgUnitBankAccountSettingsDto settings = null;
+    List<UserReferenceDto> users = List.of();
+    if (canManage) {
+      settings =
+          backendApiClient.get(
+              "/api/v1/org-units/bank/accounts/" + id + "/settings",
+              OrgUnitBankAccountSettingsDto.class);
+      if (detail.canConfigureVisibility()) {
+        List<UserReferenceDto> lookup =
+            backendApiClient.get(
+                "/api/v1/users/lookup",
+                new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+        users = lookup == null ? List.<UserReferenceDto>of() : lookup;
+      }
+    }
+    model.addAttribute("settings", settings);
+    model.addAttribute("users", users);
+
+    if ("orgUnitBankBookings".equals(fragment)) {
+      return "org-unit-bank-account-detail :: orgUnitBankBookings";
+    }
+    if ("orgUnitBankSettings".equals(fragment)) {
+      return "org-unit-bank-account-detail :: orgUnitBankSettings";
+    }
+    return "org-unit-bank-account-detail";
+  }
+
+  /**
    * Pre-scales each balance card's 30-day end-of-day series into its SVG sparkline polyline ({@link
-   * BankSparkline}), keyed by account id — Thymeleaf should not carry the scaling logic, and keying
-   * by account id lets the template look the spark up per card the same way the bank-detail page
-   * reads its distribution percents.
+   * BankSparkline}), keyed by account id.
    *
    * @param balances the visible balance cards (never {@code null})
    * @return account id to its scaled sparkline; same iteration order as {@code balances}

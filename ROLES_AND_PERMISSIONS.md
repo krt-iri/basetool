@@ -518,6 +518,38 @@ berechtigten Bank-MA per In-App-Benachrichtigung informiert (REQ-BANK-026,
 (409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). Das Audit-Log bleibt Admin-only. Die Seite zeigt
 ausschließlich **aktive** Konten (REQ-BANK-028).
 
+#### 3.11.2 Kontoverantwortung, Sichtbarkeit, Ziel & Read-only-Detail (REQ-BANK-034..038)
+
+Aufbauend auf 3.11.1 und weiterhin allein über den Seam `OrgUnitBankAccessService`
+(die Bank bleibt OrgUnit-blind, ADR-0011/0043, beide ArchUnit-Pins grün). Die
+Org-Einheits-Bankseite ist jetzt für **jedes KRT-Mitglied** erreichbar; der Seam
+entscheidet pro Konto, was sichtbar ist.
+
+- **Kontoverantwortliche/r (abgeleitet, REQ-BANK-034):** Staffelkonto → Staffelleiter,
+  SK-Konto → SK-Leiter, Bereichskonto → Bereichsleiter, OL/KRT-Konto (`CARTEL`) → alle
+  OL-Mitglieder, Kartellbankkonto (`CARTEL_BANK`) → Bereichsleiter des Profit-Bereichs;
+  Sonderkonto: keiner. Wird aus der Rolle abgeleitet, nicht zugewiesen.
+- **Sichtbarkeit konfigurieren (REQ-BANK-035):** die/der Verantwortliche gibt zusätzlich
+  Unter-Rollen (je einzeln), alle Mitglieder oder einzelne Nutzer frei. Sonderkonten:
+  globale Rollen / alle Mitglieder / einzelne Nutzer — konfiguriert durch **OL-Mitglieder
+  oder Bankleitung**.
+- **Feste Sichtbarkeit (REQ-BANK-037):** `CARTEL`/KRT-Konto immer für **alle KRT-Mitglieder**;
+  `CARTEL_BANK` nur Verantwortliche/r + Bankpersonal; Sonderkonten automatisch für
+  Bankpersonal **+ alle OL-Mitglieder + alle Bereichsleiter** (Bereichskoordinatoren/-operatoren
+  und Offiziere **nicht** mehr — Verschärfung von REQ-BANK-028).
+- **Kontostandsziel (REQ-BANK-036):** setzt die/der Verantwortliche **und** zugriffsberechtigte
+  Bank-MA (bei Sonderkonten nur Bankpersonal).
+- **Read-only-Detail + Kontoauszug (REQ-BANK-038):** wer ein Konto sehen darf, öffnet die
+  schreibgeschützte Detailansicht **mit Historie** und kann einen **Kontoauszug** abrufen — keine
+  Ein-/Aus-/Umbuchung; die **Halter-Spalte ist redigiert** (in Tabelle und PDF). Bankpersonal
+  behält die volle Ansicht inkl. Halter.
+
+| Funktion (Gate)                                                                                                    | Member (mit Freigabe) | Verantwortl. | Bank-MA (Zugriff) | Admin |
+|:-------------------------------------------------------------------------------------------------------------------|:---------------------:|:------------:|:-----------------:|:-----:|
+| Kontostand + Read-only-Detail + Kontoauszug sehen (`/api/v1/org-units/bank/accounts/{id}`, Halter redigiert)       |  ✅ (soweit sichtbar)  |      ✅       |   ✅ (Bankseite)   |   ✅   |
+| Sichtbarkeit konfigurieren (`/api/v1/org-units/bank/accounts/{id}/visibility/**`)                                  |           ❌           |      ✅       | ✅ nur Sonderkonto |   ✅   |
+| Kontostandsziel setzen/entfernen (`…/balance-target` Org-Einheit bzw. `/api/v1/bank/accounts/{id}/balance-target`) |           ❌           |      ✅       |    ✅ (Zugriff)    |   ✅   |
+
 ---
 
 ## 4. Mehr-OrgUnit-Sichtbarkeit (Scoping)
