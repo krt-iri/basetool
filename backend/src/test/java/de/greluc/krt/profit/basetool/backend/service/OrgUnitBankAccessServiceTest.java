@@ -394,6 +394,22 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
+  void getViewableAccountDetail_deniedWhenCallerMayNotView() {
+    // The backend endpoint is only isAuthenticated()-gated (it diverges from the page controller's
+    // MEMBER_OR_ABOVE gate), so a non-member — e.g. a GUEST hitting GET
+    // /api/v1/org-units/bank/accounts/{id} directly — must be stopped by the seam's canView guard
+    // before any account detail is loaded.
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+
+    assertThrows(AccessDeniedException.class, () -> service.getViewableAccountDetail(accountId));
+    verify(bankAccountService, never()).getAccountDetail(any(), any());
+  }
+
+  @Test
   void exportViewableStatement_authorizesAndPassesRedactionFlag() {
     // REQ-BANK-038: the seam authorizes view access, then asks for the Halter-redacted variant.
     UUID staffelId = UUID.randomUUID();
