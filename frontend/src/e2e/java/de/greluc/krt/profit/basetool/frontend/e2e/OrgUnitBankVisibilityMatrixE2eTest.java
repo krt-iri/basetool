@@ -282,15 +282,25 @@ class OrgUnitBankVisibilityMatrixE2eTest {
   @Test
   void drillInDetailHistoryOmitsHalterColumn() {
     // The read-only drill-in history must NOT carry the Halter (player-custody) column
-    // (REQ-BANK-038):
-    // the booking table has exactly four columns (Datum / Typ / Notiz / Betrag).
+    // (REQ-BANK-038): once at least one booking exists the table renders with exactly four columns
+    // (Datum / Typ / Notiz / Betrag) and no Halter column. A fresh, booked Sonderkonto keeps the
+    // shared fixtures untouched; a Bereichsleiter auto-views it. (The empty-state shows no table at
+    // all — th:if on a non-empty page — so a seeded booking is required to assert the redaction.)
+    String special =
+        seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Drill SK", "SPECIAL");
+    String holderId = seeder.registerBankHolder(MGMT_USER, MGMT_PASSWORD, memberUserId);
+    assertEquals(
+        201,
+        seeder.bankDeposit(MGMT_USER, MGMT_PASSWORD, special, holderId, 4242),
+        "a booking is seeded so the drill-in history table renders");
+
     String baseUrl = STACK.baseUrl();
     try (BrowserContext context =
         browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, BEREICH_USER, BEREICH_PASSWORD);
-        E2eSupport.navigate(page, baseUrl + "/org-unit-bank/accounts/" + specialAccountId);
+        E2eSupport.navigate(page, baseUrl + "/org-unit-bank/accounts/" + special);
         page.waitForLoadState();
         assertThat(page.locator("[data-testid='org-unit-bank-bookings-panel']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
@@ -324,7 +334,8 @@ class OrgUnitBankVisibilityMatrixE2eTest {
 
   /**
    * Reads the optimistic-locking version of a bank account via the management detail endpoint, so a
-   * balance-target write can echo it.
+   * balance-target write can echo it. {@code GET /api/v1/bank/accounts/{id}} returns a {@code
+   * BankAccountDetailDto}, so the {@code version} lives on the nested {@code account} object.
    *
    * @param username a username that may read the account (admin / management)
    * @param password the password
@@ -335,6 +346,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
     return JsonParser.parseString(
             seeder.getBody(username, password, "/api/v1/bank/accounts/" + accountId))
         .getAsJsonObject()
+        .getAsJsonObject("account")
         .get("version")
         .getAsLong();
   }
