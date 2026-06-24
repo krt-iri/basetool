@@ -105,7 +105,7 @@ class OfficerRefineryAccessTest {
             null,
             null,
             null,
-            Set.of("MEMBER"),
+            Set.of("KRT_MEMBER"),
             Collections.emptySet(),
             null,
             false,

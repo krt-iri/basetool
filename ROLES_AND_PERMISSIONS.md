@@ -177,7 +177,7 @@ Admins und Officer erfüllen damit automatisch jeden `LOGISTICIAN`- und
 |:--------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Admin**           | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie) |
 | **Officer**         | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie)                |
-| **Squadron Member** | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`                                                                                                                     |
+| **KRT Member**      | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`                                                                                                                     |
 | **Guest**           | *(keine — leeres Set)*                                                                                                                                            |
 | **Bank Employee**   | *(keine — die Feinrechte sind app-verwaltete Grant-Zeilen, REQ-BANK-009)*                                                                                         |
 | **Bank Management** | *(keine — Sichtbarkeit "alles" kommt aus der Rolle selbst, ADR-0011)*                                                                                             |
@@ -219,11 +219,31 @@ darf ein Lead die **Mitglieder seines SK verwalten** (hinzufügen/entfernen/Flag
 setzen bleibt **Admin-only** (Lead kann sich nicht selbst eskalieren). Kein
 Carry-over auf andere SKs.
 
+### Operative OFFICER-Vergabe (Führung & Bank)
+
+Die `OFFICER`-Keycloak-Rolle wird **operativ** (manuell, vgl. §1) zusätzlich zur
+OrgUnit-Mitgliedschaft vergeben:
+
+- **Alle Angehörigen der Organisationsleitung, der Bereichsleitung und jedes
+  Spezialkommandos erhalten `OFFICER`.** So erfüllen sie die `hasRole('OFFICER')`-Gates
+  des Frontends (z. B. die Seite „Leitung"). Das Backend wertet die Reichweite trotzdem
+  **mitgliedschaftsbasiert** über den `OwnerScopeService` aus (Aufsichtsscope,
+  Verantwortlicher) — `OFFICER` öffnet nur die rollengegateten Oberflächen, **nicht** die
+  kontextuelle Datenreichweite.
+- **Die Bankleitung (`BANK_MANAGEMENT`) hält ebenfalls `OFFICER`.** **Bankmitarbeiter
+  (`BANK_EMPLOYEE`)** haben **mindestens `KRT Member`** (MEMBER), aber **nicht
+  zwingend `OFFICER`** — die Bank-Gates greifen ausschließlich auf `BANK_*` (REQ-BANK-007),
+  nie auf `OFFICER`.
+- **Konsequenz für die Bank:** Weil Offiziere **und** SK-Leads `OFFICER` tragen, entscheidet
+  die Sonderkonto-Auto-Sicht (`SPECIAL`, REQ-BANK-037) **per Mitgliedschaft** (OL-Mitglied
+  bzw. Bereichsleiter), **nie** über die `OFFICER`-Rolle — Offiziere/SK-Leads sehen
+  Sonderkonten daher **nicht** automatisch, sondern nur über eine explizite Freigabe.
+
 ---
 
 ## 3. Zugriffsmatrix nach Funktionsbereich
 
-Spalten: **Anonym** = nicht eingeloggt · **Member** = Squadron Member ·
+Spalten: **Anonym** = nicht eingeloggt · **Member** = KRT Member ·
 **Log.** = Member + Logistician-Flag · **MM** = Member + Mission-Manager-Flag ·
 **Officer** · **Admin**.
 
@@ -372,7 +392,7 @@ und ein Guest wird hier wie ein anonymer Besucher behandelt.
 | Finanz-Einträge einer Mission lesen (`isMemberOrAbove` + `canSeeMission`)               |   ❌²   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Finanz-Eintrag **anlegen** (`isMemberOrAbove` + `canSeeMission`)                        |   ❌²   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Finanz-Eintrag bearbeiten/löschen (`canEditFinanceEntry`: Owner **oder** Officer/Admin) |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |    ✅    |   ✅   |
-| Profit-Kalkulation lesen (`hasAnyRole('SQUADRON_MEMBER','MEMBER','OFFICER','ADMIN')`)   |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Profit-Kalkulation lesen (`hasAnyRole('KRT_MEMBER','OFFICER','ADMIN')`)                 |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Material-Übersicht / Material-Collection eines Auftrags (`isAuthenticated()`)           |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ¹ Nur eigener Eintrag und nur solange weiterhin Teilnehmer der Mission.
@@ -518,6 +538,38 @@ berechtigten Bank-MA per In-App-Benachrichtigung informiert (REQ-BANK-026,
 (409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). Das Audit-Log bleibt Admin-only. Die Seite zeigt
 ausschließlich **aktive** Konten (REQ-BANK-028).
 
+#### 3.11.2 Kontoverantwortung, Sichtbarkeit, Ziel & Read-only-Detail (REQ-BANK-034..038)
+
+Aufbauend auf 3.11.1 und weiterhin allein über den Seam `OrgUnitBankAccessService`
+(die Bank bleibt OrgUnit-blind, ADR-0011/0043, beide ArchUnit-Pins grün). Die
+Org-Einheits-Bankseite ist jetzt für **jedes KRT-Mitglied** erreichbar; der Seam
+entscheidet pro Konto, was sichtbar ist.
+
+- **Kontoverantwortliche/r (abgeleitet, REQ-BANK-034):** Staffelkonto → Staffelleiter,
+  SK-Konto → SK-Leiter, Bereichskonto → Bereichsleiter, OL/KRT-Konto (`CARTEL`) → alle
+  OL-Mitglieder, Kartellbankkonto (`CARTEL_BANK`) → Bereichsleiter des Profit-Bereichs;
+  Sonderkonto: keiner. Wird aus der Rolle abgeleitet, nicht zugewiesen.
+- **Sichtbarkeit konfigurieren (REQ-BANK-035):** die/der Verantwortliche gibt zusätzlich
+  Unter-Rollen (je einzeln), alle Mitglieder oder einzelne Nutzer frei. Sonderkonten:
+  globale Rollen / alle Mitglieder / einzelne Nutzer — konfiguriert durch **OL-Mitglieder
+  oder Bankleitung**.
+- **Feste Sichtbarkeit (REQ-BANK-037):** `CARTEL`/KRT-Konto immer für **alle KRT-Mitglieder**;
+  `CARTEL_BANK` nur Verantwortliche/r + Bankpersonal; Sonderkonten automatisch für
+  Bankpersonal **+ alle OL-Mitglieder + alle Bereichsleiter** (Bereichskoordinatoren/-operatoren
+  und Offiziere **nicht** mehr — Verschärfung von REQ-BANK-028).
+- **Kontostandsziel (REQ-BANK-036):** setzt die/der Verantwortliche **und** zugriffsberechtigte
+  Bank-MA (bei Sonderkonten nur Bankpersonal).
+- **Read-only-Detail + Kontoauszug (REQ-BANK-038):** wer ein Konto sehen darf, öffnet die
+  schreibgeschützte Detailansicht **mit Historie** und kann einen **Kontoauszug** abrufen — keine
+  Ein-/Aus-/Umbuchung; die **Halter-Spalte ist redigiert** (in Tabelle und PDF). Bankpersonal
+  behält die volle Ansicht inkl. Halter.
+
+| Funktion (Gate)                                                                                                    | Member (mit Freigabe) | Verantwortl. | Bank-MA (Zugriff) | Admin |
+|:-------------------------------------------------------------------------------------------------------------------|:---------------------:|:------------:|:-----------------:|:-----:|
+| Kontostand + Read-only-Detail + Kontoauszug sehen (`/api/v1/org-units/bank/accounts/{id}`, Halter redigiert)       |  ✅ (soweit sichtbar)  |      ✅       |   ✅ (Bankseite)   |   ✅   |
+| Sichtbarkeit konfigurieren (`/api/v1/org-units/bank/accounts/{id}/visibility/**`)                                  |           ❌           |      ✅       | ✅ nur Sonderkonto |   ✅   |
+| Kontostandsziel setzen/entfernen (`…/balance-target` Org-Einheit bzw. `/api/v1/bank/accounts/{id}/balance-target`) |           ❌           |      ✅       |    ✅ (Zugriff)    |   ✅   |
+
 ---
 
 ## 4. Mehr-OrgUnit-Sichtbarkeit (Scoping)
@@ -619,7 +671,7 @@ analog zu `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
 2. **Default-Rolle:** Wird keine bekannte Rolle übermittelt, erhält der
    Benutzer **Guest** (keine Authorities).
 3. **Ränge:** Die `UserService`-Logik gibt vor, dass `OFFICER` nur Ränge 1–12,
-   `SQUADRON_MEMBER` Ränge 13–20 erhalten dürfen.
+   `KRT_MEMBER` Ränge 13–20 erhalten dürfen.
 4. **Logistician-/Mission-Manager-Flags** werden ausschließlich von **Admins**
    über die Mitgliedschaftsverwaltung (`org_unit_membership`) vergeben
    (`UserController#patchLogistician` / `#patchMissionManager` und die

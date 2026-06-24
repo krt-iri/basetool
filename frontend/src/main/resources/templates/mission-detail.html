@@ -256,7 +256,7 @@
                 <div class="kpanel">
                     <div class="kpanel-head" th:text="#{mission.overview.briefing}">Auftrag</div>
                     <div class="kpanel-body">
-                        <th:block sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
+                        <th:block sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')">
                             <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips
                                  unsafe link protocols, so only renderer-generated markup is emitted. The bean
                                  call is bound via th:with because Thymeleaf 3.1 evaluates th:utext in a
@@ -423,7 +423,7 @@
             <span id="finance-count-meta" hidden th:text="${(financeIncomeCount ?: 0) + (financeExpenseCount ?: 0)}"></span>
 
             <!-- Summary strip (member+ only: aggregates come from the finance ledger) -->
-            <div class="sumstrip" th:if="${financeSum != null}" sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
+            <div class="sumstrip" th:if="${financeSum != null}" sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')">
                 <div class="sum"><div class="sk" th:text="#{mission.finance.total}">Gesamtsumme</div><div class="sv" th:classappend="${financeSum >= 0 ? 'pos' : 'neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</div><div class="sd" th:text="|aUEC &middot; ${financeIncomeCount + financeExpenseCount} ${#messages.msg('mission.finance.entries')}|">aUEC</div></div>
                 <div class="sum"><div class="sk" th:text="#{mission.finance.income_sum}">Einnahmen</div><div class="sv pos" th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(financeIncomeSum), 1, 'POINT')}">0</div><div class="sd" th:text="|${financeIncomeCount} ${#messages.msg('mission.finance.entries')}|">0</div></div>
                 <div class="sum"><div class="sk" th:text="#{mission.finance.expense_sum}">Ausgaben</div><div class="sv neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.round(financeExpenseSum), 1, 'POINT')}">0</div><div class="sd" th:text="|${financeExpenseCount} ${#messages.msg('mission.finance.entries')} &middot; ${#messages.msg('mission.finance.incl_refinery')}|">0</div></div>
@@ -432,7 +432,7 @@
 
             <div class="pane-grid-fin">
                 <!-- Finance ledger (member+ only, same gate as the old finance panel) -->
-                <div class="kpanel" sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
+                <div class="kpanel" sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')">
                     <div class="kpanel-head">
                         <span th:text="#{mission.finances}">Finanzen</span>
                         <button type="button" class="btn btn--cta btn-xs2" data-trigger="open-modal-display" data-modal-id="finance-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.finance.add}">Neuer Eintrag</span></button>
@@ -658,7 +658,7 @@
                 <div class="field-error" data-error-for="name" th:text="${#fields.hasErrors('name') ? #fields.errors('name')[0] : ''}"></div>
             </div>
 
-            <div class="form-group" sec:authorize="hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER','LOGISTICIAN','MISSION_MANAGER')">
+            <div class="form-group" sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')">
                 <label th:text="#{mission.description}">Description</label>
                 <textarea name="description" rows="5" th:text="*{description}"
                           th:disabled="${!isNew and !mission.canEdit}"></textarea>
@@ -967,7 +967,7 @@
                         th:data-job="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.id : ''}"
                         th:data-planned-job="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.id : ''}"
                         th:data-org-units="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![id], ',') : ''}"
-                        th:data-is-member="${p?.user != null and p.user.roles != null and (p.user.roles.contains('MEMBER') or p.user.roles.contains('ROLE_MEMBER') or p.user.roles.contains('SQUADRON_MEMBER') or p.user.roles.contains('ROLE_SQUADRON_MEMBER') or p.user.roles.contains('ADMIN') or p.user.roles.contains('ROLE_ADMIN') or p.user.roles.contains('OFFICER') or p.user.roles.contains('ROLE_OFFICER'))}"
+                        th:data-is-member="${p?.user != null and p.user.roles != null and (p.user.roles.contains('KRT_MEMBER') or p.user.roles.contains('ROLE_KRT_MEMBER') or p.user.roles.contains('ADMIN') or p.user.roles.contains('ROLE_ADMIN') or p.user.roles.contains('OFFICER') or p.user.roles.contains('ROLE_OFFICER'))}"
                         th:data-payout-preference="${p?.payoutPreference?.name()}"
                         th:data-comment="${p?.comment}"
                         th:data-version="${p?.version}"

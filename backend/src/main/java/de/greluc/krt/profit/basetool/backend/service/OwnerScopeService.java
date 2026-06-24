@@ -573,6 +573,63 @@ public class OwnerScopeService {
   }
 
   /**
+   * {@code true} iff the caller holds an {@code OL_MEMBER} seat — a member of the
+   * Organisationsleitung. Pure membership check (no admin short-circuit), so the org-unit bank seam
+   * can use it to resolve the collegial holder of the {@code CARTEL} account and the
+   * OL-can-configure-SPECIAL-visibility rule (REQ-BANK-037), where "OL" means the OL body, not the
+   * admin carve-out.
+   *
+   * @return {@code true} iff the caller has at least one {@code OL_MEMBER} membership.
+   */
+  public boolean currentUserIsOlMember() {
+    return currentCallerMemberships().stream()
+        .anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER);
+  }
+
+  /**
+   * {@code true} iff the caller holds a {@code BEREICHSLEITER} seat on any Bereich. Pure membership
+   * check (no admin short-circuit), used by the org-unit bank seam for the SPECIAL-account
+   * auto-view rule (every Bereichsleiter sees Sonderkonten, REQ-BANK-037) — deliberately narrower
+   * than {@link #currentUserHasAreaOrOlOversight()}, which also includes
+   * Bereichskoordinatoren/-operatoren and OL members.
+   *
+   * @return {@code true} iff the caller has at least one {@code BEREICHSLEITER} membership.
+   */
+  public boolean currentUserIsBereichsleiter() {
+    return currentCallerMemberships().stream()
+        .anyMatch(m -> m.getRole() == MembershipRole.BEREICHSLEITER);
+  }
+
+  /**
+   * {@code true} iff the caller holds exactly the given {@link MembershipRole} on the given org
+   * unit. Pure membership check used by the org-unit bank seam to resolve a derived responsible
+   * holder (e.g. the {@code STAFFELLEITER} of a Staffel, the {@code BEREICHSLEITER} of a PROFIT
+   * Bereich) and to evaluate {@code MEMBERSHIP_ROLE} view grants.
+   *
+   * @param orgUnitId the org unit to check; never {@code null}
+   * @param role the membership role to match; never {@code null}
+   * @return {@code true} iff the caller has a membership on that unit carrying that role
+   */
+  public boolean currentUserHoldsRoleOnOrgUnit(
+      @NotNull UUID orgUnitId, @NotNull MembershipRole role) {
+    return currentCallerMemberships().stream()
+        .anyMatch(m -> m.getId().getOrgUnitId().equals(orgUnitId) && m.getRole() == role);
+  }
+
+  /**
+   * {@code true} iff the caller is a member of the given org unit at all (any role, including a
+   * rank-less {@code MEMBER} seat). Pure membership check used by the org-unit bank seam to
+   * evaluate the {@code ALL_MEMBERS} view grant on an org-unit account.
+   *
+   * @param orgUnitId the org unit to check; never {@code null}
+   * @return {@code true} iff the caller has any membership on that unit
+   */
+  public boolean currentUserIsMemberOfOrgUnit(@NotNull UUID orgUnitId) {
+    return currentCallerMemberships().stream()
+        .anyMatch(m -> m.getId().getOrgUnitId().equals(orgUnitId));
+  }
+
+  /**
    * Convenience entry point for the aggregate-service create paths: returns the {@link Squadron}
    * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller has
    * no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services use

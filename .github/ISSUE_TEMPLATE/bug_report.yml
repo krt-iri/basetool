@@ -114,7 +114,7 @@ body:
       label: Role of the Affected User
       options:
         - GUEST
-        - SQUADRON_MEMBER
+        - KRT_MEMBER
         - LOGISTICIAN
         - MISSION_MANAGER
         - OFFICER

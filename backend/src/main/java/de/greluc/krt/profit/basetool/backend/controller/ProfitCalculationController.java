@@ -51,7 +51,7 @@ public class ProfitCalculationController {
    * @return per-material profit rows sorted alphabetically
    */
   @GetMapping
-  @PreAuthorize("hasAnyRole('SQUADRON_MEMBER', 'MEMBER', 'OFFICER', 'ADMIN')")
+  @PreAuthorize("hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN')")
   public List<ProfitCalculationDto> getProfitCalculation(
       @RequestParam UUID shipId, @RequestParam(required = false) List<String> starSystemNames) {
     log.debug("GET profit calculation for shipId: {} and starSystems: {}", shipId, starSystemNames);

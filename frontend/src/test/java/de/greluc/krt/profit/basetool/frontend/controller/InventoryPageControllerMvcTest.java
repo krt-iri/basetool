@@ -77,7 +77,7 @@ class InventoryPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void viewAggregatedInventory_AsMember_ShouldShowPage() throws Exception {
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 10, 0, 1, Collections.emptyList());
@@ -93,7 +93,7 @@ class InventoryPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_AsMember_ShouldShowPage() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
@@ -123,7 +123,7 @@ class InventoryPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_AsMember_ShouldNotShowActions() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
@@ -137,7 +137,7 @@ class InventoryPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_ShouldRenderBookOutButtonWithDynamicLabels() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
@@ -156,7 +156,7 @@ class InventoryPageControllerMvcTest {
   // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
   // docs/specs/inv-material-quantities.md (render-wiring of the shared scu-decimal-input helper).
   @Test
-  @WithMockUser(roles = "MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_ShouldRenderScuDecimalAmountFieldsAndHelper() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
@@ -181,7 +181,7 @@ class InventoryPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "MEMBER", username = "test-user-123")
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
   void viewAllInventory_ShouldRenderLocalStorageAttributes() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
@@ -196,7 +196,7 @@ class InventoryPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "MEMBER", username = "test-user-123")
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
   void viewMyInventory_ShouldRenderLocalStorageAttributes() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
@@ -223,7 +223,7 @@ class InventoryPageControllerMvcTest {
    * 500 (stale {@code #{...}} key) fails the build.
    */
   @Test
-  @WithMockUser(roles = "MEMBER", username = "test-user-123")
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
   void viewMyStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption() throws Exception {
     UUID itemId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
@@ -286,7 +286,7 @@ class InventoryPageControllerMvcTest {
    * the entry's material (must render) and one that does not (must be hidden).
    */
   @Test
-  @WithMockUser(roles = "MEMBER", username = "test-user-123")
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
   void viewMyStackEntries_ShouldOfferOnlyOrdersThatRequireTheEntryMaterial() throws Exception {
     UUID itemId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
@@ -421,7 +421,7 @@ class InventoryPageControllerMvcTest {
    * from the new stack-key {@code th:data-*} attributes or a stale {@code #{...}} key.
    */
   @Test
-  @WithMockUser(roles = "MEMBER", username = "test-user-123")
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
   void viewMyInventory_WithStack_ShouldRenderCollapsedStackRow() throws Exception {
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -546,7 +546,7 @@ class InventoryPageControllerMvcTest {
    * {@code materials} attribute — exactly as the serial version degraded.
    */
   @Test
-  @WithMockUser(roles = "MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void viewInputPage_WhenOneCatalogFetchFails_StillRendersWithEmptyList() throws Exception {
     when(backendApiClient.getCached(
             eq("/api/v1/materials/lookup"), any(ParameterizedTypeReference.class)))

@@ -90,7 +90,7 @@ class BankControllerSecurityTest {
     mockMvc
         .perform(
             get("/api/v1/bank/accounts")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }
 
@@ -133,7 +133,7 @@ class BankControllerSecurityTest {
         .perform(
             get("/api/v1/bank/accounts")
                 .header("X-Active-Org-Unit-Id", pinnedOrgUnit)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
 
     // A bank employee with the same pin set still passes (no org-unit scoping is applied).
@@ -158,7 +158,7 @@ class BankControllerSecurityTest {
             post("/api/v1/bank/accounts")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"X\",\"type\":\"SPECIAL\"}")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }
 

@@ -222,7 +222,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
   @Test
   @WithMockUser(
       username = "logistiker",
-      roles = {"MEMBER", "LOGISTIKER"})
+      roles = {"KRT_MEMBER", "LOGISTIKER"})
   void handover_completesOrder_whenStockIsFragmentedAcrossManyInventoryItems() {
     Fixture f = prepareFixture();
 

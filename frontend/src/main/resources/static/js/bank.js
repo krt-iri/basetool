@@ -21,7 +21,7 @@
     'use strict';
 
     /** Form field names serialized as JSON numbers instead of strings. */
-    const NUMBER_FIELDS = ['amount', 'version'];
+    const NUMBER_FIELDS = ['amount', 'version', 'target'];
 
     /** Form field names serialized as JSON booleans ("true"/"false" hidden inputs). */
     const BOOLEAN_FIELDS = ['active'];
@@ -54,6 +54,9 @@
         // Org-unit officer/lead page (#666 F2): balance cards + own-request list re-render after a
         // create/cancel; query dropped (the page carries no list filter).
         orgUnitBank: { container: '#org-unit-bank-results', preserveQuery: false },
+        // Org-unit account detail (REQ-BANK-035/-036): the facts + responsibility settings region
+        // re-renders in place after a target/visibility write; query dropped.
+        orgUnitBankSettings: { container: '#org-unit-bank-settings-results', preserveQuery: false },
         // Bank-staff confirmation queue (#666 F2): the request table re-renders after a
         // confirm/reject; `?status=` preserved so the staffer stays on the filtered view.
         requestQueue: { container: '#bank-request-queue-results', preserveQuery: true },

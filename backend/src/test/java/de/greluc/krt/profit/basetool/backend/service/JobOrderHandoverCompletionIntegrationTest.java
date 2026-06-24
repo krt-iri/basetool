@@ -153,7 +153,7 @@ class JobOrderHandoverCompletionIntegrationTest {
   @Test
   @WithMockUser(
       username = "logistiker",
-      roles = {"MEMBER", "LOGISTIKER"})
+      roles = {"KRT_MEMBER", "LOGISTIKER"})
   void handover_exactlyCoversAllRemainingMaterials_completesOrderWithoutOptimisticLockConflict() {
     Fixture f = prepareFixture();
 

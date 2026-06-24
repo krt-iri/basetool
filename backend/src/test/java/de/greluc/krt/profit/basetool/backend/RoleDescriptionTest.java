@@ -117,8 +117,7 @@ class RoleDescriptionTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(regularUser.getId().toString()))
-                        .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))) // Not ADMIN
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))) // Not ADMIN
                 .contentType(MediaType.TEXT_PLAIN)
                 .content(newDescription))
         .andExpect(status().isForbidden());

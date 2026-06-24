@@ -55,6 +55,11 @@ Mining_Hub_V0.3.0.py
 /input/
 /log.txt
 
+### Local test-stack helpers (never commit; local-only, may carry throwaway creds) ###
+/docker-compose.localkc.yml
+/bank-seed.ps1
+/seed-orgs.sql
+
 ### Node / web-asset linting (gradle-node-plugin) ###
 node_modules/
 

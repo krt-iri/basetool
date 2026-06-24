@@ -70,6 +70,7 @@ class BankManagePageControllerTest {
             null,
             null,
             BigDecimal.ZERO,
+            null,
             0L,
             Instant.parse("2026-01-15T10:00:00Z"));
     BankHolderDto holder =

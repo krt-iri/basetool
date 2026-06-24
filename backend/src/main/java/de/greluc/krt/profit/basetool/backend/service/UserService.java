@@ -547,7 +547,7 @@ public class UserService {
       boolean isOfficer =
           user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase("OFFICER"));
       boolean isSquadronMember =
-          user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase("SQUADRON_MEMBER"));
+          user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase("KRT_MEMBER"));
 
       if (isOfficer) {
         if (rank < 1 || rank > 12) {

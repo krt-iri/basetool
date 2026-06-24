@@ -9,8 +9,8 @@
 
 ## Akteure
 
-- **User der Staffel A** (z. B. Squadron Member oder Logistician von A) — legt den Job Order an.
-- **User der Staffel B** (Squadron Member oder Logistician von B) — verknüpft eigenes, B-besessenes Inventar mit dem Auftrag.
+- **User der Staffel A** (z. B. KRT Member oder Logistician von A) — legt den Job Order an.
+- **User der Staffel B** (KRT Member oder Logistician von B) — verknüpft eigenes, B-besessenes Inventar mit dem Auftrag.
 
 ## Vorbedingungen
 

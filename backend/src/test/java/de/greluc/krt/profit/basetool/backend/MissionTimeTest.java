@@ -201,7 +201,7 @@ class MissionTimeTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(update)))
         .andExpect(status().isForbidden());

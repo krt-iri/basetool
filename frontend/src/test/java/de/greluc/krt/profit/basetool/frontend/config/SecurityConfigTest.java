@@ -57,7 +57,7 @@ class SecurityConfigTest {
     GrantedAuthoritiesMapper mapper = config.userAuthoritiesMapper();
 
     Map<String, Object> realmAccess = new HashMap<>();
-    realmAccess.put("roles", List.of("Officer", "Squadron Member", "admin"));
+    realmAccess.put("roles", List.of("Officer", "KRT Member", "admin"));
 
     Map<String, Object> claims = new HashMap<>();
     claims.put("realm_access", realmAccess);
@@ -75,7 +75,7 @@ class SecurityConfigTest {
         mappedAuthorities.stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
 
     assertTrue(authorityStrings.contains("ROLE_OFFICER"));
-    assertTrue(authorityStrings.contains("ROLE_SQUADRON_MEMBER"));
+    assertTrue(authorityStrings.contains("ROLE_KRT_MEMBER"));
     assertTrue(authorityStrings.contains("ROLE_ADMIN"));
   }
 }

@@ -69,7 +69,7 @@ public class PromotionTopicService {
   /**
    * Returns a paginated slice of every {@link PromotionTopicResponse} visible to the caller. The
    * controller validates the caller-supplied sort against {@link #SORTABLE_FIELDS} before this
-   * method is invoked. For Officer / Squadron Member callers the result is restricted to their home
+   * method is invoked. For Officer / KRT Member callers the result is restricted to their home
    * squadron; for Admin with the switcher set, to the focused squadron; for Admin in "all
    * squadrons" mode the result spans every squadron.
    *

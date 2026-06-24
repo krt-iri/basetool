@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.Department;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,4 +47,16 @@ public interface BereichRepository extends JpaRepository<Bereich, UUID> {
 
   /** Returns every active Bereich (soft-delete-aware list view). */
   List<Bereich> findAllByActiveTrue();
+
+  /**
+   * Returns every Bereich tagged with the given department (REQ-BANK-037). Backs the {@code
+   * CARTEL_BANK} responsible-holder resolution: the holder is the {@code BEREICHSLEITER} of a
+   * {@code Department.PROFIT} Bereich. The {@code department} column is not unique, so there may be
+   * zero, one or several matches; the seam treats every {@code BEREICHSLEITER} of any returned
+   * Bereich as a holder.
+   *
+   * @param department the department to match; never {@code null}
+   * @return the matching Bereiche; never {@code null}, possibly empty
+   */
+  List<Bereich> findByDepartment(Department department);
 }

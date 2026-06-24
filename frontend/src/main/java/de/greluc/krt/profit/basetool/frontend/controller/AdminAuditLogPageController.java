@@ -106,7 +106,11 @@ public class AdminAuditLogPageController {
               "BOOKING_REQUEST_REJECTED",
               "BOOKING_REQUEST_CANCELLED",
               "AUDIT_LOG_EXPORTED",
-              "AUDIT_LOG_PURGED"),
+              "AUDIT_LOG_PURGED",
+              "BALANCE_TARGET_SET",
+              "BALANCE_TARGET_CLEARED",
+              "BALANCE_VISIBILITY_GRANTED",
+              "BALANCE_VISIBILITY_REVOKED"),
           "INVENTORY",
           List.of(
               "INVENTORY_ITEM_CREATED",

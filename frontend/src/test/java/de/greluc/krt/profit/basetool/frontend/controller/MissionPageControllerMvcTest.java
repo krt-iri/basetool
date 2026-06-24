@@ -145,7 +145,7 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "SQUADRON_MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void missionDetail_asMember_fetchesFinanceLedger() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(
@@ -1335,7 +1335,7 @@ class MissionPageControllerMvcTest {
             "member@example.com",
             1,
             null,
-            java.util.Set.of("MEMBER"),
+            java.util.Set.of("KRT_MEMBER"),
             java.util.Set.of(),
             null,
             false,
@@ -1455,7 +1455,7 @@ class MissionPageControllerMvcTest {
             "other@example.com",
             1,
             null,
-            java.util.Set.of("MEMBER"),
+            java.util.Set.of("KRT_MEMBER"),
             java.util.Set.of(),
             null,
             false,
@@ -1625,7 +1625,7 @@ class MissionPageControllerMvcTest {
             "pilot@example.com",
             1,
             null,
-            java.util.Set.of("MEMBER"),
+            java.util.Set.of("KRT_MEMBER"),
             java.util.Set.of(),
             null,
             false,
@@ -1644,7 +1644,7 @@ class MissionPageControllerMvcTest {
             "outsider@example.com",
             1,
             null,
-            java.util.Set.of("MEMBER"),
+            java.util.Set.of("KRT_MEMBER"),
             java.util.Set.of(),
             null,
             false,
@@ -1779,7 +1779,7 @@ class MissionPageControllerMvcTest {
             "pilot@example.com",
             1,
             null,
-            java.util.Set.of("MEMBER"),
+            java.util.Set.of("KRT_MEMBER"),
             java.util.Set.of(),
             null,
             false,
@@ -1798,7 +1798,7 @@ class MissionPageControllerMvcTest {
             "outsider@example.com",
             1,
             null,
-            java.util.Set.of("MEMBER"),
+            java.util.Set.of("KRT_MEMBER"),
             java.util.Set.of(),
             null,
             false,

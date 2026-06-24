@@ -191,7 +191,7 @@ class RefineryOrderTest {
                         jwt()
                             .jwt(builder -> builder.subject(user1.getId().toString()))
                             .authorities(
-                                new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                                 new SimpleGrantedAuthority("HANGAR_READ"),
                                 new SimpleGrantedAuthority("HANGAR_WRITE"),
                                 new SimpleGrantedAuthority("MISSION_READ"),
@@ -246,7 +246,7 @@ class RefineryOrderTest {
                     jwt()
                         .jwt(builder -> builder.subject(user1.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("HANGAR_READ"),
                             new SimpleGrantedAuthority("HANGAR_WRITE"),
                             new SimpleGrantedAuthority("MISSION_READ"),
@@ -269,7 +269,7 @@ class RefineryOrderTest {
                     jwt()
                         .jwt(builder -> builder.subject(user1.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("HANGAR_READ"),
                             new SimpleGrantedAuthority("HANGAR_WRITE"),
                             new SimpleGrantedAuthority("MISSION_READ"),
@@ -374,7 +374,7 @@ class RefineryOrderTest {
                     jwt()
                         .jwt(builder -> builder.subject(user2.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("HANGAR_READ"),
                             new SimpleGrantedAuthority("HANGAR_WRITE"),
                             new SimpleGrantedAuthority("MISSION_READ"),
@@ -392,7 +392,7 @@ class RefineryOrderTest {
                     jwt()
                         .jwt(builder -> builder.subject(user2.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("HANGAR_READ"),
                             new SimpleGrantedAuthority("HANGAR_WRITE"),
                             new SimpleGrantedAuthority("MISSION_READ"),
@@ -433,7 +433,7 @@ class RefineryOrderTest {
                     jwt()
                         .jwt(builder -> builder.subject(user1.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("HANGAR_READ"),
                             new SimpleGrantedAuthority("HANGAR_WRITE"),
                             new SimpleGrantedAuthority("MISSION_READ"),
@@ -473,7 +473,7 @@ class RefineryOrderTest {
                         jwt()
                             .jwt(builder -> builder.subject(user1.getId().toString()))
                             .authorities(
-                                new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                                 new SimpleGrantedAuthority("HANGAR_READ"),
                                 new SimpleGrantedAuthority("HANGAR_WRITE"),
                                 new SimpleGrantedAuthority("MISSION_READ"),
@@ -522,7 +522,7 @@ class RefineryOrderTest {
                     jwt()
                         .jwt(builder -> builder.subject(user1.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(storeDto)))
@@ -582,7 +582,7 @@ class RefineryOrderTest {
                     jwt()
                         .jwt(builder -> builder.subject(user1.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(storeDto)))
@@ -637,7 +637,7 @@ class RefineryOrderTest {
                     jwt()
                         .jwt(builder -> builder.subject(user1.getId().toString()))
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(storeDto)))

@@ -97,7 +97,7 @@ class HttpCachingTest {
 
   @Test
   void protectedEndpoint_etagReplayedWithoutAuth_isDeniedNot304() throws Exception {
-    SimpleGrantedAuthority member = new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER");
+    SimpleGrantedAuthority member = new SimpleGrantedAuthority("ROLE_KRT_MEMBER");
 
     // An authorized member reads the protected endpoint and obtains its real ETag...
     String etag =

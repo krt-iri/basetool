@@ -283,7 +283,7 @@ class UserControllerTest {
         "bob@example.invalid",
         5,
         "some desc",
-        java.util.Set.of("ROLE_SQUADRON_MEMBER"),
+        java.util.Set.of("ROLE_KRT_MEMBER"),
         java.util.Set.of(),
         null,
         false,

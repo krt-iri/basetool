@@ -103,7 +103,7 @@ class MissionControllerSecurityTest {
                 .with(
                     jwt()
                         .authorities(
-                            new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"),
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
                             new SimpleGrantedAuthority("HANGAR_READ"),
                             new SimpleGrantedAuthority("HANGAR_WRITE"),
                             new SimpleGrantedAuthority("MISSION_READ"),
@@ -154,7 +154,7 @@ class MissionControllerSecurityTest {
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
                     "/api/v1/missions/{id}/managers/{userId}", missionId, userId)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }
 }

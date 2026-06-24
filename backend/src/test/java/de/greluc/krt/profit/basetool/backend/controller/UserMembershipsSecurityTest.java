@@ -43,10 +43,10 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Pins the Spring Security URL-filter chain for {@code GET /api/v1/users/{id}/memberships}. Before
  * the SecurityConfig fix the URL fell into the {@code /api/v1/users/**} catch-all which is gated on
- * {@code hasRole('ADMIN')} — every non-admin (Officer, Squadron Member) got a 403 from the URL
- * filter before the {@link UserController#getUserMemberships} method-level {@code @PreAuthorize}
- * was even evaluated. The frontend's {@code SquadronContextAdvice} then silently swallowed the 403
- * and rendered an empty {@code availableOrgUnits} list, surfacing as "Kein Bereichskontext" in the
+ * {@code hasRole('ADMIN')} — every non-admin (Officer, KRT Member) got a 403 from the URL filter
+ * before the {@link UserController#getUserMemberships} method-level {@code @PreAuthorize} was even
+ * evaluated. The frontend's {@code SquadronContextAdvice} then silently swallowed the 403 and
+ * rendered an empty {@code availableOrgUnits} list, surfacing as "Kein Bereichskontext" in the
  * sidebar chip for any non-admin user.
  *
  * <p>These tests assert all four caller classes can reach the endpoint at the URL-filter level. The
@@ -82,13 +82,13 @@ class UserMembershipsSecurityTest {
     mockMvc
         .perform(
             get("/api/v1/users/{id}/memberships", UUID.randomUUID())
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 
   /**
-   * Officer users must reach the endpoint — same gate as Squadron Member; OFFICER is the typical
-   * caller class that surfaced the original bug because they expect to see their own sidebar chip.
+   * Officer users must reach the endpoint — same gate as KRT Member; OFFICER is the typical caller
+   * class that surfaced the original bug because they expect to see their own sidebar chip.
    *
    * @throws Exception MockMvc plumbing.
    */

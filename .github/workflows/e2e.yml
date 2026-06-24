@@ -14,6 +14,12 @@ name: E2E
 on:
   pull_request:
     branches: [main]
+    # `labeled` is included so applying the `e2e` label AFTER a PR is opened
+    # triggers the suite immediately. Without it the gate below only ever sees
+    # the label state captured at open/synchronize, so a label added later (e.g.
+    # by `gh pr create --label e2e`, which lands after the open event) silently
+    # skips e2e until the next push — a real, recurring footgun.
+    types: [opened, synchronize, reopened, labeled]
   schedule:
     - cron: '0 3 * * *' # nightly 03:00 UTC
   workflow_dispatch:
@@ -28,10 +34,15 @@ permissions:
 jobs:
   e2e:
     name: E2E flows (${{ matrix.browser }})
-    # PRs: only when labelled `e2e`. schedule / workflow_dispatch: always.
+    # PRs: only when labelled `e2e`. A `labeled` event must be the `e2e` label
+    # itself, so toggling an unrelated label never spins up this heavy stack;
+    # open/synchronize/reopened run whenever the label is currently present.
+    # schedule / workflow_dispatch: always.
     if: >-
       github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'e2e')
+      (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
+      (github.event.action != 'labeled' &&
+      contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:

@@ -169,7 +169,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
   @Test
   @WithMockUser(
       username = "logistiker",
-      roles = {"MEMBER", "LOGISTIKER"})
+      roles = {"KRT_MEMBER", "LOGISTIKER"})
   void mixedFullAndPartialHandover_keepsOrderOpen_thenSecondHandoverCompletesIt() {
     Fixture f = prepareFixture();
 

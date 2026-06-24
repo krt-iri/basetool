@@ -87,7 +87,7 @@ class MissionFinanceEntryControllerTest {
             "bob@example.invalid",
             5,
             "desc",
-            Set.of("ROLE_SQUADRON_MEMBER"),
+            Set.of("ROLE_KRT_MEMBER"),
             Set.of("HANGAR_READ"),
             null,
             true,

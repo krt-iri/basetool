@@ -11,14 +11,14 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 | **Logistician**                                                              | Kontextuell: `org_unit_membership.is_logistician`                   | Lager- & Auftragsverwaltung. Flache Rolle wird vom JWT-Konverter befördert, wenn das Flag auf *irgendeiner* Mitgliedschaft `true` ist; das Per-OrgUnit-Scoping erfolgt über `OwnerScopeService`. |
 | **Einsatzleiter** (Keycloak-Rolle `Mission Manager`, Code `MISSION_MANAGER`) | Kontextuell: `org_unit_membership.is_mission_manager`               | Einsatz-Verwaltung; gleiche Beförderungslogik.                                                                                                                                                   |
 | **SK Lead**                                                                  | Kontextuell: `org_unit_membership.is_lead` (nur auf einer SK-Zeile) | Darf in *diesem einen* SK Mitglieder verwalten — sonst nichts.                                                                                                                                   |
-| **Squadron Member**                                                          | Basis-User                                                          | `HANGAR_READ/WRITE`, `MISSION_READ`. Keine erhöhten Rechte.                                                                                                                                      |
+| **KRT Member**                                                               | Basis-User                                                          | `HANGAR_READ/WRITE`, `MISSION_READ`. Keine erhöhten Rechte.                                                                                                                                      |
 | **Guest**                                                                    | Unauthentifiziert                                                   | Nur lesend auf öffentliche Aggregate.                                                                                                                                                            |
 
 **Hierarchie:** `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`.
 
 ## Rollen × Flow-Matrix (Schreib-Operationen)
 
-|                   Flow                   |         Guest         |     Squadron Member     |      Logistician       |  Einsatzleiter  | Officer | Admin |
+|                   Flow                   |         Guest         |       KRT Member        |      Logistician       |  Einsatzleiter  | Officer | Admin |
 |------------------------------------------|-----------------------|-------------------------|------------------------|-----------------|---------|-------|
 | Einsatz anlegen (UC-02)                  | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
 | Job Order anlegen (UC-03)                | ✓ (öffentl. Formular) | ✓                       | ✓                      | ✓               | ✓       | ✓     |

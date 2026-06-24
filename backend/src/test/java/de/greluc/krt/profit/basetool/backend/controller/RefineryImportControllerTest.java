@@ -117,7 +117,7 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(VALID_BODY))
@@ -137,7 +137,7 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(VALID_BODY.replace("\"schemaVersion\": 1", "\"schemaVersion\": 2")))
@@ -156,7 +156,7 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(VALID_BODY.replace("SETUP", "PROCESSING")))
@@ -173,7 +173,7 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(emptyOrders))
@@ -190,7 +190,7 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(nullElement))
@@ -209,7 +209,7 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -232,7 +232,7 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(sixOrders))
@@ -248,7 +248,7 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))

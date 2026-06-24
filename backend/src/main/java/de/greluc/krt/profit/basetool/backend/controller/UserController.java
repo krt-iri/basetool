@@ -79,7 +79,7 @@ public class UserController {
    * @return paged user DTOs
    */
   @GetMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER')")
   @Transactional(readOnly = true)
   public PageResponse<UserDto> getAllUsers(
       @RequestParam(required = false) Integer page,
@@ -107,7 +107,7 @@ public class UserController {
    * @return all users as reference DTOs
    */
   @GetMapping("/lookup")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER', 'BANK_MANAGEMENT')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_MANAGEMENT')")
   @Transactional(readOnly = true)
   public List<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto> lookupUsers() {
     return userService.findAllReference();
@@ -119,7 +119,7 @@ public class UserController {
    * @return paged user DTOs
    */
   @GetMapping("/search")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER')")
   @Transactional(readOnly = true)
   public PageResponse<UserDto> searchUsers(
       @RequestParam String query,
@@ -154,7 +154,7 @@ public class UserController {
    * @return the user DTO, peer-redacted for cross-squadron non-admin callers
    */
   @GetMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER')")
   @Transactional(readOnly = true)
   public UserDto getUserById(@PathVariable @NotNull UUID id) {
     de.greluc.krt.profit.basetool.backend.model.User user = userService.findById(id);
@@ -184,7 +184,7 @@ public class UserController {
    *     null}, possibly empty when the user has no memberships.
    */
   @GetMapping("/{id}/memberships")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'SQUADRON_MEMBER', 'MEMBER')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER')")
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> getUserMemberships(@PathVariable @NotNull UUID id) {
     return orgUnitMembershipService.listOptionsForUser(id);
@@ -572,7 +572,7 @@ public class UserController {
    * is re-added only on the {@code /me*} self path via {@link #withSelfEmail}), so even an
    * officer/admin never receives a peer's email through this controller. This helper now only hides
    * the remaining peer-irrelevant fields from plain members. Audit finding H-4: previously any
-   * SQUADRON_MEMBER could paginate {@code /api/v1/users/search} and harvest every member's email.
+   * KRT_MEMBER could paginate {@code /api/v1/users/search} and harvest every member's email.
    *
    * <p>The peer view keeps {@code id}, {@code username}, {@code displayName}, {@code
    * effectiveName}, {@code rank}, {@code inKeycloak}, {@code squadron}, {@code version} — enough

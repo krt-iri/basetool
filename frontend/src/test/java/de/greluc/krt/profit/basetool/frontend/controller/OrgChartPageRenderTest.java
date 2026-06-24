@@ -81,7 +81,7 @@ class OrgChartPageRenderTest {
   }
 
   @Test
-  @WithMockUser(roles = "SQUADRON_MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void emptyChart_member_rendersVacantSeatInsteadOfInvokingNodeFragmentWithNull() throws Exception {
     // Given: a completely empty chart — the Bereichsleiter seat (area.lead) is null. Pre-fix this
     // rendered ocNode(null) and NPE'd; now the vacant placeholder must render and the page 200s.

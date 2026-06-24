@@ -58,11 +58,11 @@
     "name" : "Blueprint Products",
     "description" : "User-facing blueprint product search (#327)."
   }, {
-    "name" : "Personal Blueprints",
-    "description" : "Per-user owned crafting blueprints (#327)."
-  }, {
     "name" : "org-unit-bank-controller",
     "description" : "Org-unit officer/lead bank access (balance view, booking requests)"
+  }, {
+    "name" : "Personal Blueprints",
+    "description" : "Per-user owned crafting blueprints (#327)."
   }, {
     "name" : "Admin – Default Blueprints",
     "description" : "Administrator endpoints for curating the auto-granted default blueprint set."
@@ -4632,6 +4632,199 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ]
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}" : {
+      "put" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Toggle the all-members view grant of an org-unit account",
+        "operationId" : "setAllMembersVisibility",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "enabled",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}/balance-target" : {
+      "put" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Set or clear an org-unit account's balance target (responsible holder)",
+        "operationId" : "setBalanceTarget",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OrgUnitBalanceTargetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/org-chart/positions/{id}" : {
@@ -15548,6 +15741,384 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/BankBookingRequestDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}" : {
+      "post" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Grant an individual user view access to an org-unit account",
+        "operationId" : "addUserVisibility",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Revoke an individual user's view access to an org-unit account",
+        "operationId" : "removeUserVisibility",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}" : {
+      "post" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Grant a role bucket view access to an org-unit account",
+        "operationId" : "addRoleVisibility",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "roleCode",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Revoke a role bucket's view access to an org-unit account",
+        "operationId" : "removeRoleVisibility",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "roleCode",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
                 }
               }
             }
@@ -28390,6 +28961,104 @@
         }
       }
     },
+    "/api/v1/bank/accounts/{id}/balance-target" : {
+      "patch" : {
+        "tags" : [ "bank-account-controller" ],
+        "summary" : "Set or clear a bank account's balance target (bank staff with access)",
+        "operationId" : "setBalanceTarget_1",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetBankBalanceTargetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankAccountDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/system/ping" : {
       "get" : {
         "tags" : [ "System" ],
@@ -33293,6 +33962,473 @@
                   "items" : {
                     "$ref" : "#/components/schemas/OrgUnitBankBalanceDto"
                   }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}" : {
+      "get" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Read-only detail of an org-unit account the caller may view",
+        "operationId" : "getAccountDetail",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Read-only account detail",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountDetailDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}/transactions" : {
+      "get" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Booking history of an org-unit account (Halter redacted)",
+        "operationId" : "getAccountBookings",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Redacted booking history",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseBankBookingDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}/statement" : {
+      "get" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Download the Halter-redacted account statement PDF (org-unit viewer)",
+        "operationId" : "downloadStatement",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "X-User-Time-Zone",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "byte"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}/settings" : {
+      "get" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Read an org-unit account's responsibility settings (holder/OL)",
+        "operationId" : "getAccountSettings",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Account settings",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
                 }
               }
             }
@@ -40754,7 +41890,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED" ]
           }
         }, {
           "name" : "page",
@@ -41326,7 +42462,7 @@
       "get" : {
         "tags" : [ "bank-account-controller" ],
         "summary" : "Download the account statement PDF for a period",
-        "operationId" : "downloadStatement",
+        "operationId" : "downloadStatement_1",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -45185,6 +46321,99 @@
           }
         }
       },
+      "OrgUnitBankAccountSettingsDto" : {
+        "type" : "object",
+        "properties" : {
+          "accountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountNo" : {
+            "type" : "string"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "ORG_UNIT", "AREA", "CARTEL", "CARTEL_BANK", "SPECIAL" ]
+          },
+          "orgUnitKind" : {
+            "type" : "string",
+            "enum" : [ "SQUADRON", "SPECIAL_COMMAND", "BEREICH", "ORGANISATIONSLEITUNG" ]
+          },
+          "balanceTarget" : {
+            "type" : "number"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "canSetTarget" : {
+            "type" : "boolean"
+          },
+          "canConfigureVisibility" : {
+            "type" : "boolean"
+          },
+          "visibilityConfigurable" : {
+            "type" : "boolean"
+          },
+          "allMembersSupported" : {
+            "type" : "boolean"
+          },
+          "roleBucketsGlobal" : {
+            "type" : "boolean"
+          },
+          "availableRoleCodes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "grantedRoleCodes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "allMembersGranted" : {
+            "type" : "boolean"
+          },
+          "grantedUsers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgUnitBankViewUserDto"
+            }
+          }
+        }
+      },
+      "OrgUnitBankViewUserDto" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "displayName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "OrgUnitBalanceTargetRequest" : {
+        "type" : "object",
+        "properties" : {
+          "target" : {
+            "type" : "number",
+            "maximum" : 1.0E12,
+            "minimum" : 1
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
+      },
       "OrgChartPositionUpdateRequest" : {
         "type" : "object",
         "properties" : {
@@ -48959,6 +50188,9 @@
           "balance" : {
             "type" : "number"
           },
+          "balanceTarget" : {
+            "type" : "number"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -49593,6 +50825,21 @@
           }
         },
         "required" : [ "name", "version" ]
+      },
+      "SetBankBalanceTargetRequest" : {
+        "type" : "object",
+        "properties" : {
+          "target" : {
+            "type" : "number",
+            "maximum" : 1.0E12,
+            "minimum" : 1
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
       },
       "PingResponse" : {
         "type" : "object",
@@ -50835,6 +52082,149 @@
             "type" : "array",
             "items" : {
               "type" : "number"
+            }
+          },
+          "balanceTarget" : {
+            "type" : "number"
+          },
+          "canManageSettings" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "BankAccountDetailDto" : {
+        "type" : "object",
+        "properties" : {
+          "account" : {
+            "$ref" : "#/components/schemas/BankAccountDto"
+          },
+          "delta30d" : {
+            "type" : "number"
+          },
+          "bookingCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "capabilities" : {
+            "$ref" : "#/components/schemas/BankCapabilitiesDto"
+          }
+        }
+      },
+      "BankCapabilitiesDto" : {
+        "type" : "object",
+        "properties" : {
+          "canDeposit" : {
+            "type" : "boolean"
+          },
+          "canWithdraw" : {
+            "type" : "boolean"
+          },
+          "canTransfer" : {
+            "type" : "boolean"
+          },
+          "management" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "OrgUnitBankAccountDetailDto" : {
+        "type" : "object",
+        "properties" : {
+          "detail" : {
+            "$ref" : "#/components/schemas/BankAccountDetailDto"
+          },
+          "canExportStatement" : {
+            "type" : "boolean"
+          },
+          "canSetTarget" : {
+            "type" : "boolean"
+          },
+          "canConfigureVisibility" : {
+            "type" : "boolean"
+          },
+          "canRequest" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "BankBookingDto" : {
+        "type" : "object",
+        "properties" : {
+          "postingId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "transactionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER", "HOLDER_TRANSFER", "WIPE_RESET", "REVERSAL" ]
+          },
+          "amount" : {
+            "type" : "number"
+          },
+          "holderHandle" : {
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "reversedTransactionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterAccountNo" : {
+            "type" : "string"
+          },
+          "counterAccountName" : {
+            "type" : "string"
+          },
+          "counterHolderHandle" : {
+            "type" : "string"
+          },
+          "intraAccount" : {
+            "type" : "boolean"
+          },
+          "transferFee" : {
+            "type" : "number"
+          }
+        }
+      },
+      "PageResponseBankBookingDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BankBookingDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
             }
           }
         }
@@ -52885,7 +54275,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED" ]
           },
           "accountId" : {
             "type" : "string",
@@ -52947,123 +54337,6 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/BankAccountDto"
-            }
-          },
-          "page" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "size" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "totalElements" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "totalPages" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "sort" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          }
-        }
-      },
-      "BankAccountDetailDto" : {
-        "type" : "object",
-        "properties" : {
-          "account" : {
-            "$ref" : "#/components/schemas/BankAccountDto"
-          },
-          "delta30d" : {
-            "type" : "number"
-          },
-          "bookingCount" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "capabilities" : {
-            "$ref" : "#/components/schemas/BankCapabilitiesDto"
-          }
-        }
-      },
-      "BankCapabilitiesDto" : {
-        "type" : "object",
-        "properties" : {
-          "canDeposit" : {
-            "type" : "boolean"
-          },
-          "canWithdraw" : {
-            "type" : "boolean"
-          },
-          "canTransfer" : {
-            "type" : "boolean"
-          },
-          "management" : {
-            "type" : "boolean"
-          }
-        }
-      },
-      "BankBookingDto" : {
-        "type" : "object",
-        "properties" : {
-          "postingId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "transactionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "type" : {
-            "type" : "string",
-            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER", "HOLDER_TRANSFER", "WIPE_RESET", "REVERSAL" ]
-          },
-          "amount" : {
-            "type" : "number"
-          },
-          "holderHandle" : {
-            "type" : "string"
-          },
-          "note" : {
-            "type" : "string"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "reversedTransactionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "counterAccountNo" : {
-            "type" : "string"
-          },
-          "counterAccountName" : {
-            "type" : "string"
-          },
-          "counterHolderHandle" : {
-            "type" : "string"
-          },
-          "intraAccount" : {
-            "type" : "boolean"
-          },
-          "transferFee" : {
-            "type" : "number"
-          }
-        }
-      },
-      "PageResponseBankBookingDto" : {
-        "type" : "object",
-        "properties" : {
-          "content" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/BankBookingDto"
             }
           },
           "page" : {

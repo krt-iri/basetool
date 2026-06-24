@@ -115,7 +115,7 @@ class HangarUserEndpointsSecurityTest {
                 .with(
                     jwt()
                         .jwt(j -> j.subject(user.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 

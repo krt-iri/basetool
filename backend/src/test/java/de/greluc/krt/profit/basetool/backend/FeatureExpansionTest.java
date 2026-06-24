@@ -305,7 +305,7 @@ class FeatureExpansionTest {
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(normalUser.getId().toString()))
-                            .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                            .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(req)))
             .andExpect(status().isCreated())
@@ -326,7 +326,7 @@ class FeatureExpansionTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(normalUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isNoContent());
   }
 
@@ -380,7 +380,7 @@ class FeatureExpansionTest {
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(otherUser.getId().toString()))
-                            .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                            .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(reqOther)))
             .andExpect(status().isCreated())
@@ -399,7 +399,7 @@ class FeatureExpansionTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(normalUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }
 }

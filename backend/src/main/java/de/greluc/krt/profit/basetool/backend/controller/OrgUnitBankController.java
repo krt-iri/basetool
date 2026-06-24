@@ -19,25 +19,45 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountDetailDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
+import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.DateTimeException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -58,6 +78,8 @@ import org.springframework.web.bind.annotation.RestController;
     name = "org-unit-bank-controller",
     description = "Org-unit officer/lead bank access (balance view, booking requests)")
 public class OrgUnitBankController {
+
+  private static final Set<String> BOOKING_SORT_FIELDS = Set.of("createdAt", "id");
 
   private final OrgUnitBankAccessService orgUnitBankAccessService;
 
@@ -83,6 +105,186 @@ public class OrgUnitBankController {
       value = {@ApiResponse(responseCode = "200", description = "Overseen org-unit balances")})
   public List<OrgUnitBankBalanceDto> listOverseenBalances() {
     return orgUnitBankAccessService.listOverseenOrgUnitBalances();
+  }
+
+  /**
+   * Returns the read-only account detail an org-unit viewer sees when they open an account from the
+   * card list (REQ-BANK-038): the same shape as the bank-staff detail but with all-false
+   * capabilities, plus the org-unit affordances (export statement, manage settings, request). The
+   * seam authorizes that the caller may view the account.
+   *
+   * @param id the account
+   * @return the read-only detail
+   */
+  @GetMapping("/accounts/{id}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Read-only detail of an org-unit account the caller may view")
+  @ApiResponses(
+      value = {@ApiResponse(responseCode = "200", description = "Read-only account detail")})
+  public OrgUnitBankAccountDetailDto getAccountDetail(@PathVariable @NotNull UUID id) {
+    return orgUnitBankAccessService.getViewableAccountDetail(id);
+  }
+
+  /**
+   * Pages over an account's booking history for an org-unit viewer (REQ-BANK-038), with the
+   * player-custody ("Halter") columns redacted by the seam. Newest first by default.
+   *
+   * @param id the account
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort whitelisted sort spec
+   * @return one page of redacted booking rows
+   */
+  @GetMapping("/accounts/{id}/transactions")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Booking history of an org-unit account (Halter redacted)")
+  @ApiResponses(
+      value = {@ApiResponse(responseCode = "200", description = "Redacted booking history")})
+  public PageResponse<BankBookingDto> getAccountBookings(
+      @PathVariable @NotNull UUID id,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    String effectiveSort = sort == null || sort.isBlank() ? "createdAt,desc" : sort;
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page, size, effectiveSort, BOOKING_SORT_FIELDS, "createdAt");
+    return toPageResponse(orgUnitBankAccessService.getViewableAccountBookings(id, pageable));
+  }
+
+  /**
+   * Downloads the Halter-redacted account statement PDF for an org-unit viewer (REQ-BANK-038). The
+   * seam authorizes view access and records the export; the optional {@code X-User-Time-Zone}
+   * header overrides UTC for the document timestamps.
+   *
+   * @param id the account
+   * @param from period start (inclusive, ISO-8601 instant)
+   * @param to period end (inclusive, ISO-8601 instant)
+   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @return PDF body with {@code application/pdf} and attachment Content-Disposition
+   */
+  @GetMapping("/accounts/{id}/statement")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Download the Halter-redacted account statement PDF (org-unit viewer)")
+  public ResponseEntity<byte[]> downloadStatement(
+      @PathVariable @NotNull UUID id,
+      @RequestParam @NotNull Instant from,
+      @RequestParam @NotNull Instant to,
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
+    byte[] pdf =
+        orgUnitBankAccessService.exportViewableStatement(id, from, to, parse(userTimeZone));
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_PDF);
+    headers.setContentDispositionFormData("attachment", "kontoauszug-" + id + ".pdf");
+    return ResponseEntity.ok().headers(headers).body(pdf);
+  }
+
+  /**
+   * Returns the responsibility settings of one account (REQ-BANK-035/-036) — the current balance
+   * target and visibility grants, plus which controls the caller may use. The seam authorizes that
+   * the caller may manage the account.
+   *
+   * @param id the account
+   * @return the settings snapshot
+   */
+  @GetMapping("/accounts/{id}/settings")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Read an org-unit account's responsibility settings (holder/OL)")
+  @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Account settings")})
+  public OrgUnitBankAccountSettingsDto getAccountSettings(@PathVariable @NotNull UUID id) {
+    return orgUnitBankAccessService.getAccountSettings(id);
+  }
+
+  /**
+   * Sets or clears an account's balance target (REQ-BANK-036). A {@code null} target clears it. The
+   * seam authorizes that the caller is the responsible holder.
+   *
+   * @param id the account
+   * @param request the new target (or {@code null} to clear) plus the echoed version
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/balance-target")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Set or clear an org-unit account's balance target (responsible holder)")
+  public OrgUnitBankAccountSettingsDto setBalanceTarget(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid OrgUnitBalanceTargetRequest request) {
+    return orgUnitBankAccessService.setBalanceTarget(id, request.target(), request.version());
+  }
+
+  /**
+   * Grants a role bucket view access to an account (REQ-BANK-035). The seam derives the kind from
+   * the account type and validates the role code.
+   *
+   * @param id the account
+   * @param roleCode the role bucket to grant
+   * @return the refreshed settings
+   */
+  @PostMapping("/accounts/{id}/visibility/role/{roleCode}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Grant a role bucket view access to an org-unit account")
+  public OrgUnitBankAccountSettingsDto addRoleVisibility(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
+    return orgUnitBankAccessService.addRoleVisibility(id, roleCode);
+  }
+
+  /**
+   * Revokes a role bucket's view access to an account (REQ-BANK-035).
+   *
+   * @param id the account
+   * @param roleCode the role bucket to revoke
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/visibility/role/{roleCode}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Revoke a role bucket's view access to an org-unit account")
+  public OrgUnitBankAccountSettingsDto removeRoleVisibility(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
+    return orgUnitBankAccessService.removeRoleVisibility(id, roleCode);
+  }
+
+  /**
+   * Enables or disables the all-members view grant of an account (REQ-BANK-035).
+   *
+   * @param id the account
+   * @param enabled whether all members may view the account
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/visibility/all-members/{enabled}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Toggle the all-members view grant of an org-unit account")
+  public OrgUnitBankAccountSettingsDto setAllMembersVisibility(
+      @PathVariable @NotNull UUID id, @PathVariable boolean enabled) {
+    return orgUnitBankAccessService.setAllMembersVisibility(id, enabled);
+  }
+
+  /**
+   * Grants an individual user view access to an account (REQ-BANK-035).
+   *
+   * @param id the account
+   * @param userId the user to grant
+   * @return the refreshed settings
+   */
+  @PostMapping("/accounts/{id}/visibility/user/{userId}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Grant an individual user view access to an org-unit account")
+  public OrgUnitBankAccountSettingsDto addUserVisibility(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+    return orgUnitBankAccessService.addUserVisibility(id, userId);
+  }
+
+  /**
+   * Revokes an individual user's view access to an account (REQ-BANK-035).
+   *
+   * @param id the account
+   * @param userId the user to revoke
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/visibility/user/{userId}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Revoke an individual user's view access to an org-unit account")
+  public OrgUnitBankAccountSettingsDto removeUserVisibility(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+    return orgUnitBankAccessService.removeUserVisibility(id, userId);
   }
 
   /**
@@ -138,5 +340,41 @@ public class OrgUnitBankController {
   public BankBookingRequestDto cancelOwnBookingRequest(
       @PathVariable UUID id, @Valid @RequestBody CancelBankBookingRequest request) {
     return orgUnitBankAccessService.cancelOwnBookingRequest(id, request.version());
+  }
+
+  /**
+   * Wraps a Spring {@link Page} into the API's {@link PageResponse} envelope (mirrors {@code
+   * BankAccountController}).
+   *
+   * @param page the page to wrap
+   * @param <T> the row type
+   * @return the page envelope
+   */
+  private static <T> PageResponse<T> toPageResponse(@NotNull Page<T> page) {
+    return new PageResponse<>(
+        page.getContent(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements(),
+        page.getTotalPages(),
+        PaginationUtil.toSortStrings(page.getSort()));
+  }
+
+  /**
+   * Parses the {@code X-User-Time-Zone} header, silently dropping invalid IANA zones (the statement
+   * service falls back to UTC).
+   *
+   * @param userTimeZone the raw header value; may be {@code null} or blank
+   * @return the parsed zone, or {@code null}
+   */
+  private static ZoneId parse(String userTimeZone) {
+    if (userTimeZone == null || userTimeZone.isBlank()) {
+      return null;
+    }
+    try {
+      return ZoneId.of(userTimeZone);
+    } catch (DateTimeException ex) {
+      return null;
+    }
   }
 }

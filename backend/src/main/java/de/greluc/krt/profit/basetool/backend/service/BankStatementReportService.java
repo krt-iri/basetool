@@ -82,8 +82,9 @@ public class BankStatementReportService {
   private final MessageSource messageSource;
 
   /**
-   * Generates the statement PDF for one account and period and records the export in the audit log.
-   * Write transaction on purpose: the audit insert runs {@code MANDATORY} inside it.
+   * Generates the full bank-staff statement PDF (with the holder/Halter column) for one account and
+   * period and records the export. Equivalent to {@link #generateStatement(UUID, Instant, Instant,
+   * ZoneId, boolean)} with {@code redactHolders = false}.
    *
    * @param accountId the account
    * @param from period start (inclusive)
@@ -99,6 +100,35 @@ public class BankStatementReportService {
       @NotNull Instant from,
       @NotNull Instant to,
       @Nullable ZoneId userZone) {
+    return generateStatement(accountId, from, to, userZone, false);
+  }
+
+  /**
+   * Generates the statement PDF for one account and period and records the export in the audit log.
+   * Write transaction on purpose: the audit insert runs {@code MANDATORY} inside it.
+   *
+   * <p>When {@code redactHolders} is {@code true} the player-custody ("Halter") column is omitted —
+   * the redacted variant the org-unit-aware seam ({@code OrgUnitBankAccessService}) hands to
+   * org-unit viewers of an account they may see but do not staff (REQ-BANK-038): they get the full
+   * history (date / type / note / amount / running balance) but not who physically holds the money.
+   * Bank staff pass {@code false} and keep the full statement (REQ-BANK-014).
+   *
+   * @param accountId the account
+   * @param from period start (inclusive)
+   * @param to period end (inclusive); must not be before {@code from}
+   * @param userZone the zone to render timestamps in; {@code null} falls back to UTC
+   * @param redactHolders {@code true} to omit the holder/Halter column (org-unit viewers)
+   * @return the PDF bytes
+   * @throws NotFoundException when the account is unknown
+   * @throws BadRequestException when the period is inverted
+   */
+  @Transactional
+  public byte @NotNull [] generateStatement(
+      @NotNull UUID accountId,
+      @NotNull Instant from,
+      @NotNull Instant to,
+      @Nullable ZoneId userZone,
+      boolean redactHolders) {
     BankAccount account =
         bankAccountRepository
             .findById(accountId)
@@ -110,17 +140,22 @@ public class BankStatementReportService {
     BigDecimal opening = bankPostingRepository.accountBalanceBefore(accountId, from);
     List<BankBookingRow> rows = bankPostingRepository.findBookingsInPeriod(accountId, from, to);
     List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
+    // The holder column is redacted for org-unit viewers, so the holder-leg query is skipped too.
     Map<UUID, List<BankHolderLeg>> holderLegsByTx =
-        txIds.isEmpty()
+        (redactHolders || txIds.isEmpty())
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
 
-    byte[] pdf = buildPdf(account, from, to, opening, rows, holderLegsByTx, userZone);
+    byte[] pdf =
+        buildPdf(account, from, to, opening, rows, holderLegsByTx, userZone, redactHolders);
     bankAuditService.record(
         BankAuditEventType.STATEMENT_EXPORTED, accountId, null, null, "period=" + from + ".." + to);
     log.info(
-        "Bank statement exported for account {} ({} rows)", account.getAccountNo(), rows.size());
+        "Bank statement exported for account {} ({} rows{})",
+        account.getAccountNo(),
+        rows.size(),
+        redactHolders ? ", holders redacted" : "");
     return pdf;
   }
 
@@ -131,7 +166,8 @@ public class BankStatementReportService {
       @NotNull BigDecimal opening,
       @NotNull List<BankBookingRow> rows,
       @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx,
-      @Nullable ZoneId userZone) {
+      @Nullable ZoneId userZone,
+      boolean redactHolders) {
     ZoneId zone = userZone != null ? userZone : ZoneOffset.UTC;
     DateTimeFormatter stamp = DATE_TIME_PATTERN.withZone(zone);
 
@@ -160,12 +196,20 @@ public class BankStatementReportService {
 
       KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.statement.bookings"));
 
-      PdfPTable table = new PdfPTable(6);
+      // Org-unit viewers get the same history without the player-custody column (REQ-BANK-038): the
+      // redacted layout drops the "Halter" column entirely.
+      int columns = redactHolders ? 5 : 6;
+      PdfPTable table = new PdfPTable(columns);
       table.setWidthPercentage(100);
-      table.setWidths(new float[] {1.6f, 1.3f, 1.5f, 2.2f, 1.3f, 1.4f});
+      table.setWidths(
+          redactHolders
+              ? new float[] {1.6f, 1.3f, 2.7f, 1.3f, 1.4f}
+              : new float[] {1.6f, 1.3f, 1.5f, 2.2f, 1.3f, 1.4f});
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.date"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.type"));
-      KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
+      if (!redactHolders) {
+        KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
+      }
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.note"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.balance"));
@@ -175,22 +219,24 @@ public class BankStatementReportService {
       for (BankBookingRow row : rows) {
         running = running.add(row.amount());
         Color bg = KrtPdfSupport.rowBackground(alt);
-        String holder =
-            row.type() == BankTransactionType.WIPE_RESET
-                ? ""
-                : matchHolderHandle(
-                    holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
-                    row.amount().signum());
         KrtPdfSupport.addTableCell(table, stamp.format(row.createdAt()), bg, false);
         KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
-        KrtPdfSupport.addTableCell(table, holder, bg, false);
+        if (!redactHolders) {
+          String holder =
+              row.type() == BankTransactionType.WIPE_RESET
+                  ? ""
+                  : matchHolderHandle(
+                      holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
+                      row.amount().signum());
+          KrtPdfSupport.addTableCell(table, holder, bg, false);
+        }
         KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running), bg, true);
         alt = !alt;
       }
       if (rows.isEmpty()) {
-        KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), 6);
+        KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), columns);
       }
       krt.document().add(table);
 

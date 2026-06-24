@@ -184,6 +184,21 @@ public class BankProxyController {
   }
 
   /**
+   * Forwards setting/clearing an account's balance target (REQ-BANK-036). A {@code null} target in
+   * the body clears it.
+   *
+   * @param id the account
+   * @param body the target payload (target + echoed version)
+   * @return the updated account
+   */
+  @PatchMapping("/accounts/{id}/balance-target")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> setBalanceTarget(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
+    return patchMap("/api/v1/bank/accounts/" + id + "/balance-target", body);
+  }
+
+  /**
    * Forwards an account close (zero-balance rule enforced by the backend, 409 inline).
    *
    * @param id the account

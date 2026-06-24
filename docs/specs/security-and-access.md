@@ -34,7 +34,7 @@ The following must always hold and are enforced as ArchUnit rules in
 
 ### REQ-SEC-004 — Roles & hierarchy
 
-Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`.
+Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER`, `GUEST`.
 Hierarchy: `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`,
 `OFFICER > MISSION_MANAGER`. The full matrix is authoritative in
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
@@ -90,7 +90,7 @@ The application has a deliberately public surface so requesters and visitors can
 without a login. That surface is **minimal and identical for two cohorts** — *anonymous*
 callers (no JWT) and the *GUEST role* (an authenticated Keycloak user with no member or
 elevated authority). The discriminator is `AuthHelperService.isMemberOrAbove()` (true for
-`ADMIN`/`OFFICER`/`MISSION_MANAGER`/`LOGISTICIAN`/`SQUADRON_MEMBER`/`MEMBER`); its negation
+`ADMIN`/`OFFICER`/`MISSION_MANAGER`/`LOGISTICIAN`/`KRT_MEMBER`/`MEMBER`); its negation
 is the **"mission outsider"** predicate. A GUEST is treated exactly like an anonymous
 visitor on the mission surface — *behandle guest wie anonym bei den Einsätzen*.
 

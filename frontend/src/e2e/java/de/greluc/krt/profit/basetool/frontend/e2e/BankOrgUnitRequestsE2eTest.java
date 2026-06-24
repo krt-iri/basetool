@@ -41,7 +41,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <ul>
  *   <li><b>F1:</b> an officer who oversees a Staffel sees the balance-only card on the slim {@code
- *       /org-unit-bank} page, while a plain member is locked out (no card, no nav entry).
+ *       /org-unit-bank} page; a plain member may open the same member-or-above page and sees its
+ *       nav entry, but — overseeing and granted no account — no balance card (REQ-BANK-038).
  *   <li><b>F2:</b> the officer raises a deposit request through the modal (recorded {@code
  *       PENDING}, no money moved); a granted bank employee confirms it from the staff queue,
  *       recording a holder, which books the deposit onto the org-unit account; the requester can
@@ -122,8 +123,10 @@ class BankOrgUnitRequestsE2eTest {
   }
 
   /**
-   * F1: an officer sees their org unit's balance card on the slim page, while a plain member sees
-   * neither the card nor the nav entry — the page is gated to leadership roles, not bank staff.
+   * F1: an officer sees their org unit's balance card on the slim page; a plain member reaches the
+   * same member-or-above page and sees its nav entry, but — overseeing and granted no account — no
+   * balance card. The account-responsibility feature opened the page to every member (REQ-BANK-038,
+   * read-only drill-in); only the balance card itself stays scoped to oversight/grants.
    */
   @Test
   void officerSeesOrgUnitBalanceAndPlainMemberDoesNot() {
@@ -149,8 +152,10 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.waitForLoadState();
+        // The page opened to every member (REQ-BANK-038), so the member reaches it and sees the
+        // nav entry; overseeing and granted no account, they still see no balance card.
+        assertThat(page.locator("[data-testid='nav-org-unit-bank']")).isVisible();
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
-        assertThat(page.locator("[data-testid='nav-org-unit-bank']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-member");
         throw failure;

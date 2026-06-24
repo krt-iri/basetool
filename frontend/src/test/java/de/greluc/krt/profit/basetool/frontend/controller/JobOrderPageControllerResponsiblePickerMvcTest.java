@@ -86,7 +86,7 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void viewCreateForm_authenticated_requestingOffersBereichAndOl_responsibleStaysProfitStaffelSk()
       throws Exception {
     OrgUnitMembershipOptionDto profitStaffel =

@@ -175,6 +175,30 @@ class BankReportServiceTest {
   }
 
   @Test
+  void statement_redactedVariant_omitsHolderColumnButKeepsHistory() throws IOException {
+    // REQ-BANK-038: the org-unit-facing statement drops the player-custody (Halter) column entirely
+    // while the full booking history (amount/type/running balance) stays intact.
+    Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
+    deposit("500");
+    withdraw("200");
+    Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
+
+    String full =
+        extractText(statementService.generateStatement(account.getId(), before, after, null));
+    String redacted =
+        extractText(statementService.generateStatement(account.getId(), before, after, null, true));
+
+    // The full (bank-staff) statement names the holder; the redacted one does not.
+    assertTrue(full.contains(holderHandle), "full statement keeps the holder column");
+    assertFalse(redacted.contains(holderHandle), "redacted statement hides the holder handle");
+    assertFalse(redacted.contains("HALTER"), "redacted statement drops the Halter column header");
+    // The history itself is unchanged in the redacted variant.
+    assertTrue(redacted.contains("+500"), "deposit amount still present when redacted");
+    assertTrue(redacted.contains("-200"), "withdrawal amount still present when redacted");
+    assertTrue(redacted.contains("300 aUEC"), "closing balance still present when redacted");
+  }
+
+  @Test
   void statement_rejectsInvertedPeriodAndUnknownAccount() {
     // Given
     Instant now = Instant.now();

@@ -31,7 +31,7 @@
       { "name": "Officer", "description": "E2E test role" },
       { "name": "Logistician", "description": "E2E test role" },
       { "name": "Mission Manager", "description": "E2E test role" },
-      { "name": "Squadron Member", "description": "E2E test role" },
+      { "name": "KRT Member", "description": "E2E test role" },
       { "name": "Guest", "description": "E2E test role" },
       { "name": "Bank Employee", "description": "E2E test role" },
       { "name": "Bank Management", "description": "E2E test role" }
@@ -111,7 +111,7 @@
       "credentials": [
         { "type": "password", "value": "test-admin-pw", "temporary": false }
       ],
-      "realmRoles": ["Admin", "Officer", "Squadron Member"]
+      "realmRoles": ["Admin", "Officer", "KRT Member"]
     },
     {
       "username": "test-officer",
@@ -121,7 +121,7 @@
       "credentials": [
         { "type": "password", "value": "test-officer-pw", "temporary": false }
       ],
-      "realmRoles": ["Officer", "Squadron Member"]
+      "realmRoles": ["Officer", "KRT Member"]
     },
     {
       "username": "test-member",
@@ -131,7 +131,7 @@
       "credentials": [
         { "type": "password", "value": "test-member-pw", "temporary": false }
       ],
-      "realmRoles": ["Squadron Member"]
+      "realmRoles": ["KRT Member"]
     },
     {
       "username": "test-sk",
@@ -141,7 +141,7 @@
       "credentials": [
         { "type": "password", "value": "test-sk-pw", "temporary": false }
       ],
-      "realmRoles": ["Squadron Member"]
+      "realmRoles": ["KRT Member"]
     },
     {
       "username": "test-none",
@@ -151,7 +151,7 @@
       "credentials": [
         { "type": "password", "value": "test-none-pw", "temporary": false }
       ],
-      "realmRoles": ["Squadron Member"]
+      "realmRoles": ["KRT Member"]
     },
     {
       "username": "test-both",
@@ -161,7 +161,7 @@
       "credentials": [
         { "type": "password", "value": "test-both-pw", "temporary": false }
       ],
-      "realmRoles": ["Squadron Member"]
+      "realmRoles": ["KRT Member"]
     },
     {
       "username": "test-bereich",
@@ -171,7 +171,7 @@
       "credentials": [
         { "type": "password", "value": "test-bereich-pw", "temporary": false }
       ],
-      "realmRoles": ["Squadron Member"]
+      "realmRoles": ["KRT Member"]
     },
     {
       "username": "test-bank-employee",
@@ -201,7 +201,7 @@
       "credentials": [
         { "type": "password", "value": "test-bank-member-pw", "temporary": false }
       ],
-      "realmRoles": ["Bank Employee", "Squadron Member"]
+      "realmRoles": ["Bank Employee", "KRT Member"]
     },
     {
       "username": "test-appoint-bl",
@@ -211,7 +211,7 @@
       "credentials": [
         { "type": "password", "value": "test-appoint-bl-pw", "temporary": false }
       ],
-      "realmRoles": ["Squadron Member"]
+      "realmRoles": ["KRT Member"]
     },
     {
       "username": "test-appoint-tgt",
@@ -221,7 +221,7 @@
       "credentials": [
         { "type": "password", "value": "test-appoint-tgt-pw", "temporary": false }
       ],
-      "realmRoles": ["Squadron Member"]
+      "realmRoles": ["KRT Member"]
     }
   ]
 }

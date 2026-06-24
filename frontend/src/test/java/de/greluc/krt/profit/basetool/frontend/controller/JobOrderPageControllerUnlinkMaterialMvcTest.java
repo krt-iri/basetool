@@ -73,7 +73,7 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkMaterial_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
       throws Exception {
     // Given
@@ -100,7 +100,7 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void unlinkMaterial_AsPlainMember_ShouldReturn403() throws Exception {
     // Given
     UUID orderId = UUID.randomUUID();
@@ -116,7 +116,7 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkMaterial_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
     // Given
     UUID orderId = UUID.randomUUID();

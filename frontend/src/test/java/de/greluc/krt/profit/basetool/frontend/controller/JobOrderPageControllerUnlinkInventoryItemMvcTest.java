@@ -75,7 +75,7 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItem_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
       throws Exception {
     // Given
@@ -103,7 +103,7 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void unlinkInventoryItem_AsPlainMember_ShouldReturn403() throws Exception {
     // Given
     UUID orderId = UUID.randomUUID();
@@ -117,7 +117,7 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItem_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
     // Given
     UUID orderId = UUID.randomUUID();

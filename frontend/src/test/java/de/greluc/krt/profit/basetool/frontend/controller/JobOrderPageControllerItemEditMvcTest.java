@@ -98,7 +98,7 @@ class JobOrderPageControllerItemEditMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_itemOrderNoHandovers_rendersCreateFormInEditMode() throws Exception {
     UUID id = UUID.randomUUID();
     doReturn(order(id, "ITEM", List.of()))
@@ -115,7 +115,7 @@ class JobOrderPageControllerItemEditMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_nonItemOrder_redirectsWithError() throws Exception {
     UUID id = UUID.randomUUID();
     doReturn(order(id, "MATERIAL", List.of()))
@@ -130,7 +130,7 @@ class JobOrderPageControllerItemEditMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_itemOrderWithHandover_redirectsWithError() throws Exception {
     UUID id = UUID.randomUUID();
     JobOrderItemHandoverDto handover =
@@ -148,7 +148,7 @@ class JobOrderPageControllerItemEditMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updateItemOrder_relaysToBackendAndRedirects() throws Exception {
     UUID id = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
@@ -182,7 +182,7 @@ class JobOrderPageControllerItemEditMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void editForm_itemOrderWithLine_inlinesSavedItemNameForPicker() throws Exception {
     UUID id = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();

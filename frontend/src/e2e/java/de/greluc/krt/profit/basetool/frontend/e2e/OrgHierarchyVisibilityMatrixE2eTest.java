@@ -56,9 +56,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * at the unit level ({@code OwnerScopeServiceTest.CascadingScopeTests}); this e2e drives the new
  * Bereich-leadership path through the real stack end-to-end.
  *
- * <p><b>Fixtures.</b> {@code test-bereich} is a dedicated realm user carrying only the {@code
- * Squadron Member} base role and <em>no</em> Staffel membership, so it can be made a Bereichsleiter
- * without tripping the leader-excludes-Staffel invariant (REQ-ORG-017). It is this suite's own
+ * <p><b>Fixtures.</b> {@code test-bereich} is a dedicated realm user carrying only the {@code KRT
+ * Member} base role and <em>no</em> Staffel membership, so it can be made a Bereichsleiter without
+ * tripping the leader-excludes-Staffel invariant (REQ-ORG-017). It is this suite's own
  * membership-shape-owned profile: making a user a Bereich leader gives it a Bereich membership for
  * the rest of the sequentially-run shared stack, so we must <em>not</em> reuse {@code test-none} —
  * the dedicated membershipless user that {@code RefineryOrderTenancyE2eTest} and {@code

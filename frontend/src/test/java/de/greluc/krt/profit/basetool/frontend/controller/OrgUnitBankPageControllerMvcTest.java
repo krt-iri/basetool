@@ -90,7 +90,9 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("1850000"),
             true,
             new BigDecimal("420000"),
-            List.of(new BigDecimal("1430000"), new BigDecimal("1850000")));
+            List.of(new BigDecimal("1430000"), new BigDecimal("1850000")),
+            new BigDecimal("2000000"),
+            true);
     BankBookingRequestDto request =
         new BankBookingRequestDto(
             UUID.randomUUID(),
@@ -154,8 +156,17 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"SQUADRON_MEMBER"})
-  void orgUnitBank_plainMemberIsForbidden() throws Exception {
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void orgUnitBank_memberIsPermitted() throws Exception {
+    // REQ-BANK-037: the page is reachable by any KRT member (the cartel account is visible to all,
+    // and a member may have been granted access to other accounts); the backend seam scopes the
+    // visible accounts. The member sees an empty page here because no data is stubbed.
+    mockMvc.perform(get("/org-unit-bank")).andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(roles = {"GUEST"})
+  void orgUnitBank_guestIsForbidden() throws Exception {
     mockMvc.perform(get("/org-unit-bank")).andExpect(status().isForbidden());
   }
 
@@ -178,7 +189,9 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("250000"),
             false,
             BigDecimal.ZERO,
-            List.of());
+            List.of(),
+            null,
+            false);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of(special));

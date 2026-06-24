@@ -90,7 +90,7 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void approvedUser_passesThrough() throws Exception {
-    authenticateWith("ROLE_SQUADRON_MEMBER", "HANGAR_WRITE");
+    authenticateWith("ROLE_KRT_MEMBER", "HANGAR_WRITE");
     FilterChain chain = mock(FilterChain.class);
 
     MockHttpServletResponse response = run("POST", "/api/v1/inventory", chain);
