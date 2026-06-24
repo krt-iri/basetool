@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Crew-Board (Teilnehmer & Einheiten): Teilnehmer per Drag & Drop ins Leere entfernen und am Rand automatisch scrollen.** Zieht man einen Teilnehmer aus einer Einheit und lässt ihn über keiner anderen Einheit (im leeren Bereich) los, wird er aus der Einheit entfernt und wieder unter „Ohne Einheit" geführt — man muss bei langen Listen nicht mehr bis zum Pool scrollen. Während des Ziehens scrollt die Seite automatisch, wenn man den oberen oder unteren Fensterrand erreicht, sodass auch gerade nicht sichtbare Einheiten als Ziel erreichbar sind.
+
 ## [v0.7.13](https://github.com/krt-profit/basetool/releases/tag/v0.7.13) - 2026-06-24
 
 ### Added

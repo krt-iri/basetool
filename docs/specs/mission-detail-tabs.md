@@ -56,7 +56,13 @@ click fallback (select person → click target) **and** keyboard (rows and zones
 Enter/Space selects and assigns) — all three drive the **existing** crew endpoints
 (`POST/PUT/DELETE …/units/{u}/crew[/{c}]/ajax`); a drop equals the action of the former
 "Crew zuweisen" modal. Moving between units is remove + add; dropping on the pool removes the
-assignment.
+assignment. Releasing a drag **outside every `.drop-zone`** (over no unit and not over the pool)
+also removes the unit assignment — the participant falls back into "Ohne Einheit", so a row deep in
+a long board can be unassigned by dragging into empty space without scrolling to the pool; a pool
+row dragged into empty space is a no-op. While a crew row is being dragged, holding the pointer
+near the **top or bottom viewport edge auto-scrolls the page** (speed eases with depth into the
+edge band) so units scrolled out of view stay reachable as drop targets; the scroll stops on drop /
+drag-end.
 
 Each person row shows: check-in status dot, name (+ guest chip), org-unit badges (incl. SK),
 desired job, planned job, comment as a tooltip mark, on-board function(s), check-in/check-out

@@ -3452,6 +3452,41 @@
 
         let dragged = null;
         let selected = null;
+        // True once the active drag was released on a real drop-zone; lets `dragend`
+        // distinguish "released over no unit" (→ remove the assignment) from a genuine
+        // zone drop (which already handled the move).
+        let droppedOnZone = false;
+
+        // ---- Edge auto-scroll while dragging a crew row. ----
+        // Native HTML5 drag does not scroll the page, so a unit scrolled out of view is
+        // unreachable as a drop target on a long board. We drive the scroll ourselves:
+        // a document-level `dragover` (fires as the pointer moves) sets a direction when
+        // the pointer enters the top/bottom edge band, and a rAF loop keeps scrolling —
+        // even while the pointer is held still in the band — until the drag ends or the
+        // pointer leaves the band. Speed eases with distance into the band.
+        const EDGE_ZONE_PX = 72;
+        const MAX_SCROLL_STEP_PX = 22;
+        let autoScrollDir = 0; // -1 = up, +1 = down, 0 = idle
+        let autoScrollStep = 0;
+        let autoScrollRaf = null;
+
+        function autoScrollTick() {
+            if (autoScrollDir === 0) {
+                autoScrollRaf = null;
+                return;
+            }
+            window.scrollBy(0, autoScrollDir * autoScrollStep);
+            autoScrollRaf = window.requestAnimationFrame(autoScrollTick);
+        }
+
+        function stopAutoScroll() {
+            autoScrollDir = 0;
+            autoScrollStep = 0;
+            if (autoScrollRaf !== null) {
+                window.cancelAnimationFrame(autoScrollRaf);
+                autoScrollRaf = null;
+            }
+        }
 
         function setSelected(row) {
             if (selected) {
@@ -3508,9 +3543,25 @@
             const row = e.target.closest('.person-row');
             if (!row || !board.contains(row)) return;
             dragged = row;
+            droppedOnZone = false;
             if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
         });
-        board.addEventListener('dragend', function () { dragged = null; });
+        // A drag released outside every drop-zone — over no unit and not over the pool —
+        // falls back to removing the unit assignment, so a participant deep in a long
+        // board can be unassigned by dragging into empty space (mirrors a pool drop).
+        // Pool rows (no unit) are a no-op. dragend always fires, so it also halts the
+        // edge auto-scroll and clears the drag state.
+        board.addEventListener('dragend', function () {
+            if (dragged && !droppedOnZone) {
+                const pool = document.getElementById('board-pool');
+                if (pool && dragged.getAttribute('data-crew-id') && dragged.getAttribute('data-unit-id')) {
+                    moveParticipant(dragged, pool);
+                }
+            }
+            stopAutoScroll();
+            dragged = null;
+            droppedOnZone = false;
+        });
 
         // Click: a row toggles its selection; a zone (empty space) receives the selected person.
         board.addEventListener('click', function (e) {
@@ -3567,8 +3618,33 @@
             if (!zone || !board.contains(zone)) return;
             e.preventDefault();
             zone.classList.remove('is-over');
+            droppedOnZone = true;
+            stopAutoScroll();
             if (dragged && !zone.contains(dragged)) {
                 moveParticipant(dragged, zone);
+            }
+        });
+
+        // Edge auto-scroll driver — document-level so the band stays live even when the
+        // pointer leaves the board (e.g. over the sticky header) mid-drag. Gated on an
+        // active crew drag; never calls preventDefault, so it does not affect drop
+        // eligibility (the board-level dragover still governs that per zone).
+        document.addEventListener('dragover', function (e) {
+            if (!dragged) return;
+            const y = e.clientY;
+            const h = window.innerHeight;
+            if (y <= EDGE_ZONE_PX) {
+                autoScrollDir = -1;
+                autoScrollStep = Math.ceil(MAX_SCROLL_STEP_PX * (EDGE_ZONE_PX - y) / EDGE_ZONE_PX);
+            } else if (y >= h - EDGE_ZONE_PX) {
+                autoScrollDir = 1;
+                autoScrollStep = Math.ceil(MAX_SCROLL_STEP_PX * (y - (h - EDGE_ZONE_PX)) / EDGE_ZONE_PX);
+            } else {
+                autoScrollDir = 0;
+                autoScrollStep = 0;
+            }
+            if (autoScrollDir !== 0 && autoScrollRaf === null) {
+                autoScrollRaf = window.requestAnimationFrame(autoScrollTick);
             }
         });
 
@@ -3609,6 +3685,8 @@
             if (ev.detail && ev.detail.container === board) {
                 selected = null;
                 dragged = null;
+                droppedOnZone = false;
+                stopAutoScroll();
             }
         });
     })();

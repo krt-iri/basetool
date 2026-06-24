@@ -35,8 +35,9 @@ import org.junit.jupiter.api.Test;
  * Ad-hoc visual verification harness for the mission tab layout against an ALREADY RUNNING local
  * test stack ({@code E2E_BASE_URL} + {@code MISSION_ID} env). Logs in as the synthetic test admin,
  * walks all four tabs, captures full-page screenshots under {@code build/e2e/}, dumps console
- * errors, probes the chip-select computed styles, and performs one board drag&drop. Not part of CI
- * — it requires a pre-seeded mission id.
+ * errors, probes the chip-select computed styles, and performs two board drag&drops (pool→unit, and
+ * unit→empty-space which returns the participant to the pool). Not part of CI — it requires a
+ * pre-seeded mission id.
  */
 @Tag("e2e")
 class MissionTabsMockupCheckE2eTest {
@@ -146,6 +147,25 @@ class MissionTabsMockupCheckE2eTest {
             new Page.ScreenshotOptions()
                 .setFullPage(true)
                 .setPath(Paths.get("build", "e2e", "tab-crew-after-drag.png")));
+      }
+
+      // Drag a unit row OUT onto the section header (not a drop-zone): releasing over
+      // no unit returns the participant to the "Ohne Einheit" pool, mirroring a pool
+      // drop. This is the long-board unassign gesture — no need to scroll to the pool.
+      Locator unitRow = page.locator(".board-units .drop-zone .person-row").first();
+      if (unitRow.count() > 0) {
+        int poolBeforeRemove = page.locator("#board-pool .person-row").count();
+        System.out.println("[mockup-check] pool rows before drag-out: " + poolBeforeRemove);
+        unitRow.dragTo(page.locator(".sec-h").first());
+        page.waitForTimeout(2500);
+        E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
+        page.waitForLoadState();
+        int poolAfterRemove = page.locator("#board-pool .person-row").count();
+        System.out.println("[mockup-check] pool rows after drag-out: " + poolAfterRemove);
+        page.screenshot(
+            new Page.ScreenshotOptions()
+                .setFullPage(true)
+                .setPath(Paths.get("build", "e2e", "tab-crew-after-drag-out.png")));
       }
 
       System.out.println("[mockup-check] console messages:\n" + consoleLog);
