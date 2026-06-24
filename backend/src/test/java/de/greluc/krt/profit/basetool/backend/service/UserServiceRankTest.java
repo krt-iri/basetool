@@ -91,7 +91,7 @@ class UserServiceRankTest {
     user.setId(id);
     user.setVersion(0L);
     Role memberRole = new Role();
-    memberRole.setName("SQUADRON_MEMBER");
+    memberRole.setName("KRT_MEMBER");
     user.setRoles(Set.of(memberRole));
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
@@ -109,7 +109,7 @@ class UserServiceRankTest {
     user.setId(id);
     user.setVersion(0L);
     Role memberRole = new Role();
-    memberRole.setName("SQUADRON_MEMBER");
+    memberRole.setName("KRT_MEMBER");
     user.setRoles(Set.of(memberRole));
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));

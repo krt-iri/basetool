@@ -71,7 +71,7 @@ documents cover everything else:
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)                                                               | Community standards (Contributor Covenant 3.0).                                                                                                                                                                                                   |
 | [.github/SECURITY.md](.github/SECURITY.md)                                                             | Security policy — how to report a vulnerability via GitHub Private Vulnerability Reporting, supported versions, scope, safe harbor, release verification (Cosign, SLSA, SBOM).                                                                    |
 | [LICENSE.md](LICENSE.md)                                                                               | GNU General Public License v3.0.                                                                                                                                                                                                                  |
-| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md)                                                   | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `SQUADRON_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface.                                       |
+| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md)                                                   | Full role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER`, `GUEST`, plus the per-SK `Lead` role) and the anonymous / unauthenticated public request surface.                                            |
 | [docs/specs/INDEX.md](docs/specs/INDEX.md)                                                             | Registry of the canonical, binding requirement specs (`REQ-<AREA>-NNN`) — security & access, org-unit tenancy, data persistence, API conventions, observability, UI design system and the per-feature specs.                                      |
 | [docs/adr/README.md](docs/adr/README.md)                                                               | Architecture Decision Records — every architecturally significant decision, recorded before or with the change that implements it.                                                                                                                |
 | [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md)             | "DAS KARTELL" design system / Corporate Design Manual — the source of truth for brand colors, typography, the department palette and UI components. A git submodule of [`krt-profit/design-system`](https://github.com/krt-profit/design-system). |
@@ -486,7 +486,7 @@ worktree; the commands are identical).
        'enabled': True, 'emailVerified': True,
        'email': 'test-admin@example.test',
        'credentials': [{'type': 'password', 'value': 'test-admin-pw', 'temporary': False}],
-       'realmRoles': ['Admin', 'Officer', 'Squadron Member', 'default-roles-iri',
+       'realmRoles': ['Admin', 'Officer', 'KRT Member', 'default-roles-iri',
                       'offline_access', 'uma_authorization'],
    }]
    json.dump(r, open('realm-export.json', 'w', encoding='utf-8'), indent=2, ensure_ascii=False)

@@ -61,10 +61,9 @@ public class AuthHelperService {
    * The authorities that mark a caller as a registered organisation member (or a role above it). A
    * caller that reaches none of these — i.e. an anonymous request OR an authenticated but role-less
    * {@code GUEST} account — is treated as a mission "outsider" by {@link #isMemberOrAbove()}. The
-   * elevated roles are listed explicitly (not only {@code ROLE_SQUADRON_MEMBER}) because the role
+   * elevated roles are listed explicitly (not only {@code ROLE_KRT_MEMBER}) because the role
    * hierarchy promotes {@code ADMIN}/{@code OFFICER} to {@code LOGISTICIAN}/{@code MISSION_MANAGER}
-   * but never down to {@code SQUADRON_MEMBER}; the legacy {@code ROLE_MEMBER} alias is kept for
-   * accounts whose Keycloak realm role predates the {@code SQUADRON_MEMBER} rename.
+   * but never down to {@code KRT_MEMBER}.
    */
   private static final Set<String> MEMBER_OR_ABOVE_ROLES =
       Set.of(
@@ -72,8 +71,7 @@ public class AuthHelperService {
           "ROLE_OFFICER",
           "ROLE_MISSION_MANAGER",
           "ROLE_LOGISTICIAN",
-          "ROLE_SQUADRON_MEMBER",
-          "ROLE_MEMBER");
+          "ROLE_KRT_MEMBER");
 
   /**
    * Returns the current {@link Authentication}, or empty if no security context is bound, the
@@ -145,7 +143,7 @@ public class AuthHelperService {
 
   /**
    * {@code true} when the current caller is a registered organisation member or holds an elevated
-   * role ({@code SQUADRON_MEMBER}/{@code MEMBER}/{@code LOGISTICIAN}/{@code MISSION_MANAGER}/{@code
+   * role ({@code KRT_MEMBER}/{@code MEMBER}/{@code LOGISTICIAN}/{@code MISSION_MANAGER}/{@code
    * OFFICER}/{@code ADMIN}), evaluated through the configured {@link RoleHierarchy}.
    *
    * <p>Its negation is the project's "mission outsider" predicate: it returns {@code false} for an

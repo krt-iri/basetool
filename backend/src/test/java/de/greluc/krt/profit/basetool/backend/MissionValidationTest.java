@@ -280,7 +280,7 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(caller.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk());
@@ -323,7 +323,7 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(caller.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isForbidden());
@@ -364,7 +364,7 @@ class MissionValidationTest {
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(caller.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isConflict());

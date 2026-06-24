@@ -396,18 +396,18 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/missions/*/participants/*/slim")
                     .permitAll()
                     .requestMatchers("/api/v1/users/search")
-                    .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
+                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
                     // BANK_MANAGEMENT widening (REQ-BANK-009): the grants UI resolves grantees
                     // via the user lookup, and bank staff need not hold any org-role
                     // (REQ-BANK-008) — without this, a pure bank manager would receive 403 here.
                     .requestMatchers("/api/v1/users/lookup")
-                    .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER", "BANK_MANAGEMENT")
+                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER", "BANK_MANAGEMENT")
                     .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/users")
-                    .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
+                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
-                    .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
+                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
                     // Post Phase-4-Lockdown (MULTI_SQUADRON_PLAN.md section 2): flag-vergabe
                     // (Logistician/Mission-Manager) und attribute-patches sind admin-only. Die
                     // method-level @PreAuthorize auf UserController#patchLogistician /
@@ -434,7 +434,7 @@ public class SecurityConfig {
                     // (defense in depth) und bleibt das Source-of-truth fuer die zulaessigen
                     // Rollen — die URL-Regel oeffnet nur das Tor.
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*/memberships")
-                    .hasAnyRole("ADMIN", "OFFICER", "SQUADRON_MEMBER", "MEMBER")
+                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
                     .requestMatchers("/api/v1/users/**")
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")
@@ -455,7 +455,7 @@ public class SecurityConfig {
                         "/api/v1/inventory/my-inventory", "/api/v1/inventory/my-inventory/**")
                     .authenticated()
                     .requestMatchers("/api/v1/inventory", "/api/v1/inventory/**")
-                    .hasAnyRole("ADMIN", "OFFICER", "LOGISTICIAN", "SQUADRON_MEMBER", "MEMBER")
+                    .hasAnyRole("ADMIN", "OFFICER", "LOGISTICIAN", "KRT_MEMBER")
                     .requestMatchers("/api/v1/personal-inventory", "/api/v1/personal-inventory/**")
                     .authenticated()
                     .requestMatchers("/api/v1/uex/locations/**")

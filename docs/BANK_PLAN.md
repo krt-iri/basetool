@@ -91,7 +91,7 @@ start.
   `operations-index.html` + `static/js/datetime-splitter.js`.
 - **User selection:** `GET /api/v1/users/lookup` → `UserReferenceDto`, rendered into a
   `<select>` enhanced by `krt-searchable-select.js`. **Gate caveat:** the endpoint is
-  `hasAnyRole('ADMIN','OFFICER','SQUADRON_MEMBER','MEMBER')` — bank management is none
+  `hasAnyRole('ADMIN','OFFICER','KRT_MEMBER')` — bank management is none
   of these, so Phase 1 must widen the gate by `'BANK_MANAGEMENT'` (URL matrix +
   `@PreAuthorize`) or the grants UI gets 403 on user lookup.
 - **E2E:** Java Playwright under `frontend/src/e2e/java/...e2e/`, `@Tag("e2e")`,

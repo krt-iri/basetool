@@ -61,7 +61,7 @@ public class ProfitCalculationPageController {
    * @return the {@code materials-profit-calculation} view name
    */
   @GetMapping
-  @PreAuthorize("hasAnyRole('SQUADRON_MEMBER', 'MEMBER', 'OFFICER', 'ADMIN')")
+  @PreAuthorize("hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN')")
   public String showProfitCalculationPage(Model model) {
     log.debug("Showing profit calculation page");
     try {

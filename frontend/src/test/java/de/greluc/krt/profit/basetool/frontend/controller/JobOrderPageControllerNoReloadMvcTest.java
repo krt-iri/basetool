@@ -130,7 +130,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updatePriorityAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
@@ -152,7 +152,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updatePriorityAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
@@ -171,7 +171,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void updatePriorityAjax_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
     UUID orderId = UUID.randomUUID();
 
@@ -183,7 +183,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItemAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
@@ -203,7 +203,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItemAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
@@ -219,7 +219,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void unlinkInventoryItemAjax_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
@@ -265,7 +265,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updateOrderAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(eq("/api/v1/orders/" + orderId), any(), eq(JobOrderDto.class)))
@@ -282,7 +282,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updateOrderAjax_EmptyMaterials_Returns400WithoutCallingBackend() throws Exception {
     UUID orderId = UUID.randomUUID();
 
@@ -299,7 +299,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void updateOrderAjax_AsPlainMember_Returns403() throws Exception {
     UUID orderId = UUID.randomUUID();
 
@@ -320,7 +320,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
@@ -337,7 +337,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandoverAjax_EmptyItems_Returns400() throws Exception {
     UUID orderId = UUID.randomUUID();
 
@@ -351,7 +351,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void createHandoverAjax_AsPlainMember_Returns403() throws Exception {
     UUID orderId = UUID.randomUUID();
 
@@ -365,7 +365,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createItemHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
@@ -385,7 +385,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createOrderAjax_ValidMaterial_ReturnsNavigationTarget() throws Exception {
     // Routed by X-Requested-With; returns the post-create navigation target as JSON (the page
     // navigates itself) instead of a server redirect.
@@ -405,7 +405,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createOrderAjax_EmptyMaterials_Returns400WithoutCallingBackend() throws Exception {
     mockMvc
         .perform(
@@ -420,7 +420,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createItemOrderAjax_ValidLine_ReturnsNavigationTarget() throws Exception {
     mockMvc
         .perform(

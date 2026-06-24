@@ -32,6 +32,12 @@ import org.jetbrains.annotations.Nullable;
  * is a whole-aUEC amount of at least 1 (the constraints skip a {@code null} value by
  * Bean-Validation semantics, so clearing stays valid).
  *
+ * <p>Intentionally a separate, field-identical sibling of {@code SetBankBalanceTargetRequest}: this
+ * one is the body of the org-unit-facing {@code PUT …/org-units/bank/accounts/{id}/balance-target}
+ * while that one backs the bank-staff {@code PATCH …/bank/accounts/{id}/balance-target}. Kept
+ * distinct per API surface (REQ-API) so either can evolve without coupling the two endpoints'
+ * contracts; the duplication is deliberate, not an oversight.
+ *
  * @param target the new balance target, or {@code null} to clear it
  * @param version optimistic-locking version the client read (REQ-BANK-018); a mismatch surfaces as
  *     409 {@code OPTIMISTIC_LOCK}

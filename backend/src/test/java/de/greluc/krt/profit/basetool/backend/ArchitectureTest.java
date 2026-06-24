@@ -1175,7 +1175,7 @@ class ArchitectureTest {
    * structurally by giving the records only safe components, but a future maintainer could ship a
    * "small convenience" patch like adding {@code UUID owningSquadronId} to {@code
    * CreateMissionRequest} and re-wiring the service to honour it — that single step re-opens the
-   * squadron-stamp-forgery vector (an authenticated SQUADRON_MEMBER of squadron A creates a mission
+   * squadron-stamp-forgery vector (an authenticated KRT_MEMBER of squadron A creates a mission
    * stamped as squadron B's, optionally with {@code isInternal=true} so it is hidden from A's
    * roster).
    *

@@ -39,7 +39,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <ul>
  *   <li><b>Handover</b> ({@code order-handover-open}) — {@code hasAnyRole('LOGISTICIAN', 'OFFICER',
- *       'ADMIN')}: hidden from a plain Squadron Member, shown to an Officer.
+ *       'ADMIN')}: hidden from a plain KRT Member, shown to an Officer.
  *   <li><b>Edit</b> (the {@code edit-modal} trigger) — {@code hasRole('LOGISTICIAN')}: hidden from
  *       a Member, shown to an Officer (and Admin, via the role hierarchy).
  *   <li><b>Delete</b> (the {@code /delete} form) — {@code hasRole('ADMIN')}: hidden from both
@@ -117,9 +117,7 @@ class RolePermissionsE2eTest {
     }
   }
 
-  /**
-   * A plain Squadron Member opens the order but the role-gated handover control is not rendered.
-   */
+  /** A plain KRT Member opens the order but the role-gated handover control is not rendered. */
   @Test
   void squadronMemberDoesNotSeeTheHandoverControl() {
     assertHandoverControlVisibility(MEMBER_USER, MEMBER_PASSWORD, false);
@@ -131,7 +129,7 @@ class RolePermissionsE2eTest {
     assertHandoverControlVisibility(OFFICER_USER, OFFICER_PASSWORD, true);
   }
 
-  /** A plain Squadron Member sees neither the (LOGISTICIAN) edit nor the (ADMIN) delete control. */
+  /** A plain KRT Member sees neither the (LOGISTICIAN) edit nor the (ADMIN) delete control. */
   @Test
   void squadronMemberSeesNoEditOrDeleteControls() {
     assertEditAndDeleteControls(MEMBER_USER, MEMBER_PASSWORD, false, false);

@@ -78,7 +78,7 @@ class BankGrantServiceTest {
   @Test
   void createGrant_rejectsGranteeWithoutBankRole() {
     // Given: a user with only org roles — org-unit membership does not qualify (REQ-BANK-008)
-    User user = userWithRoleCodes("SQUADRON_MEMBER", "OFFICER");
+    User user = userWithRoleCodes("KRT_MEMBER", "OFFICER");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
 

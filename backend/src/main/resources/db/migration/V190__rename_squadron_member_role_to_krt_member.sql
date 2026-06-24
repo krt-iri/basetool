@@ -1,0 +1,14 @@
+-- Rename the base member role from SQUADRON_MEMBER / "Squadron Member" to
+-- KRT_MEMBER / "KRT Member" (hard cutover). The Keycloak realm role is renamed to
+-- "KRT Member" in the same deploy window, so the JWT-derived authority resolves to
+-- ROLE_KRT_MEMBER and every @PreAuthorize / sec:authorize gate now reads KRT_MEMBER.
+--
+-- DataInitializer looks roles up by `code` (V73), so renaming the code here is what
+-- stops it from creating a SECOND role row ("KRT Member") next to the legacy one on
+-- the next boot. The matching display `name` is renamed too so UserService#syncUser
+-- (which maps the JWT realm-role NAME -> role row via findByNameIgnoreCase) resolves
+-- the renamed Keycloak role.
+--
+-- No-op on a fresh database (the row is seeded directly as KRT_MEMBER by
+-- DataInitializer after migrations run); renames the existing row on an upgraded one.
+UPDATE role SET code = 'KRT_MEMBER', name = 'KRT Member' WHERE code = 'SQUADRON_MEMBER';

@@ -99,7 +99,7 @@ class SpecialCommandControllerTest {
   void getAll_includeInactive_withoutAdminAuth_throwsAccessDenied() {
     Authentication memberAuth =
         new UsernamePasswordAuthenticationToken(
-            "member", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+            "member", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
 
     assertThrows(
         AccessDeniedException.class,

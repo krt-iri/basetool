@@ -127,7 +127,7 @@ class MembersPageDiscordColumnRenderTest {
         null,
         5,
         null,
-        Set.of("ROLE_SQUADRON_MEMBER"),
+        Set.of("ROLE_KRT_MEMBER"),
         Set.of(),
         null,
         false,

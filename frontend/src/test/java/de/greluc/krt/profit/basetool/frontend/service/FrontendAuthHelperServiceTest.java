@@ -59,7 +59,7 @@ class FrontendAuthHelperServiceTest {
   @Test
   void isMemberOrAbove_withSquadronMemberRole_returnsTrue() {
     // Given
-    authenticateWith("ROLE_SQUADRON_MEMBER");
+    authenticateWith("ROLE_KRT_MEMBER");
     // When / Then
     assertTrue(service.isMemberOrAbove(), "a squadron member is a member or above");
   }

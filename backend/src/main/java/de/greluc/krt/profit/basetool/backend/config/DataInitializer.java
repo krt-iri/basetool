@@ -58,9 +58,7 @@ public class DataInitializer {
       // Lookup is by `code`, not by `name`: an admin renaming a role no longer
       // triggers a silent re-create with default permissions on the next boot.
       createRoleIfNotFound(
-          "SQUADRON_MEMBER",
-          "Squadron Member",
-          Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ"));
+          "KRT_MEMBER", "KRT Member", Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ"));
       createRoleIfNotFound(
           "OFFICER",
           "Officer",

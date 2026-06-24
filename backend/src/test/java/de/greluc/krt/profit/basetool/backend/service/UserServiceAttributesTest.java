@@ -282,7 +282,7 @@ class UserServiceAttributesTest {
       // Just above the 13-20 range.
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("SQUADRON_MEMBER"))));
+      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
       assertThrows(
@@ -305,7 +305,7 @@ class UserServiceAttributesTest {
     private void assertSquadronRankPasses(int rank) {
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("SQUADRON_MEMBER"))));
+      user.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(user)).thenReturn(user);
 
@@ -536,7 +536,7 @@ class UserServiceAttributesTest {
 
       UUID currentId = UUID.randomUUID();
       User current = newUser(currentId);
-      current.setRoles(new HashSet<>(Set.of(roleNamed("SQUADRON_MEMBER"))));
+      current.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(toDelete));
       when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));

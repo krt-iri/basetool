@@ -65,7 +65,7 @@ class SpecialCommandSecurityServiceTest {
   void setUp() {
     authenticatedMember =
         new UsernamePasswordAuthenticationToken(
-            "member", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+            "member", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
   }
 
   @Test

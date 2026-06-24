@@ -331,8 +331,12 @@ public class OrgUnitBankAccessService {
   /**
    * Sets, changes or clears an account's balance target (REQ-BANK-036). Only the responsible holder
    * may do this from the org-unit side; bank staff use the bank surface. A {@code null} target
-   * clears the goal; a present target must be positive. {@code saveAndFlush} writes back the bumped
-   * {@code @Version} within the transaction so the form can echo it next time (REQ-FE-003).
+   * clears the goal; a present target is a positive whole amount — enforced at the API boundary by
+   * the {@code @Valid} {@code OrgUnitBalanceTargetRequest}'s
+   * {@code @DecimalMin("1")}/{@code @WholeNumber} constraints (same gate the bank-surface path
+   * relies on), so the service trusts the validated input rather than re-checking it. {@code
+   * saveAndFlush} writes back the bumped {@code @Version} within the transaction so the form can
+   * echo it next time (REQ-FE-003).
    *
    * @param accountId the account
    * @param target the new target, or {@code null} to clear it
@@ -340,7 +344,6 @@ public class OrgUnitBankAccessService {
    * @return the refreshed settings
    * @throws NotFoundException when the account does not exist
    * @throws AccessDeniedException when the caller may not set the target
-   * @throws BadRequestException when the target is present but not positive
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
   @NotNull
@@ -350,9 +353,6 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanSetTarget(account);
     requireVersionMatch(account, version);
-    if (target != null && target.signum() <= 0) {
-      throw new BadRequestException("The balance target must be a positive amount");
-    }
     account.setBalanceTarget(target);
     bankAccountRepository.saveAndFlush(account);
     bankAuditService.record(

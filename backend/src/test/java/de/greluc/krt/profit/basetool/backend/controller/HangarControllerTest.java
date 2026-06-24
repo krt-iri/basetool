@@ -173,7 +173,7 @@ class HangarControllerTest {
   void getSquadronOverview_whenCallerIsPlainUser_hidesOwnerDetails() {
     Authentication user =
         new UsernamePasswordAuthenticationToken(
-            "carol", "n/a", List.of(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER")));
+            "carol", "n/a", List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
     when(hangarService.getSquadronOverview(any(Pageable.class), eq(false), isNull()))
         .thenReturn(page);

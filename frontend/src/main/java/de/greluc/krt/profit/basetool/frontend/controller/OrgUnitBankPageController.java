@@ -58,7 +58,7 @@ public class OrgUnitBankPageController {
 
   /** Any KRT member (or above) may reach the page; the backend seam scopes the data per account. */
   private static final String MEMBER_OR_ABOVE =
-      "hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','SQUADRON_MEMBER','MEMBER')";
+      "hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER')";
 
   private final BackendApiClient backendApiClient;
 

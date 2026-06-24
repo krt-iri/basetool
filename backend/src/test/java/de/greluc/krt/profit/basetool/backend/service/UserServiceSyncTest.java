@@ -468,11 +468,11 @@ class UserServiceSyncTest {
       Jwt jwt =
           newJwt(
               USER_ID.toString(),
-              Map.of("realm_access", Map.of("roles", List.of("ADMIN", "SQUADRON_MEMBER"))));
+              Map.of("realm_access", Map.of("roles", List.of("ADMIN", "KRT_MEMBER"))));
 
       Set<String> roles = userService.extractRolesFromJwt(jwt);
 
-      assertEquals(Set.of("ADMIN", "SQUADRON_MEMBER"), roles);
+      assertEquals(Set.of("ADMIN", "KRT_MEMBER"), roles);
     }
 
     @Test

@@ -278,7 +278,7 @@ class LogisticianRoleTest {
     mockMvc
         .perform(
             get("/api/v1/inventory/aggregated")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 
@@ -287,7 +287,7 @@ class LogisticianRoleTest {
     mockMvc
         .perform(
             get("/api/v1/inventory/material/" + UUID.randomUUID())
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(
             status().isNotFound()); // NotFound because material ID doesn't exist, but NOT 403
   }
@@ -297,7 +297,7 @@ class LogisticianRoleTest {
     mockMvc
         .perform(
             get("/api/v1/inventory/all")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 

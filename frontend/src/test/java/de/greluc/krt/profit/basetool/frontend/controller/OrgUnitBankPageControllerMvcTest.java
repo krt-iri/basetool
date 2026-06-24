@@ -156,7 +156,7 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"SQUADRON_MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void orgUnitBank_memberIsPermitted() throws Exception {
     // REQ-BANK-037: the page is reachable by any KRT member (the cartel account is visible to all,
     // and a member may have been granted access to other accounts); the backend seam scopes the

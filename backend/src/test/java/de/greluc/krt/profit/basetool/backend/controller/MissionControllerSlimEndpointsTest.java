@@ -239,7 +239,7 @@ class MissionControllerSlimEndpointsTest {
     mockMvc
         .perform(
             delete("/api/v1/missions/{id}/units/{unitId}/slim", missionId, unitId)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }
 
@@ -283,7 +283,7 @@ class MissionControllerSlimEndpointsTest {
                 .with(
                     jwt()
                         .jwt(j -> j.subject(userId.toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$").isArray())
         .andExpect(jsonPath("$[0].id").value(participantId.toString()));
@@ -306,7 +306,7 @@ class MissionControllerSlimEndpointsTest {
                 .with(
                     jwt()
                         .jwt(j -> j.subject(callerId.toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }
 
@@ -501,7 +501,7 @@ class MissionControllerSlimEndpointsTest {
                 .with(
                     jwt()
                         .jwt(j -> j.subject(callerId.toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value(participantId.toString()));
 
@@ -565,7 +565,7 @@ class MissionControllerSlimEndpointsTest {
                 .with(
                     jwt()
                         .jwt(j -> j.subject(callerId.toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
 
     org.mockito.ArgumentCaptor<UUID> userIdCaptor = org.mockito.ArgumentCaptor.forClass(UUID.class);

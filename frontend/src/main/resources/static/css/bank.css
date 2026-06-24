@@ -97,6 +97,17 @@
     gap: 8px;
 }
 
+/*
+ * Action footer (detail link + request button / view-only label): the auto top
+ * margin consumes the card's free vertical space so the action feet sit flush at
+ * the card bottom. The grid stretches every card in a row to equal height, so the
+ * detail and request buttons line up across cards whether or not a given card
+ * carries the optional balance-target progress block above it (REQ-BANK-036).
+ */
+.kpi-card .kpi-card-foot--actions {
+    margin-top: auto;
+}
+
 .kpi-delta {
     font-size: 0.72rem;
     font-weight: var(--fw-bold);

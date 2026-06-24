@@ -32,6 +32,12 @@ import org.jetbrains.annotations.Nullable;
  * amount of at least 1 (the {@code @DecimalMin}/{@code @DecimalMax}/{@code @WholeNumber}
  * constraints skip a {@code null} value by Bean-Validation semantics, so clearing stays valid).
  *
+ * <p>Intentionally a separate, field-identical sibling of {@code OrgUnitBalanceTargetRequest}: this
+ * is the body of the bank-staff {@code PATCH /api/v1/bank/accounts/{id}/balance-target} while that
+ * one backs the org-unit-facing {@code PUT /api/v1/org-units/bank/accounts/{id}/balance-target}.
+ * Kept distinct per API surface (REQ-API) so either can evolve without coupling the two endpoints'
+ * contracts; the duplication is deliberate, not an oversight.
+ *
  * @param target the new balance target, or {@code null} to clear it
  * @param version optimistic-locking version the client read (REQ-BANK-018); a mismatch surfaces as
  *     409 {@code OPTIMISTIC_LOCK}

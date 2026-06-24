@@ -137,7 +137,7 @@ class MissionControllerLifecycleTest {
             "alice@example.com",
             12,
             "internal description",
-            Set.of("ROLE_SQUADRON_MEMBER"),
+            Set.of("ROLE_KRT_MEMBER"),
             Set.of("MISSION_READ"),
             UUID.randomUUID(),
             true,

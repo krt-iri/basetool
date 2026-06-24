@@ -106,7 +106,7 @@ class AuthHelperServiceTest {
     void returnsAuth_whenRealJwtPrincipalPresent() {
       Authentication real =
           new UsernamePasswordAuthenticationToken(
-              "alice", "n/a", AuthorityUtils.createAuthorityList("ROLE_SQUADRON_MEMBER"));
+              "alice", "n/a", AuthorityUtils.createAuthorityList("ROLE_KRT_MEMBER"));
       SecurityContextHolder.getContext().setAuthentication(real);
 
       Optional<Authentication> result = helper.currentAuthentication();
@@ -191,7 +191,7 @@ class AuthHelperServiceTest {
     void trueWhenRealAuthenticatedPrincipal() {
       Authentication real =
           new UsernamePasswordAuthenticationToken(
-              "alice", "n/a", AuthorityUtils.createAuthorityList("ROLE_SQUADRON_MEMBER"));
+              "alice", "n/a", AuthorityUtils.createAuthorityList("ROLE_KRT_MEMBER"));
       SecurityContextHolder.getContext().setAuthentication(real);
 
       assertTrue(helper.isAuthenticated());
@@ -239,12 +239,11 @@ class AuthHelperServiceTest {
 
     @Test
     void falseWhenAuthorityIsNotReachable() {
-      authContextWith("ROLE_SQUADRON_MEMBER");
-      stubHierarchyReaches(List.of("ROLE_SQUADRON_MEMBER"));
+      authContextWith("ROLE_KRT_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
 
       assertFalse(
-          helper.hasReachableRole("ROLE_LOGISTICIAN"),
-          "SQUADRON_MEMBER must not reach LOGISTICIAN");
+          helper.hasReachableRole("ROLE_LOGISTICIAN"), "KRT_MEMBER must not reach LOGISTICIAN");
     }
 
     @Test
@@ -262,8 +261,8 @@ class AuthHelperServiceTest {
 
     @Test
     void throwsNullPointerException_whenCalledWithNullRole() {
-      authContextWith("ROLE_SQUADRON_MEMBER");
-      stubHierarchyReaches(List.of("ROLE_SQUADRON_MEMBER"));
+      authContextWith("ROLE_KRT_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
 
       // role parameter is @NotNull; calling with null is a programmer error
       // that should not be silently swallowed. (String.equals(null) returns
@@ -307,8 +306,8 @@ class AuthHelperServiceTest {
 
     @Test
     void falseForSquadronMember() {
-      authContextWith("ROLE_SQUADRON_MEMBER");
-      stubHierarchyReaches(List.of("ROLE_SQUADRON_MEMBER"));
+      authContextWith("ROLE_KRT_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
 
       assertFalse(helper.isLogisticianOrAbove());
     }
@@ -358,16 +357,16 @@ class AuthHelperServiceTest {
 
     @Test
     void trueForSquadronMember() {
-      authContextWith("ROLE_SQUADRON_MEMBER");
-      stubHierarchyReaches(List.of("ROLE_SQUADRON_MEMBER"));
+      authContextWith("ROLE_KRT_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
 
       assertTrue(helper.isMemberOrAbove());
     }
 
     @Test
     void trueForLegacyMemberAlias() {
-      authContextWith("ROLE_MEMBER");
-      stubHierarchyReaches(List.of("ROLE_MEMBER"));
+      authContextWith("ROLE_KRT_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
 
       assertTrue(helper.isMemberOrAbove());
     }
@@ -391,7 +390,7 @@ class AuthHelperServiceTest {
     @Test
     void trueForContextualLogisticianWithoutSquadronMemberRole() {
       // A user promoted via an org-unit is_logistician flag carries ROLE_LOGISTICIAN even without a
-      // SQUADRON_MEMBER realm role — they are still an insider, not an outsider.
+      // KRT_MEMBER realm role — they are still an insider, not an outsider.
       authContextWith("ROLE_LOGISTICIAN");
       stubHierarchyReaches(List.of("ROLE_LOGISTICIAN"));
 

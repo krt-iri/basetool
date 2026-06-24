@@ -84,8 +84,10 @@
                         </div>
                     </div>
                 </div>
-                <!-- Drill-in: every viewable card opens the read-only detail (history + Kontoauszug). -->
-                <div class="kpi-card-foot">
+                <!-- Drill-in + request affordance: pinned to the card bottom via the --actions
+                     modifier so the detail and request buttons line up across the grid whether or
+                     not a card carries the optional balance-target progress above (REQ-BANK-036). -->
+                <div class="kpi-card-foot kpi-card-foot--actions">
                     <a class="btn btn-ghost btn-sm" data-testid="org-unit-bank-card-detail"
                        th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
                        th:text="${b.canManageSettings()} ? #{bank.orgUnit.detail.manage} : #{bank.orgUnit.detail.open}">Details &amp; Verlauf</a>

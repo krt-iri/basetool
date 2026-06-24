@@ -81,7 +81,7 @@ class JobOrderPageControllerHandoverMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandover_WithValidItems_ShouldMapDtoAndRedirectWithSuccessToast() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
@@ -121,7 +121,7 @@ class JobOrderPageControllerHandoverMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandover_WhenBackendReturns409_ShouldRedirectWithErrorToast() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
@@ -144,7 +144,7 @@ class JobOrderPageControllerHandoverMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandover_WithNoItems_ShouldShortCircuit_NotCallBackend_AndShowErrorToast()
       throws Exception {
     UUID orderId = UUID.randomUUID();

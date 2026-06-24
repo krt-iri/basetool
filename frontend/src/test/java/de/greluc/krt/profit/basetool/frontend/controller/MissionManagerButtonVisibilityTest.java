@@ -80,7 +80,7 @@ class MissionManagerButtonVisibilityTest {
   }
 
   @Test
-  @WithMockUser(roles = "MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void listMissions_AsMember_ShouldShowCreateButton() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
         .thenReturn(

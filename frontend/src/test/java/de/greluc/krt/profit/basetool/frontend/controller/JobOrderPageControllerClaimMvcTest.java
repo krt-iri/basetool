@@ -85,7 +85,7 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_AsLogistician_RelaysAndReturnsCreated() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
@@ -123,7 +123,7 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_WhenBackendReturns409_PropagatesConflict() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
@@ -145,7 +145,7 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_WhenBackendRejectsOverclaim_Propagates400() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
@@ -167,7 +167,7 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void upsertClaim_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
@@ -186,7 +186,7 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void withdrawClaim_AsLogistician_RelaysAndReturnsNoContent() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID claimId = UUID.randomUUID();
@@ -203,7 +203,7 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER", "LOGISTICIAN"})
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void withdrawClaim_WhenBackendReturns409_PropagatesConflict() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID claimId = UUID.randomUUID();
@@ -217,7 +217,7 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void withdrawClaim_AsPlainMember_Returns403() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID claimId = UUID.randomUUID();

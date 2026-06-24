@@ -150,7 +150,7 @@ class UserJoinDateTest {
     mockMvc
         .perform(
             put("/api/v1/users/" + testUser.getId() + "/attributes")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
         .andExpect(status().isForbidden());

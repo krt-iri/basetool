@@ -74,7 +74,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void updateOrderAjax_ValidForm_ReturnsListTarget() throws Exception {
     UUID id = UUID.randomUUID();
 
@@ -94,7 +94,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void updateOrderAjax_EmptyGoods_Returns400WithoutCallingBackend() throws Exception {
     UUID id = UUID.randomUUID();
 
@@ -110,7 +110,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void storeOrderAjax_EmptyItems_Returns400() throws Exception {
     UUID id = UUID.randomUUID();
 
@@ -124,7 +124,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void createOrderAjax_ValidForm_ReturnsListTarget() throws Exception {
     mockMvc
         .perform(
@@ -141,7 +141,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void createOrderAjax_EmptyGoods_Returns400WithoutCallingBackend() throws Exception {
     mockMvc
         .perform(
@@ -155,7 +155,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"MEMBER"})
+  @WithMockUser(roles = {"KRT_MEMBER"})
   void deleteOrderAjax_ReturnsListTarget() throws Exception {
     UUID id = UUID.randomUUID();
 

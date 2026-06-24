@@ -227,7 +227,7 @@ is a name — REQ-OBS).
 
 ## Open questions
 
-- **Baseline floor on approval** — does approval auto-grant a baseline `SQUADRON_MEMBER`, or does the
+- **Baseline floor on approval** — does approval auto-grant a baseline `KRT_MEMBER`, or does the
   admin seat every role by hand? Track-1 default: by hand (epic open decision #1).
 - **Existing-member migration** — ~~link an existing credential account to a Discord identity, or only
   forward via Discord login? (epic open decision #2)~~ **Resolved (ADR-0036):** an existing account

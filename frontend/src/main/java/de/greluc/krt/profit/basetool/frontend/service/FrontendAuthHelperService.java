@@ -56,8 +56,7 @@ public class FrontendAuthHelperService {
           "ROLE_OFFICER",
           "ROLE_MISSION_MANAGER",
           "ROLE_LOGISTICIAN",
-          "ROLE_SQUADRON_MEMBER",
-          "ROLE_MEMBER");
+          "ROLE_KRT_MEMBER");
 
   /**
    * {@code true} if the current request carries an authenticated, non-anonymous principal.

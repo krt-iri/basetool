@@ -105,7 +105,7 @@ public class SecurityHardeningIntegrationTest {
                 .with(
                     jwt()
                         .jwt(j -> j.subject(regularUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 
@@ -119,7 +119,7 @@ public class SecurityHardeningIntegrationTest {
                 .with(
                     jwt()
                         .jwt(b -> b.subject(java.util.UUID.randomUUID().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER"))))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 

@@ -72,7 +72,7 @@ class MissionControllerCreatePathTest {
   }
 
   private static SimpleGrantedAuthority member() {
-    return new SimpleGrantedAuthority("ROLE_SQUADRON_MEMBER");
+    return new SimpleGrantedAuthority("ROLE_KRT_MEMBER");
   }
 
   @Test

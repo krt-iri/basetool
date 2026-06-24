@@ -155,7 +155,7 @@ class PromotionFeatureFlagPageGateTest {
   }
 
   @Test
-  @WithMockUser(roles = "SQUADRON_MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void squadronlessNonAdmin_overviewIsForbidden() throws Exception {
     // A non-admin whose home squadron does not resolve (active-org-unit endpoint returns null) has
     // no promotion system of their own: the menu is hidden and direct page access is blocked, so a

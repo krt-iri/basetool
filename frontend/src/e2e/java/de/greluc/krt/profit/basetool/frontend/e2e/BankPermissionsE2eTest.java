@@ -44,9 +44,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <p><b>Fixtures (from {@code realm-export.e2e.json}).</b> {@code test-bank-management} (role
  * <em>Bank Management</em>, no squadron), {@code test-bank-employee} (role <em>Bank Employee</em>
  * only, no squadron — pins that bank access does not require org membership), {@code
- * test-bank-member} (roles <em>Bank Employee</em> + <em>Squadron Member</em> — pins that org
- * membership does not break bank access), {@code test-member} (a plain squadron member, no bank
- * role — must see nothing), and {@code test-admin}.
+ * test-bank-member} (roles <em>Bank Employee</em> + <em>KRT Member</em> — pins that org membership
+ * does not break bank access), {@code test-member} (a plain squadron member, no bank role — must
+ * see nothing), and {@code test-admin}.
  *
  * <p>The matrix is asserted by calling the scoped backend endpoints as each user (race-free, the
  * established tenancy-test approach), with the member-sees-nothing boundary additionally driven

@@ -110,7 +110,7 @@ class AdminOrgStructurePageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "SQUADRON_MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void page_nonAdmin_returns403() throws Exception {
     mockMvc.perform(get("/admin/org-structure")).andExpect(status().isForbidden());
   }
@@ -132,7 +132,7 @@ class AdminOrgStructurePageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "SQUADRON_MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void createBereich_ajax_nonAdmin_returns403() throws Exception {
     mockMvc
         .perform(

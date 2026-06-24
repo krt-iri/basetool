@@ -143,7 +143,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = "SQUADRON_MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void view_forbiddenForNonAdmin() throws Exception {
     mockMvc.perform(get("/admin/personal-blueprints")).andExpect(status().isForbidden());
   }

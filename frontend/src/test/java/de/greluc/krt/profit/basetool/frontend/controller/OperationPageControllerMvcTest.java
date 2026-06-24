@@ -152,7 +152,7 @@ class OperationPageControllerMvcTest {
   // ── /operations/{id} (detail) — canEdit-driven form visibility ──────────
 
   @Test
-  @WithMockUser(roles = "SQUADRON_MEMBER")
+  @WithMockUser(roles = "KRT_MEMBER")
   void operationDetail_readOnlyUser_seesDisabledFormAndNoSaveButton() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
