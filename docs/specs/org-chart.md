@@ -140,7 +140,10 @@ focus (Tab/Shift+Tab cycle within it), closes on Esc, returns focus to the contr
 opened it, and renders the page chrome `inert` + `aria-hidden` while open. A successful edit
 preserves the chart's horizontal scroll and the page's vertical scroll across the reload
 (the editor reloads on success by design — see the concurrency notes in `CLAUDE.md`). The
-"Bearbeiten" toggle exposes its state via `aria-pressed` and reveals a legend while editing.
+"Bearbeiten" toggle — admins only, on the trailing edge of the page title box — exposes its
+state via `aria-pressed` and reveals a legend while editing. The transitional "seats are managed
+under Leitung" banner that once sat above the chart is gone; the per-node "managed under Leitung"
+marker (REQ-ROLE-006, REQ-ORG-010 amendment) is the canonical mirror signal.
 
 **Acceptance**
 

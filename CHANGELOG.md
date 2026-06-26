@@ -2,9 +2,19 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Meine Blueprints: ruhigere, design-konforme Darstellung.** Die Sammlungs-Box nutzt jetzt die dezente HUD-Haarlinie mit Eckmarken statt eines vollen Orange-Rahmens, Formular- und Abschnitts-Beschriftungen sind neutral statt orange, und die Auswahl-Chips beim Hinzufügen verwenden die Standard-Chips des Designsystems. In der Blueprint-Liste sitzt der Notiz-Stift jetzt als sauberes Icon gemeinsam mit dem Craftbarkeits-Badge am rechten Zeilenrand. Reine Optik — keine Funktionsänderung.
+
+- **Admin-Seite „Fremde Blueprints" im einheitlichen Design.** Die Admin-Verwaltung der Blueprints anderer Mitglieder nutzt jetzt dieselben Design-System-Komponenten wie die Mitglieder-Seite: die DS-Tabelle, den KRT-Modalrahmen für Notiz bearbeiten, Entfernen-Bestätigung und JSON-Import (Icon-Schließen mit Beschriftung, Esc, eine hervorgehobene Aktion), die DS-Chips für die Auswahl sowie einen flachen Admin-Banner ohne Verlauf. Funktion, Berechtigungen, Live-Aktualisierung und Übersetzungen bleiben unverändert.
+
 ### Added
 
 - **Auftrag: Blaupausen-Verfügbarkeit wahlweise mit oder ohne Varianten zählen.** Bei Item-Aufträgen lässt sich jetzt direkt im Verfügbarkeits-Panel umschalten, ob die Abdeckung kosmetische Varianten der bestellten Items mitzählt (Standard) oder nur exakt die bestellte Variante — hilfreich, wenn genau eine Variante gefordert ist und Mitglieder mit anderen Varianten die Zahl sonst verfälschen. Die Wahl wird am Auftrag gespeichert, gilt für alle Betrachter und das Panel aktualisiert sich ohne Neuladen.
+
+### Changed
+
+- **Organigramm: aufgeräumter Seitenkopf.** Der Hinweistext über dem Diagramm („Kontogebundene Sitze werden unter Organisation → Leitung verwaltet …") entfällt; der „Bearbeiten"-Button sitzt jetzt rechts in der Titelbox und erscheint weiterhin nur für Nutzer mit Bearbeitungsrecht (Admins). Der „Leitung-verwaltet"-Hinweis an den einzelnen Knoten bleibt erhalten.
 
 ### Fixed
 
@@ -13,10 +23,6 @@
 - **Meine Blueprints: Die Liste ist nicht mehr auf 200 Blueprints begrenzt.** Es werden jetzt alle eigenen Blueprints geladen — die Anzahl im Tab stimmt und die Suche durchsucht den vollständigen Bestand. Rezept- und Craftbarkeits-Berechnung laufen weiterhin bedarfsweise bzw. asynchron, sodass auch große Sammlungen flüssig laden.
 
 - **Blueprint-Import: Vorschläge werden jetzt eindeutig als importierbar angezeigt.** Zeilen mit leicht abweichendem Namen (Gruppe „Vorschläge bestätigen") sind angehakt und automatisch dem besten Treffer — dem bereits angezeigten Namen — zugeordnet, sodass „Anwenden" sie ohne den bisher nötigen Extra-Klick auf den Vorschlags-Button importiert. Ein anderer Treffer per Klick/Suche oder ein entferntes Häkchen steuern wie gewohnt; nicht zuordenbare Zeilen bleiben unangehakt, sodass das Häkchen immer dem tatsächlichen Import entspricht.
-
-### Changed
-
-- **Admin-Seite „Fremde Blueprints" im einheitlichen Design.** Die Admin-Verwaltung der Blueprints anderer Mitglieder nutzt jetzt dieselben Design-System-Komponenten wie die Mitglieder-Seite: die DS-Tabelle, den KRT-Modalrahmen für Notiz bearbeiten, Entfernen-Bestätigung und JSON-Import (Icon-Schließen mit Beschriftung, Esc, eine hervorgehobene Aktion), die DS-Chips für die Auswahl sowie einen flachen Admin-Banner ohne Verlauf. Funktion, Berechtigungen, Live-Aktualisierung und Übersetzungen bleiben unverändert.
 
 ## [v0.7.14](https://github.com/krt-profit/basetool/releases/tag/v0.7.14) - 2026-06-24
 

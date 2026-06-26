@@ -605,10 +605,18 @@
     function decorateRows() {
         rows().forEach(function (r) {
             const id = attr(r, 'data-id');
-            let badge = r.querySelector('.krt-bp-craft-badge');
+            // The badge lives in the row's trailing .krt-bp-row-aside cluster (next to the note
+            // pencil), so the status signals stay grouped at the row's edge. The template always
+            // renders the aside; find-or-create it defensively for any JS-built row.
+            let aside = r.querySelector('.krt-bp-row-aside');
+            if (!aside) {
+                aside = el('span', 'krt-bp-row-aside');
+                r.appendChild(aside);
+            }
+            let badge = aside.querySelector('.krt-bp-craft-badge');
             if (!badge) {
                 badge = el('span', 'krt-bp-craft-badge');
-                r.appendChild(badge);
+                aside.appendChild(badge);
             }
             clear(badge);
             badge.className = 'krt-bp-craft-badge';
