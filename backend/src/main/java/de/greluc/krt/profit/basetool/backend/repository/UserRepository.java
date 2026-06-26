@@ -168,26 +168,31 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       org.springframework.data.domain.Sort sort);
 
   /**
-   * Paged squadron-scoped listing of users eligible to be evaluated in the promotion system.
-   * Excludes admins entirely — they are squadron-less by design (admins always have no Staffel
-   * membership row) and must not appear in any Officer's Bewertungsverwaltung even when an admin
-   * has focused a squadron via the switcher. The additional explicit role-based exclusion guards
-   * against a manually mis-assigned admin row that still carries a membership.
+   * Paged squadron-scoped listing of the ordinary members a squadron may evaluate in the promotion
+   * system — the row set of the Bewertungsverwaltung matrix. The promotion system assesses only the
+   * <strong>simple members</strong> of a squadron (issue #817): both the {@code ADMIN} and the
+   * {@code OFFICER} realm role are excluded, because their holders <em>run</em> the evaluation
+   * rather than being its subject. Admins are squadron-less by design (no Staffel membership row)
+   * and must not surface even when one has focused a squadron via the switcher; officers are the
+   * squadron's leadership / evaluators and likewise do not belong in the matrix. The role-based
+   * exclusion also guards against a manually mis-assigned admin or officer row that still carries a
+   * squadron membership.
    *
    * <p>When {@code scopeSquadronId} is {@code null} (admin "all squadrons" mode) the result spans
    * every squadron's members. A non-null id restricts to that squadron. Users without a squadron
-   * membership are excluded — they are not part of any squadron's evaluation list.
+   * membership are excluded — they are not part of any squadron's evaluation list, which keeps the
+   * promotion system scoped to squadrons and never to other org-unit kinds.
    *
    * @param scopeSquadronId squadron filter; {@code null} = all squadrons.
    * @param pageable Spring Data paging and sorting parameters.
-   * @return paged squadron members that an Officer / Admin may evaluate.
+   * @return paged ordinary squadron members that an Officer / Admin may evaluate.
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
       "SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id ="
           + " u.id AND ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON"
           + " AND (:scopeSquadronId IS NULL OR ms.id.orgUnitId = :scopeSquadronId)) AND NOT"
-          + " EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) = 'ADMIN')")
+          + " EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) IN ('ADMIN', 'OFFICER'))")
   Page<User> findEvaluatableMembers(
       @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
       Pageable pageable);

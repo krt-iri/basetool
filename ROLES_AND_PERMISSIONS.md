@@ -416,18 +416,24 @@ Service-Schicht über den aktiven Staffel-Kontext gefiltert
 - Ein **Nutzer ohne Staffelzugehörigkeit, der kein Admin ist**, hat kein eigenes
   Beförderungssystem: der Menüpunkt ist ausgeblendet, jeder Listen-/Eligibility-Read
   liefert leer und ein direkter Seitenaufruf wird mit 403 blockiert (`hasPromotionReadAccess()`).
+- Die **Bewertungsmatrix** (die Member-Liste der Bewertungsverwaltung) führt ausschließlich die
+  **einfachen Mitglieder** einer Staffel: Wer die Rolle `ADMIN` oder `OFFICER` trägt, erscheint
+  dort **nie** als zu bewertende Zeile — Admins sind staffellos, und Offiziere führen die Bewertung
+  durch, statt selbst bewertet zu werden. Das Beförderungssystem betrachtet nur einfache Member
+  einer Staffel und steht keiner anderen OrgUnit-Art zur Verfügung (#817).
 
 | Funktion (Gate)                                                                                                      | Anonym | Member | Log. | MM | Officer | Admin |
 |:---------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
 | Themenbereiche/Kategorien/Level-Inhalte/Rangvoraussetzungen lesen (`isAuthenticated()`, **nur eigene Staffel**)      |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
 | …**pflegen** (Service: Admin **oder** Officer der besitzenden Staffel)                                               |   ❌    |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
 | Eigene Bewertungen / Eligibility ansehen (`/my`, JWT-Sub, **eigene Staffel**)                                        |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| Bewertungen/Eligibility **anderer** ansehen, Member-Liste (`hasAnyRole('ADMIN','OFFICER')`, Officer staffel-gescopt) |   ❌    |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| Bewertungen/Eligibility **anderer** ansehen, Member-Liste (`hasAnyRole('ADMIN','OFFICER')`, Officer staffel-gescopt) |   ❌    |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
 | Promotion-Subsystem je Staffel an-/abschalten (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)        |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Nur die **eigene Heimat-Staffel**; ein Nutzer ganz ohne Staffel (und ohne Admin-Rechte) sieht nichts — `hasPromotionReadAccess()` liefert leer, das Menü ist ausgeblendet, Direktaufruf 403.
 ² Admin: die aktiv angepinnte Staffel; im Alle-Staffeln-Modus ein „Staffel wählen"-Hinweis statt einer Vermischung.
 ³ Nur für die eigene Staffel. **SKs sind vom Promotion-System per DB-CHECK/Trigger + ArchUnit-Regel dauerhaft ausgeschlossen.**
+⁴ Die zu bewertende **Member-Liste** (`GET /api/v1/promotion/evaluations/members`) enthält nur die **einfachen Mitglieder** der Staffel — Träger der Rollen `ADMIN` und `OFFICER` werden herausgefiltert (#817), da sie die Bewertung durchführen, statt selbst bewertet zu werden. Officer/Admin **lesen** die Matrix also, **erscheinen** aber nicht als Zeile darin.
 
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 

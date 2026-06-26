@@ -153,10 +153,12 @@ public class MemberEvaluationController {
   }
 
   /**
-   * Returns the paged list of squadron members that the caller may evaluate. Squadron-scoped for
-   * Officer (own squadron only) and for Admin with the sidebar switcher focused on a squadron;
-   * Admin in "all squadrons" mode sees every squadron's members. Admins themselves never appear —
-   * they are squadron-less by design and must not show up in any Officer's Bewertungsverwaltung.
+   * Returns the paged list of squadron members that the caller may evaluate — the simple members of
+   * the squadron, with both admins and officers excluded (issue #817). Squadron-scoped for Officer
+   * (own squadron only) and for Admin with the sidebar switcher focused on a squadron; Admin in
+   * "all squadrons" mode sees every squadron's ordinary members. Admins and officers themselves
+   * never appear — admins are squadron-less by design, and officers run the Bewertungsverwaltung
+   * rather than being its subject.
    *
    * @param page zero-based page index, or {@code null} for the default
    * @param size page size, or {@code null} for the default
@@ -170,7 +172,7 @@ public class MemberEvaluationController {
   @Operation(
       summary =
           "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins"
-              + " excluded).")
+              + " and officers excluded).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Evaluatable members."),
     @ApiResponse(responseCode = "403", description = "Insufficient permissions.")

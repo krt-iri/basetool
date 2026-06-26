@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Beförderungssystem: Offiziere erscheinen nicht mehr in der Bewertungsmatrix.** Die Member-Liste der Bewertungsverwaltung führt jetzt nur noch die einfachen Mitglieder einer Staffel — Träger der Rollen `OFFICER` und `ADMIN` werden herausgefiltert, da sie die Bewertung durchführen, statt selbst bewertet zu werden (bisher wurden nur Admins ausgeschlossen). Das Beförderungssystem betrachtet damit ausschließlich einfache Staffel-Mitglieder.
+
 - **Meine Blueprints: Die Liste ist nicht mehr auf 200 Blueprints begrenzt.** Es werden jetzt alle eigenen Blueprints geladen — die Anzahl im Tab stimmt und die Suche durchsucht den vollständigen Bestand. Rezept- und Craftbarkeits-Berechnung laufen weiterhin bedarfsweise bzw. asynchron, sodass auch große Sammlungen flüssig laden.
 
 - **Blueprint-Import: Vorschläge werden jetzt eindeutig als importierbar angezeigt.** Zeilen mit leicht abweichendem Namen (Gruppe „Vorschläge bestätigen") sind angehakt und automatisch dem besten Treffer — dem bereits angezeigten Namen — zugeordnet, sodass „Anwenden" sie ohne den bisher nötigen Extra-Klick auf den Vorschlags-Button importiert. Ein anderer Treffer per Klick/Suche oder ein entferntes Häkchen steuern wie gewohnt; nicht zuordenbare Zeilen bleiben unangehakt, sodass das Häkchen immer dem tatsächlichen Import entspricht.

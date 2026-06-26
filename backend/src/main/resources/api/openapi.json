@@ -32211,7 +32211,7 @@
     "/api/v1/promotion/evaluations/members" : {
       "get" : {
         "tags" : [ "Member Evaluations" ],
-        "summary" : "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins excluded).",
+        "summary" : "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins and officers excluded).",
         "operationId" : "listEvaluatableMembers",
         "parameters" : [ {
           "name" : "page",
