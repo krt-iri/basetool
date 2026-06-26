@@ -28,8 +28,10 @@
 }
 
 .krt-personal-inventory {
-    background-color: var(--color-bg-dark-gray, #141414);
-    border: 1px solid var(--color-primary, #e77e23);
+    /* The wrapping .hud-box owns the surface treatment (hairline + corner brackets +
+       translucent fill). This rule only carries the page's content padding; a solid fill
+       and a full orange border here would override the quieter .hud-box look and make the
+       page read louder than the rest of the modernised app (DS hygiene, REQ-UI-002). */
     padding: 1.25rem;
 }
 
@@ -83,7 +85,8 @@
 }
 
 .krt-pi-userform label {
-    color: var(--color-primary, #e77e23);
+    /* Form labels stay neutral; orange is reserved for action + identity (REQ-UI-002). */
+    color: var(--color-gray-1, #d2d2d2);
     font-family: Lato, sans-serif;
     font-weight: var(--fw-bold);
     text-transform: uppercase;
@@ -193,7 +196,8 @@
 .krt-personal-inventory .form-group label,
 #krt-pi-modal .form-group label {
     display: block;
-    color: var(--color-primary, #e77e23);
+    /* Neutral label; the input value is the brightest element, not the label (REQ-UI-002). */
+    color: var(--color-gray-1, #d2d2d2);
     font-family: Lato, sans-serif;
     font-weight: var(--fw-bold);
     text-transform: uppercase;
@@ -412,7 +416,8 @@
     font-weight: var(--fw-bold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--color-primary, #e77e23);
+    /* Neutral section heading; orange is reserved for action + identity (REQ-UI-002). */
+    color: var(--color-gray-1, #d2d2d2);
     font-size: 1rem;
     margin: 0 0 1rem;
 }
@@ -441,7 +446,8 @@
 
 .krt-bp-staging-label {
     display: block;
-    color: var(--color-primary, #e77e23);
+    /* Neutral label; orange is reserved for action + identity (REQ-UI-002). */
+    color: var(--color-gray-1, #d2d2d2);
     font-family: Lato, sans-serif;
     font-weight: var(--fw-bold);
     text-transform: uppercase;
@@ -491,6 +497,16 @@
 .krt-bp-chip-remove:focus {
     color: var(--color-primary, #e77e23);
     outline: none;
+}
+
+/* Staging selections render as the canonical DS .chip (chip--primary). The inline remove
+   affordance is sized down to fit the compact squared chip and inherits the chip's hue. */
+.krt-bp-chip-list .chip .krt-bp-chip-remove {
+    min-width: 1.25rem;
+    min-height: 1.25rem;
+    padding: 0;
+    font-size: 1rem;
+    color: inherit;
 }
 
 .krt-bp-dash {
@@ -549,7 +565,8 @@
 
 #krt-bp-edit-modal .form-group label {
     display: block;
-    color: var(--color-primary, #e77e23);
+    /* Neutral label; orange is reserved for action + identity (REQ-UI-002). */
+    color: var(--color-gray-1, #d2d2d2);
     font-family: Lato, sans-serif;
     font-weight: var(--fw-bold);
     text-transform: uppercase;
@@ -781,7 +798,8 @@
     justify-content: center;
     background: transparent;
     border: 1px solid var(--color-gray-3, #282828);
-    border-radius: 4px;
+    /* Corners are sharp everywhere except pills + circular controls (REQ-UI-007). */
+    border-radius: var(--radius-none);
     color: var(--color-primary, #e77e23);
     cursor: pointer;
 }
@@ -835,7 +853,8 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-size: var(--fs-xs);
-    color: var(--color-primary, #e77e23);
+    /* Neutral column header; orange is reserved for action + identity (REQ-UI-002). */
+    color: var(--color-gray-1, #d2d2d2);
 }
 
 .krt-bp-recipe-table td {
@@ -1084,9 +1103,25 @@
     font-family: var(--font-body);
 }
 
+/* Right-aligned status cluster on a master row: the note pencil + the craft badge sit
+   together at the row's trailing edge so the "can I build this?" signal is scannable. */
+.krt-bp-row-aside {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex: none;
+}
+
 .master-row .master-row-note {
     color: var(--color-primary);
+    display: inline-flex;
     flex: none;
+}
+
+.master-row .master-row-note .krt-icon {
+    width: 14px;
+    height: 14px;
 }
 
 /* Detail pane: head row, quality blocks, note box, mobile back button. */
@@ -1196,9 +1231,9 @@
     font-size: 0.72rem;
 }
 
-/* Master-row badge: pushed to the row's right edge, regardless of the note pencil. */
+/* Master-row badge: lives in the trailing .krt-bp-row-aside cluster (which owns the
+   margin-left:auto), so the note pencil and the badge stay grouped at the row's edge. */
 .krt-bp-craft-badge {
-    margin-left: auto;
     flex: none;
     font-size: 0.62rem;
     font-weight: var(--fw-bold);
