@@ -14,6 +14,10 @@
 
 - **Blueprint-Import: Vorschläge werden jetzt eindeutig als importierbar angezeigt.** Zeilen mit leicht abweichendem Namen (Gruppe „Vorschläge bestätigen") sind angehakt und automatisch dem besten Treffer — dem bereits angezeigten Namen — zugeordnet, sodass „Anwenden" sie ohne den bisher nötigen Extra-Klick auf den Vorschlags-Button importiert. Ein anderer Treffer per Klick/Suche oder ein entferntes Häkchen steuern wie gewohnt; nicht zuordenbare Zeilen bleiben unangehakt, sodass das Häkchen immer dem tatsächlichen Import entspricht.
 
+### Changed
+
+- **Admin-Seite „Fremde Blueprints" im einheitlichen Design.** Die Admin-Verwaltung der Blueprints anderer Mitglieder nutzt jetzt dieselben Design-System-Komponenten wie die Mitglieder-Seite: die DS-Tabelle, den KRT-Modalrahmen für Notiz bearbeiten, Entfernen-Bestätigung und JSON-Import (Icon-Schließen mit Beschriftung, Esc, eine hervorgehobene Aktion), die DS-Chips für die Auswahl sowie einen flachen Admin-Banner ohne Verlauf. Funktion, Berechtigungen, Live-Aktualisierung und Übersetzungen bleiben unverändert.
+
 ## [v0.7.14](https://github.com/krt-profit/basetool/releases/tag/v0.7.14) - 2026-06-24
 
 ### Added

@@ -34,7 +34,7 @@
 }
 
 .krt-admin-banner {
-    background: linear-gradient(90deg, rgb(231 126 35 / 25%) 0%, rgb(231 126 35 / 5%) 100%);
+    background-color: rgb(231 126 35 / 12%);
     border: 1px solid var(--color-primary, #e77e23);
     color: var(--color-primary, #e77e23);
     font-family: var(--font-headline);
@@ -114,7 +114,8 @@
     width: 100%;
 }
 
-.krt-pi-table td.krt-pi-empty {
+.krt-pi-table td.krt-pi-empty,
+.data-table td.krt-pi-empty {
     text-align: center;
     color: var(--color-gray-2, #646464);
     padding: 1.25rem;
@@ -493,6 +494,27 @@
     outline: none;
 }
 
+/* Multi-select staging tokens render as DS .chip.chip--primary (see
+   personal-inventory-blueprints.js renderStaging). The .krt-bp-chip / -remove
+   metrics above stay for the bespoke admin-default chip; here the inline remove
+   control is scaled to the compact chip and inherits its orange accent. The
+   leading padding leaves the chip's own 0.5rem, so only the right edge is tightened. */
+.krt-bp-staging-chip {
+    padding-right: 0.25rem;
+    /* Product names can be long; let them wrap inside the token rather than
+       inherit the DS chip's single-line nowrap (which would overflow on mobile). */
+    white-space: normal;
+}
+
+.krt-bp-staging-chip .krt-bp-chip-remove {
+    min-width: 0;
+    min-height: 0;
+    margin-left: 0.1rem;
+    padding: 0 0.1rem;
+    font-size: 1rem;
+    color: currentcolor;
+}
+
 .krt-bp-dash {
     color: var(--color-gray-2, #646464);
 }
@@ -501,37 +523,6 @@
     color: var(--color-primary, #e77e23);
     font-weight: var(--fw-bold);
     margin: 0 0 1rem;
-}
-
-/* Edit / remove modal close-X parity with the Items modals. */
-#krt-bp-edit-modal .modal-content,
-#krt-bp-delete-modal .modal-content {
-    position: relative;
-    padding-top: 3rem;
-}
-
-#krt-bp-edit-modal .modal-content > .close,
-#krt-bp-delete-modal .modal-content > .close {
-    position: absolute;
-    top: 0.6rem;
-    right: 0.9rem;
-    color: var(--color-gray-1, #d2d2d2);
-    font-size: 1.8rem;
-    line-height: 1;
-    font-weight: bold;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    padding: 0.25rem 0.5rem;
-    z-index: 2;
-}
-
-#krt-bp-edit-modal .modal-content > .close:hover,
-#krt-bp-edit-modal .modal-content > .close:focus,
-#krt-bp-delete-modal .modal-content > .close:hover,
-#krt-bp-delete-modal .modal-content > .close:focus {
-    color: var(--color-primary, #e77e23);
-    outline: none;
 }
 
 #krt-bp-edit-modal .form-group input,
@@ -587,34 +578,6 @@
 
 .krt-bp-import-trigger .btn {
     min-height: 44px;
-}
-
-.krt-bp-import-content {
-    position: relative;
-    padding-top: 3rem;
-    max-width: 1100px;
-    width: 95%;
-}
-
-.krt-bp-import-content > .close {
-    position: absolute;
-    top: 0.6rem;
-    right: 0.9rem;
-    color: var(--color-gray-1, #d2d2d2);
-    font-size: 1.8rem;
-    line-height: 1;
-    font-weight: bold;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    padding: 0.25rem 0.5rem;
-    z-index: 2;
-}
-
-.krt-bp-import-content > .close:hover,
-.krt-bp-import-content > .close:focus {
-    color: var(--color-primary, #e77e23);
-    outline: none;
 }
 
 .krt-bp-import-summary {

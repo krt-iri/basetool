@@ -224,7 +224,7 @@
             let html = '';
             staged.forEach(function (name, key) {
                 html +=
-                    '<span class="krt-bp-chip" data-key="' +
+                    '<span class="chip chip--primary krt-bp-staging-chip" data-key="' +
                     esc(key) +
                     '">' +
                     '<span class="krt-bp-chip-name">' +
