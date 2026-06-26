@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Auftrag: Blaupausen-Verfügbarkeit wahlweise mit oder ohne Varianten zählen.** Bei Item-Aufträgen lässt sich jetzt direkt im Verfügbarkeits-Panel umschalten, ob die Abdeckung kosmetische Varianten der bestellten Items mitzählt (Standard) oder nur exakt die bestellte Variante — hilfreich, wenn genau eine Variante gefordert ist und Mitglieder mit anderen Varianten die Zahl sonst verfälschen. Die Wahl wird am Auftrag gespeichert, gilt für alle Betrachter und das Panel aktualisiert sich ohne Neuladen.
+
 ### Fixed
 
 - **Beförderungssystem: Offiziere erscheinen nicht mehr in der Bewertungsmatrix.** Die Member-Liste der Bewertungsverwaltung führt jetzt nur noch die einfachen Mitglieder einer Staffel — Träger der Rollen `OFFICER` und `ADMIN` werden herausgefiltert, da sie die Bewertung durchführen, statt selbst bewertet zu werden (bisher wurden nur Admins ausgeschlossen). Das Beförderungssystem betrachtet damit ausschließlich einfache Staffel-Mitglieder.

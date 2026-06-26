@@ -57,13 +57,19 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>{@link PersonalBlueprint} carries no org-unit column — it is a per-user aggregate keyed by the
  * Keycloak {@code sub}. This service bridges a job order's required items to org-unit members
  * entirely in Java, mirroring {@link PersonalBlueprintOverviewService}: it reduces each item line's
- * chosen-blueprint output name to its <em>variant family key</em> via {@link
- * BlueprintVariantFamilyResolver} (so a base item and its cosmetic variants — {@code Fresnel Energy
- * LMG} ↔ {@code Fresnel "Molten" Energy LMG} — collapse onto one required family, while magazines
- * stay atomic), resolves the responsible org unit's member ids to their {@code sub} form (the
- * {@code owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}), loads the members'
- * owned blueprints, and matches them by the same family key. The coverage count is the distinct
- * members owning any family member; each owner row lists the concrete variants they hold.
+ * chosen-blueprint output name to its <em>match key</em> via {@link
+ * BlueprintVariantFamilyResolver}, resolves the responsible org unit's member ids to their {@code
+ * sub} form (the {@code owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}),
+ * loads the members' owned blueprints, and matches them by the same key. The coverage count is the
+ * distinct members owning any matching blueprint; each owner row lists the concrete variants they
+ * hold.
+ *
+ * <p>The match key honours the order's per-order counting toggle ({@code
+ * countBlueprintsWithVariants}, REQ-ORDERS-021): when on (the default), the key is the variant
+ * family key, so a base item and its cosmetic variants — {@code Fresnel Energy LMG} ↔ {@code
+ * Fresnel "Molten" Energy LMG} — collapse onto one required family (magazines stay atomic); when
+ * off, the key is the exact normalized name, so an order for one specific variant counts only
+ * owners of that exact blueprint and excludes the family's other variants.
  *
  * <p>Member identity never leaves the service except as a display name — owners are exposed only
  * via {@link User#getEffectiveName()} (never the {@code sub} or e-mail), preserving the
@@ -101,21 +107,35 @@ public class JobOrderItemBlueprintOwnersService {
             .findByIdWithItemBlueprints(jobOrderId)
             .orElseThrow(() -> new EntityNotFoundException("Job order not found: " + jobOrderId));
 
-    // Required variant families: family key -> (ordered display name, variant-inclusive flag).
-    // Each item line's chosen-blueprint output name is reduced to its variant family key, so a base
-    // item and its cosmetic variants collapse onto one required row. Lines whose output name
-    // resolves to nothing are skipped; a MATERIAL order has no item lines. A magazine line stays
-    // atomic (variantInclusive = false): it is matched exactly and never folds in variants.
+    // Per-order counting toggle (REQ-ORDERS-021, issue #822): when true the coverage counts
+    // cosmetic
+    // variants of an ordered item via the variant family key (the historic behaviour); when false
+    // it
+    // matches blueprints exactly, so when a specific variant is requested only owners of that exact
+    // blueprint count and the other variants of the same family are excluded. Both the required
+    // side
+    // here and the owned side below derive their key through familyResolver.matchKey(name,
+    // countWithVariants) so the two stay symmetric.
+    boolean countWithVariants = order.isCountBlueprintsWithVariants();
+
+    // Required products: match key -> (ordered display name, variant-inclusive flag). Each item
+    // line's chosen-blueprint output name is reduced to its match key (variant family key when the
+    // toggle is on, exact normalized name when off), so in variant mode a base item and its
+    // cosmetic
+    // variants collapse onto one required row. Lines whose output name resolves to nothing are
+    // skipped; a MATERIAL order has no item lines. A row is variant-inclusive only when the toggle
+    // is
+    // on AND the line is not an atomic magazine (a magazine is always matched exactly).
     Map<String, RequiredFamily> requiredByFamily = new LinkedHashMap<>();
     for (JobOrderItem item : order.getItems()) {
       String outputName = item.getBlueprint() == null ? null : item.getBlueprint().getOutputName();
-      String familyKey = familyResolver.familyKey(outputName);
-      if (familyKey.isEmpty()) {
+      String matchKey = familyResolver.matchKey(outputName, countWithVariants);
+      if (matchKey.isEmpty()) {
         continue;
       }
       String displayName = item.getGameItem() != null ? item.getGameItem().getName() : outputName;
-      boolean variantInclusive = !familyResolver.isMagazine(outputName);
-      requiredByFamily.putIfAbsent(familyKey, new RequiredFamily(displayName, variantInclusive));
+      boolean variantInclusive = countWithVariants && !familyResolver.isMagazine(outputName);
+      requiredByFamily.putIfAbsent(matchKey, new RequiredFamily(displayName, variantInclusive));
     }
     if (requiredByFamily.isEmpty()) {
       return new JobOrderItemBlueprintOwnersDto(List.of(), List.of());
@@ -140,18 +160,19 @@ public class JobOrderItemBlueprintOwnersService {
         .map(UUID::toString)
         .forEach(ownerSubs::add);
 
-    // Load the members' owned blueprints and keep the ones whose variant family is required. The
-    // family key is a Java-computed reduction of the product name (no SQL form), so the match runs
-    // in memory over the members' rows. The per-owner set carries the ACTUAL owned variant names
-    // (so a lead sees which variant each member holds), and the per-family owner set drives the
-    // coverage count (distinct members owning any family member).
+    // Load the members' owned blueprints and keep the ones whose match key is required. The match
+    // key is a Java-computed reduction of the product name (no SQL form), so the match runs in
+    // memory
+    // over the members' rows. The per-owner set carries the ACTUAL owned variant names (so a lead
+    // sees which variant each member holds), and the per-key owner set drives the coverage count
+    // (distinct members owning any matching blueprint).
     Map<UUID, Set<String>> ownedNamesByOwnerId = new LinkedHashMap<>();
     Map<String, Set<UUID>> ownersByFamily = new HashMap<>();
     if (!ownerSubs.isEmpty()) {
       for (BlueprintOwnerProduct bp :
           personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs)) {
-        String familyKey = familyResolver.familyKey(bp.productName());
-        if (!requiredByFamily.containsKey(familyKey)) {
+        String matchKey = familyResolver.matchKey(bp.productName(), countWithVariants);
+        if (!requiredByFamily.containsKey(matchKey)) {
           continue;
         }
         UUID ownerId = parseUuid(bp.ownerSub());
@@ -161,7 +182,7 @@ public class JobOrderItemBlueprintOwnersService {
         ownedNamesByOwnerId
             .computeIfAbsent(ownerId, id -> new LinkedHashSet<>())
             .add(bp.productName());
-        ownersByFamily.computeIfAbsent(familyKey, k -> new LinkedHashSet<>()).add(ownerId);
+        ownersByFamily.computeIfAbsent(matchKey, k -> new LinkedHashSet<>()).add(ownerId);
       }
     }
 

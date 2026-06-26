@@ -81,6 +81,7 @@ class OrderHierarchyVisibilityTest {
             1,
             "OPEN",
             "MATERIAL",
+            true,
             java.util.List.of(),
             java.util.List.of(),
             java.util.List.of(),
