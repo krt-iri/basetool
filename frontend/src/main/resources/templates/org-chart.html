@@ -26,26 +26,23 @@
 </header>
 
 <main class="oc-page">
-    <div class="greeting hud-box">
-        <h1 th:text="#{orgChart.title}">Organigramm</h1>
-        <p style="color: var(--color-gray-2); margin-top: 0.5rem;" th:text="#{orgChart.subtitle}">
-            Übersicht der Funktionsränge in Bereichsleitung, Staffeln und Spezialkommandos.
-        </p>
+    <div class="greeting hud-box oc-greeting">
+        <div class="oc-greeting-text">
+            <h1 th:text="#{orgChart.title}">Organigramm</h1>
+            <p style="color: var(--color-gray-2); margin-top: 0.5rem;" th:text="#{orgChart.subtitle}">
+                Übersicht der Funktionsränge in Bereichsleitung, Staffeln und Spezialkommandos.
+            </p>
+        </div>
+        <!-- Inline-editor toggle, ADMIN-only (the only edit right on the descriptive chart,
+             REQ-ORG-010): assign / rename / remove positions. It sits in the trailing edge of the
+             title box but stays OUTSIDE #oc-chart, so an in-place chart refresh (REQ-FE-005) never
+             duplicates it — pinned by OrgChartPageRenderTest#chartBodyFragment_rendersTreeWithoutPageChrome. -->
+        <button type="button" class="btn btn-outline oc-edit-toggle" data-trigger="oc-toggle-edit"
+                sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}"
+                aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
     </div>
 
     <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
-
-    <!-- Account-linked seats are now a mirror of the functional ranks (epic #800, REQ-ROLE-006):
-         appoint them under Organisation -> Leitung; free-text holders stay editable here. -->
-    <div class="hud-box mt-2 oc-mirror-hint" role="note" th:if="${orgChart != null}">
-        <span th:text="#{orgChart.mirrorHint}">Kontogebundene Sitze werden unter Leitung verwaltet.</span>
-        <a th:href="@{/organisation/leitung}" sec:authorize="hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER')" data-testid="oc-leitung-link" th:text="#{nav.leitung}">Leitung</a>
-    </div>
-
-    <div class="oc-toolbar" sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}">
-        <button type="button" class="btn btn-outline" data-trigger="oc-toggle-edit"
-                aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
-    </div>
 
     <!-- Edit-mode legend: hidden until the toolbar toggle turns editing on (oc-edit-hint--on),
          so the cloud of dashed "+" affordances has context. Admins only, like the toolbar. -->

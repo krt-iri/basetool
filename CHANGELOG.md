@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Organigramm: aufgeräumter Seitenkopf.** Der Hinweistext über dem Diagramm („Kontogebundene Sitze werden unter Organisation → Leitung verwaltet …") entfällt; der „Bearbeiten"-Button sitzt jetzt rechts in der Titelbox und erscheint weiterhin nur für Nutzer mit Bearbeitungsrecht (Admins). Der „Leitung-verwaltet"-Hinweis an den einzelnen Knoten bleibt erhalten.
+
 ### Fixed
 
 - **Beförderungssystem: Offiziere erscheinen nicht mehr in der Bewertungsmatrix.** Die Member-Liste der Bewertungsverwaltung führt jetzt nur noch die einfachen Mitglieder einer Staffel — Träger der Rollen `OFFICER` und `ADMIN` werden herausgefiltert, da sie die Bewertung durchführen, statt selbst bewertet zu werden (bisher wurden nur Admins ausgeschlossen). Das Beförderungssystem betrachtet damit ausschließlich einfache Staffel-Mitglieder.
