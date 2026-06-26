@@ -107,6 +107,7 @@ class JobOrderServicePriorityAndStatusTest {
                   o.getPriority(),
                   o.getStatus(),
                   JobOrderType.MATERIAL,
+                  o.isCountBlueprintsWithVariants(),
                   List.of(),
                   List.of(),
                   List.of(),

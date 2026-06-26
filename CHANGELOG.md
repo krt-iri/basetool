@@ -6,6 +6,14 @@
 
 - **Meine Blueprints: ruhigere, design-konforme Darstellung.** Die Sammlungs-Box nutzt jetzt die dezente HUD-Haarlinie mit Eckmarken statt eines vollen Orange-Rahmens, Formular- und Abschnitts-Beschriftungen sind neutral statt orange, und die Auswahl-Chips beim Hinzufügen verwenden die Standard-Chips des Designsystems. In der Blueprint-Liste sitzt der Notiz-Stift jetzt als sauberes Icon gemeinsam mit dem Craftbarkeits-Badge am rechten Zeilenrand. Reine Optik — keine Funktionsänderung.
 
+### Added
+
+- **Auftrag: Blaupausen-Verfügbarkeit wahlweise mit oder ohne Varianten zählen.** Bei Item-Aufträgen lässt sich jetzt direkt im Verfügbarkeits-Panel umschalten, ob die Abdeckung kosmetische Varianten der bestellten Items mitzählt (Standard) oder nur exakt die bestellte Variante — hilfreich, wenn genau eine Variante gefordert ist und Mitglieder mit anderen Varianten die Zahl sonst verfälschen. Die Wahl wird am Auftrag gespeichert, gilt für alle Betrachter und das Panel aktualisiert sich ohne Neuladen.
+
+### Changed
+
+- **Organigramm: aufgeräumter Seitenkopf.** Der Hinweistext über dem Diagramm („Kontogebundene Sitze werden unter Organisation → Leitung verwaltet …") entfällt; der „Bearbeiten"-Button sitzt jetzt rechts in der Titelbox und erscheint weiterhin nur für Nutzer mit Bearbeitungsrecht (Admins). Der „Leitung-verwaltet"-Hinweis an den einzelnen Knoten bleibt erhalten.
+
 ### Fixed
 
 - **Beförderungssystem: Offiziere erscheinen nicht mehr in der Bewertungsmatrix.** Die Member-Liste der Bewertungsverwaltung führt jetzt nur noch die einfachen Mitglieder einer Staffel — Träger der Rollen `OFFICER` und `ADMIN` werden herausgefiltert, da sie die Bewertung durchführen, statt selbst bewertet zu werden (bisher wurden nur Admins ausgeschlossen). Das Beförderungssystem betrachtet damit ausschließlich einfache Staffel-Mitglieder.
