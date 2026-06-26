@@ -232,9 +232,22 @@
 
     function renderRow(entry, kind) {
         const owned = kind === 'owned';
-        const resolved = entry.productKey || '';
+        const suggestions = entry.suggestions || [];
+        // Auto-select the top suggestion for a SUGGESTED row so the pre-checked box is honest:
+        // a checked row ALWAYS carries a resolved product key, which is what apply() submits
+        // (issue #824). MATCHED rows already carry their own productKey; UNMATCHED rows resolve
+        // nothing until the user picks one. The user can still pick a different suggestion / search
+        // hit (setRowProduct) or untick the row to skip it.
+        let resolved = entry.productKey || '';
+        if (!resolved && kind === 'suggested' && suggestions.length > 0) {
+            resolved = suggestions[0].productKey || '';
+        }
         const acquired = entry.suggestedAcquiredAt || '';
-        const checked = (kind === 'matched' || kind === 'suggested') && !owned ? ' checked' : '';
+        // Pre-check matched rows and any suggested row that resolved to a product (never owned).
+        // Keeping "checked ⇔ data-key set" is the whole fix: a SUGGESTED row with no resolvable
+        // suggestion stays unchecked instead of looking importable when it is not.
+        const checked =
+            !owned && (kind === 'matched' || (kind === 'suggested' && resolved)) ? ' checked' : '';
         let resolution;
         if (kind === 'matched') {
             resolution =

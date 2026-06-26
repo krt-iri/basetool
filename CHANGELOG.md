@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Meine Blueprints: Die Liste ist nicht mehr auf 200 Blueprints begrenzt.** Es werden jetzt alle eigenen Blueprints geladen — die Anzahl im Tab stimmt und die Suche durchsucht den vollständigen Bestand. Rezept- und Craftbarkeits-Berechnung laufen weiterhin bedarfsweise bzw. asynchron, sodass auch große Sammlungen flüssig laden.
+
+- **Blueprint-Import: Vorschläge werden jetzt eindeutig als importierbar angezeigt.** Zeilen mit leicht abweichendem Namen (Gruppe „Vorschläge bestätigen") sind angehakt und automatisch dem besten Treffer — dem bereits angezeigten Namen — zugeordnet, sodass „Anwenden" sie ohne den bisher nötigen Extra-Klick auf den Vorschlags-Button importiert. Ein anderer Treffer per Klick/Suche oder ein entferntes Häkchen steuern wie gewohnt; nicht zuordenbare Zeilen bleiben unangehakt, sodass das Häkchen immer dem tatsächlichen Import entspricht.
+
 ## [v0.7.14](https://github.com/krt-profit/basetool/releases/tag/v0.7.14) - 2026-06-24
 
 ### Added

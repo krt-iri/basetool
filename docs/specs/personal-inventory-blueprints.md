@@ -32,6 +32,14 @@ move the selection (listbox semantics: `role="listbox"`/`option`, `aria-selected
 collection and no-selection states use `.empty-state`. On viewports ≤900px the layout collapses
 to list → detail navigation with a back button in the pane.
 
+The list loads the caller's **complete** owned set in one render — there is **no** server-side page
+cap (issue #823). The page controller pages the backend in chunks and concatenates until the last
+page, so the facts subtitle ("N Blueprints"), the `.tab-count`, and the instant client-side filter
+all cover **every** owned blueprint, never a truncated first page. Loading the full set never blocks
+the render because the heavy per-row work stays off the critical path: the recipe is lazy per
+selection (REQ-INV-009) and craftability is one bulk async fetch (REQ-INV-019) — so "all are listed
+and searchable, only what you open / what the badge pass covers is computed".
+
 ### REQ-INV-009 — Detail pane on the existing lazy recipe endpoint, calculation unchanged
 
 The detail pane shows product name, "Erhalten am" (UTC → local), note edit ✎ and remove 🗑 as
@@ -285,3 +293,48 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 [`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto/BlueprintCraftabilityDto.java),
 [`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-recipe.js).
+
+### REQ-INV-021 — Import preview: auto-selected top suggestion, honest include checkbox
+
+In the JSON-import preview modal (REQ-INV-010) every parsed row carries an **include checkbox** that
+is the single source of truth for what "Anwenden" imports: a row is imported **iff** its checkbox is
+ticked **and** it has resolved to a product. The two states must never disagree — a ticked row always
+carries a resolved `product_key`, an unresolved row is never ticked. The preview groups rows by match
+status:
+
+- **Auto-matched** (exact / alias / structural tag, REQ-INV-006/007/019) — carry their resolved
+  product and render ticked.
+- **Suggestions** (a fuzzy candidate set, no exact match) — **auto-select their top suggestion**: the
+  row resolves to the highest-ranked candidate (the name already displayed) and renders ticked, so a
+  plain "Anwenden" imports the suggested match with no extra confirm click. The user may pick a
+  different suggestion / search hit (which re-points the row's product and keeps it ticked) or untick
+  the row to skip it. A suggestion-less row (none offered) resolves to nothing and stays unticked.
+- **Unmatched** — resolve to nothing and render unticked; the row becomes ticked only after the user
+  picks a product via the inline search.
+- **Already owned** — rendered disabled, never re-imported.
+
+*Why:* the previous preview pre-ticked suggestion rows but left them unresolved, so "Anwenden"
+silently skipped them unless the user first clicked the suggestion button — even though the suggested
+name was already shown (issue #824). Tying the checkbox to a resolved product, and defaulting a
+suggestion to its top candidate, makes "ticked ⇒ will be imported as shown" always true. "Anwenden"
+still learns a `blueprint_external_alias` for every resolved pick (REQ-INV-020), so a confirmed
+suggestion auto-matches on the next import.
+
+**Acceptance**
+
+- [ ] A suggestion row renders ticked with `data-key` set to the top suggestion's product key, and
+  "Anwenden" with no further interaction imports it as that product.
+- [ ] Picking a different suggestion / search hit re-points the row's product and leaves it ticked;
+  unticking excludes it from "Anwenden".
+- [ ] An unmatched row (no suggestion) renders unticked with no product key and is excluded from
+  "Anwenden" until the user resolves it; a suggestion-less suggested row likewise stays unticked.
+- [ ] No row is ever submitted while ticked-but-unresolved or unticked-but-resolved (checkbox ⇔
+  resolved product).
+
+**Enforced by:** manual Preview verification (no JS unit-test harness in CI; the JS is lint-gated by
+eslint/prettier and the server-side apply contract — blank/unresolvable picks skipped — by
+`BlueprintImportServiceTest`) · **Code:**
+[`personal-inventory-blueprints-import.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-import.js)
+(`renderRow`, `apply`),
+[`BlueprintImportService#applyImport`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintImportService.java)
+· **Issues:** [#824](https://github.com/krt-profit/basetool/issues/824)
