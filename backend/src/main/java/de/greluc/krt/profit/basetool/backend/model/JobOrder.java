@@ -126,6 +126,22 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private JobOrderType type = JobOrderType.MATERIAL;
 
+  /**
+   * Whether the item-order blueprint-coverage view ({@code GET /orders/{id}/item-blueprint-owners})
+   * counts cosmetic <em>variants</em> of the ordered items toward availability. {@code true} (the
+   * default, and the value backfilled onto every pre-existing row by migration V191) keeps the
+   * historic behaviour: a member owning any variant of the family — {@code Fresnel "Molten" Energy
+   * LMG} for an ordered {@code Fresnel Energy LMG} — is counted, via {@code
+   * BlueprintVariantFamilyResolver} family-key matching. {@code false} switches the coverage to
+   * exact-name matching, so when a specific variant is requested only owners of that exact
+   * blueprint count and other variants of the same family are excluded. Relevant only to {@link
+   * JobOrderType#ITEM} orders; ignored for {@link JobOrderType#MATERIAL} orders. {@code nullable =
+   * false}: V191 adds the column {@code NOT NULL DEFAULT true}.
+   */
+  @Column(name = "count_blueprints_with_variants", nullable = false)
+  @Builder.Default
+  private boolean countBlueprintsWithVariants = true;
+
   @OneToMany(
       mappedBy = "jobOrder",
       cascade = CascadeType.ALL,

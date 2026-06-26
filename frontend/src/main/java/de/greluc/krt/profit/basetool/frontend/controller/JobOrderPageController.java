@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionD
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderForm;
@@ -507,6 +508,7 @@ public class JobOrderPageController {
         case "items" -> "orders-detail :: itemsSection";
         case "item-handovers" -> "orders-detail :: itemHandoverSection";
         case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
+        case "blueprint-owners" -> "orders-detail :: blueprintOwnersSection";
         default -> "orders-detail";
       };
     }
@@ -1258,6 +1260,40 @@ public class JobOrderPageController {
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to update status for order {}", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
+   * AJAX toggle for the item-order blueprint-coverage variant counting (issue #822). Relays the
+   * requested mode + version to the backend's PATCH endpoint and propagates its status code (400
+   * not an item order, 403 forbidden, 409 optimistic-lock conflict) so the order-detail JS can show
+   * a clean toast and re-render the coverage panel in place. The coarse {@code
+   * hasRole('LOGISTICIAN')} gate here mirrors the backend; the fine per-order edit scope is
+   * enforced backend-side.
+   *
+   * @param id the order id.
+   * @param dto the requested counting mode + the order's expected version.
+   * @return the updated order on success, or the propagated backend error status.
+   */
+  @PostMapping("/{id}/blueprint-variant-counting")
+  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @org.springframework.web.bind.annotation.ResponseBody
+  public org.springframework.http.ResponseEntity<Object> updateBlueprintVariantCounting(
+      @PathVariable UUID id, @RequestBody UpdateJobOrderBlueprintCountingDto dto) {
+    try {
+      JobOrderDto result =
+          backendApiClient.patch(
+              "/api/v1/orders/" + id + "/blueprint-variant-counting", dto, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (BackendServiceException bse) {
+      log.error(
+          "Failed to update blueprint variant counting for order {}: {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to update blueprint variant counting for order {}", id, e);
       return org.springframework.http.ResponseEntity.status(
               org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
           .build();

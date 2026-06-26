@@ -646,6 +646,66 @@ public class JobOrderService {
   }
 
   /**
+   * Toggles whether the item order's blueprint-coverage view counts cosmetic variants of the
+   * ordered items toward availability (REQ-ORDERS-021, issue #822). {@code true} keeps family-key
+   * matching (a member owning any cosmetic variant of an ordered item is counted); {@code false}
+   * switches to exact-name matching, so an order for one specific variant counts only owners of
+   * that exact blueprint and excludes the family's other variants. A no-op call (the order already
+   * carries the requested mode) returns the order unchanged, without bumping its {@code @Version}
+   * or recording an audit event.
+   *
+   * @param id the order id.
+   * @param countWithVariants the requested counting mode.
+   * @param version the order's expected optimistic-lock version; a stale value triggers a 409.
+   * @return the persisted order DTO (carries the bumped version when the mode actually changed).
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no order matches
+   *     the id.
+   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the order is
+   *     not an item order.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     version is stale.
+   */
+  @Transactional
+  public JobOrderDto updateBlueprintVariantCounting(
+      UUID id, boolean countWithVariants, Long version) {
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+
+    if (jobOrder.getType() != JobOrderType.ITEM) {
+      throw new BadRequestException("Blueprint variant counting applies only to item orders");
+    }
+
+    if (version != null
+        && jobOrder.getVersion() != null
+        && !jobOrder.getVersion().equals(version)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
+    }
+
+    if (jobOrder.isCountBlueprintsWithVariants() == countWithVariants) {
+      // No change: skip the @Version bump (which would needlessly 409 a concurrent edit) and the
+      // audit entry. The caller still gets the current state back.
+      return mapToDtoWithStock(jobOrder);
+    }
+
+    jobOrder.setCountBlueprintsWithVariants(countWithVariants);
+    // saveAndFlush so the bumped @Version reaches the response DTO: the order-detail panel re-reads
+    // the order @Version on its in-place swap, so a stale pre-flush version would 409 the next
+    // write.
+    // Mirrors updateJobOrder.
+    jobOrder = jobOrderRepository.saveAndFlush(jobOrder);
+
+    auditService.record(
+        AuditEventType.JOB_ORDER_BLUEPRINT_COUNTING_CHANGED,
+        jobOrder.getId(),
+        orderLabel(jobOrder),
+        null,
+        "countWithVariants=" + countWithVariants);
+    return mapToDtoWithStock(jobOrder);
+  }
+
+  /**
    * Full update of the order's metadata + materials list. Replaces the materials wholesale —
    * removed materials are orphan-removed, kept materials retain their accumulated inventory links.
    *
@@ -1253,6 +1313,7 @@ public class JobOrderService {
         baseDto.priority(),
         baseDto.status(),
         baseDto.type(),
+        baseDto.countBlueprintsWithVariants(),
         updatedMaterials,
         items,
         aggregatedMaterials,

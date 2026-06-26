@@ -127,6 +127,22 @@ class JobOrderItemBlueprintOwnersServiceTest {
   }
 
   /**
+   * Like {@link #order(JobOrderItem...)} but with the per-order variant-counting toggle
+   * <em>off</em> (REQ-ORDERS-021), so coverage matches blueprints by exact normalized name instead
+   * of family key.
+   */
+  private static JobOrder orderWithoutVariants(JobOrderItem... items) {
+    Squadron responsible = new Squadron();
+    responsible.setId(ORG_ID);
+    return JobOrder.builder()
+        .id(ORDER_ID)
+        .responsibleOrgUnit(responsible)
+        .countBlueprintsWithVariants(false)
+        .items(new LinkedHashSet<>(List.of(items)))
+        .build();
+  }
+
+  /**
    * Builds an owned-blueprint row; {@code productName} is the concrete blueprint the member owns.
    */
   private static BlueprintOwnerProduct owned(UUID owner, String productName) {
@@ -239,6 +255,51 @@ class JobOrderItemBlueprintOwnersServiceTest {
             .orElseThrow();
     assertEquals(List.of("Novian Crossbow"), bernd.ownedProductNames());
     assertTrue(result.owners().stream().noneMatch(o -> o.ownerName().equals("Carla")));
+  }
+
+  // covers REQ-ORDERS-021 — with the per-order toggle OFF, coverage matches blueprints EXACTLY: a
+  // member owning a DIFFERENT variant of an ordered base, or the base of an ordered variant, is no
+  // longer counted; only owners of the exact ordered blueprint count, and no row is
+  // variant-inclusive.
+  @Test
+  void withoutVariants_countsOnlyTheExactOrderedBlueprint() {
+    JobOrder order =
+        orderWithoutVariants(
+            item("Fresnel Energy LMG", "Fresnel Energy LMG"),
+            item("Novian \"Wildshot\" Crossbow", "Novian \"Wildshot\" Crossbow"));
+    when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
+    when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
+        .thenReturn(Set.of(ALICE, BERND, CARLA));
+    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
+        .thenReturn(
+            List.of(
+                // Alice owns a DIFFERENT variant of the ordered base -> with variants OFF, excluded
+                // (in variant mode she WOULD count toward Fresnel).
+                owned(ALICE, "Fresnel \"Molten\" Energy LMG"),
+                // Bernd owns the EXACT ordered base -> counts.
+                owned(BERND, "Fresnel Energy LMG"),
+                // Carla owns the EXACT ordered variant -> counts (the base would NOT, in this
+                // mode).
+                owned(CARLA, "Novian \"Wildshot\" Crossbow")));
+    when(userRepository.findAllById(any()))
+        .thenReturn(List.of(user(BERND, "Bernd"), user(CARLA, "Carla")));
+
+    JobOrderItemBlueprintOwnersDto result = service.getBlueprintOwners(ORDER_ID);
+
+    // The exact key keeps the variant quote, unlike the family key (which would be "novian
+    // crossbow").
+    JobOrderRequiredBlueprintDto fresnel = coverageFor(result, "fresnel energy lmg");
+    assertEquals(
+        1, fresnel.ownerCount(), "only the exact-base owner counts, not the variant owner");
+    assertFalse(fresnel.variantInclusive(), "no row is variant-inclusive when the toggle is off");
+    JobOrderRequiredBlueprintDto novian = coverageFor(result, "novian \"wildshot\" crossbow");
+    assertEquals(1, novian.ownerCount(), "only the exact-variant owner counts");
+    assertFalse(novian.variantInclusive());
+
+    // Alice (different variant) is not listed; only the two exact owners are.
+    assertEquals(
+        List.of("Bernd", "Carla"),
+        result.owners().stream().map(JobOrderBlueprintOwnerDto::ownerName).toList());
   }
 
   @Test

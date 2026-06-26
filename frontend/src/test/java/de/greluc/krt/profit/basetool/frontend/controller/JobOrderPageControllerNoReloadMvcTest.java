@@ -119,6 +119,7 @@ class JobOrderPageControllerNoReloadMvcTest {
         1,
         "OPEN",
         "MATERIAL",
+        true,
         List.of(),
         List.of(),
         List.of(),
@@ -180,6 +181,51 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isForbidden());
 
     verify(backendApiClient, never()).put(any(String.class), any(), eq(JobOrderDto.class));
+  }
+
+  // REQ-ORDERS-021 / #822: the variant-counting toggle proxy relays to the backend PATCH and
+  // returns
+  // the persisted order so the order-detail JS can patch the @Version and re-render the panel.
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void blueprintVariantCounting_AsLogistician_RelaysAndReturnsOrder() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.patch(
+            eq("/api/v1/orders/" + orderId + "/blueprint-variant-counting"),
+            any(),
+            eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 9L));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/blueprint-variant-counting")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"countBlueprintsWithVariants\":false,\"version\":5}")
+                .with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(9));
+
+    verify(backendApiClient)
+        .patch(
+            eq("/api/v1/orders/" + orderId + "/blueprint-variant-counting"),
+            any(),
+            eq(JobOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void blueprintVariantCounting_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/blueprint-variant-counting")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"countBlueprintsWithVariants\":false,\"version\":5}")
+                .with(csrf()))
+        .andExpect(status().isForbidden());
+
+    verify(backendApiClient, never()).patch(any(String.class), any(), eq(JobOrderDto.class));
   }
 
   @Test

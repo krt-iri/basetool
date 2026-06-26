@@ -89,6 +89,7 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
         null,
         "OPEN",
         "MATERIAL",
+        true,
         List.of(),
         List.of(),
         List.of(),
