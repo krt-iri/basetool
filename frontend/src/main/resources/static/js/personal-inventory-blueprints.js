@@ -222,9 +222,12 @@
                 '</span>';
         } else {
             let html = '';
+            // DS staging chip: the canonical squared .chip (chip--primary), not the bespoke
+            // .krt-bp-chip orange-border box. The inline remove × keeps its i18n accessible name.
+            const removeLabel = esc(i18n().chipRemove || 'Entfernen');
             staged.forEach(function (name, key) {
                 html +=
-                    '<span class="krt-bp-chip" data-key="' +
+                    '<span class="chip chip--primary" data-key="' +
                     esc(key) +
                     '">' +
                     '<span class="krt-bp-chip-name">' +
@@ -233,7 +236,9 @@
                     '<button type="button" class="krt-bp-chip-remove" data-key="' +
                     esc(key) +
                     '"' +
-                    ' aria-label="remove">&times;</button>' +
+                    ' aria-label="' +
+                    removeLabel +
+                    '">&times;</button>' +
                     '</span>';
             });
             stagingListEl.innerHTML = html;
@@ -451,11 +456,21 @@
             let marker = row.querySelector('.master-row-note');
             if (newNote.trim() !== '') {
                 if (!marker) {
+                    // The note pencil lives in the trailing .krt-bp-row-aside cluster (alongside the
+                    // craft badge); find-or-create it and insert the marker before the badge.
+                    let aside = row.querySelector('.krt-bp-row-aside');
+                    if (!aside) {
+                        aside = document.createElement('span');
+                        aside.className = 'krt-bp-row-aside';
+                        row.appendChild(aside);
+                    }
                     marker = document.createElement('span');
                     marker.className = 'master-row-note';
                     marker.setAttribute('aria-hidden', 'true');
-                    marker.textContent = '✎';
-                    row.appendChild(marker);
+                    marker.title = i18n().noteTitle || '';
+                    // Static sprite reference (no user data) — this constant is not an HTML sink.
+                    marker.innerHTML = '<svg class="krt-icon"><use href="#krt-icon-edit"/></svg>';
+                    aside.insertBefore(marker, aside.firstChild);
                 }
             } else if (marker) {
                 marker.remove();

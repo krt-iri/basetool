@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Meine Blueprints: ruhigere, design-konforme Darstellung.** Die Sammlungs-Box nutzt jetzt die dezente HUD-Haarlinie mit Eckmarken statt eines vollen Orange-Rahmens, Formular- und Abschnitts-Beschriftungen sind neutral statt orange, und die Auswahl-Chips beim Hinzufügen verwenden die Standard-Chips des Designsystems. In der Blueprint-Liste sitzt der Notiz-Stift jetzt als sauberes Icon gemeinsam mit dem Craftbarkeits-Badge am rechten Zeilenrand. Reine Optik — keine Funktionsänderung.
+
 ### Fixed
 
 - **Beförderungssystem: Offiziere erscheinen nicht mehr in der Bewertungsmatrix.** Die Member-Liste der Bewertungsverwaltung führt jetzt nur noch die einfachen Mitglieder einer Staffel — Träger der Rollen `OFFICER` und `ADMIN` werden herausgefiltert, da sie die Bewertung durchführen, statt selbst bewertet zu werden (bisher wurden nur Admins ausgeschlossen). Das Beförderungssystem betrachtet damit ausschließlich einfache Staffel-Mitglieder.
