@@ -496,12 +496,13 @@ public class PromotionPageController {
 
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> fetchMembers() {
     try {
-      // Squadron-scoped, admin-free member list. The backend's
+      // Squadron-scoped list of the squadron's simple members. The backend's
       // /api/v1/promotion/evaluations/members endpoint applies the same scope as
       // SquadronScopeService.currentSquadronId() (Officer = own squadron, Admin = focused
-      // squadron or all squadrons) and excludes any user that carries the Admin role —
-      // admins are squadron-less by design and must not appear in any Officer's
-      // Bewertungsverwaltung even when an admin set a squadron context via the switcher.
+      // squadron or all squadrons) and excludes any user that carries the Admin OR the Officer
+      // role (issue #817): admins are squadron-less by design, and officers run the
+      // Bewertungsverwaltung rather than being its subject, so neither belongs in the matrix —
+      // it assesses only the ordinary members of the squadron.
       PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> result =
           backendApiClient.get(
               "/api/v1/promotion/evaluations/members?size=1000",

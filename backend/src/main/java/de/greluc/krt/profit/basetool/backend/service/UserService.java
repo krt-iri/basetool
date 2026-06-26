@@ -735,15 +735,16 @@ public class UserService {
 
   /**
    * Returns paged squadron members eligible to be evaluated in the promotion system, scoped to the
-   * caller's squadron context and excluding admins. An Officer of squadron X sees only members of
-   * squadron X; an Admin in "all squadrons" mode sees every squadron's members; an Admin with the
-   * sidebar switcher focused on a squadron sees that squadron's members. Admins themselves are
-   * never returned — they are squadron-less by design and must not appear in any Officer's
-   * Bewertungsverwaltung. Delegates the filter to {@link
-   * UserRepository#findEvaluatableMembers(UUID, Pageable)}.
+   * caller's squadron context and excluding both admins and officers — the promotion system
+   * assesses only the simple members of a squadron (issue #817). An Officer of squadron X sees only
+   * the ordinary members of squadron X; an Admin in "all squadrons" mode sees every squadron's
+   * ordinary members; an Admin with the sidebar switcher focused on a squadron sees that squadron's
+   * ordinary members. Admins and officers themselves are never returned — admins are squadron-less
+   * by design, and officers run the Bewertungsverwaltung rather than being its subject. Delegates
+   * the filter to {@link UserRepository#findEvaluatableMembers(UUID, Pageable)}.
    *
    * @param pageable page request
-   * @return paged evaluatable members (squadron-scoped, admin-free)
+   * @return paged evaluatable members (squadron-scoped, admin- and officer-free)
    */
   @NotNull
   public Page<User> findEvaluatableMembers(@NotNull Pageable pageable) {
