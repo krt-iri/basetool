@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportService;
@@ -125,6 +126,7 @@ class JobOrderControllerTest {
         1,
         JobOrderStatus.OPEN,
         JobOrderType.MATERIAL,
+        true,
         List.of(),
         List.of(),
         List.of(),
@@ -341,6 +343,23 @@ class JobOrderControllerTest {
 
     assertThat(result).isSameAs(persisted);
     verify(jobOrderService).updateJobOrderPriority(id, 3);
+  }
+
+  // ── PATCH /api/v1/orders/{id}/blueprint-variant-counting ─────────────
+
+  @Test
+  void updateBlueprintVariantCounting_forwardsModeAndVersionToService() {
+    UUID id = UUID.randomUUID();
+    UpdateJobOrderBlueprintCountingDto dto = new UpdateJobOrderBlueprintCountingDto(false, 7L);
+    JobOrderDto persisted = jobOrderDto(id);
+    when(jobOrderService.updateBlueprintVariantCounting(id, false, 7L)).thenReturn(persisted);
+
+    JobOrderDto result = controller.updateBlueprintVariantCounting(id, dto);
+
+    // The controller unboxes the mode + forwards the optimistic-lock version verbatim so the
+    // service can guard a concurrent edit; mirrors the status round-trip above.
+    assertThat(result).isSameAs(persisted);
+    verify(jobOrderService).updateBlueprintVariantCounting(id, false, 7L);
   }
 
   // ── PUT /api/v1/orders/{id} (full update) ────────────────────────────

@@ -42,6 +42,9 @@ import java.util.UUID;
  * @param priority queue priority (null when terminal)
  * @param status lifecycle status
  * @param type order kind ({@code MATERIAL} or {@code ITEM})
+ * @param countBlueprintsWithVariants whether the item-order blueprint-coverage view counts cosmetic
+ *     variants of the ordered items toward availability ({@code true}, family matching) or matches
+ *     blueprints exactly ({@code false}); relevant only to {@code ITEM} orders
  * @param materials material lines (populated for {@code MATERIAL} orders; empty for {@code ITEM})
  * @param items ordered finished-item lines (populated for {@code ITEM} orders; empty for {@code
  *     MATERIAL})
@@ -64,6 +67,7 @@ public record JobOrderDto(
     Integer priority,
     JobOrderStatus status,
     JobOrderType type,
+    boolean countBlueprintsWithVariants,
     List<JobOrderMaterialDto> materials,
     List<JobOrderItemDto> items,
     List<AggregatedMaterialDto> aggregatedMaterials,

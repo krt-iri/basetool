@@ -133,6 +133,7 @@ class JobOrderListRenderTest {
             1,
             "OPEN",
             "ITEM",
+            true,
             List.of(),
             List.of(item),
             List.of(new AggregatedMaterialDto(quantanium, "NONE", 10.0, 4.0, List.of(), null)),

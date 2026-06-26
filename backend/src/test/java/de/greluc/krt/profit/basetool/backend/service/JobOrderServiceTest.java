@@ -184,6 +184,7 @@ class JobOrderServiceTest {
             1,
             JobOrderStatus.OPEN,
             JobOrderType.MATERIAL,
+            true,
             List.of(jomDto),
             List.of(),
             List.of(),
@@ -1400,6 +1401,7 @@ class JobOrderServiceTest {
               1,
               JobOrderStatus.OPEN,
               JobOrderType.ITEM,
+              true,
               List.of(),
               List.of(),
               List.of(),
@@ -1433,6 +1435,125 @@ class JobOrderServiceTest {
           4.0,
           result.aggregatedMaterials().get(0).currentStock(),
           "GOOD bucket sums order-linked inventory at the 650 floor as collection progress");
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // updateBlueprintVariantCounting — REQ-ORDERS-021 / #822
+  // ---------------------------------------------------------------
+
+  @org.junit.jupiter.api.Nested
+  class UpdateBlueprintVariantCountingTests {
+
+    private JobOrder itemOrder(boolean countWithVariants, Long version) {
+      JobOrder order = new JobOrder();
+      order.setId(orderId);
+      order.setType(JobOrderType.ITEM);
+      order.setStatus(JobOrderStatus.OPEN);
+      order.setCountBlueprintsWithVariants(countWithVariants);
+      order.setVersion(version);
+      return order;
+    }
+
+    /** mapToDtoWithStock runs on the return path; stub the ITEM enrichment + mapper to no-ops. */
+    private void stubItemMapping() {
+      lenient().when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
+      lenient().when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
+      lenient()
+          .when(jobOrderMapper.toDto(any(JobOrder.class)))
+          .thenAnswer(
+              inv -> {
+                JobOrder o = inv.getArgument(0);
+                return new JobOrderDto(
+                    o.getId(),
+                    1,
+                    null,
+                    null,
+                    null,
+                    null,
+                    1,
+                    JobOrderStatus.OPEN,
+                    JobOrderType.ITEM,
+                    o.isCountBlueprintsWithVariants(),
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    Instant.now(),
+                    o.getVersion());
+              });
+    }
+
+    @Test
+    void notFound_throws() {
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.empty());
+
+      assertThrows(
+          NotFoundException.class,
+          () -> jobOrderService.updateBlueprintVariantCounting(orderId, false, 1L));
+    }
+
+    @Test
+    void nonItemOrder_throwsBadRequest() {
+      JobOrder material = new JobOrder();
+      material.setId(orderId);
+      material.setType(JobOrderType.MATERIAL);
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(material));
+
+      assertThrows(
+          BadRequestException.class,
+          () -> jobOrderService.updateBlueprintVariantCounting(orderId, false, null));
+      verify(jobOrderRepository, never()).saveAndFlush(any());
+      verify(auditService, never()).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void versionMismatch_throwsOptimisticLockingFailure() {
+      JobOrder order = itemOrder(true, 5L);
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+
+      assertThrows(
+          org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+          () -> jobOrderService.updateBlueprintVariantCounting(orderId, false, 99L));
+      verify(jobOrderRepository, never()).saveAndFlush(any());
+      verify(auditService, never()).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void togglesFlagOff_persistsAndAuditsWithBooleanDetailsOnly() {
+      JobOrder order = itemOrder(true, 1L);
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+      when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
+      stubItemMapping();
+
+      JobOrderDto result = jobOrderService.updateBlueprintVariantCounting(orderId, false, 1L);
+
+      assertFalse(order.isCountBlueprintsWithVariants(), "the entity flag is flipped to off");
+      assertFalse(result.countBlueprintsWithVariants(), "the returned DTO reflects the new mode");
+      verify(jobOrderRepository).saveAndFlush(order);
+      verify(auditService)
+          .record(
+              eq(
+                  de.greluc.krt.profit.basetool.backend.model.AuditEventType
+                      .JOB_ORDER_BLUEPRINT_COUNTING_CHANGED),
+              eq(orderId),
+              any(),
+              any(),
+              eq("countWithVariants=false"));
+    }
+
+    @Test
+    void noOp_whenModeUnchanged_doesNotSaveOrAudit() {
+      JobOrder order = itemOrder(true, 1L);
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+      stubItemMapping();
+
+      jobOrderService.updateBlueprintVariantCounting(orderId, true, 1L);
+
+      verify(jobOrderRepository, never()).saveAndFlush(any());
+      verify(auditService, never()).record(any(), any(), any(), any(), any());
     }
   }
 }
