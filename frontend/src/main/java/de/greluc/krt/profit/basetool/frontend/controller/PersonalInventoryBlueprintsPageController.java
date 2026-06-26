@@ -73,8 +73,19 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class PersonalInventoryBlueprintsPageController {
 
-  /** Page size for the owned-blueprint list — modest, one row per product. */
-  private static final int PAGE_SIZE = 200;
+  /**
+   * Per-request page size used while pulling the caller's <em>complete</em> owned-blueprint set
+   * page by page (issue #823). One row per product, so a generous chunk keeps the common case to a
+   * single round-trip while still bounding each backend query.
+   */
+  private static final int FETCH_PAGE_SIZE = 500;
+
+  /**
+   * Hard upper bound on the number of pages assembled into the full owned set, a safety net against
+   * an unbounded loop should the backend ever report an inconsistent page count. At {@link
+   * #FETCH_PAGE_SIZE} per page this matches the backend's own {@code size} clamp ({@code 100000}).
+   */
+  private static final int MAX_PAGES = 200;
 
   private final BackendApiClient backendApiClient;
 
@@ -95,9 +106,7 @@ public class PersonalInventoryBlueprintsPageController {
       @RequestParam(required = false) String fragment,
       Model model) {
     model.addAttribute("filterQuery", q == null ? "" : q);
-    PageResponse<PersonalBlueprintDto> blueprints = fetchOwned(q);
-    model.addAttribute(
-        "blueprints", blueprints != null ? blueprints.content() : Collections.emptyList());
+    model.addAttribute("blueprints", fetchAllOwned(q));
     if (fragment != null && "list".equalsIgnoreCase(fragment)) {
       return "personal-inventory-blueprints :: blueprintList";
     }
@@ -369,26 +378,59 @@ public class PersonalInventoryBlueprintsPageController {
   }
 
   /**
-   * Fetches the caller's owned blueprints, optionally filtered by a product-name substring, sorted
-   * alphabetically by product name. A backend failure collapses to an empty page rather than a 500.
+   * Fetches the caller's <em>complete</em> owned-blueprint set — every page, not a capped first
+   * page — so the "Meine Blueprints" list shows all blueprints, the facts subtitle and the tab
+   * count are accurate, and the client-side filter searches the whole set (issue #823). Pages are
+   * pulled in {@link #FETCH_PAGE_SIZE}-sized chunks and concatenated until the last page. A backend
+   * failure collapses to whatever was gathered so far (empty on the first call) rather than a 500.
+   * Heavy per-row work (recipe + craftability) stays lazy / bulk-async on the client, so loading
+   * the full list never blocks the page render.
    *
-   * @param q optional case-insensitive product-name filter
-   * @return the owned-blueprint page, or an empty page on failure
+   * @param q optional case-insensitive product-name filter applied server-side
+   * @return the caller's owned blueprints across all pages, alphabetically by product name
    */
-  private PageResponse<PersonalBlueprintDto> fetchOwned(String q) {
+  @NotNull
+  private List<PersonalBlueprintDto> fetchAllOwned(String q) {
+    List<PersonalBlueprintDto> all = new ArrayList<>();
     try {
-      StringBuilder uri =
-          new StringBuilder("/api/v1/personal-blueprints?size=")
-              .append(PAGE_SIZE)
-              .append("&sort=productName,asc");
-      if (q != null && !q.isBlank()) {
-        uri.append("&q=").append(URLEncoder.encode(q, StandardCharsets.UTF_8));
+      int page = 0;
+      while (page < MAX_PAGES) {
+        PageResponse<PersonalBlueprintDto> response = fetchOwnedPage(q, page);
+        if (response == null || response.content() == null || response.content().isEmpty()) {
+          break;
+        }
+        all.addAll(response.content());
+        if (page + 1 >= response.totalPages()) {
+          break;
+        }
+        page++;
       }
-      return backendApiClient.get(uri.toString(), new ParameterizedTypeReference<>() {});
     } catch (Exception e) {
       log.error("Failed to fetch owned blueprints", e);
-      return new PageResponse<>(new ArrayList<>(), 0, PAGE_SIZE, 0, 0, List.of());
     }
+    return all;
+  }
+
+  /**
+   * Fetches one page of the caller's owned blueprints (the backend derives the owner from the
+   * relayed JWT, never the request), sorted alphabetically by product name and optionally filtered
+   * by a case-insensitive product-name substring.
+   *
+   * @param q optional case-insensitive product-name filter
+   * @param page zero-based page index
+   * @return the requested page of owned blueprints
+   */
+  private PageResponse<PersonalBlueprintDto> fetchOwnedPage(String q, int page) {
+    StringBuilder uri =
+        new StringBuilder("/api/v1/personal-blueprints?size=")
+            .append(FETCH_PAGE_SIZE)
+            .append("&page=")
+            .append(page)
+            .append("&sort=productName,asc");
+    if (q != null && !q.isBlank()) {
+      uri.append("&q=").append(URLEncoder.encode(q, StandardCharsets.UTF_8));
+    }
+    return backendApiClient.get(uri.toString(), new ParameterizedTypeReference<>() {});
   }
 
   /**

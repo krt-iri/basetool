@@ -103,6 +103,53 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
 
   @Test
   @WithMockUser
+  void view_loadsEveryPage_whenOwnedSetExceedsOnePage() throws Exception {
+    // covers REQ-INV-008 / issue #823 — the list must show the caller's COMPLETE owned set, not a
+    // capped first page. The controller pages through the backend until the last page, so a user
+    // with more blueprints than one fetch chunk still sees (and can search/count) all of them.
+    PersonalBlueprintDto first =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "arclight pistol",
+            "Arclight Pistol",
+            null,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            null,
+            true,
+            0L,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-01T00:00:00Z"));
+    PersonalBlueprintDto second =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "demeco lmg",
+            "Demeco LMG",
+            null,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            null,
+            true,
+            0L,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-01T00:00:00Z"));
+    // Two pages of one entry each (totalPages = 2): the controller must request both and
+    // concatenate.
+    PageResponse<PersonalBlueprintDto> page0 =
+        new PageResponse<>(List.of(first), 0, 500, 2, 2, List.of());
+    PageResponse<PersonalBlueprintDto> page1 =
+        new PageResponse<>(List.of(second), 1, 500, 2, 2, List.of());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(page0, page1);
+
+    mockMvc
+        .perform(get("/personal-inventory/blueprints"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("blueprints", org.hamcrest.Matchers.hasSize(2)))
+        .andExpect(content().string(containsString("Arclight Pistol")))
+        .andExpect(content().string(containsString("Demeco LMG")));
+  }
+
+  @Test
+  @WithMockUser
   void view_fragmentList_rendersOnlyTheCollectionCardFragment() throws Exception {
     // The in-place swap target: GET /personal-inventory/blueprints?fragment=list returns just the
     // blueprintList fragment (the master/detail card) and NOT the surrounding page chrome (the add
