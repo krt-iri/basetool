@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.mapper.MemberEvaluationMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.MemberEvaluation;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
@@ -59,6 +60,8 @@ class MemberEvaluationServiceTest {
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @Mock private AuthHelperService authHelperService;
+
+  @Mock private AuditService auditService;
 
   /**
    * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
@@ -147,6 +150,66 @@ class MemberEvaluationServiceTest {
     // Then
     assertEquals(PromotionLevel.LEVEL_B, result.assignedLevel());
     verify(repository).save(any(MemberEvaluation.class));
+    // A brand-new (user, category) grading records a CREATED event; the unparseable test sub and
+    // the id-less fixture category leave target + subject id null.
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_EVALUATION_CREATED),
+            isNull(),
+            eq("Flug Kenntnisse"),
+            isNull(),
+            eq("level=LEVEL_B"));
+  }
+
+  @Test
+  void upsert_shouldRecordUpdated_whenExistingEvaluationVersionMatches() {
+    // Given: an existing grading for a member with a parseable sub; the version matches so the
+    // upsert overwrites the level and records an UPDATED event carrying the member as target.
+    String userId = UUID.randomUUID().toString();
+    UUID categoryId = UUID.randomUUID();
+    UUID evalId = UUID.randomUUID();
+    PromotionCategory category =
+        PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
+    MemberEvaluation existing =
+        MemberEvaluation.builder()
+            .userId(userId)
+            .category(category)
+            .assignedLevel(PromotionLevel.LEVEL_A)
+            .build();
+    existing.setId(evalId);
+    existing.setVersion(2L);
+    MemberEvaluationUpdateRequest request =
+        new MemberEvaluationUpdateRequest(2L, PromotionLevel.LEVEL_B);
+    MemberEvaluationResponse response =
+        new MemberEvaluationResponse(
+            evalId,
+            3L,
+            userId,
+            categoryId,
+            "Flug Kenntnisse",
+            UUID.randomUUID(),
+            "Grundlagen",
+            PromotionLevel.LEVEL_B,
+            null,
+            null);
+    when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+    when(repository.findByUserIdAndCategoryId(userId, categoryId))
+        .thenReturn(Optional.of(existing));
+    when(authHelperService.isAdmin()).thenReturn(true);
+    when(repository.save(existing)).thenReturn(existing);
+    when(mapper.toResponse(existing)).thenReturn(response);
+
+    // When
+    service.upsert(userId, categoryId, request);
+
+    // Then
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_EVALUATION_UPDATED),
+            isNull(),
+            eq("Flug Kenntnisse"),
+            eq(UUID.fromString(userId)),
+            eq("level=LEVEL_B"));
   }
 
   @Test
@@ -279,5 +342,7 @@ class MemberEvaluationServiceTest {
 
     // Then
     verify(repository).delete(entity);
+    verify(auditService)
+        .record(eq(AuditEventType.PROMOTION_EVALUATION_DELETED), any(), any(), any(), isNull());
   }
 }

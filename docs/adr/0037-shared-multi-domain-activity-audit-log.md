@@ -46,7 +46,10 @@ layer through a shared `AuditLogPdfFormat` renderer; the bank export feeds the s
 
 - One migration (V179), one entity/service/repository/mapper/DTO and one controller serve all four
   new areas; adding a fifth area is an enum addition, not a new table. The unified viewer and the
-  "switch which log you see" + "export the selected log" requirements fall out naturally.
+  "switch which log you see" + "export the selected log" requirements fall out naturally. *(Borne
+  out since: Missionen, Operationen, Rollen & Mitglieder (epic #800) and Beförderung (the promotion
+  catalogue + member gradings) were each added as a pure `AuditDomain` / `AuditEventType` enum
+  extension — no new table, no viewer rewrite — for nine logs total incl. the bank's.)*
 - The audit table is **business data**, admin-only, insert-only; the log-stream PII rule
   (`observability.md`) is unaffected and user free text never enters the details payload.
 - The `audit_event` table grows unbounded (no retention) and the scheduled UEX sync writes a summary

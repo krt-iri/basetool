@@ -18,7 +18,8 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
   `REQ-<AREA>-NNN` or adapt the existing one(s) it touches. Code and spec move together; a
   behaviour change with no matching spec change is incomplete.
 - **Every change to an audited area keeps its audit log in sync** — the audited areas (Bank,
-  Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen) log **every** state-mutating
+  Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen, Rollen, Beförderung) log
+  **every** state-mutating
   activity (REQ-AUDIT-001, [`docs/specs/audit.md`](docs/specs/audit.md)). When you add, change or
   remove such an activity, adapt its audit logging in the **same PR**: add or adjust the
   `AuditEventType` and the `auditService.record(...)` call (honouring the optimistic-locking

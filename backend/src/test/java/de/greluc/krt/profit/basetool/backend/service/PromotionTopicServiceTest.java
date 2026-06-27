@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionTopicMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateRequest;
@@ -49,6 +50,8 @@ class PromotionTopicServiceTest {
   @Mock private PromotionTopicMapper mapper;
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private AuditService auditService;
 
   @InjectMocks private PromotionTopicService service;
 
@@ -130,6 +133,13 @@ class PromotionTopicServiceTest {
     // Then
     assertEquals("Grundlagen", result.name());
     verify(repository).save(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_TOPIC_CREATED),
+            any(),
+            eq("Grundlagen"),
+            isNull(),
+            isNull());
   }
 
   @Test
@@ -166,6 +176,8 @@ class PromotionTopicServiceTest {
     // Then
     assertEquals("Grundlagen neu", result.name());
     verify(mapper).updateEntity(entity, request);
+    verify(auditService)
+        .record(eq(AuditEventType.PROMOTION_TOPIC_UPDATED), any(), any(), isNull(), isNull());
   }
 
   @Test
@@ -180,5 +192,12 @@ class PromotionTopicServiceTest {
 
     // Then
     verify(repository).delete(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_TOPIC_DELETED),
+            eq(id),
+            eq("Grundlagen"),
+            isNull(),
+            isNull());
   }
 }

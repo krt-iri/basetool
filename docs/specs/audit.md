@@ -8,14 +8,15 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 ## Context
 
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
-guarantee is extended to seven more areas — **Lagerverwaltung** (`InventoryItem`),
+guarantee is extended to eight more areas — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
-Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`) and
-**Rollen & Mitglieder** (`org_unit_membership`, epic #800). Every activity in each area is captured
-into a separate, admin-only log; all eight logs (the seven here plus the bank's) are read on one page
-with a tab switcher, and each can be exported as a PDF or JSON for a chosen period.
+Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`),
+**Rollen & Mitglieder** (`org_unit_membership`, epic #800) and **Beförderung** (the promotion
+catalogue + member gradings). Every activity in each area is captured into a separate, admin-only
+log; all nine logs (the eight here plus the bank's) are read on one page with a tab switcher, and
+each can be exported as a PDF or JSON for a chosen period.
 
-The seven new areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
+The eight new areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
 bank keeps its own `bank_audit_event` table (it has bank-specific reference columns and shipped
 first). The storage choice and the unified-viewer architecture are recorded in
 [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -24,7 +25,7 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
-Every state-mutating activity in the seven areas writes exactly **one** row to an **append-only**
+Every state-mutating activity in the eight areas writes exactly **one** row to an **append-only**
 audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated; the
 sole deletion path is the explicit admin retention purge, REQ-AUDIT-004) **in the same transaction
 as the business write**. An audit-insert failure rolls the mutation back, so the trail has **no
@@ -65,6 +66,15 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   payload carries only the rank/kind enum names, the two flag booleans and the squadron label —
   never a user handle or free text (the group name is a non-personal structure label, like an order
   title).
+- **Beförderung** (`PromotionTopic` / `PromotionCategory` / `PromotionLevelContent` /
+  `RankRequirement` / `MemberEvaluation`) — every promotion-catalogue and member-grading mutation:
+  topic create / edit / delete; category create / edit / delete; level-content create / edit /
+  delete; rank-requirement create / edit / delete; and member-evaluation create / change / delete.
+  For catalogue events the subject is the mutated entity (its non-personal title / name / rank-step
+  label, e.g. `20->19`); for an evaluation the subject is the **graded category** (its
+  `topic / category` label) and the **evaluated member** is the target reference. The details
+  payload carries only the assigned `PromotionLevel` enum (evaluations) or the minimum level + count
+  (rank requirements) — never a user handle, a member name or the free-text rubric description.
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User
@@ -95,11 +105,11 @@ per-domain emission assertions in the service tests · **Code:** `service/AuditS
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
-All eight logs are read on **one** admin page (`/admin/audit-log`) with an **eight-way tab switcher**
-(Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen · Rollen) built from
-the design-system `.tab-nav` component. The bank tab reads the existing `/api/v1/bank/admin/audit`
-endpoint; the seven area tabs read `/api/v1/audit/{domain}`; both DTO shapes are adapted into one
-uniform row view so a single
+All nine logs are read on **one** admin page (`/admin/audit-log`) with a **nine-way tab switcher**
+(Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen · Rollen ·
+Beförderung) built from the design-system `.tab-nav` component. The bank tab reads the existing
+`/api/v1/bank/admin/audit` endpoint; the eight area tabs read `/api/v1/audit/{domain}`; both DTO
+shapes are adapted into one uniform row view so a single
 template renders every tab. Each tab is paginated and filterable by **period** (the
 `datetime-split-group` picker), **actor** and **event type** (the per-area type list). Filtering and
 paging swap **in place** (`krtFetch`, the epic #571 pattern); the legacy `/admin/bank-audit` URL
@@ -107,7 +117,7 @@ redirects here with the bank tab preselected.
 
 **Acceptance**
 
-- [ ] An admin sees eight tabs; switching a tab loads that area's log; filtering/paging stays in place.
+- [ ] An admin sees nine tabs; switching a tab loads that area's log; filtering/paging stays in place.
 - [ ] `/admin/bank-audit` redirects to `/admin/audit-log?domain=BANK`.
 
 **Enforced by:** `AdminAuditLogPageControllerTest`, `AuditLogE2eTest` · **Code:**

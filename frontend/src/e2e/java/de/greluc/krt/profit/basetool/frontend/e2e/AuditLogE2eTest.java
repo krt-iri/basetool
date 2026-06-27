@@ -38,7 +38,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 /**
  * Unified admin audit-log viewer end to end (REQ-AUDIT-001/-002, ADR-0037): a bank mutation writes
  * a bank audit row, and the unified {@code /admin/audit-log} viewer lists it under the Bank tab,
- * filters by event type in place, switches between the seven area tabs, and the legacy {@code
+ * filters by event type in place, switches between the eight area tabs, and the legacy {@code
  * /admin/bank-audit} URL redirects in. The viewer is admin-only — the permission carve-out itself
  * is covered by {@link BankPermissionsE2eTest}.
  */

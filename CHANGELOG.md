@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Beförderung: Alle Änderungen am Beförderungssystem stehen jetzt im Audit-Log.** Anlegen, Bearbeiten und Löschen von Beförderungs-Themen, -Kategorien, Stufeninhalten und Ranganforderungen sowie das Setzen und Entfernen von Mitglieder-Bewertungen erscheinen als eigener Reiter „Beförderung" im Aktivitätsprotokoll (Admin → Audit-Logs) — inklusive Zeitraum-Export (PDF/JSON) und Aufbewahrungs-Bereinigung wie die übrigen Bereiche.
+
 ### Changed
 
 - **Mitgliederverwaltung: bis zu zwei Staffeln je Mitglied.** In den Mitglied-Details lassen sich jetzt zwei Staffeln zuweisen statt nur einer, jede mit eigenen Logistiker-/Missions-Manager-Rollen; das Speichern gleicht die Staffelmitgliedschaften in einem Schritt ab (Hinzufügen, Entfernen, Rollen). Die Logistiker-/Missions-Manager-Schalter in der Mitgliederliste entfallen — diese Rollen werden nun je Staffel in den Mitglied-Details gepflegt; die Staffel-Spalte zeigt beide Staffeln.

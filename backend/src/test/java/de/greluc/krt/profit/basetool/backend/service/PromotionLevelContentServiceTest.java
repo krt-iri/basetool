@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionLevelContentMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevelContent;
@@ -55,6 +56,8 @@ class PromotionLevelContentServiceTest {
   @Mock private PromotionLevelContentMapper mapper;
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private AuditService auditService;
 
   /**
    * Default-on the per-squadron promotion-feature flag so the existing fixtures that exercise the
@@ -176,6 +179,13 @@ class PromotionLevelContentServiceTest {
     // Then
     assertEquals(PromotionLevel.LEVEL_A, result.level());
     verify(repository).save(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_LEVEL_CONTENT_CREATED),
+            any(),
+            eq("Flug Kenntnisse / LEVEL_A"),
+            isNull(),
+            isNull());
   }
 
   /**
@@ -223,6 +233,13 @@ class PromotionLevelContentServiceTest {
     // Then: the flushed entity is what gets mapped, and a plain save never happens.
     verify(repository).saveAndFlush(entity);
     verify(repository, never()).save(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_LEVEL_CONTENT_UPDATED),
+            any(),
+            eq("Flug Kenntnisse / LEVEL_A"),
+            isNull(),
+            isNull());
   }
 
   @Test
@@ -238,6 +255,13 @@ class PromotionLevelContentServiceTest {
 
     // Then
     verify(repository).delete(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_LEVEL_CONTENT_DELETED),
+            eq(id),
+            eq("LEVEL_B"),
+            isNull(),
+            isNull());
   }
 
   @Test
