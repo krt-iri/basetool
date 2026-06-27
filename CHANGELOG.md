@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Keycloak auf 26.6.4 angehoben (Sicherheitspatch).** Der Anmeldedienst (Keycloak) wird vom Patch 26.6.3 auf 26.6.4 aktualisiert — ein reines Patch-Release mit mehreren Sicherheitskorrekturen (u. a. Authentifizierungs-Bypass und Rechte-Eskalation) und einem Quarkus-Update; keine Funktions- oder Konfigurationsänderung. Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.6`-Digest) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Beim nächsten Deploy lädt Compose das neue Image-Digest; der Keycloak-Container muss dafür neu gestartet werden.
+
 - **Meine Blueprints: ruhigere, design-konforme Darstellung.** Die Sammlungs-Box nutzt jetzt die dezente HUD-Haarlinie mit Eckmarken statt eines vollen Orange-Rahmens, Formular- und Abschnitts-Beschriftungen sind neutral statt orange, und die Auswahl-Chips beim Hinzufügen verwenden die Standard-Chips des Designsystems. In der Blueprint-Liste sitzt der Notiz-Stift jetzt als sauberes Icon gemeinsam mit dem Craftbarkeits-Badge am rechten Zeilenrand. Reine Optik — keine Funktionsänderung.
 
 - **Admin-Seite „Fremde Blueprints" im einheitlichen Design.** Die Admin-Verwaltung der Blueprints anderer Mitglieder nutzt jetzt dieselben Design-System-Komponenten wie die Mitglieder-Seite: die DS-Tabelle, den KRT-Modalrahmen für Notiz bearbeiten, Entfernen-Bestätigung und JSON-Import (Icon-Schließen mit Beschriftung, Esc, eine hervorgehobene Aktion), die DS-Chips für die Auswahl sowie einen flachen Admin-Banner ohne Verlauf. Funktion, Berechtigungen, Live-Aktualisierung und Übersetzungen bleiben unverändert.
