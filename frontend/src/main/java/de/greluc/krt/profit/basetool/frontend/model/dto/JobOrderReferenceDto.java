@@ -25,13 +25,16 @@ import java.util.UUID;
 /**
  * Frontend mirror of the backend {@code JobOrderReferenceDto}. {@code requiredMaterialIds} carries
  * the order's distinct required material ids across both order kinds (ITEM-derived included) so the
- * Lager "Auftrag" dropdown can hide an order that does not require a row's material
- * (REQ-ORDERS-018); {@code materials} stays the MATERIAL-order lines (empty for ITEM orders).
+ * Lager "Auftrag" dropdown and the refinery-order store "Auftrag" dropdown can hide an order that
+ * does not require a row's material (REQ-ORDERS-018); {@code materials} stays the MATERIAL-order
+ * lines (empty for ITEM orders). {@code requestingOrgUnit} labels the refinery store picker option
+ * with the order's customer org unit (may be {@code null} on pre-rework rows).
  */
 public record JobOrderReferenceDto(
     UUID id,
     Integer displayId,
     String handle,
     String status,
+    SquadronReferenceDto requestingOrgUnit,
     List<JobOrderMaterialDto> materials,
     List<UUID> requiredMaterialIds) {}

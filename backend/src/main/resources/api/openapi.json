@@ -54544,6 +54544,9 @@
             "type" : "string",
             "enum" : [ "OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED" ]
           },
+          "requestingOrgUnit" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
           "materials" : {
             "type" : "array",
             "items" : {
